@@ -14,8 +14,6 @@ cargo test --release --test cli_dog -- --test-threads=1 || ((exit++))
 cargo test --release --test cli_files -- --test-threads=1 || ((exit++))
 cargo test --release --test cli_files_get -- --test-threads=1 || ((exit++))
 cargo test --release --test cli_keys || ((exit++))
-# TODO: we run NRS tests single threaded since Safe doesn't support
-# concurrent reads to config file.
 cargo test --release --test cli_nrs -- --test-threads=1 || ((exit++))
 
 exit $exit

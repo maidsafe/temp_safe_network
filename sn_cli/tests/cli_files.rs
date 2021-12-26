@@ -19,7 +19,7 @@ use sn_cmd_test_utilities::util::{
     safeurl_from, test_symlinks_are_valid, upload_path, upload_test_symlinks_folder,
     upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
 };
-use std::{process::Command, str::FromStr};
+use std::{path::Path, process::Command, str::FromStr};
 
 const PRETTY_FILES_CREATION_RESPONSE: &str = "FilesContainer created at: ";
 const TEST_FILE: &str = "../resources/testdata/test.md";
@@ -71,11 +71,16 @@ fn calling_safe_files_put_dry_run() -> Result<()> {
         Some(0),
     )?;
 
-    let (_container_xorurl, map) = parse_files_put_or_sync_output(&content)?;
+    let (_, processed_files) = parse_files_put_or_sync_output(&content)?;
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["cat", &map[TEST_FILE_RANDOM_CONTENT].1])
-        .assert()
-        .failure();
+    cmd.args(&vec![
+        "cat",
+        processed_files[Path::new(TEST_FILE_RANDOM_CONTENT)]
+            .link()
+            .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
+    ])
+    .assert()
+    .failure();
     Ok(())
 }
 
@@ -84,7 +89,7 @@ fn calling_safe_files_put_recursive() -> Result<()> {
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["files", "put", TEST_FOLDER, "--recursive", "--json"])
         .assert()
-        .stdout(predicate::str::contains(r#"+"#).count(12))
+        .stdout(predicate::str::contains(r#"Added"#).count(12))
         .stdout(predicate::str::contains("../resources/testdata/test.md").count(1))
         .stdout(predicate::str::contains("../resources/testdata/another.md").count(1))
         .stdout(predicate::str::contains("../resources/testdata/subfolder/subexists.md").count(1))
@@ -281,11 +286,16 @@ fn calling_safe_files_sync_dry_run() -> Result<()> {
         ],
         Some(0),
     )?;
-    let (_, map) = parse_files_put_or_sync_output(&sync_content)?;
+    let (_, processed_files) = parse_files_put_or_sync_output(&sync_content)?;
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
-    cmd.args(&vec!["cat", &map[TEST_FILE_RANDOM_CONTENT].1])
-        .assert()
-        .failure();
+    cmd.args(&vec![
+        "cat",
+        processed_files[Path::new(TEST_FILE_RANDOM_CONTENT)]
+            .link()
+            .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
+    ])
+    .assert()
+    .failure();
     Ok(())
 }
 
@@ -475,7 +485,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
         ],
         Some(0),
     )?;
-    let (nrs_xorurl, _files_map) = parse_nrs_register_output(&output)?;
+    let (nrs_xorurl, _) = parse_nrs_register_output(&output)?;
     let nrs_version = nrs_xorurl
         .content_version()
         .ok_or_else(|| eyre!("failed to get content version from xorurl"))?;
@@ -644,15 +654,11 @@ fn calling_safe_files_add_a_url() -> Result<()> {
     let mut safeurl = safeurl_from(&files_container_xor)?;
     safeurl.set_content_version(None);
     safeurl.set_path("/new_test.md");
-    println!("data type: {}", safeurl.data_type());
+    let link = processed_files[Path::new(TEST_FILE)]
+        .link()
+        .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?;
     safe_cmd(
-        [
-            "files",
-            "add",
-            &processed_files[TEST_FILE].1,
-            &safeurl.to_string(),
-            "--json",
-        ],
+        ["files", "add", link, &safeurl.to_string(), "--json"],
         Some(0),
     )?;
 
@@ -696,20 +702,20 @@ fn calling_files_ls() -> Result<()> {
     assert_eq!(xorurl, container_xorurl_no_version);
     assert_eq!(files_map.len(), 8);
     assert_eq!(
-        files_map[".hidden.txt"]["link"],
-        processed_files[&format!("{}.hidden.txt", TEST_FOLDER)].1
+        processed_files[Path::new(&format!("{}.hidden.txt", TEST_FOLDER))].link(),
+        Some(&files_map[".hidden.txt"]["link"]),
     );
     assert_eq!(
-        files_map["another.md"]["link"],
-        processed_files[&format!("{}another.md", TEST_FOLDER)].1
+        processed_files[Path::new(&format!("{}another.md", TEST_FOLDER))].link(),
+        Some(&files_map["another.md"]["link"]),
     );
     assert_eq!(
-        files_map["noextension"]["link"],
-        processed_files[&format!("{}noextension", TEST_FOLDER)].1
+        processed_files[Path::new(&format!("{}noextension", TEST_FOLDER))].link(),
+        Some(&files_map["noextension"]["link"]),
     );
     assert_eq!(
-        files_map["test.md"]["link"],
-        processed_files[&format!("{}test.md", TEST_FOLDER)].1
+        processed_files[Path::new(&format!("{}test.md", TEST_FOLDER))].link(),
+        Some(&files_map["test.md"]["link"]),
     );
 
     let subfolder_len = get_directory_len(TEST_FOLDER_SUBFOLDER)?;
@@ -724,15 +730,15 @@ fn calling_files_ls() -> Result<()> {
     assert_eq!(xorurl, subfolder_path);
     assert_eq!(files_map.len(), 2);
     assert_eq!(
-        files_map["sub2.md"]["link"],
-        processed_files[&format!("{}sub2.md", TEST_FOLDER_SUBFOLDER)].1
+        processed_files[Path::new(&format!("{}sub2.md", TEST_FOLDER_SUBFOLDER))].link(),
+        Some(&files_map["sub2.md"]["link"]),
     );
 
     let sub2_len = get_file_len(&format!("{}/{}", TEST_FOLDER_SUBFOLDER, "sub2.md"))?;
     assert_eq!(files_map["sub2.md"]["size"], sub2_len.to_string());
     assert_eq!(
-        files_map["subexists.md"]["link"],
-        processed_files[&format!("{}subexists.md", TEST_FOLDER_SUBFOLDER)].1
+        processed_files[Path::new(&format!("{}subexists.md", TEST_FOLDER_SUBFOLDER))].link(),
+        Some(&files_map["subexists.md"]["link"]),
     );
 
     let subexists_len = get_file_len(&format!("{}/{}", TEST_FOLDER_SUBFOLDER, "subexists.md"))?;

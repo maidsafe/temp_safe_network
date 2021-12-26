@@ -17,24 +17,28 @@ use crate::{
     Safe, SafeUrl, Scope, XorUrl,
 };
 use bytes::{Buf, Bytes};
-use file_system::{file_system_dir_walk, file_system_single_file, normalise_path_separator};
+use file_system::{
+    file_system_dir_walk, file_system_single_file, normalise_path_separator, upload_file_to_net,
+};
 use files_map::add_or_update_file_item;
 use log::{debug, info, warn};
 use relative_path::RelativePath;
 use safe_network::types::BytesAddress;
-use std::collections::{BTreeMap, HashSet};
-use std::iter::FromIterator;
-use std::str;
-use std::{fs, path::Path};
+use std::{
+    collections::{BTreeMap, HashSet},
+    iter::FromIterator,
+    path::{Path, PathBuf},
+    str,
+};
 
 pub(crate) use files_map::{file_map_for_path, get_file_link_and_metadata};
 pub(crate) use metadata::FileMeta;
 pub(crate) use realpath::RealPath;
 
-pub use files_map::{FileInfo, FilesMap, GetAttr};
+pub use files_map::{FileInfo, FilesMap, FilesMapChange, GetAttr};
 
-// List of files uploaded with details if they were added, updated or deleted from FilesContainer
-pub type ProcessedFiles = BTreeMap<String, (String, String)>;
+// List of files uploaded with details if they were added, updated or removed from FilesContainer
+pub type ProcessedFiles = BTreeMap<PathBuf, FilesMapChange>;
 
 const ERROR_MSG_NO_FILES_CONTAINER_FOUND: &str = "No FilesContainer found at this address";
 // Type tag to use for the FilesContainer stored on Register
@@ -58,7 +62,7 @@ impl Safe {
     pub async fn files_container_create(
         &mut self,
         location: Option<&str>,
-        dest: Option<&str>,
+        dest: Option<&Path>,
         recursive: bool,
         follow_links: bool,
         dry_run: bool,
@@ -89,23 +93,26 @@ impl Safe {
         // Build a Register creation operation
         let (xorname, reg_op) = self
             .safe_client
-            .create_register(None, FILES_CONTAINER_TYPE_TAG, None, false)
+            .create_register(None, FILES_CONTAINER_TYPE_TAG, None, false, dry_run)
             .await?;
 
-        let xorurl = if !dry_run {
+        let xorurl = SafeUrl::encode_register(
+            xorname,
+            FILES_CONTAINER_TYPE_TAG,
+            Scope::Public,
+            ContentType::FilesContainer,
+            self.xorurl_base,
+        )?;
+
+        if dry_run {
+            Ok((xorurl.to_string(), processed_files, files_map))
+        } else {
             // Send the Register creation op to the network
             self.safe_client.apply_register_ops(reg_op).await?;
 
             // Store files map on network
             let files_map_xorurl = self.store_files_map(&files_map).await?;
 
-            let xorurl = SafeUrl::encode_register(
-                xorname,
-                FILES_CONTAINER_TYPE_TAG,
-                Scope::Public,
-                ContentType::FilesContainer,
-                self.xorurl_base,
-            )?;
             let mut reg_url = SafeUrl::from_xorurl(&xorurl)?;
 
             // Write pointer to files_map onto our register
@@ -120,12 +127,9 @@ impl Safe {
 
             // We return versioned xorurl
             reg_url.set_content_version(Some(VersionHash::from(&entry_hash)));
-            reg_url.to_string()
-        } else {
-            "".to_string()
-        };
 
-        Ok((xorurl, processed_files, files_map))
+            Ok((reg_url.to_string(), processed_files, files_map))
+        }
     }
 
     /// # Fetch an existing FilesContainer.
@@ -268,7 +272,7 @@ impl Safe {
         let processed_files =
             file_system_dir_walk(self, location, recursive, follow_links, true).await?;
 
-        let dest_path = Some(safe_url.path());
+        let dest_path = Path::new(safe_url.path());
 
         let (processed_files, new_files_map, success_count): (ProcessedFiles, FilesMap, u64) =
             files_map_sync(
@@ -276,7 +280,7 @@ impl Safe {
                 current_files_map,
                 location,
                 processed_files,
-                dest_path,
+                Some(dest_path),
                 delete,
                 dry_run,
                 false,
@@ -333,7 +337,7 @@ impl Safe {
         let (safe_url, current_version, current_files_map) =
             validate_files_add_params(self, source_file, url, update_nrs).await?;
 
-        let dest_path = safe_url.path();
+        let dest_path = Path::new(safe_url.path());
 
         // Let's act according to if it's a local file path or a safe:// location
         let (processed_files, new_files_map, success_count) = if source_file.starts_with("safe://")
@@ -404,7 +408,7 @@ impl Safe {
         let (safe_url, current_version, current_files_map) =
             validate_files_add_params(self, "", url, update_nrs).await?;
 
-        let dest_path = safe_url.path();
+        let dest_path = Path::new(safe_url.path());
         let new_file_xorurl = self.store_public_bytes(data, None, false).await?;
 
         // Let's act according to if it's a local file path or a safe:// location
@@ -478,7 +482,7 @@ impl Safe {
             self.fetch_files_container(&safe_url).await?;
 
         let (processed_files, new_files_map, success_count) =
-            files_map_remove_path(dest_path, files_map, recursive)?;
+            files_map_remove_path(Path::new(dest_path), files_map, recursive)?;
 
         let version = if success_count == 0 {
             current_version
@@ -576,13 +580,14 @@ impl Safe {
             },
         )?;
 
-        // TODO: do we want ownership from other PKs yet?
         let xorname = self.safe_client.store_bytes(bytes.clone(), dry_run).await?;
-        Ok(SafeUrl::encode_bytes(
+        let xorurl = SafeUrl::encode_bytes(
             BytesAddress::Public(xorname),
             content_type,
             self.xorurl_base,
-        )?)
+        )?;
+
+        Ok(xorurl)
     }
 
     /// # Get a Public Blob
@@ -697,7 +702,7 @@ async fn validate_files_add_params(
 
 // From the location path and the destination path chosen by the user, calculate
 // the destination path considering ending '/' in both the  location and dest path
-fn get_base_paths(location: &str, dest_path: Option<&str>) -> (String, String) {
+fn get_base_paths(location: &str, dest_path: Option<&Path>) -> (String, String) {
     // Let's normalise the path to use '/' (instead of '\' as on Windows)
     let location_base_path = if location == "." {
         "./".to_string()
@@ -707,10 +712,11 @@ fn get_base_paths(location: &str, dest_path: Option<&str>) -> (String, String) {
 
     let new_dest_path = match dest_path {
         Some(path) => {
-            if path.is_empty() {
+            let path_str = path.display().to_string();
+            if path_str.is_empty() {
                 "/".to_string()
             } else {
-                path.to_string()
+                path_str
             }
         }
         None => "/".to_string(),
@@ -743,7 +749,7 @@ async fn files_map_sync(
     mut current_files_map: FilesMap,
     location: &str,
     new_content: ProcessedFiles,
-    dest_path: Option<&str>,
+    dest_path: Option<&Path>,
     delete: bool,
     dry_run: bool,
     force: bool,
@@ -755,14 +761,12 @@ async fn files_map_sync(
     let mut processed_files = ProcessedFiles::new();
     let mut success_count = 0;
 
-    for (local_file_name, _) in new_content
-        .iter()
-        .filter(|(_, (change, _))| change != CONTENT_ERROR_SIGN)
-    {
+    for (local_file_name, _) in new_content.iter().filter(|(_, change)| change.is_success()) {
         let file_path = Path::new(&local_file_name);
 
         let file_name = RelativePath::new(
             &local_file_name
+                .display()
                 .to_string()
                 .replace(&location_base_path, &dest_base_path),
         )
@@ -826,7 +830,7 @@ async fn files_map_sync(
                         local_file_name,
                         &normalised_file_name,
                         file_path,
-                        &FileMeta::from_path(local_file_name, follow_links)?,
+                        &FileMeta::from_path(local_file_name.as_path(), follow_links)?,
                         None, // no xorurl link
                         true,
                         dry_run,
@@ -842,18 +846,23 @@ async fn files_map_sync(
                     updated_files_map.insert(normalised_file_name.to_string(), file_item.clone());
 
                     if !force && !compare_file_content {
-                        let comp_str = if is_modified { "different" } else { "same" };
-                        processed_files.insert(
-                            local_file_name.to_string(),
+                        let (err_type, comp_str) = if is_modified {
                             (
-                                CONTENT_ERROR_SIGN.to_string(),
-                                format!(
-                                    "File named \"{}\" with {} content already exists on target. Use the 'force' flag to replace it",
-                                    normalised_file_name, comp_str
-                                ),
-                            ),
+                                Error::FileNameConflict(normalised_file_name.clone()),
+                                "different",
+                            )
+                        } else {
+                            (
+                                Error::FileAlreadyExists(normalised_file_name.clone()),
+                                "same",
+                            )
+                        };
+
+                        processed_files.insert(
+                            local_file_name.to_path_buf(),
+                            FilesMapChange::Failed(format!("{}", err_type)),
                         );
-                        info!("Skipping file \"{}\" since a file named \"{}\" with {} content already exists on target. You can use the 'force' flag to replace the existing file with the new one", local_file_name, normalised_file_name, comp_str);
+                        info!("Skipping file \"{}\" since a file named \"{}\" with {} content already exists on target. You can use the 'force' flag to replace the existing file with the new one", local_file_name.display(), normalised_file_name, comp_str);
                     }
                 }
 
@@ -887,18 +896,13 @@ async fn files_map_sync(
         if !delete {
             updated_files_map.insert(file_name.to_string(), file_item.clone());
         } else {
-            processed_files.insert(
-                file_name.to_string(),
-                (
-                    CONTENT_DELETED_SIGN.to_string(),
-                    // note: files have link property,
-                    //       dirs and symlinks do not
-                    file_item
-                        .get(PREDICATE_LINK)
-                        .unwrap_or(&String::default())
-                        .to_string(),
-                ),
-            );
+            // note: files have link property, dirs and symlinks do not
+            let xorurl = file_item
+                .get(PREDICATE_LINK)
+                .unwrap_or(&String::default())
+                .to_string();
+
+            processed_files.insert(PathBuf::from(file_name), FilesMapChange::Removed(xorurl));
             success_count += 1;
         }
     });
@@ -931,18 +935,18 @@ async fn files_map_add_link(
     safe: &mut Safe,
     mut files_map: FilesMap,
     file_link: &str,
-    file_name: &str,
+    file_name: &Path,
     force: bool,
 ) -> Result<(ProcessedFiles, FilesMap, u64)> {
     let mut processed_files = ProcessedFiles::new();
     let mut success_count = 0;
     match SafeUrl::from_url(file_link) {
         Err(err) => {
-            processed_files.insert(
-                file_link.to_string(),
-                (CONTENT_ERROR_SIGN.to_string(), format!("<{:?}>", err)),
-            );
             info!("Skipping file \"{}\". {}", file_link, err);
+            processed_files.insert(
+                PathBuf::from(file_link),
+                FilesMapChange::Failed(format!("{}", err)),
+            );
             Ok((processed_files, files_map, success_count))
         }
         Ok(safe_url) => {
@@ -952,9 +956,10 @@ async fn files_map_add_link(
                 other => format!("{}", other),
             };
             let file_size = ""; // unknown
+            let file_name_str = file_name.display().to_string();
 
             // Let's update FileInfo if the link is different or it doesn't exist in the files_map
-            match files_map.get(file_name) {
+            match files_map.get(&file_name_str) {
                 Some(current_file_item) => {
                     let mut file_meta = FileMeta::from_file_item(current_file_item);
                     file_meta.file_type = file_type;
@@ -973,7 +978,7 @@ async fn files_map_add_link(
                             if add_or_update_file_item(
                                 safe,
                                 file_name,
-                                file_name,
+                                &file_name_str,
                                 file_path,
                                 &file_meta,
                                 Some(file_link),
@@ -987,28 +992,31 @@ async fn files_map_add_link(
                                 success_count += 1;
                             }
                         } else {
-                            processed_files.insert(file_name.to_string(), (CONTENT_ERROR_SIGN.to_string(), format!("File named \"{}\" already exists on target. Use the 'force' flag to replace it", file_name)));
-                            info!("Skipping file \"{}\" since a file with name \"{}\" already exists on target. You can use the 'force' flag to replace the existing file with the new one", file_link, file_name);
+                            info!("Skipping file \"{}\" since a file with name \"{}\" already exists on target. You can use the 'force' flag to replace the existing file with the new one", file_link, file_name_str);
+                            processed_files.insert(
+                                file_name.to_path_buf(),
+                                FilesMapChange::Failed(format!(
+                                    "<{}>",
+                                    Error::FileNameConflict(file_name_str)
+                                )),
+                            );
                         }
                     } else {
+                        info!("Skipping file \"{}\" since a file with name \"{}\" already exists on target with the same link", file_link, file_name_str);
                         processed_files.insert(
-                            file_link.to_string(),
-                            (
-                                CONTENT_ERROR_SIGN.to_string(),
-                                format!(
-                                    "File named \"{}\" already exists on target with same link",
-                                    file_name
-                                ),
-                            ),
+                            PathBuf::from(file_link),
+                            FilesMapChange::Failed(format!(
+                                "<{}>",
+                                Error::FileAlreadyExists(file_name_str)
+                            )),
                         );
-                        info!("Skipping file \"{}\" since a file with name \"{}\" already exists on target with the same link", file_link, file_name);
                     }
                 }
                 None => {
                     if add_or_update_file_item(
                         safe,
                         file_name,
-                        file_name,
+                        &file_name_str,
                         file_path,
                         &FileMeta::from_type_and_size(&file_type, file_size),
                         Some(file_link),
@@ -1031,7 +1039,7 @@ async fn files_map_add_link(
 
 // Remove a path from the FilesMap provided
 fn files_map_remove_path(
-    dest_path: &str,
+    dest_path: &Path,
     mut files_map: FilesMap,
     recursive: bool,
 ) -> Result<(ProcessedFiles, FilesMap, u64)> {
@@ -1039,27 +1047,22 @@ fn files_map_remove_path(
     let (success_count, new_files_map) = if recursive {
         let mut success_count = 0;
         let mut new_files_map = FilesMap::default();
-        let folder_path = if !dest_path.ends_with('/') {
-            format!("{}/", dest_path)
+        let folder_path = if !dest_path.ends_with("/") {
+            format!("{}/", dest_path.display())
         } else {
-            dest_path.to_string()
+            dest_path.display().to_string()
         };
 
         files_map.iter().for_each(|(file_path, file_item)| {
             // if the current file_path is a subfolder we remove it
             if file_path.starts_with(&folder_path) {
-                processed_files.insert(
-                    file_path.to_string(),
-                    (
-                        CONTENT_DELETED_SIGN.to_string(),
-                        // note: files have link property,
-                        //       dirs and symlinks do not
-                        file_item
-                            .get(PREDICATE_LINK)
-                            .unwrap_or(&String::default())
-                            .to_string(),
-                    ),
-                );
+                // note: files have link property, dirs and symlinks do not
+                let xorurl = file_item
+                    .get(PREDICATE_LINK)
+                    .unwrap_or(&String::default())
+                    .to_string();
+
+                processed_files.insert(PathBuf::from(file_path), FilesMapChange::Removed(xorurl));
                 success_count += 1;
             } else {
                 new_files_map.insert(file_path.to_string(), file_item.clone());
@@ -1068,51 +1071,24 @@ fn files_map_remove_path(
         (success_count, new_files_map)
     } else {
         let file_item = files_map
-            .remove(dest_path)
+            .remove(&dest_path.display().to_string())
             .ok_or_else(|| Error::ContentError(format!(
                 "No content found matching the \"{}\" path on the target FilesContainer. If you are trying to remove a folder rather than a file, you need to pass the 'recursive' flag",
-                dest_path
+                dest_path.display()
             )))?;
-        processed_files.insert(
-            dest_path.to_string(),
-            (
-                CONTENT_DELETED_SIGN.to_string(),
-                // note: files have link property,
-                //       dirs and symlinks do not
-                file_item
-                    .get(PREDICATE_LINK)
-                    .unwrap_or(&String::default())
-                    .to_string(),
-            ),
-        );
+
+        // note: files have link property, dirs and symlinks do not
+        let xorurl = file_item
+            .get(PREDICATE_LINK)
+            .unwrap_or(&String::default())
+            .to_string();
+
+        processed_files.insert(dest_path.to_path_buf(), FilesMapChange::Removed(xorurl));
+
         (1, files_map)
     };
 
     Ok((processed_files, new_files_map, success_count))
-}
-
-// Upload a files to the Network as a Public Blob
-async fn upload_file_to_net(safe: &mut Safe, path: &Path, dry_run: bool) -> Result<XorUrl> {
-    let data = fs::read(path).map_err(|err| {
-        Error::InvalidInput(format!("Failed to read file from local location: {}", err))
-    })?;
-    let data = Bytes::from(data);
-
-    let mime_type = mime_guess::from_path(&path);
-    match safe
-        .store_public_bytes(data.to_owned(), mime_type.first_raw(), dry_run)
-        .await
-    {
-        Ok(xorurl) => Ok(xorurl),
-        Err(err) => {
-            // Let's then upload it and set media-type to be simply raw content
-            if let Error::InvalidMediaType(_) = err {
-                safe.store_public_bytes(data, None, dry_run).await
-            } else {
-                Err(err)
-            }
-        }
-    }
 }
 
 // From the provided list of local files paths and corresponding files XOR-URLs,
@@ -1121,7 +1097,7 @@ async fn files_map_create(
     safe: &mut Safe,
     content: &mut ProcessedFiles,
     location: &str,
-    dest_path: Option<&str>,
+    dest_path: Option<&Path>,
     follow_links: bool,
     dry_run: bool,
 ) -> Result<FilesMap> {
@@ -1134,16 +1110,18 @@ async fn files_map_create(
     // Rust doesn't allow that exactly, but we can get the keys
     // to iterate over instead.  Cloning the keys isn't ideal
     // either, but is much less data.  Is there a more efficient way?
-    let keys = content.keys().cloned().collect::<Vec<_>>();
-    for file_name in keys {
-        let (change, link) = &content[&file_name].clone();
-
-        if change == CONTENT_ERROR_SIGN {
-            continue;
-        }
+    let names = content.keys().cloned().collect::<Vec<_>>();
+    for file_name in names {
+        let link = match &content[&file_name] {
+            FilesMapChange::Failed(_) => continue,
+            FilesMapChange::Added(link)
+            | FilesMapChange::Updated(link)
+            | FilesMapChange::Removed(link) => link.clone(),
+        };
 
         let new_file_name = RelativePath::new(
             &file_name
+                .display()
                 .to_string()
                 .replace(&location_base_path, &dest_base_path),
         )
@@ -1161,9 +1139,9 @@ async fn files_map_create(
             safe,
             &file_name,
             &final_name,
-            Path::new(&file_name),
+            &file_name,
             &FileMeta::from_path(&file_name, follow_links)?,
-            if link.is_empty() { None } else { Some(link) },
+            if link.is_empty() { None } else { Some(&link) },
             false,
             dry_run,
             &mut files_map,
@@ -1182,13 +1160,13 @@ mod tests {
         retry_loop, retry_loop_for_pattern,
     };
     use anyhow::{anyhow, bail, Result};
+    use assert_matches::assert_matches;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
     const TEST_DATA_FOLDER: &str = "./testdata/";
     const TEST_DATA_FOLDER_NO_SLASH: &str = "./testdata";
 
-    // make some constants for these, in case entries in the
-    // testdata folder change.
+    // make some constants for these, in case entries in the testdata folder change.
     const TESTDATA_PUT_FILEITEM_COUNT: usize = 11;
     const TESTDATA_PUT_FILESMAP_COUNT: usize = 10; // TODO: review case of empty folder and empty file
     const TESTDATA_NO_SLASH_PUT_FILEITEM_COUNT: usize = 12;
@@ -1224,18 +1202,18 @@ mod tests {
         let second_xorurl = SafeUrl::from_url("safe://second_xorurl")?.to_xorurl_string();
 
         processed_files.insert(
-            "./testdata/test.md".to_string(),
-            (CONTENT_ADDED_SIGN.to_string(), first_xorurl.clone()),
+            PathBuf::from("./testdata/test.md"),
+            FilesMapChange::Added(first_xorurl.clone()),
         );
         processed_files.insert(
-            "./testdata/subfolder/subexists.md".to_string(),
-            (CONTENT_ADDED_SIGN.to_string(), second_xorurl.clone()),
+            PathBuf::from("./testdata/subfolder/subexists.md"),
+            FilesMapChange::Added(second_xorurl.clone()),
         );
         let files_map = files_map_create(
             &mut safe,
             &mut processed_files,
             TEST_DATA_FOLDER_NO_SLASH,
-            Some(""),
+            Some(Path::new("")),
             true,
             false,
         )
@@ -1277,11 +1255,11 @@ mod tests {
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), 1);
 
-        let filename = "./testdata/test.md";
-        assert_eq!(new_processed_files[filename].0, CONTENT_ADDED_SIGN);
+        let filename = Path::new("./testdata/test.md");
+        assert!(new_processed_files[filename].is_added());
         assert_eq!(
-            new_processed_files[filename].1,
-            new_files_map["/test.md"][PREDICATE_LINK]
+            new_processed_files[filename].link(),
+            Some(&new_files_map["/test.md"][PREDICATE_LINK])
         );
 
         Ok(())
@@ -1306,19 +1284,24 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_create_file() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let filename = "./testdata/test.md";
+        let filename = Path::new("./testdata/test.md");
         let (xorurl, processed_files, files_map) = safe
-            .files_container_create(Some(filename), None, false, false, false)
+            .files_container_create(
+                Some(&filename.display().to_string()),
+                None,
+                false,
+                false,
+                false,
+            )
             .await?;
 
         assert!(xorurl.starts_with("safe://"));
         assert_eq!(processed_files.len(), 1);
         assert_eq!(files_map.len(), 1);
-        let file_path = "/test.md";
-        assert_eq!(processed_files[filename].0, CONTENT_ADDED_SIGN);
+        assert!(processed_files[filename].is_added());
         assert_eq!(
-            processed_files[filename].1,
-            files_map[file_path][PREDICATE_LINK]
+            processed_files[filename].link(),
+            Some(&files_map["/test.md"][PREDICATE_LINK])
         );
 
         Ok(())
@@ -1331,40 +1314,40 @@ mod tests {
             .files_container_create(Some(TEST_DATA_FOLDER), None, true, false, true)
             .await?;
 
-        assert!(xorurl.is_empty());
+        assert!(xorurl.starts_with("safe://"));
         assert_eq!(processed_files.len(), TESTDATA_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), TESTDATA_PUT_FILESMAP_COUNT);
 
-        let filename1 = "./testdata/test.md";
-        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
-        assert!(!processed_files[filename1].1.is_empty());
+        let filename1 = Path::new("./testdata/test.md");
+        assert!(processed_files[filename1].is_added());
+        assert_matches!(processed_files[filename1].link(), Some(link) if !link.is_empty());
         assert_eq!(
-            processed_files[filename1].1,
-            files_map["/test.md"][PREDICATE_LINK]
+            processed_files[filename1].link(),
+            Some(&files_map["/test.md"][PREDICATE_LINK])
         );
 
-        let filename2 = "./testdata/another.md";
-        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
-        assert!(!processed_files[filename2].1.is_empty());
+        let filename2 = Path::new("./testdata/another.md");
+        assert!(processed_files[filename2].is_added());
+        assert_matches!(processed_files[filename2].link(), Some(link) if !link.is_empty());
         assert_eq!(
-            processed_files[filename2].1,
-            files_map["/another.md"][PREDICATE_LINK]
+            processed_files[filename2].link(),
+            Some(&files_map["/another.md"][PREDICATE_LINK])
         );
 
-        let filename3 = "./testdata/subfolder/subexists.md";
-        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
-        assert!(!processed_files[filename3].1.is_empty());
+        let filename3 = Path::new("./testdata/subfolder/subexists.md");
+        assert!(processed_files[filename3].is_added());
+        assert_matches!(processed_files[filename3].link(), Some(link) if !link.is_empty());
         assert_eq!(
-            processed_files[filename3].1,
-            files_map["/subfolder/subexists.md"][PREDICATE_LINK]
+            processed_files[filename3].link(),
+            Some(&files_map["/subfolder/subexists.md"][PREDICATE_LINK])
         );
 
-        let filename4 = "./testdata/noextension";
-        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
-        assert!(!processed_files[filename4].1.is_empty());
+        let filename4 = Path::new("./testdata/noextension");
+        assert!(processed_files[filename4].is_added());
+        assert_matches!(processed_files[filename4].link(), Some(link) if !link.is_empty());
         assert_eq!(
-            processed_files[filename4].1,
-            files_map["/noextension"][PREDICATE_LINK]
+            processed_files[filename4].link(),
+            Some(&files_map["/noextension"][PREDICATE_LINK])
         );
 
         Ok(())
@@ -1385,32 +1368,32 @@ mod tests {
         assert_eq!(processed_files.len(), TESTDATA_NO_SLASH_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), TESTDATA_NO_SLASH_PUT_FILESMAP_COUNT);
 
-        let filename1 = "./testdata/test.md";
-        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        let filename1 = Path::new("./testdata/test.md");
+        assert!(processed_files[filename1].is_added());
         assert_eq!(
-            processed_files[filename1].1,
-            files_map["/testdata/test.md"][PREDICATE_LINK]
+            processed_files[filename1].link(),
+            Some(&files_map["/testdata/test.md"][PREDICATE_LINK])
         );
 
-        let filename2 = "./testdata/another.md";
-        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        let filename2 = Path::new("./testdata/another.md");
+        assert!(processed_files[filename2].is_added());
         assert_eq!(
-            processed_files[filename2].1,
-            files_map["/testdata/another.md"][PREDICATE_LINK]
+            processed_files[filename2].link(),
+            Some(&files_map["/testdata/another.md"][PREDICATE_LINK])
         );
 
-        let filename3 = "./testdata/subfolder/subexists.md";
-        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        let filename3 = Path::new("./testdata/subfolder/subexists.md");
+        assert!(processed_files[filename3].is_added());
         assert_eq!(
-            processed_files[filename3].1,
-            files_map["/testdata/subfolder/subexists.md"][PREDICATE_LINK]
+            processed_files[filename3].link(),
+            Some(&files_map["/testdata/subfolder/subexists.md"][PREDICATE_LINK])
         );
 
-        let filename4 = "./testdata/noextension";
-        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        let filename4 = Path::new("./testdata/noextension");
+        assert!(processed_files[filename4].is_added());
         assert_eq!(
-            processed_files[filename4].1,
-            files_map["/testdata/noextension"][PREDICATE_LINK]
+            processed_files[filename4].link(),
+            Some(&files_map["/testdata/noextension"][PREDICATE_LINK])
         );
 
         Ok(())
@@ -1421,32 +1404,32 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let (_, processed_files, files_map) = new_files_container_from_testdata(&mut safe).await?;
 
-        let filename1 = "./testdata/test.md";
-        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        let filename1 = Path::new("./testdata/test.md");
+        assert!(processed_files[filename1].is_added());
         assert_eq!(
-            processed_files[filename1].1,
-            files_map["/test.md"][PREDICATE_LINK]
+            processed_files[filename1].link(),
+            Some(&files_map["/test.md"][PREDICATE_LINK])
         );
 
-        let filename2 = "./testdata/another.md";
-        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        let filename2 = Path::new("./testdata/another.md");
+        assert!(processed_files[filename2].is_added());
         assert_eq!(
-            processed_files[filename2].1,
-            files_map["/another.md"][PREDICATE_LINK]
+            processed_files[filename2].link(),
+            Some(&files_map["/another.md"][PREDICATE_LINK])
         );
 
-        let filename3 = "./testdata/subfolder/subexists.md";
-        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        let filename3 = Path::new("./testdata/subfolder/subexists.md");
+        assert!(processed_files[filename3].is_added());
         assert_eq!(
-            processed_files[filename3].1,
-            files_map["/subfolder/subexists.md"][PREDICATE_LINK]
+            processed_files[filename3].link(),
+            Some(&files_map["/subfolder/subexists.md"][PREDICATE_LINK])
         );
 
-        let filename4 = "./testdata/noextension";
-        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        let filename4 = Path::new("./testdata/noextension");
+        assert!(processed_files[filename4].is_added());
         assert_eq!(
-            processed_files[filename4].1,
-            files_map["/noextension"][PREDICATE_LINK]
+            processed_files[filename4].link(),
+            Some(&files_map["/noextension"][PREDICATE_LINK])
         );
 
         Ok(())
@@ -1458,7 +1441,7 @@ mod tests {
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(
                 Some(TEST_DATA_FOLDER_NO_SLASH),
-                Some("/myroot"),
+                Some(Path::new("/myroot")),
                 true,
                 true,
                 false,
@@ -1469,32 +1452,32 @@ mod tests {
         assert_eq!(processed_files.len(), TESTDATA_NO_SLASH_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), TESTDATA_NO_SLASH_PUT_FILESMAP_COUNT);
 
-        let filename1 = "./testdata/test.md";
-        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        let filename1 = Path::new("./testdata/test.md");
+        assert!(processed_files[filename1].is_added());
         assert_eq!(
-            processed_files[filename1].1,
-            files_map["/myroot/test.md"][PREDICATE_LINK]
+            processed_files[filename1].link(),
+            Some(&files_map["/myroot/test.md"][PREDICATE_LINK])
         );
 
-        let filename2 = "./testdata/another.md";
-        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        let filename2 = Path::new("./testdata/another.md");
+        assert!(processed_files[filename2].is_added());
         assert_eq!(
-            processed_files[filename2].1,
-            files_map["/myroot/another.md"][PREDICATE_LINK]
+            processed_files[filename2].link(),
+            Some(&files_map["/myroot/another.md"][PREDICATE_LINK])
         );
 
-        let filename3 = "./testdata/subfolder/subexists.md";
-        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        let filename3 = Path::new("./testdata/subfolder/subexists.md");
+        assert!(processed_files[filename3].is_added());
         assert_eq!(
-            processed_files[filename3].1,
-            files_map["/myroot/subfolder/subexists.md"][PREDICATE_LINK]
+            processed_files[filename3].link(),
+            Some(&files_map["/myroot/subfolder/subexists.md"][PREDICATE_LINK])
         );
 
-        let filename4 = "./testdata/noextension";
-        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        let filename4 = Path::new("./testdata/noextension");
+        assert!(processed_files[filename4].is_added());
         assert_eq!(
-            processed_files[filename4].1,
-            files_map["/myroot/noextension"][PREDICATE_LINK]
+            processed_files[filename4].link(),
+            Some(&files_map["/myroot/noextension"][PREDICATE_LINK])
         );
 
         Ok(())
@@ -1506,7 +1489,7 @@ mod tests {
         let (xorurl, processed_files, files_map) = safe
             .files_container_create(
                 Some(TEST_DATA_FOLDER_NO_SLASH),
-                Some("/myroot/"),
+                Some(Path::new("/myroot/")),
                 true,
                 true,
                 false,
@@ -1517,32 +1500,32 @@ mod tests {
         assert_eq!(processed_files.len(), TESTDATA_NO_SLASH_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), TESTDATA_NO_SLASH_PUT_FILESMAP_COUNT);
 
-        let filename1 = "./testdata/test.md";
-        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        let filename1 = Path::new("./testdata/test.md");
+        assert!(processed_files[filename1].is_added());
         assert_eq!(
-            processed_files[filename1].1,
-            files_map["/myroot/testdata/test.md"][PREDICATE_LINK]
+            processed_files[filename1].link(),
+            Some(&files_map["/myroot/testdata/test.md"][PREDICATE_LINK])
         );
 
-        let filename2 = "./testdata/another.md";
-        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        let filename2 = Path::new("./testdata/another.md");
+        assert!(processed_files[filename2].is_added());
         assert_eq!(
-            processed_files[filename2].1,
-            files_map["/myroot/testdata/another.md"][PREDICATE_LINK]
+            processed_files[filename2].link(),
+            Some(&files_map["/myroot/testdata/another.md"][PREDICATE_LINK])
         );
 
-        let filename3 = "./testdata/subfolder/subexists.md";
-        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        let filename3 = Path::new("./testdata/subfolder/subexists.md");
+        assert!(processed_files[filename3].is_added());
         assert_eq!(
-            processed_files[filename3].1,
-            files_map["/myroot/testdata/subfolder/subexists.md"][PREDICATE_LINK]
+            processed_files[filename3].link(),
+            Some(&files_map["/myroot/testdata/subfolder/subexists.md"][PREDICATE_LINK])
         );
 
-        let filename4 = "./testdata/noextension";
-        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        let filename4 = Path::new("./testdata/noextension");
+        assert!(processed_files[filename4].is_added());
         assert_eq!(
-            processed_files[filename4].1,
-            files_map["/myroot/testdata/noextension"][PREDICATE_LINK]
+            processed_files[filename4].link(),
+            Some(&files_map["/myroot/testdata/noextension"][PREDICATE_LINK])
         );
 
         Ok(())
@@ -1574,46 +1557,46 @@ mod tests {
             TESTDATA_PUT_FILESMAP_COUNT + SUBFOLDER_PUT_FILEITEM_COUNT
         );
 
-        let filename1 = "./testdata/test.md";
-        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        let filename1 = Path::new("./testdata/test.md");
+        assert!(processed_files[filename1].is_added());
         assert_eq!(
-            processed_files[filename1].1,
-            new_files_map["/test.md"][PREDICATE_LINK]
+            processed_files[filename1].link(),
+            Some(&new_files_map["/test.md"][PREDICATE_LINK])
         );
 
-        let filename2 = "./testdata/another.md";
-        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        let filename2 = Path::new("./testdata/another.md");
+        assert!(processed_files[filename2].is_added());
         assert_eq!(
-            processed_files[filename2].1,
-            new_files_map["/another.md"][PREDICATE_LINK]
+            processed_files[filename2].link(),
+            Some(&new_files_map["/another.md"][PREDICATE_LINK])
         );
 
-        let filename3 = "./testdata/subfolder/subexists.md";
-        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        let filename3 = Path::new("./testdata/subfolder/subexists.md");
+        assert!(processed_files[filename3].is_added());
         assert_eq!(
-            processed_files[filename3].1,
-            new_files_map["/subfolder/subexists.md"][PREDICATE_LINK]
+            processed_files[filename3].link(),
+            Some(&new_files_map["/subfolder/subexists.md"][PREDICATE_LINK])
         );
 
-        let filename4 = "./testdata/noextension";
-        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        let filename4 = Path::new("./testdata/noextension");
+        assert!(processed_files[filename4].is_added());
         assert_eq!(
-            processed_files[filename4].1,
-            new_files_map["/noextension"][PREDICATE_LINK]
+            processed_files[filename4].link(),
+            Some(&new_files_map["/noextension"][PREDICATE_LINK])
         );
 
-        let filename5 = "./testdata/subfolder/subexists.md";
-        assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
+        let filename5 = Path::new("./testdata/subfolder/subexists.md");
+        assert!(new_processed_files[filename5].is_added());
         assert_eq!(
-            new_processed_files[filename5].1,
-            new_files_map["/subexists.md"][PREDICATE_LINK]
+            new_processed_files[filename5].link(),
+            Some(&new_files_map["/subexists.md"][PREDICATE_LINK])
         );
 
-        let filename6 = "./testdata/subfolder/sub2.md";
-        assert_eq!(new_processed_files[filename6].0, CONTENT_ADDED_SIGN);
+        let filename6 = Path::new("./testdata/subfolder/sub2.md");
+        assert!(new_processed_files[filename6].is_added());
         assert_eq!(
-            new_processed_files[filename6].1,
-            new_files_map["/sub2.md"][PREDICATE_LINK]
+            new_processed_files[filename6].link(),
+            Some(&new_files_map["/sub2.md"][PREDICATE_LINK])
         );
 
         Ok(())
@@ -1643,48 +1626,48 @@ mod tests {
             TESTDATA_PUT_FILESMAP_COUNT + SUBFOLDER_PUT_FILEITEM_COUNT
         );
 
-        let filename1 = "./testdata/test.md";
-        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        let filename1 = Path::new("./testdata/test.md");
+        assert!(processed_files[filename1].is_added());
         assert_eq!(
-            processed_files[filename1].1,
-            new_files_map["/test.md"][PREDICATE_LINK]
+            processed_files[filename1].link(),
+            Some(&new_files_map["/test.md"][PREDICATE_LINK])
         );
 
-        let filename2 = "./testdata/another.md";
-        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        let filename2 = Path::new("./testdata/another.md");
+        assert!(processed_files[filename2].is_added());
         assert_eq!(
-            processed_files[filename2].1,
-            new_files_map["/another.md"][PREDICATE_LINK]
+            processed_files[filename2].link(),
+            Some(&new_files_map["/another.md"][PREDICATE_LINK])
         );
 
-        let filename3 = "./testdata/subfolder/subexists.md";
-        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        let filename3 = Path::new("./testdata/subfolder/subexists.md");
+        assert!(processed_files[filename3].is_added());
         assert_eq!(
-            processed_files[filename3].1,
-            new_files_map["/subfolder/subexists.md"][PREDICATE_LINK]
+            processed_files[filename3].link(),
+            Some(&new_files_map["/subfolder/subexists.md"][PREDICATE_LINK])
         );
 
-        let filename4 = "./testdata/noextension";
-        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        let filename4 = Path::new("./testdata/noextension");
+        assert!(processed_files[filename4].is_added());
         assert_eq!(
-            processed_files[filename4].1,
-            new_files_map["/noextension"][PREDICATE_LINK]
+            processed_files[filename4].link(),
+            Some(&new_files_map["/noextension"][PREDICATE_LINK])
         );
 
-        let filename5 = "./testdata/subfolder/subexists.md";
-        assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
-        assert!(!new_processed_files[filename5].1.is_empty());
+        let filename5 = Path::new("./testdata/subfolder/subexists.md");
+        assert!(new_processed_files[filename5].is_added());
+        assert_matches!(new_processed_files[filename5].link(), Some(link) if !link.is_empty());
         assert_eq!(
-            new_processed_files[filename5].1,
-            new_files_map["/subexists.md"][PREDICATE_LINK]
+            new_processed_files[filename5].link(),
+            Some(&new_files_map["/subexists.md"][PREDICATE_LINK])
         );
 
-        let filename6 = "./testdata/subfolder/sub2.md";
-        assert_eq!(new_processed_files[filename6].0, CONTENT_ADDED_SIGN);
-        assert!(!new_processed_files[filename6].1.is_empty());
+        let filename6 = Path::new("./testdata/subfolder/sub2.md");
+        assert!(new_processed_files[filename6].is_added());
+        assert_matches!(new_processed_files[filename6].link(), Some(link) if !link.is_empty());
         assert_eq!(
-            new_processed_files[filename6].1,
-            new_files_map["/sub2.md"][PREDICATE_LINK]
+            new_processed_files[filename6].link(),
+            Some(&new_files_map["/sub2.md"][PREDICATE_LINK])
         );
 
         Ok(())
@@ -1718,17 +1701,17 @@ mod tests {
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), 1);
 
-        let filename1 = "./testdata/test.md";
-        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        let filename1 = Path::new("./testdata/test.md");
+        assert!(processed_files[filename1].is_added());
         assert_eq!(
-            processed_files[filename1].1,
-            files_map["/test.md"][PREDICATE_LINK]
+            processed_files[filename1].link(),
+            Some(&files_map["/test.md"][PREDICATE_LINK])
         );
-        let filename2 = "./testdata/.subhidden/test.md";
-        assert_eq!(new_processed_files[filename2].0, CONTENT_UPDATED_SIGN);
+        let filename2 = Path::new("./testdata/.subhidden/test.md");
+        assert!(new_processed_files[filename2].is_updated());
         assert_eq!(
-            new_processed_files[filename2].1,
-            new_files_map["/test.md"][PREDICATE_LINK]
+            new_processed_files[filename2].link(),
+            Some(&new_files_map["/test.md"][PREDICATE_LINK])
         );
 
         // check sizes are the same but links are different
@@ -1806,40 +1789,40 @@ mod tests {
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
 
         // first check all previous files were removed
-        let file_path1 = "/test.md";
-        assert_eq!(new_processed_files[file_path1].0, CONTENT_DELETED_SIGN);
+        let file_path1 = Path::new("/test.md");
+        assert!(new_processed_files[file_path1].is_removed());
         assert_eq!(
-            new_processed_files[file_path1].1,
-            files_map[file_path1][PREDICATE_LINK]
+            new_processed_files[file_path1].link(),
+            Some(&files_map[&file_path1.display().to_string()][PREDICATE_LINK])
         );
 
-        let file_path2 = "/another.md";
-        assert_eq!(new_processed_files[file_path2].0, CONTENT_DELETED_SIGN);
+        let file_path2 = Path::new("/another.md");
+        assert!(new_processed_files[file_path2].is_removed());
         assert_eq!(
-            new_processed_files[file_path2].1,
-            files_map[file_path2][PREDICATE_LINK]
+            new_processed_files[file_path2].link(),
+            Some(&files_map[&file_path2.display().to_string()][PREDICATE_LINK])
         );
 
-        let file_path3 = "/subfolder/subexists.md";
-        assert_eq!(new_processed_files[file_path3].0, CONTENT_DELETED_SIGN);
+        let file_path3 = Path::new("/subfolder/subexists.md");
+        assert!(new_processed_files[file_path3].is_removed());
         assert_eq!(
-            new_processed_files[file_path3].1,
-            files_map[file_path3][PREDICATE_LINK]
+            new_processed_files[file_path3].link(),
+            Some(&files_map[&file_path3.display().to_string()][PREDICATE_LINK])
         );
 
-        let file_path4 = "/noextension";
-        assert_eq!(new_processed_files[file_path4].0, CONTENT_DELETED_SIGN);
+        let file_path4 = Path::new("/noextension");
+        assert!(new_processed_files[file_path4].is_removed());
         assert_eq!(
-            new_processed_files[file_path4].1,
-            files_map[file_path4][PREDICATE_LINK]
+            new_processed_files[file_path4].link(),
+            Some(&files_map[&file_path4.display().to_string()][PREDICATE_LINK])
         );
 
         // and finally check the synced file was added
-        let filename5 = "./testdata/subfolder/subexists.md";
-        assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
+        let filename5 = Path::new("./testdata/subfolder/subexists.md");
+        assert!(new_processed_files[filename5].is_added());
         assert_eq!(
-            new_processed_files[filename5].1,
-            new_files_map["/subexists.md"][PREDICATE_LINK]
+            new_processed_files[filename5].link(),
+            Some(&new_files_map["/subexists.md"][PREDICATE_LINK])
         );
 
         Ok(())
@@ -2003,40 +1986,40 @@ mod tests {
             TESTDATA_PUT_FILESMAP_COUNT + SUBFOLDER_NO_SLASH_PUT_FILEITEM_COUNT
         );
 
-        let filename1 = "./testdata/test.md";
-        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        let filename1 = Path::new("./testdata/test.md");
+        assert!(processed_files[filename1].is_added());
         assert_eq!(
-            processed_files[filename1].1,
-            new_files_map["/test.md"][PREDICATE_LINK]
+            processed_files[filename1].link(),
+            Some(&new_files_map["/test.md"][PREDICATE_LINK])
         );
 
-        let filename2 = "./testdata/another.md";
-        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        let filename2 = Path::new("./testdata/another.md");
+        assert!(processed_files[filename2].is_added());
         assert_eq!(
-            processed_files[filename2].1,
-            new_files_map["/another.md"][PREDICATE_LINK]
+            processed_files[filename2].link(),
+            Some(&new_files_map["/another.md"][PREDICATE_LINK])
         );
 
-        let filename3 = "./testdata/subfolder/subexists.md";
-        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        let filename3 = Path::new("./testdata/subfolder/subexists.md");
+        assert!(processed_files[filename3].is_added());
         assert_eq!(
-            processed_files[filename3].1,
-            new_files_map["/subfolder/subexists.md"][PREDICATE_LINK]
+            processed_files[filename3].link(),
+            Some(&new_files_map["/subfolder/subexists.md"][PREDICATE_LINK])
         );
 
-        let filename4 = "./testdata/noextension";
-        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        let filename4 = Path::new("./testdata/noextension");
+        assert!(processed_files[filename4].is_added());
         assert_eq!(
-            processed_files[filename4].1,
-            new_files_map["/noextension"][PREDICATE_LINK]
+            processed_files[filename4].link(),
+            Some(&new_files_map["/noextension"][PREDICATE_LINK])
         );
 
         // and finally check the synced file is there
-        let filename5 = "./testdata/subfolder/subexists.md";
-        assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
+        let filename5 = Path::new("./testdata/subfolder/subexists.md");
+        assert!(new_processed_files[filename5].is_added());
         assert_eq!(
-            new_processed_files[filename5].1,
-            new_files_map["/path/when/sync/subexists.md"][PREDICATE_LINK]
+            new_processed_files[filename5].link(),
+            Some(&new_files_map["/path/when/sync/subexists.md"][PREDICATE_LINK])
         );
 
         Ok(())
@@ -2069,40 +2052,40 @@ mod tests {
             TESTDATA_PUT_FILESMAP_COUNT + SUBFOLDER_NO_SLASH_PUT_FILEITEM_COUNT
         );
 
-        let filename1 = "./testdata/test.md";
-        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        let filename1 = Path::new("./testdata/test.md");
+        assert!(processed_files[filename1].is_added());
         assert_eq!(
-            processed_files[filename1].1,
-            new_files_map["/test.md"][PREDICATE_LINK]
+            processed_files[filename1].link(),
+            Some(&new_files_map["/test.md"][PREDICATE_LINK])
         );
 
-        let filename2 = "./testdata/another.md";
-        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        let filename2 = Path::new("./testdata/another.md");
+        assert!(processed_files[filename2].is_added());
         assert_eq!(
-            processed_files[filename2].1,
-            new_files_map["/another.md"][PREDICATE_LINK]
+            processed_files[filename2].link(),
+            Some(&new_files_map["/another.md"][PREDICATE_LINK])
         );
 
-        let filename3 = "./testdata/subfolder/subexists.md";
-        assert_eq!(processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        let filename3 = Path::new("./testdata/subfolder/subexists.md");
+        assert!(processed_files[filename3].is_added());
         assert_eq!(
-            processed_files[filename3].1,
-            new_files_map["/subfolder/subexists.md"][PREDICATE_LINK]
+            processed_files[filename3].link(),
+            Some(&new_files_map["/subfolder/subexists.md"][PREDICATE_LINK])
         );
 
-        let filename4 = "./testdata/noextension";
-        assert_eq!(processed_files[filename4].0, CONTENT_ADDED_SIGN);
+        let filename4 = Path::new("./testdata/noextension");
+        assert!(processed_files[filename4].is_added());
         assert_eq!(
-            processed_files[filename4].1,
-            new_files_map["/noextension"][PREDICATE_LINK]
+            processed_files[filename4].link(),
+            Some(&new_files_map["/noextension"][PREDICATE_LINK])
         );
 
         // and finally check the synced file is there
-        let filename5 = "./testdata/subfolder/subexists.md";
-        assert_eq!(new_processed_files[filename5].0, CONTENT_ADDED_SIGN);
+        let filename5 = Path::new("./testdata/subfolder/subexists.md");
+        assert!(new_processed_files[filename5].is_added());
         assert_eq!(
-            new_processed_files[filename5].1,
-            new_files_map["/path/when/sync/subfolder/subexists.md"][PREDICATE_LINK]
+            new_processed_files[filename5].link(),
+            Some(&new_files_map["/path/when/sync/subfolder/subexists.md"][PREDICATE_LINK])
         );
 
         Ok(())
@@ -2183,10 +2166,10 @@ mod tests {
         assert_eq!(version, version0);
         assert_eq!(files_map, v0_files_map);
         // let's check that one of the files in v1 is still there
-        let file_path1 = "/test.md";
+        let file_path1 = Path::new("/test.md");
         assert_eq!(
-            files_map[file_path1][PREDICATE_LINK],
-            v0_files_map[file_path1][PREDICATE_LINK]
+            files_map[&file_path1.display().to_string()][PREDICATE_LINK],
+            v0_files_map[&file_path1.display().to_string()][PREDICATE_LINK]
         );
 
         // let's fetch version1
@@ -2197,13 +2180,21 @@ mod tests {
         assert_eq!(version, version1);
         assert_eq!(new_files_map, v1_files_map);
         // let's check that some of the files are no in v2 anymore
-        let file_path2 = "/another.md";
-        let file_path3 = "/subfolder/subexists.md";
-        let file_path4 = "/noextension";
-        assert!(v1_files_map.get(file_path1).is_none());
-        assert!(v1_files_map.get(file_path2).is_none());
-        assert!(v1_files_map.get(file_path3).is_none());
-        assert!(v1_files_map.get(file_path4).is_none());
+        let file_path2 = Path::new("/another.md");
+        let file_path3 = Path::new("/subfolder/subexists.md");
+        let file_path4 = Path::new("/noextension");
+        assert!(v1_files_map
+            .get(&file_path1.display().to_string())
+            .is_none());
+        assert!(v1_files_map
+            .get(&file_path2.display().to_string())
+            .is_none());
+        assert!(v1_files_map
+            .get(&file_path3.display().to_string())
+            .is_none());
+        assert!(v1_files_map
+            .get(&file_path4.display().to_string())
+            .is_none());
 
         // let's fetch invalid version
         safe_url.set_content_version(Some(VersionHash::default()));
@@ -2336,25 +2327,25 @@ mod tests {
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
 
-        let filename1 = "./testdata/subfolder/subexists.md";
-        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        let filename1 = Path::new("./testdata/subfolder/subexists.md");
+        assert!(processed_files[filename1].is_added());
         assert_eq!(
-            processed_files[filename1].1,
-            new_files_map["/subexists.md"][PREDICATE_LINK]
+            processed_files[filename1].link(),
+            Some(&new_files_map["/subexists.md"][PREDICATE_LINK])
         );
 
-        let filename2 = "./testdata/subfolder/sub2.md";
-        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        let filename2 = Path::new("./testdata/subfolder/sub2.md");
+        assert!(processed_files[filename2].is_added());
         assert_eq!(
-            processed_files[filename2].1,
-            new_files_map["/sub2.md"][PREDICATE_LINK]
+            processed_files[filename2].link(),
+            Some(&new_files_map["/sub2.md"][PREDICATE_LINK])
         );
 
-        let filename3 = "./testdata/test.md";
-        assert_eq!(new_processed_files[filename3].0, CONTENT_ADDED_SIGN);
+        let filename3 = Path::new("./testdata/test.md");
+        assert!(new_processed_files[filename3].is_added());
         assert_eq!(
-            new_processed_files[filename3].1,
-            new_files_map["/new_filename_test.md"][PREDICATE_LINK]
+            new_processed_files[filename3].link(),
+            Some(&new_files_map["/new_filename_test.md"][PREDICATE_LINK])
         );
         Ok(())
     }
@@ -2404,16 +2395,16 @@ mod tests {
         assert_eq!(new_processed_files.len(), new_processed_files2.len());
         assert_eq!(new_files_map.len(), new_files_map2.len());
 
-        let filename = "./testdata/test.md";
-        assert_eq!(new_processed_files[filename].0, CONTENT_ADDED_SIGN);
-        assert_eq!(new_processed_files2[filename].0, CONTENT_ADDED_SIGN);
+        let filename = Path::new("./testdata/test.md");
+        assert!(new_processed_files[filename].is_added());
+        assert!(new_processed_files2[filename].is_added());
         assert_eq!(
-            new_processed_files[filename].1,
-            new_files_map["/new_filename_test.md"][PREDICATE_LINK]
+            new_processed_files[filename].link(),
+            Some(&new_files_map["/new_filename_test.md"][PREDICATE_LINK])
         );
         assert_eq!(
-            new_processed_files2[filename].1,
-            new_files_map2["/new_filename_test.md"][PREDICATE_LINK]
+            new_processed_files2[filename].link(),
+            Some(&new_files_map2["/new_filename_test.md"][PREDICATE_LINK])
         );
 
         Ok(())
@@ -2481,9 +2472,10 @@ mod tests {
         url_with_path.set_path("/sub2.md");
 
         // let's try to add a file with same target name and same content, it should fail
+        let filename1 = Path::new("./testdata/subfolder/sub2.md");
         let (version1, new_processed_files, new_files_map) = safe
             .files_container_add(
-                "./testdata/subfolder/sub2.md",
+                &filename1.display().to_string(),
                 &url_with_path.to_string(),
                 false,
                 false,
@@ -2495,15 +2487,16 @@ mod tests {
         assert_eq!(version1, version0);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
-        assert_eq!(
-            new_processed_files["./testdata/subfolder/sub2.md"].1,
-            "File named \"/sub2.md\" with same content already exists on target. Use the \'force\' flag to replace it"
+        assert_matches!(
+            &new_processed_files[filename1],
+            FilesMapChange::Failed(msg) if msg == &format!("{}", Error::FileAlreadyExists("/sub2.md".to_string()))
         );
         assert_eq!(files_map, new_files_map);
 
         // let's try to add a file with same target name but with different content, it should still fail
+        let filename2 = Path::new("./testdata/test.md");
         let (version2, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
-            "./testdata/test.md",
+            &filename2.display().to_string(),
             &url_with_path.to_string(),
             false,
             false,
@@ -2514,15 +2507,15 @@ mod tests {
         assert_eq!(version2, version0);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
-        assert_eq!(
-            new_processed_files["./testdata/test.md"].1,
-            "File named \"/sub2.md\" with different content already exists on target. Use the \'force\' flag to replace it"
+        assert_matches!(
+            &new_processed_files[filename2],
+            FilesMapChange::Failed(msg) if msg == &format!("{}", Error::FileNameConflict("/sub2.md".to_string()))
         );
         assert_eq!(files_map, new_files_map);
 
         // let's now force it
         let (version3, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
-            "./testdata/test.md",
+            &filename2.display().to_string(),
             &url_with_path.to_string(),
             true, //force it
             false,
@@ -2533,13 +2526,10 @@ mod tests {
         assert!(version3 != version0);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
+        assert!(new_processed_files[filename2].is_updated());
         assert_eq!(
-            new_processed_files["./testdata/test.md"].0,
-            CONTENT_UPDATED_SIGN
-        );
-        assert_eq!(
-            new_processed_files["./testdata/test.md"].1,
-            new_files_map["/sub2.md"]["link"]
+            new_processed_files[filename2].link(),
+            Some(&new_files_map["/sub2.md"]["link"])
         );
 
         Ok(())
@@ -2629,10 +2619,10 @@ mod tests {
 
         let data = Bytes::from("0123456789");
         let file_xorurl = retry_loop!(safe.store_public_bytes(data.clone(), None, false));
-        let new_filename = "/new_filename_test.md";
+        let new_filename = Path::new("/new_filename_test.md");
 
         let mut url_with_path = SafeUrl::from_xorurl(&xorurl)?;
-        url_with_path.set_path(new_filename);
+        url_with_path.set_path(&new_filename.display().to_string());
 
         let (version1, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
             &file_xorurl,
@@ -2647,26 +2637,29 @@ mod tests {
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
 
-        let filename1 = "./testdata/subfolder/subexists.md";
-        assert_eq!(processed_files[filename1].0, CONTENT_ADDED_SIGN);
+        let filename1 = Path::new("./testdata/subfolder/subexists.md");
+        assert!(processed_files[filename1].is_added());
         assert_eq!(
-            processed_files[filename1].1,
-            new_files_map["/subexists.md"][PREDICATE_LINK]
+            processed_files[filename1].link(),
+            Some(&new_files_map["/subexists.md"][PREDICATE_LINK])
         );
 
-        let filename2 = "./testdata/subfolder/sub2.md";
-        assert_eq!(processed_files[filename2].0, CONTENT_ADDED_SIGN);
+        let filename2 = Path::new("./testdata/subfolder/sub2.md");
+        assert!(processed_files[filename2].is_added());
         assert_eq!(
-            processed_files[filename2].1,
-            new_files_map["/sub2.md"][PREDICATE_LINK]
+            processed_files[filename2].link(),
+            Some(&new_files_map["/sub2.md"][PREDICATE_LINK])
         );
 
-        assert_eq!(new_processed_files[new_filename].0, CONTENT_ADDED_SIGN);
+        assert!(new_processed_files[new_filename].is_added());
         assert_eq!(
-            new_processed_files[new_filename].1,
-            new_files_map[new_filename][PREDICATE_LINK]
+            new_processed_files[new_filename].link(),
+            Some(&new_files_map[&new_filename.display().to_string()][PREDICATE_LINK])
         );
-        assert_eq!(new_files_map[new_filename][PREDICATE_LINK], file_xorurl);
+        assert_eq!(
+            new_files_map[&new_filename.display().to_string()][PREDICATE_LINK],
+            file_xorurl
+        );
 
         // let's add another file but with the same name
         let data = Bytes::from("9876543210");
@@ -2684,13 +2677,13 @@ mod tests {
         assert_ne!(version2, version1);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
-        assert_eq!(new_processed_files[new_filename].0, CONTENT_UPDATED_SIGN);
+        assert!(new_processed_files[new_filename].is_updated());
         assert_eq!(
-            new_processed_files[new_filename].1,
-            new_files_map[new_filename][PREDICATE_LINK]
+            new_processed_files[new_filename].link(),
+            Some(&new_files_map[&new_filename.display().to_string()][PREDICATE_LINK])
         );
         assert_eq!(
-            new_files_map[new_filename][PREDICATE_LINK],
+            new_files_map[&new_filename.display().to_string()][PREDICATE_LINK],
             other_file_xorurl
         );
 
@@ -2713,10 +2706,10 @@ mod tests {
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
 
         let data = Bytes::from("0123456789");
-        let new_filename = "/new_filename_test.md";
+        let new_filename = Path::new("/new_filename_test.md");
 
         let mut url_with_path = SafeUrl::from_xorurl(&xorurl)?;
-        url_with_path.set_path(new_filename);
+        url_with_path.set_path(&new_filename.display().to_string());
 
         let (version1, new_processed_files, new_files_map) = retry_loop!(safe
             .files_container_add_from_raw(
@@ -2732,10 +2725,10 @@ mod tests {
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
 
-        assert_eq!(new_processed_files[new_filename].0, CONTENT_ADDED_SIGN);
+        assert!(new_processed_files[new_filename].is_added());
         assert_eq!(
-            new_processed_files[new_filename].1,
-            new_files_map[new_filename][PREDICATE_LINK]
+            new_processed_files[new_filename].link(),
+            Some(&new_files_map[&new_filename.display().to_string()][PREDICATE_LINK])
         );
 
         // let's add another file but with the same name
@@ -2754,10 +2747,10 @@ mod tests {
         assert_ne!(version2, version1);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
-        assert_eq!(new_processed_files[new_filename].0, CONTENT_UPDATED_SIGN);
+        assert!(new_processed_files[new_filename].is_updated());
         assert_eq!(
-            new_processed_files[new_filename].1,
-            new_files_map[new_filename][PREDICATE_LINK]
+            new_processed_files[new_filename].link(),
+            Some(&new_files_map[&new_filename.display().to_string()][PREDICATE_LINK])
         );
         Ok(())
     }
@@ -2781,11 +2774,11 @@ mod tests {
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), TESTDATA_PUT_FILESMAP_COUNT - 1);
 
-        let filepath = "/test.md";
-        assert_eq!(new_processed_files[filepath].0, CONTENT_DELETED_SIGN);
+        let filepath = Path::new("/test.md");
+        assert!(new_processed_files[filepath].is_removed());
         assert_eq!(
-            new_processed_files[filepath].1,
-            files_map[filepath][PREDICATE_LINK]
+            new_processed_files[filepath].link(),
+            Some(&files_map[&filepath.display().to_string()][PREDICATE_LINK])
         );
 
         // let's remove an entire folder now with recursive flag
@@ -2802,18 +2795,18 @@ mod tests {
             TESTDATA_PUT_FILESMAP_COUNT - SUBFOLDER_PUT_FILEITEM_COUNT - 1
         );
 
-        let filename1 = "/subfolder/subexists.md";
-        assert_eq!(new_processed_files[filename1].0, CONTENT_DELETED_SIGN);
+        let filename1 = Path::new("/subfolder/subexists.md");
+        assert!(new_processed_files[filename1].is_removed());
         assert_eq!(
-            new_processed_files[filename1].1,
-            files_map[filename1][PREDICATE_LINK]
+            new_processed_files[filename1].link(),
+            Some(&files_map[&filename1.display().to_string()][PREDICATE_LINK])
         );
 
-        let filename2 = "/subfolder/sub2.md";
-        assert_eq!(new_processed_files[filename2].0, CONTENT_DELETED_SIGN);
+        let filename2 = Path::new("/subfolder/sub2.md");
+        assert!(new_processed_files[filename2].is_removed());
         assert_eq!(
-            new_processed_files[filename2].1,
-            files_map[filename2][PREDICATE_LINK]
+            new_processed_files[filename2].link(),
+            Some(&files_map[&filename2.display().to_string()][PREDICATE_LINK])
         );
 
         Ok(())

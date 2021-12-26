@@ -9,7 +9,7 @@
 
 use super::ipc::IpcError;
 use super::nrs::NrsMap;
-use super::safeurl::{Error as UrlError, SafeUrl};
+use super::safeurl::{Error as UrlError, SafeUrl, XorUrl};
 use safe_network::client::Error as ClientError;
 use thiserror::Error;
 
@@ -72,9 +72,12 @@ pub enum Error {
     /// EntryNotFound
     #[error("EntryNotFound: {0}")]
     EntryNotFound(String),
-    /// EntryExists
-    #[error("EntryExists: {0}")]
-    EntryExists(String),
+    /// A file with same name already exists on target FilesContainer with same link"
+    #[error("File named \"{0}\" already exists on target with same link.")]
+    FileAlreadyExists(String),
+    /// A file with same name already exists on target FilesContainer with same link"
+    #[error("File named \"{0}\" already exists on target. Use the 'force' flag to replace it.")]
+    FileNameConflict(String),
     /// InvalidAmount
     #[error("InvalidAmount: {0}")]
     InvalidAmount(String),
@@ -108,6 +111,9 @@ pub enum Error {
     /// UnversionedContentError
     #[error("UnversionedContentError: {0}")]
     UnversionedContentError(String),
+    /// Content may have been correctly stored on the network, but verification failed
+    #[error("Content may have been correctly stored on the network, but verification failed: {0}")]
+    ContentUploadVerificationFailed(XorUrl),
     /// NotImplementedError
     #[error("NotImplementedError: {0}")]
     NotImplementedError(String),

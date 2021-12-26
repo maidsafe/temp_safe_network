@@ -12,8 +12,9 @@ use super::{
     metadata::FileMeta,
     ProcessedFiles, RealPath,
 };
-use crate::{app::consts::*, Error, Result, Safe};
+use crate::{app::consts::*, Error, Result, Safe, XorUrl};
 use log::{debug, info};
+use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, path::Path};
 
 // To use for mapping files names (with path in a flattened hierarchy) to FileInfos
@@ -21,6 +22,53 @@ pub type FilesMap = BTreeMap<String, FileInfo>;
 
 // Each FileInfo contains file metadata and the link to the file's Blob XOR-URL
 pub type FileInfo = BTreeMap<String, String>;
+
+// Type of changes made to each item of a FilesMap
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Serialize, Deserialize)]
+pub enum FilesMapChange {
+    Added(XorUrl),
+    Updated(XorUrl),
+    Removed(XorUrl),
+    Failed(String),
+}
+
+impl FilesMapChange {
+    pub fn is_success(&self) -> bool {
+        match self {
+            Self::Added(_) | Self::Updated(_) | Self::Removed(_) => true,
+            Self::Failed(_) => false,
+        }
+    }
+
+    pub fn link(&self) -> Option<&XorUrl> {
+        match self {
+            Self::Added(link) | Self::Updated(link) | Self::Removed(link) => Some(link),
+            Self::Failed(_) => None,
+        }
+    }
+
+    pub fn is_added(&self) -> bool {
+        match self {
+            Self::Added(_) => true,
+            Self::Updated(_) | Self::Removed(_) | Self::Failed(_) => false,
+        }
+    }
+
+    pub fn is_updated(&self) -> bool {
+        match self {
+            Self::Updated(_) => true,
+            Self::Added(_) | Self::Removed(_) | Self::Failed(_) => false,
+        }
+    }
+
+    pub fn is_removed(&self) -> bool {
+        match self {
+            Self::Removed(_) => true,
+            Self::Added(_) | Self::Updated(_) | Self::Failed(_) => false,
+        }
+    }
+}
 
 // A trait to get an key attr and return an API Result
 pub trait GetAttr {
@@ -42,7 +90,7 @@ impl GetAttr for FileInfo {
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn add_or_update_file_item(
     safe: &mut Safe,
-    file_name: &str,
+    file_name: &Path,
     file_name_for_map: &str,
     file_path: &Path,
     file_meta: &FileMeta,
@@ -55,37 +103,32 @@ pub(crate) async fn add_or_update_file_item(
     // We need to add a new FileInfo, let's generate the FileInfo first
     match gen_new_file_item(safe, file_path, file_meta, file_link, dry_run).await {
         Ok(new_file_item) => {
-            let content_added_sign = if name_exists {
-                CONTENT_UPDATED_SIGN.to_string()
+            // note: files have link property, dirs and symlinks do not
+            let xorurl = new_file_item
+                .get(PREDICATE_LINK)
+                .unwrap_or(&String::default())
+                .to_string();
+
+            let file_item_change = if name_exists {
+                FilesMapChange::Updated(xorurl)
             } else {
-                CONTENT_ADDED_SIGN.to_string()
+                FilesMapChange::Added(xorurl)
             };
 
             debug!("New FileInfo item: {:?}", new_file_item);
             debug!("New FileInfo item inserted as {:?}", file_name);
-            files_map.insert(file_name_for_map.to_string(), new_file_item.clone());
+            files_map.insert(file_name_for_map.to_string(), new_file_item);
 
-            processed_files.insert(
-                file_name.to_string(),
-                (
-                    content_added_sign,
-                    // note: files have link property,
-                    //       dirs and symlinks do not
-                    new_file_item
-                        .get(PREDICATE_LINK)
-                        .unwrap_or(&String::default())
-                        .to_string(),
-                ),
-            );
+            processed_files.insert(file_name.to_path_buf(), file_item_change);
 
             true
         }
         Err(err) => {
-            processed_files.insert(
-                file_name.to_string(),
-                (CONTENT_ERROR_SIGN.to_string(), format!("<{:?}>", err)),
-            );
             info!("Skipping file \"{}\": {:?}", file_link.unwrap_or(""), err);
+            processed_files.insert(
+                file_name.to_path_buf(),
+                FilesMapChange::Failed(format!("{}", err)),
+            );
 
             false
         }

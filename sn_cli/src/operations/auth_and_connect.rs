@@ -61,7 +61,7 @@ pub async fn connect(safe: &mut Safe, config: Config) -> Result<Option<Keypair>>
         info!("No credentials found for CLI, connecting with read-only access...");
     }
 
-    let (_, bootstrap_contacts) = config.read_current_node_config()?;
+    let (_, bootstrap_contacts) = config.read_current_node_config().await?;
     let client_cfg = client_config_path();
     match safe
         .connect(
