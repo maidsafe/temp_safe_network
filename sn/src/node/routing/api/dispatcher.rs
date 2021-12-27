@@ -111,7 +111,7 @@ impl Dispatcher {
                 return Err(Error::CouldNotGetPermitInTime);
             }
 
-            time::sleep(Duration::from_millis(500)).await;
+            time::sleep(Duration::from_millis(50)).await;
             trace!(
                 "looping while we wait for available permits to be {:?}: {:?}",
                 count,
