@@ -130,6 +130,7 @@ impl Comm {
             wire_msg.set_dst_xorname(name);
 
             let bytes = wire_msg.serialize()?;
+            // TODO: rework priority so this we dont need to deserialise payload to determine priority.
             let priority = wire_msg.into_message()?.priority();
             let retries = self.back_pressure.get(&addr).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 

@@ -95,11 +95,6 @@ impl Dispatcher {
         semaphore: Arc<Semaphore>,
         count: usize,
     ) -> Result<()> {
-        if !cfg!(feature = "unstable-command-prioritisation") {
-            // then we don't wait.
-            return Ok(());
-        }
-
         // there's probably a neater way to do this
         debug!("available, permits {:?}", semaphore.available_permits());
 
@@ -137,33 +132,14 @@ impl Dispatcher {
         None
     }
 
-    /// Based upon message priority will wait for any higher priority commands to be completed before continuing
-    async fn acquire_permit_or_wait(&self, prio: i32, cmd_id: CmdId) -> Result<()> {
-        debug!("{:?} start of acquire permit", cmd_id);
-        let mut the_prio = prio;
-        // if we already have a permit, increase our count and continue
-        let root_cmd_id = get_root_cmd_id(&cmd_id);
-        let permit_map = self.cmd_permit_map.clone();
-        let commands_len = permit_map.read().await.len();
-        debug!("Commands in flight (root permit len): {:?}", commands_len);
-
-        let root_prio = self.a_root_cmd_permit_exists(root_cmd_id.clone()).await;
-
-        if let Some(prio) = root_prio {
-            // use the root priority for all subsequent commands
-            the_prio = prio;
-        }
-
-        // now, no matter the command/root, we wait for anything higher prio than the _root_ priority
-
-        let permit = match the_prio {
-            JOIN_RESPONSE_PRIORITY => Some(
-                self.join_permits
-                    .clone()
-                    .acquire_owned()
-                    .await
-                    .map_err(|_| Error::SemaphoreClosed),
-            ),
+    /// Waits until higher priority messages have all been handled
+    async fn wait_until_nothing_higher_priority_to_handle(
+        &self,
+        priority: i32,
+        cmd_id: CmdId,
+    ) -> Result<()> {
+        match priority {
+            JOIN_RESPONSE_PRIORITY => {}
             DKG_MSG_PRIORITY => {
                 trace!(
                     "{:?} Awaiting Join Completion before continuing with DKG Msg",
@@ -174,18 +150,6 @@ impl Dispatcher {
                     SEMAPHORE_COUNT,
                 )
                 .await?;
-
-                if root_prio.is_some() {
-                    return Ok(());
-                }
-
-                Some(
-                    self.dkg_permits
-                        .clone()
-                        .acquire_owned()
-                        .await
-                        .map_err(|_| Error::SemaphoreClosed),
-                )
             }
             AE_MSG_PRIORITY => {
                 trace!(
@@ -202,18 +166,6 @@ impl Dispatcher {
                     SEMAPHORE_COUNT,
                 )
                 .await?;
-
-                if root_prio.is_some() {
-                    return Ok(());
-                }
-
-                Some(
-                    self.ae_permits
-                        .clone()
-                        .acquire_owned()
-                        .await
-                        .map_err(|_| Error::SemaphoreClosed),
-                )
             }
             INFRASTRUCTURE_MSG_PRIORITY => {
                 trace!(
@@ -232,18 +184,6 @@ impl Dispatcher {
                 .await?;
                 self.wait_for_priority_commands_to_finish(self.ae_permits.clone(), SEMAPHORE_COUNT)
                     .await?;
-
-                if root_prio.is_some() {
-                    return Ok(());
-                }
-
-                Some(
-                    self.infra_permits
-                        .clone()
-                        .acquire_owned()
-                        .await
-                        .map_err(|_| Error::SemaphoreClosed),
-                )
             }
             NODE_DATA_MSG_PRIORITY => {
                 trace!(
@@ -267,18 +207,6 @@ impl Dispatcher {
                     SEMAPHORE_COUNT,
                 )
                 .await?;
-
-                if root_prio.is_some() {
-                    return Ok(());
-                }
-
-                Some(
-                    self.node_data_permits
-                        .clone()
-                        .acquire_owned()
-                        .await
-                        .map_err(|_| Error::SemaphoreClosed),
-                )
             }
             // service msgs...
             _ => {
@@ -308,40 +236,103 @@ impl Dispatcher {
                     SEMAPHORE_COUNT,
                 )
                 .await?;
-
-                match self.service_msg_permits.clone().try_acquire_owned() {
-                    Ok(permit) => Some(Ok(permit)),
-                    Err(error) => {
-                        error!(
-                            "Could not acquire service msg permit, dropping the command {:?} {:?}",
-                            cmd_id, error
-                        );
-                        Some(Err(Error::AtMaxServiceCommandThroughput))
-                    }
-                }
             }
         };
 
-        trace!("{:?} continuing...", cmd_id);
-        // if there is a permit to be got...
-        if let Some(permit) = permit {
-            match permit {
-                // and there was no error w/ semaphore
-                Ok(permit) => {
-                    debug!("inserting permit for cmd {:?}", cmd_id);
-                    let mut permit_map_write_guard = permit_map.write().await;
-                    let _old_permit = permit_map_write_guard.insert(root_cmd_id, (permit, 1, prio));
-                    debug!("inserted permit");
-                    Ok(())
-                }
+        Ok(())
+    }
+
+    /// Based upon message priority will wait for any higher priority commands to be completed before continuing
+    async fn acquire_permit_or_wait(&self, prio: i32, cmd_id: CmdId) -> Result<()> {
+        debug!("{:?} start of acquire permit", cmd_id);
+        let mut the_prio = prio;
+        // if we already have a permit, increase our count and continue
+        let root_cmd_id = get_root_cmd_id(&cmd_id);
+        let permit_map = self.cmd_permit_map.clone();
+        let commands_len = permit_map.read().await.len();
+        debug!("Commands in flight (root permit len): {:?}", commands_len);
+
+        let root_prio = self.a_root_cmd_permit_exists(root_cmd_id.clone()).await;
+
+        if let Some(prio) = root_prio {
+            // use the root priority for all subsequent commands
+            the_prio = prio;
+        }
+
+        // If we have our feat enabled, wait until anything higher prio has completed.
+        if cfg!(feature = "unstable-command-prioritisation") {
+            self.wait_until_nothing_higher_priority_to_handle(the_prio, cmd_id.clone())
+                .await?;
+        }
+
+        if root_prio.is_some() {
+            return Ok(());
+        }
+
+        let permit = match the_prio {
+            JOIN_RESPONSE_PRIORITY => self
+                .join_permits
+                .clone()
+                .acquire_owned()
+                .await
+                .map_err(|_| Error::SemaphoreClosed),
+
+            DKG_MSG_PRIORITY => self
+                .dkg_permits
+                .clone()
+                .acquire_owned()
+                .await
+                .map_err(|_| Error::SemaphoreClosed),
+
+            AE_MSG_PRIORITY => self
+                .ae_permits
+                .clone()
+                .acquire_owned()
+                .await
+                .map_err(|_| Error::SemaphoreClosed),
+
+            INFRASTRUCTURE_MSG_PRIORITY => self
+                .infra_permits
+                .clone()
+                .acquire_owned()
+                .await
+                .map_err(|_| Error::SemaphoreClosed),
+
+            NODE_DATA_MSG_PRIORITY => self
+                .node_data_permits
+                .clone()
+                .acquire_owned()
+                .await
+                .map_err(|_| Error::SemaphoreClosed),
+
+            // service msgs...
+            _ => match self.service_msg_permits.clone().try_acquire_owned() {
+                Ok(permit) => Ok(permit),
                 Err(error) => {
-                    // log error, it can only be permit acquisition here, so that's okay and we ignore it / drop command as we've bigger issues
-                    error!("{:?}", error);
-                    Err(error)
+                    error!(
+                        "Could not acquire service msg permit, dropping the command {:?} {:?}",
+                        cmd_id, error
+                    );
+                    Err(Error::AtMaxServiceCommandThroughput)
                 }
+            },
+        };
+
+        trace!("CmdId {:?} continuing...", cmd_id);
+        match permit {
+            // there was no error w/ semaphore
+            Ok(permit) => {
+                debug!("inserting permit for cmd {:?}", cmd_id);
+                let mut permit_map_write_guard = permit_map.write().await;
+                let _old_permit = permit_map_write_guard.insert(root_cmd_id, (permit, 1, prio));
+                debug!("inserted permit");
+                Ok(())
             }
-        } else {
-            Ok(())
+            Err(error) => {
+                // log error, it can only be permit acquisition here, so that's okay and we ignore it / drop command as we've bigger issues
+                error!("{:?}", error);
+                Err(error)
+            }
         }
     }
 

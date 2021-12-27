@@ -197,20 +197,19 @@ jobs:
       # register api
       - name: Client reg tests against local network
         shell: bash
-        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::reg --test-threads=2 --skip ae && sleep 5
-        timeout-minutes: 10
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::reg --test-threads=1 --skip ae && sleep 30
+        timeout-minutes: 15
 
       # blob api
       - name: client blob tests against local network
         shell: bash
-        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::blob --test-threads=2 --skip ae  && sleep 5
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::blob --test-threads=1 --skip ae --skip from_many_clients  && sleep 30
         timeout-minutes: 10
-
 
       # ae tests api
       - name: client ae tests against local network
         shell: bash
-        run: cd sn && cargo test --release --features=always-joinable,test-utils -- ae_checks --test-threads=2 && sleep 5
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- ae_checks --test-threads=2 && sleep 30
         timeout-minutes: 10
         env:
           SN_AE_WAIT: 10
@@ -219,6 +218,14 @@ jobs:
         timeout-minutes: 10
         shell: bash
         run: cd sn && cargo run  --release  --features=always-joinable,test-utils --example client_blob
+
+      # # many client connections
+      # - name: many client test against local network
+      #   shell: bash
+      #   run: cd sn && cargo test --release --features=always-joinable,test-utils -- from_many_clients  && sleep 30
+      #   timeout-minutes: 20
+      #   env:
+      #     SN_QUERY_TIMEOUT: 240 # 240 secs
 
       - name: Are nodes still running...?
         shell: bash
@@ -299,7 +306,7 @@ jobs:
       - name: Run sn_api tests
         shell: bash
         run: ./resources/scripts/api_tests.sh
-        timeout-minutes: 25
+        timeout-minutes: 45
         env:
           # these api tests realy heavily on retry_loop at the moment
           # TODO: Remove that dependency
