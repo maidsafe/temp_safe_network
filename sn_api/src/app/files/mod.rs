@@ -2664,6 +2664,10 @@ mod tests {
         // let's add another file but with the same name
         let data = Bytes::from("9876543210");
         let other_file_xorurl = retry_loop!(safe.store_public_bytes(data.clone(), None, false));
+
+        // We give the network a moment to make sure updated
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+
         let (version2, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
             &other_file_xorurl,
             &url_with_path.to_string(),
@@ -2731,6 +2735,9 @@ mod tests {
             Some(&new_files_map[&new_filename.display().to_string()][PREDICATE_LINK])
         );
 
+        // We give the network a moment to make sure updated
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+
         // let's add another file but with the same name
         let data = Bytes::from("9876543210");
         let (version2, new_processed_files, new_files_map) = retry_loop!(safe
@@ -2780,6 +2787,9 @@ mod tests {
             new_processed_files[filepath].link(),
             Some(&files_map[&filepath.display().to_string()][PREDICATE_LINK])
         );
+
+        // We give the network a moment to make sure updated
+        std::thread::sleep(std::time::Duration::from_millis(1000));
 
         // let's remove an entire folder now with recursive flag
         url_with_path.set_path("/subfolder");

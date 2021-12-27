@@ -181,6 +181,9 @@ mod tests {
             )
             .await?;
 
+        // We give the network a moment to make sure register updated
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+
         let received_entry = safe.register_read_entry(&xorurl, hash).await?;
         let received_entry_priv = safe.register_read_entry(&xorurl_priv, hash_priv).await?;
 

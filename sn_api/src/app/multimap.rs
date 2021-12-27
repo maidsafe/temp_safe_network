@@ -364,6 +364,9 @@ mod tests {
             .multimap_insert(&xorurl_priv, key_val2.clone(), BTreeSet::new(), false)
             .await?;
 
+        // We give the network a moment to make sure register updated
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+
         let received_data = safe.multimap_get_by_hash(&xorurl, hash).await?;
         let received_data_priv = safe.multimap_get_by_hash(&xorurl_priv, hash_priv).await?;
 
