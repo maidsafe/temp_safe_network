@@ -338,12 +338,13 @@ impl Dispatcher {
                     for (sub_cmd_count, command) in commands.into_iter().enumerate() {
                         let sub_cmd_id = format!("{}.{}", &cmd_id, sub_cmd_count);
                         // Error here is only related to queueing, and so a dropped command will be logged
-                        let _result = self
-                            .clone()
-                            .enqueue_and_handle_next_command_and_any_offshoots(
-                                command,
-                                Some(sub_cmd_id),
-                            );
+                        let _result = tokio::spawn(
+                            self.clone()
+                                .enqueue_and_handle_next_command_and_any_offshoots(
+                                    command,
+                                    Some(sub_cmd_id),
+                                ),
+                        );
                     }
                 }
             });
