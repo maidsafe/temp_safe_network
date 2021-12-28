@@ -850,10 +850,8 @@ impl Core {
                         "Cannot verify DkgSessionInfo: {:?}. Unknown key: {:?}!",
                         &session_id, auth.sig.public_key
                     );
-                    warn!(
-                        "Chain: {:?}",
-                        self.network_knowledge().section_chain().await
-                    );
+                    let chain = self.network_knowledge().section_chain().await;
+                    warn!("Chain: {:?}", chain);
                     return Ok(commands);
                 }
                 let _existing = self.dkg_sessions.write().await.insert(

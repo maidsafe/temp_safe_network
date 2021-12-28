@@ -347,10 +347,11 @@ impl Core {
             }
         }
 
+        let section_key = self.network_knowledge.section_key().await;
         trace!(
             "Performing AE checks, provided pk was: {:?} ours is: {:?}",
             dst_section_key,
-            self.network_knowledge.section_key().await
+            section_key
         );
 
         if dst_section_key == &self.network_knowledge.section_key().await {

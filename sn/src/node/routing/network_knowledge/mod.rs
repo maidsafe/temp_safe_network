@@ -344,9 +344,10 @@ impl NetworkKnowledge {
         // Update members if changes were provided
         if let Some(peers) = updated_members {
             if self.merge_members(peers).await? {
+                let prefix = self.prefix().await;
                 info!(
                     "Updated our section's members ({:?}): {:?}",
-                    self.prefix().await,
+                    prefix,
                     self.members()
                 );
             }
