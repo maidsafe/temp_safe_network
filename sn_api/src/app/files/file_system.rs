@@ -69,21 +69,20 @@ pub(crate) fn normalise_path_separator(from: &str) -> String {
 // the list of files with their corresponding XOR-URLs
 pub(crate) async fn file_system_dir_walk(
     safe: &mut Safe,
-    location: &str,
+    location: &Path,
     recursive: bool,
     follow_links: bool,
     dry_run: bool,
 ) -> Result<ProcessedFiles> {
-    let file_path = Path::new(location);
-    info!("Reading files from {}", file_path.display());
+    info!("Reading files from {}", location.display());
 
-    let (metadata, _) = get_metadata(file_path, follow_links)?;
+    let (metadata, _) = get_metadata(location, follow_links)?;
     if metadata.is_dir() || !recursive {
         // TODO: option to enable following symlinks?
         // We now compare both FilesMaps to upload the missing files
         let max_depth = if recursive { MAX_RECURSIVE_DEPTH } else { 1 };
         let mut processed_files = ProcessedFiles::default();
-        let children_to_process = WalkDir::new(file_path)
+        let children_to_process = WalkDir::new(location)
             .follow_links(follow_links)
             .into_iter()
             .filter_entry(|e| valid_depth(e, max_depth))
@@ -162,7 +161,7 @@ pub(crate) async fn file_system_dir_walk(
         // or remove the 'recursive' flag from the args
         Err(Error::InvalidInput(format!(
             "'{}' is not a directory. The \"recursive\" arg is only supported for folders.",
-            location
+            location.display()
         )))
     }
 }
@@ -181,23 +180,22 @@ fn valid_depth(entry: &DirEntry, max_depth: usize) -> bool {
 // the obtained XOR-URL in the single file list returned
 pub(crate) async fn file_system_single_file(
     safe: &mut Safe,
-    location: &str,
+    location: &Path,
     dry_run: bool,
 ) -> Result<ProcessedFiles> {
-    let file_path = Path::new(location);
-    info!("Reading file {}", file_path.display());
-    let (metadata, _) = get_metadata(file_path, true)?; // follows symlinks.
+    info!("Reading file {}", location.display());
+    let (metadata, _) = get_metadata(location, true)?; // follows symlinks.
 
     // We now compare both FilesMaps to upload the missing files
     let mut processed_files = ProcessedFiles::default();
-    let normalised_path = PathBuf::from(normalise_path_separator(file_path.to_str().unwrap_or("")));
+    let normalised_path = PathBuf::from(normalise_path_separator(&location.display().to_string()));
     if metadata.is_dir() {
         Err(Error::InvalidInput(format!(
             "'{}' is a directory, only individual files can be added. Use files sync operation for uploading folders",
-            location
+            location.display()
         )))
     } else {
-        match upload_file_to_net(safe, file_path, dry_run).await {
+        match upload_file_to_net(safe, location, dry_run).await {
             Ok(xorurl) => {
                 processed_files.insert(normalised_path, FilesMapChange::Added(xorurl));
             }

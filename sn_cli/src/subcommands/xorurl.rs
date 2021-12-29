@@ -95,7 +95,7 @@ pub async fn xorurl_commander(
 
             // Do a dry-run on the location
             let (_version, processed_files, _) = safe
-                .files_container_create(Some(&location), None, recursive, follow_symlinks, true)
+                .files_container_create_from(&location, None, recursive, follow_symlinks, true)
                 .await?;
 
             // Now let's just print out a list of the xorurls

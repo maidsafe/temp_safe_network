@@ -45,7 +45,7 @@ const ERROR_MSG_NO_FILES_CONTAINER_FOUND: &str = "No FilesContainer found at thi
 pub(crate) const FILES_CONTAINER_TYPE_TAG: u64 = 1_100;
 
 impl Safe {
-    /// # Create a FilesContainer.
+    /// # Create an empty FilesContainer.
     ///
     /// ## Example
     ///
@@ -55,41 +55,11 @@ impl Safe {
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
     ///     safe.connect(None, None, None).await.unwrap();
-    ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("./testdata"), None, true, true, false).await.unwrap();
+    ///     let xorurl = safe.files_container_create(false).await.unwrap();
     ///     assert!(xorurl.contains("safe://"))
     /// # });
     /// ```
-    pub async fn files_container_create(
-        &mut self,
-        location: Option<&str>,
-        dest: Option<&Path>,
-        recursive: bool,
-        follow_links: bool,
-        dry_run: bool,
-    ) -> Result<(XorUrl, ProcessedFiles, FilesMap)> {
-        // Let's upload the files (if not dry_run) and generate the list of local files paths
-        let (processed_files, files_map) = match location {
-            Some(path) => {
-                let mut processed_files =
-                    file_system_dir_walk(self, path, recursive, follow_links, dry_run).await?;
-
-                // The FilesContainer is stored on a Register
-                // and the link to the serialised FilesMap as the entry's value
-                let files_map = files_map_create(
-                    self,
-                    &mut processed_files,
-                    path,
-                    dest,
-                    follow_links,
-                    dry_run,
-                )
-                .await?;
-
-                (processed_files, files_map)
-            }
-            None => (ProcessedFiles::default(), FilesMap::default()),
-        };
-
+    pub async fn files_container_create(&mut self, dry_run: bool) -> Result<XorUrl> {
         // Build a Register creation operation
         let (xorname, reg_op) = self
             .safe_client
@@ -104,12 +74,58 @@ impl Safe {
             self.xorurl_base,
         )?;
 
+        if !dry_run {
+            // Send the Register creation op to the network
+            self.safe_client.apply_register_ops(reg_op).await?;
+        }
+
+        Ok(xorurl.to_string())
+    }
+
+    /// # Create a FilesContainer containing files uploaded from a local folder.
+    ///
+    /// ## Example
+    ///
+    /// ```no_run
+    /// # use sn_api::Safe;
+    /// # let mut safe = Safe::default();
+    /// # let rt = tokio::runtime::Runtime::new().unwrap();
+    /// # rt.block_on(async {
+    ///     safe.connect(None, None, None).await.unwrap();
+    ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create_from("./testdata", None, true, true, false).await.unwrap();
+    ///     assert!(xorurl.contains("safe://"))
+    /// # });
+    /// ```
+    pub async fn files_container_create_from<P: AsRef<Path>>(
+        &mut self,
+        location: P,
+        dest: Option<&Path>,
+        recursive: bool,
+        follow_links: bool,
+        dry_run: bool,
+    ) -> Result<(XorUrl, ProcessedFiles, FilesMap)> {
+        // Let's upload the files (if not dry_run) and generate the list of local files paths
+        let mut processed_files =
+            file_system_dir_walk(self, location.as_ref(), recursive, follow_links, dry_run).await?;
+
+        // The FilesContainer is stored on a Register
+        // and the link to the serialised FilesMap as the entry's value
+        let files_map = files_map_create(
+            self,
+            &mut processed_files,
+            location.as_ref(),
+            dest,
+            follow_links,
+            dry_run,
+        )
+        .await?;
+
+        // Create a Register
+        let xorurl = self.files_container_create(dry_run).await?;
+
         if dry_run {
             Ok((xorurl.to_string(), processed_files, files_map))
         } else {
-            // Send the Register creation op to the network
-            self.safe_client.apply_register_ops(reg_op).await?;
-
             // Store files map on network
             let files_map_xorurl = self.store_files_map(&files_map).await?;
 
@@ -142,7 +158,7 @@ impl Safe {
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
     /// #   safe.connect(None, None, None).await.unwrap();
-    ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("./testdata"), None, true, true, false).await.unwrap();
+    ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create_from("./testdata", None, true, true, false).await.unwrap();
     ///     let (version, files_map) = safe.files_container_get(&xorurl).await.unwrap();
     ///     println!("FilesContainer fetched is at version: {}", version);
     ///     println!("FilesMap of fetched version is: {:?}", files_map);
@@ -226,7 +242,7 @@ impl Safe {
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
     /// #   safe.connect(None, None, None).await.unwrap();
-    ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("./testdata"), None, true, false, false).await.unwrap();
+    ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create_from("./testdata", None, true, false, false).await.unwrap();
     ///     let (version, new_processed_files, new_files_map) = safe.files_container_sync("./testdata", &xorurl, true, true, false, false, false).await.unwrap();
     ///     println!("FilesContainer synced up is at version: {}", version);
     ///     println!("The local files that were synced up are: {:?}", new_processed_files);
@@ -234,9 +250,9 @@ impl Safe {
     /// # });
     /// ```
     #[allow(clippy::too_many_arguments)]
-    pub async fn files_container_sync(
+    pub async fn files_container_sync<P: AsRef<Path>>(
         &mut self,
-        location: &str,
+        location: P,
         url: &str,
         recursive: bool,
         follow_links: bool,
@@ -270,7 +286,7 @@ impl Safe {
 
         // Let's generate the list of local files paths, without uploading any new file yet
         let processed_files =
-            file_system_dir_walk(self, location, recursive, follow_links, true).await?;
+            file_system_dir_walk(self, location.as_ref(), recursive, follow_links, true).await?;
 
         let dest_path = Path::new(safe_url.path());
 
@@ -278,7 +294,7 @@ impl Safe {
             files_map_sync(
                 self,
                 current_files_map,
-                location,
+                location.as_ref(),
                 processed_files,
                 Some(dest_path),
                 delete,
@@ -316,7 +332,7 @@ impl Safe {
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
     /// #   safe.connect(None, None, None).await.unwrap();
-    ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("./testdata"), None, true, true, false).await.unwrap();
+    ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create_from("./testdata", None, true, true, false).await.unwrap();
     ///     let new_file_name = format!("{}/new_name_test.md", xorurl);
     ///     let (version, new_processed_files, new_files_map) = safe.files_container_add("./testdata/test.md", &new_file_name, false, false, true, false).await.unwrap();
     ///     println!("FilesContainer is now at version: {}", version);
@@ -344,13 +360,16 @@ impl Safe {
         {
             files_map_add_link(self, current_files_map, source_file, dest_path, force).await?
         } else {
+            // We then assume source is a local path
+            let source_path = Path::new(source_file);
+
             // Let's generate the list of local files paths, without uploading any new file yet
-            let processed_files = file_system_single_file(self, source_file, true).await?;
+            let processed_files = file_system_single_file(self, source_path, true).await?;
 
             files_map_sync(
                 self,
                 current_files_map,
-                source_file,
+                source_path,
                 processed_files,
                 Some(dest_path),
                 false,
@@ -389,7 +408,7 @@ impl Safe {
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
     /// #   safe.connect(None, None, None).await.unwrap();
-    ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create(Some("./testdata"), None, true, true, false).await.unwrap();
+    ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create_from("./testdata", None, true, true, false).await.unwrap();
     ///     let new_file_name = format!("{}/new_name_test.md", xorurl);
     ///     let (version, new_processed_files, new_files_map) = safe.files_container_add_from_raw(b"0123456789", &new_file_name, false, false, false).await.unwrap();
     ///     println!("FilesContainer is now at version: {}", version);
@@ -442,7 +461,7 @@ impl Safe {
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
     /// #   safe.connect(None, None, None).await.unwrap();
-    ///     let (xorurl, processed_files, files_map) = safe.files_container_create(Some("./testdata/"), None, true, true, false).await.unwrap();
+    ///     let (xorurl, processed_files, files_map) = safe.files_container_create_from("./testdata/", None, true, true, false).await.unwrap();
     ///     let remote_file_path = format!("{}/test.md", xorurl);
     ///     let (version, new_processed_files, new_files_map) = safe.files_container_remove_path(&remote_file_path, false, false, false).await.unwrap();
     ///     println!("FilesContainer is now at version: {}", version);
@@ -701,13 +720,13 @@ async fn validate_files_add_params(
 }
 
 // From the location path and the destination path chosen by the user, calculate
-// the destination path considering ending '/' in both the  location and dest path
-fn get_base_paths(location: &str, dest_path: Option<&Path>) -> (String, String) {
+// the destination path considering ending '/' in both the location and dest path
+fn get_base_paths(location: &Path, dest_path: Option<&Path>) -> (String, String) {
     // Let's normalise the path to use '/' (instead of '\' as on Windows)
-    let location_base_path = if location == "." {
-        "./".to_string()
+    let location_base_path = if location.to_str() == Some(".") {
+        String::from("./")
     } else {
-        normalise_path_separator(location)
+        normalise_path_separator(&location.display().to_string())
     };
 
     let new_dest_path = match dest_path {
@@ -747,7 +766,7 @@ fn get_base_paths(location: &str, dest_path: Option<&Path>) -> (String, String) 
 async fn files_map_sync(
     safe: &mut Safe,
     mut current_files_map: FilesMap,
-    location: &str,
+    location: &Path,
     new_content: ProcessedFiles,
     dest_path: Option<&Path>,
     delete: bool,
@@ -1096,7 +1115,7 @@ fn files_map_remove_path(
 async fn files_map_create(
     safe: &mut Safe,
     content: &mut ProcessedFiles,
-    location: &str,
+    location: &Path,
     dest_path: Option<&Path>,
     follow_links: bool,
     dry_run: bool,
@@ -1178,8 +1197,8 @@ mod tests {
     async fn new_files_container_from_testdata(
         safe: &mut Safe,
     ) -> Result<(String, ProcessedFiles, FilesMap)> {
-        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
-            Some(TEST_DATA_FOLDER),
+        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create_from(
+            TEST_DATA_FOLDER,
             None,
             true,
             true,
@@ -1212,7 +1231,7 @@ mod tests {
         let files_map = files_map_create(
             &mut safe,
             &mut processed_files,
-            TEST_DATA_FOLDER_NO_SLASH,
+            Path::new(TEST_DATA_FOLDER_NO_SLASH),
             Some(Path::new("")),
             true,
             false,
@@ -1232,15 +1251,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_files_container_create_empty() -> Result<()> {
+    async fn test_files_container_create_from_empty() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = safe
-            .files_container_create(None, None, false, false, false)
-            .await?;
+        let xorurl = safe.files_container_create(false).await?;
 
         assert!(xorurl.starts_with("safe://"));
-        assert_eq!(processed_files.len(), 0);
-        assert_eq!(files_map.len(), 0);
 
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
@@ -1282,17 +1297,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_files_container_create_file() -> Result<()> {
+    async fn test_files_container_create_from_file() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let filename = Path::new("./testdata/test.md");
         let (xorurl, processed_files, files_map) = safe
-            .files_container_create(
-                Some(&filename.display().to_string()),
-                None,
-                false,
-                false,
-                false,
-            )
+            .files_container_create_from(&filename.display().to_string(), None, false, false, false)
             .await?;
 
         assert!(xorurl.starts_with("safe://"));
@@ -1308,10 +1317,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_files_container_create_dry_run() -> Result<()> {
+    async fn test_files_container_create_from_dry_run() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
-            .files_container_create(Some(TEST_DATA_FOLDER), None, true, false, true)
+            .files_container_create_from(TEST_DATA_FOLDER, None, true, false, true)
             .await?;
 
         assert!(xorurl.starts_with("safe://"));
@@ -1354,10 +1363,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_files_container_create_folder_without_trailing_slash() -> Result<()> {
+    async fn test_files_container_create_from_folder_without_trailing_slash() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
-            Some(TEST_DATA_FOLDER_NO_SLASH),
+        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create_from(
+            TEST_DATA_FOLDER_NO_SLASH,
             None,
             true,
             true,
@@ -1400,7 +1409,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_files_container_create_folder_with_trailing_slash() -> Result<()> {
+    async fn test_files_container_create_from_folder_with_trailing_slash() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (_, processed_files, files_map) = new_files_container_from_testdata(&mut safe).await?;
 
@@ -1436,11 +1445,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_files_container_create_dest_path_without_trailing_slash() -> Result<()> {
+    async fn test_files_container_create_from_dest_path_without_trailing_slash() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
-            .files_container_create(
-                Some(TEST_DATA_FOLDER_NO_SLASH),
+            .files_container_create_from(
+                TEST_DATA_FOLDER_NO_SLASH,
                 Some(Path::new("/myroot")),
                 true,
                 true,
@@ -1484,11 +1493,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_files_container_create_dest_path_with_trailing_slash() -> Result<()> {
+    async fn test_files_container_create_from_dest_path_with_trailing_slash() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
-            .files_container_create(
-                Some(TEST_DATA_FOLDER_NO_SLASH),
+            .files_container_create_from(
+                TEST_DATA_FOLDER_NO_SLASH,
                 Some(Path::new("/myroot/")),
                 true,
                 true,
@@ -1677,7 +1686,7 @@ mod tests {
     async fn test_files_container_sync_same_size() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
-            .files_container_create(Some("./testdata/test.md"), None, false, false, false)
+            .files_container_create_from("./testdata/test.md", None, false, false, false)
             .await?;
 
         assert_eq!(processed_files.len(), 1);
@@ -2221,7 +2230,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_files_container_create_get_empty_folder() -> Result<()> {
+    async fn test_files_container_create_from_get_empty_folder() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, _, files_map) = new_files_container_from_testdata(&mut safe).await?;
 
@@ -2241,8 +2250,8 @@ mod tests {
     #[ignore = "fix unknown issue"]
     async fn test_files_container_sync_with_nrs_url() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, _, _) = retry_loop!(safe.files_container_create(
-            Some("./testdata/test.md"),
+        let (xorurl, _, _) = retry_loop!(safe.files_container_create_from(
+            "./testdata/test.md",
             None,
             false,
             true,
@@ -2299,8 +2308,8 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_add() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
-            Some("./testdata/subfolder/"),
+        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create_from(
+            "./testdata/subfolder/",
             None,
             false,
             true,
@@ -2353,8 +2362,8 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_add_dry_run() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
-            Some("./testdata/subfolder/"),
+        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create_from(
+            "./testdata/subfolder/",
             None,
             false,
             true,
@@ -2413,8 +2422,8 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_add_dir() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
-            Some("./testdata/subfolder/"),
+        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create_from(
+            "./testdata/subfolder/",
             None,
             false,
             true,
@@ -2455,8 +2464,8 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_add_existing_name() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
-            Some("./testdata/subfolder/"),
+        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create_from(
+            "./testdata/subfolder/",
             None,
             false,
             true,
@@ -2538,8 +2547,8 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_fail_add_or_sync_invalid_path() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
-            Some("./testdata/test.md"),
+        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create_from(
+            "./testdata/test.md",
             None,
             false,
             true,
@@ -2605,8 +2614,8 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_add_a_url() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
-            Some("./testdata/subfolder/"),
+        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create_from(
+            "./testdata/subfolder/",
             None,
             false,
             true,
@@ -2693,8 +2702,8 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_add_from_raw() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create(
-            Some("./testdata/subfolder/"),
+        let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create_from(
+            "./testdata/subfolder/",
             None,
             false,
             true,

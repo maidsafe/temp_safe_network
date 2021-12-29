@@ -384,6 +384,8 @@ mod tests {
     use anyhow::{anyhow, bail, Result};
     use std::{matches, str::FromStr};
 
+    const TEST_DATA_FILE: &str = "./testdata/test.md";
+
     #[tokio::test]
     async fn test_nrs_create() -> Result<()> {
         let site_name = random_nrs_name();
@@ -407,7 +409,7 @@ mod tests {
 
         // let's create an empty files container so we have a valid to link
         let (link, _, _) = safe
-            .files_container_create(None, None, true, true, false)
+            .files_container_create_from(TEST_DATA_FILE, None, false, false, false)
             .await?;
         let (version0, _) = retry_loop!(safe.files_container_get(&link));
         let mut url_v0 = SafeUrl::from_url(&link)?;
@@ -445,7 +447,7 @@ mod tests {
 
         // let's create an empty files container so we have a valid to link
         let (link, _, _) = safe
-            .files_container_create(None, None, true, true, false)
+            .files_container_create_from(TEST_DATA_FILE, None, false, false, false)
             .await?;
         let (version0, _) = retry_loop!(safe.files_container_get(&link));
         let mut url_v0 = SafeUrl::from_url(&link)?;
@@ -507,7 +509,7 @@ mod tests {
 
         // let's create an empty files container so we have a valid to link
         let (link, _, _) = safe
-            .files_container_create(None, None, true, true, false)
+            .files_container_create_from(TEST_DATA_FILE, None, false, false, false)
             .await?;
         let (version0, _) = retry_loop!(safe.files_container_get(&link));
 
@@ -565,7 +567,7 @@ mod tests {
 
         // let's create an empty files container so we have a valid to link
         let (link, _, _) = safe
-            .files_container_create(None, None, true, true, false)
+            .files_container_create_from(TEST_DATA_FILE, None, false, false, false)
             .await?;
         let (version0, _) = retry_loop!(safe.files_container_get(&link));
         let mut url_v0 = SafeUrl::from_url(&link)?;
@@ -618,7 +620,7 @@ mod tests {
 
         // let's create an empty files container so we have a valid to link
         let (link, _, _) = safe
-            .files_container_create(None, None, true, true, false)
+            .files_container_create_from(TEST_DATA_FILE, None, false, false, false)
             .await?;
         let (version0, _) = retry_loop!(safe.files_container_get(&link));
 

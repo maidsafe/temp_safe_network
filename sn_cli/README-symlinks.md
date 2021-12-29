@@ -166,7 +166,7 @@ The JSON for a FileContainer with a single symlink looks like:
 
 A parameter `follow_links` was added to the following public APIs:
 
-* Safe::files_container_create()
+* Safe::files_container_create_from()
 * Safe::files_container_sync()
 * Safe::files_container_add()
 * Safe::files_map_sync()
