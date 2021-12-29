@@ -29,31 +29,38 @@ async fn main() -> Result<()> {
 
     // We assume there is a local network running which we can
     // bootstrap to using 127.0.0.1:12000 contact address.
-    // We would also need to be supplied the BLS public key, or the 'genesis key' from the running
+    // We would also need to be supplied the 'genesis key' (BLS public key) from the running
     // network. Here we just provide an example.
     let genesis_key = PublicKey::bls_from_hex("8640e62cc44e75cf4fadc8ee91b74b4cf0fd2c0984fb0e3ab40f026806857d8c41f01d3725223c55b1ef87d669f5e2cc")?
         .bls()
         .ok_or_else(|| eyre!("Unexpectedly failed to obtain (BLS) genesis key."))?;
+
+    // Let's build the bootstrap config
     let mut nodes: BTreeSet<SocketAddr> = BTreeSet::new();
     nodes.insert("127.0.0.1:12000".parse()?);
-    let node_config = (genesis_key, nodes);
-    // Using our afe instance we connect to the network
-    safe.connect(None, None, node_config).await?;
+    let bootstrap_config = (genesis_key, nodes);
+
+    // Using our Safe instance we connect to the network
+    safe.connect(None, None, bootstrap_config).await?;
 
     // We can now upload the file to the network, using the following information
-    let location = file_path.display().to_string();
     let dest = None; // root path at destination container
     let recursive = false; // do not do a recursive look up of files on local path
     let follow_links = false; // do not attempt to follow local links
     let dry_run = false; // commit the operation on the network
 
-    println!("Uploading '{}' to Safe ...", location);
+    println!("Uploading '{}' to Safe ...", file_path.display());
     let (xorurl, _, _) = safe
-        .files_container_create(Some(&location), dest, recursive, follow_links, dry_run)
+        .files_container_create_from(&file_path, dest, recursive, follow_links, dry_run)
         .await?;
-    // The 'files_container_create' API returns (among other information) the
+
+    // The 'files_container_create_from' API returns (among other information) the
     // XOR-URL of the FilesContainer where the file was uplaoded to
-    println!("\nFile '{}' uploaded to Safe at {}", location, xorurl);
+    println!(
+        "\nFile '{}' uploaded to Safe at {}",
+        file_path.display(),
+        xorurl
+    );
 
     // We give the network a moment to make sure nodes get in sync
     std::thread::sleep(std::time::Duration::from_millis(300));

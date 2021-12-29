@@ -218,8 +218,8 @@ pub async fn files_commander(
                 notice_dry_run();
             }
             let (files_container_xorurl, processed_files, _) = safe
-                .files_container_create(
-                    Some(&location),
+                .files_container_create_from(
+                    &location,
                     dest.as_deref(),
                     recursive,
                     follow_links,

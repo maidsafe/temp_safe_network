@@ -59,7 +59,7 @@ impl Safe {
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
     /// #   safe.connect(None, None, None).await.unwrap();
-    ///     let (xorurl, _, _) = safe.files_container_create(Some("./testdata/"), None, true, false, false).await.unwrap();
+    ///     let (xorurl, _, _) = safe.files_container_create_from("./testdata/", None, true, false, false).await.unwrap();
     ///
     ///     let safe_data = safe.fetch( &format!( "{}/test.md", &xorurl.replace("?v=0", "") ), None ).await.unwrap();
     ///     let data_string = match safe_data {
@@ -108,7 +108,7 @@ impl Safe {
     /// # rt.block_on(async {
     /// #   let mut safe = Safe::default();
     /// #   safe.connect(None, None, None).await.unwrap();
-    ///     let (container_xorurl, _, _) = safe.files_container_create(Some("./testdata/"), None, true, false, false).await.unwrap();
+    ///     let (container_xorurl, _, _) = safe.files_container_create_from("./testdata/", None, true, false, false).await.unwrap();
     ///
     ///     let inspected_content = safe.inspect( &format!( "{}/test.md", &container_xorurl.replace("?v=0", "") ) ).await.unwrap();
     ///     match &inspected_content[0] {
@@ -254,7 +254,7 @@ mod tests {
     async fn test_fetch_files_container() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (fc_xorurl, _, original_files_map) = safe
-            .files_container_create(Some("./testdata/"), None, true, false, false)
+            .files_container_create_from("./testdata/", None, true, false, false)
             .await?;
 
         let safe_url = SafeUrl::from_url(&fc_xorurl)?;
@@ -306,7 +306,7 @@ mod tests {
 
         // create file container
         let (xorurl, _, the_files_map) = safe
-            .files_container_create(Some("./testdata/"), None, true, false, false)
+            .files_container_create_from("./testdata/", None, true, false, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
@@ -365,7 +365,7 @@ mod tests {
 
         // create file container
         let (xorurl, _, _the_files_map) = safe
-            .files_container_create(Some("./testdata/"), None, true, false, false)
+            .files_container_create_from("./testdata/", None, true, false, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
@@ -505,7 +505,7 @@ mod tests {
 
         // create file container
         let (xorurl, _, _files_map) = safe
-            .files_container_create(Some("./testdata/"), None, true, false, false)
+            .files_container_create_from("./testdata/", None, true, false, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
