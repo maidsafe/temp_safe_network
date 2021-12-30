@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::dbs::{convert_to_error_message, Error, KvStore, Result, Subdir, UsedSpace};
+use crate::dbs::UsedSpace;
 use crate::messaging::{data::StorageLevel, system::NodeQueryResponse};
 use crate::types::{log_markers::LogMarker, Chunk, ChunkAddress};
 use std::{
@@ -17,45 +17,43 @@ use std::{
 use tokio::sync::RwLock;
 use tracing::info;
 
-type Db = KvStore<Chunk>;
+mod errors;
+pub(crate) use errors::{convert_to_error_message, Error, Result};
 
-impl Subdir for Db {
-    fn subdir() -> &'static Path {
-        Path::new("chunks")
-    }
-}
+mod chunk_disk_store;
+use chunk_disk_store::ChunkDiskStore;
 
 /// Operations on data chunks.
 #[derive(Clone)]
 pub(crate) struct ChunkStore {
-    db: Db,
+    disk_store: ChunkDiskStore,
     last_recorded_level: Arc<RwLock<StorageLevel>>,
 }
 
 impl ChunkStore {
     pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
-            db: Db::new(path, used_space)?,
+            disk_store: ChunkDiskStore::new(path, used_space)?,
             last_recorded_level: Arc::new(RwLock::new(StorageLevel::zero())),
         })
     }
 
     pub(crate) fn keys(&self) -> Result<Vec<ChunkAddress>> {
-        self.db.keys()
+        self.disk_store.list_all_chunk_addresses()
     }
 
     pub(crate) fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
         trace!("Removing chunk, {:?}", address);
-        self.db.delete(address)
+        self.disk_store.delete_chunk(address)
     }
 
     pub(crate) fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
         debug!("Getting chunk {:?}", address);
 
-        match self.db.get(address) {
+        match self.disk_store.read_chunk(address) {
             Ok(res) => Ok(res),
             Err(error) => match error {
-                Error::KeyNotFound(_) => Err(Error::ChunkNotFound(*address.name())),
+                Error::Io(_) => Err(Error::ChunkNotFound(*address.name())),
                 something_else => Err(something_else),
             },
         }
@@ -67,10 +65,11 @@ impl ChunkStore {
         NodeQueryResponse::GetChunk(self.get_chunk(address).map_err(convert_to_error_message))
     }
 
+    /// Store a chunk in the local disk store
+    /// If that chunk was already in the local store, just overwrites it
     #[instrument(skip_all)]
     pub(super) async fn store(&self, data: &Chunk) -> Result<Option<StorageLevel>> {
-        trace!("{:?}", LogMarker::StoringChunk);
-        if self.db.has(data.address())? {
+        if self.disk_store.chunk_file_exists(data.address())? {
             info!(
                 "{}: Chunk already exists, not storing: {:?}",
                 self,
@@ -79,13 +78,14 @@ impl ChunkStore {
             // Nothing more to do here
             return Ok(None);
         }
-        self.db.store(data).await?;
 
+        trace!("{:?}", LogMarker::StoringChunk);
+        self.disk_store.write_chunk(data).await?;
         trace!("{:?}", LogMarker::StoredNewChunk);
 
         let last_recorded_level = { *self.last_recorded_level.read().await };
         if let Ok(next_level) = last_recorded_level.next() {
-            let used_space = self.db.used_space_ratio().await;
+            let used_space = self.disk_store.used_space_ratio().await;
             // every level represents 10 percentage points
             if (10.0 * used_space) as u8 >= next_level.value() {
                 debug!("Next level for storage has been reached");

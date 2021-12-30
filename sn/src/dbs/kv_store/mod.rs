@@ -25,7 +25,6 @@ use serde::de::DeserializeOwned;
 use sled::Db;
 use std::{marker::PhantomData, path::Path};
 use to_db_key::ToDbKey;
-use tracing::info;
 use used_space::UsedSpace;
 
 const DB_DIR: &str = "db";
@@ -153,13 +152,7 @@ impl<V: Value + Send + Sync> KvStore<V> {
 
     /// Used space to max capacity ratio.
     pub(crate) async fn used_space_ratio(&self) -> f64 {
-        let used = self.total_used_space().await;
-        let max_capacity = self.used_space.max_capacity();
-        let used_space_ratio = used as f64 / max_capacity as f64;
-        info!("Used space: {:?}", used);
-        info!("Max capacity: {:?}", max_capacity);
-        info!("Used space ratio: {:?}", used_space_ratio);
-        used_space_ratio
+        self.used_space.ratio().await
     }
 
     /// Lists all keys of currently stored data.
