@@ -181,11 +181,11 @@ impl Safe {
             }
             Err(Error::EmptyContent(_)) => Err(Error::EmptyContent(format!(
                 "Multimap found at \"{}\" was empty",
-                safeurl.to_string()
+                safeurl
             ))),
             Err(Error::ContentNotFound(_)) => Err(Error::ContentNotFound(format!(
                 "No Multimap found at \"{}\"",
-                safeurl.to_string()
+                safeurl
             ))),
             other => other,
         }?;
