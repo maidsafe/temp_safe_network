@@ -19,24 +19,24 @@ pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
 #[non_exhaustive]
 /// Chunk Store error variants.
 pub enum Error {
-    /// Not enough space to store the Chunk.
-    #[error("Not enough space")]
-    NotEnoughSpace,
     /// Chunk not found.
     #[error("Chunk not found: {0:?}")]
     ChunkNotFound(XorName),
     /// Invalid filename
     #[error("Invalid chunk filename")]
     InvalidFilename,
-    /// No filename found
-    #[error("Path contains no file name")]
-    NoFilename,
     /// I/O error.
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
     /// NetworkData error.
     #[error("Network data error:: {0}")]
     NetworkData(#[from] crate::types::Error),
+    /// No filename found
+    #[error("Path contains no file name")]
+    NoFilename,
+    /// Not enough space to store the Chunk.
+    #[error("Not enough space")]
+    NotEnoughSpace,
 }
 
 /// Convert chunk errors to messaging error message for sending over the network.

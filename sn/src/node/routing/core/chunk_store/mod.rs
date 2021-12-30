@@ -11,6 +11,7 @@ use crate::messaging::{data::StorageLevel, system::NodeQueryResponse};
 use crate::types::{log_markers::LogMarker, Chunk, ChunkAddress};
 use std::{
     fmt::{self, Display, Formatter},
+    io::ErrorKind,
     path::Path,
     sync::Arc,
 };
@@ -53,7 +54,9 @@ impl ChunkStore {
         match self.disk_store.read_chunk(address) {
             Ok(res) => Ok(res),
             Err(error) => match error {
-                Error::Io(_) => Err(Error::ChunkNotFound(*address.name())),
+                Error::Io(io_error) if io_error.kind() == ErrorKind::NotFound => {
+                    Err(Error::ChunkNotFound(*address.name()))
+                }
                 something_else => Err(something_else),
             },
         }
