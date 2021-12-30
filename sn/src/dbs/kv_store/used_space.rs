@@ -14,6 +14,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
+use tracing::info;
 
 #[derive(Clone, Debug)]
 /// Tracking used space in supplied dirs, and providing checks to ensure max capacity isn't exceeded
@@ -90,6 +91,16 @@ impl UsedSpace {
             .map(|d| d.clone())
             .map(|path| tokio::spawn(async move { get_size(path).await.map_err(Error::from) }));
         join_all(handles).await.iter().flatten().flatten().sum()
+    }
+
+    pub(crate) async fn ratio(&self) -> f64 {
+        let used = self.total().await;
+        let max_capacity = self.max_capacity();
+        let used_space_ratio = used as f64 / max_capacity as f64;
+        info!("Used space: {:?}", used);
+        info!("Max capacity: {:?}", max_capacity);
+        info!("Used space ratio: {:?}", used_space_ratio);
+        used_space_ratio
     }
 }
 

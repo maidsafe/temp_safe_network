@@ -16,7 +16,6 @@ mod resource_proof;
 mod service_msgs;
 mod update_section;
 
-use crate::dbs::Error as DatabaseError;
 use crate::messaging::{
     data::{ServiceMsg, StorageLevel},
     signature_aggregator::Error as AggregatorError,
@@ -30,7 +29,7 @@ use crate::node::{
     error::{Error, Result},
     routing::{
         api::command::Command,
-        core::{Core, DkgSessionInfo},
+        core::{Core, DkgSessionInfo, ChunkStoreError},
         messages::{NodeMsgAuthorityUtils, WireMsgUtils},
         network_knowledge::{NetworkKnowledge, SectionPeers},
         relocation::RelocateState,
@@ -683,8 +682,8 @@ impl Core {
                         error!("Error storing chunk: {:?}", error);
                         let mut commands = vec![];
 
-                        // if the error was DbFull
-                        if matches!(error, DatabaseError::NotEnoughSpace) {
+                        // if the error was Disk Full
+                        if matches!(error, ChunkStoreError::NotEnoughSpace) {
                             warn!("Db errored as full. Informing elders");
                             let level = StorageLevel::from(10)?;
                             commands.extend(self.record_if_any(Some(level)).await);
