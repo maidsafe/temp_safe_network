@@ -81,10 +81,6 @@ impl ChunkDiskStore {
 
     // ---------------------- public (crate) methods ----------------------
 
-    pub(crate) async fn total_used_space(&self) -> u64 {
-        self.used_space.total().await
-    }
-
     pub(crate) async fn used_space_ratio(&self) -> f64 {
         self.used_space.ratio().await
     }
@@ -141,6 +137,9 @@ impl ChunkDiskStore {
         all_addrs
     }
 
+    #[allow(unused)]
+    /// quickly find chunks related or not to a section, might be usefull when adults change sections
+    /// not used yet
     pub(crate) fn list_files_without_prefix(&self, prefix: Prefix) -> Result<Vec<String>> {
         let all_files = self.list_all_files()?;
         let prefix_path = self.prefix_tree_path(prefix.name(), prefix.bit_count());
@@ -151,6 +150,9 @@ impl ChunkDiskStore {
         Ok(outside_prefix)
     }
 
+    #[allow(unused)]
+    /// quickly find chunks related or not to a section, might be usefull when adults change sections
+    /// not used yet
     pub(crate) fn list_files_with_prefix(&self, prefix: Prefix) -> Result<Vec<String>> {
         let prefix_path = self.prefix_tree_path(prefix.name(), prefix.bit_count());
         list_files_in(prefix_path.as_path())
