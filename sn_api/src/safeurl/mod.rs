@@ -1207,7 +1207,8 @@ impl fmt::Display for SafeUrl {
 mod tests {
     use super::*;
     use color_eyre::{eyre::bail, eyre::eyre, Result};
-    use safe_network::types::BytesAddress;
+    use rand::Rng;
+    use safe_network::types::{register::EntryHash, BytesAddress};
 
     macro_rules! verify_expected_result {
             ($result:expr, $pattern:pat $(if $cond:expr)?) => {
@@ -1377,7 +1378,8 @@ mod tests {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let type_tag: u64 = 0x0eef;
         let subdirs = "/dir1/dir2";
-        let content_version = VersionHash::default();
+        let random_hash: EntryHash = rand::thread_rng().gen::<[u8; 32]>();
+        let content_version = VersionHash::from(&random_hash);
         let query_string = "k1=v1&k2=v2";
         let query_string_v = format!("{}&v={}", query_string, content_version);
         let fragment = "myfragment";
@@ -1593,7 +1595,8 @@ mod tests {
         assert_eq!(x.to_string(), "safe://myname?name=&age=25");
 
         // Test setting content version via ?v=61342
-        let version_hash = VersionHash::default();
+        let random_hash: EntryHash = rand::thread_rng().gen::<[u8; 32]>();
+        let version_hash = VersionHash::from(&random_hash);
         x.set_query_key(URL_VERSION_QUERY_NAME, Some(&version_hash.to_string()))?;
         assert_eq!(
             x.query_key_last(URL_VERSION_QUERY_NAME),
@@ -1631,7 +1634,8 @@ mod tests {
     fn test_url_set_content_version() -> Result<()> {
         let mut x = SafeUrl::from_url("safe://myname?name=John+Doe&name=Jane%20Doe")?;
 
-        let version_hash = VersionHash::default();
+        let random_hash: EntryHash = rand::thread_rng().gen::<[u8; 32]>();
+        let version_hash = VersionHash::from(&random_hash);
         x.set_content_version(Some(version_hash));
         assert_eq!(
             x.query_key_first(URL_VERSION_QUERY_NAME),
@@ -1730,12 +1734,17 @@ mod tests {
 
     #[test]
     fn test_url_parts() -> Result<()> {
-        // These two are equivalent.  ie, the xorurl is the result of nrs.to_xorurl_string()
-        let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe#somefragment";
-        let xorurl = "safe://my.sub.hnyydyiixsfrqix9aoqg97jebuzc6748uc8rykhdd5hjrtg5o4xso9jmggbqh/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe#somefragment";
+        let random_hash: EntryHash = rand::thread_rng().gen::<[u8; 32]>();
+        let nrsurl_version_hash = VersionHash::from(&random_hash);
+        let random_hash: EntryHash = rand::thread_rng().gen::<[u8; 32]>();
+        let xorurl_version_hash = VersionHash::from(&random_hash);
 
-        let nrs = SafeUrl::from_url(nrsurl)?;
-        let xor = SafeUrl::from_url(xorurl)?;
+        // These two are equivalent.  ie, the xorurl is the result of nrs.to_xorurl_string()
+        let nrsurl = format!("safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v={}&name=John+Doe#somefragment", nrsurl_version_hash);
+        let xorurl = format!("safe://my.sub.hnyydyiixsfrqix9aoqg97jebuzc6748uc8rykhdd5hjrtg5o4xso9jmggbqh/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v={}&name=John+Doe#somefragment", xorurl_version_hash);
+
+        let nrs = SafeUrl::from_url(&nrsurl)?;
+        let xor = SafeUrl::from_url(&xorurl)?;
 
         assert_eq!(nrs.scheme(), URL_SCHEME);
         assert_eq!(xor.scheme(), URL_SCHEME);
@@ -1766,18 +1775,24 @@ mod tests {
 
         assert_eq!(
             nrs.query_string(),
-            "this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe"
+            format!(
+                "this=that&this=other&color=blue&v={}&name=John+Doe",
+                nrsurl_version_hash
+            )
         );
         assert_eq!(
             xor.query_string(),
-            "this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe"
+            format!(
+                "this=that&this=other&color=blue&v={}&name=John+Doe",
+                xorurl_version_hash
+            )
         );
 
         assert_eq!(nrs.fragment(), "somefragment");
         assert_eq!(xor.fragment(), "somefragment");
 
-        assert_eq!(nrs.content_version(), Some(VersionHash::default()));
-        assert_eq!(xor.content_version(), Some(VersionHash::default()));
+        assert_eq!(nrs.content_version(), Some(nrsurl_version_hash));
+        assert_eq!(xor.content_version(), Some(xorurl_version_hash));
 
         Ok(())
     }

@@ -33,7 +33,7 @@ pub enum SafeData {
         xorurl: String,
         xorname: XorName,
         type_tag: u64,
-        version: VersionHash,
+        version: Option<VersionHash>, // this is set to None if the container is found empty
         files_map: FilesMap,
         data_type: DataType,
         metadata: Option<FileInfo>,

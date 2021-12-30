@@ -333,7 +333,7 @@ async fn files_container_get_files(
     let (version, files_map) = match safe.fetch(url, None).await? {
         SafeData::FilesContainer {
             version, files_map, ..
-        } => (version.to_string(), files_map),
+        } => (version.map_or("".to_string(), |v| v.to_string()), files_map),
         SafeData::PublicBlob { metadata, .. } => {
             if let Some(file_item) = metadata {
                 let mut files_map = FilesMap::new();

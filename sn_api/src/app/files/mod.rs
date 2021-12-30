@@ -159,12 +159,15 @@ impl Safe {
     /// # rt.block_on(async {
     /// #   safe.connect(None, None, None).await.unwrap();
     ///     let (xorurl, _processed_files, _files_map) = safe.files_container_create_from("./testdata", None, true, true, false).await.unwrap();
-    ///     let (version, files_map) = safe.files_container_get(&xorurl).await.unwrap();
+    ///     let (version, files_map) = safe.files_container_get(&xorurl).await.unwrap().unwrap();
     ///     println!("FilesContainer fetched is at version: {}", version);
     ///     println!("FilesMap of fetched version is: {:?}", files_map);
     /// # });
     /// ```
-    pub async fn files_container_get(&mut self, url: &str) -> Result<(VersionHash, FilesMap)> {
+    pub async fn files_container_get(
+        &mut self,
+        url: &str,
+    ) -> Result<Option<(VersionHash, FilesMap)>> {
         debug!("Getting files container from: {:?}", url);
         let safe_url = self.parse_and_resolve_url(url).await?;
 
@@ -175,7 +178,7 @@ impl Safe {
     pub(crate) async fn fetch_files_container(
         &self,
         safe_url: &SafeUrl,
-    ) -> Result<(VersionHash, FilesMap)> {
+    ) -> Result<Option<(VersionHash, FilesMap)>> {
         // fetch register entries and wrap errors
         debug!(
             "Fetching FilesContainer from {}, address type: {:?}",
@@ -215,7 +218,7 @@ impl Safe {
             (v.into(), str::from_utf8(m)?)
         } else {
             warn!("FilesContainer found at \"{:?}\" was empty", safe_url);
-            return Ok((VersionHash::default(), FilesMap::default()));
+            return Ok(None);
         };
 
         // Using the FilesMap XOR-URL we can now fetch the FilesMap and deserialise it
@@ -229,7 +232,7 @@ impl Safe {
         })?;
         debug!("Files map retrieved.... {:?}", &version);
 
-        Ok((version, files_map))
+        Ok(Some((version, files_map)))
     }
 
     /// # Sync up local folder with the content on a FilesContainer.
@@ -259,7 +262,7 @@ impl Safe {
         delete: bool,
         update_nrs: bool,
         dry_run: bool,
-    ) -> Result<(VersionHash, ProcessedFiles, FilesMap)> {
+    ) -> Result<(Option<(VersionHash, FilesMap)>, ProcessedFiles)> {
         if delete && !recursive {
             return Err(Error::InvalidInput(
                 "'delete' is not allowed if 'recursive' is not set".to_string(),
@@ -281,8 +284,11 @@ impl Safe {
         // the version from it so we can fetch latest version of it for sync-ing
         safe_url.set_content_version(None);
 
-        let (current_version, current_files_map): (VersionHash, FilesMap) =
-            self.fetch_files_container(&safe_url).await?;
+        let (current_version, current_files_map) =
+            match self.fetch_files_container(&safe_url).await? {
+                Some((version, files_map)) => (Some(version), files_map),
+                None => (None, FilesMap::default()),
+            };
 
         // Let's generate the list of local files paths, without uploading any new file yet
         let processed_files =
@@ -305,21 +311,17 @@ impl Safe {
             )
             .await?;
 
-        let version = if success_count == 0 {
-            current_version
-        } else {
-            self.append_version_to_files_container(
-                HashSet::from_iter([current_version]),
-                &new_files_map,
-                url,
-                safe_url,
-                dry_run,
-                update_nrs,
-            )
-            .await?
-        };
-
-        Ok((version, processed_files, new_files_map))
+        self.update_files_container(
+            success_count,
+            current_version,
+            new_files_map,
+            processed_files,
+            url,
+            safe_url,
+            dry_run,
+            update_nrs,
+        )
+        .await
     }
 
     /// # Add a file, either a local path or an already uploaded file, on an existing FilesContainer.
@@ -348,7 +350,7 @@ impl Safe {
         update_nrs: bool,
         follow_links: bool,
         dry_run: bool,
-    ) -> Result<(VersionHash, ProcessedFiles, FilesMap)> {
+    ) -> Result<(Option<(VersionHash, FilesMap)>, ProcessedFiles)> {
         debug!("Adding file to FilesContainer at {}", url);
         let (safe_url, current_version, current_files_map) =
             validate_files_add_params(self, source_file, url, update_nrs).await?;
@@ -381,21 +383,17 @@ impl Safe {
             .await?
         };
 
-        let version = if success_count == 0 {
-            current_version
-        } else {
-            self.append_version_to_files_container(
-                HashSet::from_iter([current_version]),
-                &new_files_map,
-                url,
-                safe_url,
-                dry_run,
-                update_nrs,
-            )
-            .await?
-        };
-
-        Ok((version, processed_files, new_files_map))
+        self.update_files_container(
+            success_count,
+            current_version,
+            new_files_map,
+            processed_files,
+            url,
+            safe_url,
+            dry_run,
+            update_nrs,
+        )
+        .await
     }
 
     /// # Add a file, from raw bytes, on an existing FilesContainer.
@@ -423,7 +421,7 @@ impl Safe {
         force: bool,
         update_nrs: bool,
         dry_run: bool,
-    ) -> Result<(VersionHash, ProcessedFiles, FilesMap)> {
+    ) -> Result<(Option<(VersionHash, FilesMap)>, ProcessedFiles)> {
         let (safe_url, current_version, current_files_map) =
             validate_files_add_params(self, "", url, update_nrs).await?;
 
@@ -434,21 +432,17 @@ impl Safe {
         let (processed_files, new_files_map, success_count) =
             files_map_add_link(self, current_files_map, &new_file_xorurl, dest_path, force).await?;
 
-        let version = if success_count == 0 {
-            current_version
-        } else {
-            self.append_version_to_files_container(
-                HashSet::from_iter([current_version]),
-                &new_files_map,
-                url,
-                safe_url,
-                dry_run,
-                update_nrs,
-            )
-            .await?
-        };
-
-        Ok((version, processed_files, new_files_map))
+        self.update_files_container(
+            success_count,
+            current_version,
+            new_files_map,
+            processed_files,
+            url,
+            safe_url,
+            dry_run,
+            update_nrs,
+        )
+        .await
     }
 
     /// # Remove a file from an existing FilesContainer.
@@ -497,8 +491,15 @@ impl Safe {
         // the version from it so we can fetch latest version of it
         safe_url.set_content_version(None);
 
-        let (current_version, files_map): (VersionHash, FilesMap) =
-            self.fetch_files_container(&safe_url).await?;
+        let (current_version, files_map) = match self.fetch_files_container(&safe_url).await? {
+            Some(info) => info,
+            None => {
+                return Err(Error::EmptyContent(format!(
+                    "FilesContainer found at \"{}\" was empty",
+                    safe_url
+                )))
+            }
+        };
 
         let (processed_files, new_files_map, success_count) =
             files_map_remove_path(Path::new(dest_path), files_map, recursive)?;
@@ -518,6 +519,55 @@ impl Safe {
         };
 
         Ok((version, processed_files, new_files_map))
+    }
+
+    // Private helper to append new FilesMap entry to container, and/or return
+    // information regarding the update and new version if so
+    #[allow(clippy::too_many_arguments)]
+    async fn update_files_container(
+        &mut self,
+        files_map_changes_count: u64,
+        current_version: Option<VersionHash>,
+        new_files_map: FilesMap,
+        processed_files: ProcessedFiles,
+        url: &str,
+        safe_url: SafeUrl,
+        dry_run: bool,
+        update_nrs: bool,
+    ) -> Result<(Option<(VersionHash, FilesMap)>, ProcessedFiles)> {
+        if files_map_changes_count == 0 {
+            if let Some(version) = current_version {
+                // We had a FilesMap but there were no changes to it, so let's
+                // return the existing version and files map, along with
+                // details about the processed files.
+                // Note: the 'new_files_map' should be the same as to 'current_files_map'.
+                Ok((Some((version, new_files_map)), processed_files))
+            } else {
+                // The container was empty, and is still empty, but let's return
+                // the details about proessed files still
+                Ok((None, processed_files))
+            }
+        } else {
+            // There were changes to current FilesMap, so append new version to the container
+            let parent_versions = if let Some(version) = current_version {
+                HashSet::from_iter([version])
+            } else {
+                HashSet::new()
+            };
+
+            let new_version = self
+                .append_version_to_files_container(
+                    parent_versions,
+                    &new_files_map,
+                    url,
+                    safe_url,
+                    dry_run,
+                    update_nrs,
+                )
+                .await?;
+
+            Ok((Some((new_version, new_files_map)), processed_files))
+        }
     }
 
     // Private helper function to append new version of the FilesMap to the Files Container
@@ -677,7 +727,7 @@ async fn validate_files_add_params(
     source_file: &str,
     url: &str,
     update_nrs: bool,
-) -> Result<(SafeUrl, VersionHash, FilesMap)> {
+) -> Result<(SafeUrl, Option<VersionHash>, FilesMap)> {
     let safe_url = Safe::parse_url(url)?;
 
     // If NRS name shall be updated then the URL has to be an NRS-URL
@@ -693,11 +743,6 @@ async fn validate_files_add_params(
     // the version from it so we can fetch latest version of it for sync-ing
     safe_url.set_content_version(None);
 
-    let (current_version, current_files_map): (VersionHash, FilesMap) =
-        safe.fetch_files_container(&safe_url).await?;
-
-    let dest_path = safe_url.path().to_string();
-
     // Let's act according to if it's a local file path or a safe:// location
     if source_file.starts_with("safe://") {
         let source_safe_url = Safe::parse_url(source_file)?;
@@ -709,13 +754,19 @@ async fn validate_files_add_params(
             )));
         }
 
-        if dest_path.is_empty() {
+        if safe_url.path().is_empty() {
             return Err(Error::InvalidInput(
                 "The destination URL should include a target file path since we are adding a link"
                     .to_string(),
             ));
         }
     }
+
+    let (current_version, current_files_map) = match safe.fetch_files_container(&safe_url).await? {
+        Some((version, files_map)) => (Some(version), files_map),
+        None => (None, FilesMap::default()),
+    };
+
     Ok((safe_url, current_version, current_files_map))
 }
 
@@ -1176,6 +1227,7 @@ mod tests {
     use super::*;
     use crate::{
         app::test_helpers::{new_safe_instance, random_nrs_name},
+        register::EntryHash,
         retry_loop, retry_loop_for_pattern,
     };
     use anyhow::{anyhow, bail, Result};
@@ -1251,22 +1303,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_files_container_create_from_empty() -> Result<()> {
+    async fn test_files_container_create_empty() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let xorurl = safe.files_container_create(false).await?;
 
         assert!(xorurl.starts_with("safe://"));
 
         let _ = retry_loop!(safe.fetch(&xorurl, None));
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
+
+        // we check that the container is empty, i.e. no entry in the underlying Register.
+        let file_map = retry_loop!(safe.files_container_get(&xorurl));
+        assert!(file_map.is_none());
 
         // let's add a file
-        let (version, new_processed_files, new_files_map) = safe
+        let (content, new_processed_files) = safe
             .files_container_add("./testdata/test.md", &xorurl, false, false, false, false)
             .await?;
+        let (_, new_files_map) =
+            content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
-        assert_ne!(version, VersionHash::default());
-        assert_ne!(version, version0);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), 1);
 
@@ -1545,9 +1600,10 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, _) = new_files_container_from_testdata(&mut safe).await?;
 
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
-        let (version, new_processed_files, new_files_map) = safe
+        let (content, new_processed_files) = safe
             .files_container_sync(
                 "./testdata/subfolder/",
                 &xorurl,
@@ -1558,6 +1614,8 @@ mod tests {
                 false,
             )
             .await?;
+        let (version, new_files_map) =
+            content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         assert_ne!(version, version0);
         assert_eq!(new_processed_files.len(), 2);
@@ -1616,7 +1674,7 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, _) = new_files_container_from_testdata(&mut safe).await?;
 
-        let (version, new_processed_files, new_files_map) = safe
+        let (content, new_processed_files) = safe
             .files_container_sync(
                 "./testdata/subfolder/",
                 &xorurl,
@@ -1627,8 +1685,9 @@ mod tests {
                 true, // set dry_run flag on
             )
             .await?;
+        let (_, new_files_map) =
+            content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
-        assert_ne!(version, VersionHash::default());
         assert_eq!(new_processed_files.len(), 2);
         assert_eq!(
             new_files_map.len(),
@@ -1694,7 +1753,7 @@ mod tests {
 
         let _ = retry_loop!(safe.fetch(&xorurl, None));
 
-        let (version, new_processed_files, new_files_map) = safe
+        let (content, new_processed_files) = safe
             .files_container_sync(
                 "./testdata/.subhidden/test.md",
                 &xorurl,
@@ -1705,8 +1764,9 @@ mod tests {
                 false,
             )
             .await?;
+        let (_, new_files_map) =
+            content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
-        assert_ne!(version, VersionHash::default());
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), 1);
 
@@ -1776,9 +1836,10 @@ mod tests {
         let (xorurl, _, files_map) = new_files_container_from_testdata(&mut safe).await?;
 
         let _ = retry_loop!(safe.fetch(&xorurl, None));
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
-        let (version1, new_processed_files, new_files_map) = safe
+        let (version1_content, new_processed_files) = safe
             .files_container_sync(
                 "./testdata/subfolder/",
                 &xorurl,
@@ -1789,6 +1850,8 @@ mod tests {
                 false,
             )
             .await?;
+        let (version1, new_files_map) =
+            version1_content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         assert_ne!(version1, version0);
         assert_eq!(
@@ -1936,7 +1999,8 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let (xorurl, _, _) = new_files_container_from_testdata(&mut safe).await?;
 
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         let nrsurl = random_nrs_name();
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
@@ -1945,7 +2009,7 @@ mod tests {
         assert!(did_create);
         let _ = retry_loop!(safe.fetch(&nrs_xorurl.to_string(), None));
 
-        let (version1, _, _) = retry_loop!(safe.files_container_sync(
+        let (version1_content, _) = retry_loop!(safe.files_container_sync(
             "./testdata/subfolder/",
             &nrsurl,
             false,
@@ -1954,10 +2018,12 @@ mod tests {
             true, // this flag requests the update-nrs
             false,
         ));
+        let (version1, _) =
+            version1_content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         // wait for it
         retry_loop_for_pattern!(safe
-            .files_container_get(&safe_url.to_string()), Ok((version, _)) if *version == version1)?;
+            .files_container_get(&safe_url.to_string()), Ok(Some((version, _))) if *version == version1)?;
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version1));
@@ -1975,7 +2041,7 @@ mod tests {
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_path("path/when/sync");
-        let (version, new_processed_files, new_files_map) = retry_loop!(safe.files_container_sync(
+        let (content, new_processed_files) = retry_loop!(safe.files_container_sync(
             "./testdata/subfolder",
             &safe_url.to_string(),
             true,
@@ -1984,8 +2050,9 @@ mod tests {
             false,
             false,
         ));
+        let (_, new_files_map) =
+            content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
-        assert_ne!(version, VersionHash::default());
         assert_eq!(
             new_processed_files.len(),
             SUBFOLDER_NO_SLASH_PUT_FILEITEM_COUNT
@@ -2041,7 +2108,7 @@ mod tests {
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_path("/path/when/sync/");
-        let (version, new_processed_files, new_files_map) = retry_loop!(safe.files_container_sync(
+        let (content, new_processed_files) = retry_loop!(safe.files_container_sync(
             "./testdata/subfolder",
             &safe_url.to_string(),
             true,
@@ -2050,8 +2117,9 @@ mod tests {
             false,
             false,
         ));
+        let (_, new_files_map) =
+            content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
-        assert_ne!(version, VersionHash::default());
         assert_eq!(
             new_processed_files.len(),
             SUBFOLDER_NO_SLASH_PUT_FILEITEM_COUNT
@@ -2105,9 +2173,9 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let (xorurl, _, files_map) = new_files_container_from_testdata(&mut safe).await?;
 
-        let (version, fetched_files_map) = retry_loop!(safe.files_container_get(&xorurl));
+        let (_, fetched_files_map) = retry_loop!(safe.files_container_get(&xorurl))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
-        assert_ne!(version, VersionHash::default());
         assert_eq!(fetched_files_map.len(), TESTDATA_PUT_FILESMAP_COUNT);
         assert_eq!(files_map.len(), fetched_files_map.len());
         assert_eq!(files_map["/test.md"], fetched_files_map["/test.md"]);
@@ -2126,9 +2194,10 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let (xorurl, _, _) = new_files_container_from_testdata(&mut safe).await?;
 
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
-        let (version1, _, _) = retry_loop!(safe.files_container_sync(
+        let (version1_content, _) = retry_loop!(safe.files_container_sync(
             "./testdata/subfolder/",
             &xorurl,
             true,
@@ -2137,12 +2206,15 @@ mod tests {
             false,
             false,
         ));
+        let (version1, _) =
+            version1_content.ok_or(anyhow!("files container was unexpectedly empty"))?;
+
         assert_ne!(version1, version0);
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(None);
         let (version, _) = retry_loop_for_pattern!(safe
-            .files_container_get(&safe_url.to_string()), Ok((version, _)) if *version == version1)?;
+            .files_container_get(&safe_url.to_string()), Ok(Some((version, _))) if *version == version1)?.ok_or(anyhow!("files container was unexpectedly empty"))?;
         assert_eq!(version, version1);
 
         Ok(())
@@ -2153,24 +2225,27 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let (xorurl, _, files_map) = new_files_container_from_testdata(&mut safe).await?;
 
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         // let's create a new version of the files container
-        let (version1, _new_processed_files, new_files_map) = retry_loop!(safe
-            .files_container_sync(
-                "./testdata/subfolder/",
-                &xorurl,
-                true,
-                false,
-                true, // this sets the delete flag
-                false,
-                false,
-            ));
+        let (version1_content, _) = retry_loop!(safe.files_container_sync(
+            "./testdata/subfolder/",
+            &xorurl,
+            true,
+            false,
+            true, // this sets the delete flag
+            false,
+            false,
+        ));
+        let (version1, new_files_map) =
+            version1_content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         // let's fetch version 0
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
-        let (version, v0_files_map) = retry_loop!(safe.files_container_get(&safe_url.to_string()));
+        let (version, v0_files_map) = retry_loop!(safe.files_container_get(&safe_url.to_string()))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         assert_eq!(version, version0);
         assert_eq!(files_map, v0_files_map);
@@ -2184,7 +2259,7 @@ mod tests {
         // let's fetch version1
         safe_url.set_content_version(Some(version1));
         let (version, v1_files_map) = retry_loop_for_pattern!(safe
-                .files_container_get(&safe_url.to_string()), Ok((version, _)) if *version == version1)?;
+                .files_container_get(&safe_url.to_string()), Ok(Some((version, _))) if *version == version1)?.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         assert_eq!(version, version1);
         assert_eq!(new_files_map, v1_files_map);
@@ -2206,7 +2281,9 @@ mod tests {
             .is_none());
 
         // let's fetch invalid version
-        safe_url.set_content_version(Some(VersionHash::default()));
+        let random_hash: EntryHash = rand::thread_rng().gen::<[u8; 32]>();
+        let version_hash = VersionHash::from(&random_hash);
+        safe_url.set_content_version(Some(version_hash));
         match safe.files_container_get(&safe_url.to_string()).await {
             Ok(_) => Err(anyhow!(
                 "Unexpectedly retrieved invalid version of container".to_string(),
@@ -2216,8 +2293,7 @@ mod tests {
                     msg,
                     format!(
                         "Version '{}' is invalid for FilesContainer found at \"{}\"",
-                        VersionHash::default(),
-                        safe_url
+                        version_hash, safe_url
                     )
                 );
                 Ok(())
@@ -2234,7 +2310,8 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let (xorurl, _, files_map) = new_files_container_from_testdata(&mut safe).await?;
 
-        let (_, files_map_get) = retry_loop!(safe.files_container_get(&xorurl.to_string()));
+        let (_, files_map_get) = retry_loop!(safe.files_container_get(&xorurl.to_string()))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         assert_eq!(files_map, files_map_get);
         assert_eq!(files_map_get["/emptyfolder"], files_map["/emptyfolder"]);
@@ -2258,7 +2335,8 @@ mod tests {
             false
         ));
         let _ = retry_loop!(safe.fetch(&xorurl, None));
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         let nrsurl = random_nrs_name();
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
@@ -2278,7 +2356,7 @@ mod tests {
             false,
         ));
 
-        let (version2, _, _) = retry_loop!(safe.files_container_sync(
+        let (version2_content, _) = retry_loop!(safe.files_container_sync(
             TEST_DATA_FOLDER,
             &nrsurl,
             false,
@@ -2287,6 +2365,8 @@ mod tests {
             true, // this flag requests the update-nrs
             false,
         ));
+        let (version2, _) =
+            version2_content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         // now it should look like:
         // safe://<nrs>
@@ -2298,8 +2378,7 @@ mod tests {
         // └── test.md
         //
         // So, we have 6 items.
-        let (version, fetched_files_map) = retry_loop_for_pattern!(safe.files_container_get(&xorurl), Ok((version, _)) if *version == version2)?;
-        assert_ne!(version, VersionHash::default());
+        let (_, fetched_files_map) = retry_loop_for_pattern!(safe.files_container_get(&xorurl), Ok(Some((version, _))) if *version == version2)?.ok_or(anyhow!("files container was unexpectedly empty"))?;
         assert_eq!(fetched_files_map.len(), 6);
 
         Ok(())
@@ -2318,12 +2397,13 @@ mod tests {
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         let mut url_with_path = SafeUrl::from_xorurl(&xorurl)?;
         url_with_path.set_path("/new_filename_test.md");
 
-        let (version1, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
+        let (version1_content, new_processed_files) = retry_loop!(safe.files_container_add(
             "./testdata/test.md",
             &url_with_path.to_string(),
             false,
@@ -2331,6 +2411,8 @@ mod tests {
             false,
             false,
         ));
+        let (version1, new_files_map) =
+            version1_content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         assert_ne!(version1, version0);
         assert_eq!(new_processed_files.len(), 1);
@@ -2376,7 +2458,7 @@ mod tests {
         let mut url_with_path = SafeUrl::from_xorurl(&xorurl)?;
         url_with_path.set_path("/new_filename_test.md");
 
-        let (version1, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
+        let (version1_content, new_processed_files) = retry_loop!(safe.files_container_add(
             "./testdata/test.md",
             &url_with_path.to_string(),
             false,
@@ -2384,21 +2466,24 @@ mod tests {
             false,
             true, // dry run
         ));
+        let (version1, new_files_map) =
+            version1_content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         // skip version hash check since not NotImplemented
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
 
         // a dry run again should give the exact same results
-        let (version2, new_processed_files2, new_files_map2) = retry_loop!(safe
-            .files_container_add(
-                "./testdata/test.md",
-                &url_with_path.to_string(),
-                false,
-                false,
-                false,
-                true, // dry run
-            ));
+        let (version2_content, new_processed_files2) = retry_loop!(safe.files_container_add(
+            "./testdata/test.md",
+            &url_with_path.to_string(),
+            false,
+            false,
+            false,
+            true, // dry run
+        ));
+        let (version2, new_files_map2) =
+            version2_content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         assert_eq!(version1, version2);
         assert_eq!(new_processed_files.len(), new_processed_files2.len());
@@ -2475,14 +2560,15 @@ mod tests {
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
 
         let _ = retry_loop!(safe.fetch(&xorurl, None));
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         let mut url_with_path = SafeUrl::from_xorurl(&xorurl)?;
         url_with_path.set_path("/sub2.md");
 
         // let's try to add a file with same target name and same content, it should fail
         let filename1 = Path::new("./testdata/subfolder/sub2.md");
-        let (version1, new_processed_files, new_files_map) = safe
+        let (version1_content, new_processed_files) = safe
             .files_container_add(
                 &filename1.display().to_string(),
                 &url_with_path.to_string(),
@@ -2492,6 +2578,8 @@ mod tests {
                 false,
             )
             .await?;
+        let (version1, new_files_map) =
+            version1_content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         assert_eq!(version1, version0);
         assert_eq!(new_processed_files.len(), 1);
@@ -2504,7 +2592,7 @@ mod tests {
 
         // let's try to add a file with same target name but with different content, it should still fail
         let filename2 = Path::new("./testdata/test.md");
-        let (version2, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
+        let (version2_content, new_processed_files) = retry_loop!(safe.files_container_add(
             &filename2.display().to_string(),
             &url_with_path.to_string(),
             false,
@@ -2512,6 +2600,8 @@ mod tests {
             false,
             false,
         ));
+        let (version2, new_files_map) =
+            version2_content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         assert_eq!(version2, version0);
         assert_eq!(new_processed_files.len(), 1);
@@ -2523,7 +2613,7 @@ mod tests {
         assert_eq!(files_map, new_files_map);
 
         // let's now force it
-        let (version3, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
+        let (version3_content, new_processed_files) = retry_loop!(safe.files_container_add(
             &filename2.display().to_string(),
             &url_with_path.to_string(),
             true, //force it
@@ -2531,8 +2621,10 @@ mod tests {
             false,
             false,
         ));
+        let (version3, new_files_map) =
+            version3_content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
-        assert!(version3 != version0);
+        assert_ne!(version3, version0);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert!(new_processed_files[filename2].is_updated());
@@ -2624,7 +2716,8 @@ mod tests {
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         let data = Bytes::from("0123456789");
         let file_xorurl = retry_loop!(safe.store_public_bytes(data.clone(), None, false));
@@ -2633,7 +2726,7 @@ mod tests {
         let mut url_with_path = SafeUrl::from_xorurl(&xorurl)?;
         url_with_path.set_path(&new_filename.display().to_string());
 
-        let (version1, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
+        let (version1_content, new_processed_files) = retry_loop!(safe.files_container_add(
             &file_xorurl,
             &url_with_path.to_string(),
             false,
@@ -2641,6 +2734,8 @@ mod tests {
             false,
             false,
         ));
+        let (version1, new_files_map) =
+            version1_content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         assert_ne!(version1, version0);
         assert_eq!(new_processed_files.len(), 1);
@@ -2673,7 +2768,7 @@ mod tests {
         // let's add another file but with the same name
         let data = Bytes::from("9876543210");
         let other_file_xorurl = retry_loop!(safe.store_public_bytes(data.clone(), None, false));
-        let (version2, new_processed_files, new_files_map) = retry_loop!(safe.files_container_add(
+        let (version2_content, new_processed_files) = retry_loop!(safe.files_container_add(
             &other_file_xorurl,
             &url_with_path.to_string(),
             true, // force to overwrite it with new link
@@ -2681,6 +2776,8 @@ mod tests {
             false,
             false,
         ));
+        let (version2, new_files_map) =
+            version2_content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         assert_ne!(version2, version0);
         assert_ne!(version2, version1);
@@ -2712,7 +2809,8 @@ mod tests {
         assert_eq!(processed_files.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         assert_eq!(files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT);
         let _ = retry_loop!(safe.fetch(&xorurl, None));
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         let data = Bytes::from("0123456789");
         let new_filename = Path::new("/new_filename_test.md");
@@ -2720,7 +2818,7 @@ mod tests {
         let mut url_with_path = SafeUrl::from_xorurl(&xorurl)?;
         url_with_path.set_path(&new_filename.display().to_string());
 
-        let (version1, new_processed_files, new_files_map) = retry_loop!(safe
+        let (version1_content, new_processed_files) = retry_loop!(safe
             .files_container_add_from_raw(
                 data.clone(),
                 &url_with_path.to_string(),
@@ -2728,8 +2826,9 @@ mod tests {
                 false,
                 false,
             ));
+        let (version1, new_files_map) =
+            version1_content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
-        assert!(version1 != VersionHash::default());
         assert_ne!(version1, version0);
         assert_eq!(new_processed_files.len(), 1);
         assert_eq!(new_files_map.len(), SUBFOLDER_PUT_FILEITEM_COUNT + 1);
@@ -2742,7 +2841,7 @@ mod tests {
 
         // let's add another file but with the same name
         let data = Bytes::from("9876543210");
-        let (version2, new_processed_files, new_files_map) = retry_loop!(safe
+        let (version2_content, new_processed_files) = retry_loop!(safe
             .files_container_add_from_raw(
                 data.clone(),
                 &url_with_path.to_string(),
@@ -2750,8 +2849,9 @@ mod tests {
                 false,
                 false,
             ));
+        let (version2, new_files_map) =
+            version2_content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
-        assert!(version2 != VersionHash::default());
         assert_ne!(version2, version0);
         assert_ne!(version2, version1);
         assert_eq!(new_processed_files.len(), 1);
@@ -2769,7 +2869,8 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let (xorurl, _, files_map) = new_files_container_from_testdata(&mut safe).await?;
 
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         let mut url_with_path = SafeUrl::from_xorurl(&xorurl)?;
         url_with_path.set_path("/test.md");

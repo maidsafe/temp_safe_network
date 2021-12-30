@@ -256,7 +256,7 @@ pub async fn files_commander(
                 notice_dry_run();
             }
             // Update the FilesContainer on the Network
-            let (version, processed_files, _) = safe
+            let (content, processed_files) = safe
                 .files_container_sync(
                     &location,
                     &target,
@@ -267,36 +267,35 @@ pub async fn files_commander(
                     dry_run,
                 )
                 .await?;
+            let version = content.map(|(version, _)| version);
 
             // Now let's just print out a list of the files synced/processed
             let (table, success_count) = gen_processed_files_table(&processed_files, true);
             if OutputFmt::Pretty == output_fmt {
+                let version_str = version.map_or("empty".to_string(), |v| format!("version {}", v));
                 if success_count > 0 {
                     let url = match SafeUrl::from_url(&target) {
                         Ok(mut safeurl) => {
-                            safeurl.set_content_version(Some(version));
+                            safeurl.set_content_version(version);
                             safeurl.set_path("");
                             safeurl.to_string()
                         }
                         Err(_) => target,
                     };
 
-                    println!(
-                        "FilesContainer synced up (version {}): \"{}\"",
-                        version, url
-                    );
+                    println!("FilesContainer synced up ({}): \"{}\"", version_str, url);
                     table.printstd();
                 } else if !processed_files.is_empty() {
                     println!(
-                        "No changes were made to FilesContainer (version {}) at \"{}\"",
-                        version, target
+                        "No changes were made to FilesContainer ({}) at \"{}\"",
+                        version_str, target
                     );
                     table.printstd();
                 } else {
-                    println!("No changes were required, source location is already in sync with FilesContainer (version {}) at: \"{}\"", version, target);
+                    println!("No changes were required, source location is already in sync with FilesContainer ({}) at: \"{}\"", version_str, target);
                 }
             } else {
-                print_serialized_output(target, Some(version), &processed_files, output_fmt);
+                print_serialized_output(target, version, &processed_files, output_fmt);
             }
             Ok(())
         }
@@ -320,7 +319,7 @@ pub async fn files_commander(
                 notice_dry_run();
             }
 
-            let (version, processed_files, _) =
+            let (content, processed_files) =
                 // If location is empty then we read arg from STDIN, which can still be a safe:// URL
                 if location.is_empty() {
                     let file_content = get_from_stdin(Some("...awaiting file's content to add from STDIN"))?;
@@ -332,7 +331,12 @@ pub async fn files_commander(
                 };
 
             // Now let's just print out a list of the files synced/processed
-            output_processed_files_list(output_fmt, &processed_files, Some(version), target_url);
+            output_processed_files_list(
+                output_fmt,
+                &processed_files,
+                content.map(|(version, _)| version),
+                target_url,
+            );
             Ok(())
         }
         FilesSubCommands::Rm {
@@ -716,10 +720,16 @@ fn format_symlink(name: &str, fd: &FileDetails) -> String {
 }
 
 // A function to print a FilesMap in human-friendly table format.
-fn print_files_map(files_map: &FilesMap, total_files: u64, version: VersionHash, target_url: &str) {
+fn print_files_map(
+    files_map: &FilesMap,
+    total_files: u64,
+    version: Option<VersionHash>,
+    target_url: &str,
+) {
     println!(
-        "Files of FilesContainer (version {}) at \"{}\":",
-        version, target_url
+        "Files of FilesContainer ({}) at \"{}\":",
+        version.map_or("empty".to_string(), |v| format!("version {}", v)),
+        target_url
     );
     let mut table = Table::new();
     let format = FormatBuilder::new()

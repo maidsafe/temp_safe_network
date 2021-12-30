@@ -382,6 +382,7 @@ mod tests {
         retry_loop, retry_loop_for_pattern, Error, SafeUrl,
     };
     use anyhow::{anyhow, bail, Result};
+    use rand::Rng;
     use std::{matches, str::FromStr};
 
     const TEST_DATA_FILE: &str = "./testdata/test.md";
@@ -392,7 +393,9 @@ mod tests {
         let safe = new_safe_instance().await?;
 
         let mut original_url = SafeUrl::from_url("safe://linked-from-site_name")?;
-        original_url.set_content_version(Some(VersionHash::default()));
+        let random_hash: EntryHash = rand::thread_rng().gen::<[u8; 32]>();
+        let version_hash = VersionHash::from(&random_hash);
+        original_url.set_content_version(Some(version_hash));
 
         let _nrs_map_url = retry_loop!(safe.nrs_create(&site_name, false));
 
@@ -411,7 +414,9 @@ mod tests {
         let (link, _, _) = safe
             .files_container_create_from(TEST_DATA_FILE, None, false, false, false)
             .await?;
-        let (version0, _) = retry_loop!(safe.files_container_get(&link));
+        let (version0, _) = retry_loop!(safe.files_container_get(&link))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
+
         let mut url_v0 = SafeUrl::from_url(&link)?;
         url_v0.set_content_version(Some(version0));
 
@@ -421,17 +426,15 @@ mod tests {
         let _ = retry_loop!(safe.fetch(&nrs_url.to_string(), None));
 
         // add subname and set it as the new default too
+        let random_hash: EntryHash = rand::thread_rng().gen::<[u8; 32]>();
+        let version_hash = VersionHash::from(&random_hash);
         let mut url_v1 = SafeUrl::from_url(&link)?;
-        url_v1.set_content_version(Some(VersionHash::default()));
+        url_v1.set_content_version(Some(version_hash));
         let associated_name = format!("a.b.{}", site_name);
 
         let versionned_url = retry_loop!(safe.nrs_associate(&associated_name, &url_v1, false));
 
         assert_ne!(versionned_url.content_version(), Some(version0));
-        assert_ne!(
-            versionned_url.content_version(),
-            Some(VersionHash::default())
-        );
 
         // check that the retrieved url matches the expected
         let (retrieved_url, nrs_map) = retry_loop!(safe.nrs_get(&associated_name, None));
@@ -449,7 +452,9 @@ mod tests {
         let (link, _, _) = safe
             .files_container_create_from(TEST_DATA_FILE, None, false, false, false)
             .await?;
-        let (version0, _) = retry_loop!(safe.files_container_get(&link));
+        let (version0, _) = retry_loop!(safe.files_container_get(&link))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
+
         let mut url_v0 = SafeUrl::from_url(&link)?;
         url_v0.set_content_version(Some(version0));
 
@@ -511,7 +516,8 @@ mod tests {
         let (link, _, _) = safe
             .files_container_create_from(TEST_DATA_FILE, None, false, false, false)
             .await?;
-        let (version0, _) = retry_loop!(safe.files_container_get(&link));
+        let (version0, _) = retry_loop!(safe.files_container_get(&link))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         // associate a first name
         let mut url_v0 = SafeUrl::from_url(&link)?;
@@ -569,7 +575,9 @@ mod tests {
         let (link, _, _) = safe
             .files_container_create_from(TEST_DATA_FILE, None, false, false, false)
             .await?;
-        let (version0, _) = retry_loop!(safe.files_container_get(&link));
+        let (version0, _) = retry_loop!(safe.files_container_get(&link))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
+
         let mut url_v0 = SafeUrl::from_url(&link)?;
         url_v0.set_content_version(Some(version0));
         let (nrs_url, did_create) = retry_loop!(safe.nrs_add(&site_name, &url_v0, false,));
@@ -622,7 +630,8 @@ mod tests {
         let (link, _, _) = safe
             .files_container_create_from(TEST_DATA_FILE, None, false, false, false)
             .await?;
-        let (version0, _) = retry_loop!(safe.files_container_get(&link));
+        let (version0, _) = retry_loop!(safe.files_container_get(&link))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         // associate a first name
         let mut valid_link = SafeUrl::from_url(&link)?;
