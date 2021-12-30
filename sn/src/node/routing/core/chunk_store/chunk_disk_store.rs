@@ -50,12 +50,11 @@ impl ChunkDiskStore {
     // to stay within the prefix tree path
     fn prefix_tree_path(&self, xorname: XorName, bit_count: usize) -> PathBuf {
         let bin = format!("{:b}", xorname);
-        let prefix_dir_list: Vec<String> = bin
+        let prefix_dir_path: PathBuf = bin
             .chars()
             .take(std::cmp::min(bit_count, self.bit_tree_depth))
             .map(|c| format!("{}", c))
             .collect();
-        let prefix_dir_path: PathBuf = prefix_dir_list.iter().collect();
 
         let mut path = self.chunk_store_path.clone();
         path.push(prefix_dir_path);
@@ -138,7 +137,7 @@ impl ChunkDiskStore {
     }
 
     #[allow(unused)]
-    /// quickly find chunks related or not to a section, might be usefull when adults change sections
+    /// quickly find chunks related or not to a section, might be useful when adults change sections
     /// not used yet
     pub(crate) fn list_files_without_prefix(&self, prefix: Prefix) -> Result<Vec<String>> {
         let all_files = self.list_all_files()?;
@@ -151,7 +150,7 @@ impl ChunkDiskStore {
     }
 
     #[allow(unused)]
-    /// quickly find chunks related or not to a section, might be usefull when adults change sections
+    /// quickly find chunks related or not to a section, might be useful when adults change sections
     /// not used yet
     pub(crate) fn list_files_with_prefix(&self, prefix: Prefix) -> Result<Vec<String>> {
         let prefix_path = self.prefix_tree_path(prefix.name(), prefix.bit_count());
