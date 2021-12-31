@@ -87,7 +87,7 @@ impl ChunkStore {
         }
 
         trace!("{:?}", LogMarker::StoringChunk);
-        self.disk_store.write_chunk(data).await?;
+        let _addr = self.disk_store.write_chunk(data).await?;
         trace!("{:?}", LogMarker::StoredNewChunk);
 
         let last_recorded_level = { *self.last_recorded_level.read().await };
