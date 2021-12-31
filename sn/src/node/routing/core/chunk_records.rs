@@ -232,9 +232,9 @@ impl Core {
         if we_are_not_holder_anymore || new_adult_is_holder || lost_old_holder {
             info!("Republishing chunk at {:?}", address);
             trace!("We are not a holder anymore? {}, New Adult is Holder? {}, Lost Adult was holder? {}", we_are_not_holder_anymore, new_adult_is_holder, lost_old_holder);
-            let chunk = chunks.get_chunk(address).ok()?;
+            let chunk = chunks.get_chunk(address).await.ok()?;
             if we_are_not_holder_anymore {
-                if let Err(err) = chunks.remove_chunk(address) {
+                if let Err(err) = chunks.remove_chunk(address).await {
                     warn!("Error deleting chunk during republish: {:?}", err);
                 }
             }

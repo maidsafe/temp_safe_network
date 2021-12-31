@@ -1,15 +1,20 @@
-use xor_name::{Prefix, XorName};
-
-use bytes::Bytes;
-use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
-
-use std::io::Read;
-use tokio::io::AsyncWriteExt;
+// Copyright 2021 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Error, Result};
 use crate::dbs::UsedSpace;
 use crate::types::{Chunk, ChunkAddress};
+
+use bytes::Bytes;
+use std::path::{Path, PathBuf};
+use tokio::io::AsyncWriteExt;
+use walkdir::WalkDir;
+use xor_name::{Prefix, XorName};
 
 const BIT_TREE_DEPTH: usize = 20;
 const CHUNK_DB_DIR: &str = "chunkdb";
@@ -97,23 +102,19 @@ impl ChunkDiskStore {
 
         let mut file = tokio::fs::File::create(filepath).await?;
         file.write_all(data.value()).await?;
+
         Ok(())
     }
 
-    pub(crate) fn delete_chunk(&self, addr: &ChunkAddress) -> Result<()> {
+    pub(crate) async fn delete_chunk(&self, addr: &ChunkAddress) -> Result<()> {
         let filepath = self.address_to_filepath(addr)?;
-        std::fs::remove_file(filepath)?;
+        tokio::fs::remove_file(filepath).await?;
         Ok(())
     }
 
-    pub(crate) fn read_chunk(&self, addr: &ChunkAddress) -> Result<Chunk> {
-        let filepath = self.address_to_filepath(addr)?;
-
-        let mut f = std::fs::File::open(filepath)?;
-        let mut buffer = Vec::new();
-        let _bytes_read = f.read_to_end(&mut buffer)?;
-
-        let bytes = Bytes::from(buffer);
+    pub(crate) async fn read_chunk(&self, addr: &ChunkAddress) -> Result<Chunk> {
+        let file_path = self.address_to_filepath(addr)?;
+        let bytes = Bytes::from(tokio::fs::read(file_path).await?);
         let chunk = Chunk::new(bytes);
         Ok(chunk)
     }
@@ -190,12 +191,13 @@ mod tests {
         let cds = init_chunk_disk_store();
 
         let chunk = Chunk::new(Bytes::from("test"));
-        let addr = &chunk.address();
+        let addr = chunk.address();
 
-        cds.write_chunk(&chunk)
+        let _ = cds
+            .write_chunk(&chunk)
             .await
             .expect("Failed to write chunk.");
-        let read_chunk = cds.read_chunk(addr).expect("Failed to read chunk.");
+        let read_chunk = cds.read_chunk(addr).await.expect("Failed to read chunk.");
 
         assert_eq!(chunk.value(), read_chunk.value());
     }
@@ -225,10 +227,10 @@ mod tests {
         res4.expect("error writing chunk4");
 
         let (read_chunk1, read_chunk2, read_chunk3, read_chunk4) = (
-            cds.read_chunk(addr1),
-            cds.read_chunk(addr2),
-            cds.read_chunk(addr3),
-            cds.read_chunk(addr4),
+            cds.read_chunk(addr1).await,
+            cds.read_chunk(addr2).await,
+            cds.read_chunk(addr3).await,
+            cds.read_chunk(addr4).await,
         );
 
         assert_eq!(
@@ -274,10 +276,10 @@ mod tests {
         res4.expect("error writing chunk4");
 
         let (read_chunk1, read_chunk2, read_chunk3, read_chunk4) = (
-            cds.read_chunk(addr1),
-            cds.read_chunk(addr2),
-            cds.read_chunk(addr3),
-            cds.read_chunk(addr4),
+            cds.read_chunk(addr1).await,
+            cds.read_chunk(addr2).await,
+            cds.read_chunk(addr3).await,
+            cds.read_chunk(addr4).await,
         );
 
         assert_eq!(
