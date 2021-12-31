@@ -89,7 +89,7 @@ impl ChunkDiskStore {
         self.used_space.ratio().await
     }
 
-    pub(crate) async fn write_chunk(&self, data: &Chunk) -> Result<()> {
+    pub(crate) async fn write_chunk(&self, data: &Chunk) -> Result<ChunkAddress> {
         if !self.used_space.can_consume(data.value().len() as u64).await {
             return Err(Error::NotEnoughSpace);
         }
@@ -103,7 +103,7 @@ impl ChunkDiskStore {
         let mut file = tokio::fs::File::create(filepath).await?;
         file.write_all(data.value()).await?;
 
-        Ok(())
+        Ok(*addr)
     }
 
     pub(crate) async fn delete_chunk(&self, addr: &ChunkAddress) -> Result<()> {
@@ -177,7 +177,11 @@ fn list_files_in(path: &Path) -> Result<Vec<String>> {
 
 #[cfg(test)]
 mod tests {
+    use crate::types::utils::random_bytes;
+
     use super::*;
+    use futures::future::join_all;
+    use rayon::prelude::*;
     use tempfile::tempdir;
 
     fn init_chunk_disk_store() -> ChunkDiskStore {
@@ -188,115 +192,57 @@ mod tests {
 
     #[tokio::test]
     async fn test_write_read_chunk() {
-        let cds = init_chunk_disk_store();
+        let store = init_chunk_disk_store();
+        // test that a range of different chunks return the written chunk
+        for _ in 0..10 {
+            let chunk = Chunk::new(random_bytes(100));
 
-        let chunk = Chunk::new(Bytes::from("test"));
-        let addr = chunk.address();
+            let addr = store
+                .write_chunk(&chunk)
+                .await
+                .expect("Failed to write chunk.");
 
-        let _ = cds
-            .write_chunk(&chunk)
-            .await
-            .expect("Failed to write chunk.");
-        let read_chunk = cds.read_chunk(addr).await.expect("Failed to read chunk.");
+            let read_chunk = store
+                .read_chunk(&addr)
+                .await
+                .expect("Failed to read chunk.");
 
-        assert_eq!(chunk.value(), read_chunk.value());
+            assert_eq!(chunk.value(), read_chunk.value());
+        }
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_write_read_async_multiple_chunks() {
-        let cds = init_chunk_disk_store();
-
-        let chunk1 = Chunk::new(Bytes::from("test1"));
-        let chunk2 = Chunk::new(Bytes::from("test2"));
-        let chunk3 = Chunk::new(Bytes::from("test3"));
-        let chunk4 = Chunk::new(Bytes::from("test4"));
-        let addr1 = &chunk1.address();
-        let addr2 = &chunk2.address();
-        let addr3 = &chunk3.address();
-        let addr4 = &chunk4.address();
-
-        let (res1, res2, res3, res4) = tokio::join!(
-            cds.write_chunk(&chunk1),
-            cds.write_chunk(&chunk2),
-            cds.write_chunk(&chunk3),
-            cds.write_chunk(&chunk4),
-        );
-        res1.expect("error writing chunk1");
-        res2.expect("error writing chunk2");
-        res3.expect("error writing chunk3");
-        res4.expect("error writing chunk4");
-
-        let (read_chunk1, read_chunk2, read_chunk3, read_chunk4) = (
-            cds.read_chunk(addr1).await,
-            cds.read_chunk(addr2).await,
-            cds.read_chunk(addr3).await,
-            cds.read_chunk(addr4).await,
-        );
-
-        assert_eq!(
-            chunk1.value(),
-            read_chunk1.expect("error reading chunk 1").value()
-        );
-        assert_eq!(
-            chunk2.value(),
-            read_chunk2.expect("error reading chunk 2").value()
-        );
-        assert_eq!(
-            chunk3.value(),
-            read_chunk3.expect("error reading chunk 3").value()
-        );
-        assert_eq!(
-            chunk4.value(),
-            read_chunk4.expect("error reading chunk 4").value()
-        );
+        let store = init_chunk_disk_store();
+        let size = 100;
+        let chunks: Vec<Chunk> = std::iter::repeat_with(|| Chunk::new(random_bytes(size)))
+            .take(7)
+            .collect();
+        write_and_read_chunks(&chunks, store).await;
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_write_read_async_multiple_identical_chunks() {
-        let cds = init_chunk_disk_store();
+        let store = init_chunk_disk_store();
+        let chunks: Vec<Chunk> = std::iter::repeat(Chunk::new(Bytes::from("test_concurrent")))
+            .take(7)
+            .collect();
+        write_and_read_chunks(&chunks, store).await;
+    }
 
-        let chunk1 = Chunk::new(Bytes::from("test_concurrent"));
-        let chunk2 = Chunk::new(Bytes::from("test_concurrent"));
-        let chunk3 = Chunk::new(Bytes::from("test_concurrent"));
-        let chunk4 = Chunk::new(Bytes::from("test_concurrent"));
-        let addr1 = &chunk1.address();
-        let addr2 = &chunk2.address();
-        let addr3 = &chunk3.address();
-        let addr4 = &chunk4.address();
+    async fn write_and_read_chunks(chunks: &[Chunk], store: ChunkDiskStore) {
+        // write all chunks
+        let tasks = chunks.iter().map(|c| store.write_chunk(c));
+        let results = join_all(tasks).await;
 
-        let (res1, res2, res3, res4) = tokio::join!(
-            cds.write_chunk(&chunk1),
-            cds.write_chunk(&chunk2),
-            cds.write_chunk(&chunk3),
-            cds.write_chunk(&chunk4),
-        );
-        res1.expect("error writing chunk1");
-        res2.expect("error writing chunk2");
-        res3.expect("error writing chunk3");
-        res4.expect("error writing chunk4");
+        // read all chunks
+        let tasks = results.iter().flatten().map(|addr| store.read_chunk(addr));
+        let results = join_all(tasks).await;
+        let read_chunks: Vec<&Chunk> = results.iter().flatten().collect();
 
-        let (read_chunk1, read_chunk2, read_chunk3, read_chunk4) = (
-            cds.read_chunk(addr1).await,
-            cds.read_chunk(addr2).await,
-            cds.read_chunk(addr3).await,
-            cds.read_chunk(addr4).await,
-        );
-
-        assert_eq!(
-            chunk1.value(),
-            read_chunk1.expect("error reading chunk 1").value()
-        );
-        assert_eq!(
-            chunk2.value(),
-            read_chunk2.expect("error reading chunk 2").value()
-        );
-        assert_eq!(
-            chunk3.value(),
-            read_chunk3.expect("error reading chunk 3").value()
-        );
-        assert_eq!(
-            chunk4.value(),
-            read_chunk4.expect("error reading chunk 4").value()
-        );
+        // verify all written were read
+        assert!(chunks
+            .par_iter()
+            .all(|c| read_chunks.iter().any(|r| r.value() == c.value())))
     }
 }
