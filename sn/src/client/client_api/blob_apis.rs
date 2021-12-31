@@ -194,9 +194,9 @@ impl Client {
         }
     }
 
-    /// Directly writes a [`Blob`] to the network in the
-    /// form of immutable self encrypted chunks, without any batching.
-    /// It also attempts to verify the Blob was uploaded to the network before returning.
+    /// Directly writes [`Bytes`] to the network in the
+    /// form of immutable chunks, without any batching.
+    /// It also attempts to verify that all the data was uploaded to the network before returning.
     #[instrument(skip_all, level = "trace")]
     pub async fn upload_and_verify(&self, bytes: Bytes, scope: Scope) -> Result<BytesAddress> {
         let address = self.upload(bytes, scope).await?;
