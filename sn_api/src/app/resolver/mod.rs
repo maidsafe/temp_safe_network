@@ -53,18 +53,18 @@ impl Safe {
     ///
     /// ### Fetch FilesContainer relative path file
     /// ```no_run
-    /// # use sn_api::{Safe, fetch::SafeData};
+    /// # use sn_api::{Safe, resolver::SafeData};
     /// # use std::collections::BTreeMap;
     /// # let mut safe = Safe::default();
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
     /// #   safe.connect(None, None, None).await.unwrap();
-    ///     let (xorurl, _, _) = safe.files_container_create_from("./testdata/", None, true, false, false).await.unwrap();
+    ///     let (xorurl, _, _) = safe.files_container_create_from("./testdata/", None, true, false).await.unwrap();
     ///
     ///     let safe_data = safe.fetch( &format!( "{}/test.md", &xorurl.replace("?v=0", "") ), None ).await.unwrap();
     ///     let data_string = match safe_data {
     ///         SafeData::PublicBlob { data, .. } => {
-    ///             match String::from_utf8(data) {
+    ///             match String::from_utf8(data.to_vec()) {
     ///                 Ok(string) => string,
     ///                 Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
     ///             }
@@ -102,13 +102,13 @@ impl Safe {
     ///
     /// ### Inspect FilesContainer relative path file
     /// ```no_run
-    /// # use sn_api::{Safe, fetch::SafeData};
+    /// # use sn_api::{Safe, resolver::SafeData};
     /// # use std::collections::BTreeMap;
     /// # let rt = tokio::runtime::Runtime::new().unwrap();
     /// # rt.block_on(async {
     /// #   let mut safe = Safe::default();
     /// #   safe.connect(None, None, None).await.unwrap();
-    ///     let (container_xorurl, _, _) = safe.files_container_create_from("./testdata/", None, true, false, false).await.unwrap();
+    ///     let (container_xorurl, _, _) = safe.files_container_create_from("./testdata/", None, true, false).await.unwrap();
     ///
     ///     let inspected_content = safe.inspect( &format!( "{}/test.md", &container_xorurl.replace("?v=0", "") ) ).await.unwrap();
     ///     match &inspected_content[0] {
@@ -254,7 +254,7 @@ mod tests {
     async fn test_fetch_files_container() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (fc_xorurl, _, original_files_map) = safe
-            .files_container_create_from("./testdata/", None, true, false, false)
+            .files_container_create_from("./testdata/", None, true, false)
             .await?;
 
         let safe_url = SafeUrl::from_url(&fc_xorurl)?;
@@ -307,7 +307,7 @@ mod tests {
 
         // create file container
         let (xorurl, _, the_files_map) = safe
-            .files_container_create_from("./testdata/", None, true, false, false)
+            .files_container_create_from("./testdata/", None, true, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
@@ -317,7 +317,7 @@ mod tests {
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let _ = safe.nrs_add(&site_name, &safe_url, false).await?;
+        let _ = safe.nrs_add(&site_name, &safe_url).await?;
         let nrs_url = format!("safe://{}", site_name);
 
         let content = retry_loop!(safe.fetch(&nrs_url, None));
@@ -367,7 +367,7 @@ mod tests {
 
         // create file container
         let (xorurl, _, _the_files_map) = safe
-            .files_container_create_from("./testdata/", None, true, false, false)
+            .files_container_create_from("./testdata/", None, true, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
@@ -378,9 +378,8 @@ mod tests {
         safe_url.set_content_version(Some(version0));
         let files_container_url = safe_url;
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let (nrs_resolution_url, did_create) = safe
-            .nrs_add(&site_name, &files_container_url, false)
-            .await?;
+        let (nrs_resolution_url, did_create) =
+            safe.nrs_add(&site_name, &files_container_url).await?;
         assert!(did_create);
         let nrs_url = format!("safe://{}", site_name);
 
@@ -434,7 +433,7 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let data = Bytes::from("Something super immutable");
         let xorurl = safe
-            .store_public_bytes(data.clone(), Some("text/plain"), false)
+            .store_public_bytes(data.clone(), Some("text/plain"))
             .await?;
 
         let safe_url = SafeUrl::from_url(&xorurl)?;
@@ -473,7 +472,7 @@ mod tests {
         let saved_data = Bytes::from("Something super immutable");
         let size = saved_data.len();
         let xorurl = safe
-            .store_public_bytes(saved_data.clone(), Some("text/plain"), false)
+            .store_public_bytes(saved_data.clone(), Some("text/plain"))
             .await?;
 
         // Fetch first half and match
@@ -508,7 +507,7 @@ mod tests {
 
         // create file container
         let (xorurl, _, _files_map) = safe
-            .files_container_create_from("./testdata/", None, true, false, false)
+            .files_container_create_from("./testdata/", None, true, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
@@ -518,7 +517,7 @@ mod tests {
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
-        let _ = safe.nrs_add(&site_name, &safe_url, false).await?;
+        let _ = safe.nrs_add(&site_name, &safe_url).await?;
         let nrs_url = format!("safe://{}/test.md", site_name);
 
         // read a local file content (for comparison)
@@ -603,7 +602,7 @@ mod tests {
     async fn test_fetch_public_blob_with_path() -> Result<()> {
         let safe = new_safe_instance().await?;
         let data = Bytes::from("Something super immutable");
-        let xorurl = safe.store_public_bytes(data.clone(), None, false).await?;
+        let xorurl = safe.store_public_bytes(data.clone(), None).await?;
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         let path = "/some_relative_filepath";
@@ -621,7 +620,7 @@ mod tests {
 
         // test the same but a file with some media type
         let xorurl = safe
-            .store_public_bytes(data.clone(), Some("text/plain"), false)
+            .store_public_bytes(data.clone(), Some("text/plain"))
             .await?;
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;

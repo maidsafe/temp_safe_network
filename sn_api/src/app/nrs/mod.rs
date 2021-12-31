@@ -39,7 +39,7 @@ impl Safe {
     /// Returns the NRS SafeUrl: `safe://{top_name}
     /// Note that this NRS SafeUrl is not linked to anything yet. You just registered the topname here.
     /// You can now associate public_names (with that topname) to links using `nrs_associate` or `nrs_add`
-    pub async fn nrs_create(&self, top_name: &str, dry_run: bool) -> Result<SafeUrl> {
+    pub async fn nrs_create(&self, top_name: &str) -> Result<SafeUrl> {
         info!("Creating an NRS map for: {}", top_name);
 
         // Check top_name, check if there is an NrsMapContainer there already
@@ -52,7 +52,7 @@ impl Safe {
 
         // Create a new empty Multimap
         let _ = self
-            .multimap_create(Some(nrs_xorname), NRS_MAP_TYPE_TAG, false, dry_run)
+            .multimap_create(Some(nrs_xorname), NRS_MAP_TYPE_TAG, false)
             .await?;
 
         let mut url = SafeUrl::from_url(&url_str)?;
@@ -72,12 +72,7 @@ impl Safe {
     /// Errors out if the topname is not registered.
     /// Returns the versioned NRS SafeUrl (containing a VersionHash) now pointing to the provided link:
     /// `safe://{public_name}?v={version_hash}`
-    pub async fn nrs_associate(
-        &self,
-        public_name: &str,
-        link: &SafeUrl,
-        dry_run: bool,
-    ) -> Result<SafeUrl> {
+    pub async fn nrs_associate(&self, public_name: &str, link: &SafeUrl) -> Result<SafeUrl> {
         info!(
             "Associating public name \"{}\" to \"{}\" in NRS map container",
             public_name, link
@@ -103,7 +98,7 @@ impl Safe {
             link.to_string().as_bytes().to_vec(),
         );
         let entry_hash = self
-            .multimap_insert(&url_str, entry, current_versions, dry_run)
+            .multimap_insert(&url_str, entry, current_versions)
             .await?;
 
         Ok(get_versioned_nrs_url(url_str, entry_hash)?)
@@ -115,12 +110,7 @@ impl Safe {
     /// Returns the versioned NRS SafeUrl (containing a VersionHash) now pointing to the provided link:
     /// `safe://{public_name}?v={version_hash}`
     /// Also returns a bool to indicate whether it registered the topname in the process or not.
-    pub async fn nrs_add(
-        &self,
-        public_name: &str,
-        link: &SafeUrl,
-        dry_run: bool,
-    ) -> Result<(SafeUrl, bool)> {
+    pub async fn nrs_add(&self, public_name: &str, link: &SafeUrl) -> Result<(SafeUrl, bool)> {
         info!(
             "Adding public name \"{}\" to \"{}\" in an NRS map container",
             public_name, link
@@ -130,7 +120,7 @@ impl Safe {
         let sanitised_url = sanitised_url(public_name);
         let safe_url = Safe::parse_url(&sanitised_url)?;
         let top_name = safe_url.top_name();
-        let creation_result = self.nrs_create(top_name, dry_run).await;
+        let creation_result = self.nrs_create(top_name).await;
         let did_register_topname = match creation_result {
             Ok(_) => Ok(true),
             Err(Error::NrsNameAlreadyExists(_)) => Ok(false),
@@ -138,7 +128,7 @@ impl Safe {
         }?;
 
         // associate with peace of mind
-        let new_url = self.nrs_associate(public_name, link, dry_run).await?;
+        let new_url = self.nrs_associate(public_name, link).await?;
         Ok((new_url, did_register_topname))
     }
 
@@ -154,7 +144,7 @@ impl Safe {
     /// Returns a versioned NRS SafeUrl (containing a VersionHash) pointing to the latest version
     /// (including the deletion) for the provided public name.
     /// `safe://{public_name}?v={version_hash}`
-    pub async fn nrs_remove(&self, public_name: &str, dry_run: bool) -> Result<SafeUrl> {
+    pub async fn nrs_remove(&self, public_name: &str) -> Result<SafeUrl> {
         info!(
             "Removing public name \"{}\" from NRS map container",
             public_name
@@ -174,9 +164,7 @@ impl Safe {
             .collect();
 
         // remove
-        let entry_hash = self
-            .multimap_remove(&url_str, current_versions, dry_run)
-            .await?;
+        let entry_hash = self.multimap_remove(&url_str, current_versions).await?;
 
         Ok(get_versioned_nrs_url(url_str, entry_hash)?)
     }
@@ -397,7 +385,7 @@ mod tests {
         let version_hash = VersionHash::from(&random_hash);
         original_url.set_content_version(Some(version_hash));
 
-        let _nrs_map_url = retry_loop!(safe.nrs_create(&site_name, false));
+        let _nrs_map_url = retry_loop!(safe.nrs_create(&site_name));
 
         let nrs_map = retry_loop!(safe.nrs_get_subnames_map(&site_name, None));
 
@@ -412,7 +400,7 @@ mod tests {
 
         // let's create an empty files container so we have a valid to link
         let (link, _, _) = safe
-            .files_container_create_from(TEST_DATA_FILE, None, false, false, false)
+            .files_container_create_from(TEST_DATA_FILE, None, false, false)
             .await?;
         let (version0, _) = retry_loop!(safe.files_container_get(&link))
             .ok_or(anyhow!("files container was unexpectedly empty"))?;
@@ -420,7 +408,7 @@ mod tests {
         let mut url_v0 = SafeUrl::from_url(&link)?;
         url_v0.set_content_version(Some(version0));
 
-        let (nrs_url, did_create) = retry_loop!(safe.nrs_add(&site_name, &url_v0, false));
+        let (nrs_url, did_create) = retry_loop!(safe.nrs_add(&site_name, &url_v0));
         assert!(did_create);
 
         let _ = retry_loop!(safe.fetch(&nrs_url.to_string(), None));
@@ -432,7 +420,7 @@ mod tests {
         url_v1.set_content_version(Some(version_hash));
         let associated_name = format!("a.b.{}", site_name);
 
-        let versionned_url = retry_loop!(safe.nrs_associate(&associated_name, &url_v1, false));
+        let versionned_url = retry_loop!(safe.nrs_associate(&associated_name, &url_v1));
 
         assert_ne!(versionned_url.content_version(), Some(version0));
 
@@ -450,7 +438,7 @@ mod tests {
 
         // let's create an empty files container so we have a valid to link
         let (link, _, _) = safe
-            .files_container_create_from(TEST_DATA_FILE, None, false, false, false)
+            .files_container_create_from(TEST_DATA_FILE, None, false, false)
             .await?;
         let (version0, _) = retry_loop!(safe.files_container_get(&link))
             .ok_or(anyhow!("files container was unexpectedly empty"))?;
@@ -458,7 +446,7 @@ mod tests {
         let mut url_v0 = SafeUrl::from_url(&link)?;
         url_v0.set_content_version(Some(version0));
 
-        let (nrs_url, did_create) = retry_loop!(safe.nrs_add(&site_name, &url_v0, false));
+        let (nrs_url, did_create) = retry_loop!(safe.nrs_add(&site_name, &url_v0));
         assert!(did_create);
 
         let _ = retry_loop!(safe.fetch(&nrs_url.to_string(), None));
@@ -468,7 +456,7 @@ mod tests {
         let mut dummy_url_v0 = SafeUrl::from_url("safe://linked-from-a_b_site_name")?;
         dummy_url_v0.set_content_version(Some(version0));
         match safe
-            .nrs_associate(&versioned_sitename, &dummy_url_v0, false)
+            .nrs_associate(&versioned_sitename, &dummy_url_v0)
             .await
         {
             Ok(_) => {
@@ -486,7 +474,7 @@ mod tests {
             other => bail!("Error returned is not the expected one: {:?}", other),
         };
 
-        match safe.nrs_remove(&versioned_sitename, false).await {
+        match safe.nrs_remove(&versioned_sitename).await {
             Ok(_) => Err(anyhow!(
                 "NRS map remove was unexpectedly successful".to_string(),
             )),
@@ -514,7 +502,7 @@ mod tests {
 
         // let's create an empty files container so we have a valid to link
         let (link, _, _) = safe
-            .files_container_create_from(TEST_DATA_FILE, None, false, false, false)
+            .files_container_create_from(TEST_DATA_FILE, None, false, false)
             .await?;
         let (version0, _) = retry_loop!(safe.files_container_get(&link))
             .ok_or(anyhow!("files container was unexpectedly empty"))?;
@@ -523,7 +511,7 @@ mod tests {
         let mut url_v0 = SafeUrl::from_url(&link)?;
         url_v0.set_content_version(Some(version0));
 
-        let (nrs_url, did_create) = retry_loop!(safe.nrs_add(&site_name, &url_v0, false));
+        let (nrs_url, did_create) = retry_loop!(safe.nrs_add(&site_name, &url_v0));
         assert!(did_create);
 
         let _ = retry_loop!(safe.fetch(&nrs_url.to_string(), None));
@@ -535,7 +523,7 @@ mod tests {
         url_v1.set_content_version(Some(version1));
         let associated_name1 = format!("a.b.{}", site_name);
 
-        let versionned_url = retry_loop!(safe.nrs_associate(&associated_name1, &url_v1, false));
+        let versionned_url = retry_loop!(safe.nrs_associate(&associated_name1, &url_v1));
         assert!(versionned_url.content_version().is_some());
 
         // wait for them to be available
@@ -543,7 +531,7 @@ mod tests {
         let _ = retry_loop_for_pattern!(safe.nrs_get(&associated_name1, None), Ok((res_url, _)) if res_url == &url_v1)?;
 
         // remove the first one
-        let versionned_url = retry_loop!(safe.nrs_remove(&site_name, false));
+        let versionned_url = retry_loop!(safe.nrs_remove(&site_name));
         assert_ne!(versionned_url.content_version(), Some(version1));
         assert_ne!(versionned_url.content_version(), Some(version0));
 
@@ -573,14 +561,14 @@ mod tests {
 
         // let's create an empty files container so we have a valid to link
         let (link, _, _) = safe
-            .files_container_create_from(TEST_DATA_FILE, None, false, false, false)
+            .files_container_create_from(TEST_DATA_FILE, None, false, false)
             .await?;
         let (version0, _) = retry_loop!(safe.files_container_get(&link))
             .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         let mut url_v0 = SafeUrl::from_url(&link)?;
         url_v0.set_content_version(Some(version0));
-        let (nrs_url, did_create) = retry_loop!(safe.nrs_add(&site_name, &url_v0, false,));
+        let (nrs_url, did_create) = retry_loop!(safe.nrs_add(&site_name, &url_v0));
         assert!(did_create);
 
         // check it's there
@@ -589,7 +577,7 @@ mod tests {
         assert!(nrs_map.map.len() == 1);
 
         // remove subname
-        let versionned_url = retry_loop!(safe.nrs_remove(&site_name, false));
+        let versionned_url = retry_loop!(safe.nrs_remove(&site_name));
         assert!(versionned_url.content_version().is_some());
 
         // check it's gone
@@ -613,7 +601,7 @@ mod tests {
         // test with invalid top name
         let invalid_top_name = "atffdgasd/d";
         let expected_err = format!("The NRS top name \"{}\" is invalid because it contains url parts. Please remove any path, version or subnames.", invalid_top_name);
-        match safe.nrs_create(invalid_top_name, true).await {
+        match safe.nrs_create(invalid_top_name).await {
             Ok(_) => bail!("Unexpected NRS success when expected to fail with invalid top name"),
             Err(Error::InvalidInput(e)) => assert_eq!(e, expected_err),
             Err(_) => bail!("Expected an InvalidInput error kind, got smth else"),
@@ -628,7 +616,7 @@ mod tests {
 
         // let's create an empty files container so we have a valid to link
         let (link, _, _) = safe
-            .files_container_create_from(TEST_DATA_FILE, None, false, false, false)
+            .files_container_create_from(TEST_DATA_FILE, None, false, false)
             .await?;
         let (version0, _) = retry_loop!(safe.files_container_get(&link))
             .ok_or(anyhow!("files container was unexpectedly empty"))?;
@@ -637,7 +625,7 @@ mod tests {
         let mut valid_link = SafeUrl::from_url(&link)?;
         valid_link.set_content_version(Some(version0));
 
-        let (nrs_url, did_create) = retry_loop!(safe.nrs_add(&site_name, &valid_link, false));
+        let (nrs_url, did_create) = retry_loop!(safe.nrs_add(&site_name, &valid_link));
         assert!(did_create);
 
         let _ = retry_loop!(safe.fetch(&nrs_url.to_string(), None));
@@ -647,8 +635,7 @@ mod tests {
         valid_link.set_content_version(Some(version0));
         let site_name2 = format!("sub.{}", &site_name);
 
-        let (nrs_url2, did_create) =
-            retry_loop!(safe.nrs_add(&site_name2, &second_valid_link, false));
+        let (nrs_url2, did_create) = retry_loop!(safe.nrs_add(&site_name2, &second_valid_link));
         assert!(!did_create);
 
         let _ = retry_loop!(safe.fetch(&nrs_url2.to_string(), None));
@@ -661,7 +648,7 @@ mod tests {
             another_valid_url.to_string().as_bytes().to_vec(),
         );
         let _ = safe
-            .multimap_insert(&url_str, entry, BTreeSet::new(), false)
+            .multimap_insert(&url_str, entry, BTreeSet::new())
             .await?;
 
         // get of other name should be ok
@@ -686,7 +673,7 @@ mod tests {
         }
 
         // resolve the error
-        let _ = retry_loop!(safe.nrs_associate(&site_name, &valid_link, false));
+        let _ = retry_loop!(safe.nrs_associate(&site_name, &valid_link));
 
         // get should work now
         let _ = retry_loop_for_pattern!(safe.nrs_get(&site_name, None), Ok((res_url, _)) if res_url == &valid_link)?;

@@ -91,6 +91,9 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
         }
     };
 
+    // Set dry run mode in Safe instance as per arg provide
+    safe.dry_run_mode = args.dry;
+
     debug!("Processing command: {:?}", args);
 
     let result = match args.cmd {
@@ -127,7 +130,7 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
             // available to connect to the network with them (unless dry-run was set),
             // otherwise the connection created  will be with read-only access and some
             // of these commands will fail if they require write access.
-            if !args.dry {
+            if !safe.dry_run_mode {
                 connect(safe, get_config().await?).await?;
             }
 
@@ -135,8 +138,8 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
                 SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, safe).await,
                 SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, safe).await,
                 SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, safe).await,
-                SubCommands::Files(cmd) => files_commander(cmd, output_fmt, args.dry, safe).await,
-                SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, args.dry, safe).await,
+                SubCommands::Files(cmd) => files_commander(cmd, output_fmt, safe).await,
+                SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, safe).await,
                 _ => Err(eyre!("Unknown safe subcommand")),
             }
         }

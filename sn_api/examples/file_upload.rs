@@ -47,11 +47,10 @@ async fn main() -> Result<()> {
     let dest = None; // root path at destination container
     let recursive = false; // do not do a recursive look up of files on local path
     let follow_links = false; // do not attempt to follow local links
-    let dry_run = false; // commit the operation on the network
 
     println!("Uploading '{}' to Safe ...", file_path.display());
     let (xorurl, _, _) = safe
-        .files_container_create_from(&file_path, dest, recursive, follow_links, dry_run)
+        .files_container_create_from(&file_path, dest, recursive, follow_links)
         .await?;
 
     // The 'files_container_create_from' API returns (among other information) the

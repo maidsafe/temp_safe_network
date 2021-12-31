@@ -94,8 +94,9 @@ pub async fn xorurl_commander(
                 get_from_arg_or_stdin(location, Some("...awaiting location path from stdin"))?;
 
             // Do a dry-run on the location
+            safe.dry_run_mode = true;
             let (_version, processed_files, _) = safe
-                .files_container_create_from(&location, None, recursive, follow_symlinks, true)
+                .files_container_create_from(&location, None, recursive, follow_symlinks)
                 .await?;
 
             // Now let's just print out a list of the xorurls
