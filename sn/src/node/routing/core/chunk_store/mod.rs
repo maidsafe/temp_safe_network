@@ -43,15 +43,15 @@ impl ChunkStore {
         self.disk_store.list_all_chunk_addresses()
     }
 
-    pub(crate) fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
+    pub(crate) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
         trace!("Removing chunk, {:?}", address);
-        self.disk_store.delete_chunk(address)
+        self.disk_store.delete_chunk(address).await
     }
 
-    pub(crate) fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
+    pub(crate) async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
         debug!("Getting chunk {:?}", address);
 
-        match self.disk_store.read_chunk(address) {
+        match self.disk_store.read_chunk(address).await {
             Ok(res) => Ok(res),
             Err(error) => match error {
                 Error::Io(io_error) if io_error.kind() == ErrorKind::NotFound => {
@@ -63,9 +63,13 @@ impl ChunkStore {
     }
 
     // Read chunk from local store and return NodeQueryResponse
-    pub(crate) fn get(&self, address: &ChunkAddress) -> NodeQueryResponse {
+    pub(crate) async fn get(&self, address: &ChunkAddress) -> NodeQueryResponse {
         trace!("{:?}", LogMarker::ChunkQueryReceviedAtAdult);
-        NodeQueryResponse::GetChunk(self.get_chunk(address).map_err(convert_to_error_message))
+        NodeQueryResponse::GetChunk(
+            self.get_chunk(address)
+                .await
+                .map_err(convert_to_error_message),
+        )
     }
 
     /// Store a chunk in the local disk store
