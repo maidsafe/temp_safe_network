@@ -90,10 +90,6 @@ impl ChunkDiskStore {
     }
 
     pub(crate) async fn write_chunk(&self, data: &Chunk) -> Result<ChunkAddress> {
-        if !self.used_space.can_consume(data.value().len() as u64).await {
-            return Err(Error::NotEnoughSpace);
-        }
-
         let addr = data.address();
         let filepath = self.address_to_filepath(addr)?;
         if let Some(dirs) = filepath.parent() {
