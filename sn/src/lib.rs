@@ -68,9 +68,26 @@ use tracing_subscriber::{
 
 /// Number of elders per section.
 pub(crate) const DEFAULT_ELDER_COUNT: usize = 7;
-const SN_ELDER_COUNT: &str = "SN_ELDER_COUNT";
+/// Number of copies of a chunk
+pub(crate) const DEFAULT_CHUNK_COPY_COUNT: usize = 3;
 
-/// Get the expected elder count for our network, defaults to DEFAULT_ELDER_COUNT, but can be overridden by the env var SN_ELDER_COUNT
+const SN_ELDER_COUNT: &str = "SN_ELDER_COUNT";
+const SN_CHUNK_COPY_COUNT: &str = "SN_CHUNK_COPY_COUNT";
+
+/// Max number of faulty Elders is assumed to be less than 1/3.
+/// So it's no more than 2 with 7 Elders.
+pub(crate) fn max_num_faulty_elders() -> usize {
+    elder_count() / 3
+}
+
+/// The least number of Elders to select, to be "guaranteed" one correctly functioning Elder.
+/// This number will be 3 with 7 Elders.
+pub(crate) fn at_least_one_correct_elder() -> usize {
+    max_num_faulty_elders() + 1
+}
+
+/// Get the expected elder count for our network.
+/// Defaults to DEFAULT_ELDER_COUNT, but can be overridden by the env var SN_ELDER_COUNT.
 pub(crate) fn elder_count() -> usize {
     // if we have an env var for this, lets override
     match std::env::var(SN_ELDER_COUNT) {
@@ -83,11 +100,33 @@ pub(crate) fn elder_count() -> usize {
                 count
             }
             Err(error) => {
-                warn!("There was an error parsing {:?} env var. Defaultelder_count() will be used: {:?}", SN_ELDER_COUNT, error);
+                warn!("There was an error parsing {:?} env var. DEFAULT_ELDER_COUNT will be used: {:?}", SN_ELDER_COUNT, error);
                 DEFAULT_ELDER_COUNT
             }
         },
         Err(_) => DEFAULT_ELDER_COUNT,
+    }
+}
+
+/// Get the expected chunk copy count for our network.
+/// Defaults to DEFAULT_CHUNK_COPY_COUNT, but can be overridden by the env var SN_CHUNK_COPY_COUNT.
+pub(crate) fn chunk_copy_count() -> usize {
+    // if we have an env var for this, lets override
+    match std::env::var(SN_CHUNK_COPY_COUNT) {
+        Ok(count) => match count.parse() {
+            Ok(count) => {
+                warn!(
+                    "CHUNK_COPY_COUNT countout set from env var SN_CHUNK_COPY_COUNT: {:?}",
+                    SN_CHUNK_COPY_COUNT
+                );
+                count
+            }
+            Err(error) => {
+                warn!("There was an error parsing {:?} env var. DEFAULT_CHUNK_COPY_COUNT will be used: {:?}", SN_CHUNK_COPY_COUNT, error);
+                DEFAULT_CHUNK_COPY_COUNT
+            }
+        },
+        Err(_) => DEFAULT_CHUNK_COPY_COUNT,
     }
 }
 
