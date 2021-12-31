@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::chunk_copy_count;
 use crate::dbs::convert_to_error_message as convert_db_error_to_error_message;
 use crate::messaging::{
     data::{CmdError, DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite, ServiceMsg},
@@ -14,10 +15,7 @@ use crate::messaging::{
 };
 use crate::node::{
     error::Result,
-    routing::{
-        api::command::Command,
-        core::{capacity::CHUNK_COPY_COUNT, Core},
-    },
+    routing::{api::command::Command, core::Core},
 };
 use crate::peer::Peer;
 use crate::types::{log_markers::LogMarker, ChunkAddress, PublicKey};
@@ -340,7 +338,7 @@ impl Core {
             .into_iter()
             .sorted_by(|lhs, rhs| target.cmp_distance(lhs, rhs))
             .filter(|peer| !full_adults.contains(peer))
-            .take(CHUNK_COPY_COUNT)
+            .take(chunk_copy_count())
             .collect::<BTreeSet<_>>();
 
         trace!(
@@ -387,7 +385,7 @@ impl Core {
             .into_iter()
             .sorted_by(|lhs, rhs| target.cmp_distance(lhs, rhs))
             .filter(|peer| !full_adults.contains(peer))
-            .take(CHUNK_COPY_COUNT)
+            .take(chunk_copy_count())
             .collect::<BTreeSet<_>>();
 
         trace!(
