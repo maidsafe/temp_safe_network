@@ -62,33 +62,19 @@ pub enum NrsSubCommands {
 pub async fn nrs_commander(
     cmd: NrsSubCommands,
     output_fmt: OutputFmt,
-    dry_run: bool,
     safe: &mut Safe,
 ) -> Result<()> {
     match cmd {
         NrsSubCommands::Register { name, link } => {
-            run_register_subcommand(name, link, safe, dry_run, output_fmt).await
+            run_register_subcommand(name, link, safe, output_fmt).await
         }
         NrsSubCommands::Add {
             public_name: name,
             link,
             register_top_name,
             default,
-        } => {
-            run_add_subcommand(
-                name,
-                link,
-                register_top_name,
-                default,
-                safe,
-                dry_run,
-                output_fmt,
-            )
-            .await
-        }
-        NrsSubCommands::Remove { name } => {
-            run_remove_subcommand(name, safe, dry_run, output_fmt).await
-        }
+        } => run_add_subcommand(name, link, register_top_name, default, safe, output_fmt).await,
+        NrsSubCommands::Remove { name } => run_remove_subcommand(name, safe, output_fmt).await,
     }
 }
 
@@ -96,16 +82,16 @@ async fn run_register_subcommand(
     name: String,
     link: Option<String>,
     safe: &mut Safe,
-    dry_run: bool,
     output_fmt: OutputFmt,
 ) -> Result<()> {
     if let Some(ref link) = link {
         validate_target_link(link)?;
     }
-    match safe.nrs_create(&name, dry_run).await {
+
+    match safe.nrs_create(&name).await {
         Ok(topname_url) => {
             let (nrs_url, summary) =
-                get_new_nrs_url_for_topname(&name, safe, topname_url, link, dry_run).await?;
+                get_new_nrs_url_for_topname(&name, safe, topname_url, link).await?;
             print_summary(
                 output_fmt,
                 &format!(
@@ -148,17 +134,16 @@ async fn run_add_subcommand(
     register_top_name: bool,
     default: bool,
     safe: &mut Safe,
-    dry_run: bool,
     output_fmt: OutputFmt,
 ) -> Result<()> {
     let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
     validate_target_link(&link)?;
     let link_url = SafeUrl::from_url(&link)?;
     let (url, topname_was_registered) = if register_top_name {
-        add_public_name_for_url(&name, safe, &link_url, dry_run).await?
+        add_public_name_for_url(&name, safe, &link_url).await?
     } else {
         (
-            associate_url_with_public_name(&name, safe, &link_url, dry_run).await?,
+            associate_url_with_public_name(&name, safe, &link_url).await?,
             false,
         )
     };
@@ -177,7 +162,7 @@ async fn run_add_subcommand(
 
     if default {
         let topname = get_topname_from_public_name(&name)?;
-        associate_url_with_public_name(&topname, safe, &link_url, dry_run).await?;
+        associate_url_with_public_name(&topname, safe, &link_url).await?;
         summary_header.push_str(&format!(
             "This link was also set as the default location for {}.",
             topname
@@ -193,13 +178,8 @@ async fn run_add_subcommand(
     Ok(())
 }
 
-async fn run_remove_subcommand(
-    name: String,
-    safe: &mut Safe,
-    dry_run: bool,
-    output_fmt: OutputFmt,
-) -> Result<()> {
-    match safe.nrs_remove(&name, dry_run).await {
+async fn run_remove_subcommand(name: String, safe: &mut Safe, output_fmt: OutputFmt) -> Result<()> {
+    match safe.nrs_remove(&name).await {
         Ok(url) => {
             let version = url
                 .content_version()
@@ -256,11 +236,10 @@ async fn get_new_nrs_url_for_topname(
     safe: &mut Safe,
     topname_url: SafeUrl,
     link: Option<String>,
-    dry_run: bool,
 ) -> Result<(SafeUrl, String)> {
     if let Some(link) = link {
         let url = SafeUrl::from_url(&link)?;
-        let new_url = associate_url_with_public_name(name, safe, &url, dry_run).await?;
+        let new_url = associate_url_with_public_name(name, safe, &url).await?;
         return Ok((new_url, format!("The entry points to {}", link)));
     }
     Ok((topname_url, "".to_string()))
@@ -270,9 +249,8 @@ async fn associate_url_with_public_name(
     public_name: &str,
     safe: &mut Safe,
     url: &SafeUrl,
-    dry_run: bool,
 ) -> Result<SafeUrl> {
-    match safe.nrs_associate(public_name, url, dry_run).await {
+    match safe.nrs_associate(public_name, url).await {
         Ok(new_url) => Ok(new_url),
         Err(error) => match error {
             UnversionedContentError(_) => Err(eyre!(error)
@@ -294,9 +272,8 @@ async fn add_public_name_for_url(
     public_name: &str,
     safe: &mut Safe,
     url: &SafeUrl,
-    dry_run: bool,
 ) -> Result<(SafeUrl, bool)> {
-    match safe.nrs_add(public_name, url, dry_run).await {
+    match safe.nrs_add(public_name, url).await {
         Ok((new_url, topname_was_registered)) => Ok((new_url, topname_was_registered)),
         Err(error) => match error {
             UnversionedContentError(_) => Err(eyre!(error)

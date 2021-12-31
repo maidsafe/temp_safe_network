@@ -203,7 +203,6 @@ pub enum FilesSubCommands {
 pub async fn files_commander(
     cmd: FilesSubCommands,
     output_fmt: OutputFmt,
-    dry_run: bool,
     safe: &mut Safe,
 ) -> Result<()> {
     match cmd {
@@ -214,22 +213,16 @@ pub async fn files_commander(
             follow_links,
         } => {
             // create FilesContainer from a given path to local files/folders
-            if dry_run && OutputFmt::Pretty == output_fmt {
+            if safe.dry_run_mode && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
             }
             let (files_container_xorurl, processed_files, _) = safe
-                .files_container_create_from(
-                    &location,
-                    dest.as_deref(),
-                    recursive,
-                    follow_links,
-                    dry_run,
-                )
+                .files_container_create_from(&location, dest.as_deref(), recursive, follow_links)
                 .await?;
 
             // Now let's just print out a list of the files uploaded/processed
             if OutputFmt::Pretty == output_fmt {
-                if dry_run {
+                if safe.dry_run_mode {
                     println!("FilesContainer not created since running in dry-run mode");
                 } else {
                     println!("FilesContainer created at: \"{}\"", files_container_xorurl);
@@ -252,7 +245,7 @@ pub async fn files_commander(
             update_nrs,
         } => {
             let target = get_from_arg_or_stdin(target, None)?;
-            if dry_run && OutputFmt::Pretty == output_fmt {
+            if safe.dry_run_mode && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
             }
             // Update the FilesContainer on the Network
@@ -264,7 +257,6 @@ pub async fn files_commander(
                     follow_links,
                     delete,
                     update_nrs,
-                    dry_run,
                 )
                 .await?;
             let version = content.map(|(version, _)| version);
@@ -315,7 +307,7 @@ pub async fn files_commander(
             let target_url =
                 get_from_arg_or_stdin(Some(target_url), Some("...awaiting target URl from STDIN"))?;
 
-            if dry_run && OutputFmt::Pretty == output_fmt {
+            if safe.dry_run_mode && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
             }
 
@@ -324,10 +316,10 @@ pub async fn files_commander(
                 if location.is_empty() {
                     let file_content = get_from_stdin(Some("...awaiting file's content to add from STDIN"))?;
                     // Update the FilesContainer on the Network
-                    safe.files_container_add_from_raw(Bytes::from(file_content), &target_url, force, update_nrs, dry_run).await?
+                    safe.files_container_add_from_raw(Bytes::from(file_content), &target_url, force, update_nrs).await?
                 } else {
                     // Update the FilesContainer on the Network
-                    safe.files_container_add(&location, &target_url, force, update_nrs, follow_links, dry_run).await?
+                    safe.files_container_add(&location, &target_url, force, update_nrs, follow_links).await?
                 };
 
             // Now let's just print out a list of the files synced/processed
@@ -347,13 +339,13 @@ pub async fn files_commander(
             let target_url =
                 get_from_arg_or_stdin(Some(target), Some("...awaiting target URl from STDIN"))?;
 
-            if dry_run && OutputFmt::Pretty == output_fmt {
+            if safe.dry_run_mode && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
             }
 
             // Update the FilesContainer on the Network
             let (version, processed_files, _) = safe
-                .files_container_remove_path(&target_url, recursive, update_nrs, dry_run)
+                .files_container_remove_path(&target_url, recursive, update_nrs)
                 .await?;
 
             // Now let's just print out a list of the files removed

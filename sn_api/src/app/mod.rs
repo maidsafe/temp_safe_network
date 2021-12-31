@@ -39,6 +39,7 @@ pub use xor_name::{XorName, XOR_NAME_LEN};
 pub struct Safe {
     safe_client: SafeAppClient,
     pub xorurl_base: XorUrlBase,
+    pub dry_run_mode: bool,
 }
 
 impl Default for Safe {
@@ -52,6 +53,7 @@ impl Safe {
         Self {
             safe_client: SafeAppClient::new(timeout),
             xorurl_base: xorurl_base.unwrap_or(DEFAULT_XORURL_BASE),
+            dry_run_mode: false,
         }
     }
 
