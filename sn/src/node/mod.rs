@@ -11,13 +11,15 @@
 mod chaos;
 /// Configuration handling
 pub mod config_handler;
+/// Routing
+pub mod routing;
+/// Docs
+pub mod state_db;
+
 mod error;
 mod logging;
 mod network;
 mod node_api;
-
-/// Docs
-pub mod state_db;
 
 pub use crate::node::{
     config_handler::{add_connection_info, set_connection_info, Config},

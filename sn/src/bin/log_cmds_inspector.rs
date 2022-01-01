@@ -3,7 +3,7 @@ use grep::matcher::Matcher;
 use grep::regex::RegexMatcher;
 use grep::searcher::sinks::UTF8;
 use grep::searcher::Searcher;
-use safe_network::routing::log_markers::LogMarker;
+use safe_network::types::log_markers::LogMarker;
 use std::str::FromStr;
 use std::{
     collections::BTreeMap,

@@ -38,12 +38,12 @@ use tracing_subscriber::EnvFilter;
 use xor_name::{Prefix, XorName};
 use yansi::{Color, Style};
 
-use safe_network::routing::create_test_used_space_and_root_storage;
+use safe_network::node::routing::create_test_used_space_and_root_storage;
 
 use safe_network::messaging::{
     data::Error::FailedToWriteFile, system::SystemMsg, DstLocation, MessageId,
 };
-use safe_network::routing::{Config, Event as RoutingEvent, NodeElderChange, Routing};
+use safe_network::node::routing::{Config, Event as RoutingEvent, NodeElderChange, Routing};
 use safe_network::types::Cache;
 
 // Minimal delay between two consecutive prints of the network status.
