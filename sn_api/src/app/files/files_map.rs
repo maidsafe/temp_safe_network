@@ -20,7 +20,7 @@ use std::{collections::BTreeMap, fs, path::Path};
 // To use for mapping files names (with path in a flattened hierarchy) to FileInfos
 pub type FilesMap = BTreeMap<String, FileInfo>;
 
-// Each FileInfo contains file metadata and the link to the file's Blob XOR-URL
+// Each FileInfo contains file metadata and the link to the file's XOR-URL
 pub type FileInfo = BTreeMap<String, String>;
 
 // Type of changes made to each item of a FilesMap
@@ -215,7 +215,7 @@ pub(crate) fn file_map_for_path(files_map: FilesMap, path: &str) -> Result<Files
     Ok(chrooted_file_map)
 }
 
-/// If a file is found at path, returns its "link" (xorurl to the blob)
+/// If a file is found at path, returns its "link" (xorurl)
 /// along with its metadata enriched with the name of the file
 /// Else returns (None, None)
 pub(crate) fn get_file_link_and_metadata(

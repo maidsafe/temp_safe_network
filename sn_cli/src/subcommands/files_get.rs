@@ -334,7 +334,7 @@ async fn files_container_get_files(
         SafeData::FilesContainer {
             version, files_map, ..
         } => (version.map_or("".to_string(), |v| v.to_string()), files_map),
-        SafeData::PublicBlob { metadata, .. } => {
+        SafeData::PublicFile { metadata, .. } => {
             if let Some(file_item) = metadata {
                 let mut files_map = FilesMap::new();
                 files_map.insert("".to_string(), file_item);
@@ -619,7 +619,7 @@ fn denormalize_slashes(p: &str) -> String {
 }
 
 // Downloads a file from the network to a given file path
-// xorurl must point to a Blob
+// xorurl must point to a file
 // size (in bytes) must be provided
 async fn download_file_from_net(
     safe: &mut Safe,
@@ -640,7 +640,7 @@ async fn download_file_from_net(
     let mut stream = BufWriter::new(fh);
 
     // gets public or private, based on xorurl type
-    let filedata = files_get_blob(safe, xorurl, None).await?;
+    let filedata = files_get(safe, xorurl, None).await?;
     bytes_written += stream_write(&mut stream, &filedata, path)? as u64;
     rcvd += filedata.len() as u64;
     trace!("received {} bytes of {}", rcvd, size,);
@@ -691,13 +691,13 @@ fn create_dir_all(dir_path: &Path) -> Result<()> {
         .with_context(|| format!("Couldn't create path: \"{}\"", dir_path.display(),))
 }
 
-/// # Get Public or Private Blob
-/// Get immutable data blobs from the network.
-pub async fn files_get_blob(safe: &mut Safe, url: &str, range: Range) -> Result<Vec<u8>> {
+/// # Get Public or Private file
+/// Get immutable files from the network.
+pub async fn files_get(safe: &mut Safe, url: &str, range: Range) -> Result<Vec<u8>> {
     match SafeUrl::from_url(url)?.data_type() {
-        DataType::Bytes => {
-            let pub_blob = safe.files_get_public_data(url, range).await?;
-            Ok(pub_blob.chunk().to_vec())
+        DataType::File => {
+            let bytes = safe.files_get_public(url, range).await?;
+            Ok(bytes.chunk().to_vec())
         }
         _ => Err(eyre!("URL target is not immutable data")),
     }

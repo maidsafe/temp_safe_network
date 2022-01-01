@@ -76,13 +76,13 @@ async fn main() -> Result<()> {
     // but its metadata too so we can distinguish what has
     // been fetched from the provided Safe-URL.
     let fetched = safe.fetch(&url.to_string(), None).await;
-    if let Ok(SafeData::PublicBlob { data, .. }) = fetched {
+    if let Ok(SafeData::PublicFile { data, .. }) = fetched {
         println!(
             "Content retrieved:\n{}",
             String::from_utf8(data.chunk().to_vec())?
         );
     } else {
-        println!("Failed to retrieve Blob, obtained: {:?}", fetched);
+        println!("Failed to retrieve file, obtained: {:?}", fetched);
     }
 
     Ok(())

@@ -20,7 +20,7 @@ use walkdir::{DirEntry, WalkDir};
 
 const MAX_RECURSIVE_DEPTH: usize = 10_000;
 
-// Upload a files to the Network as a Public Blob
+// Upload a file to the Network
 pub(crate) async fn upload_file_to_net(safe: &mut Safe, path: &Path) -> Result<XorUrl> {
     let data = fs::read(path).map_err(|err| {
         Error::InvalidInput(format!("Failed to read file from local location: {}", err))
@@ -29,14 +29,14 @@ pub(crate) async fn upload_file_to_net(safe: &mut Safe, path: &Path) -> Result<X
 
     let mut mime_type_for_xorurl = mime_guess::from_path(&path).first_raw();
     let result = match safe
-        .store_public_bytes(data.to_owned(), mime_type_for_xorurl)
+        .store_public_file(data.to_owned(), mime_type_for_xorurl)
         .await
     {
         Ok(xorurl) => Ok(xorurl),
         Err(Error::InvalidMediaType(_)) => {
             // Let's then upload it and set media-type to be simply raw content
             mime_type_for_xorurl = None;
-            safe.store_public_bytes(data.clone(), mime_type_for_xorurl)
+            safe.store_public_file(data.clone(), mime_type_for_xorurl)
                 .await
         }
         other_err => other_err,
@@ -49,7 +49,7 @@ pub(crate) async fn upload_file_to_net(safe: &mut Safe, path: &Path) -> Result<X
         // Switch dry run mode ON only for this next operation
         let prev_dry_run_mode = safe.dry_run_mode;
         safe.dry_run_mode = true;
-        let result = safe.store_public_bytes(data, mime_type_for_xorurl).await;
+        let result = safe.store_public_file(data, mime_type_for_xorurl).await;
         safe.dry_run_mode = prev_dry_run_mode;
         let xorurl = result?;
 

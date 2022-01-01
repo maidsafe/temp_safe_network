@@ -157,7 +157,7 @@ pub enum DataType {
     #[allow(missing_docs)]
     SafeKey = 0x00,
     #[allow(missing_docs)]
-    Bytes = 0x01,
+    File = 0x01,
     #[allow(missing_docs)]
     Register = 0x02,
 }
@@ -544,7 +544,7 @@ impl SafeUrl {
     /// returns SAFE data type
     pub fn data_type(&self) -> DataType {
         match self.address {
-            DataAddress::Bytes(_) => DataType::Bytes,
+            DataAddress::Bytes(_) => DataType::File,
             DataAddress::Register(_) => DataType::Register,
             DataAddress::SafeKey(_) => DataType::SafeKey,
         }
@@ -1403,7 +1403,7 @@ mod tests {
         assert_eq!(xor_name, url.xorname());
         assert_eq!(type_tag, url.type_tag());
         assert_eq!(Scope::Public, url.scope());
-        assert_eq!(DataType::Bytes, url.data_type());
+        assert_eq!(DataType::File, url.data_type());
         assert_eq!(ContentType::Raw, url.content_type());
         assert_eq!(Some(content_version), url.content_version());
         assert_eq!(query_string_v, url.query_string());
@@ -1500,7 +1500,7 @@ mod tests {
         )?;
 
         let url = SafeUrl::from_url(&xorurl)?;
-        assert_eq!(url.data_type(), DataType::Bytes);
+        assert_eq!(url.data_type(), DataType::File);
         Ok(())
     }
 

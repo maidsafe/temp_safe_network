@@ -40,7 +40,7 @@ pub enum SafeData {
         resolves_into: Option<SafeUrl>,
         resolved_from: String,
     },
-    PublicBlob {
+    PublicFile {
         xorurl: String,
         xorname: XorName,
         data: Bytes,
@@ -88,7 +88,7 @@ impl SafeData {
         match self {
             SafeKey { xorurl, .. }
             | FilesContainer { xorurl, .. }
-            | PublicBlob { xorurl, .. }
+            | PublicFile { xorurl, .. }
             | NrsMapContainer { xorurl, .. }
             | Multimap { xorurl, .. }
             | PublicRegister { xorurl, .. }
@@ -101,7 +101,7 @@ impl SafeData {
         match self {
             SafeKey { resolved_from, .. }
             | FilesContainer { resolved_from, .. }
-            | PublicBlob { resolved_from, .. }
+            | PublicFile { resolved_from, .. }
             | NrsMapContainer { resolved_from, .. }
             | Multimap { resolved_from, .. }
             | PublicRegister { resolved_from, .. }
@@ -113,7 +113,7 @@ impl SafeData {
         use SafeData::*;
         match self {
             SafeKey { .. }
-            | PublicBlob { .. }
+            | PublicFile { .. }
             | Multimap { .. }
             | PublicRegister { .. }
             | PrivateRegister { .. } => None,
@@ -131,7 +131,7 @@ impl SafeData {
             | PublicRegister { .. }
             | PrivateRegister { .. }
             | NrsMapContainer { .. } => None,
-            FilesContainer { metadata, .. } | PublicBlob { metadata, .. } => metadata.clone(),
+            FilesContainer { metadata, .. } | PublicFile { metadata, .. } => metadata.clone(),
         }
     }
 }

@@ -73,12 +73,12 @@ fn nrs_register_should_register_a_topname_with_an_immutable_content_link() -> Re
         .iter()
         .last()
         .ok_or_else(|| eyre!("list of processed files unexpectedly empty"))?;
-    let test_md_blob_link = test_md_entry
+    let test_md_file_link = test_md_entry
         .1
         .to_owned()
         .link()
         .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?;
-    let url = SafeUrl::from_url(test_md_blob_link)?;
+    let url = SafeUrl::from_url(test_md_file_link)?;
     println!("processed_files = {:?}", processed_files);
 
     let topname = get_random_nrs_string();
@@ -219,12 +219,12 @@ fn nrs_add_should_add_a_subname_to_immutable_content() -> Result<()> {
         .iter()
         .last()
         .ok_or_else(|| eyre!("list of processed files unexpectedly empty"))?;
-    let test_md_blob_link = test_md_entry
+    let test_md_file_link = test_md_entry
         .1
         .to_owned()
         .link()
         .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?;
-    let url = SafeUrl::from_url(test_md_blob_link)?;
+    let url = SafeUrl::from_url(test_md_file_link)?;
 
     let test_name = get_random_nrs_string();
     let public_name = format!("test.{}", &test_name);

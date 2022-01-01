@@ -78,12 +78,12 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &mut S
                 println!("{}", serialise_output(&(url, files_map), output_fmt));
             }
         }
-        SafeData::PublicBlob { data, .. } => {
+        SafeData::PublicFile { data, .. } => {
             if cmd.hexdump {
-                // Render hex representation of Blob file
+                // Render hex representation of file
                 println!("{}", pretty_hex::pretty_hex(data));
             } else {
-                // Render Blob file
+                // Render file
                 io::stdout()
                     .write_all(data)
                     .context("Failed to print out the content of the file")?;

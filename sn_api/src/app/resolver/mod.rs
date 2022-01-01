@@ -63,7 +63,7 @@ impl Safe {
     ///
     ///     let safe_data = safe.fetch( &format!( "{}/test.md", &xorurl.replace("?v=0", "") ), None ).await.unwrap();
     ///     let data_string = match safe_data {
-    ///         SafeData::PublicBlob { data, .. } => {
+    ///         SafeData::PublicFile { data, .. } => {
     ///             match String::from_utf8(data.to_vec()) {
     ///                 Ok(string) => string,
     ///                 Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
@@ -121,7 +121,7 @@ impl Safe {
     ///         )
     ///     };
     ///     match &inspected_content[1] {
-    ///         SafeData::PublicBlob { data, media_type, .. } => {
+    ///         SafeData::PublicFile { data, media_type, .. } => {
     ///             assert_eq!(*media_type, Some("text/markdown".to_string()));
     ///             assert!(data.is_empty());
     ///         }
@@ -147,10 +147,10 @@ impl Safe {
     // - or reaches the indirection limit
     // Returns a Vector with the data for all resolution steps
     //
-    // NB: When resolving a Blob, metadata can be attached to it (attached_metadata)
-    // Blobs don't have metadata on SAFE but the FileContainers linking to them have it
-    // attached_metadata is used to attach metadata to Blobs linked by their FilesContainers
-    // URL -> FileContainer (has metadata..) -> Actual File in a Blob (..that we attach here)
+    // NB: When resolving a file, metadata can be attached to it (attached_metadata)
+    // Files don't have metadata on SAFE but the FileContainers linking to them have it
+    // attached_metadata is used to attach metadata to files linked by their FilesContainers
+    // URL -> FileContainer (has metadata..) -> Actual data in a file (..that we attach here)
     // devs can leave a None there when using this function
     //
     // NB: recursive (resolutions that resolve to themselves) aren't managed but since the
@@ -429,18 +429,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fetch_public_blob() -> Result<()> {
+    async fn test_fetch_public_file() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let data = Bytes::from("Something super immutable");
         let xorurl = safe
-            .store_public_bytes(data.clone(), Some("text/plain"))
+            .store_public_file(data.clone(), Some("text/plain"))
             .await?;
 
         let safe_url = SafeUrl::from_url(&xorurl)?;
         let content = retry_loop!(safe.fetch(&xorurl, None));
         assert!(
             content
-                == SafeData::PublicBlob {
+                == SafeData::PublicFile {
                     xorurl: xorurl.clone(),
                     xorname: safe_url.xorname(),
                     data: data.clone(),
@@ -454,7 +454,7 @@ mod tests {
         let inspected_content = safe.inspect(&xorurl).await?;
         assert!(
             inspected_content[0]
-                == SafeData::PublicBlob {
+                == SafeData::PublicFile {
                     xorurl: xorurl.clone(),
                     xorname: safe_url.xorname(),
                     data: Bytes::new(),
@@ -467,34 +467,34 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fetch_range_public_blob() -> Result<()> {
+    async fn test_fetch_range_public_file() -> Result<()> {
         let safe = new_safe_instance().await?;
         let saved_data = Bytes::from("Something super immutable");
         let size = saved_data.len();
         let xorurl = safe
-            .store_public_bytes(saved_data.clone(), Some("text/plain"))
+            .store_public_file(saved_data.clone(), Some("text/plain"))
             .await?;
 
         // Fetch first half and match
         let fetch_first_half = Some((None, Some(size as u64 / 2)));
         let content = retry_loop!(safe.fetch(&xorurl, fetch_first_half));
 
-        if let SafeData::PublicBlob { data, .. } = content {
+        if let SafeData::PublicFile { data, .. } = content {
             assert_eq!(data, saved_data.slice(0..size / 2));
         } else {
-            bail!("Content fetched is not a PublicBlob: {:?}", content);
+            bail!("Content fetched is not a PublicFile: {:?}", content);
         }
 
         // Fetch second half and match
         let fetch_second_half = Some((Some(size as u64 / 2), None));
         let content = safe.fetch(&xorurl, fetch_second_half).await?;
 
-        if let SafeData::PublicBlob { data, .. } = content {
+        if let SafeData::PublicFile { data, .. } = content {
             assert_eq!(data, saved_data[size / 2..]);
             Ok(())
         } else {
             Err(anyhow!(
-                "Content fetched is not a PublicBlob: {:?}",
+                "Content fetched is not a PublicFile: {:?}",
                 content
             ))
         }
@@ -530,28 +530,28 @@ mod tests {
 
         // fetch full file and compare
         let content = retry_loop!(safe.fetch(&nrs_url, None));
-        if let SafeData::PublicBlob { data, .. } = &content {
+        if let SafeData::PublicFile { data, .. } = &content {
             assert_eq!(data.clone(), file_data.clone());
         } else {
-            bail!("Content fetched is not a PublicBlob: {:?}", content);
+            bail!("Content fetched is not a PublicFile: {:?}", content);
         }
 
         // fetch first half and match
         let fetch_first_half = Some((Some(0), Some(file_size as u64 / 2)));
         let content = safe.fetch(&nrs_url, fetch_first_half).await?;
-        if let SafeData::PublicBlob { data, .. } = content {
+        if let SafeData::PublicFile { data, .. } = content {
             assert_eq!(data, file_data[0..file_size / 2]);
         } else {
-            bail!("Content fetched is not a PublicBlob: {:?}", content);
+            bail!("Content fetched is not a PublicFile: {:?}", content);
         }
 
         // fetch second half and match
         let fetch_second_half = Some((Some(file_size as u64 / 2), Some(file_size as u64)));
         let content = safe.fetch(&nrs_url, fetch_second_half).await?;
-        if let SafeData::PublicBlob { data, .. } = content {
+        if let SafeData::PublicFile { data, .. } = content {
             assert_eq!(data, file_data[file_size / 2..]);
         } else {
-            bail!("Content fetched is not a PublicBlob: {:?}", content);
+            bail!("Content fetched is not a PublicFile: {:?}", content);
         }
 
         Ok(())
@@ -599,10 +599,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fetch_public_blob_with_path() -> Result<()> {
+    async fn test_fetch_public_file_with_path() -> Result<()> {
         let safe = new_safe_instance().await?;
         let data = Bytes::from("Something super immutable");
-        let xorurl = safe.store_public_bytes(data.clone(), None).await?;
+        let xorurl = safe.store_public_file(data.clone(), None).await?;
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         let path = "/some_relative_filepath";
@@ -620,7 +620,7 @@ mod tests {
 
         // test the same but a file with some media type
         let xorurl = safe
-            .store_public_bytes(data.clone(), Some("text/plain"))
+            .store_public_file(data.clone(), Some("text/plain"))
             .await?;
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
