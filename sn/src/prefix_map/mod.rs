@@ -19,7 +19,7 @@ mod stats;
 
 use self::stats::NetworkStats;
 use crate::messaging::system::SectionAuth;
-use crate::routing::{Error, Result, SectionAuthUtils, SectionAuthorityProvider};
+use crate::node::routing::{Error, Result, SectionAuthUtils, SectionAuthorityProvider};
 use bls::PublicKey as BlsPublicKey;
 use dashmap::{self, mapref::multiple::RefMulti, DashMap};
 use secured_linked_list::SecuredLinkedList;
@@ -390,7 +390,7 @@ impl<'de> Deserialize<'de> for NetworkPrefixMap {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::routing::{gen_section_authority_provider, section_signed};
+    use crate::node::routing::{gen_section_authority_provider, section_signed};
     use eyre::{eyre, Context, Result};
     use rand::Rng;
 

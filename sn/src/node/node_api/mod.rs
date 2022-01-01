@@ -10,13 +10,13 @@ use crate::dbs::UsedSpace;
 
 use crate::node::logging::log_ctx::LogCtx;
 use crate::node::logging::run_system_logger;
+use crate::node::routing::{
+    EventStream, {Prefix, XorName},
+};
 use crate::node::{
     network::Network,
     state_db::{get_reward_pk, store_new_reward_keypair},
     Config, Error, Result,
-};
-use crate::routing::{
-    EventStream, {Prefix, XorName},
 };
 use crate::types::PublicKey;
 use rand::rngs::OsRng;

@@ -8,7 +8,7 @@
 
 use crate::dbs;
 use crate::messaging::MessageId;
-use crate::routing::Prefix;
+use crate::node::routing::Prefix;
 use crate::types::{DataAddress, PublicKey};
 use std::io;
 use thiserror::Error;
@@ -75,7 +75,7 @@ pub enum Error {
     NetworkData(#[from] crate::types::Error),
     /// Routing error.
     #[error("Routing error:: {0}")]
-    Routing(#[from] crate::routing::Error),
+    Routing(#[from] crate::node::routing::Error),
     /// Message is invalid.
     #[error("Message with id: '{0:?}' is invalid. {1}")]
     InvalidMessage(MessageId, String),

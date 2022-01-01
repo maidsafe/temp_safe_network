@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::dbs::UsedSpace;
+use crate::node::routing::{Config as RoutingConfig, EventStream, Routing as RoutingNode};
 use crate::node::{state_db::store_network_keypair, Config as NodeConfig, Result};
-use crate::routing::{Config as RoutingConfig, EventStream, Routing as RoutingNode};
 use bls::PublicKey as BlsPublicKey;
 use std::{net::SocketAddr, path::Path, sync::Arc};
 use xor_name::{Prefix, XorName};
