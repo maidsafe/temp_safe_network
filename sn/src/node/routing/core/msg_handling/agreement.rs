@@ -106,11 +106,11 @@ impl Core {
 
         self.log_network_stats().await;
 
-        if new_info.previous_name().is_some() {
-            // Switch joins_allowed off a new adult joining.
+        // Do not disable node joins in first section.
+        if !self.network_knowledge.prefix().await.is_empty() {
+            // ..otherwise, switch off joins_allowed on a node joining.
+            // TODO: fix racing issues here? https://github.com/maidsafe/safe_network/issues/890
             *self.joins_allowed.write().await = false;
-        } else if !self.network_knowledge.prefix().await.is_empty() {
-            *self.joins_allowed.write().await = true;
         }
 
         commands.extend(
