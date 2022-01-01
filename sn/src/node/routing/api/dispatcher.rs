@@ -6,12 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Command;
 use crate::messaging::{system::SystemMsg, DstLocation, EndUser, MsgKind, WireMsg};
-use crate::node::routing::{
-    core::{Core, Proposal, SendStatus},
-    error::Result,
-    Error,
+use crate::node::{
+    error::{Error, Result},
+    routing::{
+        api::Command,
+        core::{Core, Proposal, SendStatus},
+    },
 };
 use crate::peer::Peer;
 use crate::types::log_markers::LogMarker;

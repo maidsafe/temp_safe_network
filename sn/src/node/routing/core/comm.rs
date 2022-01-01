@@ -7,8 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{msg_count::MsgCount, BackPressure};
+
 use crate::messaging::{system::LoadReport, MessageId, WireMsg};
-use crate::node::routing::error::{Error, Result};
+use crate::node::error::{Error, Result};
 use crate::peer::{Peer, UnnamedPeer};
 use crate::types::log_markers::LogMarker;
 

@@ -193,7 +193,7 @@ impl SectionAuth<SectionAuthorityProviderMsg> {
 #[cfg(test)]
 pub(crate) mod test_utils {
     use super::*;
-    use crate::node::routing::routing_api::tests::SecretKeySet;
+    use crate::node::routing::api::tests::SecretKeySet;
     use crate::node::routing::{ed25519, node::Node, MIN_ADULT_AGE, MIN_AGE};
     use itertools::Itertools;
     use std::{cell::Cell, net::SocketAddr};

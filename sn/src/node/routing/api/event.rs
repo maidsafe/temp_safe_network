@@ -11,6 +11,7 @@ use crate::messaging::{
     system::{NodeCmd, NodeQuery, NodeQueryResponse},
     AuthorityProof, DstLocation, EndUser, MessageId, ServiceAuth, SrcLocation,
 };
+
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Keypair;
 use std::{collections::BTreeSet, sync::Arc};

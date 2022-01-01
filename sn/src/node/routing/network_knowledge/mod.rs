@@ -11,7 +11,6 @@ pub(super) mod node_state;
 pub(crate) mod section_authority_provider;
 pub(super) mod section_keys;
 mod section_peers;
-use crate::peer::Peer;
 
 #[cfg(test)]
 pub(crate) use self::section_authority_provider::test_utils;
@@ -25,11 +24,11 @@ pub(crate) use section_peers::SectionPeers;
 
 use crate::elder_count;
 use crate::messaging::system::{KeyedSig, SectionAuth};
-use crate::node::routing::{
-    dkg::SectionAuthUtils,
+use crate::node::{
     error::{Error, Result},
-    recommended_section_size,
+    routing::{dkg::SectionAuthUtils, recommended_section_size},
 };
+use crate::peer::Peer;
 use crate::prefix_map::NetworkPrefixMap;
 use crate::types::log_markers::LogMarker;
 

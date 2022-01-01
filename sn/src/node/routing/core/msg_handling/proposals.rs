@@ -6,10 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Core;
-
 use crate::messaging::{signature_aggregator::Error as AggregatorError, MessageId};
-use crate::node::routing::{core::Proposal, dkg::SigShare, routing_api::command::Command, Result};
+use crate::node::{
+    error::Result,
+    routing::{
+        api::command::Command,
+        core::{Core, Proposal},
+        dkg::SigShare,
+    },
+};
 use crate::peer::Peer;
 
 // Decisions

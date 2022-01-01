@@ -16,30 +16,30 @@ mod resource_proof;
 mod service_msgs;
 mod update_section;
 
-use super::Core;
 use crate::dbs::Error as DatabaseError;
-use crate::node::routing::{
-    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
-    network_knowledge::{NetworkKnowledge, SectionPeers},
-    relocation::RelocateState,
-    routing_api::command::Command,
-    Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
+use crate::messaging::{
+    data::{ServiceMsg, StorageLevel},
+    signature_aggregator::Error as AggregatorError,
+    system::{
+        JoinRequest, JoinResponse, NodeCmd, NodeQuery, SectionAuth as SystemSectionAuth, SystemMsg,
+    },
+    AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth,
+    ServiceAuth, WireMsg,
+};
+use crate::node::{
+    error::{Error, Result},
+    routing::{
+        api::command::Command,
+        core::{Core, DkgSessionInfo},
+        messages::{NodeMsgAuthorityUtils, WireMsgUtils},
+        network_knowledge::{NetworkKnowledge, SectionPeers},
+        relocation::RelocateState,
+        Event, MessageReceived, MIN_LEVEL_WHEN_FULL,
+    },
 };
 use crate::peer::{Peer, UnnamedPeer};
 use crate::types::{log_markers::LogMarker, Chunk, Keypair, PublicKey};
-use crate::{
-    messaging::{
-        data::{ServiceMsg, StorageLevel},
-        signature_aggregator::Error as AggregatorError,
-        system::{
-            JoinRequest, JoinResponse, NodeCmd, NodeQuery, SectionAuth as SystemSectionAuth,
-            SystemMsg,
-        },
-        AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority,
-        SectionAuth, ServiceAuth, WireMsg,
-    },
-    node::routing::core::DkgSessionInfo,
-};
+
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use rand::rngs::OsRng;

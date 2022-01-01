@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Core;
 use crate::messaging::{
     data::DataExchange,
     system::{
@@ -15,14 +14,16 @@ use crate::messaging::{
     },
     DstLocation, MsgKind, WireMsg,
 };
-use crate::node::routing::{
-    core::{Proposal, StateSnapshot},
-    dkg::DkgSessionIdUtils,
+use crate::node::{
     error::{Error, Result},
-    messages::WireMsgUtils,
-    network_knowledge::{ElderCandidates, NodeState, SectionKeyShare},
-    relocation::RelocateState,
-    routing_api::command::Command,
+    routing::{
+        api::command::Command,
+        core::{Core, Proposal, StateSnapshot},
+        dkg::DkgSessionIdUtils,
+        messages::WireMsgUtils,
+        network_knowledge::{ElderCandidates, NodeState, SectionKeyShare},
+        relocation::RelocateState,
+    },
 };
 use crate::peer::{Peer, UnnamedPeer};
 use crate::types::log_markers::LogMarker;

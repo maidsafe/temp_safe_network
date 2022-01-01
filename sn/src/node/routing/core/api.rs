@@ -7,16 +7,21 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{delivery_group, Comm, Core};
+
 use crate::dbs::UsedSpace;
-use crate::messaging::system::{JoinResponse, MembershipState, NodeState, SigShare, SystemMsg};
-use crate::messaging::WireMsg;
-use crate::node::routing::{
-    core::Proposal,
+use crate::messaging::{
+    system::{JoinResponse, MembershipState, NodeState, SigShare, SystemMsg},
+    WireMsg,
+};
+use crate::node::{
     error::Result,
-    network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionKeyShare},
-    node::Node,
-    routing_api::command::Command,
-    Event,
+    routing::{
+        api::command::Command,
+        core::Proposal,
+        network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionKeyShare},
+        node::Node,
+        Event,
+    },
 };
 use crate::peer::Peer;
 use crate::types::log_markers::LogMarker;

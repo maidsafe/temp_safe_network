@@ -8,7 +8,7 @@
 
 #![allow(dead_code, unused_imports)]
 
-use super::{Comm, Command, Core, Dispatcher};
+use super::{Comm, Command, Dispatcher};
 use crate::dbs::UsedSpace;
 use crate::messaging::{
     system::{
@@ -19,25 +19,30 @@ use crate::messaging::{
     AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeAuth,
     SectionAuth as MsgKindSectionAuth, WireMsg,
 };
-use crate::node::routing::{
-    core::{ConnectionEvent, Proposal, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
-    create_test_used_space_and_root_storage,
-    dkg::test_utils::{prove, section_signed},
-    ed25519,
-    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
-    network_knowledge::{
-        test_utils::*, NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare,
+use crate::node::{
+    error::{Error, Result as RoutingResult},
+    routing::{
+        core::{
+            ConnectionEvent, Core, Proposal, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
+        },
+        create_test_used_space_and_root_storage,
+        dkg::test_utils::{prove, section_signed},
+        ed25519,
+        messages::{NodeMsgAuthorityUtils, WireMsgUtils},
+        network_knowledge::{
+            test_utils::*, NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare,
+        },
+        node::Node,
+        recommended_section_size,
+        relocation::{self, RelocatePayloadUtils},
+        supermajority, Event, Peer, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+        MIN_AGE,
     },
-    node::Node,
-    recommended_section_size,
-    relocation::{self, RelocatePayloadUtils},
-    supermajority, Error, Event, Peer, Result as RoutingResult, FIRST_SECTION_MAX_AGE,
-    FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
 };
 use crate::peer::UnnamedPeer;
+use crate::types::{Keypair, PublicKey};
 use crate::{elder_count, init_test_logger};
 
-use crate::types::{Keypair, PublicKey};
 use assert_matches::assert_matches;
 use bls_dkg::message::Message;
 use ed25519_dalek::Signer;

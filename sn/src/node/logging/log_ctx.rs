@@ -6,8 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::network::Network;
+use crate::node::routing::Routing;
+
+use std::sync::Arc;
 use xor_name::Prefix;
+
+type Network = Arc<Routing>;
 
 pub(crate) struct LogCtx {
     network: Network,

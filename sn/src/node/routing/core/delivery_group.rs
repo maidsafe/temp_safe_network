@@ -8,12 +8,12 @@
 
 use crate::elder_count;
 use crate::messaging::DstLocation;
-use crate::node::routing::{
+use crate::node::{
     error::{Error, Result},
-    network_knowledge::NetworkKnowledge,
-    supermajority,
+    routing::{network_knowledge::NetworkKnowledge, supermajority},
 };
 use crate::peer::Peer;
+
 use itertools::Itertools;
 use std::{cmp, iter};
 use xor_name::XorName;

@@ -7,21 +7,21 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::dbs::UsedSpace;
-
-use crate::node::logging::log_ctx::LogCtx;
-use crate::node::logging::run_system_logger;
-use crate::node::routing::{
-    EventStream, {Prefix, XorName},
-};
 use crate::node::{
-    network::Network,
-    state_db::{get_reward_pk, store_new_reward_keypair},
-    Config, Error, Result,
+    keypair_storage::store_network_keypair,
+    keypair_storage::{get_reward_pk, store_new_reward_keypair},
+    logging::{log_ctx::LogCtx, run_system_logger},
+    routing::{Config as RoutingConfig, EventStream, Routing},
+    Config as NodeConfig, Error, Result,
 };
 use crate::types::PublicKey;
+
 use rand::rngs::OsRng;
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 use tokio::time::Duration;
+use xor_name::{Prefix, XorName};
+
+type Network = Arc<Routing>;
 
 /// Main node struct.
 #[derive(custom_debug::Debug)]
@@ -33,7 +33,10 @@ pub struct Node {
 
 impl Node {
     /// Initialize a new node.
-    pub async fn new(config: &Config, joining_timeout: Duration) -> Result<(Self, EventStream)> {
+    pub async fn new(
+        config: &NodeConfig,
+        joining_timeout: Duration,
+    ) -> Result<(Self, EventStream)> {
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
         tokio::fs::create_dir_all(root_dir).await?;
@@ -61,12 +64,28 @@ impl Node {
             joining_timeout
         };
 
-        let (network_api, network_events) = tokio::time::timeout(
+        let mut routing_config = RoutingConfig {
+            first: config.is_first(),
+            bootstrap_nodes: config.hard_coded_contacts.clone(),
+            genesis_key: config.genesis_key.clone(),
+            network_config: config.network_config().clone(),
+            ..Default::default()
+        };
+        if let Some(local_addr) = config.local_addr {
+            routing_config.local_addr = local_addr;
+        }
+
+        let (routing, network_events) = tokio::time::timeout(
             joining_timeout,
-            Network::new(root_dir_buf.as_path(), config, used_space.clone()),
+            Routing::new(routing_config, used_space.clone(), root_dir.to_path_buf()),
         )
         .await
         .map_err(|_| Error::JoinTimeout)??;
+
+        // Network keypair may have to be changed due to naming criteria or network requirements.
+        store_network_keypair(root_dir, routing.keypair_as_bytes().await).await?;
+
+        let network_api = Arc::new(routing);
 
         let node = Self {
             used_space,
@@ -101,7 +120,7 @@ impl Node {
 
     /// Returns our name.
     pub async fn our_name(&self) -> XorName {
-        self.network_api.our_name().await
+        self.network_api.name().await
     }
 
     /// Returns our age.

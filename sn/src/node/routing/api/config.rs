@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::routing::NetworkConfig;
+
 use ed25519_dalek::Keypair;
 use std::{
     collections::BTreeSet,

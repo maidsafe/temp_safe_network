@@ -10,17 +10,20 @@ use crate::messaging::{
     system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
     DstLocation, WireMsg,
 };
-use crate::node::routing::{
-    dkg::dkg_msgs_utils::{DkgFailureSigSetUtils, DkgFailureSigUtils},
-    ed25519,
-    error::Result,
-    messages::WireMsgUtils,
-    network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
-    node::Node,
-    routing_api::command::{next_timer_token, Command},
+use crate::node::{
+    routing::{
+        api::command::{next_timer_token, Command},
+        dkg::dkg_msgs_utils::{DkgFailureSigSetUtils, DkgFailureSigUtils},
+        ed25519,
+        messages::WireMsgUtils,
+        network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
+        node::Node,
+    },
+    Result,
 };
 use crate::peer::Peer;
 use crate::types::{log_markers::LogMarker, PublicKey};
+
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{
     message::Message as DkgMessage, Error as DkgError, KeyGen, MessageAndTarget, Phase,

@@ -6,8 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::dbs::SLED_FLUSH_TIME_MS;
-use crate::dbs::{convert_to_error_message, Error, EventStore, Result, UsedSpace};
+use crate::dbs::{
+    convert_to_error_message, Error, EventStore, Result, UsedSpace, SLED_FLUSH_TIME_MS,
+};
 use crate::types::{
     register::{Action, Register, User},
     PublicKey, RegisterAddress as Address,
@@ -22,6 +23,7 @@ use crate::{
     },
     types::DataAddress,
 };
+
 use dashmap::DashMap;
 use sled::Db;
 use std::{

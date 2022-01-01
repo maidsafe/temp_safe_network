@@ -14,14 +14,12 @@ use crate::messaging::{
     },
     AuthorityProof, DstLocation, SectionAuth, WireMsg,
 };
-use crate::node::routing::{
-    ed25519,
+use crate::node::{
     error::{Error, Result},
-    messages::WireMsgUtils,
-    network_knowledge::SectionAuthorityProvider,
-    node::Node,
-    relocation::RelocatePayloadUtils,
-    routing_api::command::Command,
+    routing::{
+        api::command::Command, ed25519, messages::WireMsgUtils,
+        network_knowledge::SectionAuthorityProvider, node::Node, relocation::RelocatePayloadUtils,
+    },
 };
 use crate::peer::Peer;
 

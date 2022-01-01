@@ -6,8 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{capacity::CHUNK_COPY_COUNT, Command, Core, Prefix, Result};
-use crate::node::routing::{error::convert_to_error_message, Error};
+use super::{capacity::CHUNK_COPY_COUNT, Command, Core, Prefix};
+
+use crate::node::{error::convert_to_error_message, Error, Result};
 use crate::peer::Peer;
 use crate::types::{log_markers::LogMarker, Chunk, PublicKey};
 use crate::{
@@ -18,10 +19,12 @@ use crate::{
     },
     types::ChunkAddress,
 };
+
 use itertools::Itertools;
 use std::collections::{BTreeMap, BTreeSet};
 use tracing::info;
 use xor_name::XorName;
+
 impl Core {
     pub(crate) fn get_copy_count(&self) -> usize {
         CHUNK_COPY_COUNT

@@ -20,26 +20,25 @@
 //!  * All network messages signed via ED25519 and/or BLS
 //!  * Section consensus via an ABFT algorithm (PARSEC)
 
-// ############################################################################
-// Public API
-// ############################################################################
-pub(crate) use self::{
-    core::MIN_LEVEL_WHEN_FULL,
-    network_knowledge::{section_keys::SectionKeyShare, SectionAuthorityProvider},
-};
-use crate::peer::Peer;
+mod api;
+mod core;
+mod dkg;
+mod ed25519;
+mod messages;
+mod network_knowledge;
+mod node;
+mod relocation;
 
 pub use self::{
-    dkg::SectionAuthUtils,
-    error::{Error, Result},
-    network_knowledge::node_state::{
-        FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
-    },
-    routing_api::{
+    api::{
         config::Config,
         event::{Elders, Event, MessageReceived, NodeElderChange},
         event_stream::EventStream,
         Routing,
+    },
+    dkg::SectionAuthUtils,
+    network_knowledge::node_state::{
+        FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
     },
 };
 pub use qp2p::{Config as NetworkConfig, SendStream};
@@ -53,24 +52,14 @@ pub(crate) use dkg::test_utils::section_signed;
 #[cfg(test)]
 pub(crate) use network_knowledge::test_utils::gen_section_authority_provider;
 
-// ############################################################################
-// Private
-// ############################################################################
+pub(crate) use self::{
+    core::MIN_LEVEL_WHEN_FULL,
+    network_knowledge::{section_keys::SectionKeyShare, SectionAuthorityProvider},
+};
 
-mod core;
-mod dkg;
-mod ed25519;
-mod error;
-mod messages;
-mod network_knowledge;
-mod node;
-mod relocation;
-mod routing_api;
-
-/// Recommended section size. sn_routing will keep adding nodes until the section reaches this size.
-/// More nodes might be added if requested by the upper layers.
-/// This number also detemines when split happens - if both post-split sections would have at least
-/// this number of nodes.
+/// Recommended section size.
+/// The section will keep adding nodes when requested by the upper layers, until it can split.
+/// A split happens if both post-split sections would have at least this number of nodes.
 pub(crate) fn recommended_section_size() -> usize {
     2 * crate::elder_count()
 }
@@ -80,6 +69,8 @@ pub(crate) fn recommended_section_size() -> usize {
 pub(crate) const fn supermajority(group_size: usize) -> usize {
     1 + group_size * 2 / 3
 }
+
+use crate::peer::Peer;
 
 #[cfg(any(test, feature = "test-utils"))]
 mod test_utils {

@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::super::Core;
 use crate::elder_count;
 use crate::messaging::{
     system::{
@@ -15,11 +14,12 @@ use crate::messaging::{
     },
     WireMsg,
 };
-use crate::node::routing::{
+use crate::node::{
     error::{Error, Result},
-    relocation::RelocatePayloadUtils,
-    routing_api::command::Command,
-    SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE,
+    routing::{
+        api::command::Command, core::Core, relocation::RelocatePayloadUtils, SectionAuthUtils,
+        FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE,
+    },
 };
 use crate::peer::Peer;
 use crate::types::log_markers::LogMarker;

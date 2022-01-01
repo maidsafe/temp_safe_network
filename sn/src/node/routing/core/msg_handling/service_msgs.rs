@@ -6,18 +6,22 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Core;
 use crate::dbs::convert_to_error_message as convert_db_error_to_error_message;
 use crate::messaging::{
     data::{CmdError, DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite, ServiceMsg},
     system::{NodeQueryResponse, SystemMsg},
     AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, NodeAuth, ServiceAuth, WireMsg,
 };
-use crate::node::routing::{
-    core::capacity::CHUNK_COPY_COUNT, error::Result, routing_api::command::Command,
+use crate::node::{
+    error::Result,
+    routing::{
+        api::command::Command,
+        core::{capacity::CHUNK_COPY_COUNT, Core},
+    },
 };
 use crate::peer::Peer;
 use crate::types::{log_markers::LogMarker, ChunkAddress, PublicKey};
+
 use itertools::Itertools;
 use std::{cmp::Ordering, collections::BTreeSet};
 use xor_name::XorName;

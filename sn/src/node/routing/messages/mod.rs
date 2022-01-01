@@ -9,14 +9,15 @@
 mod msg_authority;
 
 pub(super) use self::msg_authority::NodeMsgAuthorityUtils;
+
 use crate::messaging::{
     system::SystemMsg, BlsShareAuth, DstLocation, MessageId, MsgKind, NodeAuth, WireMsg,
 };
-use crate::node::routing::{
+use crate::node::{
     error::{Error, Result},
-    network_knowledge::SectionKeyShare,
-    node::Node,
+    routing::{network_knowledge::SectionKeyShare, node::Node},
 };
+
 use bls::PublicKey as BlsPublicKey;
 use xor_name::XorName;
 

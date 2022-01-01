@@ -23,16 +23,19 @@ use self::{
     event::{Elders, Event, NodeElderChange},
     event_stream::EventStream,
 };
+
 use crate::dbs::UsedSpace;
 use crate::messaging::{system::SystemMsg, DstLocation, WireMsg};
-use crate::node::routing::{
-    core::{join_network, Comm, ConnectionEvent, Core},
-    ed25519,
+use crate::node::{
     error::{Error, Result},
-    messages::WireMsgUtils,
-    network_knowledge::SectionAuthorityProvider,
-    node::Node,
-    Peer, MIN_ADULT_AGE,
+    routing::{
+        core::{join_network, Comm, ConnectionEvent, Core},
+        ed25519,
+        messages::WireMsgUtils,
+        network_knowledge::SectionAuthorityProvider,
+        node::Node,
+        Peer, MIN_ADULT_AGE,
+    },
 };
 use crate::types::{log_markers::LogMarker, PublicKey as TypesPublicKey};
 

@@ -6,16 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::super::Core;
-use crate::messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg};
-use crate::messaging::DstLocation;
-use crate::node::routing::{
-    core::{msg_handling::WireMsg, Proposal},
-    dkg::DkgFailureSigSetUtils,
+use crate::messaging::{
+    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
+    DstLocation,
+};
+use crate::node::{
     error::{Error, Result},
-    messages::WireMsgUtils,
-    network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
-    routing_api::command::Command,
+    routing::{
+        api::command::Command,
+        core::{msg_handling::WireMsg, Core, Proposal},
+        dkg::DkgFailureSigSetUtils,
+        messages::WireMsgUtils,
+        network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
+    },
 };
 use crate::peer::Peer;
 use crate::types::log_markers::LogMarker;

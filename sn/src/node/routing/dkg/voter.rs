@@ -6,28 +6,28 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::DstLocation;
 use crate::messaging::{
     system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
-    WireMsg,
+    DstLocation, WireMsg,
 };
-use crate::node::routing::{
-    dkg::session::Session,
-    ed25519,
-    error::Result,
-    messages::WireMsgUtils,
-    network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
-    node::Node,
-    routing_api::command::Command,
-    supermajority,
+use crate::node::{
+    routing::{
+        api::command::Command,
+        dkg::session::Session,
+        ed25519,
+        messages::WireMsgUtils,
+        network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
+        node::Node,
+        supermajority,
+    },
+    Result,
 };
 use crate::peer::Peer;
 
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};
 use dashmap::DashMap;
-use std::collections::BTreeSet;
-use std::sync::Arc;
+use std::{collections::BTreeSet, sync::Arc};
 use xor_name::XorName;
 
 /// DKG voter carries out the work of participating and/or observing a DKG.

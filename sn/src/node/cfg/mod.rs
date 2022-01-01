@@ -6,20 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! Implementation of the "Node" node for the SAFE Network.
-
 /// Configuration
-pub mod cfg;
-/// Routing
-pub mod routing;
+pub mod config_handler;
 
-mod api;
-mod error;
-mod logging;
-
-pub use crate::node::{
-    api::Node,
-    cfg::{config_handler, keypair_storage},
-    config_handler::{add_connection_info, set_connection_info, Config},
-    error::{Error, Result},
-};
+/// File storage for keypairs
+pub mod keypair_storage;

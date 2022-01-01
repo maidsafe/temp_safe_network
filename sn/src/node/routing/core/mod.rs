@@ -32,30 +32,35 @@ pub(crate) use proposal::Proposal;
 pub(crate) use register_storage::RegisterStorage;
 
 use self::split_barrier::SplitBarrier;
-use crate::dbs::UsedSpace;
-use crate::messaging::signature_aggregator::SignatureAggregator;
-use crate::messaging::system::{DkgSessionId, SystemMsg};
-use crate::messaging::{AuthorityProof, SectionAuth};
-use crate::node::routing::{
+
+use super::{
+    super::error::Result,
+    api::command::Command,
     dkg::DkgVoter,
-    error::Result,
     network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider},
     node::Node,
     relocation::RelocateState,
-    routing_api::command::Command,
     Elders, Event, NodeElderChange,
 };
+
+use crate::dbs::UsedSpace;
+use crate::messaging::{
+    signature_aggregator::SignatureAggregator,
+    system::{DkgSessionId, SystemMsg},
+    AuthorityProof, SectionAuth,
+};
+
 use crate::peer::Peer;
 use crate::types::{log_markers::LogMarker, utils::write_data_to_disk, Cache};
+
 use backoff::ExponentialBackoff;
 use capacity::Capacity;
 use itertools::Itertools;
 use liveness_tracking::Liveness;
 use resource_proof::ResourceProof;
-use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, HashMap},
+    net::SocketAddr,
     path::PathBuf,
     sync::Arc,
     time::Duration,
