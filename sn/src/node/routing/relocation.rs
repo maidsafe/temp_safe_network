@@ -8,18 +8,20 @@
 
 //! Relocation related types and utilities.
 
+use super::{
+    super::error::Error,
+    core::JoiningAsRelocated,
+    ed25519::{self, Keypair, Verifier},
+    network_knowledge::{NetworkKnowledge, NodeState},
+    recommended_section_size, Peer,
+};
+
 use crate::elder_count;
 use crate::messaging::{
     system::{RelocateDetails, RelocatePayload, RelocatePromise, SystemMsg},
     AuthorityProof, SectionAuth,
 };
-use crate::node::routing::{
-    core::JoiningAsRelocated,
-    ed25519::{self, Keypair, Verifier},
-    error::Error,
-    network_knowledge::{NetworkKnowledge, NodeState},
-    recommended_section_size, Peer,
-};
+
 use async_trait::async_trait;
 use std::{cmp::min, collections::BTreeSet};
 use xor_name::XorName;
@@ -257,8 +259,8 @@ mod tests {
     use super::*;
     use crate::elder_count;
     use crate::node::routing::{
-        dkg::test_utils::section_signed, network_knowledge::SectionAuthorityProvider,
-        routing_api::tests::SecretKeySet, MIN_AGE,
+        api::tests::SecretKeySet, dkg::test_utils::section_signed,
+        network_knowledge::SectionAuthorityProvider, MIN_AGE,
     };
     use crate::peer::test_utils::arbitrary_unique_peers;
     use assert_matches::assert_matches;

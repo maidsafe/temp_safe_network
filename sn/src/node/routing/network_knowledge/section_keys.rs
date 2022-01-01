@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::routing::error::{Error, Result};
+use crate::node::error::{Error, Result};
 use crate::types::log_markers::LogMarker;
 
 use std::sync::Arc;

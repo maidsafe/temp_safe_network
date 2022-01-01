@@ -6,18 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Core;
 use crate::elder_count;
 use crate::messaging::{
     system::{RelocateDetails, RelocatePromise, SystemMsg},
     AuthorityProof, SectionAuth,
 };
-use crate::node::routing::{
-    core::{bootstrap::JoiningAsRelocated, Proposal},
+use crate::node::{
     error::Result,
-    relocation::{self, RelocateAction, RelocateDetailsUtils, RelocateState},
-    routing_api::command::Command,
-    Event,
+    routing::{
+        api::command::Command,
+        core::{bootstrap::JoiningAsRelocated, Core, Proposal},
+        relocation::{self, RelocateAction, RelocateDetailsUtils, RelocateState},
+        Event,
+    },
 };
 use crate::peer::Peer;
 use crate::types::log_markers::LogMarker;

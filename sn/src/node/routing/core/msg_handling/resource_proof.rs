@@ -6,13 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Core;
 use crate::messaging::system::{JoinResponse, ResourceProofResponse, SystemMsg};
-use crate::node::routing::{
-    core::{RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
-    ed25519,
-    routing_api::command::Command,
-    Error, Result,
+use crate::node::{
+    error::{Error, Result},
+    routing::{
+        api::command::Command,
+        core::{Core, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
+        ed25519,
+    },
 };
 use crate::peer::Peer;
 use crate::types::log_markers::LogMarker;

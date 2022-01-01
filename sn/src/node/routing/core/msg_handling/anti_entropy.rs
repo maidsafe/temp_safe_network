@@ -6,19 +6,22 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Core;
 use crate::messaging::{
     system::{KeyedSig, SectionAuth, SystemMsg},
     MessageId, MessageType, SrcLocation, WireMsg,
 };
-use crate::node::routing::{
+use crate::node::{
     error::{Error, Result},
-    messages::WireMsgUtils,
-    network_knowledge::{SectionAuthorityProvider, SectionPeers},
-    routing_api::command::Command,
+    routing::{
+        api::command::Command,
+        core::Core,
+        messages::WireMsgUtils,
+        network_knowledge::{SectionAuthorityProvider, SectionPeers},
+    },
 };
 use crate::peer::Peer;
 use crate::types::{log_markers::LogMarker, PublicKey};
+
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -462,6 +465,7 @@ mod tests {
     use crate::elder_count;
     use crate::messaging::{DstLocation, MessageId, MessageType, MsgKind, NodeAuth};
     use crate::node::routing::{
+        api::tests::create_comm,
         create_test_used_space_and_root_storage,
         dkg::test_utils::section_signed,
         ed25519,
@@ -470,7 +474,6 @@ mod tests {
             SectionKeysProvider,
         },
         node::Node,
-        routing_api::tests::create_comm,
         SectionKeyShare, XorName, MIN_ADULT_AGE,
     };
 

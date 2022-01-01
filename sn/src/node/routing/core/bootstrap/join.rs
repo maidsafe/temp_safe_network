@@ -15,15 +15,17 @@ use crate::messaging::{
     },
     DstLocation, MessageType, MsgKind, NodeAuth, WireMsg,
 };
-use crate::node::routing::{
-    core::{Comm, ConnectionEvent, SendStatus},
-    dkg::SectionAuthUtils,
-    ed25519,
+use crate::node::{
     error::{Error, Result},
-    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
-    network_knowledge::NetworkKnowledge,
-    node::Node,
-    MIN_ADULT_AGE,
+    routing::{
+        core::{Comm, ConnectionEvent, SendStatus},
+        dkg::SectionAuthUtils,
+        ed25519,
+        messages::{NodeMsgAuthorityUtils, WireMsgUtils},
+        network_knowledge::NetworkKnowledge,
+        node::Node,
+        MIN_ADULT_AGE,
+    },
 };
 use crate::peer::{Peer, UnnamedPeer};
 use crate::prefix_map::NetworkPrefixMap;
@@ -604,12 +606,14 @@ async fn send_messages(mut rx: mpsc::Receiver<(WireMsg, Vec<Peer>)>, comm: &Comm
 mod tests {
     use super::*;
     use crate::messaging::SectionAuthorityProvider as SectionAuthorityProviderMsg;
-    use crate::node::routing::{
-        dkg::test_utils::*,
+    use crate::node::{
         error::Error as RoutingError,
-        messages::WireMsgUtils,
-        network_knowledge::{test_utils::*, NodeState},
-        MIN_ADULT_AGE,
+        routing::{
+            dkg::test_utils::*,
+            messages::WireMsgUtils,
+            network_knowledge::{test_utils::*, NodeState},
+            MIN_ADULT_AGE,
+        },
     };
     use crate::peer::UnnamedPeer;
     use crate::{elder_count, init_test_logger};

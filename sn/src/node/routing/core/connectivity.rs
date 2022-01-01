@@ -6,8 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Core;
-use crate::node::routing::{core::Proposal, error::Result, routing_api::command::Command};
+use crate::node::{
+    error::Result,
+    routing::{
+        api::command::Command,
+        core::{Core, Proposal},
+    },
+};
 use std::{collections::BTreeSet, iter, net::SocketAddr};
 use xor_name::XorName;
 

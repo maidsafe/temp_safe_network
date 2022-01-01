@@ -6,20 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::{cmp, collections::BTreeSet};
-
 use crate::messaging::system::{KeyedSig, MembershipState, SectionAuth};
-use crate::node::routing::{
-    core::Proposal,
-    dkg::SectionAuthUtils,
+use crate::node::{
     error::Result,
-    network_knowledge::{NodeState, SectionAuthorityProvider},
-    routing_api::command::Command,
-    Event, MIN_AGE,
+    routing::{
+        api::command::Command,
+        core::{Core, Proposal},
+        dkg::SectionAuthUtils,
+        network_knowledge::{NodeState, SectionAuthorityProvider},
+        Event, MIN_AGE,
+    },
 };
 use crate::types::log_markers::LogMarker;
 
-use super::Core;
+use std::{cmp, collections::BTreeSet};
 
 // Agreement
 impl Core {

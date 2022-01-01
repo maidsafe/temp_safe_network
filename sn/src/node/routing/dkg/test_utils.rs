@@ -7,8 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{KeyedSig, SectionAuthUtils};
+
 use crate::messaging::system::SectionAuth;
-use crate::node::routing::{Error, Result};
+use crate::node::{Error, Result};
+
 use serde::Serialize;
 
 // Create signature for the given payload using the given secret key.
