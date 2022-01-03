@@ -24,7 +24,6 @@ use self::{
     event_stream::EventStream,
 };
 
-use crate::dbs::UsedSpace;
 use crate::messaging::{system::SystemMsg, DstLocation, WireMsg};
 use crate::node::{
     error::{Error, Result},
@@ -73,7 +72,8 @@ impl Routing {
     /// caller to handle this case, for example by using a timeout.
     pub async fn new(
         config: Config,
-        used_space: UsedSpace,
+        reg_store_size: u64,
+        chunk_store_size: u64,
         root_storage_dir: PathBuf,
     ) -> Result<(Self, EventStream)> {
         let (event_tx, event_rx) = mpsc::channel(EVENT_CHANNEL_SIZE);
@@ -103,7 +103,8 @@ impl Routing {
                 comm,
                 node,
                 event_tx,
-                used_space,
+                reg_store_size,
+                chunk_store_size,
                 root_storage_dir.clone(),
                 genesis_sk_set,
             )
@@ -190,7 +191,8 @@ impl Routing {
                 network_knowledge,
                 None,
                 event_tx,
-                used_space,
+                reg_store_size,
+                chunk_store_size,
                 root_storage_dir.to_path_buf(),
                 false,
             )

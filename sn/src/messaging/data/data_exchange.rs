@@ -63,13 +63,6 @@ impl StorageLevel {
         StorageLevel::from(self.0 + 1)
     }
 
-    /// The storage level ratio.
-    pub fn ratio(&self) -> f64 {
-        let current = self.0;
-        let max_capacity = Self::MAX;
-        current as f64 / max_capacity as f64
-    }
-
     /// The previous level.
     /// Returns an OutOfRange error if called on a StorageLevel with value 0.
     pub fn previous(&self) -> Result<StorageLevel> {

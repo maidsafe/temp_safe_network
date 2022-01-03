@@ -56,8 +56,7 @@ struct StateEntry {
 
 impl RegisterStorage {
     /// Create new RegisterStorage
-    pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
-        used_space.add_dir(path);
+    pub(crate) fn new(path: &Path, max_capacity: u64) -> Result<Self> {
         let db_dir = path.join("db").join(DATABASE_NAME.to_string());
 
         let db = sled::Config::default()
@@ -67,7 +66,7 @@ impl RegisterStorage {
             .map_err(Error::from)?;
 
         Ok(Self {
-            used_space,
+            used_space: UsedSpace::new(max_capacity),
             registers: Arc::new(DashMap::new()),
             db,
         })
@@ -124,10 +123,10 @@ impl RegisterStorage {
         write: RegisterWrite,
         auth: AuthorityProof<ServiceAuth>,
     ) -> Result<()> {
-        let required_space = std::mem::size_of::<RegisterCmd>() as u64;
-        if !self.used_space.can_consume(required_space).await {
-            return Err(Error::NotEnoughSpace);
-        }
+        // let required_space = std::mem::size_of::<RegisterCmd>() as u64;
+        // if !self.used_space.can_consume(required_space).await {
+        //     return Err(Error::NotEnoughSpace);
+        // }
         let op = RegisterCmd {
             write,
             auth: auth.clone().into_inner(),
@@ -136,6 +135,8 @@ impl RegisterStorage {
     }
 
     fn apply(&self, op: RegisterCmd, auth: AuthorityProof<ServiceAuth>) -> Result<()> {
+        let required_space = std::mem::size_of::<RegisterCmd>();
+
         let RegisterCmd { write, .. } = op.clone();
 
         let address = *write.address();
@@ -153,6 +154,8 @@ impl RegisterStorage {
                 let _prev = self
                     .registers
                     .insert(key, Some(StateEntry { state: map, store }));
+
+                self.used_space.increase(required_space);
 
                 Ok(())
             }
@@ -221,6 +224,7 @@ impl RegisterStorage {
 
                 if result.is_ok() {
                     entry.store.append(op)?;
+                    self.used_space.increase(required_space);
                     trace!("Editing Register success!");
                 } else {
                     trace!("Editing Register failed!");

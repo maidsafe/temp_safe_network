@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::dbs::UsedSpace;
 use crate::node::{
     keypair_storage::store_network_keypair,
     keypair_storage::{get_reward_pk, store_new_reward_keypair},
@@ -28,7 +27,6 @@ type Network = Arc<Routing>;
 pub struct Node {
     #[debug(skip)]
     network_api: Network,
-    used_space: UsedSpace,
 }
 
 impl Node {
@@ -50,8 +48,6 @@ impl Node {
                 PublicKey::Ed25519(keypair.public)
             }
         };
-
-        let used_space = UsedSpace::new(config.max_capacity());
 
         let joining_timeout = if cfg!(feature = "always-joinable") {
             debug!(
@@ -75,9 +71,17 @@ impl Node {
             routing_config.local_addr = local_addr;
         }
 
+        let reg_store_size = config.max_capacity();
+        let chunk_store_size = config.max_capacity();
+
         let (routing, network_events) = tokio::time::timeout(
             joining_timeout,
-            Routing::new(routing_config, used_space.clone(), root_dir.to_path_buf()),
+            Routing::new(
+                routing_config,
+                reg_store_size,
+                chunk_store_size,
+                root_dir.to_path_buf(),
+            ),
         )
         .await
         .map_err(|_| Error::JoinTimeout)??;
@@ -88,7 +92,6 @@ impl Node {
         let network_api = Arc::new(routing);
 
         let node = Self {
-            used_space,
             network_api: network_api.clone(),
         };
 

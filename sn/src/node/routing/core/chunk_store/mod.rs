@@ -6,10 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::dbs::UsedSpace;
 use crate::messaging::{data::StorageLevel, system::NodeQueryResponse};
 use crate::types::{log_markers::LogMarker, Chunk, ChunkAddress};
-use std::sync::atomic::{AtomicU8, Ordering};
 use std::{
     fmt::{self, Display, Formatter},
     io::ErrorKind,
@@ -26,28 +24,16 @@ mod chunk_disk_store;
 use chunk_disk_store::ChunkDiskStore;
 
 /// Operations on data chunks.
+#[derive(Clone)]
 pub(crate) struct ChunkStore {
-    atomic_counter: AtomicU8,
     disk_store: ChunkDiskStore,
     last_recorded_level: Arc<RwLock<StorageLevel>>,
 }
 
-// Manual clone for the ChunkStore because AtomicU8 is not Clone
-impl Clone for ChunkStore {
-    fn clone(&self) -> Self {
-        Self {
-            atomic_counter: AtomicU8::new(0),
-            disk_store: self.disk_store.clone(),
-            last_recorded_level: self.last_recorded_level.clone(),
-        }
-    }
-}
-
 impl ChunkStore {
-    pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
+    pub(crate) fn new(path: &Path, max_capacity: u64) -> Result<Self> {
         Ok(Self {
-            atomic_counter: AtomicU8::new(0),
-            disk_store: ChunkDiskStore::new(path, used_space)?,
+            disk_store: ChunkDiskStore::new(path, max_capacity)?,
             last_recorded_level: Arc::new(RwLock::new(StorageLevel::zero())),
         })
     }
@@ -99,34 +85,23 @@ impl ChunkStore {
             return Ok(None);
         }
 
-        // check for storage level only when ratio is critical
-        let ratio = {
-            let last_recorded_level = *self.last_recorded_level.read().await;
-            last_recorded_level.ratio()
-        };
-        if ratio > 0.9 {
-            self.disk_store.confirm_can_consume(data).await?;
-        }
-
         // store the data
         trace!("{:?}", LogMarker::StoringChunk);
         let _addr = self.disk_store.write_chunk(data).await?;
         trace!("{:?}", LogMarker::StoredNewChunk);
 
-        // update the recorded level with a frequency that grows as the ratio increases
-        let ratio_level: u8 = (10.0 * ratio) as u8; // with 0.8 ratio gives 8
-        let counter = self.atomic_counter.fetch_add(1, Ordering::SeqCst); // 0,1,2,3,...255,0,1,..
-        if counter % 10 <= ratio_level {
-            let last_recorded_level = { *self.last_recorded_level.read().await };
-            if let Ok(next_level) = last_recorded_level.next() {
-                // used_space_ratio is a heavy task that's why we don't do it all the time
-                let used_space = self.disk_store.used_space_ratio().await;
-                // every level represents 10 percentage points
-                if (10.0 * used_space) as u8 >= next_level.value() {
-                    debug!("Next level for storage has been reached");
-                    *self.last_recorded_level.write().await = next_level;
-                    return Ok(Some(next_level));
-                }
+        // check if we've filled another apprx. 10%-points of our storage
+        // if so, update the recorded level
+        let last_recorded_level = { *self.last_recorded_level.read().await };
+        if let Ok(next_level) = last_recorded_level.next() {
+            // used_space_ratio is a heavy task that's why we don't do it all the time
+            let used_space_ratio = self.disk_store.used_space_ratio().await;
+            let used_space_level = 10.0 * used_space_ratio;
+            // every level represents 10 percentage points
+            if used_space_level as u8 >= next_level.value() {
+                debug!("Next level for storage has been reached");
+                *self.last_recorded_level.write().await = next_level;
+                return Ok(Some(next_level));
             }
         }
 

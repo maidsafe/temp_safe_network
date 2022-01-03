@@ -74,7 +74,6 @@ use crate::peer::Peer;
 
 #[cfg(any(test, feature = "test-utils"))]
 mod test_utils {
-    use crate::dbs::UsedSpace;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use std::path::{Path, PathBuf};
     use tempfile::tempdir;
@@ -82,14 +81,13 @@ mod test_utils {
     const TEST_MAX_CAPACITY: u64 = 1024 * 1024;
 
     /// Create a register store for routing examples
-    pub fn create_test_used_space_and_root_storage() -> eyre::Result<(UsedSpace, PathBuf)> {
-        let used_space = UsedSpace::new(TEST_MAX_CAPACITY);
+    pub fn create_test_max_capacity_and_root_storage() -> eyre::Result<(u64, u64, PathBuf)> {
         let random_filename: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
         let root_dir = tempdir().map_err(|e| eyre::eyre!(e.to_string()))?;
         let storage_dir = Path::new(root_dir.path()).join(random_filename);
 
-        Ok((used_space, storage_dir))
+        Ok((TEST_MAX_CAPACITY, TEST_MAX_CAPACITY, storage_dir))
     }
 }
 
