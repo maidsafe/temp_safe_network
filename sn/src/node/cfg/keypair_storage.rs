@@ -36,16 +36,23 @@ pub async fn get_network_keypair(root_dir: &Path) -> Result<Option<Keypair>> {
     if !path.is_file() {
         return Ok(None);
     }
-    let keypair_hex_bytes = fs::read(path).await?;
+
+    let keypair_hex_bytes = fs::read(&path).await?;
     let keypair_bytes = decode(keypair_hex_bytes).map_err(|err| {
-        Error::Logic(format!(
-            "Couldn't hex-decode network keypair bytes: {}",
+        Error::Configuration(format!(
+            "couldn't hex-decode network keypair bytes read from {}: {}",
+            path.display(),
             err
         ))
     })?;
 
-    let keypair = Keypair::from_bytes(&keypair_bytes)
-        .map_err(|_| Error::Logic("Config error: Invalid network keypair bytes".to_string()))?;
+    let keypair = Keypair::from_bytes(&keypair_bytes).map_err(|err| {
+        Error::Configuration(format!(
+            "invalid network keypair bytes read from {}: {}",
+            path.display(),
+            err
+        ))
+    })?;
 
     Ok(Some(keypair))
 }
@@ -66,16 +73,23 @@ pub async fn get_reward_pk(root_dir: &Path) -> Result<Option<PublicKey>> {
     if !path.is_file() {
         return Ok(None);
     }
-    let pk_hex_bytes = fs::read(path).await?;
+
+    let pk_hex_bytes = fs::read(&path).await?;
     let pk_bytes = decode(pk_hex_bytes).map_err(|err| {
-        Error::Logic(format!(
-            "Couldn't hex-decode Ed25519 public key bytes: {}",
+        Error::Configuration(format!(
+            "couldn't hex-decode rewards Ed25519 public key bytes from {}: {}",
+            path.display(),
             err
         ))
     })?;
 
-    let pk = PublicKey::from_bytes(&pk_bytes)
-        .map_err(|_| Error::Logic("Config error: Invalid Ed25519 public key bytes".to_string()))?;
+    let pk = PublicKey::from_bytes(&pk_bytes).map_err(|err| {
+        Error::Configuration(format!(
+            "invalid rewards Ed25519 public key bytes read from {}: {}",
+            path.display(),
+            err
+        ))
+    })?;
 
     Ok(Some(pk))
 }

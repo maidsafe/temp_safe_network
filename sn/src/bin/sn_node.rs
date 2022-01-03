@@ -169,9 +169,7 @@ async fn run_node() -> Result<()> {
     let (node, mut event_stream) = loop {
         match Node::new(&config, bootstrap_retry_duration).await {
             Ok(result) => break result,
-            Err(Error::CannotConnectEndpoint {
-                err: qp2p::EndpointError::Upnp(error),
-            }) => {
+            Err(Error::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
                 return Err(error).suggestion(
                     "You can disable port forwarding by supplying --skip-auto-port-forwarding. Without port\n\
                     forwarding, your machine must be publicly reachable by the given\n\
@@ -185,7 +183,7 @@ async fn run_node() -> Result<()> {
                 );
             }
             #[cfg(feature = "always-joinable")]
-            Err(Error::CannotConnectEndpoint { err, .. }) => {
+            Err(Error::CannotConnectEndpoint(err)) => {
                 warn!(
                     "In 'always-joinable' mode. Continuing to try and join after error: {:?}",
                     err
