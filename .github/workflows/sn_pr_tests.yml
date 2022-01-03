@@ -172,7 +172,7 @@ jobs:
         timeout-minutes: 60
 
       - name: Start the network
-        run: ./target/release/testnet && sleep 30
+        run: ./target/release/testnet
         id: section-startup
 
       - name: Print Network Log Stats at start
