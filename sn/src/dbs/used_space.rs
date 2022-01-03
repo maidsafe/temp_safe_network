@@ -33,6 +33,10 @@ impl UsedSpace {
         let _ = self.used_space.fetch_add(size, Ordering::Relaxed);
     }
 
+    pub(crate) fn decrease(&self, size: usize) {
+        let _ = self.used_space.fetch_sub(size, Ordering::Relaxed);
+    }
+
     pub(crate) async fn ratio(&self) -> f64 {
         let used = self.used_space.load(Ordering::SeqCst);
         let max_capacity = self.max_capacity;
