@@ -8,6 +8,8 @@ fi
 
 DEFAULT_ELDER_COUNT=7
 ELDER_COUNT="${SN_ELDER_COUNT:-$DEFAULT_ELDER_COUNT}"
+DEFAULT_NODE_COUNT=33
+NODE_COUNT="${NODE_COUNT:-$DEFAULT_NODE_COUNT}"
 
 # It's better to use the network health test in rust as it's type safe.
 # This is needed for windows though at the moment due to the logfile locking...
