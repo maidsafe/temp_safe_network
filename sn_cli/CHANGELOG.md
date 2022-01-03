@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.42.0 (2022-01-03)
+
+### Bug Fixes (BREAKING)
+
+ - <csr-id-fe13166b6dc4ae0fdd96b20a135baf7ebef3647b/> properly handle scenarios when retrieving empty FilesContainers
+   - Also removing the Default impl for VersioHash as it's meaningless, and invalid content version hash.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - properly handle scenarios when retrieving empty FilesContainers ([`fe13166`](https://github.com/maidsafe/safe_network/commit/fe13166b6dc4ae0fdd96b20a135baf7ebef3647b))
+</details>
+
 ## v0.41.0 (2022-01-03)
 
 ### Documentation
@@ -14,18 +39,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
    The following updates were made:
    
    * Reduce the indentation levels of the whole document.
-   * Add a Quickstart section to get users going with a single command if they want to avoid reading lots of setup text. Windows was explicitly left out because having a Git Bash installation does not constitute the ability to quick start.
-   * Re-work the previous 'Download' section to an 'Installation and Setup' section.
-   * Restructure the 'Networks' section with a new example using remote networks.
-   * Temporarily remove the 'Interactive Shell' section. This was using a feature that didn't exist any more.
-   * Temporarily remove the 'SafeKeys' section, which used examples referring to removed features. This can be added back in but applied to currently relevant features. I didn't understand it enough to apply it at the moment.
-   * Trim the wordy prose in the 'Files' section. This helps the reader get to the salient issues quicker.
-   * Temporarily remove documentation for `files sync`. This command wasn't behaving as described currently, and I'm not sure the NRS stuff still applied. Didn't have time to go into it in detail. This section also has wordy prose that could benefit from being trimmed down. I'll do that when I add it back in.
-   * Temporarily remove the NRS section. This is completely out of sync with the new NRS commands and terminology and I suspect it can also be made less verbose.
-   * Remove the 'Auth' section, since this feature has been removed.
-   * Remove the 'Sequences' section, since this feature has been removed.
-   * Remove the 'Updates' section, since this feature is currently not enabled.
-   * Remove the `shell` style from the ``` code blocks since we don't need shell syntax highlighting. There's only one line of shell and the rest is showing the output of the command, which isn't shell code.
+* Add a Quickstart section to get users going with a single command if they want to avoid reading lots of setup text. Windows was explicitly left out because having a Git Bash installation does not constitute the ability to quick start.
+* Re-work the previous 'Download' section to an 'Installation and Setup' section.
+* Restructure the 'Networks' section with a new example using remote networks.
+* Temporarily remove the 'Interactive Shell' section. This was using a feature that didn't exist any more.
+* Temporarily remove the 'SafeKeys' section, which used examples referring to removed features. This can be added back in but applied to currently relevant features. I didn't understand it enough to apply it at the moment.
+* Trim the wordy prose in the 'Files' section. This helps the reader get to the salient issues quicker.
+* Temporarily remove documentation for `files sync`. This command wasn't behaving as described currently, and I'm not sure the NRS stuff still applied. Didn't have time to go into it in detail. This section also has wordy prose that could benefit from being trimmed down. I'll do that when I add it back in.
+* Temporarily remove the NRS section. This is completely out of sync with the new NRS commands and terminology and I suspect it can also be made less verbose.
+* Remove the 'Auth' section, since this feature has been removed.
+* Remove the 'Sequences' section, since this feature has been removed.
+* Remove the 'Updates' section, since this feature is currently not enabled.
+* Remove the `shell` style from the ``` code blocks since we don't need shell syntax highlighting. There's only one line of shell and the rest is showing the output of the command, which isn't shell code.
 
 ### New Features
 
@@ -35,21 +60,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - <csr-id-4adaeaff4f07871840397adc3371ec8b3436e7ce/> change files APIs to accept std::Path for path args rather than only &str
    - Changed the files_container_create API to now create just an empty FilesContainer
-   - Adding a new files_container_create_from API which creates a FilesContainer with files
+- Adding a new files_container_create_from API which creates a FilesContainer with files
    uploaded from a local folder.
-   - All path args passed to files container APIs can either be &str, std::Path, or std::PathBuf
+- All path args passed to files container APIs can either be &str, std::Path, or std::PathBuf
 
 ### refactor (BREAKING)
 
  - <csr-id-ff1dd477aaea2a4dda6c9c15b5822b1b3a7514b7/> ProcessedFiles redefined on more specific data types instead of simply Strings
 
-
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release over the course of 10 calendar days.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits contributed to the release over the course of 10 calendar days.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -59,6 +83,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.52.1/sn_api-0.48.0/sn_cli-0.41.0 ([`e38925e`](https://github.com/maidsafe/safe_network/commit/e38925e07d69432db310fc8ec9803200ea964ab2))
     - change files APIs to accept std::Path for path args rather than only &str ([`4adaeaf`](https://github.com/maidsafe/safe_network/commit/4adaeaff4f07871840397adc3371ec8b3436e7ce))
     - align cli user guide with current features ([`4e0d82e`](https://github.com/maidsafe/safe_network/commit/4e0d82ec847edd0da621208e906deffb5aa89ac2))
     - minor refactor and changes to CLI report errors ([`f1bb190`](https://github.com/maidsafe/safe_network/commit/f1bb1909f3fb506c1b7ec9b660ad533b7b8b9044))
