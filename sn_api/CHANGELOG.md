@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.50.0 (2022-01-03)
+
+### refactor (BREAKING)
+
+ - <csr-id-715a154fe7448cd18decd0a666ae11fb02eadedb/> remove dry-run as arg from all APIs and make it a Safe instance mode
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - remove dry-run as arg from all APIs and make it a Safe instance mode ([`715a154`](https://github.com/maidsafe/safe_network/commit/715a154fe7448cd18decd0a666ae11fb02eadedb))
+    - safe_network-0.52.2 ([`d490127`](https://github.com/maidsafe/safe_network/commit/d490127b17d53a7648f9e97aae690b232188b034))
+</details>
+
 ## v0.49.0 (2022-01-03)
 
 ### Bug Fixes (BREAKING)
@@ -16,8 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -27,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_api-0.49.0/sn_cli-0.42.0 ([`4f600e1`](https://github.com/maidsafe/safe_network/commit/4f600e179bfbf6ac018876cca6f7fc193f5b5f1e))
     - properly handle scenarios when retrieving empty FilesContainers ([`fe13166`](https://github.com/maidsafe/safe_network/commit/fe13166b6dc4ae0fdd96b20a135baf7ebef3647b))
 </details>
 
@@ -41,9 +68,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-4adaeaff4f07871840397adc3371ec8b3436e7ce/> change files APIs to accept std::Path for path args rather than only &str
    - Changed the files_container_create API to now create just an empty FilesContainer
-- Adding a new files_container_create_from API which creates a FilesContainer with files
-   uploaded from a local folder.
-- All path args passed to files container APIs can either be &str, std::Path, or std::PathBuf
 
 ### refactor (BREAKING)
 
@@ -71,6 +95,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - enable logging from api tests; resolve one failing test ([`19e8f70`](https://github.com/maidsafe/safe_network/commit/19e8f70c3f4369fae3a80d5de5e56161c5fa0258))
     - when in dry-run was still requiring a connection by some APIs ([`7ba567f`](https://github.com/maidsafe/safe_network/commit/7ba567f7f491836961e769c836226ebc9a4731f8))
 </details>
+
+<csr-unknown>
+Adding a new files_container_create_from API which creates a FilesContainer with filesuploaded from a local folder.All path args passed to files container APIs can either be &str, std::Path, or std::PathBuf<csr-unknown/>
 
 ## v0.47.0 (2021-12-22)
 
