@@ -588,7 +588,7 @@ mod tests {
 
         let mut the_logs = crate::testnet_grep::NetworkLogState::new()?;
 
-        let address = client
+        let _address = client
             .upload_and_verify(bytes.clone(), Scope::Public)
             .await?;
 
@@ -597,37 +597,12 @@ mod tests {
             .assert_count(LogMarker::ChunkStoreReceivedAtElder, 3)
             .await?;
 
-        // 3 elders were chosen by the client (should only be 3 as even if client chooses adults, AE should kick in prior to them attempting any of this)
-        the_logs
-            .assert_count(LogMarker::ServiceMsgToBeHandled, 3)
-            .await?;
-
         // 4 adults * reqs from 3 elders storing the chunk
         the_logs.assert_count(LogMarker::StoringChunk, 12).await?;
 
         // Here we can see that each write thinks it's new, so there's 12... but we let Sled handle this later.
         // 4 adults storing the chunk * 3 messages, so we'll still see this due to the rapid/ concurrent nature here...
         the_logs.assert_count(LogMarker::StoredNewChunk, 12).await?;
-
-        // now that it was written to the network we should be able to retrieve it
-        let _ = client.read_bytes(address).await?;
-
-        // small delay to ensure logs have written
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-        // client send msg to 3 elders
-        the_logs
-            .assert_count(LogMarker::ChunkQueryReceviedAtElder, 3)
-            .await?;
-        // client send msg to 3 elders
-        the_logs
-            .assert_count(LogMarker::ChunkQueryReceviedAtAdult, 12)
-            .await?;
-
-        // 4 adults * 3 requests back at elders
-        the_logs
-            .assert_count(LogMarker::ChunkQueryResponseReceviedFromAdult, 12)
-            .await?;
 
         Ok(())
     }

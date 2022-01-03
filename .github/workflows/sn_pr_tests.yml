@@ -167,8 +167,12 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
+      - name: Build all safe_network tests
+        run: cd sn && cargo test --no-run --release --features=always-joinable,test-utils
+        timeout-minutes: 60
+
       - name: Start the network
-        run: ./target/release/testnet
+        run: ./target/release/testnet && sleep 30
         id: section-startup
 
       - name: Print Network Log Stats at start
@@ -176,15 +180,11 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
-      - name: Build all safe_network tests
-        run: cd sn && cargo test --no-run --release --features=always-joinable,test-utils
-        timeout-minutes: 60
-
       - name: Run network asserts one by one
         shell: bash
         # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
-        run: cd sn && cargo test --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 --skip health && sleep 5
-        timeout-minutes: 7
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 --skip health && sleep 30
+        timeout-minutes: 5
         continue-on-error: true
 
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
@@ -198,7 +198,7 @@ jobs:
       - name: Client reg tests against local network
         shell: bash
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::reg --test-threads=1 --skip ae --skip batching && sleep 30
-        timeout-minutes: 5
+        timeout-minutes: 10
 
       # register api batching check
       - name: Client register batching
@@ -297,6 +297,9 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
+      - name: Build all sn_api tests
+        run: cargo test --no-run -p sn_api --release --lib
+
       - name: Start the network
         run: ./target/release/testnet
         id: section-startup
@@ -306,8 +309,6 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
-      - name: Build all sn_api tests
-        run: cargo test --no-run -p sn_api --release --lib
 
       - name: Run sn_api tests
         shell: bash
@@ -380,6 +381,9 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
+      - name: Build all CLI tests
+        run: cargo test --no-run -p sn_cli --release
+
       - name: Start the network
         run: ./target/release/testnet
         id: section-startup
@@ -389,8 +393,6 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
-      - name: Build all CLI tests
-        run: cargo test --no-run -p sn_cli --release
 
       - name: Run CLI tests
         shell: bash
