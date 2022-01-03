@@ -358,7 +358,7 @@ mod tests {
         // store a Private Register
         let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
-        let (address, batch) = client
+        let (_address, batch) = client
             .store_private_register(name, tag, owner, perms)
             .await?;
         client.publish_register_ops(batch).await?;
@@ -368,16 +368,6 @@ mod tests {
 
         // All elders should have been written to
         the_logs.assert_count(LogMarker::RegisterWrite, 7).await?;
-
-        let _ = client.get_register(address).await?;
-
-        // small delay to ensure logs have written
-        tokio::time::sleep(delay).await;
-
-        // All elders should receive the query
-        the_logs
-            .assert_count(LogMarker::RegisterQueryReceived, 3)
-            .await?;
 
         Ok(())
     }
