@@ -12,12 +12,12 @@ mod wire_msg_header;
 use xor_name::XorName;
 
 // highest prio as we can't do anything until we've joined
-pub(crate) const JOIN_RESPONSE_PRIORITY: i32 = 4;
 pub(crate) const DKG_MSG_PRIORITY: i32 = 3;
 pub(crate) const AE_MSG_PRIORITY: i32 = 2;
 pub(crate) const INFRASTRUCTURE_MSG_PRIORITY: i32 = 1;
 pub(crate) const NODE_DATA_MSG_PRIORITY: i32 = 0;
 pub(crate) const SERVICE_MSG_PRIORITY: i32 = -2;
+pub(crate) const JOIN_RESPONSE_PRIORITY: i32 = -5;
 
 use crate::types::PublicKey;
 

@@ -53,7 +53,6 @@ pub(super) struct Dispatcher {
 
     cancel_timer_tx: watch::Sender<bool>,
     cancel_timer_rx: watch::Receiver<bool>,
-    join_permits: Arc<Semaphore>,
     ae_permits: Arc<Semaphore>,
     infra_permits: Arc<Semaphore>,
     node_data_permits: Arc<Semaphore>,
@@ -77,7 +76,6 @@ impl Dispatcher {
             core,
             cancel_timer_tx,
             cancel_timer_rx,
-            join_permits: Arc::new(Semaphore::new(SEMAPHORE_COUNT)),
             ae_permits: Arc::new(Semaphore::new(SEMAPHORE_COUNT)),
             infra_permits: Arc::new(Semaphore::new(SEMAPHORE_COUNT)),
             dkg_permits: Arc::new(Semaphore::new(SEMAPHORE_COUNT)),
@@ -139,28 +137,13 @@ impl Dispatcher {
         cmd_id: CmdId,
     ) -> Result<()> {
         match priority {
-            JOIN_RESPONSE_PRIORITY => {}
-            DKG_MSG_PRIORITY => {
-                trace!(
-                    "{:?} Awaiting Join Completion before continuing with DKG Msg",
-                    cmd_id
-                );
-                self.wait_for_priority_commands_to_finish(
-                    self.join_permits.clone(),
-                    SEMAPHORE_COUNT,
-                )
-                .await?;
-            }
+            DKG_MSG_PRIORITY => {}
             AE_MSG_PRIORITY => {
                 trace!(
-                    "{:?} Awaiting DKG Completion before continuing with Join Msg",
+                    "{:?} Awaiting DKG Completion before continuing with AE Msg",
                     cmd_id
                 );
-                self.wait_for_priority_commands_to_finish(
-                    self.join_permits.clone(),
-                    SEMAPHORE_COUNT,
-                )
-                .await?;
+
                 self.wait_for_priority_commands_to_finish(
                     self.dkg_permits.clone(),
                     SEMAPHORE_COUNT,
@@ -169,14 +152,9 @@ impl Dispatcher {
             }
             INFRASTRUCTURE_MSG_PRIORITY => {
                 trace!(
-                    "{:?} Awaiting AE/Join/DKG Completion before continuing msg",
+                    "{:?} Awaiting AE/DKG Completion before continuing msg",
                     cmd_id
                 );
-                self.wait_for_priority_commands_to_finish(
-                    self.join_permits.clone(),
-                    SEMAPHORE_COUNT,
-                )
-                .await?;
                 self.wait_for_priority_commands_to_finish(
                     self.dkg_permits.clone(),
                     SEMAPHORE_COUNT,
@@ -187,14 +165,9 @@ impl Dispatcher {
             }
             NODE_DATA_MSG_PRIORITY => {
                 trace!(
-                    "{:?} Awaiting Infra/AE/Join/DKG Completion before continuing msg",
+                    "{:?} Awaiting Infra/AE/DKG Completion before continuing msg",
                     cmd_id
                 );
-                self.wait_for_priority_commands_to_finish(
-                    self.join_permits.clone(),
-                    SEMAPHORE_COUNT,
-                )
-                .await?;
                 self.wait_for_priority_commands_to_finish(
                     self.dkg_permits.clone(),
                     SEMAPHORE_COUNT,
@@ -211,14 +184,9 @@ impl Dispatcher {
             // service msgs...
             _ => {
                 trace!(
-                    "{:?} Awaiting Data/Infra/AE/Join/DKG Completion before continuing msg",
+                    "{:?} Awaiting Data/Infra/AE/DKG Completion before continuing msg handling",
                     cmd_id
                 );
-                self.wait_for_priority_commands_to_finish(
-                    self.join_permits.clone(),
-                    SEMAPHORE_COUNT,
-                )
-                .await?;
                 self.wait_for_priority_commands_to_finish(
                     self.dkg_permits.clone(),
                     SEMAPHORE_COUNT,
@@ -270,13 +238,10 @@ impl Dispatcher {
         }
 
         let permit = match the_prio {
-            JOIN_RESPONSE_PRIORITY => self
-                .join_permits
-                .clone()
-                .acquire_owned()
-                .await
-                .map_err(|_| Error::SemaphoreClosed),
-
+            JOIN_RESPONSE_PRIORITY => {
+                // as we're already a node accepted to the network, we can discard this
+                return Err(Error::AlreadyJoinedTheNetwork);
+            }
             DKG_MSG_PRIORITY => self
                 .dkg_permits
                 .clone()
