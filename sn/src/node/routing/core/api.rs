@@ -8,7 +8,6 @@
 
 use super::{delivery_group, Comm, Core};
 
-use crate::dbs::UsedSpace;
 use crate::messaging::{
     system::{JoinResponse, MembershipState, NodeState, SigShare, SystemMsg},
     WireMsg,
@@ -37,7 +36,8 @@ impl Core {
         comm: Comm,
         mut node: Node,
         event_tx: mpsc::Sender<Event>,
-        used_space: UsedSpace,
+        reg_store_size: u64,
+        chunk_store_size: u64,
         root_storage_dir: PathBuf,
         genesis_sk_set: bls::SecretKeySet,
     ) -> Result<Self> {
@@ -52,7 +52,8 @@ impl Core {
             section,
             Some(section_key_share),
             event_tx,
-            used_space,
+            reg_store_size,
+            chunk_store_size,
             root_storage_dir,
             true,
         )

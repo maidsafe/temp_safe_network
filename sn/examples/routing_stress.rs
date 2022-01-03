@@ -38,7 +38,7 @@ use tracing_subscriber::EnvFilter;
 use xor_name::{Prefix, XorName};
 use yansi::{Color, Style};
 
-use safe_network::node::routing::create_test_used_space_and_root_storage;
+use safe_network::node::routing::create_test_max_capacity_and_root_storage;
 
 use safe_network::messaging::{
     data::Error::FailedToWriteFile, system::SystemMsg, DstLocation, MessageId,
@@ -632,20 +632,21 @@ impl Network {
 }
 
 async fn add_node(id: u64, config: Config, event_tx: Sender<Event>) -> Result<()> {
-    let (storage, root_dir) = create_test_used_space_and_root_storage()?;
+    let (reg_store_size, chunk_store_size, root_dir) = create_test_max_capacity_and_root_storage()?;
 
-    let (node, mut events) = match Routing::new(config, storage, root_dir).await {
-        Ok(output) => output,
-        Err(error) => {
-            let _res = event_tx
-                .send(Event::JoinFailure {
-                    id,
-                    error: error.into(),
-                })
-                .await;
-            return Ok(());
-        }
-    };
+    let (node, mut events) =
+        match Routing::new(config, reg_store_size, chunk_store_size, root_dir).await {
+            Ok(output) => output,
+            Err(error) => {
+                let _res = event_tx
+                    .send(Event::JoinFailure {
+                        id,
+                        error: error.into(),
+                    })
+                    .await;
+                return Ok(());
+            }
+        };
 
     let _res = event_tx.send(Event::JoinSuccess { id, node }).await;
 

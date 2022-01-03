@@ -36,7 +36,7 @@
 use eyre::Result;
 use futures::future::join_all;
 use safe_network::node::routing::{
-    create_test_used_space_and_root_storage, Config, Event, EventStream, Routing,
+    create_test_max_capacity_and_root_storage, Config, Event, EventStream, Routing,
 };
 use std::{
     convert::TryInto,
@@ -189,9 +189,9 @@ async fn start_node(
         ..Default::default()
     };
 
-    let (used_space, root) = create_test_used_space_and_root_storage()?;
+    let (reg_store_size, chunk_store_size, root) = create_test_max_capacity_and_root_storage()?;
 
-    let (node, event_stream) = Routing::new(config, used_space, root)
+    let (node, event_stream) = Routing::new(config, reg_store_size, chunk_store_size, root)
         .await
         .expect("Failed to instantiate a Node");
 

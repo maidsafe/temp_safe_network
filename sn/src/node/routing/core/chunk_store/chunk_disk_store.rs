@@ -7,8 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Error, Result};
-use crate::dbs::UsedSpace;
+
 use crate::types::{Chunk, ChunkAddress};
+use crate::UsedSpace;
 
 use bytes::Bytes;
 use std::path::{Path, PathBuf};
@@ -33,14 +34,13 @@ impl ChunkDiskStore {
     /// If the location specified already contains a ChunkDiskStore, it is simply used
     ///
     /// Used space of the dir is tracked
-    pub(crate) fn new<P: AsRef<Path>>(root: P, used_space: UsedSpace) -> Result<Self> {
-        let dir = root.as_ref().join(CHUNK_DB_DIR);
-        used_space.add_dir(&dir);
+    pub(crate) fn new<P: AsRef<Path>>(root: P, max_capacity: u64) -> Result<Self> {
+        let chunk_store_path = root.as_ref().join(CHUNK_DB_DIR);
 
         Ok(ChunkDiskStore {
             bit_tree_depth: BIT_TREE_DEPTH,
-            chunk_store_path: dir,
-            used_space,
+            chunk_store_path,
+            used_space: UsedSpace::new(max_capacity),
         })
     }
 
@@ -83,16 +83,6 @@ impl ChunkDiskStore {
         Ok(ChunkAddress::decode_from_zbase32(filename)?)
     }
 
-    // ---------------------- public (crate) methods ----------------------
-
-    pub(crate) async fn confirm_can_consume(&self, data: &Chunk) -> Result<()> {
-        if self.used_space.can_consume(data.value().len() as u64).await {
-            Ok(())
-        } else {
-            Err(Error::NotEnoughSpace)
-        }
-    }
-
     pub(crate) async fn used_space_ratio(&self) -> f64 {
         self.used_space.ratio().await
     }
@@ -106,6 +96,8 @@ impl ChunkDiskStore {
 
         let mut file = tokio::fs::File::create(filepath).await?;
         file.write_all(data.value()).await?;
+
+        self.used_space.increase(data.value().len());
 
         Ok(*addr)
     }
@@ -190,8 +182,7 @@ mod tests {
 
     fn init_chunk_disk_store() -> ChunkDiskStore {
         let root = tempdir().expect("Failed to create temporary directory for chunk disk store");
-        let used_space = UsedSpace::new(u64::MAX);
-        ChunkDiskStore::new(root.path(), used_space).expect("Failed to create chunk disk store")
+        ChunkDiskStore::new(root.path(), u64::MAX).expect("Failed to create chunk disk store")
     }
 
     #[tokio::test]

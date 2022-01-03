@@ -43,7 +43,6 @@ use super::{
     Elders, Event, NodeElderChange,
 };
 
-use crate::dbs::UsedSpace;
 use crate::messaging::{
     signature_aggregator::SignatureAggregator,
     system::{DkgSessionId, SystemMsg},
@@ -132,7 +131,8 @@ impl Core {
         network_knowledge: NetworkKnowledge,
         section_key_share: Option<SectionKeyShare>,
         event_tx: mpsc::Sender<Event>,
-        used_space: UsedSpace,
+        reg_store_size: u64,
+        chunk_store_size: u64,
         root_storage_dir: PathBuf,
         is_genesis_node: bool,
     ) -> Result<Self> {
@@ -141,8 +141,8 @@ impl Core {
         // make sure the Node has the correct local addr as Comm
         node.addr = comm.our_connection_info();
 
-        let register_storage = RegisterStorage::new(&root_storage_dir, used_space.clone())?;
-        let chunk_storage = ChunkStore::new(&root_storage_dir, used_space.clone())?;
+        let register_storage = RegisterStorage::new(&root_storage_dir, reg_store_size)?;
+        let chunk_storage = ChunkStore::new(&root_storage_dir, chunk_store_size)?;
 
         let capacity = Capacity::new(BTreeMap::new());
         let adult_liveness = Liveness::new();
