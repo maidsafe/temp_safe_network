@@ -104,7 +104,9 @@ impl ChunkDiskStore {
 
     pub(crate) async fn delete_chunk(&self, addr: &ChunkAddress) -> Result<()> {
         let filepath = self.address_to_filepath(addr)?;
+        let meta = tokio::fs::metadata(filepath.clone()).await?;
         tokio::fs::remove_file(filepath).await?;
+        self.used_space.decrease(meta.len() as usize);
         Ok(())
     }
 
