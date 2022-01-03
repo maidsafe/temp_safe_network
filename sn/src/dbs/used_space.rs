@@ -15,7 +15,7 @@ use tracing::info;
 #[derive(Clone, Debug)]
 /// Tracking used space
 pub struct UsedSpace {
-    /// the maximum (inclusive) allocated space for chunk storage
+    /// the maximum (inclusive) allocated space for storage
     max_capacity: u64,
     used_space: Arc<AtomicUsize>,
 }
@@ -38,7 +38,7 @@ impl UsedSpace {
     }
 
     pub(crate) async fn ratio(&self) -> f64 {
-        let used = self.used_space.load(Ordering::SeqCst);
+        let used = self.used_space.load(Ordering::Relaxed);
         let max_capacity = self.max_capacity;
         let used_space_ratio = used as f64 / max_capacity as f64;
         info!("Used space: {:?}", used);
