@@ -197,14 +197,20 @@ jobs:
       # register api
       - name: Client reg tests against local network
         shell: bash
-        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::reg --test-threads=1 --skip ae && sleep 30
-        timeout-minutes: 15
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::reg --test-threads=1 --skip ae --skip batching && sleep 30
+        timeout-minutes: 5
+
+      # register api batching check
+      - name: Client register batching
+        shell: bash
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- register_batching --test-threads=1 --skip ae && sleep 30
+        timeout-minutes: 10
 
       # blob api
       - name: client blob tests against local network
         shell: bash
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::blob --test-threads=1 --skip ae --skip from_many_clients  && sleep 30
-        timeout-minutes: 10
+        timeout-minutes: 20
 
       # ae tests api
       - name: client ae tests against local network
