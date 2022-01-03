@@ -5,19 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.52.0 (2021-12-22)
-
-### refactor (BREAKING)
-
- - <csr-id-1188ed58eed443b4b8c65b591376f2f9a21acc0d/> minor refactor to error types definitions
-
+## v0.52.1 (2022-01-03)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -27,6 +22,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - further integrate and organize dir ([`36dbea0`](https://github.com/maidsafe/safe_network/commit/36dbea03d879c07f922be36a124ad8d44c3c2d0e))
+    - move routing into node dir ([`48ef44e`](https://github.com/maidsafe/safe_network/commit/48ef44e9db01d74119a2b1c9f7e7dae4ce988c57))
+</details>
+
+## v0.52.0 (2021-12-22)
+
+### Bug Fixes
+
+ - <csr-id-f00de3a9cbc43eabeb0d46804a92b88204a48ea4/> respond only once to client for every chunk query
+
+### refactor (BREAKING)
+
+ - <csr-id-1188ed58eed443b4b8c65b591376f2f9a21acc0d/> minor refactor to error types definitions
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.52.0/sn_api-0.47.0/sn_cli-0.40.0 ([`6b59ad8`](https://github.com/maidsafe/safe_network/commit/6b59ad852f89f033caf2b3c7dfcfa3019f8129e8))
+    - remove expired queries from pending queries cache ([`619d142`](https://github.com/maidsafe/safe_network/commit/619d142de8999d536e41ac5fe402a94d934689fb))
+    - respond only once to client for every chunk query ([`f00de3a`](https://github.com/maidsafe/safe_network/commit/f00de3a9cbc43eabeb0d46804a92b88204a48ea4))
     - minor refactor to error types definitions ([`1188ed5`](https://github.com/maidsafe/safe_network/commit/1188ed58eed443b4b8c65b591376f2f9a21acc0d))
 </details>
 

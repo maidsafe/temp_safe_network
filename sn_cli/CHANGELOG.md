@@ -4,14 +4,52 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.40.0 (2021-12-22)
+## v0.41.0 (2022-01-03)
+
+### Documentation
+
+ - <csr-id-4e0d82ec847edd0da621208e906deffb5aa89ac2/> align cli user guide with current features
+   The CLI user guide hadn't been updated for some time, so I brought it more in line with current features. Where relevant so far, I also trimmed the text to make it more concise.
+   
+   The following updates were made:
+   
+   * Reduce the indentation levels of the whole document.
+   * Add a Quickstart section to get users going with a single command if they want to avoid reading lots of setup text. Windows was explicitly left out because having a Git Bash installation does not constitute the ability to quick start.
+   * Re-work the previous 'Download' section to an 'Installation and Setup' section.
+   * Restructure the 'Networks' section with a new example using remote networks.
+   * Temporarily remove the 'Interactive Shell' section. This was using a feature that didn't exist any more.
+   * Temporarily remove the 'SafeKeys' section, which used examples referring to removed features. This can be added back in but applied to currently relevant features. I didn't understand it enough to apply it at the moment.
+   * Trim the wordy prose in the 'Files' section. This helps the reader get to the salient issues quicker.
+   * Temporarily remove documentation for `files sync`. This command wasn't behaving as described currently, and I'm not sure the NRS stuff still applied. Didn't have time to go into it in detail. This section also has wordy prose that could benefit from being trimmed down. I'll do that when I add it back in.
+   * Temporarily remove the NRS section. This is completely out of sync with the new NRS commands and terminology and I suspect it can also be made less verbose.
+   * Remove the 'Auth' section, since this feature has been removed.
+   * Remove the 'Sequences' section, since this feature has been removed.
+   * Remove the 'Updates' section, since this feature is currently not enabled.
+   * Remove the `shell` style from the ``` code blocks since we don't need shell syntax highlighting. There's only one line of shell and the rest is showing the output of the command, which isn't shell code.
+
+### New Features
+
+ - <csr-id-a8f84f7002cf7b043fb7606a20987ddfb29972f8/> make all read/write access to CLI config file async by using tokio::fs
+
+### New Features (BREAKING)
+
+ - <csr-id-4adaeaff4f07871840397adc3371ec8b3436e7ce/> change files APIs to accept std::Path for path args rather than only &str
+   - Changed the files_container_create API to now create just an empty FilesContainer
+   - Adding a new files_container_create_from API which creates a FilesContainer with files
+   uploaded from a local folder.
+   - All path args passed to files container APIs can either be &str, std::Path, or std::PathBuf
+
+### refactor (BREAKING)
+
+ - <csr-id-ff1dd477aaea2a4dda6c9c15b5822b1b3a7514b7/> ProcessedFiles redefined on more specific data types instead of simply Strings
+
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release over the course of 6 calendar days.
- - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits contributed to the release over the course of 10 calendar days.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -21,6 +59,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - change files APIs to accept std::Path for path args rather than only &str ([`4adaeaf`](https://github.com/maidsafe/safe_network/commit/4adaeaff4f07871840397adc3371ec8b3436e7ce))
+    - align cli user guide with current features ([`4e0d82e`](https://github.com/maidsafe/safe_network/commit/4e0d82ec847edd0da621208e906deffb5aa89ac2))
+    - minor refactor and changes to CLI report errors ([`f1bb190`](https://github.com/maidsafe/safe_network/commit/f1bb1909f3fb506c1b7ec9b660ad533b7b8b9044))
+    - ProcessedFiles redefined on more specific data types instead of simply Strings ([`ff1dd47`](https://github.com/maidsafe/safe_network/commit/ff1dd477aaea2a4dda6c9c15b5822b1b3a7514b7))
+    - make all read/write access to CLI config file async by using tokio::fs ([`a8f84f7`](https://github.com/maidsafe/safe_network/commit/a8f84f7002cf7b043fb7606a20987ddfb29972f8))
+</details>
+
+## v0.40.0 (2021-12-22)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 8 commits contributed to the release over the course of 6 calendar days.
+ - 8 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.52.0/sn_api-0.47.0/sn_cli-0.40.0 ([`6b59ad8`](https://github.com/maidsafe/safe_network/commit/6b59ad852f89f033caf2b3c7dfcfa3019f8129e8))
     - sn_cli-v0.39.2 ([`f6ffbdb`](https://github.com/maidsafe/safe_network/commit/f6ffbdb5d999f84e3531a6dcd9dcdbacefd50d18))
     - re-introduce version arg for cli install script ([`d201f7e`](https://github.com/maidsafe/safe_network/commit/d201f7e3480a8a12f488e2a54886cca942904a18))
     - use s3 as download source for sn_node ([`dffcd4e`](https://github.com/maidsafe/safe_network/commit/dffcd4e3dd07f99dd3a4f4330637cab9380db9c3))
@@ -1024,9 +1087,6 @@ like files with 0 bytes in them any more.
     - update safe-authd crate name to sn_authd ([`019370c`](https://github.com/maidsafe/safe_network/commit/019370cfd0ace44c656caf45c17248f2a547dbbf))
     - update safe-cli crate name to sn_cli ([`70c67c7`](https://github.com/maidsafe/safe_network/commit/70c67c749c504ddd552aba6663109d2b1839082a))
 </details>
-
-<csr-unknown>
-https://github.com/maidsafe/sn_cli/compare/v0.36.0...v0.37.00.37.0 (2021-10-05) keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks keypair API now returns a new randomly create Ed25519 key pair fix failing CLI build for MUSL targets remove short option used for dry run ignore error when listing networks and current network is not set in the system node join command was not passing multiple peers addresses correctly to launch tool remove keypair cmd and –pk argument from the keys command as they are not necessary anymore change node_path arg of ‘node bin-path’ command to node-path files get command to query each file with a single query rather than in chunks<csr-unknown/>
 
 ## 0.14.0 (2020-06-11)
 

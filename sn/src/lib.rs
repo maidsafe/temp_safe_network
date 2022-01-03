@@ -54,7 +54,6 @@ pub use dbs::UsedSpace;
 pub mod messaging;
 pub mod node;
 pub mod prefix_map;
-pub mod routing;
 pub mod types;
 
 use tracing_core::{Event, Subscriber};
@@ -191,8 +190,8 @@ pub fn init_test_logger() {
 #[cfg(test)]
 mod tests {
     use crate::elder_count;
-    use crate::routing::log_markers::LogMarker;
     use crate::testnet_grep::search_testnet_results_per_node;
+    use crate::types::log_markers::LogMarker;
     use eyre::Result;
 
     // Check that with one split we have 14 elders.

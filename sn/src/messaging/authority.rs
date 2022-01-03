@@ -12,7 +12,7 @@ use super::{
 };
 use crate::{
     messaging::signature_aggregator::{Error as AggregatorError, SignatureAggregator},
-    routing::SectionKeyShare,
+    node::routing::SectionKeyShare,
     types::{PublicKey, Signature},
 };
 use bls::PublicKey as BlsPublicKey;

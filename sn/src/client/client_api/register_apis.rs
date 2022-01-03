@@ -259,7 +259,7 @@ mod tests {
         Error,
     };
     use crate::messaging::data::Error as ErrorMessage;
-    use crate::routing::log_markers::LogMarker;
+    use crate::types::log_markers::LogMarker;
     use crate::types::{
         register::{Action, EntryHash, Permissions, PrivatePermissions, PublicPermissions, User},
         Error as DtError, PublicKey,

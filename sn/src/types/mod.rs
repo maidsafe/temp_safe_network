@@ -9,6 +9,8 @@
 
 //! SAFE network data types.
 
+/// Standardised log markers for various events
+pub mod log_markers;
 /// Register data type
 pub mod register;
 /// Encoding utils

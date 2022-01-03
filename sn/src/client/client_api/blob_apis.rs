@@ -375,7 +375,7 @@ mod tests {
         utils::test_utils::{create_test_client, init_test_logger},
         Client,
     };
-    use crate::routing::log_markers::LogMarker;
+    use crate::types::log_markers::LogMarker;
     use crate::types::{utils::random_bytes, BytesAddress, Keypair, Scope};
     use bytes::Bytes;
     use eyre::Result;

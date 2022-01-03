@@ -8,19 +8,18 @@
 
 //! Implementation of the "Node" node for the SAFE Network.
 
-mod chaos;
-/// Configuration handling
-pub mod config_handler;
+/// Configuration
+pub mod cfg;
+/// Routing
+pub mod routing;
+
+mod api;
 mod error;
 mod logging;
-mod network;
-mod node_api;
-
-/// Docs
-pub mod state_db;
 
 pub use crate::node::{
+    api::Node,
+    cfg::{config_handler, keypair_storage},
     config_handler::{add_connection_info, set_connection_info, Config},
     error::{Error, Result},
-    node_api::Node,
 };
