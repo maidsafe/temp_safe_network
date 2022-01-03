@@ -5,14 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.52.2 (2022-01-03)
+## v0.52.3 (2022-01-03)
+
+### New Features
+
+ - <csr-id-5fadc027b4b7dd942275ef6041b2bdb92b062bed/> remove unused kv store, cleanup chunk store
+ - <csr-id-7f1ead2f0f33558583989a7314d2c121a6f1280a/> disk chunk store
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 7 commits contributed to the release.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -22,7 +27,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - fmt ([`d54c955`](https://github.com/maidsafe/safe_network/commit/d54c955aa768ab08ef8193b7e36cb96822bc6cb8))
+    - refactor(chunk_store): do not check if space available Doing this for every write is immensely wasteful. There is just one time when it will be necessary, which is right before it is filled by the incoming chunk. Therefore, we can let the tokio writer return that error - when/if that ever occurs - which would be bubbled up and encapsulated in a generic error type. As long as nodes truthfully report their used space (StorageLevel), then this will never occur, as we stop sending them chunks well before they are actually full. ([`6b9b159`](https://github.com/maidsafe/safe_network/commit/6b9b1590bce9423130210007ddd6e9c14b51819d))
+    - remove repetitive code ([`be89899`](https://github.com/maidsafe/safe_network/commit/be8989971c68ac5aee43380223000a1f400252fc))
+    - feat(chunk_store): make read and delete async ([`eb30133`](https://github.com/maidsafe/safe_network/commit/eb30133e773124b46cdad6e6fa7f3c65f066946a))
+    - typos and shortcuts ([`72f79d4`](https://github.com/maidsafe/safe_network/commit/72f79d46fc56fdda9215f8a9d6f95bcdf323a66f))
+    - remove unused kv store, cleanup chunk store ([`5fadc02`](https://github.com/maidsafe/safe_network/commit/5fadc027b4b7dd942275ef6041b2bdb92b062bed))
+    - disk chunk store ([`7f1ead2`](https://github.com/maidsafe/safe_network/commit/7f1ead2f0f33558583989a7314d2c121a6f1280a))
+</details>
+
+## v0.52.2 (2022-01-03)
+
+### refactor (BREAKING)
+
+ - <csr-id-e9a9cc1096e025d88f19390ad6ba7398f71bc800/> removing unnecessary Error type definitions
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.52.2 ([`d490127`](https://github.com/maidsafe/safe_network/commit/d490127b17d53a7648f9e97aae690b232188b034))
     - fix docs to match parameters ([`9d7e684`](https://github.com/maidsafe/safe_network/commit/9d7e6843701465a13de7b528768273bad02e920e))
+    - removing unnecessary Error type definitions ([`e9a9cc1`](https://github.com/maidsafe/safe_network/commit/e9a9cc1096e025d88f19390ad6ba7398f71bc800))
 </details>
 
 ## v0.52.1 (2022-01-03)
