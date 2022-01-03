@@ -28,9 +28,7 @@ pub enum VersionHashError {
 }
 
 /// Version Hash corresponding to the entry hash where the content is stored
-#[derive(
-    Debug, Eq, Hash, PartialEq, Ord, PartialOrd, Serialize, Deserialize, Clone, Default, Copy,
-)]
+#[derive(Debug, Eq, Hash, PartialEq, Ord, PartialOrd, Serialize, Deserialize, Clone, Copy)]
 pub struct VersionHash {
     entry_hash: EntryHash,
 }

@@ -55,8 +55,9 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &mut S
             // Render FilesContainer
             if OutputFmt::Pretty == output_fmt {
                 println!(
-                    "Files of FilesContainer (version {}) at \"{}\":",
-                    version, url
+                    "Files of FilesContainer ({}) at \"{}\":",
+                    version.map_or("empty".to_string(), |v| format!("version {}", v)),
+                    url
                 );
                 let mut table = Table::new();
                 table.add_row(

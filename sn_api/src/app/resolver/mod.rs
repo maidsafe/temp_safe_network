@@ -259,7 +259,8 @@ mod tests {
 
         let safe_url = SafeUrl::from_url(&fc_xorurl)?;
         let content = retry_loop!(safe.fetch(&fc_xorurl, None));
-        let (version0, _) = retry_loop!(safe.files_container_get(&fc_xorurl));
+        let (version0, _) = retry_loop!(safe.files_container_get(&fc_xorurl))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         match content.clone() {
             SafeData::FilesContainer {
@@ -276,7 +277,7 @@ mod tests {
                 assert_eq!(xorurl, fc_xorurl.clone());
                 assert_eq!(xorname, safe_url.xorname());
                 assert_eq!(type_tag, files::FILES_CONTAINER_TYPE_TAG);
-                assert_eq!(version, version0);
+                assert_eq!(version, Some(version0));
                 assert_eq!(files_map, original_files_map);
                 assert_eq!(data_type, DataType::Register);
                 assert!(metadata.is_none()); // no path so no metadata
@@ -309,7 +310,8 @@ mod tests {
             .files_container_create_from("./testdata/", None, true, false, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         // link to an nrs map
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
@@ -339,7 +341,7 @@ mod tests {
                 assert_eq!(*xorurl, xorurl_without_subname);
                 assert_eq!(*xorname, safe_url.xorname());
                 assert_eq!(*type_tag, 1_100);
-                assert_eq!(*version, version0);
+                assert_eq!(*version, Some(version0));
                 assert_eq!(*data_type, DataType::Register);
                 assert_eq!(*files_map, the_files_map);
                 assert!(metadata.is_none());
@@ -368,7 +370,8 @@ mod tests {
             .files_container_create_from("./testdata/", None, true, false, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         // link to an nrs map
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
@@ -508,7 +511,8 @@ mod tests {
             .files_container_create_from("./testdata/", None, true, false, false)
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl));
+        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
+            .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         // map to nrs name
         let mut safe_url = SafeUrl::from_url(&xorurl)?;

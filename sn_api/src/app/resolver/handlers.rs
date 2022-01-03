@@ -1,6 +1,6 @@
 use super::{Range, SafeData};
 use crate::app::{
-    files::{self, FileInfo},
+    files::{self, FileInfo, FilesMap},
     multimap::MultimapKeyValues,
     DataType, Safe, SafeUrl,
 };
@@ -172,10 +172,14 @@ impl Safe {
     ) -> Result<SafeData> {
         ensure_no_subnames(&input_url, "file container")?;
 
-        // fetch file container
-        let (version, files_map) = self.fetch_files_container(&input_url).await?;
+        // Fetch files container
+        let (version, files_map) = match self.fetch_files_container(&input_url).await? {
+            Some((version, files_map)) => (Some(version), files_map),
+            None => (None, FilesMap::default()),
+        };
+
         debug!(
-            "Files container at {}, with version: {}, of data type: {}, containing: {:?}",
+            "Files container at {}, with version: {:?}, of data type: {}, containing: {:?}",
             input_url,
             version,
             input_url.data_type(),
