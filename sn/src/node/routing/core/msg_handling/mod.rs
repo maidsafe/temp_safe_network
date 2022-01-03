@@ -29,7 +29,7 @@ use crate::node::{
     error::{Error, Result},
     routing::{
         api::command::Command,
-        core::{Core, DkgSessionInfo, ChunkStoreError},
+        core::{ChunkStoreError, Core, DkgSessionInfo},
         messages::{NodeMsgAuthorityUtils, WireMsgUtils},
         network_knowledge::{NetworkKnowledge, SectionPeers},
         relocation::RelocateState,
