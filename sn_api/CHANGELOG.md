@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.48.0 (2022-01-03)
+
+### Bug Fixes
+
+ - <csr-id-19e8f70c3f4369fae3a80d5de5e56161c5fa0258/> enable logging from api tests; resolve one failing test
+ - <csr-id-7ba567f7f491836961e769c836226ebc9a4731f8/> when in dry-run was still requiring a connection by some APIs
+
+### New Features (BREAKING)
+
+ - <csr-id-4adaeaff4f07871840397adc3371ec8b3436e7ce/> change files APIs to accept std::Path for path args rather than only &str
+   - Changed the files_container_create API to now create just an empty FilesContainer
+   - Adding a new files_container_create_from API which creates a FilesContainer with files
+   uploaded from a local folder.
+   - All path args passed to files container APIs can either be &str, std::Path, or std::PathBuf
+
+### refactor (BREAKING)
+
+ - <csr-id-ff1dd477aaea2a4dda6c9c15b5822b1b3a7514b7/> ProcessedFiles redefined on more specific data types instead of simply Strings
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release over the course of 11 calendar days.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - change files APIs to accept std::Path for path args rather than only &str ([`4adaeaf`](https://github.com/maidsafe/safe_network/commit/4adaeaff4f07871840397adc3371ec8b3436e7ce))
+    - minor refactor and changes to CLI report errors ([`f1bb190`](https://github.com/maidsafe/safe_network/commit/f1bb1909f3fb506c1b7ec9b660ad533b7b8b9044))
+    - ProcessedFiles redefined on more specific data types instead of simply Strings ([`ff1dd47`](https://github.com/maidsafe/safe_network/commit/ff1dd477aaea2a4dda6c9c15b5822b1b3a7514b7))
+    - enable logging from api tests; resolve one failing test ([`19e8f70`](https://github.com/maidsafe/safe_network/commit/19e8f70c3f4369fae3a80d5de5e56161c5fa0258))
+    - when in dry-run was still requiring a connection by some APIs ([`7ba567f`](https://github.com/maidsafe/safe_network/commit/7ba567f7f491836961e769c836226ebc9a4731f8))
+</details>
+
 ## v0.47.0 (2021-12-22)
 
 ### New Features
@@ -15,13 +57,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-1188ed58eed443b4b8c65b591376f2f9a21acc0d/> minor refactor to error types definitions
 
-
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 6 commits contributed to the release over the course of 6 calendar days.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 7 commits contributed to the release over the course of 5 calendar days.
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -31,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.52.0/sn_api-0.47.0/sn_cli-0.40.0 ([`6b59ad8`](https://github.com/maidsafe/safe_network/commit/6b59ad852f89f033caf2b3c7dfcfa3019f8129e8))
     - minor refactor to error types definitions ([`1188ed5`](https://github.com/maidsafe/safe_network/commit/1188ed58eed443b4b8c65b591376f2f9a21acc0d))
     - safe_network-0.51.7 ([`c76c3ab`](https://github.com/maidsafe/safe_network/commit/c76c3ab638188cba38911f037829c209fcc45fc3))
     - calm down the retry loop tests ([`1d1487f`](https://github.com/maidsafe/safe_network/commit/1d1487f1c8e8f3e33df626af1ff027eea653f84c))
