@@ -74,6 +74,10 @@ pub enum Error {
     TryJoinLater,
     #[error("No matching Section")]
     NoMatchingSection,
+    #[error(
+        "A JoinResponse was reeived after we've already joined the network. It has been ignored."
+    )]
+    AlreadyJoinedTheNetwork,
     #[error("No matching Elder")]
     NoMatchingElder,
     #[error("Node cannot join the network since it is not externally reachable: {0}")]
