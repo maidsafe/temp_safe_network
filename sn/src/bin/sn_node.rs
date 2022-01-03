@@ -29,18 +29,19 @@
 
 use color_eyre::{Section, SectionExt};
 use eyre::{eyre, Result, WrapErr};
-use safe_network::node::{add_connection_info, set_connection_info, Config, Error, Node};
-use safe_network::LogFormatter;
+use safe_network::{
+    node::{add_connection_info, set_connection_info, Config, Error, Node},
+    LogFormatter,
+};
 use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process::exit};
 use structopt::{clap, StructOpt};
 use tokio::time::{sleep, Duration};
 use tracing::{self, error, info, trace, warn};
 use tracing_subscriber::filter::EnvFilter;
-const MODULE_NAME: &str = "safe_network";
 
+const MODULE_NAME: &str = "safe_network";
 const BOOTSTRAP_RETRY_TIME: u64 = 3; // in minutes
-use safe_network::routing;
 
 /// Runs a Safe Network node.
 fn main() -> Result<()> {
@@ -168,9 +169,9 @@ async fn run_node() -> Result<()> {
     let (node, mut event_stream) = loop {
         match Node::new(&config, bootstrap_retry_duration).await {
             Ok(result) => break result,
-            Err(Error::Routing(routing::Error::CannotConnectEndpoint {
+            Err(Error::CannotConnectEndpoint {
                 err: qp2p::EndpointError::Upnp(error),
-            })) => {
+            }) => {
                 return Err(error).suggestion(
                     "You can disable port forwarding by supplying --skip-auto-port-forwarding. Without port\n\
                     forwarding, your machine must be publicly reachable by the given\n\
@@ -184,18 +185,18 @@ async fn run_node() -> Result<()> {
                 );
             }
             #[cfg(feature = "always-joinable")]
-            Err(Error::Routing(routing::Error::CannotConnectEndpoint { err, .. })) => {
+            Err(Error::CannotConnectEndpoint { err, .. }) => {
                 warn!(
                     "In 'always-joinable' mode. Continuing to try and join after error: {:?}",
                     err
                 );
                 continue;
             }
-            Err(Error::Routing(routing::Error::TryJoinLater)) => {
+            Err(Error::TryJoinLater) => {
                 println!("{}", log);
                 info!("{}", log);
             }
-            Err(Error::Routing(routing::Error::NodeNotReachable(addr))) => {
+            Err(Error::NodeNotReachable(addr)) => {
                 let err_msg = format!(
                     "Unfortunately we are unable to establish a connection to your machine ({}) either through a \
                     public IP address, or via IGD on your router. Please ensure that IGD is enabled on your router - \

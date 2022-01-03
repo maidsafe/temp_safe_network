@@ -7,19 +7,20 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Session;
-use crate::client::connections::messaging::NUM_OF_ELDERS_SUBSET_FOR_QUERIES;
-use crate::client::{connections::messaging::send_message, Error, Result};
-use crate::elder_count;
-use crate::messaging::data::DataCmd;
-use crate::messaging::{
-    data::{CmdError, ServiceMsg},
-    system::{KeyedSig, SectionAuth, SystemMsg},
-    DstLocation, MessageId, MessageType, MsgKind, WireMsg,
+use crate::client::{
+    connections::messaging::{send_message, NUM_OF_ELDERS_SUBSET_FOR_QUERIES},
+    Error, Result,
 };
-use crate::messaging::{AuthorityProof, ServiceAuth};
+use crate::elder_count;
+use crate::messaging::{
+    data::{CmdError, DataCmd, ServiceMsg},
+    system::{KeyedSig, SectionAuth, SystemMsg},
+    AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, ServiceAuth, WireMsg,
+};
+use crate::node::routing::SectionAuthorityProvider;
 use crate::peer::Peer;
-use crate::routing::{log_markers::LogMarker, SectionAuthorityProvider};
-use crate::types::utils::write_data_to_disk;
+use crate::types::{log_markers::LogMarker, utils::write_data_to_disk};
+
 use bytes::Bytes;
 use itertools::Itertools;
 use qp2p::ConnectionIncoming;

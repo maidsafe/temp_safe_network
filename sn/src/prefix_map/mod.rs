@@ -18,14 +18,21 @@
 mod stats;
 
 use self::stats::NetworkStats;
+
 use crate::messaging::system::SectionAuth;
-use crate::routing::{Error, Result, SectionAuthUtils, SectionAuthorityProvider};
+use crate::node::{
+    routing::{SectionAuthUtils, SectionAuthorityProvider},
+    Error, Result,
+};
+
 use bls::PublicKey as BlsPublicKey;
 use dashmap::{self, mapref::multiple::RefMulti, DashMap};
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
-use std::iter::{self, Iterator};
-use std::sync::Arc;
+use std::{
+    iter::{self, Iterator},
+    sync::Arc,
+};
 use xor_name::{Prefix, XorName};
 
 /// Container for storing information about other sections in the network.
@@ -390,7 +397,7 @@ impl<'de> Deserialize<'de> for NetworkPrefixMap {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::routing::{gen_section_authority_provider, section_signed};
+    use crate::node::routing::{gen_section_authority_provider, section_signed};
     use eyre::{eyre, Context, Result};
     use rand::Rng;
 

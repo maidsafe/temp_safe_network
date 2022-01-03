@@ -6,7 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::routing::log_markers::LogMarker;
+use crate::types::log_markers::LogMarker;
+
 pub(crate) struct NetworkStats {
     pub(super) known_elders: u64,
     pub(super) total_elders: u64,
