@@ -85,6 +85,14 @@ impl ChunkDiskStore {
 
     // ---------------------- public (crate) methods ----------------------
 
+    pub(crate) async fn confirm_can_consume(&self, data: &Chunk) -> Result<()> {
+        if self.used_space.can_consume(data.value().len() as u64).await {
+            Ok(())
+        } else {
+            Err(Error::NotEnoughSpace)
+        }
+    }
+
     pub(crate) async fn used_space_ratio(&self) -> f64 {
         self.used_space.ratio().await
     }
