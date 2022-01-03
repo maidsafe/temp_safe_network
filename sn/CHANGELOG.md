@@ -5,14 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.52.1 (2022-01-03)
+## v0.52.2 (2022-01-03)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -22,6 +22,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - fix docs to match parameters ([`9d7e684`](https://github.com/maidsafe/safe_network/commit/9d7e6843701465a13de7b528768273bad02e920e))
+</details>
+
+## v0.52.1 (2022-01-03)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.52.1/sn_api-0.48.0/sn_cli-0.41.0 ([`e38925e`](https://github.com/maidsafe/safe_network/commit/e38925e07d69432db310fc8ec9803200ea964ab2))
     - further integrate and organize dir ([`36dbea0`](https://github.com/maidsafe/safe_network/commit/36dbea03d879c07f922be36a124ad8d44c3c2d0e))
     - move routing into node dir ([`48ef44e`](https://github.com/maidsafe/safe_network/commit/48ef44e9db01d74119a2b1c9f7e7dae4ce988c57))
 </details>
