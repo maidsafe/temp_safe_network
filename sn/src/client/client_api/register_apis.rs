@@ -259,12 +259,12 @@ mod tests {
         Error,
     };
     use crate::messaging::data::Error as ErrorMessage;
+    use crate::retry_loop_for_pattern;
     use crate::types::log_markers::LogMarker;
     use crate::types::{
         register::{Action, EntryHash, Permissions, PrivatePermissions, PublicPermissions, User},
         Error as DtError, PublicKey,
     };
-    use crate::{retry_loop, retry_loop_for_pattern};
     use eyre::{bail, eyre, Result};
     use std::{
         collections::{BTreeMap, BTreeSet},
@@ -558,9 +558,10 @@ mod tests {
         tokio::time::sleep(delay).await;
 
         // keep retrying until ok
-        let permissions = retry_loop!(client
+        let permissions = client
             .get_register_permissions_for_user(address, owner)
-            .instrument(tracing::info_span!("get owner perms")));
+            .instrument(tracing::info_span!("get owner perms"))
+            .await?;
 
         match permissions {
             Permissions::Public(user_perms) => {
@@ -656,18 +657,20 @@ mod tests {
         let delay = tokio::time::Duration::from_secs(1);
         tokio::time::sleep(delay).await;
         // get_register_entry
-        let retrieved_value_1 = retry_loop!(client
+        let retrieved_value_1 = client
             .get_register_entry(address, value1_hash)
-            .instrument(tracing::info_span!("get_value_1")));
+            .instrument(tracing::info_span!("get_value_1"))
+            .await?;
         assert_eq!(retrieved_value_1, value_1);
 
         tokio::time::sleep(delay).await;
 
         // loop here until we see the value set...
         // TODO: writes should be stable enoupgh that we can remove this...
-        let retrieved_value_2 = retry_loop!(client
+        let retrieved_value_2 = client
             .get_register_entry(address, value2_hash)
-            .instrument(tracing::info_span!("get_value_2")));
+            .instrument(tracing::info_span!("get_value_2"))
+            .await?;
         assert_eq!(retrieved_value_2, value_2);
 
         // Requesting a hash which desn't exist throws an error
