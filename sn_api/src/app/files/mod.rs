@@ -105,7 +105,7 @@ impl Safe {
     pub async fn files_container_create_from<P: AsRef<Path>>(
         &mut self,
         location: P,
-        dest: Option<&Path>,
+        dst: Option<&Path>,
         recursive: bool,
         follow_links: bool,
     ) -> Result<(XorUrl, ProcessedFiles, FilesMap)> {
@@ -119,7 +119,7 @@ impl Safe {
             self,
             &mut processed_files,
             location.as_ref(),
-            dest,
+            dst,
             follow_links,
         )
         .await?;
@@ -301,14 +301,14 @@ impl Safe {
         self.dry_run_mode = prev_dry_run_mode;
         let processed_files = result?;
 
-        let dest_path = Path::new(safe_url.path());
+        let dst_path = Path::new(safe_url.path());
 
         let (processed_files, new_files_map, success_count) = files_map_sync(
             self,
             current_files_map,
             location.as_ref(),
             processed_files,
-            Some(dest_path),
+            Some(dst_path),
             delete,
             false,
             true,
@@ -358,12 +358,12 @@ impl Safe {
         let (safe_url, current_version, current_files_map) =
             validate_files_add_params(self, source_file, url, update_nrs).await?;
 
-        let dest_path = Path::new(safe_url.path());
+        let dst_path = Path::new(safe_url.path());
 
         // Let's act according to if it's a local file path or a safe:// location
         let (processed_files, new_files_map, success_count) = if source_file.starts_with("safe://")
         {
-            files_map_add_link(self, current_files_map, source_file, dest_path, force).await?
+            files_map_add_link(self, current_files_map, source_file, dst_path, force).await?
         } else {
             // We then assume source is a local path
             let source_path = Path::new(source_file);
@@ -381,7 +381,7 @@ impl Safe {
                 current_files_map,
                 source_path,
                 processed_files,
-                Some(dest_path),
+                Some(dst_path),
                 false,
                 force,
                 false,
@@ -432,9 +432,9 @@ impl Safe {
 
         let new_file_xorurl = self.store_public_bytes(data, None).await?;
 
-        let dest_path = Path::new(safe_url.path());
+        let dst_path = Path::new(safe_url.path());
         let (processed_files, new_files_map, success_count) =
-            files_map_add_link(self, current_files_map, &new_file_xorurl, dest_path, force).await?;
+            files_map_add_link(self, current_files_map, &new_file_xorurl, dst_path, force).await?;
 
         self.update_files_container(
             success_count,
@@ -473,8 +473,8 @@ impl Safe {
         update_nrs: bool,
     ) -> Result<(VersionHash, ProcessedFiles, FilesMap)> {
         let safe_url = Safe::parse_url(url)?;
-        let dest_path = safe_url.path();
-        if dest_path.is_empty() {
+        let dst_path = safe_url.path();
+        if dst_path.is_empty() {
             return Err(Error::InvalidInput(
                 "The destination URL should include a target file path".to_string(),
             ));
@@ -504,7 +504,7 @@ impl Safe {
         };
 
         let (processed_files, new_files_map, success_count) =
-            files_map_remove_path(Path::new(dest_path), files_map, recursive)?;
+            files_map_remove_path(Path::new(dst_path), files_map, recursive)?;
 
         let version = if success_count == 0 {
             current_version
@@ -771,8 +771,8 @@ async fn validate_files_add_params(
 }
 
 // From the location path and the destination path chosen by the user, calculate
-// the destination path considering ending '/' in both the location and dest path
-fn get_base_paths(location: &Path, dest_path: Option<&Path>) -> (String, String) {
+// the destination path considering ending '/' in both the location and dst path
+fn get_base_paths(location: &Path, dst_path: Option<&Path>) -> (String, String) {
     // Let's normalise the path to use '/' (instead of '\' as on Windows)
     let location_base_path = if location.to_str() == Some(".") {
         String::from("./")
@@ -780,7 +780,7 @@ fn get_base_paths(location: &Path, dest_path: Option<&Path>) -> (String, String)
         normalise_path_separator(&location.display().to_string())
     };
 
-    let new_dest_path = match dest_path {
+    let new_dst_path = match dst_path {
         Some(path) => {
             let path_str = path.display().to_string();
             if path_str.is_empty() {
@@ -793,21 +793,21 @@ fn get_base_paths(location: &Path, dest_path: Option<&Path>) -> (String, String)
     };
 
     // Let's first check if it ends with '/'
-    let dest_base_path = if new_dest_path.ends_with('/') {
+    let dst_base_path = if new_dst_path.ends_with('/') {
         if location_base_path.ends_with('/') {
-            new_dest_path
+            new_dst_path
         } else {
-            // Location is a folder, then append it to dest path
+            // Location is a folder, then append it to dst path
             let parts_vec: Vec<&str> = location_base_path.split('/').collect();
             let dir_name = parts_vec[parts_vec.len() - 1];
-            format!("{}{}", new_dest_path, dir_name)
+            format!("{}{}", new_dst_path, dir_name)
         }
     } else {
         // Then just append an ending '/'
-        format!("{}/", new_dest_path)
+        format!("{}/", new_dst_path)
     };
 
-    (location_base_path, dest_base_path)
+    (location_base_path, dst_base_path)
 }
 
 // From the provided list of local files paths, find the local changes made in comparison with the
@@ -819,13 +819,13 @@ async fn files_map_sync(
     mut current_files_map: FilesMap,
     location: &Path,
     new_content: ProcessedFiles,
-    dest_path: Option<&Path>,
+    dst_path: Option<&Path>,
     delete: bool,
     force: bool,
     compare_file_content: bool,
     follow_links: bool,
 ) -> Result<(ProcessedFiles, FilesMap, u64)> {
-    let (location_base_path, dest_base_path) = get_base_paths(location, dest_path);
+    let (location_base_path, dst_base_path) = get_base_paths(location, dst_path);
     let mut updated_files_map = FilesMap::new();
     let mut processed_files = ProcessedFiles::new();
     let mut success_count = 0;
@@ -837,7 +837,7 @@ async fn files_map_sync(
             &local_file_name
                 .display()
                 .to_string()
-                .replace(&location_base_path, &dest_base_path),
+                .replace(&location_base_path, &dst_base_path),
         )
         .normalize();
         // Above normalize removes initial slash, and uses '\' if it's on Windows
@@ -1118,7 +1118,7 @@ async fn files_map_add_link(
 
 // Remove a path from the FilesMap provided
 fn files_map_remove_path(
-    dest_path: &Path,
+    dst_path: &Path,
     mut files_map: FilesMap,
     recursive: bool,
 ) -> Result<(ProcessedFiles, FilesMap, u64)> {
@@ -1126,10 +1126,10 @@ fn files_map_remove_path(
     let (success_count, new_files_map) = if recursive {
         let mut success_count = 0;
         let mut new_files_map = FilesMap::default();
-        let folder_path = if !dest_path.ends_with("/") {
-            format!("{}/", dest_path.display())
+        let folder_path = if !dst_path.ends_with("/") {
+            format!("{}/", dst_path.display())
         } else {
-            dest_path.display().to_string()
+            dst_path.display().to_string()
         };
 
         files_map.iter().for_each(|(file_path, file_item)| {
@@ -1150,10 +1150,10 @@ fn files_map_remove_path(
         (success_count, new_files_map)
     } else {
         let file_item = files_map
-            .remove(&dest_path.display().to_string())
+            .remove(&dst_path.display().to_string())
             .ok_or_else(|| Error::ContentError(format!(
                 "No content found matching the \"{}\" path on the target FilesContainer. If you are trying to remove a folder rather than a file, you need to pass the 'recursive' flag",
-                dest_path.display()
+                dst_path.display()
             )))?;
 
         // note: files have link property, dirs and symlinks do not
@@ -1162,7 +1162,7 @@ fn files_map_remove_path(
             .unwrap_or(&String::default())
             .to_string();
 
-        processed_files.insert(dest_path.to_path_buf(), FilesMapChange::Removed(xorurl));
+        processed_files.insert(dst_path.to_path_buf(), FilesMapChange::Removed(xorurl));
 
         (1, files_map)
     };
@@ -1176,12 +1176,12 @@ async fn files_map_create(
     safe: &mut Safe,
     content: &mut ProcessedFiles,
     location: &Path,
-    dest_path: Option<&Path>,
+    dst_path: Option<&Path>,
     follow_links: bool,
 ) -> Result<FilesMap> {
     let mut files_map = FilesMap::default();
 
-    let (location_base_path, dest_base_path) = get_base_paths(location, dest_path);
+    let (location_base_path, dst_base_path) = get_base_paths(location, dst_path);
 
     // We want to iterate over the BTreeMap and also modify it.
     // We DON'T want to clone/dup the whole thing, might be very big.
@@ -1201,7 +1201,7 @@ async fn files_map_create(
             &file_name
                 .display()
                 .to_string()
-                .replace(&location_base_path, &dest_base_path),
+                .replace(&location_base_path, &dst_base_path),
         )
         .normalize();
 
@@ -1500,7 +1500,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_files_container_create_from_dest_path_without_trailing_slash() -> Result<()> {
+    async fn test_files_container_create_from_dst_path_without_trailing_slash() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create_from(
@@ -1547,7 +1547,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_files_container_create_from_dest_path_with_trailing_slash() -> Result<()> {
+    async fn test_files_container_create_from_dst_path_with_trailing_slash() -> Result<()> {
         let mut safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create_from(

@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::dbs::UsedSpace;
 use crate::messaging::{data::StorageLevel, system::NodeQueryResponse};
 use crate::types::{log_markers::LogMarker, Chunk, ChunkAddress};
 use std::{
@@ -18,6 +17,7 @@ use std::{
 use tokio::sync::RwLock;
 use tracing::info;
 
+use crate::UsedSpace;
 mod errors;
 pub(crate) use errors::{convert_to_error_message, Error, Result};
 
@@ -86,15 +86,27 @@ impl ChunkStore {
             return Ok(None);
         }
 
+        // cheap extra security check for space (prone to race conditions)
+        // just so we don't go too much overboard
+        // should not be triggered as chunks should not be sent to full adults
+        if !self.disk_store.can_add(data.value().len()) {
+            return Err(Error::NotEnoughSpace);
+        }
+
+        // store the data
         trace!("{:?}", LogMarker::StoringChunk);
         let _addr = self.disk_store.write_chunk(data).await?;
         trace!("{:?}", LogMarker::StoredNewChunk);
 
+        // check if we've filled another apprx. 10%-points of our storage
+        // if so, update the recorded level
         let last_recorded_level = { *self.last_recorded_level.read().await };
         if let Ok(next_level) = last_recorded_level.next() {
-            let used_space = self.disk_store.used_space_ratio().await;
+            // used_space_ratio is a heavy task that's why we don't do it all the time
+            let used_space_ratio = self.disk_store.used_space_ratio();
+            let used_space_level = 10.0 * used_space_ratio;
             // every level represents 10 percentage points
-            if (10.0 * used_space) as u8 >= next_level.value() {
+            if used_space_level as u8 >= next_level.value() {
                 debug!("Next level for storage has been reached");
                 *self.last_recorded_level.write().await = next_level;
                 return Ok(Some(next_level));

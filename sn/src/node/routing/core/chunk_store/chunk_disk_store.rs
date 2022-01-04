@@ -7,8 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Error, Result};
-use crate::dbs::UsedSpace;
+
 use crate::types::{Chunk, ChunkAddress};
+use crate::UsedSpace;
 
 use bytes::Bytes;
 use std::path::{Path, PathBuf};
@@ -34,12 +35,11 @@ impl ChunkDiskStore {
     ///
     /// Used space of the dir is tracked
     pub(crate) fn new<P: AsRef<Path>>(root: P, used_space: UsedSpace) -> Result<Self> {
-        let dir = root.as_ref().join(CHUNK_DB_DIR);
-        used_space.add_dir(&dir);
+        let chunk_store_path = root.as_ref().join(CHUNK_DB_DIR);
 
         Ok(ChunkDiskStore {
             bit_tree_depth: BIT_TREE_DEPTH,
-            chunk_store_path: dir,
+            chunk_store_path,
             used_space,
         })
     }
@@ -83,10 +83,14 @@ impl ChunkDiskStore {
         Ok(ChunkAddress::decode_from_zbase32(filename)?)
     }
 
-    // ---------------------- public (crate) methods ----------------------
+    // ---------------------- api methods ----------------------
 
-    pub(crate) async fn used_space_ratio(&self) -> f64 {
-        self.used_space.ratio().await
+    pub(crate) fn used_space_ratio(&self) -> f64 {
+        self.used_space.ratio()
+    }
+
+    pub(crate) fn can_add(&self, size: usize) -> bool {
+        self.used_space.can_add(size)
     }
 
     pub(crate) async fn write_chunk(&self, data: &Chunk) -> Result<ChunkAddress> {
@@ -99,12 +103,16 @@ impl ChunkDiskStore {
         let mut file = tokio::fs::File::create(filepath).await?;
         file.write_all(data.value()).await?;
 
+        self.used_space.increase(data.value().len());
+
         Ok(*addr)
     }
 
     pub(crate) async fn delete_chunk(&self, addr: &ChunkAddress) -> Result<()> {
         let filepath = self.address_to_filepath(addr)?;
+        let meta = tokio::fs::metadata(filepath.clone()).await?;
         tokio::fs::remove_file(filepath).await?;
+        self.used_space.decrease(meta.len() as usize);
         Ok(())
     }
 
@@ -182,11 +190,12 @@ mod tests {
 
     fn init_chunk_disk_store() -> ChunkDiskStore {
         let root = tempdir().expect("Failed to create temporary directory for chunk disk store");
-        let used_space = UsedSpace::new(u64::MAX);
-        ChunkDiskStore::new(root.path(), used_space).expect("Failed to create chunk disk store")
+        ChunkDiskStore::new(root.path(), UsedSpace::new(usize::MAX))
+            .expect("Failed to create chunk disk store")
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_write_read_chunk() {
         let store = init_chunk_disk_store();
         // test that a range of different chunks return the written chunk

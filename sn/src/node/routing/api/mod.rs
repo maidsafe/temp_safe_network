@@ -24,7 +24,6 @@ use self::{
     event_stream::EventStream,
 };
 
-use crate::dbs::UsedSpace;
 use crate::messaging::{system::SystemMsg, DstLocation, WireMsg};
 use crate::node::{
     error::{Error, Result},
@@ -38,6 +37,7 @@ use crate::node::{
     },
 };
 use crate::types::{log_markers::LogMarker, PublicKey as TypesPublicKey};
+use crate::UsedSpace;
 
 use ed25519_dalek::{PublicKey, Signature, Signer, KEYPAIR_LENGTH};
 use itertools::Itertools;
@@ -103,7 +103,7 @@ impl Routing {
                 comm,
                 node,
                 event_tx,
-                used_space,
+                used_space.clone(),
                 root_storage_dir.clone(),
                 genesis_sk_set,
             )
@@ -190,7 +190,7 @@ impl Routing {
                 network_knowledge,
                 None,
                 event_tx,
-                used_space,
+                used_space.clone(),
                 root_storage_dir.to_path_buf(),
                 false,
             )

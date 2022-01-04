@@ -49,7 +49,7 @@ pub enum SystemMsg {
         section_auth: SectionAuthorityProvider,
         /// Sender's section signature over the `SectionAuthorityProvider`.
         section_signed: KeyedSig,
-        /// Sender's section chain truncated from the dest section key found in the `bounced_msg`.
+        /// Sender's section chain truncated from the dst section key found in the `bounced_msg`.
         proof_chain: SecuredLinkedList,
         /// Message bounced due to outdated destination section information.
         #[debug(skip)]

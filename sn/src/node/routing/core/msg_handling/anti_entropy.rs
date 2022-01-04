@@ -95,7 +95,7 @@ impl Core {
         match to_resend {
             None => Ok(vec![]),
             Some((msg_to_resend, _)) => {
-                // TODO: we may need to check if 'bounced_msg' dest section pk is different
+                // TODO: we may need to check if 'bounced_msg' dst section pk is different
                 // from the received new SAP key, to prevent from endlessly resending a msg
                 // if a sybil/corrupt peer keeps sending us the same AE msg.
                 trace!(
@@ -134,7 +134,7 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let dst_section_key = section_auth.section_key();
 
-        // We choose the Elder closest to the dest section key,
+        // We choose the Elder closest to the dst section key,
         // just to pick one of them in an arbitrary but deterministic fashion.
         let target_name = XorName::from(PublicKey::Bls(dst_section_key));
         let chosen_dst_elder = section_auth
@@ -466,7 +466,7 @@ mod tests {
     use crate::messaging::{DstLocation, MessageId, MessageType, MsgKind, NodeAuth};
     use crate::node::routing::{
         api::tests::create_comm,
-        create_test_used_space_and_root_storage,
+        create_test_max_capacity_and_root_storage,
         dkg::test_utils::section_signed,
         ed25519,
         network_knowledge::{
@@ -476,6 +476,7 @@ mod tests {
         node::Node,
         SectionKeyShare, XorName, MIN_ADULT_AGE,
     };
+    use crate::UsedSpace;
 
     use assert_matches::assert_matches;
     use bls::SecretKey;
@@ -700,12 +701,12 @@ mod tests {
             let genesis_pk = genesis_sk_set.public_keys().public_key();
             assert_eq!(genesis_pk, *chain.root_key());
 
-            let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
+            let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let mut core = Core::first_node(
                 create_comm().await?,
                 node.clone(),
                 mpsc::channel(1).0,
-                used_space,
+                UsedSpace::new(max_capacity),
                 root_storage_dir,
                 genesis_sk_set.clone(),
             )
