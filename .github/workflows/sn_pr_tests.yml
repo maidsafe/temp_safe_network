@@ -21,21 +21,6 @@ env:
   POST_TEST_SLEEP: 5
 
 jobs:
-
-  # bors Continuous Integration
-  ci-success:
-    # refereneced in bors.toml
-    name: ci
-    if: ${{ success() }}
-    # github jobs that need to have passed for bors to give the all clear
-    needs:
-      - e2e
-      - unit
-    runs-on: ubuntu-latest
-    steps:
-      - name: CI succeeded
-        run: exit 0
-
   build:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Build sn bins
@@ -69,7 +54,7 @@ jobs:
 
   unit:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run all relevant unit test categories
+    name: Unit Tests
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -162,7 +147,7 @@ jobs:
 
   e2e:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run e2e tests
+    name: E2E tests
     runs-on: ${{ matrix.os }}
     needs: ["build"]
     strategy:
