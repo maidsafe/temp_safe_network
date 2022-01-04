@@ -95,7 +95,7 @@ impl Core {
         match to_resend {
             None => Ok(vec![]),
             Some((msg_to_resend, _)) => {
-                // TODO: we may need to check if 'bounced_msg' dest section pk is different
+                // TODO: we may need to check if 'bounced_msg' dst section pk is different
                 // from the received new SAP key, to prevent from endlessly resending a msg
                 // if a sybil/corrupt peer keeps sending us the same AE msg.
                 trace!(
@@ -134,7 +134,7 @@ impl Core {
     ) -> Result<Vec<Command>> {
         let dst_section_key = section_auth.section_key();
 
-        // We choose the Elder closest to the dest section key,
+        // We choose the Elder closest to the dst section key,
         // just to pick one of them in an arbitrary but deterministic fashion.
         let target_name = XorName::from(PublicKey::Bls(dst_section_key));
         let chosen_dst_elder = section_auth

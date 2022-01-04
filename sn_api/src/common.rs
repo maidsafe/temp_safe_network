@@ -73,7 +73,7 @@ pub fn sk_to_hex(sk: safe_network::types::SecretKey) -> String {
 
 // Send a request to authd using JSON-RPC over QUIC
 pub async fn send_authd_request<T>(
-    dest_endpoint: &str,
+    dst_endpoint: &str,
     method: &str,
     params: serde_json::Value,
 ) -> Result<T>
@@ -82,7 +82,7 @@ where
 {
     info!(
         "Sending '{}' request to SAFE Authenticator on {} ...",
-        method, dest_endpoint
+        method, dst_endpoint
     );
 
     match dirs_next::home_dir() {
@@ -124,7 +124,7 @@ where
 
             // Establish a new connection
             outgoing_conn
-                .connect(dest_endpoint, None)
+                .connect(dst_endpoint, None)
                 .await
                 .map_err(|err| {
                     Error::AuthdClientError(format!(
