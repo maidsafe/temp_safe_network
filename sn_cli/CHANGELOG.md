@@ -4,12 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.43.0 (2022-01-03)
-
-### refactor (BREAKING)
-
- - <csr-id-715a154fe7448cd18decd0a666ae11fb02eadedb/> remove dry-run as arg from all APIs and make it a Safe instance mode
-
+## v0.43.1 (2022-01-04)
 
 ### Commit Statistics
 
@@ -26,6 +21,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.52.4/sn_api-0.50.1 ([`4bb2adf`](https://github.com/maidsafe/safe_network/commit/4bb2adf52efdac6187fffc299018bf13f3398e14))
+</details>
+
+## v0.43.0 (2022-01-03)
+
+### refactor (BREAKING)
+
+ - <csr-id-715a154fe7448cd18decd0a666ae11fb02eadedb/> remove dry-run as arg from all APIs and make it a Safe instance mode
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_api-0.50.0/sn_cli-0.43.0 ([`ee86dc7`](https://github.com/maidsafe/safe_network/commit/ee86dc7ab1781731d3be19f9d7f414f157a91edb))
     - remove dry-run as arg from all APIs and make it a Safe instance mode ([`715a154`](https://github.com/maidsafe/safe_network/commit/715a154fe7448cd18decd0a666ae11fb02eadedb))
 </details>
 
@@ -113,9 +133,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - ProcessedFiles redefined on more specific data types instead of simply Strings ([`ff1dd47`](https://github.com/maidsafe/safe_network/commit/ff1dd477aaea2a4dda6c9c15b5822b1b3a7514b7))
     - make all read/write access to CLI config file async by using tokio::fs ([`a8f84f7`](https://github.com/maidsafe/safe_network/commit/a8f84f7002cf7b043fb7606a20987ddfb29972f8))
 </details>
-
-<csr-unknown>
-Adding a new files_container_create_from API which creates a FilesContainer with filesuploaded from a local folder.All path args passed to files container APIs can either be &str, std::Path, or std::PathBuf<csr-unknown/>
 
 ## v0.40.0 (2021-12-22)
 
