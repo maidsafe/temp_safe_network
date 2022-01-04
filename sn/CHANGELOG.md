@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.52.4 (2022-01-04)
+
+### Bug Fixes
+
+ - <csr-id-9f89966e02c3e0ba0297377b4efdf88a31ec1e87/> restore original behavior
+
+### New Features
+
+ - <csr-id-cc2c55a24bbe3edc63fd6a3a8553b10330960495/> discard JoinResponse messages in dispatcher
+   Dispatcher is only created when we have joined the network already. Therefore we can safely ignore JoinResponses there.
+   
+   We now error out of the msg handling flow and so will log this unexpected message at the node.
+ - <csr-id-158043cba04983a35f66df825dc803c68f3ea454/> Move command limit to service msgs only.
+   Require a permit or drop a service msg level command. This should _hopefully_ stop mem leak due to waiting to handle messages coming in from clients
+ - <csr-id-01ea1017749a1644737ff8654378f9db70b8a988/> Add hard limit to concurrent commands
+   It may be that nodes can be overwhelmed when too many messages come in.
+   
+   Here there's a naiive impl to drop commands (and msgs) from being handled when we're overwhelmed
+ - <csr-id-3058bf1a50be8a88ac0c8cb4a66278db7e186957/> reenable using constants for message priority
+   and wait on higher priority message completion before spawning new
+   Command tasks
+   
+   This reverts commit 6d1cdc64078de06a43281d924f58d01b615e9268.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - restore original behavior ([`9f89966`](https://github.com/maidsafe/safe_network/commit/9f89966e02c3e0ba0297377b4efdf88a31ec1e87))
+</details>
+
 ## v0.52.3 (2022-01-03)
 
 ### New Features
@@ -16,8 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 8 commits contributed to the release.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -27,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.52.3 ([`2924661`](https://github.com/maidsafe/safe_network/commit/292466119e2d99c36043e7f2247b1bde9ec9ced9))
     - fmt ([`d54c955`](https://github.com/maidsafe/safe_network/commit/d54c955aa768ab08ef8193b7e36cb96822bc6cb8))
     - refactor(chunk_store): do not check if space available Doing this for every write is immensely wasteful. There is just one time when it will be necessary, which is right before it is filled by the incoming chunk. Therefore, we can let the tokio writer return that error - when/if that ever occurs - which would be bubbled up and encapsulated in a generic error type. As long as nodes truthfully report their used space (StorageLevel), then this will never occur, as we stop sending them chunks well before they are actually full. ([`6b9b159`](https://github.com/maidsafe/safe_network/commit/6b9b1590bce9423130210007ddd6e9c14b51819d))
     - remove repetitive code ([`be89899`](https://github.com/maidsafe/safe_network/commit/be8989971c68ac5aee43380223000a1f400252fc))
@@ -41,7 +84,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### refactor (BREAKING)
 
  - <csr-id-e9a9cc1096e025d88f19390ad6ba7398f71bc800/> removing unnecessary Error type definitions
-
 
 ### Commit Statistics
 

@@ -7,13 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
+    serialisation::{DKG_MSG_PRIORITY, INFRASTRUCTURE_MSG_PRIORITY},
     system::{DkgFailureSigSet, KeyedSig, NodeState, SectionAuth, SystemMsg},
     DstLocation, MessageId, NodeMsgAuthority, WireMsg,
 };
-use crate::node::routing::{
-    core::Proposal,
-    network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
-    XorName,
+use crate::node::{
+    routing::{
+        core::Proposal,
+        network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
+        XorName,
+    },
+    Result,
 };
 use crate::peer::{Peer, UnnamedPeer};
 
@@ -103,6 +107,26 @@ pub(crate) enum Command {
     StartConnectivityTest(XorName),
     /// Test Connectivity
     TestConnectivity(XorName),
+}
+
+impl Command {
+    /// Return the commands priority, higher being higher prio
+    pub(crate) fn priority(&self) -> Result<i32> {
+        // we should not have to worry about child commands here
+        // we use the cmd_id to check for a "root cmd" and go off that commands priority
+        // so this prio may not have an impact if the root was higher/lower
+        let prio = match self {
+            Self::HandleMessage { wire_msg, .. } => wire_msg.into_message()?.priority(),
+            Self::HandleDkgOutcome { .. } | Self::HandleDkgFailure(_) => DKG_MSG_PRIORITY,
+            Self::HandleNewEldersAgreement { .. } => DKG_MSG_PRIORITY, // its end of DKG
+            Self::HandleAgreement { .. } | Self::HandleSystemMessage { .. } => {
+                INFRASTRUCTURE_MSG_PRIORITY
+            }
+            _ => -2,
+        };
+
+        Ok(prio)
+    }
 }
 
 impl fmt::Display for Command {
