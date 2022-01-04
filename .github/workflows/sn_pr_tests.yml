@@ -223,7 +223,7 @@ jobs:
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::reg --test-threads=1 --skip ae --skip batching && sleep $POST_TEST_SLEEP
         timeout-minutes: 10
 
-      # register api batching check, only run this once as it's slow, and we verify the
+      # register api batching check, only run this once as it's slow, and we verify the basic tests above
       - name: Client register batching
         shell: bash
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- register_batching --test-threads=1 --skip ae && sleep $POST_TEST_SLEEP
