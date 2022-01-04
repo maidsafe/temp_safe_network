@@ -5,6 +5,64 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.52.4 (2022-01-04)
+
+### New Features
+
+ - <csr-id-cc2c55a24bbe3edc63fd6a3a8553b10330960495/> discard JoinResponse messages in dispatcher
+   Dispatcher is only created when we have joined the network already. Therefore we can safely ignore JoinResponses there.
+   
+   We now error out of the msg handling flow and so will log this unexpected message at the node.
+ - <csr-id-158043cba04983a35f66df825dc803c68f3ea454/> Move command limit to service msgs only.
+   Require a permit or drop a service msg level command. This should _hopefully_ stop mem leak due to waiting to handle messages coming in from clients
+ - <csr-id-01ea1017749a1644737ff8654378f9db70b8a988/> Add hard limit to concurrent commands
+   It may be that nodes can be overwhelmed when too many messages come in.
+   
+   Here there's a naiive impl to drop commands (and msgs) from being handled when we're overwhelmed
+ - <csr-id-3058bf1a50be8a88ac0c8cb4a66278db7e186957/> reenable using constants for message priority
+   and wait on higher priority message completion before spawning new
+   Command tasks
+   
+   This reverts commit 6d1cdc64078de06a43281d924f58d01b615e9268.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 21 commits contributed to the release.
+ - 21 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - set testnet interval to 10s by default once again ([`3af8ddb`](https://github.com/maidsafe/safe_network/commit/3af8ddbee91f3403b86914d352a970e366d1fa40))
+    - reorder network startup ([`b35d0cc`](https://github.com/maidsafe/safe_network/commit/b35d0ccd0305e3e87a9070bc2a57287dbe6b2633))
+    - remove unneeded retry_loop from reg tests ([`bd0382f`](https://github.com/maidsafe/safe_network/commit/bd0382fef77947935584418ee91720001f5f269c))
+    - discard JoinResponse messages in dispatcher ([`cc2c55a`](https://github.com/maidsafe/safe_network/commit/cc2c55a24bbe3edc63fd6a3a8553b10330960495))
+    - refactor wait until higher_prio ([`1caad35`](https://github.com/maidsafe/safe_network/commit/1caad35e0e744e50b2bd15dda8dbd3adbacb87c7))
+    - reduce semaphore wait timeout ([`78e41a3`](https://github.com/maidsafe/safe_network/commit/78e41a3d8387f9b53bfd5e078ae7aa44fe1ea6d4))
+    - add 5mb many client test ([`36ba7d5`](https://github.com/maidsafe/safe_network/commit/36ba7d5e85e304d6d0ff3210429923beed77d25b))
+    - make unstable-command-prioritisation required for wait ([`04ee3e7`](https://github.com/maidsafe/safe_network/commit/04ee3e74e5573f903be29cd89416ce9e5758cf00))
+    - Move command limit to service msgs only. ([`158043c`](https://github.com/maidsafe/safe_network/commit/158043cba04983a35f66df825dc803c68f3ea454))
+    - Add hard limit to concurrent commands ([`01ea101`](https://github.com/maidsafe/safe_network/commit/01ea1017749a1644737ff8654378f9db70b8a988))
+    - disable waiting for higher prio messages before continuing ([`a9913a0`](https://github.com/maidsafe/safe_network/commit/a9913a0f7140d302fcaf24264fc1982f2ad3d06b))
+    - change dkg interval ([`9717114`](https://github.com/maidsafe/safe_network/commit/97171142548772a466188f2e6d9f24072f28640d))
+    - improve formatting of priority match statements ([`a7e7908`](https://github.com/maidsafe/safe_network/commit/a7e7908537d63e4071323a59cbbd036edcff41ab))
+    - limit time waiting to acquire priority permit ([`18cee44`](https://github.com/maidsafe/safe_network/commit/18cee44f08aa4f83ad477cc82a29525e9d339e0c))
+    - tidy up some log messages ([`1d19c02`](https://github.com/maidsafe/safe_network/commit/1d19c02668dfa3739a350b15c7310daec93d9837))
+    - put command prioritisation behind a feature flag. ([`2492ea8`](https://github.com/maidsafe/safe_network/commit/2492ea84e9fcba5d19022e171ec6b60c341ee59b))
+    - add PermitInfo type ([`8884f94`](https://github.com/maidsafe/safe_network/commit/8884f9453a859bd63b378337aab326889d153768))
+    - stop everything if something more important is going on ([`690b24f`](https://github.com/maidsafe/safe_network/commit/690b24f14c3183640d04d048c2a7f4ac79f6e6c7))
+    - ensure child commands dont remove root permit early ([`3b3a381`](https://github.com/maidsafe/safe_network/commit/3b3a38130bd6943b7c53b1cf74321d89dd4af1da))
+    - use constants for cmd priorities ([`8effd08`](https://github.com/maidsafe/safe_network/commit/8effd08c16cfd2e0715ee0d00092e267f72a8cf0))
+    - reenable using constants for message priority ([`3058bf1`](https://github.com/maidsafe/safe_network/commit/3058bf1a50be8a88ac0c8cb4a66278db7e186957))
+</details>
+
 ## v0.52.3 (2022-01-03)
 
 ### New Features
@@ -16,8 +74,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 8 commits contributed to the release.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -27,6 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.52.3 ([`2924661`](https://github.com/maidsafe/safe_network/commit/292466119e2d99c36043e7f2247b1bde9ec9ced9))
     - fmt ([`d54c955`](https://github.com/maidsafe/safe_network/commit/d54c955aa768ab08ef8193b7e36cb96822bc6cb8))
     - refactor(chunk_store): do not check if space available Doing this for every write is immensely wasteful. There is just one time when it will be necessary, which is right before it is filled by the incoming chunk. Therefore, we can let the tokio writer return that error - when/if that ever occurs - which would be bubbled up and encapsulated in a generic error type. As long as nodes truthfully report their used space (StorageLevel), then this will never occur, as we stop sending them chunks well before they are actually full. ([`6b9b159`](https://github.com/maidsafe/safe_network/commit/6b9b1590bce9423130210007ddd6e9c14b51819d))
     - remove repetitive code ([`be89899`](https://github.com/maidsafe/safe_network/commit/be8989971c68ac5aee43380223000a1f400252fc))
@@ -41,7 +100,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### refactor (BREAKING)
 
  - <csr-id-e9a9cc1096e025d88f19390ad6ba7398f71bc800/> removing unnecessary Error type definitions
-
 
 ### Commit Statistics
 
