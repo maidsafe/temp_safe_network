@@ -5,6 +5,74 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.52.7 (2022-01-04)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - rename + use glob const ([`838c495`](https://github.com/maidsafe/safe_network/commit/838c495c8858b85c693da1a3e45baafa57ba03ea))
+    - use zsh to repeat e2e tests ([`2ebd1b4`](https://github.com/maidsafe/safe_network/commit/2ebd1b4fcab47bc86980860379891bb041ff2aa4))
+</details>
+
+## v0.52.6 (2022-01-04)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.52.6/sn_api-0.50.2 ([`0a70425`](https://github.com/maidsafe/safe_network/commit/0a70425fb314de4c165da54fdc29a127ae900d81))
+</details>
+
+## v0.52.5 (2022-01-04)
+
+### Bug Fixes
+
+ - <csr-id-9f89966e02c3e0ba0297377b4efdf88a31ec1e87/> restore original behavior
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.52.5 ([`ab00eca`](https://github.com/maidsafe/safe_network/commit/ab00eca916d6ed8a0a137004a6b9fd24e7217a70))
+    - do not skip AE check for AE-Probe messages ([`0a5fca9`](https://github.com/maidsafe/safe_network/commit/0a5fca96af4d2627b842591775e77c09201ed655))
+    - sn_cli-0.43.1 ([`db51539`](https://github.com/maidsafe/safe_network/commit/db515397771f117b3bf095e1a4afb897eb4acafe))
+    - restore original behavior ([`9f89966`](https://github.com/maidsafe/safe_network/commit/9f89966e02c3e0ba0297377b4efdf88a31ec1e87))
+</details>
+
 ## v0.52.4 (2022-01-04)
 
 ### Bug Fixes
@@ -33,8 +101,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 22 commits contributed to the release.
+ - 22 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -44,7 +112,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - restore original behavior ([`9f89966`](https://github.com/maidsafe/safe_network/commit/9f89966e02c3e0ba0297377b4efdf88a31ec1e87))
+    - safe_network-0.52.4/sn_api-0.50.1 ([`4bb2adf`](https://github.com/maidsafe/safe_network/commit/4bb2adf52efdac6187fffc299018bf13f3398e14))
+    - set testnet interval to 10s by default once again ([`3af8ddb`](https://github.com/maidsafe/safe_network/commit/3af8ddbee91f3403b86914d352a970e366d1fa40))
+    - reorder network startup ([`b35d0cc`](https://github.com/maidsafe/safe_network/commit/b35d0ccd0305e3e87a9070bc2a57287dbe6b2633))
+    - remove unneeded retry_loop from reg tests ([`bd0382f`](https://github.com/maidsafe/safe_network/commit/bd0382fef77947935584418ee91720001f5f269c))
+    - discard JoinResponse messages in dispatcher ([`cc2c55a`](https://github.com/maidsafe/safe_network/commit/cc2c55a24bbe3edc63fd6a3a8553b10330960495))
+    - refactor wait until higher_prio ([`1caad35`](https://github.com/maidsafe/safe_network/commit/1caad35e0e744e50b2bd15dda8dbd3adbacb87c7))
+    - reduce semaphore wait timeout ([`78e41a3`](https://github.com/maidsafe/safe_network/commit/78e41a3d8387f9b53bfd5e078ae7aa44fe1ea6d4))
+    - add 5mb many client test ([`36ba7d5`](https://github.com/maidsafe/safe_network/commit/36ba7d5e85e304d6d0ff3210429923beed77d25b))
+    - make unstable-command-prioritisation required for wait ([`04ee3e7`](https://github.com/maidsafe/safe_network/commit/04ee3e74e5573f903be29cd89416ce9e5758cf00))
+    - Move command limit to service msgs only. ([`158043c`](https://github.com/maidsafe/safe_network/commit/158043cba04983a35f66df825dc803c68f3ea454))
+    - Add hard limit to concurrent commands ([`01ea101`](https://github.com/maidsafe/safe_network/commit/01ea1017749a1644737ff8654378f9db70b8a988))
+    - disable waiting for higher prio messages before continuing ([`a9913a0`](https://github.com/maidsafe/safe_network/commit/a9913a0f7140d302fcaf24264fc1982f2ad3d06b))
+    - change dkg interval ([`9717114`](https://github.com/maidsafe/safe_network/commit/97171142548772a466188f2e6d9f24072f28640d))
+    - improve formatting of priority match statements ([`a7e7908`](https://github.com/maidsafe/safe_network/commit/a7e7908537d63e4071323a59cbbd036edcff41ab))
+    - limit time waiting to acquire priority permit ([`18cee44`](https://github.com/maidsafe/safe_network/commit/18cee44f08aa4f83ad477cc82a29525e9d339e0c))
+    - tidy up some log messages ([`1d19c02`](https://github.com/maidsafe/safe_network/commit/1d19c02668dfa3739a350b15c7310daec93d9837))
+    - put command prioritisation behind a feature flag. ([`2492ea8`](https://github.com/maidsafe/safe_network/commit/2492ea84e9fcba5d19022e171ec6b60c341ee59b))
+    - add PermitInfo type ([`8884f94`](https://github.com/maidsafe/safe_network/commit/8884f9453a859bd63b378337aab326889d153768))
+    - stop everything if something more important is going on ([`690b24f`](https://github.com/maidsafe/safe_network/commit/690b24f14c3183640d04d048c2a7f4ac79f6e6c7))
+    - ensure child commands dont remove root permit early ([`3b3a381`](https://github.com/maidsafe/safe_network/commit/3b3a38130bd6943b7c53b1cf74321d89dd4af1da))
+    - use constants for cmd priorities ([`8effd08`](https://github.com/maidsafe/safe_network/commit/8effd08c16cfd2e0715ee0d00092e267f72a8cf0))
+    - reenable using constants for message priority ([`3058bf1`](https://github.com/maidsafe/safe_network/commit/3058bf1a50be8a88ac0c8cb4a66278db7e186957))
 </details>
 
 ## v0.52.3 (2022-01-03)

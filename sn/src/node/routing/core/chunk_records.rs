@@ -6,18 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{capacity::CHUNK_COPY_COUNT, Command, Core, Prefix};
+use super::{Command, Core, Prefix};
 
-use crate::node::{error::convert_to_error_message, Error, Result};
-use crate::peer::Peer;
-use crate::types::{log_markers::LogMarker, Chunk, PublicKey};
 use crate::{
+    chunk_copy_count,
     messaging::{
         data::{operation_id, ChunkDataExchange, CmdError, Error as ErrorMessage, StorageLevel},
         system::{NodeCmd, NodeQuery, SystemMsg},
         AuthorityProof, EndUser, MessageId, ServiceAuth,
     },
-    types::ChunkAddress,
+    node::{error::convert_to_error_message, Error, Result},
+    peer::Peer,
+    types::{log_markers::LogMarker, Chunk, ChunkAddress, PublicKey},
 };
 
 use itertools::Itertools;
@@ -26,10 +26,6 @@ use tracing::info;
 use xor_name::XorName;
 
 impl Core {
-    pub(crate) fn get_copy_count(&self) -> usize {
-        CHUNK_COPY_COUNT
-    }
-
     pub(crate) async fn get_data_of(&self, prefix: &Prefix) -> ChunkDataExchange {
         // Prepare full_adult details
         let adult_levels = self.capacity.levels_matching(*prefix).await;
@@ -95,7 +91,7 @@ impl Core {
 
         let aggregation = false;
 
-        if self.get_copy_count() > targets.len() {
+        if chunk_copy_count() > targets.len() {
             let error = CmdError::Data(ErrorMessage::InsufficientAdults(
                 self.network_knowledge().prefix().await,
             ));
@@ -253,7 +249,7 @@ impl Core {
         adult_list
             .iter()
             .sorted_by(|lhs, rhs| addr.name().cmp_distance(lhs, rhs))
-            .take(CHUNK_COPY_COUNT)
+            .take(chunk_copy_count())
             .cloned()
             .collect()
     }

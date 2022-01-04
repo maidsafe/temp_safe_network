@@ -43,7 +43,6 @@ use super::{
     Elders, Event, NodeElderChange,
 };
 
-use crate::dbs::UsedSpace;
 use crate::messaging::{
     signature_aggregator::SignatureAggregator,
     system::{DkgSessionId, SystemMsg},
@@ -52,6 +51,7 @@ use crate::messaging::{
 
 use crate::peer::Peer;
 use crate::types::{log_markers::LogMarker, utils::write_data_to_disk, Cache};
+use crate::UsedSpace;
 
 use backoff::ExponentialBackoff;
 use capacity::Capacity;

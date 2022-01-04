@@ -467,7 +467,7 @@ mod tests {
     use crate::messaging::{DstLocation, MessageId, MessageType, MsgKind, NodeAuth};
     use crate::node::routing::{
         api::tests::create_comm,
-        create_test_used_space_and_root_storage,
+        create_test_max_capacity_and_root_storage,
         dkg::test_utils::section_signed,
         ed25519,
         network_knowledge::{
@@ -477,6 +477,7 @@ mod tests {
         node::Node,
         SectionKeyShare, XorName, MIN_ADULT_AGE,
     };
+    use crate::UsedSpace;
 
     use assert_matches::assert_matches;
     use bls::SecretKey;
@@ -701,12 +702,12 @@ mod tests {
             let genesis_pk = genesis_sk_set.public_keys().public_key();
             assert_eq!(genesis_pk, *chain.root_key());
 
-            let (used_space, root_storage_dir) = create_test_used_space_and_root_storage()?;
+            let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let mut core = Core::first_node(
                 create_comm().await?,
                 node.clone(),
                 mpsc::channel(1).0,
-                used_space,
+                UsedSpace::new(max_capacity),
                 root_storage_dir,
                 genesis_sk_set.clone(),
             )

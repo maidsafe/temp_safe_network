@@ -131,7 +131,6 @@ impl Core {
                         SystemMsg::AntiEntropyRetry { .. }
                         | SystemMsg::AntiEntropyUpdate { .. }
                         | SystemMsg::AntiEntropyRedirect { .. }
-                        | SystemMsg::AntiEntropyProbe(_)
                         | SystemMsg::JoinRequest(_)
                         | SystemMsg::JoinAsRelocatedRequest(_) => {
                             trace!(
