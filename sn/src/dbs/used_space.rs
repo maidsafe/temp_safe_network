@@ -38,7 +38,7 @@ impl UsedSpace {
     }
 
     pub(crate) fn can_add(&self, size: usize) -> bool {
-        let current_used_space = self.used_space.fetch_add(0, Ordering::Relaxed);
+        let current_used_space = self.used_space.load(Ordering::Relaxed);
         current_used_space + size <= self.max_capacity
     }
 
