@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.52.7 (2022-01-04)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - rename + use glob const ([`838c495`](https://github.com/maidsafe/safe_network/commit/838c495c8858b85c693da1a3e45baafa57ba03ea))
+    - use zsh to repeat e2e tests ([`2ebd1b4`](https://github.com/maidsafe/safe_network/commit/2ebd1b4fcab47bc86980860379891bb041ff2aa4))
+</details>
+
 ## v0.52.6 (2022-01-04)
 
 ### Commit Statistics
@@ -22,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - rename + use glob const ([`838c495`](https://github.com/maidsafe/safe_network/commit/838c495c8858b85c693da1a3e45baafa57ba03ea))
+    - safe_network-0.52.6/sn_api-0.50.2 ([`0a70425`](https://github.com/maidsafe/safe_network/commit/0a70425fb314de4c165da54fdc29a127ae900d81))
 </details>
 
 ## v0.52.5 (2022-01-04)
