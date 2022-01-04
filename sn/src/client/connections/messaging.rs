@@ -467,7 +467,8 @@ pub(super) async fn send_message(
     endpoint: Endpoint,
     msg_id: MessageId,
 ) -> Result<(), Error> {
-    let priority = wire_msg.msg_kind().priority();
+    let priority = wire_msg.clone().into_message()?.priority();
+
     let msg_bytes = wire_msg.serialize()?;
 
     // Send message to all Elders concurrently

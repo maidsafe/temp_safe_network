@@ -8,6 +8,8 @@ fi
 
 DEFAULT_ELDER_COUNT=7
 ELDER_COUNT="${SN_ELDER_COUNT:-$DEFAULT_ELDER_COUNT}"
+DEFAULT_NODE_COUNT=33
+NODE_COUNT="${NODE_COUNT:-$DEFAULT_NODE_COUNT}"
 
 # It's better to use the network health test in rust as it's type safe.
 # This is needed for windows though at the moment due to the logfile locking...
@@ -48,10 +50,12 @@ total_prefix1_elders=$(($prefix1_new_elder_nodes + $prefix1_prior_elder_nodes))
 total_elders=$(($total_prefix1_elders + $total_prefix0_elders))
 
 # 14 elders after or more (we're not discounting demotions here...)
+echo "$split_count is bigger than $((2*$ELDER_COUNT - 1))?"
 if ! [[ $split_count -gt $((2*$ELDER_COUNT - 1)) ]]
     then
         echo "No split, retry or perhaps change NODE_COUNT!"
         exit 100
     else
         echo "Successful split!"
+        exit 0;
 fi

@@ -382,7 +382,7 @@ mod tests {
     use futures::future::join_all;
     use rand::rngs::OsRng;
     use tokio::time::Instant;
-    use tracing::Instrument;
+    use tracing::{instrument::Instrumented, Instrument};
 
     const MIN_BLOB_SIZE: usize = self_encryption::MIN_ENCRYPTABLE_BYTES;
 
@@ -525,6 +525,57 @@ mod tests {
         Ok(())
     }
 
+    // Test storing and reading min size blob. Try and read from many clients and ensure we do not overwelm nodes.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn store_and_read_5mb_from_many_clients() -> Result<()> {
+        init_test_logger();
+        let _start_span = tracing::info_span!("store_and_read_3kb_from_many_clients").entered();
+
+        let client = create_test_client().await?;
+        // create Blob with random bytes 5mb
+        let blob_bytes = random_bytes(5 * 1024 * 1024);
+        let blob = Blob::new(blob_bytes)?;
+
+        // Store blob
+        let address = client
+            .upload_and_verify(blob.bytes(), Scope::Public)
+            .await?;
+
+        // Assert that the blob is stored.
+        let read_data = client.read_bytes(address).await?;
+
+        compare(blob.bytes(), read_data)?;
+
+        let mut tasks = vec![];
+
+        for i in 1..100 {
+            debug!("starting client on thread #{:?}", i);
+            let handle: Instrumented<tokio::task::JoinHandle<Result<()>>> =
+                tokio::spawn(async move {
+                    debug!("started client #{:?}", i);
+                    // use a fresh client
+                    let client = create_test_client().await?;
+                    // to grab that data
+                    let _read_data = client.read_bytes(address).await?;
+
+                    debug!("client #{:?} finished", i);
+                    Ok(())
+                })
+                .in_current_span();
+
+            tasks.push(handle);
+        }
+        let responses = join_all(tasks).await;
+
+        for res in responses {
+            debug!("a response is done");
+            let _ok = res??;
+        }
+
+        // TODO: we need to use the node log analysis to check the mem usage across nodes does not exceed X
+        Ok(())
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "Testnet network_assert_ tests should be excluded from normal tests runs, they need to be run in sequence to ensure validity of checks"]
     async fn blob_network_assert_expected_log_counts() -> Result<()> {
@@ -537,7 +588,7 @@ mod tests {
 
         let mut the_logs = crate::testnet_grep::NetworkLogState::new()?;
 
-        let address = client
+        let _address = client
             .upload_and_verify(bytes.clone(), Scope::Public)
             .await?;
 
@@ -546,37 +597,12 @@ mod tests {
             .assert_count(LogMarker::ChunkStoreReceivedAtElder, 3)
             .await?;
 
-        // 3 elders were chosen by the client (should only be 3 as even if client chooses adults, AE should kick in prior to them attempting any of this)
-        the_logs
-            .assert_count(LogMarker::ServiceMsgToBeHandled, 3)
-            .await?;
-
         // 4 adults * reqs from 3 elders storing the chunk
         the_logs.assert_count(LogMarker::StoringChunk, 12).await?;
 
         // Here we can see that each write thinks it's new, so there's 12... but we let Sled handle this later.
         // 4 adults storing the chunk * 3 messages, so we'll still see this due to the rapid/ concurrent nature here...
         the_logs.assert_count(LogMarker::StoredNewChunk, 12).await?;
-
-        // now that it was written to the network we should be able to retrieve it
-        let _ = client.read_bytes(address).await?;
-
-        // small delay to ensure logs have written
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-        // client send msg to 3 elders
-        the_logs
-            .assert_count(LogMarker::ChunkQueryReceviedAtElder, 3)
-            .await?;
-        // client send msg to 3 elders
-        the_logs
-            .assert_count(LogMarker::ChunkQueryReceviedAtAdult, 12)
-            .await?;
-
-        // 4 adults * 3 requests back at elders
-        the_logs
-            .assert_count(LogMarker::ChunkQueryResponseReceviedFromAdult, 12)
-            .await?;
 
         Ok(())
     }
