@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.52.9 (2022-01-04)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - rename dest to dst ([`bebdae9`](https://github.com/maidsafe/safe_network/commit/bebdae9d52d03bd13b679ee19446452990d1e2cf))
+</details>
+
 ## v0.52.8 (2022-01-04)
 
 ### New Features
@@ -20,8 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 9 commits contributed to the release.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits contributed to the release.
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -31,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.52.8 ([`5214d5e`](https://github.com/maidsafe/safe_network/commit/5214d5e7f84a3c1cf213097a5d55bfb293f03324))
     - ignore GA failing test ([`233e64a`](https://github.com/maidsafe/safe_network/commit/233e64af3b2af63bbba06ba8f43d0a7becece913))
     - remove unused dep async recursion ([`012e91a`](https://github.com/maidsafe/safe_network/commit/012e91a60e01cd2ce9155d5c56045f211865ff2c))
     - unnecessary fetch_add for loading ([`112d0b4`](https://github.com/maidsafe/safe_network/commit/112d0b474b8dd141d0daf1302b80055482d65a15))

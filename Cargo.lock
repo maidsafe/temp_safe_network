@@ -3017,7 +3017,7 @@ checksum = "73b4b750c782965c211b42f022f59af1fbceabdd026623714f104152f1ec149f"
 
 [[package]]
 name = "safe_network"
-version = "0.52.8"
+version = "0.52.9"
 dependencies = [
  "assert_matches",
  "async-trait",
@@ -3382,7 +3382,7 @@ checksum = "1ecab6c735a6bb4139c0caafd0cc3635748bbb3acf4550e8138122099251f309"
 
 [[package]]
 name = "sn_api"
-version = "0.50.3"
+version = "0.50.4"
 dependencies = [
  "anyhow",
  "assert_matches",
