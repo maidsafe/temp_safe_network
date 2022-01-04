@@ -17,6 +17,7 @@ use std::{
 use tokio::sync::RwLock;
 use tracing::info;
 
+use crate::UsedSpace;
 mod errors;
 pub(crate) use errors::{convert_to_error_message, Error, Result};
 
@@ -31,9 +32,9 @@ pub(crate) struct ChunkStore {
 }
 
 impl ChunkStore {
-    pub(crate) fn new(path: &Path, max_capacity: u64) -> Result<Self> {
+    pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
-            disk_store: ChunkDiskStore::new(path, max_capacity)?,
+            disk_store: ChunkDiskStore::new(path, used_space)?,
             last_recorded_level: Arc::new(RwLock::new(StorageLevel::zero())),
         })
     }
@@ -85,6 +86,13 @@ impl ChunkStore {
             return Ok(None);
         }
 
+        // cheap extra security check for space (prone to race conditions)
+        // just so we don't go too much overboard
+        // should not be triggered as chunks should not be sent to full adults
+        if !self.disk_store.can_add(data.value().len()) {
+            return Err(Error::NotEnoughSpace);
+        }
+
         // store the data
         trace!("{:?}", LogMarker::StoringChunk);
         let _addr = self.disk_store.write_chunk(data).await?;
@@ -95,7 +103,7 @@ impl ChunkStore {
         let last_recorded_level = { *self.last_recorded_level.read().await };
         if let Ok(next_level) = last_recorded_level.next() {
             // used_space_ratio is a heavy task that's why we don't do it all the time
-            let used_space_ratio = self.disk_store.used_space_ratio().await;
+            let used_space_ratio = self.disk_store.used_space_ratio();
             let used_space_level = 10.0 * used_space_ratio;
             // every level represents 10 percentage points
             if used_space_level as u8 >= next_level.value() {

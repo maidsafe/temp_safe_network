@@ -78,16 +78,16 @@ mod test_utils {
     use std::path::{Path, PathBuf};
     use tempfile::tempdir;
 
-    const TEST_MAX_CAPACITY: u64 = 1024 * 1024;
+    const TEST_MAX_CAPACITY: usize = 1024 * 1024;
 
     /// Create a register store for routing examples
-    pub fn create_test_max_capacity_and_root_storage() -> eyre::Result<(u64, u64, PathBuf)> {
+    pub fn create_test_max_capacity_and_root_storage() -> eyre::Result<(usize, PathBuf)> {
         let random_filename: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
 
         let root_dir = tempdir().map_err(|e| eyre::eyre!(e.to_string()))?;
         let storage_dir = Path::new(root_dir.path()).join(random_filename);
 
-        Ok((TEST_MAX_CAPACITY, TEST_MAX_CAPACITY, storage_dir))
+        Ok((TEST_MAX_CAPACITY, storage_dir))
     }
 }
 

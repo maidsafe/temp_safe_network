@@ -77,16 +77,14 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
     let node = nodes.remove(0);
-    let (reg_store_size, chunk_store_size, root_storage_dir) =
-        create_test_max_capacity_and_root_storage()?;
+    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section,
         Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
-        reg_store_size,
-        chunk_store_size,
+        UsedSpace::new(max_capacity),
         root_storage_dir,
         false,
     )
@@ -160,16 +158,14 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
 
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
     let node = nodes.remove(0);
-    let (reg_store_size, chunk_store_size, root_storage_dir) =
-        create_test_max_capacity_and_root_storage()?;
+    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section,
         Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
-        reg_store_size,
-        chunk_store_size,
+        UsedSpace::new(max_capacity),
         root_storage_dir,
         false,
     )
@@ -260,16 +256,14 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
     let node = nodes.remove(0);
     let node_name = node.name();
-    let (reg_store_size, chunk_store_size, root_storage_dir) =
-        create_test_max_capacity_and_root_storage()?;
+    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section,
         Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
-        reg_store_size,
-        chunk_store_size,
+        UsedSpace::new(max_capacity),
         root_storage_dir,
         false,
     )
@@ -363,16 +357,14 @@ async fn handle_agreement_on_online() -> Result<()> {
     let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, elder_count());
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
     let node = nodes.remove(0);
-    let (reg_store_size, chunk_store_size, root_storage_dir) =
-        create_test_max_capacity_and_root_storage()?;
+    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section,
         Some(section_key_share),
         event_tx,
-        reg_store_size,
-        chunk_store_size,
+        UsedSpace::new(max_capacity),
         root_storage_dir,
         false,
     )
@@ -428,16 +420,14 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let node = nodes.remove(0);
     let node_name = node.name();
     let section_key_share = create_section_key_share(&sk_set, 0);
-    let (reg_store_size, chunk_store_size, root_storage_dir) =
-        create_test_max_capacity_and_root_storage()?;
+    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section,
         Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
-        reg_store_size,
-        chunk_store_size,
+        UsedSpace::new(max_capacity),
         root_storage_dir,
         false,
     )
@@ -601,16 +591,14 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
     // Make a Node
     let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let node = nodes.remove(0);
-    let (reg_store_size, chunk_store_size, root_storage_dir) =
-        create_test_max_capacity_and_root_storage()?;
+    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let state = Core::new(
         create_comm().await?,
         node,
         section,
         Some(section_key_share),
         event_tx,
-        reg_store_size,
-        chunk_store_size,
+        UsedSpace::new(max_capacity),
         root_storage_dir,
         false,
     )
@@ -673,16 +661,14 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
 
     let (event_tx, _event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let node = nodes.remove(0);
-    let (reg_store_size, chunk_store_size, root_storage_dir) =
-        create_test_max_capacity_and_root_storage()?;
+    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section,
         Some(section_key_share),
         event_tx,
-        reg_store_size,
-        chunk_store_size,
+        UsedSpace::new(max_capacity),
         root_storage_dir,
         false,
     )
@@ -730,8 +716,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
     // Create our node
     let (event_tx, _event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-    let (reg_store_size, chunk_store_size, root_storage_dir) =
-        create_test_max_capacity_and_root_storage()?;
+    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = nodes.remove(0);
     let node_name = node.name();
     let core = Core::new(
@@ -740,8 +725,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         section,
         Some(section_key_share),
         event_tx,
-        reg_store_size,
-        chunk_store_size,
+        UsedSpace::new(max_capacity),
         root_storage_dir,
         false,
     )
@@ -845,16 +829,14 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let section_key_share = create_section_key_share(&sk_set1, 0);
     let node = nodes.remove(0);
-    let (reg_store_size, chunk_store_size, root_storage_dir) =
-        create_test_max_capacity_and_root_storage()?;
+    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         network_knowledge,
         Some(section_key_share),
         event_tx,
-        reg_store_size,
-        chunk_store_size,
+        UsedSpace::new(max_capacity),
         root_storage_dir,
         false,
     )
@@ -960,16 +942,14 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
 
     let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let node = create_node(MIN_ADULT_AGE, None);
-    let (reg_store_size, chunk_store_size, root_storage_dir) =
-        create_test_max_capacity_and_root_storage()?;
+    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         our_section.clone(),
         None,
         event_tx,
-        reg_store_size,
-        chunk_store_size,
+        UsedSpace::new(max_capacity),
         root_storage_dir,
         false,
     )
@@ -1070,16 +1050,14 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     let node_state = section_signed(sk_set.secret_key(), node_state)?;
     assert!(section.update_member(node_state).await);
     let node = nodes.remove(0);
-    let (reg_store_size, chunk_store_size, root_storage_dir) =
-        create_test_max_capacity_and_root_storage()?;
+    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section,
         Some(section_key_share),
         mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
-        reg_store_size,
-        chunk_store_size,
+        UsedSpace::new(max_capacity),
         root_storage_dir,
         false,
     )
@@ -1174,16 +1152,14 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let (comm_tx, mut comm_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let comm = Comm::new((Ipv4Addr::LOCALHOST, 0).into(), Default::default(), comm_tx).await?;
-    let (reg_store_size, chunk_store_size, root_storage_dir) =
-        create_test_max_capacity_and_root_storage()?;
+    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
 
     let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
     let core = Core::first_node(
         comm,
         node,
         event_tx,
-        reg_store_size,
-        chunk_store_size,
+        UsedSpace::new(max_capacity),
         root_storage_dir,
         genesis_sk_set,
     )
@@ -1292,16 +1268,14 @@ async fn handle_elders_update() -> Result<()> {
     };
 
     let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-    let (reg_store_size, chunk_store_size, root_storage_dir) =
-        create_test_max_capacity_and_root_storage()?;
+    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section0.clone(),
         Some(section_key_share),
         event_tx,
-        reg_store_size,
-        chunk_store_size,
+        UsedSpace::new(max_capacity),
         root_storage_dir,
         false,
     )
@@ -1414,16 +1388,14 @@ async fn handle_demote_during_split() -> Result<()> {
     }
 
     let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-    let (max_reg_store_size, max_chunk_store_size, root_storage_dir) =
-        create_test_max_capacity_and_root_storage()?;
+    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
         node,
         section,
         Some(section_key_share),
         event_tx,
-        max_reg_store_size,
-        max_chunk_store_size,
+        UsedSpace::new(max_capacity),
         root_storage_dir,
         false,
     )

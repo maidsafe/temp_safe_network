@@ -37,6 +37,7 @@ use crate::node::{
     },
 };
 use crate::types::{log_markers::LogMarker, PublicKey as TypesPublicKey};
+use crate::UsedSpace;
 
 use ed25519_dalek::{PublicKey, Signature, Signer, KEYPAIR_LENGTH};
 use itertools::Itertools;
@@ -72,8 +73,7 @@ impl Routing {
     /// caller to handle this case, for example by using a timeout.
     pub async fn new(
         config: Config,
-        reg_store_size: u64,
-        chunk_store_size: u64,
+        used_space: UsedSpace,
         root_storage_dir: PathBuf,
     ) -> Result<(Self, EventStream)> {
         let (event_tx, event_rx) = mpsc::channel(EVENT_CHANNEL_SIZE);
@@ -103,8 +103,7 @@ impl Routing {
                 comm,
                 node,
                 event_tx,
-                reg_store_size,
-                chunk_store_size,
+                used_space.clone(),
                 root_storage_dir.clone(),
                 genesis_sk_set,
             )
@@ -191,8 +190,7 @@ impl Routing {
                 network_knowledge,
                 None,
                 event_tx,
-                reg_store_size,
-                chunk_store_size,
+                used_space.clone(),
                 root_storage_dir.to_path_buf(),
                 false,
             )

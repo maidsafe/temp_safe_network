@@ -14,6 +14,7 @@ use crate::node::{
     Config as NodeConfig, Error, Result,
 };
 use crate::types::PublicKey;
+use crate::UsedSpace;
 
 use rand::rngs::OsRng;
 use std::{net::SocketAddr, sync::Arc};
@@ -71,17 +72,11 @@ impl Node {
             routing_config.local_addr = local_addr;
         }
 
-        let reg_store_size = config.max_capacity();
-        let chunk_store_size = config.max_capacity();
+        let used_space = UsedSpace::new(config.max_capacity());
 
         let (routing, network_events) = tokio::time::timeout(
             joining_timeout,
-            Routing::new(
-                routing_config,
-                reg_store_size,
-                chunk_store_size,
-                root_dir.to_path_buf(),
-            ),
+            Routing::new(routing_config, used_space, root_dir.to_path_buf()),
         )
         .await
         .map_err(|_| Error::JoinTimeout)??;

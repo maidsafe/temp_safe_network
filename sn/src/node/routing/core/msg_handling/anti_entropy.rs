@@ -476,6 +476,7 @@ mod tests {
         node::Node,
         SectionKeyShare, XorName, MIN_ADULT_AGE,
     };
+    use crate::UsedSpace;
 
     use assert_matches::assert_matches;
     use bls::SecretKey;
@@ -700,14 +701,12 @@ mod tests {
             let genesis_pk = genesis_sk_set.public_keys().public_key();
             assert_eq!(genesis_pk, *chain.root_key());
 
-            let (reg_store_size, chunk_store_size, root_storage_dir) =
-                create_test_max_capacity_and_root_storage()?;
+            let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let mut core = Core::first_node(
                 create_comm().await?,
                 node.clone(),
                 mpsc::channel(1).0,
-                reg_store_size,
-                chunk_store_size,
+                UsedSpace::new(max_capacity),
                 root_storage_dir,
                 genesis_sk_set.clone(),
             )

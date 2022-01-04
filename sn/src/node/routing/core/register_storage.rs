@@ -56,7 +56,7 @@ struct StateEntry {
 
 impl RegisterStorage {
     /// Create new RegisterStorage
-    pub(crate) fn new(path: &Path, max_capacity: u64) -> Result<Self> {
+    pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         let db_dir = path.join("db").join(DATABASE_NAME.to_string());
 
         let db = sled::Config::default()
@@ -66,7 +66,7 @@ impl RegisterStorage {
             .map_err(Error::from)?;
 
         Ok(Self {
-            used_space: UsedSpace::new(max_capacity),
+            used_space,
             registers: Arc::new(DashMap::new()),
             db,
         })
@@ -123,10 +123,10 @@ impl RegisterStorage {
         write: RegisterWrite,
         auth: AuthorityProof<ServiceAuth>,
     ) -> Result<()> {
-        // let required_space = std::mem::size_of::<RegisterCmd>() as u64;
-        // if !self.used_space.can_consume(required_space).await {
-        //     return Err(Error::NotEnoughSpace);
-        // }
+        let required_space = std::mem::size_of::<RegisterCmd>();
+        if !self.used_space.can_add(required_space) {
+            return Err(Error::NotEnoughSpace);
+        }
         let op = RegisterCmd {
             write,
             auth: auth.clone().into_inner(),

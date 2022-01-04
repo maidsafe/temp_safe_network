@@ -24,6 +24,7 @@ use crate::node::{
 };
 use crate::peer::Peer;
 use crate::types::log_markers::LogMarker;
+use crate::UsedSpace;
 
 use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf};
@@ -36,8 +37,7 @@ impl Core {
         comm: Comm,
         mut node: Node,
         event_tx: mpsc::Sender<Event>,
-        reg_store_size: u64,
-        chunk_store_size: u64,
+        used_space: UsedSpace,
         root_storage_dir: PathBuf,
         genesis_sk_set: bls::SecretKeySet,
     ) -> Result<Self> {
@@ -52,8 +52,7 @@ impl Core {
             section,
             Some(section_key_share),
             event_tx,
-            reg_store_size,
-            chunk_store_size,
+            used_space,
             root_storage_dir,
             true,
         )

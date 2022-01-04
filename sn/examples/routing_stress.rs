@@ -38,13 +38,13 @@ use tracing_subscriber::EnvFilter;
 use xor_name::{Prefix, XorName};
 use yansi::{Color, Style};
 
-use safe_network::node::routing::create_test_max_capacity_and_root_storage;
-
 use safe_network::messaging::{
     data::Error::FailedToWriteFile, system::SystemMsg, DstLocation, MessageId,
 };
+use safe_network::node::routing::create_test_max_capacity_and_root_storage;
 use safe_network::node::routing::{Config, Event as RoutingEvent, NodeElderChange, Routing};
 use safe_network::types::Cache;
+use safe_network::UsedSpace;
 
 // Minimal delay between two consecutive prints of the network status.
 const MIN_PRINT_DELAY: Duration = Duration::from_millis(500);
@@ -632,10 +632,10 @@ impl Network {
 }
 
 async fn add_node(id: u64, config: Config, event_tx: Sender<Event>) -> Result<()> {
-    let (reg_store_size, chunk_store_size, root_dir) = create_test_max_capacity_and_root_storage()?;
+    let (max_capacity, root_dir) = create_test_max_capacity_and_root_storage()?;
 
     let (node, mut events) =
-        match Routing::new(config, reg_store_size, chunk_store_size, root_dir).await {
+        match Routing::new(config, UsedSpace::new(max_capacity), root_dir).await {
             Ok(output) => output,
             Err(error) => {
                 let _res = event_tx
