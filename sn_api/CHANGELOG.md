@@ -5,19 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.50.0 (2022-01-03)
-
-### refactor (BREAKING)
-
- - <csr-id-715a154fe7448cd18decd0a666ae11fb02eadedb/> remove dry-run as arg from all APIs and make it a Safe instance mode
-
+## v0.50.1 (2022-01-04)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -27,6 +22,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.52.3 ([`2924661`](https://github.com/maidsafe/safe_network/commit/292466119e2d99c36043e7f2247b1bde9ec9ced9))
+</details>
+
+## v0.50.0 (2022-01-03)
+
+### refactor (BREAKING)
+
+ - <csr-id-715a154fe7448cd18decd0a666ae11fb02eadedb/> remove dry-run as arg from all APIs and make it a Safe instance mode
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_api-0.50.0/sn_cli-0.43.0 ([`ee86dc7`](https://github.com/maidsafe/safe_network/commit/ee86dc7ab1781731d3be19f9d7f414f157a91edb))
     - remove dry-run as arg from all APIs and make it a Safe instance mode ([`715a154`](https://github.com/maidsafe/safe_network/commit/715a154fe7448cd18decd0a666ae11fb02eadedb))
     - safe_network-0.52.2 ([`d490127`](https://github.com/maidsafe/safe_network/commit/d490127b17d53a7648f9e97aae690b232188b034))
 </details>
@@ -95,9 +115,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - enable logging from api tests; resolve one failing test ([`19e8f70`](https://github.com/maidsafe/safe_network/commit/19e8f70c3f4369fae3a80d5de5e56161c5fa0258))
     - when in dry-run was still requiring a connection by some APIs ([`7ba567f`](https://github.com/maidsafe/safe_network/commit/7ba567f7f491836961e769c836226ebc9a4731f8))
 </details>
-
-<csr-unknown>
-Adding a new files_container_create_from API which creates a FilesContainer with filesuploaded from a local folder.All path args passed to files container APIs can either be &str, std::Path, or std::PathBuf<csr-unknown/>
 
 ## v0.47.0 (2021-12-22)
 
