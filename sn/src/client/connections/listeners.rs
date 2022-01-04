@@ -7,11 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Session;
+
 use crate::client::{
     connections::messaging::{send_message, NUM_OF_ELDERS_SUBSET_FOR_QUERIES},
     Error, Result,
 };
-use crate::elder_count;
 use crate::messaging::{
     data::{CmdError, DataCmd, ServiceMsg},
     system::{KeyedSig, SectionAuth, SystemMsg},
@@ -20,6 +20,7 @@ use crate::messaging::{
 use crate::node::routing::SectionAuthorityProvider;
 use crate::peer::Peer;
 use crate::types::{log_markers::LogMarker, utils::write_data_to_disk};
+use crate::{at_least_one_correct_elder, elder_count};
 
 use bytes::Bytes;
 use itertools::Itertools;
@@ -419,10 +420,8 @@ impl Session {
 
         let (target_count, dst_address_of_bounced_msg) = match service_msg.clone() {
             ServiceMsg::Cmd(cmd) => {
-                let chunk_count = (elder_count() / 3) + 1;
-
                 match &cmd {
-                    DataCmd::StoreChunk(_) => (chunk_count, cmd.dst_name()), // stored at Adults, so only 1 correctly functioning Elder need to relay
+                    DataCmd::StoreChunk(_) => (at_least_one_correct_elder(), cmd.dst_name()), // stored at Adults, so only 1 correctly functioning Elder need to relay
                     DataCmd::Register(_) => (elder_count(), cmd.dst_name()), // only stored at Elders, all need a copy
                 }
             }
