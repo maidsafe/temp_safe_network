@@ -181,6 +181,10 @@ impl Core {
             && dst_location.is_to_node()
             && self.network_knowledge.prefix().await.matches(&target_name)
         {
+            // This actually means being an elder, we don't know the member yet. Which most likely
+            // happens during the join process that a node's name is changed.
+            // The command with empty recipients results in error of EmptyRecipientList during
+            // the send attempt later on. And the message get dropped.
             return Ok(Command::SendMessageDeliveryGroup {
                 recipients: Vec::new(),
                 delivery_group_size: 0,
