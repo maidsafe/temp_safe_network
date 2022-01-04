@@ -195,6 +195,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_write_read_chunk() {
         let store = init_chunk_disk_store();
         // test that a range of different chunks return the written chunk
