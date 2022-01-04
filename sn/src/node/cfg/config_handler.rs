@@ -26,7 +26,7 @@ use tracing::{debug, warn, Level};
 const CONFIG_FILE: &str = "node.config";
 const CONNECTION_INFO_FILE: &str = "node_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
-const DEFAULT_MAX_CAPACITY: u64 = 2 * 1024 * 1024 * 1024;
+const DEFAULT_MAX_CAPACITY: usize = 2 * 1024 * 1024 * 1024;
 
 /// Node configuration
 #[derive(Default, Clone, Debug, Serialize, Deserialize, StructOpt)]
@@ -39,7 +39,7 @@ pub struct Config {
     pub wallet_id: Option<String>,
     /// Upper limit in bytes for allowed network storage on this node.
     #[structopt(short, long)]
-    pub max_capacity: Option<u64>,
+    pub max_capacity: Option<usize>,
     /// Root directory for dbs and cached state. If not set, it defaults to "root_dir"
     /// within the sn_node project data directory, located at:
     /// Linux: $HOME/.safe/node/root_dir
@@ -286,7 +286,7 @@ impl Config {
     }
 
     /// Upper limit in bytes for allowed network storage on this node.
-    pub fn max_capacity(&self) -> u64 {
+    pub fn max_capacity(&self) -> usize {
         self.max_capacity.unwrap_or(DEFAULT_MAX_CAPACITY)
     }
 

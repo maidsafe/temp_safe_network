@@ -8,7 +8,6 @@
 
 use super::{delivery_group, Comm, Core};
 
-use crate::dbs::UsedSpace;
 use crate::messaging::{
     system::{JoinResponse, MembershipState, NodeState, SigShare, SystemMsg},
     WireMsg,
@@ -25,6 +24,7 @@ use crate::node::{
 };
 use crate::peer::Peer;
 use crate::types::log_markers::LogMarker;
+use crate::UsedSpace;
 
 use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf};
