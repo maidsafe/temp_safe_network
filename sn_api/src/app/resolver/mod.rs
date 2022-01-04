@@ -433,7 +433,7 @@ mod tests {
         let mut safe = new_safe_instance().await?;
         let data = Bytes::from("Something super immutable");
         let xorurl = safe
-            .store_public_file(data.clone(), Some("text/plain"))
+            .store_public_bytes(data.clone(), Some("text/plain"))
             .await?;
 
         let safe_url = SafeUrl::from_url(&xorurl)?;
@@ -472,7 +472,7 @@ mod tests {
         let saved_data = Bytes::from("Something super immutable");
         let size = saved_data.len();
         let xorurl = safe
-            .store_public_file(saved_data.clone(), Some("text/plain"))
+            .store_public_bytes(saved_data.clone(), Some("text/plain"))
             .await?;
 
         // Fetch first half and match
@@ -602,7 +602,7 @@ mod tests {
     async fn test_fetch_public_file_with_path() -> Result<()> {
         let safe = new_safe_instance().await?;
         let data = Bytes::from("Something super immutable");
-        let xorurl = safe.store_public_file(data.clone(), None).await?;
+        let xorurl = safe.store_public_bytes(data.clone(), None).await?;
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         let path = "/some_relative_filepath";
@@ -620,7 +620,7 @@ mod tests {
 
         // test the same but a file with some media type
         let xorurl = safe
-            .store_public_file(data.clone(), Some("text/plain"))
+            .store_public_bytes(data.clone(), Some("text/plain"))
             .await?;
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;

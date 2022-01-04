@@ -430,7 +430,7 @@ impl Safe {
         let (safe_url, current_version, current_files_map) =
             validate_files_add_params(self, "", url, update_nrs).await?;
 
-        let new_file_xorurl = self.store_public_file(data, None).await?;
+        let new_file_xorurl = self.store_public_bytes(data, None).await?;
 
         let dest_path = Path::new(safe_url.path());
         let (processed_files, new_files_map, success_count) =
@@ -627,7 +627,7 @@ impl Safe {
     ///     assert_eq!(received_data, data);
     /// # });
     /// ```
-    pub async fn store_public_file(
+    pub async fn store_public_bytes(
         &self,
         bytes: Bytes,
         media_type: Option<&str>,
@@ -712,7 +712,7 @@ impl Safe {
         })?;
 
         let files_map_xorurl = self
-            .store_public_file(Bytes::from(serialised_files_map), None)
+            .store_public_bytes(Bytes::from(serialised_files_map), None)
             .await?;
 
         Ok(files_map_xorurl)
@@ -1342,7 +1342,7 @@ mod tests {
         let random_content: String = thread_rng().sample_iter(&Alphanumeric).take(20).collect();
 
         let file_xorurl = safe
-            .store_public_file(Bytes::from(random_content.to_owned()), None)
+            .store_public_bytes(Bytes::from(random_content.to_owned()), None)
             .await?;
 
         let retrieved = retry_loop!(safe.files_get_public(&file_xorurl, None));
@@ -2656,7 +2656,7 @@ mod tests {
             .ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         let data = Bytes::from("0123456789");
-        let file_xorurl = retry_loop!(safe.store_public_file(data.clone(), None));
+        let file_xorurl = retry_loop!(safe.store_public_bytes(data.clone(), None));
         let new_filename = Path::new("/new_filename_test.md");
 
         let mut url_with_path = SafeUrl::from_xorurl(&xorurl)?;
@@ -2702,7 +2702,7 @@ mod tests {
 
         // let's add another file but with the same name
         let data = Bytes::from("9876543210");
-        let other_file_xorurl = retry_loop!(safe.store_public_file(data.clone(), None));
+        let other_file_xorurl = retry_loop!(safe.store_public_bytes(data.clone(), None));
         let (version2_content, new_processed_files) = retry_loop!(safe.files_container_add(
             &other_file_xorurl,
             &url_with_path.to_string(),
