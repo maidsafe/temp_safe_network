@@ -1,6 +1,8 @@
-name: PR Tests
+name: Bors CI Tests
 
-on: pull_request
+on:
+  push:
+    branches: [staging, trying]
 
 env:
   # Turn on backtrace as needed. Generally (passing) CI should not need this.
@@ -17,6 +19,20 @@ env:
   POST_TEST_SLEEP: 5
 
 jobs:
+
+  # bors Continuous Integration
+  ci-success:
+    # refereneced in bors.toml
+    name: ci
+    if: ${{ success() }}
+    # github jobs that need to have passed for bors to give the all clear
+    needs:
+      - e2e
+      - unit
+    runs-on: ubuntu-latest
+    steps:
+      - name: CI succeeded
+        run: exit 0
 
   build:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -310,161 +326,3 @@ jobs:
         if: failure()
         continue-on-error: true
 
-
-  api:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run api tests
-    needs: ["build"]
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@v2
-
-      # Install Rust
-      - name: Install Rust
-        id: toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      - uses: Swatinem/rust-cache@v1
-        continue-on-error: true
-        with:
-          cache-on-failure: true
-          sharedKey: ${{github.run_id}}
-
-      - name: Build all sn_api tests
-        run: cargo test --no-run -p sn_api --release --lib
-
-      - name: Start the network
-        run: ./target/release/testnet
-        id: section-startup
-
-      - name: Print Network Log Stats at start
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
-
-
-      - name: Run sn_api tests
-        shell: bash
-        run: ./resources/scripts/api_tests.sh
-        timeout-minutes: 45
-        env:
-          # these api tests realy heavily on retry_loop at the moment
-          # TODO: Remove that dependency
-          SN_QUERY_TIMEOUT: 20 # 20 secs
-
-      - name: Are nodes still running...?
-        shell: bash
-        timeout-minutes: 1
-        if: failure() && matrix.os
-        run: |
-          echo "$(pgrep sn_node | wc -l) nodes still running"
-          ls $HOME/.safe/node/local-test-network
-
-      - name: Print Network Log Stats
-        shell: bash
-        continue-on-error: true
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success'
-
-      - name: Upload Node Logs to AWS for Windowns
-          # Upload artifacts.
-        run: aws s3 sync C:\Users\runneradmin\.safe\node\local-test-network\ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure() &&  matrix.os == 'windows-latest'
-        continue-on-error: true
-
-      - name: Upload Node Logs to AWS for Non-Windows
-          # Upload artifacts.
-        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure() &&  matrix.os != 'windows-latest'
-        continue-on-error: true
-
-      - name: Upload Node Logs
-          # Upload artifacts.
-        uses: actions/upload-artifact@v2
-        with:
-          name: ${{github.job.name}}_sn_node_logs_${{matrix.os}}
-          path: ~/.safe/node/local-test-network/**/*.log*
-        if: failure()
-        continue-on-error: true
-
-  cli:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run CLI tests
-    needs: ["build"]
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@v2
-
-      # Install Rust
-      - name: Install Rust
-        id: toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      - uses: Swatinem/rust-cache@v1
-        continue-on-error: true
-        with:
-          cache-on-failure: true
-          sharedKey: ${{github.run_id}}
-
-      - name: Build all CLI tests
-        run: cargo test --no-run -p sn_cli --release
-
-      - name: Start the network
-        run: ./target/release/testnet
-        id: section-startup
-
-      - name: Print Network Log Stats at start
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
-
-
-      - name: Run CLI tests
-        shell: bash
-        run: ./resources/scripts/cli_tests.sh
-        timeout-minutes: 45
-
-      - name: Are nodes still running...?
-        shell: bash
-        timeout-minutes: 1
-        if: failure() && matrix.os
-        run: |
-          echo "$(pgrep sn_node | wc -l) nodes still running"
-          ls $HOME/.safe/node/local-test-network
-
-      - name: Print Network Log Stats
-        shell: bash
-        continue-on-error: true
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success'
-
-      - name: Upload Node Logs to AWS
-          # Upload artifacts.
-        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure()
-        continue-on-error: true
-
-      - name: Upload Node Logs
-          # Upload artifacts.
-        uses: actions/upload-artifact@v2
-        with:
-          name: ${{github.job.name}}_sn_node_logs_${{matrix.os}}
-          path: ~/.safe/node/local-test-network/**/*.log*
-        if: failure()
-        continue-on-error: true

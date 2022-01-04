@@ -1,1 +1,1 @@
-status = ["Unit Tests", "E2E tests"]
+status = ["ci"]
