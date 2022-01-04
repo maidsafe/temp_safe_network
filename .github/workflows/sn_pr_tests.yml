@@ -17,6 +17,20 @@ env:
   POST_TEST_SLEEP: 5
 
 jobs:
+
+  # bors Continuous Integration
+  ci-success:
+    # refereneced in bors.toml
+    name: ci
+    if: ${{ success() }}
+    needs:
+      - e2e
+      - unit
+    runs-on: ubuntu-latest
+    steps:
+      - name: CI succeeded
+        run: exit 0
+
   build:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Build sn bins
