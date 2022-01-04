@@ -583,6 +583,13 @@ mod tests {
 
         let _outer_span = tracing::info_span!("blob_network_assert").entered();
 
+        let network_assert_delay: u64 = std::env::var("NETWORK_ASSERT_DELAY")
+            .unwrap_or_else(|_| "3".to_string())
+            .parse()?;
+
+        let delay = tokio::time::Duration::from_secs(network_assert_delay);
+        debug!("Running network asserts with delay of {:?}", delay);
+
         let bytes = random_bytes(MIN_BLOB_SIZE / 3);
         let client = create_test_client().await?;
 
@@ -591,6 +598,9 @@ mod tests {
         let _address = client
             .upload_and_verify(bytes.clone(), Scope::Public)
             .await?;
+
+        // small delay to ensure all node's logs have written
+        tokio::time::sleep(delay).await;
 
         // 3 elders were chosen by the client (should only be 3 as even if client chooses adults, AE should kick in prior to them attempting any of this)
         the_logs
