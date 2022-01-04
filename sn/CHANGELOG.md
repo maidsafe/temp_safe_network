@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.52.6 (2022-01-04)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - rename + use glob const ([`838c495`](https://github.com/maidsafe/safe_network/commit/838c495c8858b85c693da1a3e45baafa57ba03ea))
+</details>
+
 ## v0.52.5 (2022-01-04)
 
 ### Bug Fixes
@@ -15,8 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits contributed to the release.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -26,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.52.5 ([`ab00eca`](https://github.com/maidsafe/safe_network/commit/ab00eca916d6ed8a0a137004a6b9fd24e7217a70))
     - do not skip AE check for AE-Probe messages ([`0a5fca9`](https://github.com/maidsafe/safe_network/commit/0a5fca96af4d2627b842591775e77c09201ed655))
     - sn_cli-0.43.1 ([`db51539`](https://github.com/maidsafe/safe_network/commit/db515397771f117b3bf095e1a4afb897eb4acafe))
     - restore original behavior ([`9f89966`](https://github.com/maidsafe/safe_network/commit/9f89966e02c3e0ba0297377b4efdf88a31ec1e87))
