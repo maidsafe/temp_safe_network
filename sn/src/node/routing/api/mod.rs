@@ -223,13 +223,19 @@ impl Routing {
     /// Sets the JoinsAllowed flag.
     pub async fn set_joins_allowed(&self, joins_allowed: bool) -> Result<()> {
         let command = Command::SetJoinsAllowed(joins_allowed);
-        self.dispatcher.clone().handle_commands(command, None).await
+        self.dispatcher
+            .clone()
+            .enqueue_and_handle_next_command_and_any_offshoots(command, None)
+            .await
     }
 
     /// Signals the Elders of our section to test connectivity to a node.
     pub async fn start_connectivity_test(&self, name: XorName) -> Result<()> {
         let command = Command::StartConnectivityTest(name);
-        self.dispatcher.clone().handle_commands(command, None).await
+        self.dispatcher
+            .clone()
+            .enqueue_and_handle_next_command_and_any_offshoots(command, None)
+            .await
     }
 
     /// Returns the current age of this node.
@@ -394,7 +400,10 @@ impl Routing {
         );
         self.dispatcher
             .clone()
-            .handle_commands(Command::ParseAndSendWireMsg(wire_msg), None)
+            .enqueue_and_handle_next_command_and_any_offshoots(
+                Command::ParseAndSendWireMsg(wire_msg),
+                None,
+            )
             .await
     }
 
@@ -452,7 +461,10 @@ async fn handle_connection_events(
                     original_bytes: Some(bytes),
                 };
 
-                let _handle = dispatcher.clone().handle_commands(command, None).await;
+                let _handle = dispatcher
+                    .clone()
+                    .enqueue_and_handle_next_command_and_any_offshoots(command, None)
+                    .await;
             }
         }
     }

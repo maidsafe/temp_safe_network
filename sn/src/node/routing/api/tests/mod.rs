@@ -461,7 +461,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     };
 
     let commands = dispatcher
-        .handle_command(Command::HandleNewNodeOnline(auth), "cmd-id")
+        .process_command(Command::HandleNewNodeOnline(auth), "cmd-id")
         .await?;
 
     // Verify we sent a `DkgStart` message with the expected participants.
@@ -522,7 +522,7 @@ async fn handle_online_command(
     };
 
     let commands = dispatcher
-        .handle_command(Command::HandleNewNodeOnline(auth), "cmd-id")
+        .process_command(Command::HandleNewNodeOnline(auth), "cmd-id")
         .await?;
 
     let mut status = HandleOnlineStatus {
@@ -694,7 +694,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
     let _commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
+        .process_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     assert!(!dispatcher
@@ -753,7 +753,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
     let commands = dispatcher
-        .handle_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
+        .process_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     // Verify we sent a `DkgStart` message with the expected participants.
@@ -1013,19 +1013,19 @@ async fn get_internal_commands(
     command: Command,
     dispatcher: &Dispatcher,
 ) -> RoutingResult<Vec<Command>> {
-    let commands = dispatcher.handle_command(command, "cmd-id").await?;
+    let commands = dispatcher.process_command(command, "cmd-id").await?;
 
     let mut node_msg_handling = vec![];
     // let mut inner_handling = vec![];
 
     for command in commands {
         // first pass gets us into node msg handling
-        let commands = dispatcher.handle_command(command, "cmd-id").await?;
+        let commands = dispatcher.process_command(command, "cmd-id").await?;
         node_msg_handling.extend(commands);
     }
     for command in node_msg_handling.clone() {
         // first pass gets us into node msg handling
-        let commands = dispatcher.handle_command(command, "cmd-id").await?;
+        let commands = dispatcher.process_command(command, "cmd-id").await?;
         node_msg_handling.extend(commands);
     }
 
@@ -1097,7 +1097,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
 
     let auth = create_relocation_trigger(sk_set.secret_key(), relocated_peer.age())?;
     let commands = dispatcher
-        .handle_command(Command::HandleNewNodeOnline(auth), "cmd-id")
+        .process_command(Command::HandleNewNodeOnline(auth), "cmd-id")
         .await?;
 
     let mut relocate_sent = false;
@@ -1210,7 +1210,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     let wire_msg = WireMsg::single_src(&node, dst_location, node_msg.clone(), section_pk)?;
 
     let commands = dispatcher
-        .handle_command(
+        .process_command(
             Command::SendMessage {
                 recipients: vec![node.peer()],
                 wire_msg,
@@ -1316,7 +1316,7 @@ async fn handle_elders_update() -> Result<()> {
     let dispatcher = Dispatcher::new(core);
 
     let commands = dispatcher
-        .handle_command(
+        .process_command(
             Command::HandleNewEldersAgreement { proposal, sig },
             "cmd-id",
         )
@@ -1467,7 +1467,7 @@ async fn handle_demote_during_split() -> Result<()> {
 
     let signed_sap = section_signed(sk_set_v1_p0.secret_key(), section_auth)?;
     let command = create_our_elders_command(signed_sap)?;
-    let commands = dispatcher.handle_command(command, "cmd-id-1").await?;
+    let commands = dispatcher.process_command(command, "cmd-id-1").await?;
 
     assert_matches!(&commands[..], &[]);
 
@@ -1478,7 +1478,7 @@ async fn handle_demote_during_split() -> Result<()> {
     let signed_sap = section_signed(sk_set_v1_p1.secret_key(), section_auth)?;
     let command = create_our_elders_command(signed_sap)?;
 
-    let commands = dispatcher.handle_command(command, "cmd-id-2").await?;
+    let commands = dispatcher.process_command(command, "cmd-id-2").await?;
 
     let mut update_recipients = BTreeMap::new();
 

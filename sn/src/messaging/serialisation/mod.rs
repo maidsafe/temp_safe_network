@@ -11,6 +11,14 @@ mod wire_msg_header;
 
 use xor_name::XorName;
 
+// highest prio as we can't do anything until we've joined
+pub(crate) const DKG_MSG_PRIORITY: i32 = 3;
+pub(crate) const AE_MSG_PRIORITY: i32 = 2;
+pub(crate) const INFRASTRUCTURE_MSG_PRIORITY: i32 = 1;
+pub(crate) const NODE_DATA_MSG_PRIORITY: i32 = 0;
+pub(crate) const SERVICE_MSG_PRIORITY: i32 = -2;
+pub(crate) const JOIN_RESPONSE_PRIORITY: i32 = -5;
+
 use crate::types::PublicKey;
 
 pub use self::wire_msg::WireMsg;
@@ -47,6 +55,61 @@ pub enum MessageType {
         /// the message
         msg: SystemMsg,
     },
+}
+
+impl MessageType {
+    /// The priority of the message, when handled by lower level comms.
+    pub fn priority(&self) -> i32 {
+        match self {
+            MessageType::System {
+                msg: SystemMsg::JoinResponse(_) | SystemMsg::JoinAsRelocatedResponse(_),
+                ..
+            } => JOIN_RESPONSE_PRIORITY,
+            // DKG messages
+            MessageType::System {
+                msg:
+                    SystemMsg::DkgStart { .. }
+                    | SystemMsg::DkgSessionUnknown { .. }
+                    | SystemMsg::DkgSessionInfo { .. }
+                    | SystemMsg::DkgNotReady { .. }
+                    | SystemMsg::DkgRetry { .. }
+                    | SystemMsg::DkgMessage { .. }
+                    | SystemMsg::DkgFailureObservation { .. }
+                    | SystemMsg::DkgFailureAgreement(_),
+                ..
+            } => DKG_MSG_PRIORITY,
+
+            // Node messages for AE updates
+            MessageType::System {
+                msg:
+                    SystemMsg::AntiEntropyRetry { .. }
+                    | SystemMsg::AntiEntropyRedirect { .. }
+                    | SystemMsg::AntiEntropyUpdate { .. }
+                    | SystemMsg::AntiEntropyProbe(_)
+                    | SystemMsg::BackPressure(_)
+                    | SystemMsg::Relocate(_)
+                    | SystemMsg::RelocatePromise(_)
+                    | SystemMsg::JoinRequest(_)
+                    | SystemMsg::JoinAsRelocatedRequest(_)
+                    | SystemMsg::Propose { .. }
+                    | SystemMsg::StartConnectivityTest(_),
+                ..
+            } => INFRASTRUCTURE_MSG_PRIORITY,
+
+            // Inter-node comms related to processing client requests
+            MessageType::System {
+                msg:
+                    SystemMsg::NodeCmd(_)
+                    | SystemMsg::NodeQuery(_)
+                    | SystemMsg::NodeQueryResponse { .. }
+                    | SystemMsg::NodeMsgError { .. },
+                ..
+            } => NODE_DATA_MSG_PRIORITY,
+
+            // Client<->node service comms
+            MessageType::Service { .. } => SERVICE_MSG_PRIORITY,
+        }
+    }
 }
 
 /// Authority of a NodeMsg.

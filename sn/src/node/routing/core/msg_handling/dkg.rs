@@ -85,7 +85,6 @@ impl Core {
                 self.network_knowledge().section_key().await,
             )
             .await?;
-
         Ok(commands)
     }
 

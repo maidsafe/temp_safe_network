@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "safe_network"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
-version = "0.52.3"
+version = "0.52.4"
 
 #[profile.release]
 #incremental = true
@@ -37,6 +37,7 @@ required-features = ["test-utils"]
 [features]
 default = []
 always-joinable = []
+unstable-command-prioritisation = []
 chaos = []
 unstable-wiremsg-debuginfo = []
 test-utils = []
