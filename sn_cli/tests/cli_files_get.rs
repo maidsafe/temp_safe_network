@@ -25,7 +25,7 @@ use std::{
 /// --------
 /// Test:  safe files get <url> /tmp/testdata
 ///   src is a container url
-///   dest exists, and is a directory
+///   dst exists, and is a directory
 ///   expected result: ../resources/testdata matches /tmp/testdata/testdata
 ///
 /// Details
@@ -39,14 +39,14 @@ use std::{
 /// And a unique `dest` directory is created
 /// And `src` is set to the files container xor address
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then it should download `src` to `dest`
 /// And due to the use of the trailing slash, `dest` should have a directory named `tmp_data_path`
 /// And the directory tree of `dest/tmp_data_path` should match the test data directory in
 /// the repository
 #[test]
-fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
+fn files_get_src_is_container_and_dst_is_dir() -> Result<()> {
     // Arrange
     let with_trailing_slash = false;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -55,8 +55,8 @@ fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
-    let dest = assert_fs::TempDir::new()?;
-    let dest = dest.path().display().to_string();
+    let dst = assert_fs::TempDir::new()?;
+    let dst = dst.path().display().to_string();
 
     // Act
     safe_cmd(
@@ -64,7 +64,7 @@ fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
             "files",
             "get",
             src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -72,8 +72,8 @@ fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
     )?;
 
     // Assert
-    let mut dest_pb = PathBuf::from(dest);
-    dest_pb.push(tmp_data_path.path().file_name().ok_or_else(|| {
+    let mut dst_pb = PathBuf::from(dst);
+    dst_pb.push(tmp_data_path.path().file_name().ok_or_else(|| {
         eyre!(
             "failed to read file name from path: {}",
             tmp_data_path.path().display()
@@ -81,7 +81,7 @@ fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
     })?);
     assert_eq!(
         sum_tree(TEST_FOLDER)?,
-        sum_tree(&dest_pb.as_path().display().to_string())?
+        sum_tree(&dst_pb.as_path().display().to_string())?
     );
 
     Ok(())
@@ -91,7 +91,7 @@ fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
 /// --------
 /// Test:  safe files get <url> /tmp/testdata
 ///    src is a container url, uploaded with trailing slash
-///    dest exists, and is an empty directory
+///    dst exists, and is an empty directory
 ///    expected result: ../resources/testdata matches /tmp/testdata
 ///
 /// Details
@@ -105,12 +105,12 @@ fn files_get_src_is_container_and_dest_is_dir() -> Result<()> {
 /// And a unique `dest` directory is created
 /// And `src` is set to the files container xor address
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then it should download `src` to `dest`
 /// And the directory tree of `dest` should match the test data directory in the repository
 #[test]
-fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
+fn files_get_src_is_container_trailing_and_dst_is_dir() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -119,8 +119,8 @@ fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
-    let dest = assert_fs::TempDir::new()?;
-    let dest = dest.path().display().to_string();
+    let dst = assert_fs::TempDir::new()?;
+    let dst = dst.path().display().to_string();
 
     // Act
     safe_cmd(
@@ -128,7 +128,7 @@ fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
             "files",
             "get",
             src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -136,7 +136,7 @@ fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
     )?;
 
     // Assert
-    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dst)?);
 
     Ok(())
 }
@@ -145,7 +145,7 @@ fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
 /// --------
 /// Test:  safe files get <url> .
 ///    src is a container url, testdata put without slash.
-///    dest is the current working directory.
+///    dst is the current working directory.
 ///    expected result: ../resources/testdata matches ../resources/testdata
 ///
 /// Details
@@ -160,12 +160,12 @@ fn files_get_src_is_container_trailing_and_dest_is_dir() -> Result<()> {
 /// And a unique `dest` directory is created
 /// And the current working directory is changed to `dest`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then it should download `src` to `dest`
 /// And the directory tree of `dest` should match the test data directory in the repository
 #[test]
-fn files_get_src_is_container_and_dest_is_cwd() -> Result<()> {
+fn files_get_src_is_container_and_dst_is_cwd() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -174,8 +174,8 @@ fn files_get_src_is_container_and_dest_is_cwd() -> Result<()> {
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
-    let dest = assert_fs::TempDir::new()?;
-    let dest = dest.path().display().to_string();
+    let dst = assert_fs::TempDir::new()?;
+    let dst = dst.path().display().to_string();
 
     // Act
     safe_cmd_at(
@@ -187,12 +187,12 @@ fn files_get_src_is_container_and_dest_is_cwd() -> Result<()> {
             "--exists=overwrite",
             "--progress=none",
         ],
-        &dest,
+        &dst,
         Some(0),
     )?;
 
     // Assert
-    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dst)?);
 
     Ok(())
 }
@@ -201,7 +201,7 @@ fn files_get_src_is_container_and_dest_is_cwd() -> Result<()> {
 /// --------
 /// Test:  safe files get <url>
 ///    src is a container url, testdata put without slash.
-///    dest is unspecified.  (should default to the current working directory)
+///    dst is unspecified.  (should default to the current working directory)
 ///    expected result: ../resources/testdata matches ../resources/testdata
 ///
 /// Details
@@ -216,12 +216,12 @@ fn files_get_src_is_container_and_dest_is_cwd() -> Result<()> {
 /// And a unique `dest` directory is created
 /// And the current working directory is changed to `dest`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then it should download `src` to `dest`
 /// And the directory tree of `dest` should match the test data directory in the repository
 #[test]
-fn files_get_src_is_container_and_dest_is_unspecified() -> Result<()> {
+fn files_get_src_is_container_and_dst_is_unspecified() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -230,18 +230,18 @@ fn files_get_src_is_container_and_dest_is_unspecified() -> Result<()> {
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
-    let dest = assert_fs::TempDir::new()?;
-    let dest = dest.path().display().to_string();
+    let dst = assert_fs::TempDir::new()?;
+    let dst = dst.path().display().to_string();
 
     // Act
     safe_cmd_at(
         ["files", "get", src, "--exists=overwrite", "--progress=none"],
-        &dest,
+        &dst,
         Some(0),
     )?;
 
     // Assert
-    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dst)?);
 
     Ok(())
 }
@@ -250,7 +250,7 @@ fn files_get_src_is_container_and_dest_is_unspecified() -> Result<()> {
 /// --------
 /// From files_get.rs
 ///
-/// It is an error/warning if the dest path attempts to use
+/// It is an error/warning if the dst path attempts to use
 /// an existing file as a directory. But other files should
 /// still be written.  eg:
 /// $ mkdir -p /tmp/a/b/c && touch /tmp/a/file.txt
@@ -269,9 +269,9 @@ fn files_get_src_is_container_and_dest_is_unspecified() -> Result<()> {
 ///
 /// Test:  safe files get <url> /tmp/testdata
 ///    src is a container url, uploaded with trailing slash
-///    dest exists, and is a directory
+///    dst exists, and is a directory
 ///    src contains 'subfolder', which is a directory
-///    dest contains 'subfolder' (a file) and is otherwise empty.
+///    dst contains 'subfolder' (a file) and is otherwise empty.
 ///    expected result:
 ///        exit code = 0 and
 ///        /tmp/testdata/subfolder is still a file and
@@ -292,7 +292,7 @@ fn files_get_src_is_container_and_dest_is_unspecified() -> Result<()> {
 /// And a unique `dest` directory is created
 /// And a `dest/subfolder` file is created
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then it should download `src` to `dest`
 /// And the process should exit with no error even though there was an existing file named
@@ -317,7 +317,7 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
     pb.pop();
 
     let src = &files_container_xor;
-    let dest = pb.as_path().display().to_string();
+    let dst = pb.as_path().display().to_string();
 
     // Act
     let output = safe_cmd(
@@ -325,7 +325,7 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
             "files",
             "get",
             src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -334,12 +334,12 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
 
     // Assert
     assert_eq!(output.status.code(), Some(0));
-    assert_ne!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
+    assert_ne!(sum_tree(TEST_FOLDER)?, sum_tree(&dst)?);
     subfolder_file.assert(predicate::path::is_file());
     subfolder_file.assert(predicate::str::contains("existing text file"));
 
-    assert!(Path::new(&dest).join("test.md").is_file());
-    assert!(Path::new(&dest).join("another.md").is_file());
+    assert!(Path::new(&dst).join("test.md").is_file());
+    assert!(Path::new(&dst).join("another.md").is_file());
 
     // Disabled for now because the warning is disabled by sn_cli if TTY
     // not detected.  So it doesn't appear in our output.  Perhaps later
@@ -353,7 +353,7 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
 /// --------
 /// Test:  safe files get <nrs_url>
 ///    src is an nrs url, linked to a container url, testdata put without slash.
-///    dest is unspecified.  (should default to the current working directory)
+///    dst is unspecified.  (should default to the current working directory)
 ///    expected result: ../resources/testdata matches ../resources/testdata
 ///
 /// Scenario: the `files get` command downloads a directory from the network to the specified
@@ -369,12 +369,12 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
 /// And a unique `dest` directory is created
 /// And the current working directory is changed to `dest`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then it should download `src` to `dest`
 /// And the directory tree of `dest` should match the test data directory in the repository
 #[test]
-fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
+fn files_get_src_is_nrs_and_dst_is_unspecified() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -395,8 +395,8 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
     )?;
 
     let src = format!("safe://{}", &nrs_name);
-    let dest = assert_fs::TempDir::new()?;
-    let dest = dest.path().display().to_string();
+    let dst = assert_fs::TempDir::new()?;
+    let dst = dst.path().display().to_string();
 
     // Act
     safe_cmd_at(
@@ -407,12 +407,12 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
             "--exists=overwrite",
             "--progress=none",
         ],
-        &dest,
+        &dst,
         Some(0),
     )?;
 
     // Assert
-    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dst)?);
 
     Ok(())
 }
@@ -421,7 +421,7 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
 /// --------
 /// Test:  safe files get <nrs_url>
 ///    src is an nrs url, linked to a container url, testdata put without slash.
-///    dest is unspecified.  (should default to the current working directory)
+///    dst is unspecified.  (should default to the current working directory)
 ///    expected result: ../resources/testdata matches ../resources/testdata
 ///
 /// Details
@@ -438,14 +438,14 @@ fn files_get_src_is_nrs_and_dest_is_unspecified() -> Result<()> {
 /// And a unique `dest` directory is created
 /// And the current working directory is changed to `dest`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then it should download `src` to `dest`
 /// And the contents of `dest/sub2.ms` should match the contents of sub2.md in the repository
 /// testdata
 #[test]
 #[ignore = "investigate after sn_cli merge into workspace"]
-fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
+fn files_get_src_is_nrs_with_path_and_dst_is_unspecified() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_dir = assert_fs::TempDir::new()?;
@@ -470,8 +470,8 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
     )?;
 
     let src = format!("safe://{}/sub2.md", &nrs_name);
-    let dest = assert_fs::TempDir::new()?;
-    let dest = dest.path().display().to_string();
+    let dst = assert_fs::TempDir::new()?;
+    let dst = dst.path().display().to_string();
 
     // Act
     safe_cmd_at(
@@ -482,13 +482,13 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
             "--exists=overwrite",
             "--progress=none",
         ],
-        &dest,
+        &dst,
         Some(0),
     )?;
 
     // Assert
     assert_eq!(
-        std::fs::read_to_string(Path::new(&format!("{}/sub2.md", dest)))?,
+        std::fs::read_to_string(Path::new(&format!("{}/sub2.md", dst)))?,
         std::fs::read_to_string(Path::new("testdata/subfolder/sub2.md"))?
     );
 
@@ -501,7 +501,7 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
 ///    src is a recursive nrs url
 ///       safe://subfolder  --> safe://testdata/subfolder
 ///       safe://testdata   --> safe://xorurl/testdata
-///    dest exists
+///    dst exists
 ///    expected result: ../resources/testdata/subfolder matches /tmp/testdata/subfolder
 ///
 /// Details
@@ -517,14 +517,14 @@ fn files_get_src_is_nrs_with_path_and_dest_is_unspecified() -> Result<()> {
 /// And `src` is set to `nrs link/subfolder`
 /// And a unique `dest` directory is created
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then it should download `src` to `dest`
 /// And the nrs link pointing to the subfolder should have been downloaded to `dest`
 /// And the contents of `dest/subfolder` should be the same as `testdata/subfolder`
 #[test]
 #[ignore = "investigate after sn_cli merge into workspace"]
-fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
+fn files_get_src_is_nrs_recursive_and_dst_not_existing() -> Result<()> {
     // Arrange
     let with_trailing_slash = false;
     let tmp_data_dir = assert_fs::TempDir::new()?;
@@ -556,8 +556,8 @@ fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
         tmp_data_nrs,
         version.to_string()
     );
-    let dest = assert_fs::TempDir::new()?;
-    let dest = dest.path().display().to_string();
+    let dst = assert_fs::TempDir::new()?;
+    let dst = dst.path().display().to_string();
 
     // Act
     safe_cmd(
@@ -565,7 +565,7 @@ fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
             "files",
             "get",
             &src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -575,7 +575,7 @@ fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
     // Assert
     assert_eq!(
         sum_tree("testdata/subfolder")?,
-        sum_tree(&format!("{}/subfolder", dest))?
+        sum_tree(&format!("{}/subfolder", dst))?
     );
 
     Ok(())
@@ -585,7 +585,7 @@ fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
 /// --------
 /// Test:  safe files get "safe://.../dir with space/file with space" "/tmp/new file"
 ///    src is a file, directory and file both contain embedded spaces, not url encoded.
-///    dest does not exist
+///    dst does not exist
 ///    expected result: /tmp/new file is written without error.
 ///
 /// Details
@@ -599,13 +599,13 @@ fn files_get_src_is_nrs_recursive_and_dest_not_existing() -> Result<()> {
 /// And `src` is set to the `tmp_data_path` container xor url
 /// And a unique `dest` directory is created
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then it should download `src` to `dest`
 /// And the `tmp_data_path` and `dest` paths should have the same directory trees, with the files
 /// and directories with spaces in the names.
 #[test]
-fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<()> {
+fn files_get_src_has_embedded_spaces_and_dst_also() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -615,8 +615,8 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<()> {
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
-    let dest = assert_fs::TempDir::new()?;
-    let dest = dest.path().display().to_string();
+    let dst = assert_fs::TempDir::new()?;
+    let dst = dst.path().display().to_string();
 
     // Act
     safe_cmd(
@@ -624,7 +624,7 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<()> {
             "files",
             "get",
             src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -634,7 +634,7 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<()> {
     // Assert
     assert_eq!(
         sum_tree(&tmp_data_path.path().display().to_string())?,
-        sum_tree(&dest)?
+        sum_tree(&dst)?
     );
 
     Ok(())
@@ -644,7 +644,7 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<()> {
 /// --------
 /// Test:  safe files get "safe://.../dir%20with%20space/file%20with%20space" "/tmp/new file"
 ///    src is a file, directory and file both contain embedded spaces, url-encoded.
-///    dest does not exist
+///    dst does not exist
 ///
 ///    expected result: /tmp/new file is written without error.
 ///
@@ -660,13 +660,13 @@ fn files_get_src_has_embedded_spaces_and_dest_also() -> Result<()> {
 /// And `src` is set to the `tmp_data_path/dir%20with%20space/file%20with%20space` container xor url
 /// And a unique `dest` file path is specified
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then it should download `src` to `dest`
 /// And the `tmp_data_path` and `dest` paths should have the same directory trees, with the files
 /// and directories with spaces in the names.
 #[test]
-fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
+fn files_get_src_has_encoded_spaces_and_dst_also() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -682,7 +682,7 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
         url.public_name(),
         "dir%20with%20space/file%20with%20space",
     );
-    let dest = assert_fs::NamedTempFile::new("new file")?;
+    let dst = assert_fs::NamedTempFile::new("new file")?;
 
     // Act
     safe_cmd(
@@ -690,7 +690,7 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
             "files",
             "get",
             &src,
-            &dest.path().display().to_string(),
+            &dst.path().display().to_string(),
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -698,8 +698,8 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
     )?;
 
     // Assert
-    dest.assert(predicate::path::is_file());
-    dest.assert(predicate::str::contains("some file content"));
+    dst.assert(predicate::path::is_file());
+    dst.assert(predicate::str::contains("some file content"));
 
     Ok(())
 }
@@ -708,8 +708,8 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
 /// --------
 /// Test:  safe files get --exists=preserve <url> /tmp/testdata
 ///    src is a container url, uploaded with trailing slash
-///    dest exists, and is a directory
-///    dest contains only test.md, with 0 bytes.
+///    dst exists, and is a directory
+///    dst contains only test.md, with 0 bytes.
 ///    expected result:
 ///        ../resources/testdata does not match /tmp/testdata/
 ///        /tmp/testdata still contains test.md with 0 bytes
@@ -726,7 +726,7 @@ fn files_get_src_has_encoded_spaces_and_dest_also() -> Result<()> {
 /// And a unique `dest` file path is specified
 /// And a markdown file is created at `dest/test.md`
 ///
-/// When the `files get src dest --exists=preserve --progress=none` command runs
+/// When the `files get src dst --exists=preserve --progress=none` command runs
 ///
 /// Then it should download `src` to `dest`
 /// And the `dest/test.md` markdown file should be preserved
@@ -744,9 +744,9 @@ fn files_get_exists_preserve() -> Result<()> {
     let src = &files_container_xor;
     let test_md_file = assert_fs::NamedTempFile::new("test.md")?;
     test_md_file.write_str("some markdown content")?;
-    let mut dest_pb = PathBuf::from(test_md_file.path());
-    dest_pb.pop();
-    let dest = dest_pb.as_path().display().to_string();
+    let mut dst_pb = PathBuf::from(test_md_file.path());
+    dst_pb.pop();
+    let dst = dst_pb.as_path().display().to_string();
 
     // Act
     safe_cmd(
@@ -754,7 +754,7 @@ fn files_get_exists_preserve() -> Result<()> {
             "files",
             "get",
             src,
-            &dest,
+            &dst,
             "--exists=preserve",
             "--progress=none",
         ],
@@ -764,8 +764,8 @@ fn files_get_exists_preserve() -> Result<()> {
     // Assert
     test_md_file.assert(predicate::path::is_file());
     test_md_file.assert(predicate::str::contains("some markdown content"));
-    assert_ne!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
-    assert!(Path::new(&dest).join("another.md").is_file());
+    assert_ne!(sum_tree(TEST_FOLDER)?, sum_tree(&dst)?);
+    assert!(Path::new(&dst).join("another.md").is_file());
 
     Ok(())
 }
@@ -774,8 +774,8 @@ fn files_get_exists_preserve() -> Result<()> {
 /// --------
 /// Test:  safe files get --exists=overwrite <url> /tmp/testdata
 ///    src is a container url, uploaded with trailing slash
-///    dest exists, and is a directory
-///    dest contains only test.md, with 0 bytes.
+///    dst exists, and is a directory
+///    dst contains only test.md, with 0 bytes.
 ///    expected result:
 ///        ../resources/testdata matches /tmp/testdata
 ///
@@ -791,7 +791,7 @@ fn files_get_exists_preserve() -> Result<()> {
 /// And a unique `dest` file path is specified
 /// And a markdown file is created at `dest/test.md`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then it should download `src` to `dest`
 /// And the `dest/test.md` markdown file should be overwritten
@@ -809,9 +809,9 @@ fn files_get_exists_overwrite() -> Result<()> {
     let src = &files_container_xor;
     let test_md_file = assert_fs::NamedTempFile::new("test.md")?;
     test_md_file.write_str("some markdown content")?;
-    let mut dest_pb = PathBuf::from(test_md_file.path());
-    dest_pb.pop();
-    let dest = dest_pb.as_path().display().to_string();
+    let mut dst_pb = PathBuf::from(test_md_file.path());
+    dst_pb.pop();
+    let dst = dst_pb.as_path().display().to_string();
 
     // Act
     safe_cmd(
@@ -819,7 +819,7 @@ fn files_get_exists_overwrite() -> Result<()> {
             "files",
             "get",
             src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -827,10 +827,10 @@ fn files_get_exists_overwrite() -> Result<()> {
     )?;
 
     // Assert
-    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
-    assert!(Path::new(&dest).join("another.md").is_file());
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dst)?);
+    assert!(Path::new(&dst).join("another.md").is_file());
     assert_eq!(
-        std::fs::read_to_string(Path::new(&format!("{}/test.md", dest)))?,
+        std::fs::read_to_string(Path::new(&format!("{}/test.md", dst)))?,
         "hello tests!"
     );
 
@@ -841,7 +841,7 @@ fn files_get_exists_overwrite() -> Result<()> {
 /// --------
 /// Test:  safe files get <url>/path/is/invalid
 ///    src is a container url, uploaded without trailing slash
-///    dest does not exist
+///    dst does not exist
 ///    src url contains a path, which is invalid, ie
 ///        no files in container match the path.
 ///    expected result:
@@ -858,7 +858,7 @@ fn files_get_exists_overwrite() -> Result<()> {
 /// And `src` is set to the `safe://files_container_xor/path/is/invalid?v=0`
 /// And a unique `dest` path is created and specified
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then the command should fail
 /// And the the error output should contain "No data found for path '/path/is/invalid' on the
@@ -877,8 +877,8 @@ fn files_get_src_path_is_invalid() -> Result<()> {
     url.set_path("/path/is/invalid");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new()?;
-    let dest = dest.path().display().to_string();
+    let dst = assert_fs::TempDir::new()?;
+    let dst = dst.path().display().to_string();
 
     // Act
     let output = safe_cmd(
@@ -886,7 +886,7 @@ fn files_get_src_path_is_invalid() -> Result<()> {
             "files",
             "get",
             &src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -905,7 +905,7 @@ fn files_get_src_path_is_invalid() -> Result<()> {
 /// --------
 /// Test:  safe files get <url> /tmp/foo/bar
 ///    src is a container url, uploaded without trailing slash
-///    dest does not exist, /tmp/foo does not exist.
+///    dst does not exist, /tmp/foo does not exist.
 ///    expected result:
 ///          command fails with exit code 1.
 ///          stderr contains string "No such directory:"
@@ -920,12 +920,12 @@ fn files_get_src_path_is_invalid() -> Result<()> {
 /// And `src` is set to the `files_container_xor`
 /// And `dest` is set to `/non/existent/path`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then the command should fail
 /// And the the error output should contain "No such directory"
 #[test]
-fn files_get_dest_parent_does_not_exist() -> Result<()> {
+fn files_get_dst_parent_does_not_exist() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -934,7 +934,7 @@ fn files_get_dest_parent_does_not_exist() -> Result<()> {
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
     let src = &&files_container_xor;
-    let dest = "/non/existent/path";
+    let dst = "/non/existent/path";
 
     // Act
     let output = safe_cmd(
@@ -942,7 +942,7 @@ fn files_get_dest_parent_does_not_exist() -> Result<()> {
             "files",
             "get",
             src,
-            dest,
+            dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -973,7 +973,7 @@ a test case for each possibility.
 
 -- source is a dir --
 
-source     |source type| dest                      | dest exists | dest type | translated
+source     |source type| dst                      | dst exists | dst type | translated
 ---------------------------------------------------------------------------------------
 testdata   | dir       | /tmp/testdata             | Y           | dir       | /tmp/testdata/testdata
 testdata   | dir       | /tmp/testdata             | Y           | file      | error:  cannot overwrite non-directory '/tmp/testdata' with directory '../resources/testdata/'
@@ -999,7 +999,7 @@ testdata   | file      | /tmp/newname              | N           | --        | /
 /// --------
 /// Test:  safe files get ../resources/testdata /tmp/testdata
 ///    src is a dir
-///    dest exists, and is a dir
+///    dst exists, and is a dir
 ///    expected result: ../resources/testdata matches /tmp/testdata/testdata
 ///
 /// Details
@@ -1014,14 +1014,14 @@ testdata   | file      | /tmp/newname              | N           | --        | /
 /// And a unique `dest` path is created and specified
 /// And a directory is created at `dest/testdata`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then it should download `src` to `dest`
 /// And the content should be downloaded to `dest/testdata/testdata`
 /// And the `dest/testdata/testdata` tree should be the same as the testdata directory in the
 /// repository.
 #[test]
-fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<()> {
+fn files_get_src_is_dir_and_dst_exists_as_dir() -> Result<()> {
     // Arrange
     let with_trailing_slash = false;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -1034,10 +1034,10 @@ fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<()> {
     url.set_path("testdata/");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new()?;
-    let child = dest.child("testdata");
+    let dst = assert_fs::TempDir::new()?;
+    let child = dst.child("testdata");
     child.create_dir_all()?;
-    let dest = format!("{}/testdata", child.path().display());
+    let dst = format!("{}/testdata", child.path().display());
 
     // Act
     safe_cmd(
@@ -1045,7 +1045,7 @@ fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<()> {
             "files",
             "get",
             &src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1053,7 +1053,7 @@ fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<()> {
     )?;
 
     // Assert
-    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dst)?);
 
     Ok(())
 }
@@ -1062,7 +1062,7 @@ fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<()> {
 /// --------
 /// Test:  safe files get ../resources/testdata /tmp/testdata
 ///    src is a dir
-///    dest exists, and is a file
+///    dst exists, and is a file
 ///    expected result:
 ///        exit code = 1 and
 ///        stderr contains: "[Error] FileSystemError - cannot overwrite non-directory"
@@ -1079,11 +1079,11 @@ fn files_get_src_is_dir_and_dest_exists_as_dir() -> Result<()> {
 /// And a unique `dest` directory is created
 /// And a file is created at `dest/testdata`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then the command should fail
 #[test]
-fn files_get_src_is_dir_and_dest_exists_as_file() -> Result<()> {
+fn files_get_src_is_dir_and_dst_exists_as_file() -> Result<()> {
     // Arrange
     let with_trailing_slash = false;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -1098,10 +1098,10 @@ fn files_get_src_is_dir_and_dest_exists_as_file() -> Result<()> {
         url.public_name(),
         "testdata/",
     );
-    let dest = assert_fs::TempDir::new()?;
-    let child = dest.child("testdata");
+    let dst = assert_fs::TempDir::new()?;
+    let child = dst.child("testdata");
     child.write_str("some file content")?;
-    let dest = format!("{}/testdata", child.path().display());
+    let dst = format!("{}/testdata", child.path().display());
 
     // Act
     let output = safe_cmd(
@@ -1109,7 +1109,7 @@ fn files_get_src_is_dir_and_dest_exists_as_file() -> Result<()> {
             "files",
             "get",
             &src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1128,7 +1128,7 @@ fn files_get_src_is_dir_and_dest_exists_as_file() -> Result<()> {
 /// --------
 /// Test:  safe files get ../resources/testdata /tmp/testdata
 ///    src is a dir
-///    dest does not exist
+///    dst does not exist
 ///    expected result: ../resources/testdata matches /tmp/testdata
 ///
 /// Details
@@ -1142,13 +1142,13 @@ fn files_get_src_is_dir_and_dest_exists_as_file() -> Result<()> {
 /// And `src` is set to the `files_container_xor/testdata`
 /// And a unique `dest` path is created and specified
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then it should download `src` to `dest`
 /// And the `dest/testdata` tree should be the same as the testdata directory in the
 /// repository.
 #[test]
-fn files_get_src_is_dir_and_dest_not_existing() -> Result<()> {
+fn files_get_src_is_dir_and_dst_not_existing() -> Result<()> {
     // Arrange
     let with_trailing_slash = false;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -1161,8 +1161,8 @@ fn files_get_src_is_dir_and_dest_not_existing() -> Result<()> {
     url.set_path("testdata/");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new()?;
-    let dest = format!("{}/testdata", dest.path().display());
+    let dst = assert_fs::TempDir::new()?;
+    let dst = format!("{}/testdata", dst.path().display());
 
     // Act
     safe_cmd(
@@ -1170,7 +1170,7 @@ fn files_get_src_is_dir_and_dest_not_existing() -> Result<()> {
             "files",
             "get",
             &src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1178,7 +1178,7 @@ fn files_get_src_is_dir_and_dest_not_existing() -> Result<()> {
     )?;
 
     // Assert
-    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dest)?);
+    assert_eq!(sum_tree(TEST_FOLDER)?, sum_tree(&dst)?);
 
     Ok(())
 }
@@ -1187,7 +1187,7 @@ fn files_get_src_is_dir_and_dest_not_existing() -> Result<()> {
 /// --------
 /// Test:  safe files get ../resources/testdata /tmp/newname
 ///    src is a dir
-///    dest exists, and is a dir
+///    dst exists, and is a dir
 ///    expected result: ../resources/testdata matches /tmp/newname/testdata
 ///
 /// Details
@@ -1202,13 +1202,13 @@ fn files_get_src_is_dir_and_dest_not_existing() -> Result<()> {
 /// And a unique `dest` path is created and specified
 /// And a subdirectory is created at `dest/newname`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then it should download `src` to `dest`
 /// And the `dest/testdata` tree should be the same as the testdata directory in the
 /// repository.
 #[test]
-fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<()> {
+fn files_get_src_is_dir_and_dst_exists_as_newname_dir() -> Result<()> {
     // Arrange
     let with_trailing_slash = false;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -1221,10 +1221,10 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<()> {
     url.set_path("testdata/");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new()?;
-    let child = dest.child("newname");
+    let dst = assert_fs::TempDir::new()?;
+    let child = dst.child("newname");
     child.create_dir_all()?;
-    let dest = format!("{}/testdata", child.path().display());
+    let dst = format!("{}/testdata", child.path().display());
 
     // Act
     safe_cmd(
@@ -1232,7 +1232,7 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<()> {
             "files",
             "get",
             &src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1240,7 +1240,7 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<()> {
     )?;
 
     // Assert
-    assert_eq!(sum_tree("../resources/testdata")?, sum_tree(&dest)?);
+    assert_eq!(sum_tree("../resources/testdata")?, sum_tree(&dst)?);
 
     Ok(())
 }
@@ -1249,7 +1249,7 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<()> {
 /// --------
 /// Test:  safe files get ../resources/testdata /tmp/newname
 ///    src is a dir
-///    dest exists, and is a file
+///    dst exists, and is a file
 ///    expected result:
 ///        exit code = 1 and
 ///        stderr contains: "[Error] FileSystemError - cannot overwrite non-directory"
@@ -1266,12 +1266,12 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_dir() -> Result<()> {
 /// And a unique `dest` path is created and specified
 /// And a file is created at `dest/newname`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then the command should fail
 /// And the error message should contain "cannot overwrite non-directory"
 #[test]
-fn files_get_src_is_dir_and_dest_exists_as_newname_file() -> Result<()> {
+fn files_get_src_is_dir_and_dst_exists_as_newname_file() -> Result<()> {
     // Arrange
     let with_trailing_slash = false;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -1284,10 +1284,10 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_file() -> Result<()> {
     url.set_path("testdata/");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new()?;
-    let child = dest.child("newname");
+    let dst = assert_fs::TempDir::new()?;
+    let child = dst.child("newname");
     child.write_str("some file contents")?;
-    let dest = child.path().display().to_string();
+    let dst = child.path().display().to_string();
 
     // Act
     let output = safe_cmd(
@@ -1295,7 +1295,7 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_file() -> Result<()> {
             "files",
             "get",
             &src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1313,7 +1313,7 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_file() -> Result<()> {
 /// --------
 /// Test:  safe files get ../resources/testdata/noextension /tmp/noextension
 ///    src is a file
-///    dest exists, and is a dir
+///    dst exists, and is a dir
 ///    expected result: ../resources/testdata/noextension matches /tmp/noextension/noextension
 ///
 /// Details
@@ -1326,15 +1326,15 @@ fn files_get_src_is_dir_and_dest_exists_as_newname_file() -> Result<()> {
 /// And the contents of `tmp_data_path` are uploaded using the `files put tmp_data_path/ --recursive` command
 /// And `src` is set to the `files_container_xor/noextension`
 /// And a unique `dest` path is created and specified
-/// And a dest is set to `dest/noextension`
+/// And a dst is set to `dest/noextension`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then `src` should be downloaded to `dest/noextension` (this fully expands to
 /// `dest/noextension/noextension`)
-/// And the dest file should be the same as the noextension file in the repository testdata
+/// And the dst file should be the same as the noextension file in the repository testdata
 #[test]
-fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
+fn files_get_src_is_file_and_dst_exists_as_dir() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -1347,10 +1347,10 @@ fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
     url.set_path("noextension");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new()?;
-    let child = dest.child("noextension");
+    let dst = assert_fs::TempDir::new()?;
+    let child = dst.child("noextension");
     child.create_dir_all()?;
-    let dest = child.path().display().to_string();
+    let dst = child.path().display().to_string();
 
     // Act
     safe_cmd(
@@ -1358,7 +1358,7 @@ fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
             "files",
             "get",
             &src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1368,7 +1368,7 @@ fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
     // Assert
     assert_eq!(
         digest_file("../resources/testdata/noextension")?,
-        digest_file(&format!("{}/noextension", dest))?
+        digest_file(&format!("{}/noextension", dst))?
     );
 
     Ok(())
@@ -1378,7 +1378,7 @@ fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
 /// --------
 /// Test:  safe files get ../resources/testdata/noextension /tmp/noextension
 ///    src is a file
-///    dest exists, and is a file
+///    dst exists, and is a file
 ///    expected result: ../resources/testdata/noextension matches /tmp/noextension
 ///
 /// Details
@@ -1392,9 +1392,9 @@ fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
 /// And `src` is set to the `files_container_xor/noextension`
 /// And a unique `dest` path is created and specified
 /// And a file is written to `dest/noextension`
-/// And a dest is set to `dest/noextension`
+/// And a dst is set to `dest/noextension`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then `src` should be downloaded to `dest/noextension`
 /// And the existing `dest/noextension` should be overwritten with `noextension` from the files
@@ -1402,7 +1402,7 @@ fn files_get_src_is_file_and_dest_exists_as_dir() -> Result<()> {
 /// And `dest/noextension` should have the same content as `noextension` in the testdata in the
 /// repository.
 #[test]
-fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
+fn files_get_src_is_file_and_dst_exists_as_file() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -1415,10 +1415,10 @@ fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
     url.set_path("noextension");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new()?;
-    let child = dest.child("noextension");
+    let dst = assert_fs::TempDir::new()?;
+    let child = dst.child("noextension");
     child.write_str("noextension is an existing file with some content")?;
-    let dest = child.path().display().to_string();
+    let dst = child.path().display().to_string();
 
     // Act
     safe_cmd(
@@ -1426,7 +1426,7 @@ fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
             "files",
             "get",
             &src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1436,7 +1436,7 @@ fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
     // Assert
     assert_eq!(
         digest_file("../resources/testdata/noextension")?,
-        digest_file(&dest)?
+        digest_file(&dst)?
     );
 
     Ok(())
@@ -1446,7 +1446,7 @@ fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
 /// --------
 /// Test:  safe files get ../resources/testdata/noextension /tmp/noextension
 ///    src is a file
-///    dest does not exist
+///    dst does not exist
 ///    expected result: ../resources/testdata/noextension matches /tmp/noextension
 ///
 /// Details
@@ -1459,15 +1459,15 @@ fn files_get_src_is_file_and_dest_exists_as_file() -> Result<()> {
 /// And the contents of `tmp_data_path` are uploaded using the `files put tmp_data_path/ --recursive` command
 /// And `src` is set to the `files_container_xor/noextension`
 /// And a unique `dest` path is created and specified
-/// And a dest is set to `dest/noextension`
+/// And a dst is set to `dest/noextension`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then `src` should be downloaded to `dest/noextension`
 /// And `dest/noextension` should have the same content as `noextension` in the testdata in the
 /// repository.
 #[test]
-fn files_get_src_is_file_and_dest_not_existing() -> Result<()> {
+fn files_get_src_is_file_and_dst_not_existing() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -1480,8 +1480,8 @@ fn files_get_src_is_file_and_dest_not_existing() -> Result<()> {
     url.set_path("noextension");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new()?;
-    let dest = dest.path().display().to_string();
+    let dst = assert_fs::TempDir::new()?;
+    let dst = dst.path().display().to_string();
 
     // Act
     safe_cmd(
@@ -1489,7 +1489,7 @@ fn files_get_src_is_file_and_dest_not_existing() -> Result<()> {
             "files",
             "get",
             &src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1499,7 +1499,7 @@ fn files_get_src_is_file_and_dest_not_existing() -> Result<()> {
     // Assert
     assert_eq!(
         digest_file("../resources/testdata/noextension")?,
-        digest_file(&format!("{}/noextension", dest))?
+        digest_file(&format!("{}/noextension", dst))?
     );
 
     Ok(())
@@ -1509,7 +1509,7 @@ fn files_get_src_is_file_and_dest_not_existing() -> Result<()> {
 /// --------
 /// Test:  safe files get ../resources/testdata/noextension /tmp/newname
 ///    src is a file
-///    dest exists, and is a dir with new name.
+///    dst exists, and is a dir with new name.
 ///    expected result: ../resources/testdata/noextension matches /tmp/newname/noextension
 ///
 /// Scenario: the `files get` command downloads content from the network when the source is a file
@@ -1523,15 +1523,15 @@ fn files_get_src_is_file_and_dest_not_existing() -> Result<()> {
 /// And `src` is set to the `files_container_xor/noextension`
 /// And a unique `dest` path is created and specified
 /// And a subdirectory is created at `dest/newname`
-/// And a dest is set to `dest/newname`
+/// And a dst is set to `dest/newname`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then `src` should be downloaded to `dest/noextension`
 /// And `dest/newname/noextension` should have the same content as `noextension` in the testdata in the
 /// repository.
 #[test]
-fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
+fn files_get_src_is_file_and_dst_exists_as_newname_dir() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -1544,10 +1544,10 @@ fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
     url.set_path("noextension");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new()?;
-    let child = dest.child("newname");
+    let dst = assert_fs::TempDir::new()?;
+    let child = dst.child("newname");
     child.create_dir_all()?;
-    let dest = child.path().display().to_string();
+    let dst = child.path().display().to_string();
 
     // Act
     safe_cmd(
@@ -1555,7 +1555,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
             "files",
             "get",
             &src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1565,7 +1565,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
     // Assert
     assert_eq!(
         digest_file("../resources/testdata/noextension")?,
-        digest_file(&format!("{}/noextension", dest))?
+        digest_file(&format!("{}/noextension", dst))?
     );
 
     Ok(())
@@ -1575,7 +1575,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
 /// --------
 /// Test:  safe files get ../resources/testdata/noextension /tmp/newname
 ///    src is a file
-///    dest exists, and is a file with new name
+///    dst exists, and is a file with new name
 ///    expected result: ../resources/testdata/noextension matches /tmp/newname
 ///
 /// Details
@@ -1589,15 +1589,15 @@ fn files_get_src_is_file_and_dest_exists_as_newname_dir() -> Result<()> {
 /// And `src` is set to the `files_container_xor/noextension`
 /// And a unique `dest` path is created and specified
 /// And a file is created at `dest/newname`
-/// And a dest is set to `dest/newname`
+/// And a dst is set to `dest/newname`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then `src` should be downloaded to `dest/noextension`
 /// And `dest/newname` should have the same content as `noextension` in the testdata in the
 /// repository.
 #[test]
-fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
+fn files_get_src_is_file_and_dst_exists_as_newname_file() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -1610,10 +1610,10 @@ fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
     url.set_path("noextension");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new()?;
-    let child = dest.child("newname");
+    let dst = assert_fs::TempDir::new()?;
+    let child = dst.child("newname");
     child.write_str("this file will be overwritten")?;
-    let dest = child.path().display().to_string();
+    let dst = child.path().display().to_string();
 
     // Act
     safe_cmd(
@@ -1621,7 +1621,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
             "files",
             "get",
             &src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1631,7 +1631,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
     // Assert
     assert_eq!(
         digest_file("../resources/testdata/noextension")?,
-        digest_file(&dest)?
+        digest_file(&dst)?
     );
 
     Ok(())
@@ -1641,7 +1641,7 @@ fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
 /// --------
 /// Test:  safe files get ../resources/testdata/noextension /tmp/newname
 ///    src is a file
-///    dest does not exist
+///    dst does not exist
 ///    expected result: ../resources/testdata/noextension matches /tmp/newname
 ///
 /// Details
@@ -1654,15 +1654,15 @@ fn files_get_src_is_file_and_dest_exists_as_newname_file() -> Result<()> {
 /// And the contents of `tmp_data_path` are uploaded using the `files put tmp_data_path/ --recursive` command
 /// And `src` is set to the `files_container_xor/noextension`
 /// And a unique `dest` path is created and specified
-/// And a dest is set to `dest/newname`
+/// And a dst is set to `dest/newname`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then `src` should be downloaded to `dest/noextension`
 /// And `dest/newname` should have the same content as `noextension` in the testdata in the
 /// repository.
 #[test]
-fn files_get_src_is_file_and_dest_newname_not_existing() -> Result<()> {
+fn files_get_src_is_file_and_dst_newname_not_existing() -> Result<()> {
     // Arrange
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -1675,8 +1675,8 @@ fn files_get_src_is_file_and_dest_newname_not_existing() -> Result<()> {
     url.set_path("noextension");
     let src = url.to_string();
 
-    let dest = assert_fs::TempDir::new()?;
-    let dest = format!("{}/newname", dest.path().display());
+    let dst = assert_fs::TempDir::new()?;
+    let dst = format!("{}/newname", dst.path().display());
 
     // Act
     safe_cmd(
@@ -1684,7 +1684,7 @@ fn files_get_src_is_file_and_dest_newname_not_existing() -> Result<()> {
             "files",
             "get",
             &src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1694,7 +1694,7 @@ fn files_get_src_is_file_and_dest_newname_not_existing() -> Result<()> {
     // Assert
     assert_eq!(
         digest_file("../resources/testdata/noextension")?,
-        digest_file(&dest)?
+        digest_file(&dst)?
     );
 
     Ok(())
@@ -1704,7 +1704,7 @@ fn files_get_src_is_file_and_dest_newname_not_existing() -> Result<()> {
 /// --------
 /// Test:  safe files get <src> /tmp/newname
 ///    src is xor-url generated from `safe files put ./test_symlinks`
-///    dest does not exist
+///    dst does not exist
 ///    expected result: ./test_symlinks matches /tmp/newname
 ///
 /// Details
@@ -1716,9 +1716,9 @@ fn files_get_src_is_file_and_dest_newname_not_existing() -> Result<()> {
 /// --recursive` command
 /// And `src` is set to the `files_container_xor`
 /// And a unique `dest` path is created and specified
-/// And a dest is set to `dest/newname`
+/// And a dst is set to `dest/newname`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then `src` should be downloaded to `dest/newname`
 /// And the `dest/newname` tree should match the `./test_symlinks` tree with the relative symlinks
@@ -1739,8 +1739,8 @@ fn files_get_symlinks_relative() -> Result<()> {
         upload_path("../resources/test_symlinks", with_trailing_slash)?;
 
     let src = &files_container_xor;
-    let dest = assert_fs::TempDir::new()?;
-    let dest = format!("{}/newname", dest.path().display());
+    let dst = assert_fs::TempDir::new()?;
+    let dst = format!("{}/newname", dst.path().display());
 
     // Act
     safe_cmd(
@@ -1748,7 +1748,7 @@ fn files_get_symlinks_relative() -> Result<()> {
             "files",
             "get",
             src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1756,7 +1756,7 @@ fn files_get_symlinks_relative() -> Result<()> {
     )?;
 
     // Assert
-    assert_eq!(sum_tree("../resources/test_symlinks")?, sum_tree(&dest)?);
+    assert_eq!(sum_tree("../resources/test_symlinks")?, sum_tree(&dst)?);
     Ok(())
 }
 
@@ -1764,7 +1764,7 @@ fn files_get_symlinks_relative() -> Result<()> {
 /// --------
 /// Test:  safe files get <xor-url>/absolute_symlinks /tmp/newname
 ///    src is symlinks test dir containing absolute-path links
-///    dest does not exist
+///    dst does not exist
 ///    expected result: source directory matches /tmp/newname
 ///
 /// Details
@@ -1777,9 +1777,9 @@ fn files_get_symlinks_relative() -> Result<()> {
 /// And `tmp_data_path` is uploaded using the `files put tmp_data_path/ --recursive` command
 /// And `src` is set to the `files_container_xor`
 /// And a unique `dest` path is created and specified
-/// And a dest is set to `dest/newname`
+/// And a dst is set to `dest/newname`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then `src` should be downloaded to `dest/newname`
 /// And the `dest/newname` tree should match the `tmp_data_path` tree with absolute symlinks.
@@ -1799,8 +1799,8 @@ fn files_get_symlinks_absolute() -> Result<()> {
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
     let src = &files_container_xor;
-    let dest = assert_fs::TempDir::new()?;
-    let dest = format!("{}/newname", dest.path().display());
+    let dst = assert_fs::TempDir::new()?;
+    let dst = format!("{}/newname", dst.path().display());
 
     // Act
     safe_cmd(
@@ -1808,7 +1808,7 @@ fn files_get_symlinks_absolute() -> Result<()> {
             "files",
             "get",
             src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1818,7 +1818,7 @@ fn files_get_symlinks_absolute() -> Result<()> {
     // Assert
     assert_eq!(
         sum_tree(&tmp_data_path.path().display().to_string())?,
-        sum_tree(&dest)?
+        sum_tree(&dst)?
     );
 
     Ok(())
@@ -1828,7 +1828,7 @@ fn files_get_symlinks_absolute() -> Result<()> {
 /// --------
 /// Test:  safe files get <xor-url>/absolute_symlinks /tmp/newname
 ///    src is symlinks test dir containing absolute-path links
-///    dest does not exist
+///    dst does not exist
 ///    expected result: source directory matches /tmp/newname
 ///
 /// Details
@@ -1847,7 +1847,7 @@ fn files_get_symlinks_absolute() -> Result<()> {
 /// And a unique `dest` path is created and specified
 /// And `dest` is set to `dest/newname`
 ///
-/// When the `files get src dest --exists=overwrite --progress=none` command runs
+/// When the `files get src dst --exists=overwrite --progress=none` command runs
 ///
 /// Then `src` should be downloaded to `dest/newname`
 /// And the `dest/newname` tree should match the `tmp_data_path` tree with absolute symlinks and
@@ -1887,8 +1887,8 @@ fn files_get_symlinks_after_sync() -> Result<()> {
     )?;
 
     let src = &safeurl.to_string();
-    let dest = assert_fs::TempDir::new()?;
-    let dest = format!("{}/newname", dest.path().display());
+    let dst = assert_fs::TempDir::new()?;
+    let dst = format!("{}/newname", dst.path().display());
 
     // Act
     safe_cmd(
@@ -1896,7 +1896,7 @@ fn files_get_symlinks_after_sync() -> Result<()> {
             "files",
             "get",
             src,
-            &dest,
+            &dst,
             "--exists=overwrite",
             "--progress=none",
         ],
@@ -1906,7 +1906,7 @@ fn files_get_symlinks_after_sync() -> Result<()> {
     // Assert
     assert_eq!(
         sum_tree(&tmp_data_path.path().display().to_string())?,
-        sum_tree(&dest)?
+        sum_tree(&dst)?
     );
 
     Ok(())

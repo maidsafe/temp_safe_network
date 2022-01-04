@@ -98,7 +98,7 @@ fn calling_safe_files_put_recursive() -> Result<()> {
 }
 
 #[test]
-fn calling_safe_files_put_recursive_and_set_dest_path() -> Result<()> {
+fn calling_safe_files_put_recursive_and_set_dst_path() -> Result<()> {
     let files_container = safe_cmd_stdout(
         ["files", "put", TEST_FOLDER, "/aha", "--recursive"],
         Some(0),

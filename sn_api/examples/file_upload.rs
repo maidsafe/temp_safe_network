@@ -44,13 +44,13 @@ async fn main() -> Result<()> {
     safe.connect(None, None, bootstrap_config).await?;
 
     // We can now upload the file to the network, using the following information
-    let dest = None; // root path at destination container
+    let dst = None; // root path at destination container
     let recursive = false; // do not do a recursive look up of files on local path
     let follow_links = false; // do not attempt to follow local links
 
     println!("Uploading '{}' to Safe ...", file_path.display());
     let (xorurl, _, _) = safe
-        .files_container_create_from(&file_path, dest, recursive, follow_links)
+        .files_container_create_from(&file_path, dst, recursive, follow_links)
         .await?;
 
     // The 'files_container_create_from' API returns (among other information) the

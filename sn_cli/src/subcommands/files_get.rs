@@ -103,7 +103,7 @@ impl Default for ProgressIndicator {
 
 // processes the `safe files get` command.  called by files.rs
 //
-// dest is a local path.  defaults to "."
+// dst is a local path.  defaults to "."
 //   Path will be created if not existing, else error.
 //
 // TODO: _preserve file attributes is not yet implemented, we need them
@@ -121,13 +121,13 @@ impl Default for ProgressIndicator {
 pub async fn process_get_command(
     safe: &mut Safe,
     source: XorUrl,
-    dest: Option<String>,
+    dst: Option<String>,
     exists: FileExistsAction,
     progress: ProgressIndicator,
     _preserve: bool,
     _output_fmt: OutputFmt,
 ) -> Result<()> {
-    let str_path = dest.unwrap_or_else(|| ".".to_string());
+    let str_path = dst.unwrap_or_else(|| ".".to_string());
     let path = Path::new(&str_path);
 
     let mut overwrites: u64 = 0;
@@ -139,7 +139,7 @@ pub async fn process_get_command(
             let mut mystatus = status.clone();
 
             if status.file_bytes_written == 0 {
-                // It is an error/warning if the dest path attempts to use
+                // It is an error/warning if the dst path attempts to use
                 // an existing file as a directory. But other files should
                 // still be written.  eg:
                 // $ mkdir -p /tmp/a/b/c && touch /tmp/a/file.txt
@@ -372,7 +372,7 @@ async fn files_container_get_files(
 // The root path is determined as per the follow matrix:
 /*
 
-source     |source type| dest                      | dest exists | dest type | translated
+source     |source type| dst                      | dst exists | dst type | translated
 ---------------------------------------------------------------------------------------
 testdata   | dir       | /tmp/testdata             | Y           | dir       | /tmp/testdata/testdata
 testdata   | dir       | /tmp/testdata             | Y           | file      | error:  cannot overwrite non-directory '/tmp/testdata' with directory './testdata/'
