@@ -16,13 +16,13 @@ use tracing::info;
 /// Tracking used space
 pub struct UsedSpace {
     /// the maximum (inclusive) allocated space for storage
-    max_capacity: u64,
+    max_capacity: usize,
     used_space: Arc<AtomicUsize>,
 }
 
 impl UsedSpace {
     /// Create new UsedSpace tracker
-    pub fn new(max_capacity: u64) -> Self {
+    pub fn new(max_capacity: usize) -> Self {
         Self {
             max_capacity,
             used_space: Arc::new(AtomicUsize::new(0)),
@@ -37,7 +37,12 @@ impl UsedSpace {
         let _ = self.used_space.fetch_sub(size, Ordering::Relaxed);
     }
 
-    pub(crate) async fn ratio(&self) -> f64 {
+    pub(crate) fn can_add(&self, size: usize) -> bool {
+        let current_used_space = self.used_space.fetch_add(0, Ordering::Relaxed);
+        current_used_space + size <= self.max_capacity
+    }
+
+    pub(crate) fn ratio(&self) -> f64 {
         let used = self.used_space.load(Ordering::Relaxed);
         let max_capacity = self.max_capacity;
         let used_space_ratio = used as f64 / max_capacity as f64;

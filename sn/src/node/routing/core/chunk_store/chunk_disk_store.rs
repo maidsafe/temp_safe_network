@@ -34,13 +34,13 @@ impl ChunkDiskStore {
     /// If the location specified already contains a ChunkDiskStore, it is simply used
     ///
     /// Used space of the dir is tracked
-    pub(crate) fn new<P: AsRef<Path>>(root: P, max_capacity: u64) -> Result<Self> {
+    pub(crate) fn new<P: AsRef<Path>>(root: P, used_space: UsedSpace) -> Result<Self> {
         let chunk_store_path = root.as_ref().join(CHUNK_DB_DIR);
 
         Ok(ChunkDiskStore {
             bit_tree_depth: BIT_TREE_DEPTH,
             chunk_store_path,
-            used_space: UsedSpace::new(max_capacity),
+            used_space,
         })
     }
 
@@ -83,8 +83,14 @@ impl ChunkDiskStore {
         Ok(ChunkAddress::decode_from_zbase32(filename)?)
     }
 
-    pub(crate) async fn used_space_ratio(&self) -> f64 {
-        self.used_space.ratio().await
+    // ---------------------- api methods ----------------------
+
+    pub(crate) fn used_space_ratio(&self) -> f64 {
+        self.used_space.ratio()
+    }
+
+    pub(crate) fn can_add(&self, size: usize) -> bool {
+        self.used_space.can_add(size)
     }
 
     pub(crate) async fn write_chunk(&self, data: &Chunk) -> Result<ChunkAddress> {
@@ -184,7 +190,8 @@ mod tests {
 
     fn init_chunk_disk_store() -> ChunkDiskStore {
         let root = tempdir().expect("Failed to create temporary directory for chunk disk store");
-        ChunkDiskStore::new(root.path(), u64::MAX).expect("Failed to create chunk disk store")
+        ChunkDiskStore::new(root.path(), UsedSpace::new(usize::MAX))
+            .expect("Failed to create chunk disk store")
     }
 
     #[tokio::test]
