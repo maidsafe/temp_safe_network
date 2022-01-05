@@ -1378,7 +1378,7 @@ mod tests {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let type_tag: u64 = 0x0eef;
         let subdirs = "/dir1/dir2";
-        let random_hash: EntryHash = rand::thread_rng().gen::<[u8; 32]>();
+        let random_hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
         let content_version = VersionHash::from(&random_hash);
         let query_string = "k1=v1&k2=v2";
         let query_string_v = format!("{}&v={}", query_string, content_version);
@@ -1595,7 +1595,7 @@ mod tests {
         assert_eq!(x.to_string(), "safe://myname?name=&age=25");
 
         // Test setting content version via ?v=61342
-        let random_hash: EntryHash = rand::thread_rng().gen::<[u8; 32]>();
+        let random_hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
         let version_hash = VersionHash::from(&random_hash);
         x.set_query_key(URL_VERSION_QUERY_NAME, Some(&version_hash.to_string()))?;
         assert_eq!(
@@ -1634,7 +1634,7 @@ mod tests {
     fn test_url_set_content_version() -> Result<()> {
         let mut x = SafeUrl::from_url("safe://myname?name=John+Doe&name=Jane%20Doe")?;
 
-        let random_hash: EntryHash = rand::thread_rng().gen::<[u8; 32]>();
+        let random_hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
         let version_hash = VersionHash::from(&random_hash);
         x.set_content_version(Some(version_hash));
         assert_eq!(
@@ -1734,9 +1734,9 @@ mod tests {
 
     #[test]
     fn test_url_parts() -> Result<()> {
-        let random_hash: EntryHash = rand::thread_rng().gen::<[u8; 32]>();
+        let random_hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
         let nrsurl_version_hash = VersionHash::from(&random_hash);
-        let random_hash: EntryHash = rand::thread_rng().gen::<[u8; 32]>();
+        let random_hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
         let xorurl_version_hash = VersionHash::from(&random_hash);
 
         // These two are equivalent.  ie, the xorurl is the result of nrs.to_xorurl_string()
