@@ -235,7 +235,7 @@ jobs:
         shell: zsh {0}
         if: matrix.os != 'windows-latest'
         run: cd sn && repeat 5 cargo test --release --features=always-joinable,test-utils -- client_api::blob --test-threads=1 --skip ae --skip from_many_clients  && sleep $POST_TEST_SLEEP
-        timeout-minutes: 20
+        timeout-minutes: 25
 
       # blob api
       - name: client blob tests against local network (win)
@@ -249,7 +249,7 @@ jobs:
         shell: zsh {0}
         if: matrix.os != 'windows-latest'
         run: cd sn && repeat 5 cargo test --release --features=always-joinable,test-utils -- ae_checks --test-threads=2 && sleep $POST_TEST_SLEEP
-        timeout-minutes: 10
+        timeout-minutes: 15
         env:
           SN_AE_WAIT: 10
 
