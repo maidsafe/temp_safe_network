@@ -440,6 +440,11 @@ async fn handle_incoming_connections(
     msg_count: MsgCount,
 ) {
     while let Some((connection, connection_incoming)) = incoming_connections.next().await {
+        trace!(
+            "incoming_connection from {:?} with connection_id {:?}",
+            connection.remote_address(),
+            connection.id()
+        );
         let _ = task::spawn(
             handle_incoming_messages(
                 connection,

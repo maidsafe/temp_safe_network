@@ -123,6 +123,7 @@ impl RegisterStorage {
         write: RegisterWrite,
         auth: AuthorityProof<ServiceAuth>,
     ) -> Result<()> {
+        // rough estimate ignoring the extra space used by sled
         let required_space = std::mem::size_of::<RegisterCmd>();
         if !self.used_space.can_add(required_space) {
             return Err(Error::NotEnoughSpace);
@@ -134,7 +135,24 @@ impl RegisterStorage {
         self.apply(op, auth)
     }
 
+    // helper that drops the sled tree for a given register
+    // decreases the used space by a rough estimate of the size before deletion
+    // as with addition this estimate ignores the extra space used by sled
+    // (that estimate can fall victim to a race condition if someone writes to a register that is being deleted)
+    fn drop_register_key(&self, key: XorName) -> Result<()> {
+        let tree = self.db.open_tree(key)?;
+        let len = tree.len();
+        let regcmd_size = std::mem::size_of::<RegisterCmd>();
+
+        let _res = self.db.drop_tree(key)?;
+
+        let key_used_space = len * regcmd_size;
+        self.used_space.decrease(key_used_space);
+        Ok(())
+    }
+
     fn apply(&self, op: RegisterCmd, auth: AuthorityProof<ServiceAuth>) -> Result<()> {
+        // rough estimate ignoring the extra space used by sled
         let required_space = std::mem::size_of::<RegisterCmd>();
 
         let RegisterCmd { write, .. } = op.clone();
@@ -163,7 +181,7 @@ impl RegisterStorage {
                 let result = match self.registers.get_mut(&key) {
                     None => {
                         trace!("Attempting to delete register if it exists");
-                        let _res = self.db.drop_tree(key)?;
+                        self.drop_register_key(key)?;
                         Ok(())
                     }
                     Some(mut entry) => {
@@ -180,12 +198,12 @@ impl RegisterStorage {
                                 Err(Error::InvalidOwner(auth.public_key))
                             } else {
                                 info!("Deleting Register");
-                                let _res = self.db.drop_tree(key)?;
+                                self.drop_register_key(key)?;
                                 Ok(())
                             }
                         } else if self.load_store(key).is_ok() {
                             info!("Deleting Register");
-                            let _res = self.db.drop_tree(key)?;
+                            self.drop_register_key(key)?;
                             Ok(())
                         } else {
                             Ok(())

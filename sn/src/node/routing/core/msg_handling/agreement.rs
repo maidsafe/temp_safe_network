@@ -294,7 +294,7 @@ impl Core {
                     ),
                     Ok(true) => {
                         info!("Updated our network knowledge for {:?}", prefix);
-
+                        info!("Writing updated knowledge to disk");
                         self.write_prefix_map().await
                     }
                     _ => {}

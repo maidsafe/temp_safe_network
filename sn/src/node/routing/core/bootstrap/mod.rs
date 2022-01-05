@@ -32,7 +32,7 @@ async fn read_prefix_map_from_disk(genesis_key: BlsPublicKey) -> Result<NetworkP
         Some(mut prefix_map_dir) => {
             // Read NetworkPrefixMap from disk if present
             prefix_map_dir.push(".safe");
-            prefix_map_dir.push("prefix_map");
+            prefix_map_dir.push("prefix_maps");
 
             if let Ok(mut prefix_map_file) = File::open(prefix_map_dir.clone()).await {
                 let mut prefix_map_contents = vec![];
