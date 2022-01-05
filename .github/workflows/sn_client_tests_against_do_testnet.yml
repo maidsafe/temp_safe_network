@@ -1,6 +1,6 @@
-name: 'sn: Run Client Tests against DO Testnet'
+name: 'sn:  DO Testnet. Client Tests'
 
-on: 
+on:
   workflow_dispatch:
     inputs:
       node-count:
@@ -87,7 +87,7 @@ jobs:
       - name: Client blob tests
         shell: bash
         run: cargo test --release --features=always-joinable,test-utils -- client_api::blob --test-threads=1 && sleep 5
-      
+
       - name: Run example app for Blob API
         shell: bash
         run: cargo run --release  --features=always-joinable,test-utils --example client_blob
