@@ -1,6 +1,6 @@
-name: 'sn: Run Client Tests against DO Testnet'
+name: 'sn:  DO Testnet. Client Tests'
 
-on: 
+on:
   workflow_dispatch:
     inputs:
       node-count:

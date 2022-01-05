@@ -1,6 +1,8 @@
-name: PR Tests
+name: Bors CI Tests
 
-on: pull_request
+on:
+  push:
+    branches: [staging, trying]
 
 env:
   # Turn on backtrace as needed. Generally (passing) CI should not need this.
@@ -17,6 +19,95 @@ env:
   POST_TEST_SLEEP: 5
 
 jobs:
+
+  # bors Continuous Integration
+  ci-success:
+    # refereneced in bors.toml
+    name: ci
+    if: ${{ success() }}
+    # github jobs that need to have passed for bors to give the all clear
+    needs:
+      - e2e
+      - unit
+      - checks
+      - test-publish
+      - lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: CI succeeded
+        run: exit 0
+
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@f114310111fdbd07e99f47f9ca13d62b3ec98372
+
+  checks:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Run rustfmt and clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: dorny/paths-filter@v2
+        id: sn_changes
+        with:
+          filters: |
+            src:
+              - 'sn/src/**'
+              - 'sn_api/src/**'
+              - 'sn_cli/src/**'
+
+      - uses: actions-rs/toolchain@v1
+        if: steps.sn_changes.outputs.src == 'true'
+        id: toolchain
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
+
+      - name: Check formatting
+        if: steps.sn_changes.outputs.src == 'true'
+        run: cargo fmt --all -- --check
+
+      - shell: bash
+        if: steps.sn_changes.outputs.src == 'true'
+        run: cargo clippy --all-targets
+
+  test-publish:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Test Publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: dorny/paths-filter@v2
+        id: sn_changes
+        with:
+          filters: |
+            src:
+              - 'sn/src/**'
+
+      - uses: actions-rs/toolchain@v1
+        if: steps.sn_changes.outputs.src == 'true'
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Publish Dry Run
+        if: steps.sn_changes.outputs.src == 'true'
+        run: cd sn && cargo publish --dry-run
 
   build:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -199,7 +290,7 @@ jobs:
         shell: zsh {0}
         if: matrix.os != 'windows-latest'
         # always joinable not actually needed here, but should speed up compilation as we've just built with it
-        run: cd sn && repeat 5 cargo test --release --features=always-joinable,test-utils -- client --skip client_api::reg --skip client_api::file --test-threads=2 && sleep $POST_TEST_SLEEP
+        run: cd sn && repeat 5 cargo test --release --features=always-joinable,test-utils -- client --skip client_api::reg --skip client_api::blob --test-threads=2 && sleep $POST_TEST_SLEEP
         timeout-minutes: 5
 
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
@@ -207,7 +298,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: bash
         # always joinable not actually needed here, but should speed up compilation as we've just built with it
-        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client --skip client_api::reg --skip client_api::file --test-threads=2 && sleep $POST_TEST_SLEEP
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client --skip client_api::reg --skip client_api::blob --test-threads=2 && sleep $POST_TEST_SLEEP
         timeout-minutes: 5
 
       # register api
@@ -230,19 +321,18 @@ jobs:
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- register_batching --test-threads=1 --skip ae && sleep $POST_TEST_SLEEP
         timeout-minutes: 10
 
-      # file api
-      - name: client file tests against local network (unix)
+      # blob api
+      - name: client blob tests against local network (unix)
         shell: zsh {0}
         if: matrix.os != 'windows-latest'
-        run: cd sn && repeat 5 cargo test --release --features=always-joinable,test-utils -- client_api::file --test-threads=1 --skip ae --skip from_many_clients  && sleep $POST_TEST_SLEEP
+        run: cd sn && repeat 5 cargo test --release --features=always-joinable,test-utils -- client_api::blob --test-threads=1 --skip ae --skip from_many_clients  && sleep $POST_TEST_SLEEP
         timeout-minutes: 25
 
-
-      # file api
-      - name: client file tests against local network (win)
+      # blob api
+      - name: client blob tests against local network (win)
         shell: bash
         if: matrix.os == 'windows-latest'
-        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::file --test-threads=1 --skip ae --skip from_many_clients  && sleep $POST_TEST_SLEEP
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::blob --test-threads=1 --skip ae --skip from_many_clients  && sleep $POST_TEST_SLEEP
         timeout-minutes: 15
 
       # ae tests api
@@ -262,10 +352,10 @@ jobs:
         env:
           SN_AE_WAIT: 10
 
-      - name: Run example app for file API against local network
+      - name: Run example app for Blob API against local network
         timeout-minutes: 10
         shell: bash
-        run: cd sn && cargo run  --release  --features=always-joinable,test-utils --example client_files
+        run: cd sn && cargo run  --release  --features=always-joinable,test-utils --example client_blob
 
       # # many client connections
       # - name: many client test against local network
@@ -311,161 +401,3 @@ jobs:
         if: failure()
         continue-on-error: true
 
-
-  api:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run api tests
-    needs: ["build"]
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@v2
-
-      # Install Rust
-      - name: Install Rust
-        id: toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      - uses: Swatinem/rust-cache@v1
-        continue-on-error: true
-        with:
-          cache-on-failure: true
-          sharedKey: ${{github.run_id}}
-
-      - name: Build all sn_api tests
-        run: cargo test --no-run -p sn_api --release --lib
-
-      - name: Start the network
-        run: ./target/release/testnet
-        id: section-startup
-
-      - name: Print Network Log Stats at start
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
-
-
-      - name: Run sn_api tests
-        shell: bash
-        run: ./resources/scripts/api_tests.sh
-        timeout-minutes: 45
-        env:
-          # these api tests realy heavily on retry_loop at the moment
-          # TODO: Remove that dependency
-          SN_QUERY_TIMEOUT: 20 # 20 secs
-
-      - name: Are nodes still running...?
-        shell: bash
-        timeout-minutes: 1
-        if: failure() && matrix.os
-        run: |
-          echo "$(pgrep sn_node | wc -l) nodes still running"
-          ls $HOME/.safe/node/local-test-network
-
-      - name: Print Network Log Stats
-        shell: bash
-        continue-on-error: true
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success'
-
-      - name: Upload Node Logs to AWS for Windowns
-          # Upload artifacts.
-        run: aws s3 sync C:\Users\runneradmin\.safe\node\local-test-network\ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure() &&  matrix.os == 'windows-latest'
-        continue-on-error: true
-
-      - name: Upload Node Logs to AWS for Non-Windows
-          # Upload artifacts.
-        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure() &&  matrix.os != 'windows-latest'
-        continue-on-error: true
-
-      - name: Upload Node Logs
-          # Upload artifacts.
-        uses: actions/upload-artifact@v2
-        with:
-          name: ${{github.job.name}}_sn_node_logs_${{matrix.os}}
-          path: ~/.safe/node/local-test-network/**/*.log*
-        if: failure()
-        continue-on-error: true
-
-  cli:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run CLI tests
-    needs: ["build"]
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@v2
-
-      # Install Rust
-      - name: Install Rust
-        id: toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      - uses: Swatinem/rust-cache@v1
-        continue-on-error: true
-        with:
-          cache-on-failure: true
-          sharedKey: ${{github.run_id}}
-
-      - name: Build all CLI tests
-        run: cargo test --no-run -p sn_cli --release
-
-      - name: Start the network
-        run: ./target/release/testnet
-        id: section-startup
-
-      - name: Print Network Log Stats at start
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
-
-
-      - name: Run CLI tests
-        shell: bash
-        run: ./resources/scripts/cli_tests.sh
-        timeout-minutes: 45
-
-      - name: Are nodes still running...?
-        shell: bash
-        timeout-minutes: 1
-        if: failure() && matrix.os
-        run: |
-          echo "$(pgrep sn_node | wc -l) nodes still running"
-          ls $HOME/.safe/node/local-test-network
-
-      - name: Print Network Log Stats
-        shell: bash
-        continue-on-error: true
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success'
-
-      - name: Upload Node Logs to AWS
-          # Upload artifacts.
-        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure()
-        continue-on-error: true
-
-      - name: Upload Node Logs
-          # Upload artifacts.
-        uses: actions/upload-artifact@v2
-        with:
-          name: ${{github.job.name}}_sn_node_logs_${{matrix.os}}
-          path: ~/.safe/node/local-test-network/**/*.log*
-        if: failure()
-        continue-on-error: true
