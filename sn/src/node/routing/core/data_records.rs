@@ -9,9 +9,12 @@
 use super::{Command, Core, Prefix};
 
 use crate::{
-    chunk_copy_count,
+    copy_count,
     messaging::{
-        data::{operation_id, ChunkDataExchange, CmdError, Error as ErrorMessage, StorageLevel},
+        data::{
+            chunk_operation_id, ChunkDataExchange, CmdError, Error as ErrorMessage, RegisterRead,
+            RegisterWrite, StorageLevel,
+        },
         system::{NodeCmd, NodeQuery, SystemMsg},
         AuthorityProof, EndUser, MessageId, ServiceAuth,
     },
@@ -87,15 +90,52 @@ impl Core {
             origin: EndUser(origin.name()),
         });
 
-        let targets = self.get_adults_who_should_store_chunk(&target).await;
+        let targets = self.get_adults_who_should_store_data(&target).await;
 
         let aggregation = false;
 
-        if chunk_copy_count() > targets.len() {
+        if copy_count() > targets.len() {
             let error = CmdError::Data(ErrorMessage::InsufficientAdults(
                 self.network_knowledge().prefix().await,
             ));
-            return self.send_cmd_error_response(error, origin, msg_id);
+            return self.send_cmd_error_response_to_client(error, origin, msg_id);
+        }
+
+        self.send_node_msg_to_targets(msg, targets, aggregation)
+            .await
+    }
+
+    // forward received service msg to adults
+    pub(super) async fn send_register_to_adults(
+        &self,
+        register_write: RegisterWrite,
+        msg_id: MessageId,
+        auth: AuthorityProof<ServiceAuth>,
+        origin: Peer,
+    ) -> Result<Vec<Command>> {
+        trace!(
+            "{:?}: {:?}",
+            LogMarker::RegisterWriteReceivedAtElder,
+            register_write
+        );
+
+        let target = register_write.dst_name();
+
+        let msg = SystemMsg::NodeCmd(NodeCmd::RegisterWrite {
+            register_write,
+            auth,
+            origin: EndUser(origin.name()),
+        });
+
+        let targets = self.get_adults_who_should_store_data(&target).await;
+
+        let aggregation = false;
+
+        if copy_count() > targets.len() {
+            let error = CmdError::Data(ErrorMessage::InsufficientAdults(
+                self.network_knowledge().prefix().await,
+            ));
+            return self.send_cmd_error_response_to_client(error, origin, msg_id);
         }
 
         self.send_node_msg_to_targets(msg, targets, aggregation)
@@ -111,7 +151,7 @@ impl Core {
         let error = convert_to_error_message(error);
         let error = CmdError::Data(error);
 
-        self.send_cmd_error_response(error, origin, msg_id)
+        self.send_cmd_error_response_to_client(error, origin, msg_id)
     }
 
     pub(super) async fn read_chunk_from_adults(
@@ -120,7 +160,7 @@ impl Core {
         msg_id: MessageId,
         origin: Peer,
     ) -> Result<Vec<Command>> {
-        let operation_id = operation_id(&address)?;
+        let operation_id = chunk_operation_id(&address)?;
         trace!(
             "{:?} preparing to query adults for chunk at {:?} with op_id: {:?}",
             LogMarker::ChunkQueryReceviedAtElder,
@@ -128,7 +168,7 @@ impl Core {
             operation_id
         );
 
-        let targets = self.get_adults_holding_chunk(address.name()).await;
+        let targets = self.get_adults_holding_data(address.name()).await;
 
         if targets.is_empty() {
             return self
@@ -150,14 +190,14 @@ impl Core {
 
         let correlation_id = XorName::random();
         let overwrote = self
-            .pending_chunk_queries
+            .pending_adult_queries
             .set(correlation_id, origin, None)
             .await;
         if let Some(overwrote) = overwrote {
             // Since `XorName` is a 256 bit value, we consider the probability negligible, but warn
             // anyway so we're not totally lost if it does happen.
             warn!(
-                "Overwrote an existing pending chunk query for {} from {} - what are the chances?",
+                "Overwrote an existing pending query for {} from {} - what are the chances?",
                 correlation_id, overwrote
             );
         }
@@ -165,6 +205,66 @@ impl Core {
         let msg = SystemMsg::NodeQuery(NodeQuery::GetChunk {
             address,
             origin: EndUser(correlation_id),
+        });
+        let aggregation = false;
+
+        self.send_node_msg_to_targets(msg, fresh_targets, aggregation)
+            .await
+    }
+
+    pub(super) async fn read_register_from_adults(
+        &self,
+        read: RegisterRead,
+        msg_id: MessageId,
+        auth: AuthorityProof<ServiceAuth>,
+        origin: Peer,
+    ) -> Result<Vec<Command>> {
+        let operation_id = read.operation_id()?;
+        trace!(
+            "{:?} preparing to query adults for chunk at {:?} with op_id: {:?}",
+            LogMarker::RegisterQueryReceviedAtElder,
+            read,
+            operation_id
+        );
+
+        let targets = self.get_adults_holding_data(&read.dst_name()).await;
+
+        if targets.is_empty() {
+            return self
+                .send_error(
+                    Error::NoAdults(self.network_knowledge().prefix().await),
+                    msg_id,
+                    origin,
+                )
+                .await;
+        }
+
+        let mut fresh_targets = BTreeSet::new();
+        for target in targets {
+            self.liveness
+                .add_a_pending_request_operation(target, operation_id.clone())
+                .await;
+            let _existed = fresh_targets.insert(target);
+        }
+
+        let correlation_id = XorName::random();
+        let overwrote = self
+            .pending_adult_queries
+            .set(correlation_id, origin, None)
+            .await;
+        if let Some(overwrote) = overwrote {
+            // Since `XorName` is a 256 bit value, we consider the probability negligible, but warn
+            // anyway so we're not totally lost if it does happen.
+            warn!(
+                "Overwrote an existing pending query for {} from {} - what are the chances?",
+                correlation_id, overwrote
+            );
+        }
+
+        let msg = SystemMsg::NodeQuery(NodeQuery::GetRegister {
+            read,
+            origin: EndUser(correlation_id),
+            auth,
         });
         let aggregation = false;
 
@@ -249,7 +349,7 @@ impl Core {
         adult_list
             .iter()
             .sorted_by(|lhs, rhs| addr.name().cmp_distance(lhs, rhs))
-            .take(chunk_copy_count())
+            .take(copy_count())
             .cloned()
             .collect()
     }

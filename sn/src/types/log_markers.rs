@@ -29,11 +29,17 @@ pub enum LogMarker {
     StoringChunk,
     ChunkStoreReceivedAtElder,
     StoredNewChunk,
-    ChunkQueryResponseReceviedFromAdult,
+    QueryResponseReceviedFromAdult,
     ChunkQueryReceviedAtElder,
     ChunkQueryReceviedAtAdult,
+
     // register
     RegisterWrite,
+    RegisterWriteReceivedAtElder,
+    RegisterQueryReceviedAtElder,
+    RegisterQueryReceviedAtAdult,
+    RegisterQueryResponseReceviedFromAdult,
+
     RegisterQueryReceived,
     // routing commands
     DispatchHandleMsgCmd,

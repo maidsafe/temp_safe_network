@@ -10,10 +10,10 @@ mod api;
 mod back_pressure;
 mod bootstrap;
 mod capacity;
-mod chunk_records;
 mod chunk_store;
 mod comm;
 mod connectivity;
+mod data_records;
 mod delivery_group;
 mod liveness_tracking;
 mod messaging;
@@ -117,7 +117,7 @@ pub(crate) struct Core {
     pub(super) chunk_storage: ChunkStore,
     capacity: Capacity,
     liveness: Liveness,
-    pending_chunk_queries: Arc<Cache<XorName, Peer>>,
+    pending_adult_queries: Arc<Cache<XorName, Peer>>,
     ae_backoff_cache: AeBackoffCache,
 }
 
@@ -163,7 +163,7 @@ impl Core {
             chunk_storage,
             capacity,
             liveness: adult_liveness,
-            pending_chunk_queries: Arc::new(Cache::with_expiry_duration(CHUNK_QUERY_TIMEOUT)),
+            pending_adult_queries: Arc::new(Cache::with_expiry_duration(CHUNK_QUERY_TIMEOUT)),
             ae_backoff_cache: AeBackoffCache::default(),
         })
     }

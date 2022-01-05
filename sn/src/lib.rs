@@ -69,10 +69,10 @@ use tracing_subscriber::{
 /// Number of elders per section.
 pub(crate) const DEFAULT_ELDER_COUNT: usize = 7;
 /// Number of copies of a chunk
-pub(crate) const DEFAULT_CHUNK_COPY_COUNT: usize = 4;
+pub(crate) const DEFAULT_COPY_COUNT: usize = 4;
 
 const SN_ELDER_COUNT: &str = "SN_ELDER_COUNT";
-const SN_CHUNK_COPY_COUNT: &str = "SN_CHUNK_COPY_COUNT";
+const SN_COPY_COUNT: &str = "SN_CHUNK_COPY_COUNT";
 
 /// Max number of faulty Elders is assumed to be less than 1/3.
 /// So it's no more than 2 with 7 Elders.
@@ -109,24 +109,24 @@ pub(crate) fn elder_count() -> usize {
 }
 
 /// Get the expected chunk copy count for our network.
-/// Defaults to DEFAULT_CHUNK_COPY_COUNT, but can be overridden by the env var SN_CHUNK_COPY_COUNT.
-pub(crate) fn chunk_copy_count() -> usize {
+/// Defaults to DEFAULT_COPY_COUNT, but can be overridden by the env var SN_CHUNK_COPY_COUNT.
+pub(crate) fn copy_count() -> usize {
     // if we have an env var for this, lets override
-    match std::env::var(SN_CHUNK_COPY_COUNT) {
+    match std::env::var(SN_COPY_COUNT) {
         Ok(count) => match count.parse() {
             Ok(count) => {
                 warn!(
-                    "CHUNK_COPY_COUNT countout set from env var SN_CHUNK_COPY_COUNT: {:?}",
-                    SN_CHUNK_COPY_COUNT
+                    "COPY_COUNT countout set from env var SN_COPY_COUNT: {:?}",
+                    SN_COPY_COUNT
                 );
                 count
             }
             Err(error) => {
-                warn!("There was an error parsing {:?} env var. DEFAULT_CHUNK_COPY_COUNT will be used: {:?}", SN_CHUNK_COPY_COUNT, error);
-                DEFAULT_CHUNK_COPY_COUNT
+                warn!("There was an error parsing {:?} env var. DEFAULT_COPY_COUNT will be used: {:?}", SN_COPY_COUNT, error);
+                DEFAULT_COPY_COUNT
             }
         },
-        Err(_) => DEFAULT_CHUNK_COPY_COUNT,
+        Err(_) => DEFAULT_COPY_COUNT,
     }
 }
 

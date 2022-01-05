@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::chunk_copy_count;
+use crate::copy_count;
 use crate::dbs::convert_to_error_message as convert_db_error_to_error_message;
 use crate::messaging::{
     data::{CmdError, DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite, ServiceMsg},
@@ -26,7 +26,7 @@ use xor_name::XorName;
 
 impl Core {
     /// Forms a command to send the provided node error out
-    pub(crate) fn send_cmd_error_response(
+    pub(crate) fn send_cmd_error_response_to_client(
         &self,
         error: CmdError,
         target: Peer,
@@ -53,48 +53,22 @@ impl Core {
         Ok(vec![command])
     }
 
-    /// Handle register commands
-    pub(crate) async fn handle_register_write(
-        &self,
-        msg_id: MessageId,
-        register_write: RegisterWrite,
-        user: Peer,
-        auth: AuthorityProof<ServiceAuth>,
-    ) -> Result<Vec<Command>> {
-        trace!(
-            "{:?} preparing to write register {:?}",
-            LogMarker::RegisterWrite,
-            register_write.address(),
-        );
-
-        match self.register_storage.write(register_write, auth).await {
-            Ok(_) => {
-                info!("Successfully wrote Register from Message: {:?}", msg_id);
-                Ok(vec![])
-            }
-            Err(error) => {
-                trace!("Problem on writing Register! {:?}", error);
-                let error = convert_db_error_to_error_message(error);
-
-                let error = CmdError::Data(error);
-                self.send_cmd_error_response(error, user, msg_id)
-            }
-        }
-    }
-
     /// Handle register reads
-    pub(crate) fn handle_register_read(
+    pub(crate) async fn handle_register_read(
         &self,
         msg_id: MessageId,
         query: RegisterRead,
-        user: Peer,
+        user: EndUser,
         auth: AuthorityProof<ServiceAuth>,
+        requesting_elder: Peer,
     ) -> Result<Vec<Command>> {
         trace!(
             "{:?} preparing to read {:?}",
             LogMarker::RegisterQueryReceived,
             query.dst_address(),
         );
+
+        let mut commands = vec![];
 
         match self.register_storage.read(&query, auth.public_key) {
             Ok(response) => {
@@ -108,32 +82,29 @@ impl Core {
                     msg_id,
                     response
                 );
-                let msg = ServiceMsg::QueryResponse {
-                    response,
-                    correlation_id: msg_id,
+                let msg = SystemMsg::NodeQueryResponse {
+                    response: NodeQueryResponse::GetRegister(response),
+                    correlation_id: msg_id, // TODO: Use OperadtionIds
+                    user,
                 };
 
-                // FIXME: define which signature/authority this message should really carry,
-                // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
-                // Giving a random sig temporarily
-                let (msg_kind, payload) = Self::random_client_signature(&msg)?;
-
-                let dst = DstLocation::EndUser(EndUser(user.name()));
-                let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
-
-                let command = Command::SendMessage {
-                    recipients: vec![user],
-                    wire_msg,
+                // Setup node authority on this response and send this back to our elders
+                let section_pk = self.network_knowledge().section_key().await;
+                let dst = DstLocation::Node {
+                    name: requesting_elder.name(),
+                    section_pk,
                 };
 
-                Ok(vec![command])
+                commands.push(Command::PrepareNodeMsgToSend { msg, dst });
+
+                Ok(commands)
             }
             Err(error) => {
                 trace!("Problem on reading Register! {:?}", error);
                 let error = convert_db_error_to_error_message(error);
                 let error = CmdError::Data(error);
 
-                self.send_cmd_error_response(error, user, msg_id)
+                self.send_cmd_error_response_to_client(error, requesting_elder, msg_id)
             }
         }
     }
@@ -192,7 +163,7 @@ impl Core {
     /// Handle chunk read
     /// Records response in liveness tracking
     /// Forms a response to send to the requester
-    pub(crate) async fn handle_chunk_query_response_at_elder(
+    pub(crate) async fn handle_query_response_at_elder(
         &self,
         // msg_id: MessageId,
         correlation_id: MessageId,
@@ -203,13 +174,17 @@ impl Core {
         let msg_id = MessageId::new();
         let mut commands = vec![];
         debug!(
-            "Handling chunk read @ elders, received from {:?} ",
+            "Handling read @ elders, received from {:?} ",
             sending_nodes_pk
         );
 
-        let NodeQueryResponse::GetChunk(response) = response;
+        // let NodeQueryResponse::GetChunk(response) = response;
 
-        let query_response = QueryResponse::GetChunk(response);
+        // let query_response = QueryResponse::GetChunk(response);
+        let query_response = match response {
+            NodeQueryResponse::GetChunk(res) => QueryResponse::GetChunk(res),
+            NodeQueryResponse::GetRegister(res) => res,
+        };
 
         let pending_removed = match query_response.operation_id() {
             Ok(op_id) => {
@@ -258,11 +233,11 @@ impl Core {
             correlation_id,
         };
 
-        let origin = if let Some(origin) = self.pending_chunk_queries.remove(&user.0).await {
+        let origin = if let Some(origin) = self.pending_adult_queries.remove(&user.0).await {
             origin
         } else {
             warn!(
-                "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client or \
+                "Dropping query response from Adult {}. We might have already forwarded this chunk to the requesting client or \
                 have not registered the client: {}",
                 sending_nodes_pk, user.0
             );
@@ -270,7 +245,7 @@ impl Core {
         };
 
         // Clear expired queries from the cache.
-        self.pending_chunk_queries.remove_expired().await;
+        self.pending_adult_queries.remove_expired().await;
 
         // FIXME: define which signature/authority this message should really carry,
         // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
@@ -293,7 +268,7 @@ impl Core {
         Ok(commands)
     }
 
-    /// Handle ServiceMsgs received from EndUser
+    /// Handle ServiceMsgs received from EndUser, forwarding them on to adults
     pub(crate) async fn handle_service_msg_received(
         &self,
         msg_id: MessageId,
@@ -302,17 +277,14 @@ impl Core {
         auth: AuthorityProof<ServiceAuth>,
     ) -> Result<Vec<Command>> {
         match msg {
-            // Register
-            // Commands to be handled at elder.
             ServiceMsg::Cmd(DataCmd::Register(register_write)) => {
-                self.handle_register_write(msg_id, register_write, user, auth)
+                self.send_register_to_adults(register_write, msg_id, auth, user)
                     .await
             }
             ServiceMsg::Query(DataQuery::Register(read)) => {
-                self.handle_register_read(msg_id, read, user, auth)
+                self.read_register_from_adults(read, msg_id, auth, user)
+                    .await
             }
-            // These will only be received at elders.
-            // These reads/writes are for adult nodes...
             ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => {
                 self.send_chunk_to_adults(chunk, msg_id, auth, user).await
             }
@@ -320,14 +292,17 @@ impl Core {
                 self.read_chunk_from_adults(address, msg_id, user).await
             }
             _ => {
-                warn!("!!!! Unexpected ServiceMsg received in routing. Was not sent to node layer: {:?}", msg);
+                warn!(
+                    "Unexpected ServiceMsg received in routing. Was not sent to node layer: {:?}",
+                    msg
+                );
                 Ok(vec![])
             }
         }
     }
 
-    // Used to fetch the list of holders for a given chunk.
-    pub(crate) async fn get_adults_holding_chunk(&self, target: &XorName) -> BTreeSet<XorName> {
+    // Used to fetch the list of holders for a given data.
+    pub(crate) async fn get_adults_holding_data(&self, target: &XorName) -> BTreeSet<XorName> {
         let full_adults = self.full_adults().await;
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
         let adults = self.network_knowledge().adults().await;
@@ -338,11 +313,11 @@ impl Core {
             .into_iter()
             .sorted_by(|lhs, rhs| target.cmp_distance(lhs, rhs))
             .filter(|peer| !full_adults.contains(peer))
-            .take(chunk_copy_count())
+            .take(copy_count())
             .collect::<BTreeSet<_>>();
 
         trace!(
-            "Chunk holders of {:?} are empty adults: {:?} and full adults: {:?}",
+            "Holders of {:?} are empty adults: {:?} and full adults: {:?}",
             target,
             candidates,
             full_adults
@@ -370,8 +345,8 @@ impl Core {
         candidates
     }
 
-    // Used to fetch the list of holders for a given chunk.
-    pub(crate) async fn get_adults_who_should_store_chunk(
+    // Used to fetch the list of holders for a given piece of data.
+    pub(crate) async fn get_adults_who_should_store_data(
         &self,
         target: &XorName,
     ) -> BTreeSet<XorName> {
@@ -385,11 +360,11 @@ impl Core {
             .into_iter()
             .sorted_by(|lhs, rhs| target.cmp_distance(lhs, rhs))
             .filter(|peer| !full_adults.contains(peer))
-            .take(chunk_copy_count())
+            .take(copy_count())
             .collect::<BTreeSet<_>>();
 
         trace!(
-            "Target chunk holders of {:?} are empty adults: {:?} and full adults that were ignored: {:?}",
+            "Target holders of {:?} are empty adults: {:?} and full adults that were ignored: {:?}",
             target,
             candidates,
             full_adults

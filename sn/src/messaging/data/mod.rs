@@ -40,7 +40,7 @@ use xor_name::XorName;
 pub type OperationId = String;
 
 /// Return operation Id of a chunk
-pub fn operation_id(address: &ChunkAddress) -> Result<OperationId> {
+pub fn chunk_operation_id(address: &ChunkAddress) -> Result<OperationId> {
     utils::encode(address).map_err(|_| Error::NoOperationId)
 }
 
@@ -197,10 +197,10 @@ impl QueryResponse {
         // TODO: Operation Id should eventually encompass _who_ the op is for.
         match self {
             GetChunk(result) => match result {
-                Ok(chunk) => operation_id(chunk.address()),
-                Err(ErrorMessage::ChunkNotFound(name)) => operation_id(&ChunkAddress(*name)),
+                Ok(chunk) => chunk_operation_id(chunk.address()),
+                Err(ErrorMessage::ChunkNotFound(name)) => chunk_operation_id(&ChunkAddress(*name)),
                 Err(ErrorMessage::DataNotFound(DataAddress::Bytes(address))) => {
-                    operation_id(&ChunkAddress(*address.name()))
+                    chunk_operation_id(&ChunkAddress(*address.name()))
                 }
                 Err(ErrorMessage::DataNotFound(another_address)) => {
                     error!(

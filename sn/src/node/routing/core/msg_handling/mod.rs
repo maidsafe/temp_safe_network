@@ -20,7 +20,8 @@ use crate::messaging::{
     data::{ServiceMsg, StorageLevel},
     signature_aggregator::Error as AggregatorError,
     system::{
-        JoinRequest, JoinResponse, NodeCmd, NodeQuery, SectionAuth as SystemSectionAuth, SystemMsg,
+        JoinRequest, JoinResponse, NodeCmd, NodeQuery, NodeQueryResponse,
+        SectionAuth as SystemSectionAuth, SystemMsg,
     },
     AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth,
     ServiceAuth, WireMsg,
@@ -699,6 +700,22 @@ impl Core {
                     }
                 }
             }
+            SystemMsg::NodeCmd(NodeCmd::RegisterWrite {
+                register_write,
+                auth,
+                ..
+            }) => {
+                trace!(
+                    "{:?} preparing to write register {:?}",
+                    LogMarker::RegisterWrite,
+                    register_write.address(),
+                );
+                let commands: Vec<Command> = vec![];
+
+                self.register_storage.write(register_write, auth).await?;
+
+                Ok(vec![])
+            }
             SystemMsg::NodeCmd(NodeCmd::ReplicateChunk(chunk)) => {
                 info!(
                     "Processing replicate chunk cmd with MessageId: {:?}",
@@ -747,15 +764,14 @@ impl Core {
                         self.handle_get_chunk_at_adult(msg_id, &address, origin, sender_xorname)
                             .await
                     }
-                    _ => {
-                        self.send_event(Event::MessageReceived {
-                            msg_id,
-                            src: msg_authority.src_location(),
-                            dst: dst_location,
-                            msg: Box::new(MessageReceived::NodeQuery(node_query)),
-                        })
-                        .await;
-                        Ok(vec![])
+                    // A request from EndUser - via elders - for locally stored chunk
+                    NodeQuery::GetRegister { origin, read, auth } => {
+                        // There is no point in verifying a sig from a sender A or B here.
+                        // Send back response to the sending elder
+
+                        // let sender_xorname = msg_authority.get_auth_xorname();
+                        self.handle_register_read(msg_id, read, origin, auth, sender)
+                            .await
                     }
                 }
             }
@@ -764,13 +780,14 @@ impl Core {
                 correlation_id,
                 user,
             } => {
-                debug!("{:?}", LogMarker::ChunkQueryResponseReceviedFromAdult);
+                // NodeQueryResponse::GetChunk(_) => {
+                debug!("{:?}", LogMarker::QueryResponseReceviedFromAdult);
                 let sending_nodes_pk = match msg_authority {
                     NodeMsgAuthority::Node(auth) => PublicKey::from(auth.into_inner().public_key),
                     _ => return Err(Error::InvalidQueryResponseAuthority),
                 };
 
-                self.handle_chunk_query_response_at_elder(
+                self.handle_query_response_at_elder(
                     correlation_id,
                     response,
                     user,
@@ -905,7 +922,7 @@ impl Core {
     // Locate ideal chunk holders for this chunk, line up wiremsgs for those to instruct them to store the chunk
     async fn republish_chunk(&self, chunk: Chunk) -> Result<Vec<Command>> {
         if self.is_elder().await {
-            let target_holders = self.get_adults_who_should_store_chunk(chunk.name()).await;
+            let target_holders = self.get_adults_who_should_store_data(chunk.name()).await;
             info!(
                 "Republishing chunk {:?} to holders {:?}",
                 chunk.name(),

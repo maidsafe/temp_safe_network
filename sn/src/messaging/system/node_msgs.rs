@@ -6,10 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::messaging::data::QueryResponse;
+use crate::messaging::AuthorityProof;
 use crate::types::{Chunk, PublicKey};
 use crate::{
     messaging::{
-        data::{DataCmd, DataExchange, DataQuery, Result, StorageLevel},
+        data::{
+            DataCmd, DataExchange, DataQuery, RegisterRead, RegisterWrite, Result, StorageLevel,
+        },
         EndUser, ServiceAuth,
     },
     types::ChunkAddress,
@@ -21,21 +25,21 @@ use xor_name::XorName;
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeCmd {
-    /// Metadata is handled by Elders
-    Metadata {
-        /// The contianed command
-        cmd: DataCmd,
-        /// Requester pk and signature
-        auth: ServiceAuth,
-        /// Message source
-        origin: EndUser,
-    },
     /// Chunks are stored by Adults
     StoreChunk {
         /// The chunk
         chunk: Chunk,
         /// Requester pk and signature
         auth: ServiceAuth,
+        /// Message source
+        origin: EndUser,
+    },
+    /// Registers are stored by Adults
+    RegisterWrite {
+        /// The chunk
+        register_write: RegisterWrite,
+        /// Requester pk and signature
+        auth: AuthorityProof<ServiceAuth>,
         /// Message source
         origin: EndUser,
     },
@@ -52,6 +56,10 @@ pub enum NodeCmd {
     ReplicateChunk(Chunk),
     /// Tells the Elders to re-publish a chunk in the data section
     RepublishChunk(Chunk),
+    // /// Tells the Elders to re-publish a register in the data section
+    // RepublishRegister(Register),
+    // /// Replicate a given register at an Adult (sent from elders on receipt of RepublishRegister)
+    // ReplicateRegister(Chunk),
     /// Sent to all promoted nodes (also sibling if any) after
     /// a completed transition to a new constellation.
     ReceiveExistingData {
@@ -64,21 +72,21 @@ pub enum NodeCmd {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum NodeQuery {
-    /// Metadata is handled by Elders
-    Metadata {
-        /// The actual query message
-        query: DataQuery,
-        /// Client signature
-        auth: ServiceAuth,
-        /// The user that has initiated this query
-        origin: EndUser,
-    },
     /// Chunks are handled by Adults
     GetChunk {
         /// The chunk address
         address: ChunkAddress,
         /// The user that has initiated this query
         origin: EndUser,
+    },
+    /// Chunks are handled by Adults
+    GetRegister {
+        /// The register read
+        read: RegisterRead,
+        /// The user that has initiated this query
+        origin: EndUser,
+        /// authority of read perms
+        auth: AuthorityProof<ServiceAuth>,
     },
 }
 
@@ -88,4 +96,6 @@ pub enum NodeQuery {
 pub enum NodeQueryResponse {
     /// Elder to Adult Get.
     GetChunk(Result<Chunk>),
+    ///
+    GetRegister(QueryResponse),
 }
