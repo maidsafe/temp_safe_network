@@ -52,11 +52,39 @@ pub(crate) fn decode<I: AsRef<str>, O: DeserializeOwned>(encoded: I) -> Result<O
     deserialise(&decoded).map_err(|e| Error::FailedToParse(e.to_string()))
 }
 
-pub(crate) async fn write_data_to_disk<T: Serialize>(data: &T, path: &Path) -> Result<()> {
-    trace!("writing data to disk {:?}", path);
-    let serialized = rmp_serde::to_vec(data).map_err(|e| Error::Serialisation(e.to_string()))?;
+pub(crate) async fn compare_and_write_prefix_map_to_disk(
+    prefix_map: &NetworkPrefixMap,
+) -> Result<()> {
+    // Open or create `$User/.safe/prefix_maps` dir
+    let prefix_map_dir = dirs_next::home_dir()
+        .ok_or_else(|| Error::DirectoryHandling("Could not read '.safe' directory".to_string()))?
+        .join(".safe")
+        .join("prefix_maps");
 
-    let mut file = File::create(path)
+    tokio::fs::create_dir_all(prefix_map_dir.clone())
+        .await
+        .map_err(|_| {
+            Error::DirectoryHandling("Could not read '.safe/prefix_maps' directory".to_string())
+        })?;
+
+    let prefix_map_file = prefix_map_dir.join(format!("{:?}", prefix_map.genesis_key()));
+
+    // Check if the prefixMap is already present and is latest to the provided Map.
+    let disk_map = read_prefix_map_from_disk(&prefix_map_file).await.ok();
+
+    if let Some(old_map) = disk_map {
+        // Return early as the PrefixMap in disk is the equivalent/latest already
+        if &old_map >= prefix_map {
+            info!("Equivalent/Latest PrefixMap already in disk");
+            return Ok(());
+        }
+    }
+
+    trace!("Writing prefix_map to disk at {:?}", prefix_map_file);
+    let serialized =
+        rmp_serde::to_vec(prefix_map).map_err(|e| Error::Serialisation(e.to_string()))?;
+
+    let mut file = File::create(prefix_map_file)
         .await
         .map_err(|e| Error::FileHandling(e.to_string()))?;
 

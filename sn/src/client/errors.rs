@@ -32,8 +32,8 @@ pub enum Error {
     #[error("Error reading home dir for client")]
     CouldNotReadHomeDir,
     /// Error creating root dir for client
-    #[error("Error creating root dir for client")]
-    CouldNotCreateRootDir,
+    #[error("Error creating .safe dir for client")]
+    CouldNotCreateSafeDir,
     /// Received unexpected event.
     #[error("Unexpected event received")]
     ReceivedUnexpectedEvent,

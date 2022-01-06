@@ -2255,7 +2255,7 @@ mod tests {
             .is_none());
 
         // let's fetch invalid version
-        let random_hash: EntryHash = rand::thread_rng().gen::<[u8; 32]>();
+        let random_hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
         let version_hash = VersionHash::from(&random_hash);
         safe_url.set_content_version(Some(version_hash));
         match safe.files_container_get(&safe_url.to_string()).await {

@@ -243,7 +243,7 @@ impl SafeAppClient {
                 } else {
                     Error::NetDataError(format!(
                         "Failed to retrieve entry with hash '{}' from Register data: {:?}",
-                        encode(hash),
+                        encode(hash.0),
                         err
                     ))
                 }

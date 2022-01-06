@@ -19,7 +19,7 @@ use crate::messaging::{
 };
 use crate::node::routing::SectionAuthorityProvider;
 use crate::peer::Peer;
-use crate::types::{log_markers::LogMarker, utils::write_data_to_disk};
+use crate::types::{log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk};
 use crate::{at_least_one_correct_elder, elder_count};
 
 use bytes::Bytes;
@@ -176,11 +176,14 @@ impl Session {
                     // ConnectionManager::send_query
 
                     if let Ok(op_id) = response.operation_id() {
-                        if let Some(sender) = &queries.read().await.get(&op_id) {
-                            trace!("Sending response for query w/{} via channel.", op_id);
-                            let result = sender.send(response).await;
-                            if result.is_err() {
-                                trace!("Error sending query response on a channel for {:?} op_id {:?}: {:?}. (It has likely been removed)", msg_id, op_id, result)
+                        if let Some(entry) = queries.get(&op_id) {
+                            let all_senders = entry.value();
+                            for (_msg_id, sender) in all_senders {
+                                trace!("Sending response for query w/{} via channel.", op_id);
+                                let result = sender.send(response.clone()).await;
+                                if result.is_err() {
+                                    trace!("Error sending query response on a channel for {:?} op_id {:?}: {:?}. (It has likely been removed)", msg_id, op_id, result)
+                                }
                             }
                         } else {
                             // TODO: The trace is only needed when we have an identified case of not finding a channel, but expecting one.
@@ -348,9 +351,7 @@ impl Session {
                     sap.prefix()
                 );
                 // Update the PrefixMap on disk
-                if let Err(e) =
-                    write_data_to_disk(&session.network, &session.root_dir.join("prefix_map")).await
-                {
+                if let Err(e) = compare_and_write_prefix_map_to_disk(&session.network).await {
                     error!(
                         "Error writing freshly updated PrefixMap to client dir: {:?}",
                         e

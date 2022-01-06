@@ -16,15 +16,16 @@ use crate::peer::Peer;
 use crate::prefix_map::NetworkPrefixMap;
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
-pub(crate) use messaging::SAFE_CLIENT_DIR;
+use dashmap::DashMap;
 use qp2p::Endpoint;
-use std::path::PathBuf;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::{mpsc::Sender, RwLock};
 use tokio::time::Duration;
+
+// Here we dont track the msg_id across the network, but just use it as a local identifier to remove the correct listener
+type PendingQueryResponses = Arc<DashMap<OperationId, Vec<(MessageId, QueryResponseSender)>>>;
 use uluru::LRUCache;
 type QueryResponseSender = Sender<QueryResponse>;
-type PendingQueryResponses = Arc<RwLock<HashMap<OperationId, QueryResponseSender>>>;
 
 #[derive(Debug)]
 pub struct QueryResult {
@@ -54,6 +55,4 @@ pub(super) struct Session {
     initial_connection_check_msg_id: Arc<RwLock<Option<MessageId>>>,
     /// Standard time to await potential AE messages:
     standard_wait: Duration,
-    /// Root storage dir for this session
-    root_dir: PathBuf,
 }
