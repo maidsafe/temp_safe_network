@@ -5,14 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.52.10 (2022-01-05)
+## v0.52.11 (2022-01-06)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release over the course of 1 calendar day.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -22,8 +22,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - log EntryHash human readable ([`bf16c5e`](https://github.com/maidsafe/safe_network/commit/bf16c5ea7051386064233443921438cbbd79d907))
     - refactor(prefix_map): clients and node read/write to a global prefix_map ([`8128231`](https://github.com/maidsafe/safe_network/commit/81282318ae2da1793e66f28f0c8b3c0b2272a529))
     - feat(prefix_map): impl Ordering for NetworkPrefixMap based on it's length ([`1b86818`](https://github.com/maidsafe/safe_network/commit/1b8681838d810aa2b4ef0abfaf9106678ff7cebb))
+</details>
+
+## v0.52.10 (2022-01-05)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.52.10 ([`7b0cd4d`](https://github.com/maidsafe/safe_network/commit/7b0cd4d183a9f82d1d78dbb56572e5bf36714a0a))
     - Merge #840 #906 #912 #915 ([`099d41b`](https://github.com/maidsafe/safe_network/commit/099d41b4a576343df636190b4f2956e0f9d7a1a5))
     - increase testnet startup interval on CI only. ([`f1afc59`](https://github.com/maidsafe/safe_network/commit/f1afc5933dc782bc6a7840cd12cebb32a189a5df))
     - rename dest to dst ([`bebdae9`](https://github.com/maidsafe/safe_network/commit/bebdae9d52d03bd13b679ee19446452990d1e2cf))
