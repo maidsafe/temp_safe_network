@@ -69,7 +69,7 @@ use tracing_subscriber::{
 /// Number of elders per section.
 pub(crate) const DEFAULT_ELDER_COUNT: usize = 7;
 /// Number of copies of a chunk
-pub(crate) const DEFAULT_CHUNK_COPY_COUNT: usize = 3;
+pub(crate) const DEFAULT_CHUNK_COPY_COUNT: usize = 4;
 
 const SN_ELDER_COUNT: &str = "SN_ELDER_COUNT";
 const SN_CHUNK_COPY_COUNT: &str = "SN_CHUNK_COPY_COUNT";
