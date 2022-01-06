@@ -315,7 +315,7 @@ impl Core {
                             .authority_provider()
                             .await
                             .elders_vec(),
-                        old.section_key,
+                        new.section_key,
                     )
                     .await?,
                 );
@@ -336,7 +336,7 @@ impl Core {
                         .filter(|peer| !old.elders.contains(&peer.name()))
                         .cloned()
                         .collect(),
-                    old.section_key,
+                    new.section_key,
                 )
                 .await?,
             );

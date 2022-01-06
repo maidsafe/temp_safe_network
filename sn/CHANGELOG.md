@@ -5,6 +5,60 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.52.13 (2022-01-06)
+
+### Bug Fixes
+
+ - <csr-id-edefd2d7860e6f79c07060e078cdaa433da9e804/> use latest PK to send DataExchange messages
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - use latest PK to send DataExchange messages ([`edefd2d`](https://github.com/maidsafe/safe_network/commit/edefd2d7860e6f79c07060e078cdaa433da9e804))
+    - log EntryHash human readable ([`bf16c5e`](https://github.com/maidsafe/safe_network/commit/bf16c5ea7051386064233443921438cbbd79d907))
+</details>
+
+## v0.52.12 (2022-01-06)
+
+### New Features
+
+ - <csr-id-878e4bb43865933502a22f7cefb861bb6d72195c/> locally track query listeners to avoid overwrite/removal
+   Previously each query for an op_id overwrote the listener.
+   This could lead to odd behaviour for parallel requests in the same client.
+   Now we only remove the listener for our msg_id even if it's the same
+   operation_id
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.52.12 ([`4f29c28`](https://github.com/maidsafe/safe_network/commit/4f29c285a0b48220df1f1c6c52c4b487350eae08))
+    - locally track query listeners to avoid overwrite/removal ([`878e4bb`](https://github.com/maidsafe/safe_network/commit/878e4bb43865933502a22f7cefb861bb6d72195c))
+</details>
+
 ## v0.52.11 (2022-01-06)
 
 ### Commit Statistics
@@ -22,7 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - log EntryHash human readable ([`bf16c5e`](https://github.com/maidsafe/safe_network/commit/bf16c5ea7051386064233443921438cbbd79d907))
+    - safe_network-0.52.11/sn_api-0.50.5/sn_cli-0.43.2 ([`99d012e`](https://github.com/maidsafe/safe_network/commit/99d012ef529df78ef4c84f5e6ea99d3a77414797))
     - refactor(prefix_map): clients and node read/write to a global prefix_map ([`8128231`](https://github.com/maidsafe/safe_network/commit/81282318ae2da1793e66f28f0c8b3c0b2272a529))
     - feat(prefix_map): impl Ordering for NetworkPrefixMap based on it's length ([`1b86818`](https://github.com/maidsafe/safe_network/commit/1b8681838d810aa2b4ef0abfaf9106678ff7cebb))
 </details>

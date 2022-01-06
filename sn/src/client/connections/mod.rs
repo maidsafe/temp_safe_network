@@ -16,13 +16,16 @@ use crate::peer::Peer;
 use crate::prefix_map::NetworkPrefixMap;
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
+use dashmap::DashMap;
 use qp2p::Endpoint;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::{mpsc::Sender, RwLock};
 use tokio::time::Duration;
+
+// Here we dont track the msg_id across the network, but just use it as a local identifier to remove the correct listener
+type PendingQueryResponses = Arc<DashMap<OperationId, Vec<(MessageId, QueryResponseSender)>>>;
 use uluru::LRUCache;
 type QueryResponseSender = Sender<QueryResponse>;
-type PendingQueryResponses = Arc<RwLock<HashMap<OperationId, QueryResponseSender>>>;
 
 #[derive(Debug)]
 pub struct QueryResult {
