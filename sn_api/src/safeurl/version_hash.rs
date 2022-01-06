@@ -35,7 +35,8 @@ pub struct VersionHash {
 
 impl Display for VersionHash {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.entry_hash)
+        let base32z = multibase::encode(Base::Base32Z, self.entry_hash.0);
+        write!(f, "{}", base32z)
     }
 }
 
