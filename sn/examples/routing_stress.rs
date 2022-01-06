@@ -354,7 +354,7 @@ impl Network {
                     }
                 }
                 RoutingEvent::MessageReceived { dst, .. } => {
-                    let (dst, dest_section_pk) = match dst {
+                    let (dst, dst_section_pk) = match dst {
                         DstLocation::Section { name, section_pk } => (name, section_pk),
                         DstLocation::Node { name, section_pk } => (name, section_pk),
                         DstLocation::EndUser(_) => {
@@ -362,7 +362,7 @@ impl Network {
                         }
                     };
 
-                    self.probe_tracker.receive(&dst, &dest_section_pk).await;
+                    self.probe_tracker.receive(&dst, &dst_section_pk).await;
                 }
                 _ => {
                     // Currently ignore the other event variants. This might change in the future,

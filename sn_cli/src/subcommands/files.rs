@@ -104,7 +104,7 @@ pub enum FilesSubCommands {
         /// The source file/folder local path
         location: String,
         /// The destination path (in the FilesContainer) for the uploaded files and folders (default is '/')
-        dest: Option<PathBuf>,
+        dst: Option<PathBuf>,
         /// Recursively upload folders and files found in the source location
         #[structopt(short = "r", long = "recursive")]
         recursive: bool,
@@ -117,7 +117,7 @@ pub enum FilesSubCommands {
         /// The target FilesContainer to retrieve from, optionally including the path to the directory or file within
         source: String,
         /// The local destination path for the retrieved files and folders (default is '.')
-        dest: Option<String>,
+        dst: Option<String>,
         /// How to handle pre-existing files.
         #[structopt(short = "e", long = "exists", possible_values = &["ask", "preserve", "overwrite"], default_value="ask")]
         exists: FileExistsAction,
@@ -208,7 +208,7 @@ pub async fn files_commander(
     match cmd {
         FilesSubCommands::Put {
             location,
-            dest,
+            dst,
             recursive,
             follow_links,
         } => {
@@ -217,7 +217,7 @@ pub async fn files_commander(
                 notice_dry_run();
             }
             let (files_container_xorurl, processed_files, _) = safe
-                .files_container_create_from(&location, dest.as_deref(), recursive, follow_links)
+                .files_container_create_from(&location, dst.as_deref(), recursive, follow_links)
                 .await?;
 
             // Now let's just print out a list of the files uploaded/processed
@@ -406,11 +406,11 @@ pub async fn files_commander(
         }
         FilesSubCommands::Get {
             source,
-            dest,
+            dst,
             exists,
             progress,
             preserve,
-        } => process_get_command(safe, source, dest, exists, progress, preserve, output_fmt).await,
+        } => process_get_command(safe, source, dst, exists, progress, preserve, output_fmt).await,
     }
 }
 

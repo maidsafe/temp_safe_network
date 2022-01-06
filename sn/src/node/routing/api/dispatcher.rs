@@ -334,17 +334,21 @@ impl Dispatcher {
             let cmd_id_clone = cmd_id.clone();
             let command_display = command.to_string();
             let future = tokio::spawn(async move {
-                if let Ok(commands) = self.process_command(command, &cmd_id).await {
-                    for (sub_cmd_count, command) in commands.into_iter().enumerate() {
-                        let sub_cmd_id = format!("{}.{}", &cmd_id, sub_cmd_count);
-                        // Error here is only related to queueing, and so a dropped command will be logged
-                        let _result = tokio::spawn(
-                            self.clone()
+                match self.process_command(command, &cmd_id).await {
+                    Ok(commands) => {
+                        for (sub_cmd_count, command) in commands.into_iter().enumerate() {
+                            let sub_cmd_id = format!("{}.{}", &cmd_id, sub_cmd_count);
+                            // Error here is only related to queueing, and so a dropped command will be logged
+                            let _result = self
+                                .clone()
                                 .enqueue_and_handle_next_command_and_any_offshoots(
                                     command,
                                     Some(sub_cmd_id),
-                                ),
-                        );
+                                );
+                        }
+                    }
+                    Err(err) => {
+                        error!("Failed to handle command {:?} with error {:?}", cmd_id, err);
                     }
                 }
             });
@@ -428,13 +432,22 @@ impl Dispatcher {
         };
 
         async {
-            trace!("{:?}", LogMarker::CommandHandleStart);
-
             let command_display = command.to_string();
+            trace!(
+                "{:?} {:?} - {}",
+                LogMarker::CommandHandleStart,
+                cmd_id,
+                command_display
+            );
+
             let res = match self.try_processing_a_command(command).await {
                 Ok(outcome) => {
-                    trace!("{:?} {}", LogMarker::CommandHandleEnd, command_display);
-
+                    trace!(
+                        "{:?} {:?} - {}",
+                        LogMarker::CommandHandleEnd,
+                        cmd_id,
+                        command_display
+                    );
                     Ok(outcome)
                 }
                 Err(error) => {
@@ -604,11 +617,15 @@ impl Dispatcher {
                     .await?
             }
             MsgKind::ServiceMsg(_) => {
-                let _res = self
+                if let Err(err) = self
                     .core
                     .comm
-                    .send_on_existing_connection(recipients, wire_msg)
-                    .await;
+                    .send_on_existing_connection(recipients, wire_msg.clone())
+                    .await
+                {
+                    error!("Failed sending message {:?} to recipients {:?} on existing connection with error {:?}",
+                            wire_msg, recipients, err);
+                }
 
                 vec![]
             }

@@ -11,7 +11,6 @@ use super::super::{
     RegisterAddress as Address, Signature, {utils, Error, PublicKey, Result},
 };
 use super::metadata::Entry;
-pub use crdts::merkle_reg::Hash as EntryHash;
 use crdts::{
     merkle_reg::{MerkleReg, Node},
     CmRDT,
@@ -19,9 +18,31 @@ use crdts::{
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeSet,
-    fmt::{self, Debug, Display},
+    fmt::{self, Debug, Display, Formatter, Result as FmtResult},
     hash::Hash,
 };
+
+/// Hash of the register entry. Logging as the same format of XorName.
+#[derive(Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct EntryHash(pub crdts::merkle_reg::Hash);
+
+impl Debug for EntryHash {
+    fn fmt(&self, formatter: &mut Formatter) -> FmtResult {
+        // Using the wrting format of XorName for the logging consistency.
+        write!(formatter, "{}", self)
+    }
+}
+
+impl Display for EntryHash {
+    fn fmt(&self, formatter: &mut Formatter) -> FmtResult {
+        // Using the wrting format of XorName for the logging consistency.
+        write!(
+            formatter,
+            "{:02x}{:02x}{:02x}..",
+            self.0[0], self.0[1], self.0[2]
+        )
+    }
+}
 
 /// CRDT Data operation applicable to other Register replica.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -46,7 +67,7 @@ pub(super) struct RegisterCrdt {
 }
 
 impl Display for RegisterCrdt {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "(")?;
         for (i, entry) in self.data.read().values().enumerate() {
             if i > 0 {
@@ -87,7 +108,8 @@ impl RegisterCrdt {
     ) -> Result<(EntryHash, CrdtOperation<Entry>)> {
         let address = *self.address();
 
-        let crdt_op = self.data.write(entry, children);
+        let children_array: BTreeSet<[u8; 32]> = children.iter().map(|itr| itr.0).collect();
+        let crdt_op = self.data.write(entry, children_array);
         self.data.apply(crdt_op.clone());
         let hash = crdt_op.hash();
 
@@ -99,7 +121,7 @@ impl RegisterCrdt {
             signature: None,
         };
 
-        Ok((hash, op))
+        Ok((EntryHash(hash), op))
     }
 
     /// Apply a remote data CRDT operation to this replica of the RegisterCrdt.
@@ -128,7 +150,7 @@ impl RegisterCrdt {
 
     /// Get the entry corresponding to the provided `hash` if it exists.
     pub(super) fn get(&self, hash: EntryHash) -> Option<&Entry> {
-        self.data.node(hash).map(|node| &node.value)
+        self.data.node(hash.0).map(|node| &node.value)
     }
 
     /// Read current entries (multiple entries occur on concurrent writes).
@@ -136,7 +158,7 @@ impl RegisterCrdt {
         self.data
             .read()
             .hashes_and_nodes()
-            .map(|(hash, node)| (hash, node.value.clone()))
+            .map(|(hash, node)| (EntryHash(hash), node.value.clone()))
             .collect()
     }
 }

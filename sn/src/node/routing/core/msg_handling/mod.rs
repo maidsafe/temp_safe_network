@@ -272,7 +272,11 @@ impl Core {
                 );
                 Ok(vec![])
             }
-            Ok(true) | Err(_) => Ok(vec![]),
+            Ok(true) => Ok(vec![]),
+            Err(err) => {
+                trace!("handle_system_message got error {:?}", err);
+                Ok(vec![])
+            }
         }
     }
 

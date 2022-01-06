@@ -381,7 +381,7 @@ mod tests {
         let safe = new_safe_instance().await?;
 
         let mut original_url = SafeUrl::from_url("safe://linked-from-site_name")?;
-        let random_hash: EntryHash = rand::thread_rng().gen::<[u8; 32]>();
+        let random_hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
         let version_hash = VersionHash::from(&random_hash);
         original_url.set_content_version(Some(version_hash));
 
@@ -414,7 +414,7 @@ mod tests {
         let _ = retry_loop!(safe.fetch(&nrs_url.to_string(), None));
 
         // add subname and set it as the new default too
-        let random_hash: EntryHash = rand::thread_rng().gen::<[u8; 32]>();
+        let random_hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
         let version_hash = VersionHash::from(&random_hash);
         let mut url_v1 = SafeUrl::from_url(&link)?;
         url_v1.set_content_version(Some(version_hash));

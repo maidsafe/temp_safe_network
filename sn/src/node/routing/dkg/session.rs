@@ -191,18 +191,28 @@ impl Session {
     ) -> Result<Vec<Command>> {
         let mut commands = vec![];
 
-        trace!("{}", LogMarker::DkgBroadcastMsg);
+        trace!(
+            "{} to {:?} targets",
+            LogMarker::DkgBroadcastMsg,
+            messages.len()
+        );
 
         let peers = self.peers();
         for (target, message) in messages {
             if target == node.name() {
-                commands.extend(self.process_message(
+                match self.process_message(
                     node,
                     node.name(),
                     session_id,
-                    message,
+                    message.clone(),
                     section_pk,
-                )?);
+                ) {
+                    Ok(result) => commands.extend(result),
+                    Err(err) => error!(
+                        "Within session {:?}, failed to process DkgMessage {:?} with error {:?}",
+                        session_id, message, err
+                    ),
+                }
             } else if let Some(peer) = peers.get(&target) {
                 trace!(
                     "DKG sending {:?} - {:?} to {:?}",
@@ -212,7 +222,7 @@ impl Session {
                 );
                 let node_msg = SystemMsg::DkgMessage {
                     session_id: *session_id,
-                    message,
+                    message: message.clone(),
                 };
                 let wire_msg = WireMsg::single_src(
                     node,
@@ -224,10 +234,18 @@ impl Session {
                     section_pk,
                 )?;
 
+                trace!(
+                    "DKG sending {:?} with msg_id {:?}",
+                    message,
+                    wire_msg.msg_id()
+                );
+
                 commands.push(Command::SendMessage {
                     recipients: vec![peer.clone()],
                     wire_msg,
                 });
+            } else {
+                error!("Failed to find target {:?} among peers {:?}", target, peers);
             }
         }
 

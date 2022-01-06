@@ -520,7 +520,7 @@ mod tests {
                 .instrument(tracing::info_span!("get other user perms"))
                 .await
             {
-                Ok(_) => bail!("Should not be able to retrive an entry for a random user"),
+                Ok(_) => bail!("Should not be able to retrieve an entry for a random user"),
                 Err(Error::NetworkDataError(DtError::NoSuchEntry)) => return Ok(()),
                 _ => continue,
             }
@@ -571,7 +571,7 @@ mod tests {
                 .instrument(tracing::info_span!("get other user perms"))
                 .await
             {
-                Ok(_) => bail!("Should not be able to retrive an entry for a random user"),
+                Ok(_) => bail!("Should not be able to retrieve an entry for a random user"),
                 Err(Error::NetworkDataError(DtError::NoSuchEntry)) => return Ok(()),
                 _ => continue,
             }
@@ -663,7 +663,7 @@ mod tests {
             .await?;
         assert_eq!(retrieved_value_2, value_2);
 
-        // Requesting a hash which desn't exist throws an error
+        // Requesting a hash which doesn't exist throws an error
         match client
             .get_register_entry(address, EntryHash::default())
             .instrument(tracing::info_span!("final get"))

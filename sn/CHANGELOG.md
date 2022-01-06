@@ -5,6 +5,116 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.52.11 (2022-01-06)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release over the course of 1 calendar day.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - log EntryHash human readable ([`bf16c5e`](https://github.com/maidsafe/safe_network/commit/bf16c5ea7051386064233443921438cbbd79d907))
+    - refactor(prefix_map): clients and node read/write to a global prefix_map ([`8128231`](https://github.com/maidsafe/safe_network/commit/81282318ae2da1793e66f28f0c8b3c0b2272a529))
+    - feat(prefix_map): impl Ordering for NetworkPrefixMap based on it's length ([`1b86818`](https://github.com/maidsafe/safe_network/commit/1b8681838d810aa2b4ef0abfaf9106678ff7cebb))
+</details>
+
+## v0.52.10 (2022-01-05)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.52.10 ([`7b0cd4d`](https://github.com/maidsafe/safe_network/commit/7b0cd4d183a9f82d1d78dbb56572e5bf36714a0a))
+    - Merge #840 #906 #912 #915 ([`099d41b`](https://github.com/maidsafe/safe_network/commit/099d41b4a576343df636190b4f2956e0f9d7a1a5))
+    - increase testnet startup interval on CI only. ([`f1afc59`](https://github.com/maidsafe/safe_network/commit/f1afc5933dc782bc6a7840cd12cebb32a189a5df))
+    - rename dest to dst ([`bebdae9`](https://github.com/maidsafe/safe_network/commit/bebdae9d52d03bd13b679ee19446452990d1e2cf))
+</details>
+
+## v0.52.9 (2022-01-04)
+
+### New Features
+
+ - <csr-id-fff2d52b700dfe7ec9a8909a0d5adf176de4c5c7/> substract space from used_space on register delete
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.52.9/sn_api-0.50.4 ([`a64c7e0`](https://github.com/maidsafe/safe_network/commit/a64c7e0414b77f545cb8cdbf64af0fb7212d1f2e))
+    - substract space from used_space on register delete ([`fff2d52`](https://github.com/maidsafe/safe_network/commit/fff2d52b700dfe7ec9a8909a0d5adf176de4c5c7))
+    - some detailed logging for debugging ([`6ccb792`](https://github.com/maidsafe/safe_network/commit/6ccb792c18481ffd8218cd7c27b28d8a10d1f528))
+</details>
+
+## v0.52.8 (2022-01-04)
+
+### New Features
+
+ - <csr-id-a7531b434591c39fc91bdffc413fcb2d6ed47e7a/> restore NotEnoughSpace checks and reunite reg and chunk storage tracking
+ - <csr-id-19d7d3ad04a428485738ffc916b4f14388ad10d5/> optimise disk space checks by doing them less often
+
+### Bug Fixes
+
+ - <csr-id-112d0b474b8dd141d0daf1302b80055482d65a15/> unnecessary fetch_add for loading
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 11 commits contributed to the release.
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.52.8 ([`5214d5e`](https://github.com/maidsafe/safe_network/commit/5214d5e7f84a3c1cf213097a5d55bfb293f03324))
+    - ignore GA failing test ([`233e64a`](https://github.com/maidsafe/safe_network/commit/233e64af3b2af63bbba06ba8f43d0a7becece913))
+    - remove unused dep async recursion ([`012e91a`](https://github.com/maidsafe/safe_network/commit/012e91a60e01cd2ce9155d5c56045f211865ff2c))
+    - unnecessary fetch_add for loading ([`112d0b4`](https://github.com/maidsafe/safe_network/commit/112d0b474b8dd141d0daf1302b80055482d65a15))
+    - restore NotEnoughSpace checks and reunite reg and chunk storage tracking ([`a7531b4`](https://github.com/maidsafe/safe_network/commit/a7531b434591c39fc91bdffc413fcb2d6ed47e7a))
+    - fix(used_space): make all atomic ops relaxed ([`22f6dbc`](https://github.com/maidsafe/safe_network/commit/22f6dbcba8067ef777b7bea0393673bb669893b4))
+    - fix(used_space): add decrease fn Not used yet in Register, as it's not clear yet how much space we actually clear up.. ([`a9e753d`](https://github.com/maidsafe/safe_network/commit/a9e753de1465d3f6abeb4ccf9a5b31fc3a2172f5))
+    - refactor(used_space): record it in an atomic usize ([`da3bbe1`](https://github.com/maidsafe/safe_network/commit/da3bbe16084b71ec42343035087848c8f6996ec4))
+    - optimise disk space checks by doing them less often ([`19d7d3a`](https://github.com/maidsafe/safe_network/commit/19d7d3ad04a428485738ffc916b4f14388ad10d5))
+    - Merge branch 'main' into some_detailed_logging ([`eedd75c`](https://github.com/maidsafe/safe_network/commit/eedd75c266d39e4f290b894fa38fb5e237722722))
+    - rename + use glob const ([`838c495`](https://github.com/maidsafe/safe_network/commit/838c495c8858b85c693da1a3e45baafa57ba03ea))
+</details>
+
 ## v0.52.7 (2022-01-04)
 
 ### Commit Statistics
@@ -22,7 +132,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - rename + use glob const ([`838c495`](https://github.com/maidsafe/safe_network/commit/838c495c8858b85c693da1a3e45baafa57ba03ea))
+    - safe_network-0.52.7 ([`40d1844`](https://github.com/maidsafe/safe_network/commit/40d1844e0b28578e8b8c6b270151dbb86961a766))
     - use zsh to repeat e2e tests ([`2ebd1b4`](https://github.com/maidsafe/safe_network/commit/2ebd1b4fcab47bc86980860379891bb041ff2aa4))
 </details>
 

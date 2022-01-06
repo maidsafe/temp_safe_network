@@ -12,11 +12,7 @@ mod data;
 mod queries;
 mod register_apis;
 
-use crate::client::{
-    connections::{Session, SAFE_CLIENT_DIR},
-    errors::Error,
-    ClientConfig,
-};
+use crate::client::{connections::Session, errors::Error, ClientConfig};
 use crate::messaging::data::{CmdError, DataQuery, RegisterRead, ServiceMsg};
 use crate::messaging::{ServiceAuth, WireMsg};
 use crate::peer::Peer;
@@ -103,27 +99,22 @@ impl Client {
         };
 
         let home_dir = dirs_next::home_dir().ok_or(Error::CouldNotReadHomeDir)?;
-        let root_dir = &home_dir
-            .join(SAFE_CLIENT_DIR)
-            .join(format!("sn_client-{}", keypair.public_key()));
 
         // Read NetworkPrefixMap from `.safe/prefix_map` if present else check client root dir
         let prefix_map = if read_prefixmap {
-            match read_prefix_map_from_disk(&home_dir.join(".safe/prefix_map")).await {
+            match read_prefix_map_from_disk(
+                &home_dir.join(format!(".safe/prefix_maps/{:?}", config.genesis_key)),
+            )
+            .await
+            {
                 Ok(prefix_map) => prefix_map,
                 Err(e) => {
-                    warn!("Could not read PrefixMap at '.safe/prefix_map': {:?}", e);
-                    info!("Checking Client's root dir");
-                    // Read NetworkPrefixMap from `.safe/client/sn_client-{ClientPK}` if present
-                    // else create a new one
-                    match read_prefix_map_from_disk(root_dir).await {
-                        Ok(map) => map,
-                        Err(e) => {
-                            warn!("Could not read PrefixMap at Client's root dir: {:?}", e);
-                            info!("Defaulting to a fresh NetworkPrefixMap");
-                            NetworkPrefixMap::new(config.genesis_key)
-                        }
-                    }
+                    warn!("Could not read PrefixMap at '.safe/prefix_maps': {:?}", e);
+                    info!(
+                        "Creating a fresh PrefixMap with GenesisKey {:?}",
+                        config.genesis_key
+                    );
+                    NetworkPrefixMap::new(config.genesis_key)
                 }
             }
         } else {

@@ -29,10 +29,9 @@ use bls::PublicKey as BlsPublicKey;
 use dashmap::{self, mapref::multiple::RefMulti, DashMap};
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
-use std::{
-    iter::{self, Iterator},
-    sync::Arc,
-};
+use std::cmp::Ordering;
+use std::iter::{self, Iterator};
+use std::sync::Arc;
 use xor_name::{Prefix, XorName};
 
 /// Container for storing information about other sections in the network.
@@ -281,6 +280,11 @@ impl NetworkPrefixMap {
             .collect()
     }
 
+    /// Number of SAPs we know about.
+    pub(crate) fn len(&self) -> usize {
+        self.sections.len()
+    }
+
     /// Returns the section authority provider for the prefix that matches `name`.
     pub(crate) fn section_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
         self.sections
@@ -393,6 +397,26 @@ impl<'de> Deserialize<'de> for NetworkPrefixMap {
         })
     }
 }
+
+impl Ord for NetworkPrefixMap {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.len().cmp(&other.len())
+    }
+}
+
+impl PartialOrd for NetworkPrefixMap {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for NetworkPrefixMap {
+    fn eq(&self, other: &Self) -> bool {
+        self.len() == other.len()
+    }
+}
+
+impl Eq for NetworkPrefixMap {}
 
 #[cfg(test)]
 mod tests {
