@@ -35,8 +35,7 @@ pub struct VersionHash {
 
 impl Display for VersionHash {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let base32z = multibase::encode(Base::Base32Z, self.entry_hash);
-        write!(f, "{}", base32z)
+        write!(f, "{}", self.entry_hash)
     }
 }
 
@@ -48,10 +47,12 @@ impl FromStr for VersionHash {
         if base != Base::Base32Z {
             return Err(VersionHashError::InvalidEncoding);
         }
-        let entry_hash = data
+        let array: [u8; 32] = data
             .try_into()
             .map_err(|_| VersionHashError::InvalidHashLength)?;
-        Ok(VersionHash { entry_hash })
+        Ok(VersionHash {
+            entry_hash: EntryHash(array),
+        })
     }
 }
 
