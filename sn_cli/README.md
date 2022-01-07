@@ -8,32 +8,28 @@
 - [Description](#description)
 - [Quick Start](#quick-start)
 - [Installation and Setup](#installation-and-setup)
-- [Prerequisites](#prerequisites)
-- [Install Script](#install-script)
-  - [Linux and macOS](#linux-and-macos)
-  - [Windows](#linux-and-macos)
-- [Binaries](#binaries)
-- [Build from Source](#build-from-source)
+  - [Prerequisites](#prerequisites)
+  - [Install Script](#install-script)
+    - [Linux and macOS](#linux-and-macos)
+    - [Windows](#linux-and-macos)
+  - [Binaries](#binaries)
+  - [Build from Source](#build-from-source)
 - [Using the CLI](#using-the-cli)
-- [Getting Help](#getting-help)
+  - [Getting Help](#getting-help)
 - [Networks](#networks)
-- [Node Management](#node-management)
-- [Run a Local Network](#run-a-local-network)
-- [Connect to a Remote Network](#connect-to-a-remote-network)
-  - [Connection Info via HTTP](#connection-info-via-http)
-  - [Direct Connection Info](#direct-connection-info)
-  - [Provide a Node](#provide-a-node)
+  - [Node Management](#node-management)
+  - [Run a Local Network](#run-a-local-network)
+  - [Connect to a Remote Network](#connect-to-a-remote-network)
+    - [Connection Info via HTTP](#connection-info-via-http)
+    - [Direct Connection Info](#direct-connection-info)
+    - [Provide a Node](#provide-a-node)
 - [Files](#files)
   - [Put](#put)
     - [Base Path](#base-path)
+  - [Sync](#put)
   - [Add](#files-add)
   - [Ls](#files-ls)
   - [Get](#files-get)
-    - [Example: retrieving contents of a file container to local working directory](#example-retrieving-contents-of-a-file-container-to-local-working-directory)
-    - [Example: retrieving subfolder in a file container to an existing local directory.](#example-retrieving-subfolder-in-a-file-container-to-an-existing-local-directory)
-    - [Example: retrieving subfolder in a file container to a non-existent local directory (rename)](#example-retrieving-subfolder-in-a-file-container-to-a-non-existent-local-directory-rename)
-    - [Example: retrieving individual file to an existing directory](#example-retrieving-individual-file-to-an-existing-directory)
-    - [Example: retrieving individual file to a new filename](#example-retrieving-individual-file-to-a-new-filename)
     - [Performance](#performance)
   - [Tree](#files-tree)
   - [Rm](#files-rm)
@@ -383,37 +379,7 @@ Files are uploaded and stored as a `Blob`. When we upload a directory, its hiera
 
 For brevity, in the rest of this section we'll refer to the `FilesContainer` just using the term "container".
 
-### Warning
-
-At some point, the underlying files APIs used in the CLI (and perhaps much else of the CLI) will be deprecated to use [`sn_fs`](https://github.com/maidsafe/sn_fs). This is a POSIX-based filesystem which is more comprehensive and performant. The impact this may have, if any, on CLI commands, is not yet known. But if you're interested in a filesystem on Safe, `sn_fs` is most definitely where you should look.
-
-### Put
-
-The simplest thing we can do is upload a file using the `files put` command:
-```
-$ safe files put ./to-upload/myfile.txt
-FilesContainer created at: "safe://bbkulca25xhzwo6mcxlji7ocf5tm5hgn2x3mxtg62qzycculur4aixeywm"
-+  ./to-upload/myfile.txt  safe://bbkulcbxk23cfnj7gz3r4y7624kpb5spwf4b7jogu2rofhuj5xiqa5huh7
-```
-
-This will create a container with a single file. The `safe://` URLs assigned here refer to the container and the file, respectively.
-
-We can also recursively upload everything in a local directory, obtaining the XOR-URLs of the newly created container and each uploaded file:
-```
-$ safe files put ./to-upload/ --recursive
-FilesContainer created at: "safe://bbkulcb5hsl2zbsia4af5i7myv2ujbet7di4gx5bstduikwgobru67esqu"
-+  ./to-upload/index.html          safe://bbkulcax6ulw7ovqhpsindkybsum4tusmvuc7ovtr2bu5gj6m4ugtu7euh
-+  ./to-upload/myfolder/notes.txt  safe://bbkulcan3may5gmqxqonwaoz2cjlkuc4cflrhwitmzy7ur4paof4u57yxz
-+  ./to-upload/img.jpeg            safe://bbkulcbtiq3vg4xehqbrjd2gz4kljguqtds5ko5khexya3v3k7scymcphj
-```
-
-**Note**: the `+` sign indicates the files were _added_ to the container, as opposed to _updated_ or _deleted_. This will be elaborated further when discussing the `files sync` command.
-
-#### Base Path
-
-When uploading files to a container, its base path is set to `/`. The source files are published with an absolute path stemming from the container's base.
-
-To illustrate, consider the following source directory:
+As we describe the `files` commands, all the examples will work with the following directory:
 ```
 to-upload/
 ├── file1.txt
@@ -424,161 +390,249 @@ to-upload/
         └── file3.txt
 ```
 
-If uploaded using `safe files put --recursive to-upload/`, this maps to:
+### Warning
+
+At some point, the underlying files APIs used in the CLI (and perhaps much else of the CLI) will be deprecated to use [`sn_fs`](https://github.com/maidsafe/sn_fs). This is a POSIX-based filesystem which is more comprehensive and performant. The impact this may have, if any, on CLI commands, is not yet known. But if you're interested in a filesystem on Safe, `sn_fs` is most definitely where you should look.
+
+### Put
+
+The simplest thing we can do is upload a file using the `files put` command:
+```
+$ safe files put ./to-upload/file1.txt
+FilesContainer created at: "safe://hyryyryynamznbfsgn7ccfquqmx6y8yzhq6tn7uzz775hrkyj4g8ipcy3ke6yeuy?v=h9jxxwwpy1cwf3pnb86ahkfk5ju8eb3miegnuehc99f5r5x83d9go"
++  ./to-upload/file1.txt  safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
+```
+
+This will create a container with a single file. The `safe://` URLs assigned here refer to the container and the file, respectively. This means the file is addressable using either `safe://hyryyryynamznbfsgn7ccfquqmx6y8yzhq6tn7uzz775hrkyj4g8ipcy3ke6yeuy/file1.txt` or its direct URL.
+
+We can also recursively upload everything in a local directory, obtaining the XOR-URLs of the newly created container and each uploaded file:
+```
+$ safe files put ./to-upload/ --recursive
+FilesContainer created at: "safe://hyryyryynteexnr17a75mdptifno13kugqxdu8k39tecdm1dukm8kfidq9wpyeuy?v=ha83p9ai5be5cp1bajhfaydjyxe7hrhjb833qi9dsqugugsj3jxbo"
++  ./to-upload/file1.txt                          safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
++  ./to-upload/myfolder
++  ./to-upload/myfolder/file2.txt                 safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy
++  ./to-upload/myotherfolder
++  ./to-upload/myotherfolder/subfolder
++  ./to-upload/myotherfolder/subfolder/file3.txt  safe://hy8oycyybut5ea65nec5q4s8tpouws8ax5ej1jazu9c9r8e5p3ry97xkhdp7o
+```
+
+**Note**: the `+` sign indicates the files were _added_ to the container, as opposed to _updated_ or _deleted_. This will be elaborated further when discussing the `files sync` command.
+
+#### Base Path
+
+When a container is created, its base path is set to `/`. Uploaded files have an absolute path stemming from the container's base.
+
+To illustrate using our example directory, if we run `safe files put --recursive to-upload/`, this maps to:
 ```
 /file1.txt
 /myfolder/file2.txt
 /myotherfolder/subfolder/file3.txt
 ```
 
-If desired, we could use `safe files put --recursive to-upload/ /mychosenroot` and this would map to:
+If an alternative base is desired, we could use `safe files put --recursive to-upload/ /mychosenroot` and this would map to:
 ```
 /mychosenroot/file1.txt
 /mychosenroot/myfolder/file2.txt
 /mychosenroot/myotherfolder/subfolder/file3.txt
 ```
 
-You can try this yourself, then use the `files ls` command to see the result.
+### Ls
+
+We can list the contents of a container using the `files ls` command.
+
+Create a new container with the example directory:
+```
+$ safe files put ./to-upload/ --recursive
+FilesContainer created at: "safe://hyryyryyndnbzqc9zmuu6iggm7j5obyx3sj8idcpg7ds9jdiwtjs1gjipd3ioeuy?v=hub5nnrw5eq6sbc4do4d5oyndd7ijyw4q79zt3k3ocnnpfpfzkdjy"
++  ./to-upload/file1.txt                          safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
++  ./to-upload/file2.txt                          safe://hy8oycyybpgwwyx378g4b1da348kawo9i6xerxkot9w7xzwjht71awf55tj8o
++  ./to-upload/myfolder
++  ./to-upload/myfolder/file2.txt                 safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy
++  ./to-upload/myotherfolder
++  ./to-upload/myotherfolder/subfolder
++  ./to-upload/myotherfolder/subfolder/file3.txt  safe://hy8oycyybut5ea65nec5q4s8tpouws8ax5ej1jazu9c9r8e5p3ry97xkhdp7o
+```
+
+Now list its contents:
+```
+$ safe files ls safe://hyryyryyndnbzqc9zmuu6iggm7j5obyx3sj8idcpg7ds9jdiwtjs1gjipd3ioeuy
+Files of FilesContainer (version hub5nnrw5eq6sbc4do4d5oyndd7ijyw4q79zt3k3ocnnpfpfzkdjy) at "safe://hyryyryyndnbzqc9zmuu6iggm7j5obyx3sj8idcpg7ds9jdiwtjs1gjipd3ioeuy":
+Files: 2   Size: 49   Total Files: 4   Total Size: 120
+SIZE  CREATED     MODIFIED    NAME
+29    1641566755  1641566755  file1.txt
+20    1641566755  1641566755  file2.txt
+35    1641566755  1641566755  myfolder/
+36    1641566755  1641566755  myotherfolder/
+```
+
+**Note**: the size of the subdirectory is the sum of the sizes of all its files.
+
+You can also list a subdirectory:
+```
+$ safe files ls safe://hyryyryyndnbzqc9zmuu6iggm7j5obyx3sj8idcpg7ds9jdiwtjs1gjipd3ioeuy/myfolder
+Files of FilesContainer (version hub5nnrw5eq6sbc4do4d5oyndd7ijyw4q79zt3k3ocnnpfpfzkdjy) at "safe://hyryyryyndnbzqc9zmuu6iggm7j5obyx3sj8idcpg7ds9jdiwtjs1gjipd3ioeuy/myfolder":
+Files: 1   Size: 35   Total Files: 1   Total Size: 35
+SIZE  CREATED     MODIFIED    NAME
+35    1641566755  1641566755  file2.txt
+```
+
+### Sync
+
+When files or directories have been uploaded, local changes can be kept in sync using the `files sync` command. When the command completes, we'll have a new version of the container with the local modifications.
+
+First, we'll upload our example directory:
+```
+$ safe files put ./to-upload/ --recursive
+FilesContainer created at: "safe://hyryyryynuffbauiq8jbnw4whc4kk7bkoz7e6e534ufb188c5ua4kg35yjh7oeuy?v=h63f7w71cws46ar7gxhbqntrp6ritx4wso3g1o6obw1uqgzpm14xo"
++  ./to-upload/file1.txt                          safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
++  ./to-upload/myfolder
++  ./to-upload/myfolder/file2.txt                 safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy
++  ./to-upload/myotherfolder
++  ./to-upload/myotherfolder/subfolder
++  ./to-upload/myotherfolder/subfolder/file3.txt  safe://hy8oycyybut5ea65nec5q4s8tpouws8ax5ej1jazu9c9r8e5p3ry97xkhdp7o
+```
+
+Then we'll make some local changes:
+
+* Update the content of `file1.txt`
+* Add a `new.txt` file
+* Delete `myfolder/file2.txt`
+* Change the contents of `myotherfolder/subfolder/file3.txt`
+
+Now, perform the `files sync` command using the container address:
+```
+$ safe files sync ./to-upload/ safe://hyryyryynuffbauiq8jbnw4whc4kk7bkoz7e6e534ufb188c5ua4kg35yjh7oeuy
+FilesContainer synced up (version hkib4j7zukystawmi61ytw1cmrztdy6gd85n8u8pyr6ccoexoeu8y): "safe://hyryyryynuffbauiq8jbnw4whc4kk7bkoz7e6e534ufb188c5ua4kg35yjh7oeuy?v=hkib4j7zukystawmi61ytw1cmrztdy6gd85n8u8pyr6ccoexoeu8y"
+*  ./to-upload/file1.txt  safe://hy8oycyybexj6wd9yr7r5dhf1x1un5ar8tkat1hpzm7zm7yr5m9u3dod4zjfy
++  ./to-upload/new.txt    safe://hy8oycyybkbwadw8m5d845dfwe3bgxm3ssjjtawqgoy66eh9fkhh3xbwxis9y
+```
+
+The `*` and `+` denote a _modification_ and an _addition_, respectively, and we have a new version hash, which is now the current version. Using the version hash from the initial `files put` command, it would be possible to work with the first version of the container, which still exists.
+
+What of the deletion and change to `file3.txt`? Why were those not synchronised? By default, the command won't check for deletions and will only work with the top level of the directory.
+
+Run again using the `--recursive` and `--delete` flags:
+```
+$ safe files sync ./to-upload/ safe://hyryyryynuffbauiq8jbnw4whc4kk7bkoz7e6e534ufb188c5ua4kg35yjh7oeuy --recursive --delete
+FilesContainer synced up (version hb4bed1obb7j87q8jg9dengte66s14tjdi6dgpz1doknjiggfe14o): "safe://hyryyryynuffbauiq8jbnw4whc4kk7bkoz7e6e534ufb188c5ua4kg35yjh7oeuy?v=hb4bed1obb7j87q8jg9dengte66s14tjdi6dgpz1doknjiggfe14o"
+-  /myfolder/file2.txt                            safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy
+*  ./to-upload/myotherfolder/subfolder/file3.txt  safe://hy8oycyyb9iwiadpibqwae93feyw53e8o6swhwcqpq8m6yuydbahskjjurpyo
+```
+
+Again, the container has a new version, and this time we see the _deletion_, denoted by `-`, and the _modification_ to `file3.txt`, which was in a subdirectory.
+
+**Note**: `--delete` will only apply when used in conjunction with `--recursive`.
+
+When performing a sync, it's also possible to specify a location in the container. This is useful if you wanted to synchronise some other directory to the same container. To illustrate, we can make a copy of `to-upload` and sync it to `upload2` in the container:
+```
+$ safe files sync ./to-upload2/ safe://hyryyryynuffbauiq8jbnw4whc4kk7bkoz7e6e534ufb188c5ua4kg35yjh7oeuy/upload2 --recursive
+FilesContainer synced up (version h6fpc6brw7a65zb5brwo6gigpryqeyothgpmgnwqy549ks4tfg1sy): "safe://hyryyryynuffbauiq8jbnw4whc4kk7bkoz7e6e534ufb188c5ua4kg35yjh7oeuy?v=h6fpc6brw7a65zb5brwo6gigpryqeyothgpmgnwqy549ks4tfg1sy"
++  ./to-upload2/file1.txt                          safe://hy8oycyybexj6wd9yr7r5dhf1x1un5ar8tkat1hpzm7zm7yr5m9u3dod4zjfy
++  ./to-upload2/file2.txt                          safe://hy8oycyybpaxr1qxmkxup5urtxz5xahxcw36jkf7n4fywx9i4mennnzwyxiso
++  ./to-upload2/myfolder
++  ./to-upload2/myotherfolder
++  ./to-upload2/myotherfolder/subfolder
++  ./to-upload2/myotherfolder/subfolder/file3.txt  safe://hy8oycyyb9iwiadpibqwae93feyw53e8o6swhwcqpq8m6yuydbahskjjurpyo
++  ./to-upload2/new.txt                            safe://hy8oycyybkbwadw8m5d845dfwe3bgxm3ssjjtawqgoy66eh9fkhh3xbwxis9y
+```
 
 ### Add
 
-We may simply want to add a file to an existing container rather than perform a full sync. We can use the `files add` command for this:
+We may want to add a file to an existing container rather than perform a full sync. We can use the `files add` command for this.
+
+First, create a new container by uploading the example directory: 
 ```
-$ safe files add ./some-other-folder/file.txt \
-    safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc
-FilesContainer updated (version 3): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=3"
-+  ./some-other-folder/file.txt  safe://hbhydynx64dxu5594yunsu41dykxt3nu1be81cy9igqzz3qtqrq1w3y6d9
+$ safe files put ./to-upload/ --recursive
+FilesContainer created at: "safe://hyryyryyn7y13rpg7jgitypn47f6dkprjbxh4j5skk3iafxayqo6pgh3om5poeuy?v=h3tipnhnf5iq89gfkqprs3hdg5hb3zyq8ton3ukjoakbzsqujiayo"
++  ./to-upload/file1.txt                          safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
++  ./to-upload/myfolder
++  ./to-upload/myfolder/file2.txt                 safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy
++  ./to-upload/myotherfolder
++  ./to-upload/myotherfolder/subfolder
++  ./to-upload/myotherfolder/subfolder/file3.txt  safe://hy8oycyybut5ea65nec5q4s8tpouws8ax5ej1jazu9c9r8e5p3ry97xkhdp7o
+```
+
+Then create a new file at `to-upload/file2.txt` and add it to the container:
+```
+$ safe files add to-upload/file2.txt safe://hyryyryyn7y13rpg7jgitypn47f6dkprjbxh4j5skk3iafxayqo6pgh3om5poeuy
+FilesContainer updated (version hwoqjfzhgjrjquuofwb1xj8zr574b4dh5jcatn4u9xfx6rxfw6qro): "safe://hyryyryyn7y13rpg7jgitypn47f6dkprjbxh4j5skk3iafxayqo6pgh3om5poeuy?v=hwoqjfzhgjrjquuofwb1xj8zr574b4dh5jcatn4u9xfx6rxfw6qro"
++  to-upload/file2.txt  safe://hy8oycyybpgwwyx378g4b1da348kawo9i6xerxkot9w7xzwjht71awf55tj8o
 ```
 
 If we have previously uploaded a file, we can add it to another container by providing its XOR-URL as the `<location>` argument:
 ```
-$ safe files add safe://hbhydynx64dxu5594yunsu41dykxt3nu1be81cy9igqzz3qtqrq1w3y6d9 \
-    safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/files-added/same-file.txt
-FilesContainer updated (version 4): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=4"
-+  /files-added/same-file.txt  safe://hbhydynx64dxu5594yunsu41dykxt3nu1be81cy9igqzz3qtqrq1w3y6d9
+$ safe files add \
+    safe://hy8oycyybkbwadw8m5d845dfwe3bgxm3ssjjtawqgoy66eh9fkhh3xbwxis9y \
+    safe://hyryyryyn7y13rpg7jgitypn47f6dkprjbxh4j5skk3iafxayqo6pgh3om5poeuy/new.txt
+FilesContainer updated (version hcd7koxakugzak5xfsq86dwntx18whp98zeegcbyi1n11q4za11ry): "safe://hyryyryyn7y13rpg7jgitypn47f6dkprjbxh4j5skk3iafxayqo6pgh3om5poeuy?v=hcd7koxakugzak5xfsq86dwntx18whp98zeegcbyi1n11q4za11ry"
++  /new.txt  safe://hy8oycyybkbwadw8m5d845dfwe3bgxm3ssjjtawqgoy66eh9fkhh3xbwxis9y
 ```
 
-### Ls
-
-We can list the files in a container using the `files ls` command:
-```
-$ safe files ls safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc
-Files of FilesContainer (version 4) at "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc":
-Total: 6
-SIZE  CREATED               MODIFIED              NAME
-11    2020-01-28T20:26:05Z  2020-01-28T20:29:04Z  another.md
-38    2020-01-28T20:35:43Z  2020-01-28T20:35:43Z  files-added/
-30    2020-01-28T20:31:01Z  2020-01-28T20:31:01Z  new-files/
-10    2020-01-28T20:29:04Z  2020-01-28T20:29:04Z  new.md
-23    2020-01-28T20:26:05Z  2020-01-28T20:26:05Z  subfolder/
-```
-
-**Note**: the size of the subfolder is the sum of the sizes of all its files.
-
-You can also list a subfolder within a container:
-```
-$ safe files ls safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/subfolder
-Files of FilesContainer (version 4) at "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/subfolder":
-Total: 1
-SIZE  CREATED               MODIFIED              NAME
-23    2020-01-28T20:26:05Z  2020-01-28T20:26:05Z  subexists.md
-8     2020-01-28T20:26:05Z  2020-01-28T20:26:05Z  note.md
-```
+**Note**: the `<target>` must include a filename, which is `/new.txt` in the above example.
 
 ### Get
 
 The `files get` command copies file(s) from the network to the local filesystem.
 
-This command works similarly to Unix `cp` or `scp` or the windows `copy` command.  It accepts two arguments:
+This command works similarly to Unix `cp` or `scp` or the windows `copy` command.
 
+First, create a new container by uploading the example directory: 
 ```
-<source>  The target FilesContainer to retrieve from, optionally including the path to the directory or file within
-<dest>    The local destination path for the retrieved files and folders (default is '.')
-```
-
-**Note**: Wildcards (e.g. *.txt) and set/range expansion (e.g. photo{1-3}.jpg, photo{1,3,5}.jpg) in
-the source URL path are not supported at this time, but are planned for a future release.
-
-It also accepts some unique flags/options:
-
-```
--e, --exists <exists>         How to handle pre-existing files [default: ask]  [possible values: ask, preserve, overwrite]
--i, --progress <progress>     How to display progress [default: bars]  [possible values: bars, text, none]
+$ safe files put ./to-upload/ --recursive
+FilesContainer created at: "safe://hyryyryyn68cfxon3diif17w87nkj5mesc95f4noxnr85yqt6nj4qhbaaktjyeuy?v=htj4d87x47jnpyzkgyj5gm657eak33bpbaegfgtk56kznws654dxo"
++  ./to-upload/file1.txt                          safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
++  ./to-upload/file2.txt                          safe://hy8oycyybpgwwyx378g4b1da348kawo9i6xerxkot9w7xzwjht71awf55tj8o
++  ./to-upload/myfolder
++  ./to-upload/myfolder/file2.txt                 safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy
++  ./to-upload/myotherfolder
++  ./to-upload/myotherfolder/subfolder
++  ./to-upload/myotherfolder/subfolder/file3.txt  safe://hy8oycyybut5ea65nec5q4s8tpouws8ax5ej1jazu9c9r8e5p3ry97xkhdp7o
 ```
 
-#### Example: retrieving contents of a file container to local working directory
+We'll now show examples of the different ways `files get` can be used. The command uses text to indicate the progress of each file download. For brevity, this output will be omitted, and we also won't list the resulting output on the local file system. To see the results, try the examples for yourself.
+
+Copy the contents of a container to the current directory:
 ```
-$ safe files get safe://hnyynywwu865s4zgxj5z9gdjynpz9z93n8ru68931odfio7ogkjco7er7abnc
-[00:00:00] [########################################] 45B/45B (329B/s, 0s) Transfer
-Done. Retrieved 5 files to .
+$ safe files get safe://hyryyryyn68cfxon3diif17w87nkj5mesc95f4noxnr85yqt6nj4qhbaaktjyeuy
+<progress output omitted>
+Done. Retrieved 4 files to .
 ```
 
-#### Example: retrieving subfolder in a file container to an existing local directory
-
+Copy the contents of a subdirectory to the current directory:
 ```
-$ safe files get safe://hnyynywwu865s4zgxj5z9gdjynpz9z93n8ru68931odfio7ogkjco7er7abnc/testdata/subfolder existing_dir
-[00:00:00] [########################################] 27B/27B (425B/s, 0s) Transfer
-Done. Retrieved 2 files to existing_dir
-```
-
-We see that `subfolder` has been placed inside `existing_dir`.
-
-```
-$ tree existing_dir
-existing_dir
-└── subfolder
-    ├── sub2.md
-    └── subexists.md
+$ safe files get safe://hyryyryyn68cfxon3diif17w87nkj5mesc95f4noxnr85yqt6nj4qhbaaktjyeuy/myfolder
+<progress output omitted>
+Done. Retrieved 1 files to .
 ```
 
-#### Example: retrieving subfolder in a file container to a non-existent local directory (rename)
+If it doesn't already exist, this will create the `myfolder` directory locally.
 
+If you wish `myfolder` to have a different name locally, use the destination argument:
 ```
-$ safe files get safe://hnyynywwu865s4zgxj5z9gdjynpz9z93n8ru68931odfio7ogkjco7er7abnc/testdata/subfolder nonexistent_dir
-[00:00:00] [########################################] 27B/27B (425B/s, 0s) Transfer
-Done. Retrieved 2 files to nonexistent_dir
-```
-
-We see that `subfolder` has been renamed to `nonexistent_dir`.
-
-```
-$ tree nonexistent_dir
-nonexistent_dir
-├── sub2.md
-└── subexists.md
+$ safe files get safe://hyryyryyn68cfxon3diif17w87nkj5mesc95f4noxnr85yqt6nj4qhbaaktjyeuy/myfolder other
+<progress output omitted>
+Done. Retrieved 1 files to other
 ```
 
-#### Example: retrieving individual file to an existing directory
-
+Copy the contents of a container to an existing directory:
 ```
-$ safe files get safe://hnyynywwu865s4zgxj5z9gdjynpz9z93n8ru68931odfio7ogkjco7er7abnc/testdata/subfolder/sub2.md existing_dir/
-[00:00:00] [########################################] 4B/4B (378B/s, 0s) Transfer
-Done. Retrieved 1 files to existing_dir/
-```
-
-We see that the file is now inside `existing_dir`.
-
-```
-$ tree existing_dir
-existing_dir
-└── sub2.md
+$ mkdir target
+$ safe files get safe://hyryyryyn68cfxon3diif17w87nkj5mesc95f4noxnr85yqt6nj4qhbaaktjyeuy target
+<progress output omitted>
+Done. Retrieved 4 files to target
 ```
 
-#### Example: retrieving individual file to a new filename
+Copy a file:
+```
+$ safe files get safe://hyryyryyn68cfxon3diif17w87nkj5mesc95f4noxnr85yqt6nj4qhbaaktjyeuy/file1.txt
+<progress output omitted>
+Done. Retrieved 1 files to .
+```
 
-```
-$ safe files get safe://hnyynywwu865s4zgxj5z9gdjynpz9z93n8ru68931odfio7ogkjco7er7abnc/testdata/subfolder/sub2.md existing_dir/new_filename
-[00:00:00] [########################################] 4B/4B (374B/s, 0s) Transfer
-Done. Retrieved 1 files to existing_dir/new_filename
-```
+You could also add a target for the file, which could be either an existing or non-existent directory or a new filename.
 
-We see that `new_filename` is now inside `existing_dir`.
-
-```
-$ tree existing_dir
-existing_dir
-└── new_filename
-```
+**Note**: Wildcards, e.g. *.txt, and set/range expansion, e.g. photo{1-3}.jpg, in the source URL path, are not supported at this time, but are planned for a future release.
 
 #### Performance
 
@@ -590,66 +644,78 @@ Future releases may operate differently.
 
 ### Tree
 
-The `files tree` command displays a visual representation of an entire directory tree.
+The `files tree` command displays a visual representation of an entire directory tree of a container.
 
+First, create a new container by uploading the example directory: 
 ```
-$ safe files tree safe://hnyynyiodw4extpc7xh3dncfgsg4sjzsygru9k8omo988brz688oxkxhxgbnc
-safe://hnyynyiodw4extpc7xh3dncfgsg4sjzsygru9k8omo988brz688oxkxhxgbnc
-└── testdata
-    ├── another.md
-    ├── noextension
-    ├── subfolder
-    │   ├── sub2.md
-    │   └── subexists.md
-    └── test.md
-
-2 directories, 5 files
-```
-
-If we provide a path to a subfolder, this command will resolve the path and list only children of the provided path:
-
-```
-$ safe files tree safe://hnyynyiodw4extpc7xh3dncfgsg4sjzsygru9k8omo988brz688oxkxhxgbnc/testdata/subfolder
-safe://hnyynyiodw4extpc7xh3dncfgsg4sjzsygru9k8omo988brz688oxkxhxgbnc/testdata/subfolder
-├── sub2.md
-└── subexists.md
-
-0 directories, 2 files
+$ safe files put ./to-upload/ --recursive
+FilesContainer created at: "safe://hyryyryynrqxhdosmk1xr9bsz1a8jkc6a9mwmhxueqoiwueicknboakwdk7toeuy?v=h8h3mrhkzr793pwxdwga6i31stcr35ckhkegr51rfcgmufkjcrz5y"
++  ./to-upload/file1.txt                          safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
++  ./to-upload/file2.txt                          safe://hy8oycyybpgwwyx378g4b1da348kawo9i6xerxkot9w7xzwjht71awf55tj8o
++  ./to-upload/myfolder
++  ./to-upload/myfolder/file2.txt                 safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy
++  ./to-upload/myotherfolder
++  ./to-upload/myotherfolder/subfolder
++  ./to-upload/myotherfolder/subfolder/file3.txt  safe://hy8oycyybut5ea65nec5q4s8tpouws8ax5ej1jazu9c9r8e5p3ry97xkhdp7o
 ```
 
-File details can be displayed with the `--details` flag:
-
+Run the command to visualise the container:
 ```
-$ safe files tree --details safe://hnyynyiodw4extpc7xh3dncfgsg4sjzsygru9k8omo988brz688oxkxhxgbnc/testdata
-SIZE  CREATED               MODIFIED              NAME
-                                                  safe://hnyynyiodw4extpc7xh3dncfgsg4sjzsygru9k8omo988brz688oxkxhxgbnc/testdata
-6     2020-03-06T18:31:55Z  2020-03-06T18:31:55Z  ├── another.md
-0     2020-03-06T18:31:55Z  2020-03-06T18:31:55Z  ├── noextension
-                                                  ├── subfolder
-4     2020-03-06T18:31:55Z  2020-03-06T18:31:55Z  │   ├── sub2.md
-23    2020-03-06T18:31:55Z  2020-03-06T18:31:55Z  │   └── subexists.md
-12    2020-03-06T18:31:55Z  2020-03-06T18:31:55Z  └── test.md
+$ safe files tree safe://hyryyryynrqxhdosmk1xr9bsz1a8jkc6a9mwmhxueqoiwueicknboakwdk7toeuy
+safe://hyryyryynrqxhdosmk1xr9bsz1a8jkc6a9mwmhxueqoiwueicknboakwdk7toeuy
+├── file1.txt
+├── file2.txt
+├── myfolder
+│   └── file2.txt
+└── myotherfolder
+    └── subfolder
+        └── file3.txt
 
-1 directory, 5 files
+3 directories, 4 files
 ```
+
+You can also list a subfolder of the tree:
+```
+❯ safe files tree safe://hyryyryynrqxhdosmk1xr9bsz1a8jkc6a9mwmhxueqoiwueicknboakwdk7toeuy/myotherfolder
+safe://hyryyryynrqxhdosmk1xr9bsz1a8jkc6a9mwmhxueqoiwueicknboakwdk7toeuy/myotherfolder
+└── subfolder
+    └── file3.txt
+
+1 directory, 1 file
+```
+
+**Note**: a `--details` flag can be supplied to output the file sizes.
 
 ### Rm
 
-Removing files from a container which is in sync with a local folder can be done by removing them locally followed by a call to the `files sync` command.
+Files and directories can be removed from a container using `files sync`, but it's also possible with the `files rm` command.
 
-However, if you would like to remove files directly from the container, we can use the `files rm` command:
+First, create a new container by uploading the example directory: 
 ```
-$ safe files rm safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/another.md
-FilesContainer updated (version 5): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=5"
--  /another.md  safe://hbhyrynyr3osimhxa3mfqok7tto6cf3hhjy4sp3wdri6ee46x8xg68r9mj
+$ safe files put ./to-upload/ --recursive
+FilesContainer created at: "safe://hyryyryyny8xnytj1rgad3siak49cyeuzfxnd8ggafpifcna1jj55b86914uyeuy?v=ht9kwqnhoxcrq9z9gwkwdkfk3dgig3fxi4uk88ynkqzex4nyenagy"
++  ./to-upload/file1.txt                          safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
++  ./to-upload/file2.txt                          safe://hy8oycyybpgwwyx378g4b1da348kawo9i6xerxkot9w7xzwjht71awf55tj8o
++  ./to-upload/myfolder
++  ./to-upload/myfolder/file2.txt                 safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy
++  ./to-upload/myotherfolder
++  ./to-upload/myotherfolder/subfolder
++  ./to-upload/myotherfolder/subfolder/file3.txt  safe://hy8oycyybut5ea65nec5q4s8tpouws8ax5ej1jazu9c9r8e5p3ry97xkhdp7o
 ```
 
-We can also use the `--recursive` flag to remove a subfolder in the container: 
+Remove `file1.txt` from the container:
 ```
-$ safe files rm safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc/subfolder --recursive
-FilesContainer updated (version 6): "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=6"
--  /subfolder/subexists.md  safe://hbhyryn9uodh1ju5uzyti3gmmtwburrssd89rcwcy3rzofdpypwomrzzte
--  /subfolder/note.md       safe://hbhyryncjzga5uqp3ogeadqctigyaurpju8yauqptzgh5uyctogh3dkcbt
+$ safe files rm safe://hyryyryyny8xnytj1rgad3siak49cyeuzfxnd8ggafpifcna1jj55b86914uyeuy/file1.txt
+FilesContainer updated (version hsh1bc78zckusbj3y43fsh3hj8uwdwprm7r9qc1u9uy5p7yyb58go): "safe://hyryyryyny8xnytj1rgad3siak49cyeuzfxnd8ggafpifcna1jj55b86914uyeuy?v=hsh1bc78zckusbj3y43fsh3hj8uwdwprm7r9qc1u9uy5p7yyb58go"
+-  /file1.txt  safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
+```
+
+To remove a directory, use the `--recursive` flag: 
+```
+$ safe files rm safe://hyryyryyny8xnytj1rgad3siak49cyeuzfxnd8ggafpifcna1jj55b86914uyeuy/myotherfolder --recursive
+FilesContainer updated (version h6zr4xmy7pw6bcpcat5ofs4rt9zfu3x4shjctm1mqx8it7ucda8bo): "safe://hyryyryyny8xnytj1rgad3siak49cyeuzfxnd8ggafpifcna1jj55b86914uyeuy?v=h6zr4xmy7pw6bcpcat5ofs4rt9zfu3x4shjctm1mqx8it7ucda8bo"
+-  /myotherfolder/subfolder
+-  /myotherfolder/subfolder/file3.txt  safe://hy8oycyybut5ea65nec5q4s8tpouws8ax5ej1jazu9c9r8e5p3ry97xkhdp7o
 ```
 
 ## Xorurl
