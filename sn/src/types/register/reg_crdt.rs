@@ -28,14 +28,12 @@ pub struct EntryHash(pub crdts::merkle_reg::Hash);
 
 impl Debug for EntryHash {
     fn fmt(&self, formatter: &mut Formatter) -> FmtResult {
-        // Using the wrting format of XorName for the logging consistency.
         write!(formatter, "{}", self)
     }
 }
 
 impl Display for EntryHash {
     fn fmt(&self, formatter: &mut Formatter) -> FmtResult {
-        // Using the wrting format of XorName for the logging consistency.
         write!(
             formatter,
             "{:02x}{:02x}{:02x}..",
