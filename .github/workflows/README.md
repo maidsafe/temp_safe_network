@@ -32,3 +32,19 @@ Here is the high-level overview of the process:
     - Publish the `sn_api` crate (if the commit message contains `sn_api`)
 
 It's worth mentioning that on the final step that publishes the API crate, this is done using a script that has a retry loop. This is because it sometimes takes some time for the previously published `safe_network` crate to propagate.
+
+## Running GitHub Actions on self-hosted runners
+
+By default, GitHub actions are run on machines hosted by GitHub. These can be rather slow. This repository is setup to run workflows on self-hosted runners on AWS EC2 Instances. These instances scale up and down as required. Self-hosted runners are currently set up for the following operating systems:
+
+#### Ubuntu
+
+For Ubuntu, the process is straightforward. In the runs-on field, use `self-hosted-ubuntu`.
+
+#### Windows
+
+For Windows, the process is similar, but requires some additional setup.
+
+- Use `self-hosted-windows` in the `runs-on` field.
+- Use lionel1704/toolchain instead of actions-rs/toolchain. (until https://github.com/actions-rs/core/pull/216 is resolved)
+- Add `shell: bash` to job steps with `run: ...` (Powershell is used by default so notations like `&&` and `./some_binary` are not supported.
