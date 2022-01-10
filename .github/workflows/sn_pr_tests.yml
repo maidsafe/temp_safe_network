@@ -30,6 +30,7 @@ jobs:
       - name: Build sn bins
         # all = all crates in workspace, lib/bins targets, with these features...
         run: cargo build -p safe_network --release --features=always-joinable,test-utils --bins
+        shell: bash
         timeout-minutes: 60
 
       # Install Rust
@@ -50,18 +51,20 @@ jobs:
       - name: Build all safe_network tests
         run: cd sn && cargo test --no-run --release --features=always-joinable,test-utils
         timeout-minutes: 60
+        shell: bash
 
       - name: Start the network
         run: ./target/release/testnet --interval 15000
         id: section-startup
+        shell: bash
 
       - name: Print Network Log Stats at start
         shell: bash
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+        if: steps.section-startup.outcome == 'success' && matrix.os != 'self-hosted-windows'
 
       - name: ubuntu install zsh
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'self-hosted-ubuntu'
         run: |
           sudo apt-get -y install zsh
 
@@ -75,14 +78,14 @@ jobs:
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: Initial client tests... (unix)
         shell: zsh {0}
-        if: matrix.os != 'windows-latest'
+        if: matrix.os != 'self-hosted-windows'
         # always joinable not actually needed here, but should speed up compilation as we've just built with it
         run: cd sn && repeat 5 cargo test --release --features=always-joinable,test-utils -- client --skip client_api::reg --skip client_api::blob --test-threads=2 && sleep $POST_TEST_SLEEP
         timeout-minutes: 7
 
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: Initial client tests... (win)
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'self-hosted-windows'
         shell: bash
         # always joinable not actually needed here, but should speed up compilation as we've just built with it
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client --skip client_api::reg --skip client_api::blob --test-threads=2 && sleep $POST_TEST_SLEEP
@@ -91,14 +94,14 @@ jobs:
       # register api
       - name: Client reg tests against local network (unix)
         shell: zsh {0}
-        if: matrix.os != 'windows-latest'
+        if: matrix.os != 'self-hosted-windows'
         run: cd sn && repeat 5 cargo test --release --features=always-joinable,test-utils -- client_api::reg --test-threads=1 --skip ae --skip batching && sleep $POST_TEST_SLEEP
         timeout-minutes: 10
 
       # register api
       - name: Client reg tests against local network (win)
         shell: bash
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'self-hosted-windows'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::reg --test-threads=1 --skip ae --skip batching && sleep $POST_TEST_SLEEP
         timeout-minutes: 10
 
@@ -111,21 +114,21 @@ jobs:
       # blob api
       - name: client blob tests against local network (unix)
         shell: zsh {0}
-        if: matrix.os != 'windows-latest'
+        if: matrix.os != 'self-hosted-windows'
         run: cd sn && repeat 5 cargo test --release --features=always-joinable,test-utils -- client_api::blob --test-threads=1 --skip ae --skip from_many_clients  && sleep $POST_TEST_SLEEP
         timeout-minutes: 25
 
       # blob api
       - name: client blob tests against local network (win)
         shell: bash
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'self-hosted-windows'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::blob --test-threads=1 --skip ae --skip from_many_clients  && sleep $POST_TEST_SLEEP
         timeout-minutes: 15
 
       # ae tests api
       - name: client ae tests against local network (unix)
         shell: zsh {0}
-        if: matrix.os != 'windows-latest'
+        if: matrix.os != 'self-hosted-windows'
         run: cd sn && repeat 5 cargo test --release --features=always-joinable,test-utils -- ae_checks --test-threads=2 && sleep $POST_TEST_SLEEP
         timeout-minutes: 15
         env:
@@ -133,7 +136,7 @@ jobs:
 
       - name: client ae tests against local network (win)
         shell: bash
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'self-hosted-windows'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- ae_checks --test-threads=2 && sleep $POST_TEST_SLEEP
         timeout-minutes: 10
         env:
@@ -155,7 +158,7 @@ jobs:
       - name: Are nodes still running...?
         shell: bash
         timeout-minutes: 1
-        if: failure() && matrix.os != 'windows-latest'
+        if: failure() && matrix.os != 'self-hosted-windows'
         continue-on-error: true
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
@@ -165,19 +168,21 @@ jobs:
         shell: bash
         continue-on-error: true
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' &&  matrix.os != 'windows-latest'
+        if: steps.section-startup.outcome == 'success' &&  matrix.os != 'self-hosted-windows'
 
       - name: Upload Node Logs to AWS for Windowns
           # Upload artifacts.
         run: aws s3 sync C:\Users\runneradmin\.safe\node\local-test-network\ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure() &&  matrix.os == 'windows-latest'
+        if: failure() &&  matrix.os == 'self-hosted-windows'
         continue-on-error: true
+        shell: bash
 
       - name: Upload Node Logs to AWS for Non-Windows
           # Upload artifacts.
         run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure() &&  matrix.os != 'windows-latest'
+        if: failure() &&  matrix.os != 'self-hosted-windows'
         continue-on-error: true
+        shell: bash
 
       - name: Upload Node Logs
           # Upload artifacts.
