@@ -666,7 +666,7 @@ impl Core {
             SystemMsg::NodeCmd(NodeCmd::ReceiveExistingData { metadata }) => {
                 info!("Processing received DataExchange packet: {:?}", msg_id);
 
-                self.register_storage.update(metadata.reg_data)?;
+                self.register_storage.update(metadata.reg_data).await?;
                 self.update_chunks(metadata.chunk_data).await;
                 Ok(vec![])
             }

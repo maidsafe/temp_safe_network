@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{deserialise, serialise, Error, Result, ToDbKey};
+use super::{deserialise, serialise, Error, Result};
 use serde::{de::DeserializeOwned, Serialize};
 use sled::{Db, Tree};
 use std::{fmt::Debug, marker::PhantomData};
@@ -23,9 +23,8 @@ impl<'a, TEvent: Debug + Serialize + DeserializeOwned> EventStore<TEvent>
 where
     TEvent: 'a,
 {
-    pub(crate) fn new(id: XorName, db: Db) -> Result<Self> {
-        let db_name = id.to_db_key()?;
-        let tree = db.open_tree(&db_name)?;
+    pub(crate) fn new(id: &XorName, db: Db) -> Result<Self> {
+        let tree = db.open_tree(id)?;
         Ok(Self {
             tree,
             _phantom: PhantomData::default(),
@@ -54,7 +53,7 @@ where
     }
 
     /// append a new entry
-    pub(crate) fn append(&mut self, event: TEvent) -> Result<()> {
+    pub(crate) fn append(&self, event: TEvent) -> Result<()> {
         let key = &self.tree.len().to_string();
         if self.tree.get(key)?.is_some() {
             return Err(Error::DataExists);
@@ -84,7 +83,7 @@ mod test {
             trace!("Sled Error: {:?}", error);
             Error::Sled(error)
         })?;
-        let mut store = EventStore::<Token>::new(id, db)?;
+        let store = EventStore::<Token>::new(&id, db)?;
 
         store.append(Token::from_nano(10))?;
 

@@ -9,14 +9,14 @@
 mod encoding;
 mod errors;
 mod event_store;
-mod to_db_key;
+mod lru_cache;
 mod used_space;
 
 pub(crate) use encoding::{deserialise, serialise};
 pub(crate) use errors::{convert_to_error_message, Error, Result};
 pub(crate) use event_store::EventStore;
+pub(crate) use lru_cache::LruCache;
 use std::path::Path;
-pub(crate) use to_db_key::ToDbKey;
 pub use used_space::UsedSpace;
 
 pub(crate) const SLED_FLUSH_TIME_MS: Option<u64> = Some(10000);
