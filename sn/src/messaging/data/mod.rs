@@ -98,6 +98,15 @@ pub enum ServiceMsg {
     },
     /// A message indicating that an error occurred as a node was handling a client's message.
     ServiceError(ServiceError),
+    /// For testing purpose, CmdAck will be sent back to the client when the handling on the
+    /// receiving Elder is succeed.
+    #[cfg(any(test, feature = "test-utils"))]
+    CmdAck {
+        /// ID of causing [`Cmd`] message.
+        ///
+        /// [`Cmd`]: Self::Cmd
+        correlation_id: MessageId,
+    },
 }
 
 impl ServiceMsg {

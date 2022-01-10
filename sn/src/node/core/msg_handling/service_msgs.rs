@@ -50,6 +50,29 @@ impl Core {
         Ok(vec![command])
     }
 
+    /// Forms a command to send the provided node Ack out
+    #[cfg(any(test, feature = "test-utils"))]
+    pub(crate) fn send_cmd_ack(&self, target: Peer, msg_id: MessageId) -> Result<Vec<Command>> {
+        let the_error_msg = ServiceMsg::CmdAck {
+            correlation_id: msg_id,
+        };
+
+        let dst = DstLocation::EndUser(EndUser(target.name()));
+
+        // FIXME: define which signature/authority this message should really carry,
+        // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
+        // Giving a random sig temporarily
+        let (msg_kind, payload) = Self::random_client_signature(&the_error_msg)?;
+        let wire_msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, dst)?;
+
+        let command = Command::SendMessage {
+            recipients: vec![target],
+            wire_msg,
+        };
+
+        Ok(vec![command])
+    }
+
     /// Sign and serialize node message to be sent
     pub(crate) async fn prepare_node_msg(
         &self,
