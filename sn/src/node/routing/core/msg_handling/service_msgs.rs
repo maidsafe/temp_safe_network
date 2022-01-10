@@ -83,7 +83,7 @@ impl Core {
     }
 
     /// Handle register reads
-    pub(crate) fn handle_register_read(
+    pub(crate) async fn handle_register_read(
         &self,
         msg_id: MessageId,
         query: RegisterRead,
@@ -96,7 +96,7 @@ impl Core {
             query.dst_address(),
         );
 
-        match self.register_storage.read(&query, auth.public_key) {
+        match self.register_storage.read(&query, auth.public_key).await {
             Ok(response) => {
                 if response.failed_with_data_not_found() {
                     // we don't return data not found errors.
@@ -309,7 +309,7 @@ impl Core {
                     .await
             }
             ServiceMsg::Query(DataQuery::Register(read)) => {
-                self.handle_register_read(msg_id, read, user, auth)
+                self.handle_register_read(msg_id, read, user, auth).await
             }
             // These will only be received at elders.
             // These reads/writes are for adult nodes...
