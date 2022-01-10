@@ -569,9 +569,6 @@ impl Dispatcher {
                 .await
                 .into_iter()
                 .collect()),
-            Command::SetJoinsAllowed(joins_allowed) => {
-                self.core.set_joins_allowed(joins_allowed).await
-            }
             Command::SendAcceptedOnlineShare {
                 peer,
                 previous_name,
