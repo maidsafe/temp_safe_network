@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    data::DataExchange,
     system::{
         DkgSessionId, JoinResponse, NodeCmd, RelocateDetails, RelocatePromise, SectionAuth,
         SystemMsg,
@@ -311,15 +310,9 @@ impl Core {
         recipients: Vec<Peer>,
         target_pk: BlsPublicKey,
     ) -> Result<Vec<Command>> {
-        let chunk_data = self.get_data_of(&prefix).await;
-        let reg_data = self.register_storage.get_data_of(prefix).await?;
+        let metadata = self.get_metadata_of(&prefix).await;
 
-        let data_update_msg = SystemMsg::NodeCmd(NodeCmd::ReceiveExistingData {
-            metadata: DataExchange {
-                chunk_data,
-                reg_data,
-            },
-        });
+        let data_update_msg = SystemMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata });
 
         match self
             .send_direct_message_to_nodes_in_section(

@@ -6,8 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod chunk_disk_store;
+
+use crate::dbs::{convert_to_error_message, Error, Result};
 use crate::messaging::{data::StorageLevel, system::NodeQueryResponse};
 use crate::types::{log_markers::LogMarker, Chunk, ChunkAddress};
+use crate::UsedSpace;
+
+use chunk_disk_store::ChunkDiskStore;
 use std::{
     fmt::{self, Display, Formatter},
     io::ErrorKind,
@@ -17,21 +23,14 @@ use std::{
 use tokio::sync::RwLock;
 use tracing::info;
 
-use crate::UsedSpace;
-mod errors;
-pub(crate) use errors::{convert_to_error_message, Error, Result};
-
-mod chunk_disk_store;
-use chunk_disk_store::ChunkDiskStore;
-
 /// Operations on data chunks.
 #[derive(Clone)]
-pub(crate) struct ChunkStore {
+pub(crate) struct ChunkStorage {
     disk_store: ChunkDiskStore,
     last_recorded_level: Arc<RwLock<StorageLevel>>,
 }
 
-impl ChunkStore {
+impl ChunkStorage {
     pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
             disk_store: ChunkDiskStore::new(path, used_space)?,
@@ -128,8 +127,8 @@ impl ChunkStore {
     }
 }
 
-impl Display for ChunkStore {
+impl Display for ChunkStorage {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "ChunkStore")
+        write!(formatter, "ChunkStorage")
     }
 }

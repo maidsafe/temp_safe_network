@@ -16,7 +16,7 @@ mod register;
 
 pub use self::{
     cmd::DataCmd,
-    data_exchange::{ChunkDataExchange, DataExchange, RegisterDataExchange, StorageLevel},
+    data_exchange::{DataExchange, RegisterDataExchange, StorageLevel},
     errors::{Error, Result},
     query::DataQuery,
     register::{RegisterCmd, RegisterRead, RegisterWrite},
@@ -141,6 +141,11 @@ pub enum QueryResponse {
     GetRegisterPolicy((Result<Policy>, OperationId)),
     /// Response to [`RegisterRead::GetUserPermissions`].
     GetRegisterUserPermissions((Result<Permissions>, OperationId)),
+    //
+    // ===== Other =====
+    //
+    /// Failed to create id generation
+    FailedToCreateOperationId,
 }
 
 impl QueryResponse {
@@ -154,6 +159,7 @@ impl QueryResponse {
             ReadRegister((result, _op_id)) => result.is_ok(),
             GetRegisterPolicy((result, _op_id)) => result.is_ok(),
             GetRegisterUserPermissions((result, _op_id)) => result.is_ok(),
+            FailedToCreateOperationId => false,
         }
     }
 
@@ -186,6 +192,7 @@ impl QueryResponse {
                 Ok(_) => false,
                 Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
+            FailedToCreateOperationId => false,
         }
     }
 
@@ -214,12 +221,12 @@ impl QueryResponse {
                     Err(Error::InvalidQueryResponseErrorForOperationId)
                 }
             },
-
             GetRegister((_, operation_id))
             | GetRegisterOwner((_, operation_id))
             | ReadRegister((_, operation_id))
             | GetRegisterPolicy((_, operation_id))
             | GetRegisterUserPermissions((_, operation_id)) => Ok(operation_id.clone()),
+            FailedToCreateOperationId => Err(Error::NoOperationId),
         }
     }
 }

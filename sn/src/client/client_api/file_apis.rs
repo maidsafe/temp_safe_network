@@ -604,7 +604,7 @@ mod tests {
 
         // 3 elders were chosen by the client (should only be 3 as even if client chooses adults, AE should kick in prior to them attempting any of this)
         the_logs
-            .assert_count(LogMarker::ChunkStoreReceivedAtElder, 3)
+            .assert_count(LogMarker::ChunkStorageReceivedAtElder, 3)
             .await?;
 
         // 4 adults * reqs from 3 elders storing the chunk

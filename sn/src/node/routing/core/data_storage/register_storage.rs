@@ -16,9 +16,10 @@ use crate::types::{
 use crate::{
     messaging::{
         data::{
-            DataCmd, OperationId, QueryResponse, RegisterCmd, RegisterDataExchange, RegisterRead,
-            RegisterWrite, ServiceMsg,
+            DataCmd, OperationId, RegisterCmd, RegisterDataExchange, RegisterRead, RegisterWrite,
+            ServiceMsg,
         },
+        system::NodeQueryResponse,
         AuthorityProof, ServiceAuth, WireMsg,
     },
     types::DataAddress,
@@ -80,7 +81,74 @@ impl RegisterStorage {
         })
     }
 
-    /// --- Synching ---
+    /// --- Node Synching ---
+    /// These are node internal functions, not to be exposed to users.
+
+    pub(crate) async fn remove_register(&self, address: &Address) -> Result<()> {
+        trace!("Removing register, {:?}", address);
+        self.drop_register_key(to_reg_key(address)?).await
+    }
+
+    pub(crate) async fn keys(&self) -> Result<Vec<Address>> {
+        type KeyResults = Vec<Result<XorName>>;
+        let mut the_data = vec![];
+
+        // parse keys in parallel
+        let (ok, err): (KeyResults, KeyResults) = self
+            .key_db
+            .export()
+            .into_iter()
+            .map(|(_, _, pairs)| pairs)
+            .flatten()
+            .par_bridge()
+            .map(|pair| {
+                let src_key = &pair[0];
+                // we expect xornames as keys
+                if src_key.len() != XOR_NAME_LEN {
+                    return Err(Error::CouldNotParseDbKey(src_key.to_vec()));
+                }
+                let mut dst_key: [u8; 32] = Default::default();
+                dst_key.copy_from_slice(src_key);
+
+                Ok(XorName(dst_key))
+            })
+            .partition(|r| r.is_ok());
+
+        if !err.is_empty() {
+            for e in err {
+                error!("{:?}", e);
+            }
+            return Err(Error::CouldNotConvertDbKey);
+        }
+
+        // TODO: make this concurrent
+        for key in ok.iter().flatten() {
+            match self.try_load_cache_entry(key).await {
+                Ok(entry) => {
+                    the_data.push(*entry.state.read().await.address());
+                }
+                Err(Error::KeyNotFound(_)) => return Err(Error::InvalidStore),
+                Err(e) => return Err(e),
+            }
+        }
+
+        Ok(the_data)
+    }
+
+    /// Get `Register` from the store
+    pub(crate) async fn get_register_for_replication(&self, address: &Address) -> Result<Register> {
+        let entry = match self.try_load_cache_entry(&to_reg_key(address)?).await {
+            Ok(entry) => entry,
+            Err(Error::KeyNotFound(_key)) => {
+                return Err(Error::NoSuchData(DataAddress::Register(*address)))
+            }
+            Err(e) => return Err(e),
+        };
+
+        let read_only = entry.state.read().await;
+
+        Ok(read_only.clone())
+    }
 
     /// Used for replication of data to new Elders.
     pub(crate) async fn get_data_of(&self, prefix: Prefix) -> Result<RegisterDataExchange> {
@@ -270,9 +338,14 @@ impl RegisterStorage {
         &self,
         read: &RegisterRead,
         requester_pk: PublicKey,
-    ) -> Result<QueryResponse> {
+    ) -> NodeQueryResponse {
         trace!("Reading register {:?}", read.dst_address());
-        let operation_id = read.operation_id().map_err(|_| Error::NoOperationId)?;
+        let operation_id = match read.operation_id() {
+            Ok(id) => id,
+            Err(e) => {
+                return NodeQueryResponse::FailedToCreateOperationId;
+            }
+        };
         trace!("Operation of register read: {:?}", operation_id);
         use RegisterRead::*;
         match read {
@@ -296,7 +369,7 @@ impl RegisterStorage {
         address: Address,
         requester_pk: PublicKey,
         operation_id: OperationId,
-    ) -> Result<QueryResponse> {
+    ) -> NodeQueryResponse {
         let result = match self
             .get_register(&address, Action::Read, requester_pk)
             .await
@@ -305,7 +378,7 @@ impl RegisterStorage {
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok(QueryResponse::GetRegister((result, operation_id)))
+        NodeQueryResponse::GetRegister((result, operation_id))
     }
 
     /// Get `Register` from the store and check permissions.
@@ -336,20 +409,16 @@ impl RegisterStorage {
         address: Address,
         requester_pk: PublicKey,
         operation_id: OperationId,
-    ) -> Result<QueryResponse> {
+    ) -> NodeQueryResponse {
         let result = match self
             .get_register(&address, Action::Read, requester_pk)
             .await
         {
             Ok(register) => register.read(Some(requester_pk)).map_err(Error::from),
-            Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(error),
         };
 
-        Ok(QueryResponse::ReadRegister((
-            result.map_err(convert_to_error_message),
-            operation_id,
-        )))
+        NodeQueryResponse::ReadRegister((result.map_err(convert_to_error_message), operation_id))
     }
 
     async fn get_owner(
@@ -357,17 +426,16 @@ impl RegisterStorage {
         address: Address,
         requester_pk: PublicKey,
         operation_id: OperationId,
-    ) -> Result<QueryResponse> {
+    ) -> NodeQueryResponse {
         let result = match self
             .get_register(&address, Action::Read, requester_pk)
             .await
         {
             Ok(res) => Ok(res.owner()),
-            Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok(QueryResponse::GetRegisterOwner((result, operation_id)))
+        NodeQueryResponse::GetRegisterOwner((result, operation_id))
     }
 
     async fn get_user_permissions(
@@ -376,7 +444,7 @@ impl RegisterStorage {
         user: User,
         requester_pk: PublicKey,
         operation_id: OperationId,
-    ) -> Result<QueryResponse> {
+    ) -> NodeQueryResponse {
         let result = match self
             .get_register(&address, Action::Read, requester_pk)
             .await
@@ -386,14 +454,10 @@ impl RegisterStorage {
                     .map_err(Error::from)
             }) {
             Ok(res) => Ok(res),
-            Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok(QueryResponse::GetRegisterUserPermissions((
-            result,
-            operation_id,
-        )))
+        NodeQueryResponse::GetRegisterUserPermissions((result, operation_id))
     }
 
     async fn get_policy(
@@ -401,7 +465,7 @@ impl RegisterStorage {
         address: Address,
         requester_pk: PublicKey,
         operation_id: OperationId,
-    ) -> Result<QueryResponse> {
+    ) -> NodeQueryResponse {
         let result = match self
             .get_register(&address, Action::Read, requester_pk)
             .await
@@ -412,11 +476,10 @@ impl RegisterStorage {
                     .map_err(Error::from)
             }) {
             Ok(res) => Ok(res),
-            Err(Error::NoSuchData(addr)) => return Err(Error::NoSuchData(addr)),
             Err(error) => Err(convert_to_error_message(error)),
         };
 
-        Ok(QueryResponse::GetRegisterPolicy((result, operation_id)))
+        NodeQueryResponse::GetRegisterPolicy((result, operation_id))
     }
 
     /// Helpers
@@ -503,8 +566,13 @@ impl Display for RegisterStorage {
 
 #[cfg(test)]
 mod test {
-    use super::{RegOpStore, RegisterStorage};
+    use super::{to_reg_key, RegOpStore, RegisterStorage};
 
+    use crate::messaging::{
+        data::{DataCmd, RegisterCmd, RegisterRead, RegisterWrite, ServiceMsg},
+        system::NodeQueryResponse,
+        AuthorityProof, ServiceAuth, WireMsg,
+    };
     use crate::node::{Error, Result};
     use crate::types::DataAddress;
     use crate::types::{
@@ -512,13 +580,6 @@ mod test {
         Keypair,
     };
     use crate::UsedSpace;
-    use crate::{
-        messaging::{
-            data::{DataCmd, QueryResponse, RegisterCmd, RegisterRead, RegisterWrite, ServiceMsg},
-            AuthorityProof, ServiceAuth, WireMsg,
-        },
-        node::routing::core::register_storage::to_reg_key,
-    };
 
     use rand::rngs::OsRng;
     use std::{collections::BTreeMap, path::Path};
@@ -560,10 +621,10 @@ mod test {
         let _ = store.write(write.clone(), proof.clone()).await?;
         let res = store
             .read(&RegisterRead::Get(*address), keypair.public_key())
-            .await?;
+            .await;
 
         match res {
-            QueryResponse::GetRegister((Ok(reg), _)) => {
+            NodeQueryResponse::GetRegister((Ok(reg), _)) => {
                 assert_eq!(
                     reg.address(),
                     register.address(),
@@ -606,10 +667,10 @@ mod test {
         // should be able to read the same value from this new store also
         let res = new_store
             .read(&RegisterRead::Get(*address), keypair.public_key())
-            .await?;
+            .await;
 
         match res {
-            QueryResponse::GetRegister((Ok(reg), _)) => {
+            NodeQueryResponse::GetRegister((Ok(reg), _)) => {
                 assert_eq!(
                     reg.address(),
                     register.address(),
@@ -625,13 +686,13 @@ mod test {
         // should not get the removed register
         let res = store
             .read(&RegisterRead::Get(*address), keypair.public_key())
-            .await?;
+            .await;
 
         use crate::messaging::data::Error as MsgError;
 
         match res {
-            QueryResponse::GetRegister((Ok(_), _)) => panic!("Was not removed!"),
-            QueryResponse::GetRegister((Err(MsgError::DataNotFound(addr)), _)) => {
+            NodeQueryResponse::GetRegister((Ok(_), _)) => panic!("Was not removed!"),
+            NodeQueryResponse::GetRegister((Err(MsgError::DataNotFound(addr)), _)) => {
                 assert_eq!(addr, DataAddress::Register(*register.address()))
             }
             e => panic!("Unexpected response! {:?}", e),

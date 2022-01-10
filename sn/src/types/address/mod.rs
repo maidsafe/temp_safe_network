@@ -100,6 +100,35 @@ impl DataAddress {
     }
 }
 
+/// An address of data on the network
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
+pub enum ReplicatedDataAddress {
+    ///
+    Chunk(ChunkAddress),
+    ///
+    Register(RegisterAddress),
+}
+
+impl ReplicatedDataAddress {
+    /// The xorname.
+    pub fn name(&self) -> &XorName {
+        match self {
+            Self::Chunk(address) => address.name(),
+            Self::Register(address) => address.name(),
+        }
+    }
+
+    ///
+    pub fn register(name: XorName, scope: Scope, tag: u64) -> ReplicatedDataAddress {
+        ReplicatedDataAddress::Register(RegisterAddress::new(name, scope, tag))
+    }
+
+    ///
+    pub fn chunk(name: XorName) -> ReplicatedDataAddress {
+        ReplicatedDataAddress::Chunk(ChunkAddress(name))
+    }
+}
+
 /// Address of a Chunk.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub struct ChunkAddress(pub XorName);

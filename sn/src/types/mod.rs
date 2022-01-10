@@ -24,7 +24,8 @@ mod keys;
 mod token;
 
 pub use address::{
-    BytesAddress, ChunkAddress, DataAddress, RegisterAddress, SafeKeyAddress, Scope,
+    BytesAddress, ChunkAddress, DataAddress, RegisterAddress, ReplicatedDataAddress,
+    SafeKeyAddress, Scope,
 };
 pub use cache::Cache;
 pub use chunk::{Chunk, MAX_CHUNK_SIZE_IN_BYTES};
@@ -38,4 +39,28 @@ pub use keys::{
 };
 pub use token::Token;
 
+use crate::messaging::data::RegisterWrite;
+
+use serde::{Deserialize, Serialize};
 use xor_name::XorName;
+
+///
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub enum ReplicatedData {
+    ///
+    Chunk(Chunk),
+    ///
+    Register(register::Register),
+    ///
+    RegisterWrite(RegisterWrite),
+}
+
+impl ReplicatedData {
+    pub(crate) fn name(&self) -> &XorName {
+        match self {
+            Self::Chunk(chunk) => chunk.name(),
+            Self::Register(register) => register.address().name(),
+            Self::RegisterWrite(write) => write.address().name(),
+        }
+    }
+}

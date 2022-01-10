@@ -15,15 +15,6 @@ use xor_name::XorName;
 /// Metadata (register and chunk holders) replication.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DataExchange {
-    /// Chunk data exchange.
-    pub chunk_data: ChunkDataExchange,
-    /// Register data exchange.
-    pub reg_data: RegisterDataExchange,
-}
-
-/// Chunk data exchange.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ChunkDataExchange {
     /// Adult storage levels.
     pub adult_levels: BTreeMap<XorName, StorageLevel>,
 }

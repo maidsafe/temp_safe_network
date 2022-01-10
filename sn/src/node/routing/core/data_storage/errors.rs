@@ -38,15 +38,3 @@ pub enum Error {
     #[error("Not enough space")]
     NotEnoughSpace,
 }
-
-/// Convert chunk errors to messaging error message for sending over the network.
-pub(crate) fn convert_to_error_message(error: Error) -> ErrorMessage {
-    match error {
-        Error::NotEnoughSpace => ErrorMessage::FailedToWriteFile,
-        Error::ChunkNotFound(xorname) => ErrorMessage::ChunkNotFound(xorname),
-        Error::NetworkData(error) => convert_dt_error_to_error_message(error),
-        other => {
-            ErrorMessage::InvalidOperation(format!("Failed to perform operation: {:?}", other))
-        }
-    }
-}
