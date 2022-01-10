@@ -217,15 +217,6 @@ impl Routing {
         Ok((routing, event_stream))
     }
 
-    /// Sets the JoinsAllowed flag.
-    pub async fn set_joins_allowed(&self, joins_allowed: bool) -> Result<()> {
-        let command = Command::SetJoinsAllowed(joins_allowed);
-        self.dispatcher
-            .clone()
-            .enqueue_and_handle_next_command_and_any_offshoots(command, None)
-            .await
-    }
-
     /// Signals the Elders of our section to test connectivity to a node.
     pub async fn start_connectivity_test(&self, name: XorName) -> Result<()> {
         let command = Command::StartConnectivityTest(name);

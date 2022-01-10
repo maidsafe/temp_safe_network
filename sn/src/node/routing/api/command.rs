@@ -92,8 +92,6 @@ pub(crate) enum Command {
     /// Schedule a timeout after the given duration. When the timeout expires, a `HandleTimeout`
     /// command is raised. The token is used to identify the timeout.
     ScheduleTimeout { duration: Duration, token: u64 },
-    /// Attempt to set JoinsAllowed flag.
-    SetJoinsAllowed(bool),
     /// Test peer's connectivity
     SendAcceptedOnlineShare {
         peer: Peer,
@@ -166,7 +164,6 @@ impl fmt::Display for Command {
             Command::SendMessageDeliveryGroup { wire_msg, .. } => {
                 write!(f, "SendMessageDeliveryGroup {:?}", wire_msg.msg_id())
             }
-            Command::SetJoinsAllowed(_) => write!(f, "SetJoinsAllowed"),
             Command::SendAcceptedOnlineShare { .. } => write!(f, "SendAcceptedOnlineShare"),
             Command::ProposeOffline(_) => write!(f, "ProposeOffline"),
             Command::StartConnectivityTest(_) => write!(f, "StartConnectivityTest"),

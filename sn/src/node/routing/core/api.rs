@@ -16,7 +16,6 @@ use crate::node::{
     error::Result,
     routing::{
         api::command::Command,
-        core::Proposal,
         network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionKeyShare},
         node::Node,
         Event,
@@ -201,15 +200,6 @@ impl Core {
         };
 
         Ok(command)
-    }
-
-    // Setting the JoinsAllowed triggers a round Proposal::SetJoinsAllowed to update the flag.
-    pub(crate) async fn set_joins_allowed(&self, joins_allowed: bool) -> Result<Vec<Command>> {
-        let mut commands = Vec::new();
-        if self.is_elder().await && joins_allowed != *self.joins_allowed.read().await {
-            commands.extend(self.propose(Proposal::JoinsAllowed(joins_allowed)).await?);
-        }
-        Ok(commands)
     }
 
     // Generate a new section info based on the current set of members and if it differs from the
