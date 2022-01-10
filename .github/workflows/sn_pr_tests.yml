@@ -27,12 +27,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Build sn bins
-        # all = all crates in workspace, lib/bins targets, with these features...
-        run: cargo build -p safe_network --release --features=always-joinable,test-utils --bins
-        shell: bash
-        timeout-minutes: 60
-
       # Install Rust
       - name: Install Rust
         id: toolchain
@@ -41,6 +35,12 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+
+      - name: Build sn bins
+        # all = all crates in workspace, lib/bins targets, with these features...
+        run: cargo build -p safe_network --release --features=always-joinable,test-utils --bins
+        shell: bash
+        timeout-minutes: 60
 
       - uses: Swatinem/rust-cache@v1
         continue-on-error: true
