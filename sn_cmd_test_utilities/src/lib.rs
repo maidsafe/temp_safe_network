@@ -44,9 +44,12 @@ pub mod util {
             .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
             .send()?;
         let response_json = response.json::<serde_json::Value>()?;
-        let tag_name = response_json["tag_name"]
-            .as_str()
-            .ok_or_else(|| eyre!("Failed to parse the tag_name field from the response"))?;
+        let tag_name = response_json["tag_name"].as_str().ok_or_else(|| {
+            eyre!(format!(
+                "Failed to parse the tag_name field from the response: {}",
+                response_json.to_string()
+            ))
+        })?;
         let version = get_version_from_release_version(tag_name)?;
         Ok(version)
     }
