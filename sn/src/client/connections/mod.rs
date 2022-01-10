@@ -28,6 +28,9 @@ type PendingQueryResponses = Arc<DashMap<OperationId, Vec<(MessageId, QueryRespo
 use uluru::LRUCache;
 type QueryResponseSender = Sender<QueryResponse>;
 
+#[cfg(any(test, feature = "test-utils"))]
+type PendingCmdAcks = Arc<DashMap<MessageId, Sender<std::net::SocketAddr>>>;
+
 #[derive(Debug)]
 pub struct QueryResult {
     pub response: QueryResponse,
@@ -44,6 +47,9 @@ pub(super) struct Session {
     pending_queries: PendingQueryResponses,
     // Channels for sending errors to upper layer
     incoming_err_sender: Arc<Sender<CmdError>>,
+    #[cfg(any(test, feature = "test-utils"))]
+    // Channels for sending CmdAck to upper layers
+    pending_cmds: PendingCmdAcks,
     /// All elders we know about from AE messages
     network: Arc<NetworkPrefixMap>,
     /// AE redirect cache
@@ -54,6 +60,7 @@ pub(super) struct Session {
     genesis_key: bls::PublicKey,
     /// Initial network comms messageId
     initial_connection_check_msg_id: Arc<RwLock<Option<MessageId>>>,
+    #[allow(dead_code)]
     /// Standard time to await potential AE messages:
     standard_wait: Duration,
     /// Closed connection tracking, used to validate if a new connection is needed or not. Xorname to ConnectionId

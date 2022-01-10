@@ -178,6 +178,8 @@ impl Session {
     ) -> Result<(), Error> {
         debug!("ServiceMsg with id {:?} received from {:?}", msg_id, src);
         let queries = session.pending_queries.clone();
+        #[cfg(any(test, feature = "test-utils"))]
+        let cmds = session.pending_cmds.clone();
         let error_sender = session.incoming_err_sender;
 
         let _handle = tokio::spawn(async move {
@@ -228,6 +230,27 @@ impl Session {
                         CmdError::Data(_error) => {
                             // do nothing just yet
                         }
+                    }
+                }
+                #[cfg(any(test, feature = "test-utils"))]
+                ServiceMsg::CmdAck { correlation_id } => {
+                    debug!(
+                        "CmdAck was received for Message{:?} w/ID: {:?} from {:?}",
+                        msg_id, correlation_id, src
+                    );
+                    if let Some(sender) = cmds.get(&correlation_id) {
+                        trace!(
+                            "Sending Ack from {:?} for cmd w/{:?} via channel.",
+                            src,
+                            correlation_id
+                        );
+                        let result = sender.send(src).await;
+                        if result.is_err() {
+                            trace!("Error sending cmd Ack on a channel for {:?} cmd_id {:?}: {:?}. (It has likely been removed)", msg_id, correlation_id, result)
+                        }
+                    } else {
+                        // Likely the channel is removed when received majority of Acks
+                        trace!("No channel found for cmd Ack of {:?}", correlation_id);
                     }
                 }
                 msg => {

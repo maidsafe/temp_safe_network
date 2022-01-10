@@ -62,6 +62,8 @@ impl Session {
         let session = Session {
             pending_queries: Arc::new(DashMap::default()),
             incoming_err_sender: Arc::new(err_sender),
+            #[cfg(any(test, feature = "test-utils"))]
+            pending_cmds: Arc::new(DashMap::default()),
             endpoint,
             network: Arc::new(prefix_map),
             ae_redirect_cache: Arc::new(RwLock::new(AeCache::default())),
@@ -75,6 +77,7 @@ impl Session {
         Ok(session)
     }
 
+    #[cfg(not(any(test, feature = "test-utils")))]
     /// Send a `ServiceMsg` to the network without awaiting for a response.
     #[instrument(skip(self, auth, payload), level = "debug", name = "session send cmd")]
     pub(crate) async fn send_cmd(
@@ -136,6 +139,104 @@ impl Session {
         // TODO: be smart about this. Check AE Retry cache for related msg id eg, continue early if we've seen some.
         // (cannot continue earlier if everything goes okay first time though, which is a shame)
         tokio::time::sleep(self.standard_wait).await;
+
+        trace!("Wait for any cmd response/reaction (AE msgs eg), is over)");
+        res
+    }
+
+    #[cfg(any(test, feature = "test-utils"))]
+    #[instrument(skip(self, auth, payload), level = "debug", name = "session send cmd")]
+    pub(crate) async fn send_cmd(
+        &self,
+        dst_address: XorName,
+        auth: ServiceAuth,
+        payload: Bytes,
+        targets_count: usize,
+    ) -> Result<(), Error> {
+        let endpoint = self.endpoint.clone();
+        // TODO: Consider other approach: Keep a session per section!
+
+        // Get DataSection elders details.
+        let (elders, section_pk) =
+            if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
+                let sap_elders: Vec<_> = sap.elders_vec().into_iter().take(targets_count).collect();
+
+                trace!("{:?} SAP elders found", sap_elders);
+                (sap_elders, sap.section_key())
+            } else {
+                return Err(Error::NoNetworkKnowledge);
+            };
+
+        let msg_id = MessageId::new();
+
+        if elders.len() < targets_count {
+            return Err(Error::InsufficientElderKnowledge {
+                connections: elders.len(),
+                required: targets_count,
+                section_pk,
+            });
+        }
+
+        debug!(
+            "Sending command w/id {:?}, from {}, to {} Elders w/ dst: {:?}",
+            msg_id,
+            endpoint.public_addr(),
+            elders.len(),
+            dst_address
+        );
+
+        let dst_location = DstLocation::Section {
+            name: dst_address,
+            section_pk,
+        };
+        let msg_kind = MsgKind::ServiceMsg(auth);
+        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+
+        // The insertion of channel will be executed AFTER the completion of the `send_message`.
+        let (sender, mut receiver) = channel::<SocketAddr>(targets_count);
+        let _ = self.pending_cmds.insert(msg_id, sender);
+        trace!("Inserted channel for cmd {:?}", msg_id);
+
+        let res = send_message(
+            self.clone(),
+            elders.clone(),
+            wire_msg,
+            self.endpoint.clone(),
+            msg_id,
+        )
+        .await;
+
+        let expected_acks = std::cmp::min(1, targets_count * 2 / 3);
+        // We are not wait for the receive of majority of cmd Acks.
+        // This could be further strict to wait for ALL the Acks get received.
+        // The period is expected to have AE completed, hence no extra wait is required.
+        let mut received_ack = 0;
+        loop {
+            match receiver.recv().await {
+                Some(src) => {
+                    // No need to check the uniqueness of the Ack sender
+                    received_ack += 1;
+                    trace!(
+                        "received CmdAck of {:?} from {:?}, so far {:?} / {:?}",
+                        msg_id,
+                        src,
+                        received_ack,
+                        expected_acks
+                    );
+                    if received_ack >= expected_acks {
+                        let _ = self.pending_cmds.remove(&msg_id);
+                        break;
+                    }
+                }
+                None => {
+                    error!(
+                        "CmdAck channel closed with less ack received {:?} / {:?} / {:?}.",
+                        received_ack, expected_acks, targets_count
+                    );
+                    break;
+                }
+            }
+        }
 
         trace!("Wait for any cmd response/reaction (AE msgs eg), is over)");
         res
@@ -229,7 +330,7 @@ impl Session {
         .await?;
 
         // TODO:
-        // We are now simply accepting the very first valid response we receive,
+        // We are now simply accepting the very first valid response we receive, (shall be the concensused result?)
         // but we may want to revisit this to compare multiple responses and validate them,
         // similar to what we used to do up to the following commit:
         // https://github.com/maidsafe/sn_client/blob/9091a4f1f20565f25d3a8b00571cc80751918928/src/connection_manager.rs#L328
