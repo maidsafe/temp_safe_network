@@ -1,44 +1,70 @@
-name: 'sn: Run Client Tests against DO Testnet'
+name: Nightly Release Run
 
 on:
   schedule:
     # * is a special character in YAML so you have to quote this string
     - cron:  '30 2 * * *'
 
-
 env:
-  CARGO_INCREMENTAL: '0'
-  RUST_BACKTRACE: FULL
-  RUSTFLAGS: "-D warnings"
-  RUST_LOG: "safe_network=trace"
-  SAFE_AUTH_PASSPHRASE: "x"
-  SAFE_AUTH_PASSWORD: "y"
-  SN_QUERY_TIMEOUT: 20 # 20 secs
-  SN_AE_WAIT: 1 # 1 sec
-  NODE_COUNT: 11
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_DEFAULT_REGION: 'eu-west-2'
 
 jobs:
-  launch-testnet:
-    name: Launch Digital Ocean testnet
+  build-node:
+    name: build node
     runs-on: ubuntu-latest
     steps:
-      - name: Launch testnet
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        id: toolchain
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - shell: bash
+        name: build node
+        run: |
+          sudo apt update -y
+          sudo apt install -y musl-tools
+          rustup target add x86_64-unknown-linux-musl
+          cargo build --release --target x86_64-unknown-linux-musl --bin sn_node
+      - uses: actions/upload-artifact@master
+        with:
+          name: sn_node-x86_64-unknown-linux-musl
+          path: |
+            target/x86_64-unknown-linux-musl/release
+
+  launch-testnet:
+    name: launch testnet
+    needs: build-node
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@master
+        with:
+          name: sn_node-x86_64-unknown-linux-musl
+          path: sn_node
+      - shell: bash
+        name: copy node to temp location
+        run: cp sn_node/sn_node /tmp
+      - name: launch testnet
         uses: maidsafe/sn_testnet_action@master
         with:
           do-token: ${{ secrets.DO_TOKEN }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-access-key-secret: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           ssh-secret-key: ${{ secrets.SSH_SECRET_KEY  }}
-          build-node: true
-          node-count: ${{ github.event.inputs.node-count || 50 }}
+          node-count: ${{ github.event.inputs.node-count || 11 }}
+          node-path: /tmp/sn_node
 
-  run-client-tests:
-    name: Run Client tests
-    runs-on: ubuntu-latest
-    needs: [launch-testnet]
+  client:
+    name: client tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    needs: launch-testnet
     steps:
       - uses: actions/checkout@v2
         with:
@@ -63,7 +89,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p ~/.safe/node
-          wget https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-node_connection_info.config -O ~/.safe/node/node_connection_info.config
+          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-node_connection_info.config > ~/.safe/node/node_connection_info.config
 
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: Initital client tests...
@@ -83,10 +109,90 @@ jobs:
         shell: bash
         run: cargo run --release  --features=always-joinable,test-utils --example client_files
 
+  api:
+    name: api tests
+    if: ${{ always() }} # give the suite a chance to run, even if the client tests fail.
+    needs: client
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        id: toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Set TESTNET_ID env
+        shell: bash
+        run: echo "TESTNET_ID=gha-testnet-$(echo ${{ github.event.pull_request.head.sha || github.sha }} | cut -c 1-7)" >> $GITHUB_ENV
+      - name: Download network config
+        shell: bash
+        run: |
+          mkdir -p ~/.safe/node
+          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-node_connection_info.config > ~/.safe/node/node_connection_info.config
+      - uses: Swatinem/rust-cache@v1
+        continue-on-error: true
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}
+      - name: Build all sn_api tests
+        run: cargo test --no-run -p sn_api --release --lib
+      - name: run sn_api tests
+        shell: bash
+        run: ./resources/scripts/api_tests.sh
+        timeout-minutes: 45
+        env:
+          # these tests rely heavily on retry_loop
+          # TODO: Remove that dependency
+          SN_QUERY_TIMEOUT: 20
+
+  cli:
+    name: cli tests
+    if: ${{ always() }} # give the suite a chance to run, even if the api tests fail.
+    needs: api
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        id: toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - uses: Swatinem/rust-cache@v1
+        continue-on-error: true
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}
+      - name: Set TESTNET_ID env
+        shell: bash
+        run: echo "TESTNET_ID=gha-testnet-$(echo ${{ github.event.pull_request.head.sha || github.sha }} | cut -c 1-7)" >> $GITHUB_ENV
+      - name: Download network config
+        shell: bash
+        run: |
+          mkdir -p ~/.safe/node
+          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-node_connection_info.config > ~/.safe/node/node_connection_info.config
+      - name: Build all CLI tests
+        run: cargo test --no-run -p sn_cli --release
+      - name: Run CLI tests
+        shell: bash
+        run: ./resources/scripts/cli_tests.sh
+        timeout-minutes: 90
+
   kill-testnet:
     name: Destroy Digital Ocean testnet
     runs-on: ubuntu-latest
-    needs: [launch-testnet, run-client-tests]
+    needs: [launch-testnet, client, api, cli]
     steps:
       - name: Kill testnet
         uses: maidsafe/sn_testnet_action@master
@@ -96,11 +202,45 @@ jobs:
           aws-access-key-secret: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           action: 'destroy'
 
+  bump_version:
+    runs-on: ubuntu-20.04
+    needs: kill-testnet
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: '0'
+          token: ${{ secrets.VERSION_BUMP_COMMIT_PAT }}
+      - uses: actions-rs/toolchain@v1
+        id: toolchain
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - shell: bash
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+      - shell: bash
+        run: cargo install cargo-smart-release
+      - shell: bash
+        run: ./resources/scripts/bump_version.sh
+      - name: push version bump commit and tags
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.VERSION_BUMP_COMMIT_PAT }}
+          branch: main
+          tags: true
+
   kill-if-fail:
     name: Destroy Digital Ocean testnet on fail
     runs-on: ubuntu-latest
-    if: ${{ always() && (needs.launch-testnet.result=='failure' || needs.run-client-tests.result=='failure') }}
-    needs: [launch-testnet, run-client-tests]
+    if: |
+      always() &&
+      (needs.launch-testnet.result=='failure' ||
+       needs.client.result=='failure' ||
+       needs.api.result=='failure' ||
+       needs.cli.result=='failure')
+    needs: [launch-testnet, client, api, cli]
     steps:
       - name: Kill testnet
         uses: maidsafe/sn_testnet_action@master
