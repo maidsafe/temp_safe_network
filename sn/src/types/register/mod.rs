@@ -30,7 +30,7 @@ use xor_name::XorName;
 use self_encryption::MIN_ENCRYPTABLE_BYTES;
 
 /// Arbitrary maximum size of a register entry.
-const MAX_REG_ENTRY_SIZE: usize = MIN_ENCRYPTABLE_BYTES;
+const MAX_REG_ENTRY_SIZE: usize = MIN_ENCRYPTABLE_BYTES / 3; // 1024 bytes
 
 /// Register mutation operation to apply to Register.
 pub type RegisterOp<T> = CrdtOperation<T>;
