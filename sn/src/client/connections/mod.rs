@@ -28,7 +28,8 @@ type PendingQueryResponses = Arc<DashMap<OperationId, Vec<(MessageId, QueryRespo
 use uluru::LRUCache;
 type QueryResponseSender = Sender<QueryResponse>;
 
-type PendingCmdAcks = Arc<DashMap<MessageId, Sender<std::net::SocketAddr>>>;
+type CmdResponse = (std::net::SocketAddr, Option<CmdError>);
+type PendingCmdAcks = Arc<DashMap<MessageId, Sender<CmdResponse>>>;
 
 #[derive(Debug)]
 pub struct QueryResult {
