@@ -616,7 +616,7 @@ impl Dispatcher {
                 if let Err(err) = self
                     .core
                     .comm
-                    .send_on_existing_connection(recipients, wire_msg.clone())
+                    .send_on_existing_connection_to_client(recipients, wire_msg.clone())
                     .await
                 {
                     error!("Failed sending message {:?} to recipients {:?} on existing connection with error {:?}",

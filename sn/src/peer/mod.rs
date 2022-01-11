@@ -139,6 +139,18 @@ impl Peer {
         self.connection.read().await.as_ref().cloned()
     }
 
+    /// Close the connection immediately. Anything in progress will fail.
+    pub(crate) async fn close_connection(&self) {
+        let mut guard = self.connection.write().await;
+
+        if let Some(connection) = guard.as_ref() {
+            connection.close();
+        }
+
+        // Now we empty the connection object
+        *guard = None;
+    }
+
     /// Copy the connection from another peer, if this peer doesn't have one.
     ///
     /// This prefers the keep the existing connection, if one is set. This choice is made to avoid

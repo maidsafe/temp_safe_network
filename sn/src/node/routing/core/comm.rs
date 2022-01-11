@@ -117,12 +117,16 @@ impl Comm {
     }
 
     /// Sends a message on an existing connection. If no such connection exists, returns an error.
-    pub(crate) async fn send_on_existing_connection(
+    /// Drops the connection after the message has been sent.
+    pub(crate) async fn send_on_existing_connection_to_client(
         &self,
         recipients: &[Peer],
         mut wire_msg: WireMsg,
     ) -> Result<(), Error> {
-        trace!("Sending msg on existing connection to {:?}", recipients);
+        trace!(
+            "Sending msg on existing connection to client {:?}",
+            recipients
+        );
         for recipient in recipients {
             let name = recipient.name();
             let addr = recipient.addr();
@@ -161,6 +165,8 @@ impl Comm {
 
             // count outgoing msgs..
             self.msg_count.increase_outgoing(addr);
+
+            recipient.close_connection().await;
         }
 
         Ok(())
