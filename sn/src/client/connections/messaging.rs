@@ -23,7 +23,7 @@ use bytes::Bytes;
 use dashmap::DashMap;
 use futures::future::join_all;
 use itertools::Itertools;
-use qp2p::{Config as QuicP2pConfig, Endpoint};
+use qp2p::{Close, Config as QuicP2pConfig, ConnectionError, Endpoint, SendError};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use std::path::PathBuf;
@@ -547,7 +547,17 @@ pub(super) async fn send_message(
     for r in results {
         match r {
             Ok(send_result) => {
-                if send_result.is_err() {
+                if let Err(Error::QuicP2pSend(SendError::ConnectionLost(
+                    ConnectionError::Closed(Close::Application { reason, .. }),
+                ))) = send_result
+                {
+                    warn!(
+                        "Connection was closed by the node: {:?}",
+                        String::from_utf8(reason.to_vec())
+                    );
+                    // this is not necessarily an error
+                    *successes.write().await += 1;
+                } else if send_result.is_err() {
                     error!("Error during {:?} send: {:?}", msg_id, send_result);
                 } else {
                     *successes.write().await += 1;
