@@ -166,7 +166,9 @@ impl Comm {
             // count outgoing msgs..
             self.msg_count.increase_outgoing(addr);
 
-            recipient.close_connection().await;
+            recipient
+                .close_connection("Client response sent".to_string())
+                .await;
         }
 
         Ok(())

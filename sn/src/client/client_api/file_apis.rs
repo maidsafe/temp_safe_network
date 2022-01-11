@@ -529,7 +529,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_5mb_from_many_clients() -> Result<()> {
         init_test_logger();
-        let _start_span = tracing::info_span!("store_and_read_3kb_from_many_clients").entered();
+        let _start_span = tracing::info_span!("store_and_read_5mb_from_many_clients").entered();
 
         let client = create_test_client().await?;
         // create file with random bytes 5mb

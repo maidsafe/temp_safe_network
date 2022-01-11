@@ -140,11 +140,11 @@ impl Peer {
     }
 
     /// Close the connection immediately. Anything in progress will fail.
-    pub(crate) async fn close_connection(&self) {
+    pub(crate) async fn close_connection(&self, reason: String) {
         let mut guard = self.connection.write().await;
 
         if let Some(connection) = guard.as_ref() {
-            connection.close();
+            connection.close(Some(reason));
         }
 
         // Now we empty the connection object
