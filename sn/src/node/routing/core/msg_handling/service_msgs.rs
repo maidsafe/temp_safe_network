@@ -12,6 +12,7 @@ use crate::messaging::{
     system::{NodeQueryResponse, SystemMsg},
     DstLocation, EndUser, MessageId, MsgKind, NodeAuth, WireMsg,
 };
+use crate::messaging::{AuthorityProof, ServiceAuth};
 use crate::node::{
     error::Result,
     routing::{api::command::Command, core::Core},
@@ -76,6 +77,7 @@ impl Core {
         &self,
         msg_id: MessageId,
         query: &DataQuery,
+        auth: ServiceAuth,
         user: EndUser,
         requesting_elder: XorName,
     ) -> Result<Vec<Command>> {
@@ -83,7 +85,10 @@ impl Core {
         let mut commands = vec![];
 
         let msg = SystemMsg::NodeQueryResponse {
-            response: self.data_storage.query(query, User::Id(user.0)).await,
+            response: self
+                .data_storage
+                .query(query, User::Key(auth.public_key))
+                .await,
             correlation_id: msg_id,
             user,
         };
@@ -238,6 +243,7 @@ impl Core {
         &self,
         msg_id: MessageId,
         msg: ServiceMsg,
+        auth: AuthorityProof<ServiceAuth>,
         user: Peer,
     ) -> Result<Vec<Command>> {
         match msg {
@@ -250,7 +256,7 @@ impl Core {
                 self.send_data_to_adults(ReplicatedData::Chunk(chunk), msg_id, user)
                     .await
             }
-            ServiceMsg::Query(query) => self.read_data_from_adults(query, msg_id, user).await,
+            ServiceMsg::Query(query) => self.read_data_from_adults(query, msg_id, auth, user).await,
             _ => {
                 warn!("!!!! Unexpected ServiceMsg received in routing. Was not sent to node layer: {:?}", msg);
                 Ok(vec![])
@@ -336,6 +342,7 @@ impl Core {
         msg_id: MessageId,
         msg: ServiceMsg,
         dst_location: DstLocation,
+        auth: AuthorityProof<ServiceAuth>,
         user: Peer,
     ) -> Result<Vec<Command>> {
         trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
@@ -347,6 +354,7 @@ impl Core {
             return Ok(vec![]);
         }
 
-        self.handle_service_msg_received(msg_id, msg, user).await
+        self.handle_service_msg_received(msg_id, msg, auth, user)
+            .await
     }
 }

@@ -13,7 +13,7 @@ use crate::{
     messaging::{
         data::{CmdError, DataExchange, DataQuery, Error as ErrorMessage, StorageLevel},
         system::{NodeCmd, NodeQuery, SystemMsg},
-        EndUser, MessageId,
+        AuthorityProof, EndUser, MessageId, ServiceAuth,
     },
     node::{error::convert_to_error_message, Error, Result},
     peer::Peer,
@@ -60,6 +60,7 @@ impl Core {
         &self,
         query: DataQuery,
         msg_id: MessageId,
+        auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
     ) -> Result<Vec<Command>> {
         let address = query.address();
@@ -107,6 +108,7 @@ impl Core {
 
         let msg = SystemMsg::NodeQuery(NodeQuery::Data {
             query,
+            auth: auth.into_inner(),
             origin: EndUser(correlation_id),
         });
         let aggregation = false;

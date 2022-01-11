@@ -77,6 +77,8 @@ pub enum NodeQuery {
     Data {
         /// The query
         query: DataQuery,
+        /// Client signature
+        auth: ServiceAuth,
         /// The user that has initiated this query
         origin: EndUser,
     },

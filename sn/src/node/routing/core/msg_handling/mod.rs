@@ -186,7 +186,7 @@ impl Core {
                 msg_id,
                 msg,
                 dst_location,
-                ..
+                auth,
             } => {
                 let dst_name = match msg.dst_address() {
                     Some(name) => name,
@@ -238,7 +238,7 @@ impl Core {
                 }
 
                 cmds.extend(
-                    self.handle_service_message(msg_id, msg, dst_location, sender)
+                    self.handle_service_message(msg_id, msg, dst_location, auth, sender)
                         .await?,
                 );
 
@@ -738,12 +738,22 @@ impl Core {
             SystemMsg::NodeQuery(node_query) => {
                 match node_query {
                     // A request from EndUser - via elders - for locally stored data
-                    NodeQuery::Data { origin, query } => {
+                    NodeQuery::Data {
+                        query,
+                        auth,
+                        origin,
+                    } => {
                         // There is no point in verifying a sig from a sender A or B here.
                         // Send back response to the sending elder
                         let sender_xorname = msg_authority.get_auth_xorname();
-                        self.handle_data_query_at_adult(msg_id, &query, origin, sender_xorname)
-                            .await
+                        self.handle_data_query_at_adult(
+                            msg_id,
+                            &query,
+                            auth,
+                            origin,
+                            sender_xorname,
+                        )
+                        .await
                     }
                     _ => {
                         self.send_event(Event::MessageReceived {
