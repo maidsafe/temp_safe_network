@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [self-hosted-ubuntu, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
       # Install Rust
@@ -56,7 +56,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [self-hosted-ubuntu, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
       - uses: dorny/paths-filter@v2
@@ -150,7 +150,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [self-hosted-ubuntu, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
 
@@ -183,7 +183,7 @@ jobs:
         if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
       - name: ubuntu install zsh
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'self-hosted-ubuntu'
         run: |
           sudo apt-get -y install zsh
 
@@ -320,7 +320,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [self-hosted-ubuntu, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
 
@@ -404,7 +404,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [self-hosted-ubuntu, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
 
