@@ -9,7 +9,10 @@
 use super::Session;
 
 use crate::client::{
-    connections::messaging::{send_message, NUM_OF_ELDERS_SUBSET_FOR_QUERIES},
+    connections::{
+        messaging::{send_message, NUM_OF_ELDERS_SUBSET_FOR_QUERIES},
+        PendingCmdAcks,
+    },
     Error, Result,
 };
 use crate::messaging::{
@@ -168,8 +171,32 @@ impl Session {
         }
     }
 
+    #[instrument(skip(cmds), level = "debug")]
+    async fn send_cmd_response(
+        cmds: PendingCmdAcks,
+        correlation_id: MessageId,
+        src: SocketAddr,
+        error: Option<CmdError>,
+    ) {
+        if let Some(sender) = cmds.get(&correlation_id) {
+            trace!(
+                "Sending cmd response from {:?} for cmd w/{:?} via channel.",
+                src,
+                correlation_id
+            );
+            let result = sender.send((src, error)).await;
+            if result.is_err() {
+                trace!("Error sending cmd response on a channel for cmd_id {:?}: {:?}. (It has likely been removed)", correlation_id, result)
+            }
+        } else {
+            // Likely the channel is removed when received majority of Acks
+            trace!("No channel found for cmd Ack of {:?}", correlation_id);
+        }
+    }
+
     // Handle messages intended for client consumption (re: queries + commands)
     #[instrument(skip(session), level = "debug")]
+    #[allow(clippy::redundant_clone)]
     fn handle_client_msg(
         session: Session,
         msg_id: MessageId,
@@ -179,7 +206,6 @@ impl Session {
         debug!("ServiceMsg with id {:?} received from {:?}", msg_id, src);
         let queries = session.pending_queries.clone();
         let cmds = session.pending_cmds.clone();
-        let error_sender = session.incoming_err_sender;
 
         let _handle = tokio::spawn(async move {
             match msg {
@@ -219,37 +245,18 @@ impl Session {
                     ..
                 } => {
                     debug!(
-                        "CmdError was received for Message w/ID: {:?}, sending on error channel",
+                        "CmdError was received for Message w/ID: {:?}",
                         correlation_id
                     );
                     warn!("CmdError received is: {:?}", error);
-                    let _error_from_sender = error_sender.send(error.clone()).await;
-
-                    match error {
-                        CmdError::Data(_error) => {
-                            // do nothing just yet
-                        }
-                    }
+                    Self::send_cmd_response(cmds, correlation_id, src, Some(error)).await;
                 }
                 ServiceMsg::CmdAck { correlation_id } => {
                     debug!(
                         "CmdAck was received for Message{:?} w/ID: {:?} from {:?}",
                         msg_id, correlation_id, src
                     );
-                    if let Some(sender) = cmds.get(&correlation_id) {
-                        trace!(
-                            "Sending Ack from {:?} for cmd w/{:?} via channel.",
-                            src,
-                            correlation_id
-                        );
-                        let result = sender.send(src).await;
-                        if result.is_err() {
-                            trace!("Error sending cmd Ack on a channel for {:?} cmd_id {:?}: {:?}. (It has likely been removed)", msg_id, correlation_id, result)
-                        }
-                    } else {
-                        // Likely the channel is removed when received majority of Acks
-                        trace!("No channel found for cmd Ack of {:?}", correlation_id);
-                    }
+                    Self::send_cmd_response(cmds, correlation_id, src, None).await;
                 }
                 msg => {
                     warn!("Ignoring unexpected message type received: {:?}", msg);

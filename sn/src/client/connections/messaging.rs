@@ -9,6 +9,7 @@
 use super::{QueryResult, Session};
 
 use super::AeCache;
+use crate::client::connections::CmdResponse;
 use crate::client::Error;
 use crate::elder_count;
 use crate::messaging::{
@@ -124,7 +125,7 @@ impl Session {
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
         // The insertion of channel will be executed AFTER the completion of the `send_message`.
-        let (sender, mut receiver) = channel::<SocketAddr>(targets_count);
+        let (sender, mut receiver) = channel::<CmdResponse>(targets_count);
         let _ = self.pending_cmds.insert(msg_id, sender);
         trace!("Inserted channel for cmd {:?}", msg_id);
 
@@ -142,13 +143,13 @@ impl Session {
         // This could be further strict to wait for ALL the Acks get received.
         // The period is expected to have AE completed, hence no extra wait is required.
         let mut received_ack = 0;
+        let mut received_err = 0;
         let mut attempts = 0;
         let interval = Duration::from_millis(100);
         let expected_attempts = self.standard_wait.as_millis() / interval.as_millis();
         loop {
             match receiver.try_recv() {
-                Ok(src) => {
-                    // No need to check the uniqueness of the Ack sender
+                Ok((src, None)) => {
                     received_ack += 1;
                     trace!(
                         "received CmdAck of {:?} from {:?}, so far {:?} / {:?}",
@@ -159,6 +160,23 @@ impl Session {
                     );
                     if received_ack >= expected_acks {
                         let _ = self.pending_cmds.remove(&msg_id);
+                        break;
+                    }
+                }
+                Ok((src, Some(error))) => {
+                    received_err += 1;
+                    trace!(
+                        "received error response {:?} of cmd {:?} from {:?}, so far {:?} vs. {:?}",
+                        error,
+                        msg_id,
+                        src,
+                        received_ack,
+                        received_err
+                    );
+                    if received_err >= expected_acks {
+                        error!("Received majority of error response for cmd {:?}", msg_id);
+                        let _ = self.pending_cmds.remove(&msg_id);
+                        let _ = self.incoming_err_sender.send(error);
                         break;
                     }
                 }
