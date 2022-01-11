@@ -58,7 +58,6 @@ pub(super) struct Session {
     genesis_key: bls::PublicKey,
     /// Initial network comms messageId
     initial_connection_check_msg_id: Arc<RwLock<Option<MessageId>>>,
-    #[allow(dead_code)]
     /// Standard time to await potential AE messages:
     standard_wait: Duration,
     /// Closed connection tracking, used to validate if a new connection is needed or not. Xorname to ConnectionId

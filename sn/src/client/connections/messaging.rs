@@ -142,9 +142,12 @@ impl Session {
         // This could be further strict to wait for ALL the Acks get received.
         // The period is expected to have AE completed, hence no extra wait is required.
         let mut received_ack = 0;
+        let mut attempts = 0;
+        let interval = Duration::from_millis(100);
+        let expected_attempts = self.standard_wait.as_millis() / interval.as_millis();
         loop {
-            match receiver.recv().await {
-                Some(src) => {
+            match receiver.try_recv() {
+                Ok(src) => {
                     // No need to check the uniqueness of the Ack sender
                     received_ack += 1;
                     trace!(
@@ -159,14 +162,22 @@ impl Session {
                         break;
                     }
                 }
-                None => {
-                    error!(
-                        "CmdAck channel closed with less ack received {:?} / {:?} / {:?}.",
-                        received_ack, expected_acks, targets_count
+                Err(err) => {
+                    warn!(
+                        "CmdAck channel with err {:?}, CmdAcks received {:?} / {:?} / {:?}.",
+                        err, received_ack, expected_acks, targets_count
                     );
-                    break;
                 }
             }
+            attempts += 1;
+            if attempts >= expected_attempts {
+                warn!(
+                    "Terminated with insufficient CmdAcks of {:?}, {:?} / {:?}",
+                    msg_id, received_ack, expected_acks
+                );
+                break;
+            }
+            tokio::time::sleep(interval).await;
         }
 
         trace!("Wait for any cmd response/reaction (AE msgs eg), is over)");
