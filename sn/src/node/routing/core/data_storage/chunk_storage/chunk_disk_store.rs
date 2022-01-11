@@ -85,10 +85,6 @@ impl ChunkDiskStore {
 
     // ---------------------- api methods ----------------------
 
-    pub(crate) fn used_space_ratio(&self) -> f64 {
-        self.used_space.ratio()
-    }
-
     pub(crate) fn can_add(&self, size: usize) -> bool {
         self.used_space.can_add(size)
     }

@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod chunk_storage;
-//mod errors;
 mod register_storage;
 
 use super::{Command, Core};
@@ -15,21 +14,22 @@ use super::{Command, Core};
 use crate::{
     dbs::Result,
     messaging::{
-        data::{DataQuery, StorageLevel},
+        data::{DataQuery, RegisterStoreExport, StorageLevel},
         system::{NodeCmd, NodeQueryResponse, SystemMsg},
     },
-    types::{ReplicatedData, ReplicatedDataAddress as DataAddress},
+    types::{register::User, ReplicatedData, ReplicatedDataAddress as DataAddress},
     UsedSpace,
 };
 
 pub(crate) use chunk_storage::ChunkStorage;
-//pub(crate) use errors::{Error as DataStorageError, Result};
 pub(crate) use register_storage::RegisterStorage;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
+    sync::Arc,
 };
+use tokio::sync::RwLock;
 use tracing::info;
 use xor_name::XorName;
 
@@ -38,31 +38,56 @@ use xor_name::XorName;
 pub(crate) struct DataStorage {
     chunks: ChunkStorage,
     registers: RegisterStorage,
+    used_space: UsedSpace,
+    last_recorded_level: Arc<RwLock<StorageLevel>>,
 }
 
 impl DataStorage {
     pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
             chunks: ChunkStorage::new(path, used_space.clone())?,
-            registers: RegisterStorage::new(path, used_space)?,
+            registers: RegisterStorage::new(path, used_space.clone())?,
+            used_space,
+            last_recorded_level: Arc::new(RwLock::new(StorageLevel::zero())),
         })
     }
 
     /// Store data in the local store
     #[instrument(skip_all)]
     pub(super) async fn store(&self, data: &ReplicatedData) -> Result<Option<StorageLevel>> {
-        match data {
-            ReplicatedData::Chunk(chunk) => self.chunks.store(chunk).await,
-            ReplicatedData::Register(register) => unimplemented!(), //self.registers.write(write, auth)
-            ReplicatedData::RegisterWrite(write) => unimplemented!(), //self.registers.write(write, ),
+        match data.clone() {
+            ReplicatedData::Chunk(chunk) => self.chunks.store(&chunk).await?,
+            ReplicatedData::Register(data) => {
+                self.registers
+                    .update(RegisterStoreExport(vec![data]))
+                    .await?
+            }
+            ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd).await?,
+        };
+
+        // check if we've filled another apprx. 10%-points of our storage
+        // if so, update the recorded level
+        let last_recorded_level = { *self.last_recorded_level.read().await };
+        if let Ok(next_level) = last_recorded_level.next() {
+            // used_space_ratio is a heavy task that's why we don't do it all the time
+            let used_space_ratio = self.used_space.ratio();
+            let used_space_level = 10.0 * used_space_ratio;
+            // every level represents 10 percentage points
+            if used_space_level as u8 >= next_level.value() {
+                debug!("Next level for storage has been reached");
+                *self.last_recorded_level.write().await = next_level;
+                return Ok(Some(next_level));
+            }
         }
+
+        Ok(None)
     }
 
     // Query the local store and return NodeQueryResponse
-    pub(crate) async fn query(&self, query: &DataQuery) -> NodeQueryResponse {
+    pub(crate) async fn query(&self, query: &DataQuery, requester: User) -> NodeQueryResponse {
         match query {
             DataQuery::GetChunk(addr) => self.chunks.get(addr).await,
-            DataQuery::Register(read) => unimplemented!(), // self.registers.read(read, requester_pk).await,
+            DataQuery::Register(read) => self.registers.read(read, requester).await,
         }
     }
 
@@ -90,7 +115,7 @@ impl DataStorage {
             }
             DataAddress::Register(addr) => self
                 .registers
-                .get_register_for_replication(addr)
+                .get_register_replica(addr)
                 .await
                 .map(ReplicatedData::Register),
         }
@@ -132,7 +157,7 @@ impl Core {
                 .republish_and_cache(addr, &our_name, &new_adults, &lost_adults, &remaining)
                 .await
             {
-                let _prev = data_for_replication.insert(*data.name(), (data, holders));
+                let _prev = data_for_replication.insert(data.name(), (data, holders));
             }
         }
 

@@ -16,15 +16,18 @@ mod register;
 
 pub use self::{
     cmd::DataCmd,
-    data_exchange::{DataExchange, RegisterDataExchange, StorageLevel},
+    data_exchange::{DataExchange, RegisterStoreExport, ReplicatedRegister, StorageLevel},
     errors::{Error, Result},
     query::DataQuery,
-    register::{RegisterCmd, RegisterRead, RegisterWrite},
+    register::{
+        CreateRegister, DeleteRegister, EditRegister, ExtendRegister, RegisterCmd, RegisterQuery,
+        SignedRegisterCreate, SignedRegisterDelete, SignedRegisterEdit, SignedRegisterExtend,
+    },
 };
 
 use crate::types::{
-    register::{Entry, EntryHash, Permissions, Policy, Register},
-    Chunk, ChunkAddress, DataAddress, PublicKey,
+    register::{Entry, EntryHash, Permissions, Policy, Register, User},
+    Chunk, ChunkAddress, DataAddress,
 };
 use crate::{
     messaging::{data::Error as ErrorMessage, MessageId},
@@ -131,15 +134,15 @@ pub enum QueryResponse {
     //
     // ===== Register Data =====
     //
-    /// Response to [`RegisterRead::Get`].
+    /// Response to [`RegisterQuery::Get`].
     GetRegister((Result<Register>, OperationId)),
-    /// Response to [`RegisterRead::GetOwner`].
-    GetRegisterOwner((Result<PublicKey>, OperationId)),
-    /// Response to [`RegisterRead::Read`].
+    /// Response to [`RegisterQuery::GetOwner`].
+    GetRegisterOwner((Result<User>, OperationId)),
+    /// Response to [`RegisterQuery::Read`].
     ReadRegister((Result<BTreeSet<(EntryHash, Entry)>>, OperationId)),
-    /// Response to [`RegisterRead::GetPolicy`].
+    /// Response to [`RegisterQuery::GetPolicy`].
     GetRegisterPolicy((Result<Policy>, OperationId)),
-    /// Response to [`RegisterRead::GetUserPermissions`].
+    /// Response to [`RegisterQuery::GetUserPermissions`].
     GetRegisterUserPermissions((Result<Permissions>, OperationId)),
     //
     // ===== Other =====
@@ -273,7 +276,7 @@ impl TryFrom<QueryResponse> for Chunk {
 }
 
 try_from!(Register, GetRegister);
-try_from!(PublicKey, GetRegisterOwner);
+try_from!(User, GetRegisterOwner);
 try_from!(BTreeSet<(EntryHash, Entry)>, ReadRegister);
 try_from!(Policy, GetRegisterPolicy);
 try_from!(Permissions, GetRegisterUserPermissions);
@@ -281,7 +284,7 @@ try_from!(Permissions, GetRegisterUserPermissions);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{utils::random_bytes, Chunk, Keypair};
+    use crate::types::{utils::random_bytes, Chunk, Keypair, PublicKey};
     use bytes::Bytes;
     use eyre::{eyre, Result};
     use std::convert::{TryFrom, TryInto};
@@ -307,7 +310,7 @@ mod tests {
     fn debug_format_functional() -> Result<()> {
         if let Some(key) = gen_keys().first() {
             let errored_response = QueryResponse::GetRegister((
-                Err(Error::AccessDenied(*key)),
+                Err(Error::AccessDenied(User::Key(*key))),
                 "some_op_id".to_string(),
             ));
             assert!(format!("{:?}", errored_response).contains("GetRegister((Err(AccessDenied("));
@@ -321,7 +324,7 @@ mod tests {
     fn try_from() -> Result<()> {
         use QueryResponse::*;
         let key = match gen_keys().first() {
-            Some(key) => *key,
+            Some(key) => User::Key(*key),
             None => return Err(eyre!("Could not generate public key")),
         };
 

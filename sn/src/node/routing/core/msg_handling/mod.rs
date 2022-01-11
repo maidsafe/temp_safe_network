@@ -184,9 +184,9 @@ impl Core {
             }
             MessageType::Service {
                 msg_id,
-                auth,
                 msg,
                 dst_location,
+                ..
             } => {
                 let dst_name = match msg.dst_address() {
                     Some(name) => name,
@@ -238,7 +238,7 @@ impl Core {
                 }
 
                 cmds.extend(
-                    self.handle_service_message(msg_id, auth, msg, dst_location, sender)
+                    self.handle_service_message(msg_id, msg, dst_location, sender)
                         .await?,
                 );
 

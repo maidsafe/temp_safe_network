@@ -9,34 +9,35 @@
 use crate::dbs::{
     convert_to_error_message, Error, EventStore, LruCache, Result, UsedSpace, SLED_FLUSH_TIME_MS,
 };
+use crate::messaging::data::EditRegister;
+use crate::messaging::{
+    data::{
+        CreateRegister, DeleteRegister, ExtendRegister, OperationId, RegisterCmd, RegisterQuery,
+        RegisterStoreExport, ReplicatedRegister, SignedRegisterCreate, SignedRegisterDelete,
+        SignedRegisterEdit, SignedRegisterExtend,
+    },
+    system::NodeQueryResponse,
+    SectionAuth, VerifyAuthority,
+};
 use crate::types::{
     register::{Action, Register, User},
-    PublicKey, RegisterAddress as Address,
-};
-use crate::{
-    messaging::{
-        data::{
-            DataCmd, OperationId, RegisterCmd, RegisterDataExchange, RegisterRead, RegisterWrite,
-            ServiceMsg,
-        },
-        system::NodeQueryResponse,
-        AuthorityProof, ServiceAuth, WireMsg,
-    },
-    types::DataAddress,
+    DataAddress, RegisterAddress as Address,
 };
 
 use bincode::serialize;
 use rayon::prelude::*;
 use sled::Db;
+use std::sync::atomic::{AtomicU16, Ordering};
 use std::{
-    collections::BTreeMap,
     fmt::{self, Display, Formatter},
     path::Path,
     sync::Arc,
 };
 use tokio::sync::RwLock;
 use tracing::info;
-use xor_name::{Prefix, XorName, XOR_NAME_LEN};
+#[cfg(test)]
+use xor_name::Prefix;
+use xor_name::{XorName, XOR_NAME_LEN};
 
 const REG_DB_NAME: &str = "register";
 const KEY_DB_NAME: &str = "addresses";
@@ -49,16 +50,18 @@ type Cache = LruCache<CacheEntry>;
 // TODO: dont expose this
 #[derive(Clone, Debug)]
 pub(crate) struct RegisterStorage {
-    used_space: UsedSpace,
-    cache: Cache,
     key_db: Db,
     reg_db: Db,
+    cache: Cache,
+    used_space: UsedSpace,
 }
 
 #[derive(Clone, Debug)]
 struct CacheEntry {
     state: Arc<RwLock<Register>>,
     store: RegOpStore,
+    section_auth: SectionAuth,
+    size: Arc<AtomicU16>,
 }
 
 impl RegisterStorage {
@@ -86,7 +89,7 @@ impl RegisterStorage {
 
     pub(crate) async fn remove_register(&self, address: &Address) -> Result<()> {
         trace!("Removing register, {:?}", address);
-        self.drop_register_key(to_reg_key(address)?).await
+        self.drop_register_key(address.id()?).await
     }
 
     pub(crate) async fn keys(&self) -> Result<Vec<Address>> {
@@ -135,9 +138,13 @@ impl RegisterStorage {
         Ok(the_data)
     }
 
-    /// Get `Register` from the store
-    pub(crate) async fn get_register_for_replication(&self, address: &Address) -> Result<Register> {
-        let entry = match self.try_load_cache_entry(&to_reg_key(address)?).await {
+    /// Used for replication of data to new Adults.
+    pub(crate) async fn get_register_replica(
+        &self,
+        address: &Address,
+    ) -> Result<ReplicatedRegister> {
+        let key = address.id()?;
+        let entry = match self.try_load_cache_entry(&key).await {
             Ok(entry) => entry,
             Err(Error::KeyNotFound(_key)) => {
                 return Err(Error::NoSuchData(DataAddress::Register(*address)))
@@ -145,15 +152,74 @@ impl RegisterStorage {
             Err(e) => return Err(e),
         };
 
-        let read_only = entry.state.read().await;
-
-        Ok(read_only.clone())
+        self.create_replica(key, entry)
     }
 
-    /// Used for replication of data to new Elders.
-    pub(crate) async fn get_data_of(&self, prefix: Prefix) -> Result<RegisterDataExchange> {
+    fn create_replica(&self, key: XorName, entry: Arc<CacheEntry>) -> Result<ReplicatedRegister> {
+        let mut address = None;
+        let op_log = entry
+            .store
+            .get_all()?
+            .into_iter()
+            .filter_map(|stored_cmd| {
+                // only spread signed data
+                match stored_cmd.clone() {
+                    RegisterCmd::Create {
+                        cmd, section_auth, ..
+                    } => {
+                        // TODO: in higher layers we must verify that the section_auth is from a proper section..!
+                        let _ = match section_auth.verify_authority(key) {
+                            Ok(auth) => auth,
+                            _ => {
+                                warn!("Invalid section auth on register container: {}", key);
+                                return None;
+                            }
+                        };
+                        address = Some(cmd.dst_address());
+                    }
+                    RegisterCmd::Edit(SignedRegisterEdit { op, auth }) => {
+                        let verification = auth.verify_authority(serialize(&op).ok()?);
+                        if verification.is_err() {
+                            error!(
+                                "Invalid signature found for a cmd stored in db: {:?}",
+                                stored_cmd
+                            );
+                            return None;
+                        }
+                    }
+                    RegisterCmd::Delete(SignedRegisterDelete { op, auth }) => {
+                        let verification = auth.verify_authority(serialize(&op).ok()?);
+                        if verification.is_err() {
+                            error!(
+                                "Invalid signature found for cmd stored in db: {:?}",
+                                stored_cmd
+                            );
+                            return None;
+                        }
+                    }
+                    RegisterCmd::Extend { section_auth, .. } => {
+                        // TODO: in higher layers we must verify that the section_auth is from a proper section..!
+                        if section_auth.verify_authority(key).is_err() {
+                            warn!("Invalid section auth on register container: {}", key);
+                            return None;
+                        }
+                    }
+                };
+                Some(stored_cmd)
+            })
+            .collect();
+
+        Ok(ReplicatedRegister {
+            address: address.ok_or(Error::InvalidStore)?,
+            section_auth: entry.section_auth.clone(),
+            op_log,
+        })
+    }
+
+    /// Used for replication of data to new Adults.
+    #[cfg(test)]
+    pub(crate) async fn get_data_of(&self, prefix: Prefix) -> Result<RegisterStoreExport> {
         type KeyResults = Vec<Result<XorName>>;
-        let mut the_data = BTreeMap::default();
 
         // parse keys in parallel
         let (ok, err): (KeyResults, KeyResults) = self
@@ -183,12 +249,15 @@ impl RegisterStorage {
             return Err(Error::CouldNotConvertDbKey);
         }
 
+        let mut the_data = vec![];
+
         // TODO: make this concurrent
-        for key in ok.iter().flatten() {
-            match self.try_load_cache_entry(key).await {
+        for key in ok.into_iter().flatten() {
+            match self.try_load_cache_entry(&key).await {
                 Ok(entry) => {
-                    if prefix.matches(entry.state.read().await.name()) {
-                        let _prev = the_data.insert(*key, entry.store.get_all()?);
+                    let read_only = entry.state.read().await;
+                    if prefix.matches(read_only.name()) {
+                        the_data.push(self.create_replica(key, entry.clone())?);
                     }
                 }
                 Err(Error::KeyNotFound(_)) => return Err(Error::InvalidStore),
@@ -196,28 +265,63 @@ impl RegisterStorage {
             }
         }
 
-        Ok(RegisterDataExchange(the_data))
+        Ok(RegisterStoreExport(the_data))
     }
 
     /// On receiving data from Elders when promoted.
-    pub(crate) async fn update(&self, reg_data: RegisterDataExchange) -> Result<()> {
+    pub(crate) async fn update(&self, store_data: RegisterStoreExport) -> Result<()> {
         debug!("Updating Register store");
 
-        let RegisterDataExchange(data) = reg_data;
+        let RegisterStoreExport(registers) = store_data;
 
         // nested loops, slow..
-        for (_, history) in data {
-            for cmd in history {
-                let verification = WireMsg::verify_sig(
-                    cmd.auth.clone(),
-                    ServiceMsg::Cmd(DataCmd::Register(cmd.write.clone())),
-                );
-                if verification.is_ok() {
-                    let _ = self.apply(cmd).await?;
-                } else {
-                    error!("Invalid signature found for an op in history: {:?}", cmd);
-                    return Err(Error::InvalidStore); // TODO: Custom error
+        for data in registers {
+            let key = data.address.id()?;
+            for replicated_cmd in data.op_log {
+                if replicated_cmd.dst_address() != data.address {
+                    warn!(
+                        "Corrupt ReplicatedRegister, op log contains foreign ops: {}",
+                        key
+                    );
+                    continue;
                 }
+                match replicated_cmd.clone() {
+                    RegisterCmd::Create { section_auth, .. } => {
+                        // TODO: in higher layers we must verify that the section_auth is from a proper section..!
+                        if section_auth.verify_authority(key).is_err() {
+                            warn!("Invalid section auth on register container: {}", key);
+                            continue;
+                        }
+                    }
+                    RegisterCmd::Edit(SignedRegisterEdit { op, auth }) => {
+                        let verification = auth.verify_authority(serialize(&op)?);
+                        if verification.is_err() {
+                            error!(
+                                "Invalid signature found for a cmd to be relicated in our db: {:?}",
+                                replicated_cmd
+                            );
+                            return Err(Error::InvalidStore); // TODO: Custom error
+                        }
+                    }
+                    RegisterCmd::Delete(SignedRegisterDelete { op, auth }) => {
+                        let verification = auth.verify_authority(serialize(&op)?);
+                        if verification.is_err() {
+                            error!(
+                                "Invalid signature found for a cmd to be relicated in our db: {:?}",
+                                replicated_cmd
+                            );
+                            return Err(Error::InvalidStore); // TODO: Custom error
+                        }
+                    }
+                    RegisterCmd::Extend { section_auth, .. } => {
+                        // TODO: in higher layers we must verify that the section_auth is from a proper section..!
+                        if section_auth.verify_authority(key).is_err() {
+                            warn!("Invalid section auth on register container: {}", key);
+                            continue;
+                        }
+                    }
+                }
+                let _ = self.apply(replicated_cmd).await?;
             }
         }
 
@@ -226,38 +330,34 @@ impl RegisterStorage {
 
     /// --- Writing ---
 
-    pub(crate) async fn write(
-        &self,
-        write: RegisterWrite,
-        auth: AuthorityProof<ServiceAuth>,
-    ) -> Result<()> {
+    pub(crate) async fn write(&self, cmd: RegisterCmd) -> Result<()> {
         // rough estimate ignoring the extra space used by sled
         let required_space = std::mem::size_of::<RegisterCmd>();
         if !self.used_space.can_add(required_space) {
             return Err(Error::NotEnoughSpace);
         }
-        let op = RegisterCmd {
-            write,
-            auth: auth.into_inner(),
-        };
-        self.apply(op).await
+        self.apply(cmd).await
     }
 
-    async fn apply(&self, op: RegisterCmd) -> Result<()> {
+    async fn apply(&self, cmd: RegisterCmd) -> Result<()> {
         // rough estimate ignoring the extra space used by sled
         let required_space = std::mem::size_of::<RegisterCmd>();
 
-        let RegisterCmd { write, auth } = op.clone();
+        let address = cmd.dst_address();
+        let key = address.id()?;
 
-        let address = *write.address();
-        let key = to_reg_key(&address)?;
-
-        use RegisterWrite::*;
-        match write {
-            New(_reg) => {
-                // inserts default size for now (not yet used)
-                let mut old_value = Some(serialize(&u16::MAX)?);
-                let new_value = old_value.take(); // leaves `None` in old_value, type inference shenanigans..
+        use RegisterCmd::*;
+        match cmd.clone() {
+            Create {
+                cmd:
+                    SignedRegisterCreate {
+                        op: CreateRegister { size, .. },
+                        ..
+                    },
+                ..
+            } => {
+                let old_value = None::<Vec<u8>>;
+                let new_value = Some(serialize(&size)?); // inserts size (not yet used)
 
                 // init store first, to allow append to happen asap after key insert
                 // could be races, but edge case for later todos.
@@ -270,40 +370,15 @@ impl RegisterStorage {
                 }
 
                 // insert the op to the event log
-                let _ = store.append(op)?;
+                let _ = store.append(cmd)?;
                 self.used_space.increase(required_space);
 
                 Ok(())
             }
-            Delete(address) => {
-                if address.is_public() {
-                    return Err(Error::CannotDeletePublicData(DataAddress::Register(
-                        address,
-                    )));
-                }
-                let result = match self.cache.get(&key).await {
-                    None => {
-                        trace!("Attempting to delete register if it exists");
-                        self.drop_register_key(key).await?;
-                        Ok(())
-                    }
-                    Some(entry) => {
-                        let read_only = entry.state.read().await;
-                        // TODO - Register::check_permission() doesn't support Delete yet in safe-nd
-                        // register.check_permission(action, Some(auth.public_key))?;
-                        if auth.public_key != read_only.owner() {
-                            Err(Error::InvalidOwner(auth.public_key))
-                        } else {
-                            info!("Deleting Register");
-                            self.drop_register_key(key).await?;
-                            Ok(())
-                        }
-                    }
-                };
-
-                result
-            }
-            Edit(reg_op) => {
+            Edit(SignedRegisterEdit {
+                op: EditRegister { edit, .. },
+                auth,
+            }) => {
                 let entry = self.try_load_cache_entry(&key).await?;
 
                 info!("Editing Register");
@@ -311,16 +386,16 @@ impl RegisterStorage {
                     .state
                     .read()
                     .await
-                    .check_permissions(Action::Write, Some(auth.public_key))?;
+                    .check_permissions(Action::Write, Some(User::Key(auth.public_key)))?;
                 let result = entry
                     .state
                     .write()
                     .await
-                    .apply_op(reg_op)
+                    .apply_op(edit)
                     .map_err(Error::NetworkData);
 
                 if result.is_ok() {
-                    entry.store.append(op)?;
+                    entry.store.append(cmd)?;
                     self.used_space.increase(required_space);
                     trace!("Editing Register success!");
                 } else {
@@ -329,37 +404,78 @@ impl RegisterStorage {
 
                 result
             }
+            Delete(SignedRegisterDelete {
+                op: DeleteRegister(address),
+                auth,
+            }) => {
+                if address.is_public() {
+                    return Err(Error::CannotDeletePublicData(DataAddress::Register(
+                        address,
+                    )));
+                }
+                match self.try_load_cache_entry(&key).await {
+                    Err(Error::KeyNotFound(_)) => {
+                        trace!("Register was already deleted, or never existed..");
+                        Ok(())
+                    }
+                    Ok(entry) => {
+                        let read_only = entry.state.read().await;
+                        // TODO - Register::check_permission() doesn't support Delete yet in safe-nd
+                        // register.check_permission(action, Some(auth.public_key))?;
+                        if User::Key(auth.public_key) != read_only.owner() {
+                            Err(Error::InvalidOwner(auth.public_key))
+                        } else {
+                            info!("Deleting Register");
+                            self.drop_register_key(key).await?;
+                            Ok(())
+                        }
+                    }
+                    _ => Err(Error::InvalidStore),
+                }
+            }
+            Extend {
+                cmd:
+                    SignedRegisterExtend {
+                        op: ExtendRegister { extend_with, .. },
+                        ..
+                    },
+                ..
+            } => {
+                let entry = self.try_load_cache_entry(&key).await?;
+                let prev = entry.size.fetch_add(extend_with, Ordering::SeqCst);
+                info!(
+                    "Extended Register size from {} to {}",
+                    prev,
+                    prev + extend_with
+                );
+                entry.store.append(cmd)?;
+                self.used_space.increase(required_space);
+                Ok(())
+            }
         }
     }
 
     /// --- Reading ---
 
-    pub(crate) async fn read(
-        &self,
-        read: &RegisterRead,
-        requester_pk: PublicKey,
-    ) -> NodeQueryResponse {
+    pub(crate) async fn read(&self, read: &RegisterQuery, requester: User) -> NodeQueryResponse {
         trace!("Reading register {:?}", read.dst_address());
         let operation_id = match read.operation_id() {
             Ok(id) => id,
-            Err(e) => {
+            Err(_e) => {
                 return NodeQueryResponse::FailedToCreateOperationId;
             }
         };
         trace!("Operation of register read: {:?}", operation_id);
-        use RegisterRead::*;
+        use RegisterQuery::*;
         match read {
-            Get(address) => self.get(*address, requester_pk, operation_id).await,
-            Read(address) => {
-                self.read_register(*address, requester_pk, operation_id)
-                    .await
-            }
-            GetOwner(address) => self.get_owner(*address, requester_pk, operation_id).await,
+            Get(address) => self.get(*address, requester, operation_id).await,
+            Read(address) => self.read_register(*address, requester, operation_id).await,
+            GetOwner(address) => self.get_owner(*address, requester, operation_id).await,
             GetUserPermissions { address, user } => {
-                self.get_user_permissions(*address, *user, requester_pk, operation_id)
+                self.get_user_permissions(*address, *user, requester, operation_id)
                     .await
             }
-            GetPolicy(address) => self.get_policy(*address, requester_pk, operation_id).await,
+            GetPolicy(address) => self.get_policy(*address, requester, operation_id).await,
         }
     }
 
@@ -367,13 +483,10 @@ impl RegisterStorage {
     async fn get(
         &self,
         address: Address,
-        requester_pk: PublicKey,
+        requester: User,
         operation_id: OperationId,
     ) -> NodeQueryResponse {
-        let result = match self
-            .get_register(&address, Action::Read, requester_pk)
-            .await
-        {
+        let result = match self.get_register(&address, Action::Read, requester).await {
             Ok(register) => Ok(register),
             Err(error) => Err(convert_to_error_message(error)),
         };
@@ -386,9 +499,9 @@ impl RegisterStorage {
         &self,
         address: &Address,
         action: Action,
-        requester_pk: PublicKey,
+        requester: User,
     ) -> Result<Register> {
-        let entry = match self.try_load_cache_entry(&to_reg_key(address)?).await {
+        let entry = match self.try_load_cache_entry(&address.id()?).await {
             Ok(entry) => entry,
             Err(Error::KeyNotFound(_key)) => {
                 return Err(Error::NoSuchData(DataAddress::Register(*address)))
@@ -398,7 +511,7 @@ impl RegisterStorage {
 
         let read_only = entry.state.read().await;
         read_only
-            .check_permissions(action, Some(requester_pk))
+            .check_permissions(action, Some(requester))
             .map_err(Error::from)?;
 
         Ok(read_only.clone())
@@ -407,14 +520,11 @@ impl RegisterStorage {
     async fn read_register(
         &self,
         address: Address,
-        requester_pk: PublicKey,
+        requester: User,
         operation_id: OperationId,
     ) -> NodeQueryResponse {
-        let result = match self
-            .get_register(&address, Action::Read, requester_pk)
-            .await
-        {
-            Ok(register) => register.read(Some(requester_pk)).map_err(Error::from),
+        let result = match self.get_register(&address, Action::Read, requester).await {
+            Ok(register) => register.read(Some(requester)).map_err(Error::from),
             Err(error) => Err(error),
         };
 
@@ -424,13 +534,10 @@ impl RegisterStorage {
     async fn get_owner(
         &self,
         address: Address,
-        requester_pk: PublicKey,
+        requester: User,
         operation_id: OperationId,
     ) -> NodeQueryResponse {
-        let result = match self
-            .get_register(&address, Action::Read, requester_pk)
-            .await
-        {
+        let result = match self.get_register(&address, Action::Read, requester).await {
             Ok(res) => Ok(res.owner()),
             Err(error) => Err(convert_to_error_message(error)),
         };
@@ -442,15 +549,15 @@ impl RegisterStorage {
         &self,
         address: Address,
         user: User,
-        requester_pk: PublicKey,
+        requester: User,
         operation_id: OperationId,
     ) -> NodeQueryResponse {
         let result = match self
-            .get_register(&address, Action::Read, requester_pk)
+            .get_register(&address, Action::Read, requester)
             .await
             .and_then(|register| {
                 register
-                    .permissions(user, Some(requester_pk))
+                    .permissions(user, Some(requester))
                     .map_err(Error::from)
             }) {
             Ok(res) => Ok(res),
@@ -463,7 +570,7 @@ impl RegisterStorage {
     async fn get_policy(
         &self,
         address: Address,
-        requester_pk: PublicKey,
+        requester_pk: User,
         operation_id: OperationId,
     ) -> NodeQueryResponse {
         let result = match self
@@ -519,26 +626,59 @@ impl RegisterStorage {
 
         // read from disk
         let store = self.get_or_create_store(key)?;
-        let mut register = None;
+        let mut hydrated_register = None;
+        let mut current_size: u16 = 0;
         // apply all ops
-        use RegisterWrite::*;
-        for op in store.get_all()? {
-            // first op shall be New
-            if let New(reg) = op.write {
-                register = Some(reg);
-            } else if let Some(reg) = &mut register {
-                if let Edit(reg_op) = op.write {
-                    reg.apply_op(reg_op).map_err(Error::NetworkData)?;
+        use RegisterCmd::*;
+        for stored_cmd in store.get_all()? {
+            match stored_cmd {
+                Create {
+                    cmd: SignedRegisterCreate { op, .. },
+                    section_auth,
+                } => {
+                    let CreateRegister {
+                        name,
+                        tag,
+                        size,
+                        policy,
+                    } = op;
+                    // first op shall be New
+                    hydrated_register = Some((Register::new(name, tag, policy), section_auth));
+                    current_size = size;
+                }
+                Edit(SignedRegisterEdit {
+                    op: EditRegister { edit, .. },
+                    ..
+                }) => {
+                    if let Some((reg, _)) = &mut hydrated_register {
+                        reg.apply_op(edit).map_err(Error::NetworkData)?
+                    }
+                }
+                Delete(SignedRegisterDelete { .. }) => {
+                    // should not be reachable, since we don't append these ops
+                    return Err(Error::KeyNotFound(key.to_string()));
+                }
+                Extend {
+                    cmd:
+                        SignedRegisterExtend {
+                            op: ExtendRegister { extend_with, .. },
+                            ..
+                        },
+                    ..
+                } => {
+                    current_size += extend_with;
                 }
             }
         }
 
-        match register {
+        match hydrated_register {
             None => Err(Error::KeyNotFound(key.to_string())), // nothing found on disk
-            Some(reg) => {
+            Some((reg, section_auth)) => {
                 let entry = Arc::new(CacheEntry {
                     state: Arc::new(RwLock::new(reg)),
                     store,
+                    section_auth,
+                    size: Arc::new(AtomicU16::new(current_size)),
                 });
                 // populate cache
                 self.cache.insert(key, entry.clone()).await;
@@ -546,16 +686,6 @@ impl RegisterStorage {
             }
         }
     }
-}
-
-/// This also encodes the Public | Private scope,
-/// as well as the tag of the Address.
-fn to_reg_key(address: &Address) -> Result<XorName> {
-    Ok(XorName::from_content(
-        DataAddress::Register(*address)
-            .encode_to_zbase32()?
-            .as_bytes(),
-    ))
 }
 
 impl Display for RegisterStorage {
@@ -566,23 +696,24 @@ impl Display for RegisterStorage {
 
 #[cfg(test)]
 mod test {
-    use super::{to_reg_key, RegOpStore, RegisterStorage};
+    use super::RegisterStorage;
 
-    use crate::messaging::{
-        data::{DataCmd, RegisterCmd, RegisterRead, RegisterWrite, ServiceMsg},
-        system::NodeQueryResponse,
-        AuthorityProof, ServiceAuth, WireMsg,
-    };
+    use crate::messaging::SectionAuth;
     use crate::node::{Error, Result};
     use crate::types::DataAddress;
-    use crate::types::{
-        register::{PublicPermissions, PublicPolicy, Register, User},
-        Keypair,
-    };
+    use crate::types::{register::User, Keypair};
     use crate::UsedSpace;
+    use crate::{
+        messaging::{
+            data::{CreateRegister, RegisterCmd, RegisterQuery, SignedRegisterCreate},
+            system::NodeQueryResponse,
+            ServiceAuth,
+        },
+        types::register::{Policy, PublicPolicy},
+    };
 
     use rand::rngs::OsRng;
-    use std::{collections::BTreeMap, path::Path};
+    use std::path::Path;
     use tempfile::tempdir;
     use xor_name::{Prefix, XorName};
 
@@ -600,43 +731,45 @@ mod test {
 
         let mut rng = OsRng;
         let keypair = Keypair::new_ed25519(&mut rng);
-        let random_name = XorName::random();
+        let name = XorName::random();
+        let authority = User::Key(keypair.public_key());
 
-        let register = Register::new_public(keypair.public_key(), random_name, 1, None);
-        let address = register.address();
-
-        let serialised_cmd = {
-            let msg = ServiceMsg::Cmd(DataCmd::Register(RegisterWrite::New(register.clone())));
-            WireMsg::serialize_msg_payload(&msg)?
+        let op = CreateRegister {
+            name,
+            tag: 1,
+            size: u16::MAX,
+            policy: Policy::Public(PublicPolicy {
+                owner: authority,
+                permissions: Default::default(),
+            }),
         };
-        let signature = keypair.sign(&serialised_cmd);
+        let signature = keypair.sign(&bincode::serialize(&op)?);
+
         let auth = ServiceAuth {
             public_key: keypair.public_key(),
             signature,
         };
 
-        let write = RegisterWrite::New(register.clone());
-        let proof = AuthorityProof::verify(auth, serialised_cmd)?;
+        let cmd = RegisterCmd::Create {
+            cmd: SignedRegisterCreate { op, auth },
+            section_auth: section_auth(),
+        };
 
-        let _ = store.write(write.clone(), proof.clone()).await?;
-        let res = store
-            .read(&RegisterRead::Get(*address), keypair.public_key())
-            .await;
+        let _ = store.write(cmd.clone()).await?;
+
+        let address = cmd.dst_address();
+        let res = store.read(&RegisterQuery::Get(address), authority).await;
 
         match res {
             NodeQueryResponse::GetRegister((Ok(reg), _)) => {
-                assert_eq!(
-                    reg.address(),
-                    register.address(),
-                    "Should have same address!"
-                );
-                assert_eq!(reg.owner(), register.owner(), "Should have same owner!");
+                assert_eq!(reg.address(), &address, "Should have same address!");
+                assert_eq!(reg.owner(), authority, "Should have same owner!");
             }
             e => panic!("Could not read! {:?}", e),
         }
 
         // should fail to write same register again
-        let res = store.write(write.clone(), proof.clone()).await;
+        let res = store.write(cmd.clone()).await;
 
         assert_eq!(
             res.err().unwrap().to_string(),
@@ -645,7 +778,7 @@ mod test {
         );
 
         // get all data in db
-        let prefix = Prefix::new(0, random_name);
+        let prefix = Prefix::new(0, name);
         let for_update = store.get_data_of(prefix).await?;
 
         // create new db and update it with the data from first db
@@ -656,7 +789,7 @@ mod test {
         // assert the same tests hold as for the first db
 
         // should fail to write same register again, also on this new store
-        let res = new_store.write(write, proof).await;
+        let res = new_store.write(cmd).await;
 
         assert_eq!(
             res.err().unwrap().to_string(),
@@ -666,34 +799,28 @@ mod test {
 
         // should be able to read the same value from this new store also
         let res = new_store
-            .read(&RegisterRead::Get(*address), keypair.public_key())
+            .read(&RegisterQuery::Get(address), authority)
             .await;
 
         match res {
             NodeQueryResponse::GetRegister((Ok(reg), _)) => {
-                assert_eq!(
-                    reg.address(),
-                    register.address(),
-                    "Should have same address!"
-                );
-                assert_eq!(reg.owner(), register.owner(), "Should have same owner!");
+                assert_eq!(reg.address(), &address, "Should have same address!");
+                assert_eq!(reg.owner(), authority, "Should have same owner!");
             }
             e => panic!("Could not read! {:?}", e),
         }
 
-        let _ = store.drop_register_key(to_reg_key(address)?).await?;
+        let _ = store.drop_register_key(address.id()?).await?;
 
         // should not get the removed register
-        let res = store
-            .read(&RegisterRead::Get(*address), keypair.public_key())
-            .await;
+        let res = store.read(&RegisterQuery::Get(address), authority).await;
 
         use crate::messaging::data::Error as MsgError;
 
         match res {
             NodeQueryResponse::GetRegister((Ok(_), _)) => panic!("Was not removed!"),
             NodeQueryResponse::GetRegister((Err(MsgError::DataNotFound(addr)), _)) => {
-                assert_eq!(addr, DataAddress::Register(*register.address()))
+                assert_eq!(addr, DataAddress::Register(address))
             }
             e => panic!("Unexpected response! {:?}", e),
         }
@@ -701,56 +828,20 @@ mod test {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn appends_and_reads_from_store() -> Result<()> {
-        let id = xor_name::XorName::random();
-        let tmp_dir = tempdir()?;
-        let db_dir = tmp_dir.path().join(Path::new(&"db".to_string()));
-        let db = sled::open(db_dir).map_err(|error| {
-            trace!("Sled Error: {:?}", error);
-            Error::Sled(error)
-        })?;
-        let store = RegOpStore::new(&id, db)?;
+    fn section_auth() -> SectionAuth {
+        use crate::messaging::system::KeyedSig;
 
-        let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
-        let pk = authority_keypair1.public_key();
-
-        let register_name: XorName = rand::random();
-        let register_tag = 43_000u64;
-
-        let mut permissions = BTreeMap::default();
-        let user_perms = PublicPermissions::new(true);
-        let _prev = permissions.insert(User::Key(pk), user_perms);
-
-        let replica1 = Register::new_public(
-            pk,
-            register_name,
-            register_tag,
-            Some(PublicPolicy {
-                owner: pk,
-                permissions,
-            }),
-        );
-
-        let write = RegisterWrite::New(replica1);
-
-        let auth = ServiceAuth {
-            public_key: pk,
-            signature: authority_keypair1.sign(b""),
+        let sk = bls::SecretKey::random();
+        let public_key = sk.public_key();
+        let data = "hello".to_string();
+        let signature = sk.sign(&data);
+        let sig = KeyedSig {
+            public_key,
+            signature,
         };
-
-        let cmd = RegisterCmd { write, auth };
-
-        store.append(cmd.clone())?;
-
-        let events = store.get_all()?;
-        assert_eq!(events.len(), 1);
-
-        match events.get(0) {
-            Some(found_cmd) => assert_eq!(found_cmd, &cmd),
-            None => unreachable!(),
+        SectionAuth {
+            src_name: crate::types::PublicKey::Bls(public_key).into(),
+            sig,
         }
-
-        Ok(())
     }
 }

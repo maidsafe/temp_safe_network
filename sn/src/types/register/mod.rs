@@ -17,17 +17,16 @@ pub use policy::{
 };
 pub use reg_crdt::EntryHash;
 
-use super::{Error, PublicKey, Result};
+use super::{Error, Result};
 use crate::{types::RegisterAddress as Address, types::Scope};
 use reg_crdt::{CrdtOperation, RegisterCrdt};
+use self_encryption::MIN_ENCRYPTABLE_BYTES;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
     hash::Hash,
 };
 use xor_name::XorName;
-
-use self_encryption::MIN_ENCRYPTABLE_BYTES;
 
 /// Arbitrary maximum size of a register entry.
 const MAX_REG_ENTRY_SIZE: usize = MIN_ENCRYPTABLE_BYTES / 3; // 1024 bytes
@@ -38,19 +37,33 @@ pub type RegisterOp<T> = CrdtOperation<T>;
 /// Object storing the Register
 #[derive(Clone, Eq, PartialEq, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub struct Register {
-    authority: PublicKey,
+    authority: User,
     crdt: RegisterCrdt,
     policy: Policy,
 }
 
 impl Register {
+    ///
+    pub fn new(name: XorName, tag: u64, policy: Policy) -> Self {
+        let address = if matches!(policy, Policy::Public(_)) {
+            Address::Public { name, tag }
+        } else {
+            Address::Private { name, tag }
+        };
+        Self {
+            authority: *policy.owner(),
+            crdt: RegisterCrdt::new(address),
+            policy,
+        }
+    }
+
     /// Construct a new Public Register.
     /// The 'authority' is assumed to be the PK which the messages were and will be
     /// signed with.
     /// If a policy is not provided, a default policy will be set where
     /// the 'authority' is the owner along with an empty users permissions set.
     pub fn new_public(
-        authority: PublicKey,
+        authority: User,
         name: XorName,
         tag: u64,
         policy: Option<PublicPolicy>,
@@ -73,7 +86,7 @@ impl Register {
     /// If a policy is not provided, a default policy will be set where
     /// the 'authority' is the owner along with an empty users permissions set.
     pub fn new_private(
-        authority: PublicKey,
+        authority: User,
         name: XorName,
         tag: u64,
         policy: Option<PrivatePolicy>,
@@ -122,26 +135,26 @@ impl Register {
 
     /// Return the number of items held in the register, optionally
     /// verifying read permissions if a pk is provided
-    pub fn size(&self, requester: Option<PublicKey>) -> Result<u64> {
+    pub fn size(&self, requester: Option<User>) -> Result<u64> {
         self.check_permissions(Action::Read, requester)?;
 
         Ok(self.crdt.size())
     }
 
     /// Return true if the register is empty.
-    pub fn is_empty(&self, requester: Option<PublicKey>) -> Result<bool> {
+    pub fn is_empty(&self, requester: Option<User>) -> Result<bool> {
         Ok(self.size(requester)? == 0)
     }
 
     /// Return a value corresponding to the provided 'hash', if present.
-    pub fn get(&self, hash: EntryHash, requester: Option<PublicKey>) -> Result<Option<&Entry>> {
+    pub fn get(&self, hash: EntryHash, requester: Option<User>) -> Result<Option<&Entry>> {
         self.check_permissions(Action::Read, requester)?;
 
         Ok(self.crdt.get(hash))
     }
 
     /// Read the last entry, or entries when there are branches, if the register is not empty.
-    pub fn read(&self, requester: Option<PublicKey>) -> Result<BTreeSet<(EntryHash, Entry)>> {
+    pub fn read(&self, requester: Option<User>) -> Result<BTreeSet<(EntryHash, Entry)>> {
         self.check_permissions(Action::Read, requester)?;
 
         Ok(self.crdt.read())
@@ -173,14 +186,14 @@ impl Register {
     }
 
     /// Return user permissions, if applicable.
-    pub fn permissions(&self, user: User, requester: Option<PublicKey>) -> Result<Permissions> {
+    pub fn permissions(&self, user: User, requester: Option<User>) -> Result<Permissions> {
         self.check_permissions(Action::Read, requester)?;
 
         self.policy.permissions(user).ok_or(Error::NoSuchEntry)
     }
 
     /// Return the policy.
-    pub fn policy(&self, requester: Option<PublicKey>) -> Result<&Policy> {
+    pub fn policy(&self, requester: Option<User>) -> Result<&Policy> {
         self.check_permissions(Action::Read, requester)?;
 
         Ok(&self.policy)
@@ -192,18 +205,18 @@ impl Register {
     /// Returns:
     /// `Ok(())` if the permissions are valid,
     /// `Err::AccessDenied` if the action is not allowed.
-    pub fn check_permissions(&self, action: Action, requester: Option<PublicKey>) -> Result<()> {
+    pub fn check_permissions(&self, action: Action, requester: Option<User>) -> Result<()> {
         let requester = requester.unwrap_or(self.authority);
         self.policy.is_action_allowed(requester, action)
     }
 
     /// Return the owner of the data.
-    pub fn owner(&self) -> PublicKey {
+    pub fn owner(&self) -> User {
         *self.policy.owner()
     }
 
     /// Return the PK which the messages are expected to be signed with by this replica.
-    pub fn replica_authority(&self) -> PublicKey {
+    pub fn replica_authority(&self) -> User {
         self.authority
     }
 }
@@ -240,9 +253,9 @@ mod tests {
         assert!(register.is_public());
         assert!(!register.is_private());
 
-        let authority_pk = authority_keypair.public_key();
-        assert_eq!(register.owner(), authority_pk);
-        assert_eq!(register.replica_authority(), authority_pk);
+        let authority = User::Key(authority_keypair.public_key());
+        assert_eq!(register.owner(), authority);
+        assert_eq!(register.replica_authority(), authority);
 
         let register_address = Address::new(register_name, Scope::Public, register_tag);
         assert_eq!(*register.address(), register_address);
@@ -261,9 +274,9 @@ mod tests {
         assert!(!register.is_public());
         assert!(register.is_private());
 
-        let authority_pk = authority_keypair.public_key();
-        assert_eq!(register.owner(), authority_pk);
-        assert_eq!(register.replica_authority(), authority_pk);
+        let authority = User::Key(authority_keypair.public_key());
+        assert_eq!(register.owner(), authority);
+        assert_eq!(register.replica_authority(), authority);
 
         let register_address = Address::new(register_name, Scope::Private, register_tag);
         assert_eq!(*register.address(), register_address);
@@ -272,9 +285,9 @@ mod tests {
     #[test]
     fn register_concurrent_write_ops() -> Result<()> {
         let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
-        let authority1 = authority_keypair1.public_key();
+        let authority1 = User::Key(authority_keypair1.public_key());
         let authority_keypair2 = Keypair::new_ed25519(&mut OsRng);
-        let authority2 = authority_keypair2.public_key();
+        let authority2 = User::Key(authority_keypair2.public_key());
 
         let register_name: XorName = rand::random();
         let register_tag = 43_000u64;
@@ -283,7 +296,7 @@ mod tests {
         // grant permissions for Write to 'authority2' in both replicas too
         let mut perms = BTreeMap::default();
         let user_perms = PublicPermissions::new(true);
-        let _prev = perms.insert(User::Key(authority2), user_perms);
+        let _prev = perms.insert(authority2, user_perms);
 
         // Instantiate the same Register on two replicas with the two diff authorities
         let mut replica1 = Register::new_public(
@@ -376,7 +389,7 @@ mod tests {
 
         // one replica will allow write ops to anyone
         let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
-        let owner1 = authority_keypair1.public_key();
+        let owner1 = User::Key(authority_keypair1.public_key());
         let mut perms1 = BTreeMap::default();
         let _prev = perms1.insert(User::Anyone, PublicPermissions::new(true));
         let replica1 = create_public_reg_replica_with(
@@ -391,9 +404,9 @@ mod tests {
 
         // the other replica will allow write ops to 'owner1' and 'authority2' only
         let authority_keypair2 = Keypair::new_ed25519(&mut OsRng);
-        let authority2 = authority_keypair2.public_key();
+        let authority2 = User::Key(authority_keypair2.public_key());
         let mut perms2 = BTreeMap::default();
-        let _prev = perms2.insert(User::Key(owner1), PublicPermissions::new(true));
+        let _prev = perms2.insert(owner1, PublicPermissions::new(true));
         let replica2 = create_public_reg_replica_with(
             register_name,
             register_tag,
@@ -418,11 +431,11 @@ mod tests {
         assert_eq!(replica2.owner(), authority2);
         assert_eq!(replica2.replica_authority(), authority2);
         assert_eq!(
-            replica2.policy(None)?.permissions(User::Key(owner1)),
+            replica2.policy(None)?.permissions(owner1),
             Some(Permissions::Public(PublicPermissions::new(true))),
         );
         assert_eq!(
-            replica2.permissions(User::Key(owner1), None)?,
+            replica2.permissions(owner1, None)?,
             Permissions::Public(PublicPermissions::new(true)),
         );
 
@@ -435,9 +448,9 @@ mod tests {
         let register_tag = 43_666;
 
         let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
-        let authority1 = authority_keypair1.public_key();
+        let authority1 = User::Key(authority_keypair1.public_key());
         let authority_keypair2 = Keypair::new_ed25519(&mut OsRng);
-        let authority2 = authority_keypair2.public_key();
+        let authority2 = User::Key(authority_keypair2.public_key());
 
         let mut perms1 = BTreeMap::default();
         let user_perms1 = PrivatePermissions::new(/*read*/ true, /*write*/ false);
@@ -472,30 +485,26 @@ mod tests {
         assert_eq!(replica1.owner(), authority1);
         assert_eq!(replica1.replica_authority(), authority1);
         assert_eq!(
-            replica1
-                .policy(Some(authority1))?
-                .permissions(User::Key(authority1)),
+            replica1.policy(Some(authority1))?.permissions(authority1),
             Some(Permissions::Private(PrivatePermissions::new(true, false))),
         );
         assert_eq!(
-            replica1.permissions(User::Key(authority1), Some(authority1))?,
+            replica1.permissions(authority1, Some(authority1))?,
             Permissions::Private(PrivatePermissions::new(true, false)),
         );
 
         assert_eq!(replica2.owner(), authority2);
         assert_eq!(replica2.replica_authority(), authority2);
         assert_eq!(
-            replica2
-                .policy(Some(authority2))?
-                .permissions(User::Key(authority2)),
+            replica2.policy(Some(authority2))?.permissions(authority2),
             Some(Permissions::Private(PrivatePermissions::new(true, true))),
         );
         assert_eq!(
-            replica2.permissions(User::Key(authority2), Some(authority2))?,
+            replica2.permissions(authority2, Some(authority2))?,
             Permissions::Private(PrivatePermissions::new(true, true)),
         );
         assert_eq!(
-            replica2.permissions(User::Key(authority1), None)?,
+            replica2.permissions(authority1, None)?,
             Permissions::Private(PrivatePermissions::new(false, true)),
         );
 
@@ -509,7 +518,7 @@ mod tests {
 
         // one replica will allow write ops to anyone
         let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
-        let owner1 = authority_keypair1.public_key();
+        let owner1 = User::Key(authority_keypair1.public_key());
         let mut perms1 = BTreeMap::default();
         let _prev = perms1.insert(User::Anyone, PublicPermissions::new(true));
         let mut replica1 = create_public_reg_replica_with(
@@ -524,9 +533,9 @@ mod tests {
 
         // the other replica will *not* allow write ops to 'owner1'
         let authority_keypair2 = Keypair::new_ed25519(&mut OsRng);
-        let authority2 = authority_keypair2.public_key();
+        let authority2 = User::Key(authority_keypair2.public_key());
         let mut perms2 = BTreeMap::default();
-        let _prev = perms2.insert(User::Key(owner1), PublicPermissions::new(false));
+        let _prev = perms2.insert(owner1, PublicPermissions::new(false));
         let mut replica2 = create_public_reg_replica_with(
             register_name,
             register_tag,
@@ -559,9 +568,9 @@ mod tests {
         let register_name = XorName::random();
         let register_tag = 43_666;
         let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
-        let authority1 = authority_keypair1.public_key();
+        let authority1 = User::Key(authority_keypair1.public_key());
         let authority_keypair2 = Keypair::new_ed25519(&mut OsRng);
-        let authority2 = authority_keypair2.public_key();
+        let authority2 = User::Key(authority_keypair2.public_key());
 
         let mut perms1 = BTreeMap::default();
         let user_perms1 = PrivatePermissions::new(/*read*/ false, /*write*/ true);
@@ -661,7 +670,7 @@ mod tests {
                 let authority_keypair = authority_keypair
                     .clone()
                     .unwrap_or_else(|| Keypair::new_ed25519(&mut OsRng));
-                let authority = authority_keypair.public_key();
+                let authority = User::Key(authority_keypair.public_key());
                 let register = Register::new_public(authority, name, tag, policy.clone());
                 (authority_keypair, register)
             })
@@ -683,7 +692,7 @@ mod tests {
                 let authority_keypair = authority_keypair
                     .clone()
                     .unwrap_or_else(|| Keypair::new_ed25519(&mut OsRng));
-                let authority = authority_keypair.public_key();
+                let authority = User::Key(authority_keypair.public_key());
                 let register = Register::new_private(authority, name, tag, policy.clone());
                 (authority_keypair, register)
             })
@@ -759,7 +768,7 @@ mod tests {
         let tag = 45_000u64;
 
         let owner_keypair = Arc::new(Keypair::new_ed25519(&mut OsRng));
-        let owner = owner_keypair.public_key();
+        let owner = User::Key(owner_keypair.public_key());
         let policy = PublicPolicy {
             owner,
             permissions: BTreeMap::default(),
@@ -805,7 +814,7 @@ mod tests {
             let register_tag = 45_000u64;
             let owner_keypair = Keypair::new_ed25519(&mut OsRng);
             let policy = PublicPolicy {
-                owner: owner_keypair.public_key(),
+                owner: User::Key(owner_keypair.public_key()),
                 permissions: BTreeMap::default(),
             };
 
@@ -835,7 +844,7 @@ mod tests {
             let register_tag = 43_001u64;
             let owner_keypair = Keypair::new_ed25519(&mut OsRng);
             let policy = PublicPolicy {
-                owner: owner_keypair.public_key(),
+                owner: User::Key(owner_keypair.public_key()),
                 permissions: BTreeMap::default(),
             };
 
@@ -874,7 +883,7 @@ mod tests {
             let register_tag = 43_002u64;
             let owner_keypair = Keypair::new_ed25519(&mut OsRng);
             let policy = PublicPolicy {
-                owner: owner_keypair.public_key(),
+                owner: User::Key(owner_keypair.public_key()),
                 permissions: BTreeMap::default(),
             };
 
@@ -1014,7 +1023,7 @@ mod tests {
             let register_tag = 43_001u64;
             let owner_keypair = Keypair::new_ed25519(&mut OsRng);
             let policy = PublicPolicy {
-                owner: owner_keypair.public_key(),
+                owner: User::Key(owner_keypair.public_key()),
                 permissions: BTreeMap::default(),
             };
 
@@ -1134,7 +1143,7 @@ mod tests {
             let xorname = XorName::random();
             let tag = 45_000u64;
             let random_owner_keypair = Keypair::new_ed25519(&mut OsRng);
-            let mut bogus_replica = Register::new_public(random_owner_keypair.public_key(), xorname, tag, None);
+            let mut bogus_replica = Register::new_public(User::Key(random_owner_keypair.public_key()), xorname, tag, None);
 
             // add bogus ops from bogus replica + bogus data
             let mut children = BTreeSet::new();

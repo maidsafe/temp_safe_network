@@ -13,7 +13,7 @@ mod queries;
 mod register_apis;
 
 use crate::client::{connections::Session, errors::Error, ClientConfig};
-use crate::messaging::data::{CmdError, DataQuery, RegisterRead, ServiceMsg};
+use crate::messaging::data::{CmdError, DataQuery, RegisterQuery, ServiceMsg};
 use crate::messaging::{ServiceAuth, WireMsg};
 use crate::peer::Peer;
 use crate::prefix_map::NetworkPrefixMap;
@@ -169,7 +169,7 @@ impl Client {
         // Generate a random query to send a dummy message
         let random_dst_addr = XorName::random();
         let serialised_cmd = {
-            let msg = ServiceMsg::Query(DataQuery::Register(RegisterRead::Get(
+            let msg = ServiceMsg::Query(DataQuery::Register(RegisterQuery::Get(
                 RegisterAddress::Public {
                     name: random_dst_addr,
                     tag: 1,

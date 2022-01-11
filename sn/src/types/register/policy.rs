@@ -11,6 +11,7 @@ use super::super::{Error, PublicKey, Result};
 use super::Action;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, hash::Hash};
+use xor_name::XorName;
 
 /// Wrapper type for permissions, which can be public or private.
 #[derive(Clone, Serialize, Deserialize, PartialEq, PartialOrd, Ord, Eq, Hash, Debug)]
@@ -23,7 +24,7 @@ pub enum Policy {
 
 impl Policy {
     /// Returns true if `action` is allowed for the provided user.
-    pub fn is_action_allowed(&self, requester: PublicKey, action: Action) -> Result<()> {
+    pub fn is_action_allowed(&self, requester: User, action: Action) -> Result<()> {
         match self {
             Policy::Public(policy) => policy.is_action_allowed(requester, action),
             Policy::Private(policy) => policy.is_action_allowed(requester, action),
@@ -39,7 +40,7 @@ impl Policy {
     }
 
     /// Returns the owner.
-    pub fn owner(&self) -> &PublicKey {
+    pub fn owner(&self) -> &User {
         match self {
             Policy::Public(policy) => policy.owner(),
             Policy::Private(policy) => policy.owner(),
@@ -142,13 +143,15 @@ impl PrivatePermissions {
     }
 }
 
-/// User that can access Register.
+/// User that can access a Register.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Debug)]
 pub enum User {
     /// Any user.
     Anyone,
     /// User identified by its public key.
     Key(PublicKey),
+    /// User identified by an XorName.
+    Id(XorName),
 }
 
 /// Public permissions.
@@ -156,7 +159,7 @@ pub enum User {
 pub struct PublicPolicy {
     /// An owner could represent an individual user, or a group of users,
     /// depending on the `public_key` type.
-    pub owner: PublicKey,
+    pub owner: User,
     /// Map of users to their public permission set.
     pub permissions: BTreeMap<User, PublicPermissions>,
 }
@@ -172,13 +175,13 @@ impl PublicPolicy {
 
     /// Returns `Ok(())` if `action` is allowed for the provided user and `Err(AccessDenied)` if
     /// this action is not permitted.
-    pub fn is_action_allowed(&self, requester: PublicKey, action: Action) -> Result<()> {
+    pub fn is_action_allowed(&self, requester: User, action: Action) -> Result<()> {
         // First checks if the requester is the owner.
         if action == Action::Read || requester == self.owner {
             Ok(())
         } else {
             match self
-                .is_action_allowed_by_user(&User::Key(requester), action)
+                .is_action_allowed_by_user(&requester, action)
                 .or_else(|| self.is_action_allowed_by_user(&User::Anyone, action))
             {
                 Some(true) => Ok(()),
@@ -194,7 +197,7 @@ impl PublicPolicy {
     }
 
     /// Returns the owner.
-    pub fn owner(&self) -> &PublicKey {
+    pub fn owner(&self) -> &User {
         &self.owner
     }
 }
@@ -204,15 +207,15 @@ impl PublicPolicy {
 pub struct PrivatePolicy {
     /// An owner could represent an individual user, or a group of users,
     /// depending on the `public_key` type.
-    pub owner: PublicKey,
+    pub owner: User,
     /// Map of users to their private permission set.
-    pub permissions: BTreeMap<PublicKey, PrivatePermissions>,
+    pub permissions: BTreeMap<User, PrivatePermissions>,
 }
 
 impl PrivatePolicy {
     /// Returns `Ok(())` if `action` is allowed for the provided user and `Err(AccessDenied)` if
     /// this action is not permitted.
-    pub fn is_action_allowed(&self, requester: PublicKey, action: Action) -> Result<()> {
+    pub fn is_action_allowed(&self, requester: User, action: Action) -> Result<()> {
         // First checks if the requester is the owner.
         if requester == self.owner {
             Ok(())
@@ -234,12 +237,19 @@ impl PrivatePolicy {
     pub fn permissions(&self, user: User) -> Option<Permissions> {
         match user {
             User::Anyone => None,
-            User::Key(key) => self.permissions.get(&key).map(|p| Permissions::Private(*p)),
+            user @ User::Key(_) => self
+                .permissions
+                .get(&user)
+                .map(|p| Permissions::Private(*p)),
+            user @ User::Id(_) => self
+                .permissions
+                .get(&user)
+                .map(|p| Permissions::Private(*p)),
         }
     }
 
     /// Returns the owner.
-    pub fn owner(&self) -> &PublicKey {
+    pub fn owner(&self) -> &User {
         &self.owner
     }
 }

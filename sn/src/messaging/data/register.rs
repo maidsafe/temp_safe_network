@@ -7,17 +7,20 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{CmdError, Error, QueryResponse, Result};
-use crate::messaging::data::OperationId;
+
+use crate::messaging::{data::OperationId, SectionAuth};
 use crate::types::{
-    register::{Entry, Register, RegisterOp, User},
-    PublicKey, RegisterAddress as Address,
+    register::{Entry, Policy, RegisterOp, User},
+    RegisterAddress as Address,
 };
+
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
 /// [`Register`] read operations.
+#[allow(clippy::large_enum_variant)]
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
-pub enum RegisterRead {
+pub enum RegisterQuery {
     /// Retrieve the [`Register`] at the given address.
     ///
     /// This should eventually lead to a [`GetRegister`] response.
@@ -56,78 +59,217 @@ pub enum RegisterRead {
     GetOwner(Address),
 }
 
-/// A [`Register`] write operation.
+// /// A [`Register`] cmd that is stored in a log on Adults.
+// #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+// pub enum RegisterCmd {
+//     /// Create a new [`Register`] on the network.
+//     Create(SignedRegisterCreate),
+//     /// Edit the [`Register`].
+//     Edit(SignedRegisterEdit),
+//     /// Delete the [`Register`].
+//     Delete(SignedRegisterDelete),
+//     /// Extend the size of the [`Register`].
+//     Extend(SignedRegisterExtend),
+// }
+
+/// A [`Register`] cmd that is stored in a log on Adults.
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
-pub struct RegisterCmd {
+pub enum RegisterCmd {
+    /// Create a new [`Register`] on the network.
+    Create {
+        /// The user signed op.
+        cmd: SignedRegisterCreate,
+        /// Section signature over the operation,
+        /// verifying that it was paid for.
+        section_auth: SectionAuth,
+    },
+    /// Edit the [`Register`].
+    Edit(SignedRegisterEdit),
+    /// Delete the [`Register`].
+    Delete(SignedRegisterDelete),
+    /// Extend the size of the [`Register`].
+    Extend {
+        /// The user signed op.
+        cmd: SignedRegisterExtend,
+        /// Section signature over the operation,
+        /// verifying that it was paid for.
+        section_auth: SectionAuth,
+    },
+}
+
+///
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct CreateRegister {
+    /// The name of the [`Register`].
+    pub name: XorName,
+    /// The tag on the [`Register`].
+    pub tag: u64,
+    /// The initial size of the [`Register`].
+    pub size: u16,
+    /// The policy of the [`Register`].
+    pub policy: Policy,
+}
+
+impl CreateRegister {
+    ///
+    pub fn address(&self) -> Address {
+        if let Policy::Public { .. } = self.policy {
+            Address::Public {
+                name: self.name,
+                tag: self.tag,
+            }
+        } else {
+            Address::Private {
+                name: self.name,
+                tag: self.tag,
+            }
+        }
+    }
+}
+
+///
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct ExtendRegister {
+    /// The address of the [`Register`] to extend.
+    pub address: Address,
+    /// The size to extend the [`Register`] with.
+    pub extend_with: u16,
+}
+
+///
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct DeleteRegister(pub Address);
+
+///
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct EditRegister {
+    /// The address of the [`Register`] to edit.
+    pub address: Address,
     /// The operation to perform.
-    pub write: RegisterWrite,
+    pub edit: RegisterOp<Entry>,
+}
+
+/// A signed cmd to create a [`Register`].
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct SignedRegisterCreate {
+    /// Create a [`Register`].
+    pub op: CreateRegister,
     /// A signature carrying authority to perform the operation.
     ///
     /// This will be verified against the register's owner and permissions.
     pub auth: crate::messaging::ServiceAuth,
 }
 
-/// [`Register`] write operations.
-#[allow(clippy::large_enum_variant)]
+/// A signed cmd to create a [`Register`].
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub enum RegisterWrite {
-    /// Create a new [`Register`] on the network.
-    New(Register),
-    /// Edit a [`Register`].
-    Edit(RegisterOp<Entry>),
+pub struct SignedRegisterExtend {
+    /// Extend a [`Register`].
+    pub op: ExtendRegister,
+    /// A signature carrying authority to perform the operation.
+    ///
+    /// This will be verified against the register's owner and permissions.
+    pub auth: crate::messaging::ServiceAuth,
+}
+
+/// A [`Register`] write operation signed by the requester.
+#[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
+pub struct SignedRegisterEdit {
+    /// The operation to perform.
+    pub op: EditRegister,
+    /// A signature carrying authority to perform the operation.
+    ///
+    /// This will be verified against the register's owner and permissions.
+    pub auth: crate::messaging::ServiceAuth,
+}
+
+/// A [`Register`] write operation.
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub struct SignedRegisterDelete {
     /// Delete a private [`Register`].
     ///
     /// This operation will result in an error if applied to a public register. Only private
     /// registers can be deleted, and only by their current owner(s).
-    Delete(Address),
+    pub op: DeleteRegister,
+    /// A signature carrying authority to perform the operation.
+    ///
+    /// This will be verified against the register's owner and permissions.
+    pub auth: crate::messaging::ServiceAuth,
 }
 
-impl RegisterRead {
+impl SignedRegisterCreate {
+    /// Returns the dst address of the register.
+    pub fn dst_address(&self) -> Address {
+        self.op.address()
+    }
+}
+
+impl SignedRegisterEdit {
+    /// Returns the dst address of the register.
+    pub fn dst_address(&self) -> &Address {
+        &self.op.address
+    }
+}
+
+impl SignedRegisterDelete {
+    /// Returns the dst address of the register.
+    pub fn dst_address(&self) -> &Address {
+        &self.op.0
+    }
+}
+
+impl SignedRegisterExtend {
+    /// Returns the dst address of the register.
+    pub fn dst_address(&self) -> &Address {
+        &self.op.address
+    }
+}
+
+impl RegisterQuery {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
     pub fn error(&self, error: Error) -> Result<QueryResponse> {
         match *self {
-            RegisterRead::Get(_) => Ok(QueryResponse::GetRegister((
+            RegisterQuery::Get(_) => Ok(QueryResponse::GetRegister((
                 Err(error),
                 self.operation_id()?,
             ))),
-            RegisterRead::Read(_) => Ok(QueryResponse::ReadRegister((
+            RegisterQuery::Read(_) => Ok(QueryResponse::ReadRegister((
                 Err(error),
                 self.operation_id()?,
             ))),
-            RegisterRead::GetPolicy(_) => Ok(QueryResponse::GetRegisterPolicy((
+            RegisterQuery::GetPolicy(_) => Ok(QueryResponse::GetRegisterPolicy((
                 Err(error),
                 self.operation_id()?,
             ))),
-            RegisterRead::GetUserPermissions { .. } => Ok(
+            RegisterQuery::GetUserPermissions { .. } => Ok(
                 QueryResponse::GetRegisterUserPermissions((Err(error), self.operation_id()?)),
             ),
-            RegisterRead::GetOwner(_) => Ok(QueryResponse::GetRegisterOwner((
+            RegisterQuery::GetOwner(_) => Ok(QueryResponse::GetRegisterOwner((
                 Err(error),
                 self.operation_id()?,
             ))),
         }
     }
 
-    /// Returns the address of the data for request. (Scoped to Private/Public)
+    /// Returns the dst address for the request. (Scoped to Private/Public)
     pub fn dst_address(&self) -> Address {
         match self {
-            RegisterRead::Get(ref address)
-            | RegisterRead::Read(ref address)
-            | RegisterRead::GetPolicy(ref address)
-            | RegisterRead::GetUserPermissions { ref address, .. }
-            | RegisterRead::GetOwner(ref address) => *address,
+            RegisterQuery::Get(ref address)
+            | RegisterQuery::Read(ref address)
+            | RegisterQuery::GetPolicy(ref address)
+            | RegisterQuery::GetUserPermissions { ref address, .. }
+            | RegisterQuery::GetOwner(ref address) => *address,
         }
     }
 
     /// Returns the xorname of the data for request.
     pub fn dst_name(&self) -> XorName {
         match self {
-            RegisterRead::Get(ref address)
-            | RegisterRead::Read(ref address)
-            | RegisterRead::GetPolicy(ref address)
-            | RegisterRead::GetUserPermissions { ref address, .. }
-            | RegisterRead::GetOwner(ref address) => *address.name(),
+            RegisterQuery::Get(ref address)
+            | RegisterQuery::Read(ref address)
+            | RegisterQuery::GetPolicy(ref address)
+            | RegisterQuery::GetUserPermissions { ref address, .. }
+            | RegisterQuery::GetOwner(ref address) => *address.name(),
         }
     }
 
@@ -137,31 +279,31 @@ impl RegisterRead {
     /// Right now returning result to fail for anything non-chunk, as that's all we're tracking from other nodes here just now.
     pub fn operation_id(&self) -> Result<OperationId> {
         match self {
-            RegisterRead::Get(ref address) => Ok(format!(
+            RegisterQuery::Get(ref address) => Ok(format!(
                 "Get-{:?}",
                 address
                     .encode_to_zbase32()
                     .map_err(|_| Error::NoOperationId)?
             )),
-            RegisterRead::Read(ref address) => Ok(format!(
+            RegisterQuery::Read(ref address) => Ok(format!(
                 "Read-{:?}",
                 address
                     .encode_to_zbase32()
                     .map_err(|_| Error::NoOperationId)?
             )),
-            RegisterRead::GetPolicy(ref address) => Ok(format!(
+            RegisterQuery::GetPolicy(ref address) => Ok(format!(
                 "GetPolicy-{:?}",
                 address
                     .encode_to_zbase32()
                     .map_err(|_| Error::NoOperationId)?
             )),
-            RegisterRead::GetUserPermissions { ref address, .. } => Ok(format!(
+            RegisterQuery::GetUserPermissions { ref address, .. } => Ok(format!(
                 "GetUserPermissions-{:?}",
                 address
                     .encode_to_zbase32()
                     .map_err(|_| Error::NoOperationId)?
             )),
-            RegisterRead::GetOwner(ref address) => Ok(format!(
+            RegisterQuery::GetOwner(ref address) => Ok(format!(
                 "GetOwner-{:?}",
                 address
                     .encode_to_zbase32()
@@ -171,35 +313,48 @@ impl RegisterRead {
     }
 }
 
-impl RegisterWrite {
+impl RegisterCmd {
     /// Creates a Response containing an error, with the Response variant corresponding to the
     /// Request variant.
     pub fn error(&self, error: Error) -> CmdError {
         CmdError::Data(error)
     }
 
-    /// Returns the address of the destination for request.
-    pub fn dst_name(&self) -> XorName {
+    /// Returns the name of the register.
+    /// This is not a unique identifier.
+    pub fn name(&self) -> XorName {
+        *self.dst_address().name()
+    }
+
+    // /// Returns the id of the register.
+    // /// This is a unique identifier, used
+    // /// in order to not co-locate private and public
+    // /// and different tags of same register name.
+    // pub fn dst_id(&self) -> Result<XorName> {
+    //     self.dst_address().id()
+    // }
+
+    /// Returns the dst address of the register.
+    pub fn dst_address(&self) -> Address {
         match self {
-            RegisterWrite::New(ref data) => *data.name(),
-            RegisterWrite::Delete(ref address) => *address.name(),
-            RegisterWrite::Edit(ref op) => *op.address.name(),
+            Self::Create { cmd, .. } => cmd.dst_address(),
+            Self::Edit(cmd) => *cmd.dst_address(),
+            Self::Delete(cmd) => *cmd.dst_address(),
+            Self::Extend { cmd, .. } => *cmd.dst_address(),
         }
     }
 
-    /// Returns the address of the map.
-    pub fn address(&self) -> &Address {
+    /// Owner of the Register
+    pub fn owner(&self) -> Option<&User> {
         match self {
-            Self::New(map) => map.address(),
-            Self::Delete(address) => address,
-            Self::Edit(ref op) => &op.address,
-        }
-    }
-
-    /// Owner of the RegisterWrite
-    pub fn owner(&self) -> Option<PublicKey> {
-        match self {
-            Self::New(data) => Some(data.owner()),
+            Self::Create {
+                cmd:
+                    SignedRegisterCreate {
+                        op: CreateRegister { policy, .. },
+                        ..
+                    },
+                ..
+            } => Some(policy.owner()),
             _ => None,
         }
     }

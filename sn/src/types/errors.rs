@@ -7,7 +7,8 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::{PublicKey, RegisterAddress};
+use super::{register::User, RegisterAddress};
+
 use crate::messaging::data::Error as ErrorMessage;
 
 use std::{
@@ -15,7 +16,6 @@ use std::{
     fmt::{self, Debug, Formatter},
     result,
 };
-
 use thiserror::Error;
 
 /// A specialised `Result` type for types crate.
@@ -39,9 +39,9 @@ impl<'a, T> Debug for ErrorDebug<'a, T> {
 #[non_exhaustive]
 #[allow(clippy::large_enum_variant)]
 pub enum Error {
-    /// Access denied for supplied PublicKey
-    #[error("Access denied for PublicKey: {0}")]
-    AccessDenied(PublicKey),
+    /// Access denied for user
+    #[error("Access denied for user: {0:?}")]
+    AccessDenied(User),
     /// Serialization error
     #[error("Serialisation error: {0}")]
     Serialisation(String),

@@ -167,7 +167,7 @@ impl SafeAppClient {
         info!("Xorname for new Register storage: {:?}", &xorname);
 
         // The Register's owner will be the client's public key
-        let my_pk = client.public_key();
+        let my_pk = User::Key(client.public_key());
 
         // Store the Register on the network
         let (_, op_batch) = if private {
@@ -186,12 +186,12 @@ impl SafeAppClient {
                 })?
         } else {
             // Set write permissions to this application
-            let user_app = User::Key(my_pk);
+            let user_app = my_pk;
             let mut perms = BTreeMap::default();
             let _ = perms.insert(user_app, PublicPermissions::new(true));
 
             client
-                .store_public_register(xorname, tag, my_pk, perms)
+                .store_public_register(xorname, tag, user_app, perms)
                 .await
                 .map_err(|e| {
                     Error::NetDataError(format!(

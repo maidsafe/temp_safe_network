@@ -8,13 +8,16 @@
 
 use super::Client;
 use crate::client::Error;
-use crate::messaging::data::{DataCmd, DataQuery, QueryResponse, RegisterRead, RegisterWrite};
+use crate::messaging::data::{
+    CreateRegister, DataCmd, DataQuery, DeleteRegister, EditRegister, QueryResponse, RegisterCmd,
+    RegisterQuery, SignedRegisterCreate, SignedRegisterDelete, SignedRegisterEdit,
+};
 use crate::types::{
     register::{
         Entry, EntryHash, Permissions, Policy, PrivatePermissions, PrivatePolicy,
         PublicPermissions, PublicPolicy, Register, User,
     },
-    PublicKey, RegisterAddress as Address,
+    RegisterAddress as Address,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
@@ -58,16 +61,14 @@ impl Client {
         &self,
         name: XorName,
         tag: u64,
-        owner: PublicKey,
-        permissions: BTreeMap<PublicKey, PrivatePermissions>,
+        owner: User,
+        permissions: BTreeMap<User, PrivatePermissions>,
     ) -> Result<(Address, RegisterWriteAheadLog), Error> {
-        let pk = self.public_key();
-        let policy = PrivatePolicy { owner, permissions };
-        let priv_register = Register::new_private(pk, name, tag, Some(policy));
-        let address = *priv_register.address();
+        let address = Address::Private { name, tag };
+        let policy = Policy::Private(PrivatePolicy { owner, permissions });
 
         let batch = self
-            .batch_up_pay_write_register_to_network(priv_register)
+            .batch_up_pay_create_register_on_network(name, tag, policy)
             .await?;
 
         Ok((address, batch))
@@ -88,16 +89,14 @@ impl Client {
         &self,
         name: XorName,
         tag: u64,
-        owner: PublicKey,
+        owner: User,
         permissions: BTreeMap<User, PublicPermissions>,
     ) -> Result<(Address, RegisterWriteAheadLog), Error> {
-        let pk = self.public_key();
-        let policy = PublicPolicy { owner, permissions };
-        let pub_register = Register::new_public(pk, name, tag, Some(policy));
-        let address = *pub_register.address();
+        let address = Address::Public { name, tag };
+        let policy = Policy::Public(PublicPolicy { owner, permissions });
 
         let batch = self
-            .batch_up_pay_write_register_to_network(pub_register)
+            .batch_up_pay_create_register_on_network(name, tag, policy)
             .await?;
 
         Ok((address, batch))
@@ -111,7 +110,18 @@ impl Client {
     /// You're only able to delete a PrivateRegister. Public data can not be removed from the network.
     #[instrument(skip(self), level = "debug")]
     pub async fn delete_register(&self, address: Address) -> Result<RegisterWriteAheadLog, Error> {
-        let cmd = DataCmd::Register(RegisterWrite::Delete(address));
+        let op = DeleteRegister(address);
+        let signature = self.keypair.sign(&bincode::serialize(&op)?);
+
+        let update = SignedRegisterDelete {
+            op,
+            auth: crate::messaging::ServiceAuth {
+                public_key: self.keypair.public_key(),
+                signature,
+            },
+        };
+
+        let cmd = DataCmd::Register(RegisterCmd::Delete(update));
 
         let batch = vec![cmd];
 
@@ -137,13 +147,24 @@ impl Client {
         let mut register = self.get_register(address).await?;
 
         // We can now write the entry to the Register
-        let (hash, mut op) = register.write(entry, children)?;
-        let bytes = bincode::serialize(&op.crdt_op)?;
-        let signature = self.keypair.sign(&bytes);
-        op.signature = Some(signature);
+        let (hash, op) = register.write(entry, children)?;
+        let op = EditRegister { address, edit: op };
+        //let bytes = bincode::serialize(&op.crdt_op)?;
+        //let signature = self.keypair.sign(&bytes);
+        //op.signature = Some(signature);
 
-        // Finally we package the mutation for the network's replicas (its now ready to be sent)
-        let cmd = DataCmd::Register(RegisterWrite::Edit(op));
+        let signature = self.keypair.sign(&bincode::serialize(&op)?);
+
+        let edit = SignedRegisterEdit {
+            op,
+            auth: crate::messaging::ServiceAuth {
+                public_key: self.keypair.public_key(),
+                signature,
+            },
+        };
+
+        // Finally we package the mutation for the network's replicas (it's now ready to be sent)
+        let cmd = DataCmd::Register(RegisterCmd::Edit(edit));
         let batch = vec![cmd];
         Ok((hash, batch))
     }
@@ -154,11 +175,33 @@ impl Client {
     /// Returns a write ahead log (WAL) of register operations, note that the changes are not uploaded to the
     /// network until the WAL is published with `publish_register_ops`
     #[instrument(skip_all, level = "trace")]
-    pub(crate) async fn batch_up_pay_write_register_to_network(
+    pub(crate) async fn batch_up_pay_create_register_on_network(
         &self,
-        data: Register,
+        name: XorName,
+        tag: u64,
+        //size: u16,
+        policy: Policy,
     ) -> Result<RegisterWriteAheadLog, Error> {
-        let cmd = DataCmd::Register(RegisterWrite::New(data));
+        let op = CreateRegister {
+            name,
+            tag,
+            size: u16::MAX, // TODO: use argument
+            policy,
+        };
+        let signature = self.keypair.sign(&bincode::serialize(&op)?);
+
+        let cmd = SignedRegisterCreate {
+            op,
+            auth: crate::messaging::ServiceAuth {
+                public_key: self.keypair.public_key(),
+                signature,
+            },
+        };
+
+        let cmd = DataCmd::Register(RegisterCmd::Create {
+            cmd,
+            section_auth: section_auth(), // obtained after presenting a valid payment to the network
+        });
 
         let batch = vec![cmd];
         Ok(batch)
@@ -172,7 +215,7 @@ impl Client {
     #[instrument(skip(self), level = "debug")]
     pub async fn get_register(&self, address: Address) -> Result<Register, Error> {
         // Let's fetch the Register from the network
-        let query = DataQuery::Register(RegisterRead::Get(address));
+        let query = DataQuery::Register(RegisterQuery::Get(address));
         let query_result = self.send_query(query).await?;
         match query_result.response {
             QueryResponse::GetRegister((res, op_id)) => {
@@ -215,7 +258,7 @@ impl Client {
 
     /// Get the owner of a Register.
     #[instrument(skip(self), level = "debug")]
-    pub async fn get_register_owner(&self, address: Address) -> Result<PublicKey, Error> {
+    pub async fn get_register_owner(&self, address: Address) -> Result<User, Error> {
         let register = self.get_register(address).await?;
         let owner = register.owner();
 
@@ -231,10 +274,10 @@ impl Client {
     pub async fn get_register_permissions_for_user(
         &self,
         address: Address,
-        user: PublicKey,
+        user: User,
     ) -> Result<Permissions, Error> {
         let register = self.get_register(address).await?;
-        let perms = register.permissions(User::Key(user), None)?;
+        let perms = register.permissions(user, None)?;
 
         Ok(perms)
     }
@@ -246,6 +289,24 @@ impl Client {
         let policy = register.policy(None)?;
 
         Ok(policy.clone())
+    }
+}
+
+// temp dummy
+fn section_auth() -> crate::messaging::SectionAuth {
+    use crate::messaging::system::KeyedSig;
+
+    let sk = bls::SecretKey::random();
+    let public_key = sk.public_key();
+    let data = "hello".to_string();
+    let signature = sk.sign(&data);
+    let sig = KeyedSig {
+        public_key,
+        signature,
+    };
+    crate::messaging::SectionAuth {
+        src_name: crate::types::PublicKey::Bls(public_key).into(),
+        sig,
     }
 }
 
@@ -263,7 +324,7 @@ mod tests {
     use crate::types::log_markers::LogMarker;
     use crate::types::{
         register::{Action, EntryHash, Permissions, PrivatePermissions, PublicPermissions, User},
-        Error as DtError, PublicKey,
+        Error as DtError,
     };
     use eyre::{bail, eyre, Result};
     use std::{
@@ -283,10 +344,10 @@ mod tests {
         let one_sec = tokio::time::Duration::from_secs(1);
         let name = XorName(rand::random());
         let tag = 15000;
-        let owner = client.public_key();
+        let owner = User::Key(client.public_key());
 
         // store a Private Register
-        let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
+        let mut perms = BTreeMap::<User, PrivatePermissions>::new();
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
         let (address, mut batch) = client
             .store_private_register(name, tag, owner, perms)
@@ -353,10 +414,10 @@ mod tests {
 
         let name = XorName(rand::random());
         let tag = 15000;
-        let owner = client.public_key();
+        let owner = User::Key(client.public_key());
 
         // store a Private Register
-        let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
+        let mut perms = BTreeMap::<User, PrivatePermissions>::new();
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
         let (_address, batch) = client
             .store_private_register(name, tag, owner, perms)
@@ -383,9 +444,9 @@ mod tests {
         let tag = 10;
         let client = create_test_client().await?;
 
-        let owner = client.public_key();
+        let owner = User::Key(client.public_key());
         let mut perms = BTreeMap::<User, PublicPermissions>::new();
-        let _ = perms.insert(User::Key(owner), PublicPermissions::new(true));
+        let _ = perms.insert(owner, PublicPermissions::new(true));
 
         let (address, batch) = client
             .store_public_register(name, tag, owner, perms)
@@ -431,10 +492,10 @@ mod tests {
         let client = create_test_client().await?;
         let name = XorName(rand::random());
         let tag = 15000;
-        let owner = client.public_key();
+        let owner = User::Key(client.public_key());
 
         // store a Private Register
-        let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
+        let mut perms = BTreeMap::<User, PrivatePermissions>::new();
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
         let (address, batch) = client
             .store_private_register(name, tag, owner, perms)
@@ -480,8 +541,8 @@ mod tests {
         let client = create_test_client().await?;
         let name = XorName(rand::random());
         let tag = 15000;
-        let owner = client.public_key();
-        let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
+        let owner = User::Key(client.public_key());
+        let mut perms = BTreeMap::<User, PrivatePermissions>::new();
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
         let (address, batch) = client
             .store_private_register(name, tag, owner, perms)
@@ -512,7 +573,7 @@ mod tests {
             ),
         }
 
-        let other_user = gen_ed_keypair().public_key();
+        let other_user = User::Key(gen_ed_keypair().public_key());
 
         loop {
             match client
@@ -536,9 +597,9 @@ mod tests {
 
         let name = XorName(rand::random());
         let tag = 15000;
-        let owner = client.public_key();
+        let owner = User::Key(client.public_key());
         let mut perms = BTreeMap::<User, PublicPermissions>::new();
-        let _ = perms.insert(User::Key(owner), PublicPermissions::new(None));
+        let _ = perms.insert(owner, PublicPermissions::new(None));
         let (address, batch) = client
             .store_public_register(name, tag, owner, perms)
             .await?;
@@ -563,7 +624,7 @@ mod tests {
             }
         }
 
-        let other_user = gen_ed_keypair().public_key();
+        let other_user = User::Key(gen_ed_keypair().public_key());
 
         loop {
             match client
@@ -587,9 +648,9 @@ mod tests {
         let name = XorName(rand::random());
         let client = create_test_client().await?;
 
-        let owner = client.public_key();
+        let owner = User::Key(client.public_key());
         let mut perms = BTreeMap::<User, PublicPermissions>::new();
-        let _ = perms.insert(User::Key(owner), PublicPermissions::new(true));
+        let _ = perms.insert(owner, PublicPermissions::new(true));
 
         let (address, batch) = client
             .store_public_register(name, tag, owner, perms)
@@ -685,8 +746,8 @@ mod tests {
         let name = XorName(rand::random());
         let client = create_test_client().await?;
 
-        let owner = client.public_key();
-        let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
+        let owner = User::Key(client.public_key());
+        let mut perms = BTreeMap::<User, PrivatePermissions>::new();
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
         let (address, batch) = client
             .store_private_register(name, tag, owner, perms)
@@ -709,10 +770,10 @@ mod tests {
         let mut client = create_test_client().await?;
         let name = XorName(rand::random());
         let tag = 15000;
-        let owner = client.public_key();
+        let owner = User::Key(client.public_key());
 
         // store a Private Register
-        let mut perms = BTreeMap::<PublicKey, PrivatePermissions>::new();
+        let mut perms = BTreeMap::<User, PrivatePermissions>::new();
         let _ = perms.insert(owner, PrivatePermissions::new(true, true));
         let (address, batch) = client
             .store_private_register(name, tag, owner, perms)
@@ -758,7 +819,7 @@ mod tests {
 
         let name = XorName(rand::random());
         let tag = 15000;
-        let owner = client.public_key();
+        let owner = User::Key(client.public_key());
 
         // store a Public Register
         let mut perms = BTreeMap::<User, PublicPermissions>::new();
@@ -806,7 +867,7 @@ mod tests {
         let mut perms = BTreeMap::<User, PublicPermissions>::new();
         let _ = perms.insert(User::Anyone, PublicPermissions::new(true));
         let (address, batch) = client
-            .store_public_register(name, 15000, client.public_key(), perms)
+            .store_public_register(name, 15000, User::Key(client.public_key()), perms)
             .await?;
         client.publish_register_ops(batch).await?;
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;

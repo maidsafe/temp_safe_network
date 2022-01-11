@@ -7,19 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::data_copy_count;
-//use crate::dbs::convert_to_error_message as convert_db_error_to_error_message;
 use crate::messaging::{
     data::{CmdError, DataCmd, DataQuery, ServiceMsg},
     system::{NodeQueryResponse, SystemMsg},
-    AuthorityProof, DstLocation, EndUser, MessageId, MsgKind, NodeAuth, ServiceAuth, WireMsg,
+    DstLocation, EndUser, MessageId, MsgKind, NodeAuth, WireMsg,
 };
 use crate::node::{
     error::Result,
     routing::{api::command::Command, core::Core},
 };
 use crate::peer::Peer;
-use crate::types::ReplicatedData;
-use crate::types::{log_markers::LogMarker, PublicKey};
+use crate::types::{log_markers::LogMarker, register::User, PublicKey, ReplicatedData};
 
 use itertools::Itertools;
 use std::{cmp::Ordering, collections::BTreeSet};
@@ -87,7 +85,7 @@ impl Core {
     // pub(crate) async fn handle_register_read(
     //     &self,
     //     msg_id: MessageId,
-    //     query: RegisterRead,
+    //     query: RegisterQuery,
     //     user: Peer,
     //     auth: AuthorityProof<ServiceAuth>,
     // ) -> Result<Vec<Command>> {
@@ -170,7 +168,7 @@ impl Core {
         let mut commands = vec![];
 
         let msg = SystemMsg::NodeQueryResponse {
-            response: self.data_storage.query(query).await,
+            response: self.data_storage.query(query, User::Id(user.0)).await,
             correlation_id: msg_id,
             user,
         };
@@ -326,18 +324,18 @@ impl Core {
         msg_id: MessageId,
         msg: ServiceMsg,
         user: Peer,
-        auth: AuthorityProof<ServiceAuth>,
+        //auth: AuthorityProof<ServiceAuth>,
     ) -> Result<Vec<Command>> {
         match msg {
             // These reads/writes are for adult nodes...
-            ServiceMsg::Cmd(DataCmd::Register(write)) => {
-                self.send_data_to_adults(ReplicatedData::RegisterWrite(write), msg_id, auth, user)
+            ServiceMsg::Cmd(DataCmd::Register(cmd)) => {
+                self.send_data_to_adults(ReplicatedData::RegisterWrite(cmd), msg_id, user)
                     .await
                 // self.handle_register_write(msg_id, register_write, user, auth)
                 //     .await
             }
             ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => {
-                self.send_data_to_adults(ReplicatedData::Chunk(chunk), msg_id, auth, user)
+                self.send_data_to_adults(ReplicatedData::Chunk(chunk), msg_id, user)
                     .await
             }
             ServiceMsg::Query(query) => {
@@ -398,7 +396,7 @@ impl Core {
     // Used to fetch the list of holders for given name of data.
     pub(crate) async fn get_adults_who_should_store_data(
         &self,
-        target: &XorName,
+        target: XorName,
     ) -> BTreeSet<XorName> {
         let full_adults = self.full_adults().await;
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
@@ -427,7 +425,7 @@ impl Core {
     pub(crate) async fn handle_service_message(
         &self,
         msg_id: MessageId,
-        auth: AuthorityProof<ServiceAuth>,
+        //auth: AuthorityProof<ServiceAuth>,
         msg: ServiceMsg,
         dst_location: DstLocation,
         user: Peer,
@@ -441,7 +439,6 @@ impl Core {
             return Ok(vec![]);
         }
 
-        self.handle_service_msg_received(msg_id, msg, user, auth)
-            .await
+        self.handle_service_msg_received(msg_id, msg, user).await
     }
 }

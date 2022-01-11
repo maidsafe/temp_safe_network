@@ -6,17 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::collections::BTreeSet;
-
 use crate::messaging::{
     data::{DataCmd, DataExchange, DataQuery, OperationId, QueryResponse, Result, StorageLevel},
     EndUser, ServiceAuth,
 };
 use crate::types::{
-    register::{Entry, EntryHash, Permissions, Policy, Register},
+    register::{Entry, EntryHash, Permissions, Policy, Register, User},
     Chunk, PublicKey, ReplicatedData,
 };
+
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
 /// Command message sent among nodes
@@ -36,29 +36,9 @@ pub enum NodeCmd {
     StoreData {
         /// The data
         data: ReplicatedData,
-        /// Requester pk and signature
-        auth: ServiceAuth,
         /// Message source
         origin: EndUser,
     },
-    // /// Registers are stored by Adults
-    // WriteRegister {
-    //     /// The write
-    //     write: RegisterWrite,
-    //     /// Requester pk and signature
-    //     auth: ServiceAuth,
-    //     /// Message source
-    //     origin: EndUser,
-    // },
-    // /// Chunks are stored by Adults
-    // StoreChunk {
-    //     /// The chunk
-    //     chunk: Chunk,
-    //     /// Requester pk and signature
-    //     auth: ServiceAuth,
-    //     /// Message source
-    //     origin: EndUser,
-    // },
     /// Notify Elders on nearing max capacity
     RecordStorageLevel {
         /// Node Id
@@ -114,15 +94,15 @@ pub enum NodeQueryResponse {
     //
     // ===== Register Data =====
     //
-    /// Response to [`RegisterRead::Get`].
+    /// Response to [`RegisterQuery::Get`].
     GetRegister((Result<Register>, OperationId)),
-    /// Response to [`RegisterRead::GetOwner`].
-    GetRegisterOwner((Result<PublicKey>, OperationId)),
-    /// Response to [`RegisterRead::Read`].
+    /// Response to [`RegisterQuery::GetOwner`].
+    GetRegisterOwner((Result<User>, OperationId)),
+    /// Response to [`RegisterQuery::Read`].
     ReadRegister((Result<BTreeSet<(EntryHash, Entry)>>, OperationId)),
-    /// Response to [`RegisterRead::GetPolicy`].
+    /// Response to [`RegisterQuery::GetPolicy`].
     GetRegisterPolicy((Result<Policy>, OperationId)),
-    /// Response to [`RegisterRead::GetUserPermissions`].
+    /// Response to [`RegisterQuery::GetUserPermissions`].
     GetRegisterUserPermissions((Result<Permissions>, OperationId)),
     //
     // ===== Other =====

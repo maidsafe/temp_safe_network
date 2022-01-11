@@ -13,7 +13,7 @@ use crate::{
     messaging::{
         data::{CmdError, DataExchange, DataQuery, Error as ErrorMessage, StorageLevel},
         system::{NodeCmd, NodeQuery, SystemMsg},
-        AuthorityProof, EndUser, MessageId, ServiceAuth,
+        EndUser, MessageId,
     },
     node::{error::convert_to_error_message, Error, Result},
     peer::Peer,
@@ -30,20 +30,18 @@ impl Core {
         &self,
         data: ReplicatedData,
         msg_id: MessageId,
-        auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
     ) -> Result<Vec<Command>> {
         trace!("{:?}: {:?}", LogMarker::DataStorageReceivedAtElder, data);
 
-        let target = *data.name();
+        let target = data.name();
 
         let msg = SystemMsg::NodeCmd(NodeCmd::StoreData {
             data,
-            auth: auth.into_inner(),
             origin: EndUser(origin.name()),
         });
 
-        let targets = self.get_adults_who_should_store_data(&target).await;
+        let targets = self.get_adults_who_should_store_data(target).await;
 
         let aggregation = false;
 

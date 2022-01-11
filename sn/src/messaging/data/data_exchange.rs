@@ -7,7 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::RegisterCmd;
-use crate::types::{Error, Result};
+use crate::{
+    messaging::SectionAuth,
+    types::{Error, RegisterAddress as Address, Result},
+};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use xor_name::XorName;
@@ -19,9 +22,21 @@ pub struct DataExchange {
     pub adult_levels: BTreeMap<XorName, StorageLevel>,
 }
 
+/// Data to be exchanged between Register stores.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RegisterStoreExport(pub Vec<ReplicatedRegister>);
+
 /// Register data exchange.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RegisterDataExchange(pub BTreeMap<XorName, Vec<RegisterCmd>>);
+pub struct ReplicatedRegister {
+    ///
+    pub address: Address,
+    /// section sig over address.id()
+    /// This i a duplicated entry as it should exist in first cmd
+    pub section_auth: SectionAuth,
+    ///
+    pub op_log: Vec<RegisterCmd>,
+}
 
 /// The degree to which storage has been used.
 /// Expressed in values between 0-10, where each unit represents 10-percentage points.
