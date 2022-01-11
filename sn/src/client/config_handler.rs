@@ -23,7 +23,7 @@ use tracing::{debug, warn};
 const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::UNSPECIFIED, 0);
 
 /// Default amount of time to wait for responses to queries before giving up and returning an error.
-pub const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(120);
+pub const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(500);
 /// Default amount of time to wait (to keep the client alive) after sending a command. This allows AE messages to be parsed/resent.
 /// Larger PUT operations may need larger ae wait time
 pub const DEFAULT_AE_WAIT: Duration = Duration::from_secs(0);
