@@ -333,7 +333,7 @@ impl Dispatcher {
             let cmd_id = cmd_id.unwrap_or_else(|| rand::random::<u32>().to_string());
             let cmd_id_clone = cmd_id.clone();
             let command_display = command.to_string();
-            let future = tokio::spawn(async move {
+            let _task = tokio::spawn(async move {
                 match self.process_command(command, &cmd_id).await {
                     Ok(commands) => {
                         for (sub_cmd_count, command) in commands.into_iter().enumerate() {
@@ -359,9 +359,6 @@ impl Dispatcher {
                 command_display,
                 &cmd_id_clone
             );
-            if let Err(err) = future.await {
-                error!("Error handling command {:?}: {:?}", cmd_id_clone, err);
-            }
             Ok(())
         }
         .boxed()
