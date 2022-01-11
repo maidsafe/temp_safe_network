@@ -7,13 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Client;
+use crate::at_least_one_correct_elder;
 use crate::client::Error;
 use crate::messaging::{
     data::{DataCmd, ServiceMsg},
     ServiceAuth, WireMsg,
 };
 use crate::types::{PublicKey, Signature};
-use crate::{at_least_one_correct_elder, elder_count};
 use bytes::Bytes;
 use xor_name::XorName;
 
@@ -46,10 +46,7 @@ impl Client {
         let client_pk = self.public_key();
         let dst_name = cmd.dst_name();
 
-        let targets = match &cmd {
-            DataCmd::StoreChunk(_) => at_least_one_correct_elder(), // stored at Adults, so only 1 correctly functioning Elder need to relay
-            DataCmd::Register(_) => elder_count(), // only stored at Elders, all need a copy
-        };
+        let targets = at_least_one_correct_elder(); // stored at Adults, so only 1 correctly functioning Elder need to relay
 
         let serialised_cmd = {
             let msg = ServiceMsg::Cmd(cmd);
