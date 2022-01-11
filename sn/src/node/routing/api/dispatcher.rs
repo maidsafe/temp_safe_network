@@ -19,8 +19,6 @@ use crate::node::routing::core::{Core, Proposal, SendStatus};
 use crate::node::{Error, Result};
 use crate::peer::Peer;
 use crate::types::log_markers::LogMarker;
-use futures::future::BoxFuture;
-use futures::FutureExt;
 use std::collections::BTreeMap;
 use std::{sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
@@ -324,44 +322,45 @@ impl Dispatcher {
     /// produced during its handling. Trace logs will include the provided command id,
     /// and any sub-commands produced will have it as a common root cmd id.
     /// If a command id string is not provided a random one will be generated.
-    pub(super) fn handle_command_and_any_offshoots(
+    pub(super) async fn handle_command_and_any_offshoots(
         self: Arc<Self>,
         command: Command,
         cmd_id: Option<CmdId>,
-    ) -> BoxFuture<'static, Result<()>> {
-        async move {
-            let cmd_id = cmd_id.unwrap_or_else(|| rand::random::<u32>().to_string());
-            let cmd_id_clone = cmd_id.clone();
-            let command_display = command.to_string();
-            let _task = tokio::spawn(async move {
-                match self.process_command(command, &cmd_id).await {
-                    Ok(commands) => {
-                        for (sub_cmd_count, command) in commands.into_iter().enumerate() {
-                            let sub_cmd_id = format!("{}.{}", &cmd_id, sub_cmd_count);
-                            // Error here is only related to queueing, and so a dropped command will be logged
-                            let _result = self
-                                .clone()
-                                .enqueue_and_handle_next_command_and_any_offshoots(
-                                    command,
-                                    Some(sub_cmd_id),
-                                );
-                        }
-                    }
-                    Err(err) => {
-                        error!("Failed to handle command {:?} with error {:?}", cmd_id, err);
+    ) -> Result<()> {
+        let cmd_id = cmd_id.unwrap_or_else(|| rand::random::<u32>().to_string());
+        let cmd_id_clone = cmd_id.clone();
+        let command_display = command.to_string();
+        let _task = tokio::spawn(async move {
+            match self.process_command(command, &cmd_id).await {
+                Ok(commands) => {
+                    for (sub_cmd_count, command) in commands.into_iter().enumerate() {
+                        let sub_cmd_id = format!("{}.{}", &cmd_id, sub_cmd_count);
+                        // Error here is only related to queueing, and so a dropped command will be logged
+                        let _result = self.clone().spawn_handle_commands(command, sub_cmd_id);
                     }
                 }
-            });
+                Err(err) => {
+                    error!("Failed to handle command {:?} with error {:?}", cmd_id, err);
+                }
+            }
+        });
 
-            trace!(
-                "{:?} {} cmd_id={}",
-                LogMarker::CommandHandleSpawned,
-                command_display,
-                &cmd_id_clone
-            );
-            Ok(())
-        }
-        .boxed()
+        trace!(
+            "{:?} {} cmd_id={}",
+            LogMarker::CommandHandleSpawned,
+            command_display,
+            &cmd_id_clone
+        );
+        Ok(())
+    }
+
+    // Note: this indirecton is needed. Trying to call `spawn(self.handle_commands(...))` directly
+    // inside `handle_commands` causes compile error about type check cycle.
+    fn spawn_handle_commands(self: Arc<Self>, command: Command, cmd_id: String) -> Result<()> {
+        let _task = tokio::spawn(
+            self.enqueue_and_handle_next_command_and_any_offshoots(command, Some(cmd_id)),
+        );
+        Ok(())
     }
 
     pub(super) async fn start_network_probing(self: Arc<Self>) {
