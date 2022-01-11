@@ -123,7 +123,10 @@ impl Comm {
         recipients: &[Peer],
         mut wire_msg: WireMsg,
     ) -> Result<(), Error> {
-        trace!("Sending msg on existing connection to client {:?}", recipients);
+        trace!(
+            "Sending msg on existing connection to client {:?}",
+            recipients
+        );
         for recipient in recipients {
             let name = recipient.name();
             let addr = recipient.addr();
