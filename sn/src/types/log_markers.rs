@@ -30,7 +30,7 @@ pub enum LogMarker {
     DataQueryReceviedAtElder,
     // chunks
     StoringChunk,
-    ChunkStorageReceivedAtElder,
+    ChunkStoreReceivedAtElder,
     StoredNewChunk,
     ChunkQueryResponseReceviedFromAdult,
     ChunkQueryReceviedAtElder,

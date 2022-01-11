@@ -670,8 +670,6 @@ impl Core {
             }
             SystemMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }) => {
                 info!("Processing received DataExchange packet: {:?}", msg_id);
-
-                //self.register_storage.update(metadata.reg_data).await?;
                 self.set_adult_levels(metadata).await;
                 Ok(vec![])
             }

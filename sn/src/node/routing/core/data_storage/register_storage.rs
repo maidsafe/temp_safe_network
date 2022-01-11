@@ -164,17 +164,13 @@ impl RegisterStorage {
             .filter_map(|stored_cmd| {
                 // only spread signed data
                 match stored_cmd.clone() {
-                    RegisterCmd::Create {
-                        cmd, section_auth, ..
-                    } => {
-                        // TODO: in higher layers we must verify that the section_auth is from a proper section..!
-                        let _ = match section_auth.verify_authority(key) {
-                            Ok(auth) => auth,
-                            _ => {
-                                warn!("Invalid section auth on register container: {}", key);
-                                return None;
-                            }
-                        };
+                    RegisterCmd::Create { cmd, .. } => {
+                        // TODO 1: in higher layers we must verify that the section_auth is from a proper section..!
+                        // TODO 2: Enable this check once we have section signature over the container key.
+                        // if section_auth.verify_authority(key).is_err() {
+                        //     warn!("Invalid section auth on register container: {}", key);
+                        //     return None;
+                        // }
                         address = Some(cmd.dst_address());
                     }
                     RegisterCmd::Edit(SignedRegisterEdit { op, auth }) => {
@@ -286,12 +282,13 @@ impl RegisterStorage {
                     continue;
                 }
                 match replicated_cmd.clone() {
-                    RegisterCmd::Create { section_auth, .. } => {
-                        // TODO: in higher layers we must verify that the section_auth is from a proper section..!
-                        if section_auth.verify_authority(key).is_err() {
-                            warn!("Invalid section auth on register container: {}", key);
-                            continue;
-                        }
+                    RegisterCmd::Create { .. } => {
+                        // TODO 1: in higher layers we must verify that the section_auth is from a proper section..!
+                        // TODO 2: Enable this check once we have section signature over the container key.
+                        // if section_auth.verify_authority(key).is_err() {
+                        //     warn!("Invalid section auth on register container: {}", key);
+                        //     return None;
+                        // }
                     }
                     RegisterCmd::Edit(SignedRegisterEdit { op, auth }) => {
                         let verification = auth.verify_authority(serialize(&op)?);
@@ -784,6 +781,7 @@ mod test {
         // create new db and update it with the data from first db
         let second = tmp_dir.path().join("second");
         let new_store = new_store(second.as_path())?;
+
         let _ = new_store.update(for_update).await?;
 
         // assert the same tests hold as for the first db

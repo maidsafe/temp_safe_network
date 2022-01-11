@@ -149,9 +149,6 @@ impl Client {
         // We can now write the entry to the Register
         let (hash, op) = register.write(entry, children)?;
         let op = EditRegister { address, edit: op };
-        //let bytes = bincode::serialize(&op.crdt_op)?;
-        //let signature = self.keypair.sign(&bytes);
-        //op.signature = Some(signature);
 
         let signature = self.keypair.sign(&bincode::serialize(&op)?);
 

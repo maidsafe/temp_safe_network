@@ -52,91 +52,6 @@ impl Core {
         Ok(vec![command])
     }
 
-    // /// Handle register commands
-    // pub(crate) async fn handle_register_write(
-    //     &self,
-    //     msg_id: MessageId,
-    //     register_write: RegisterWrite,
-    //     user: Peer,
-    //     auth: AuthorityProof<ServiceAuth>,
-    // ) -> Result<Vec<Command>> {
-    //     trace!(
-    //         "{:?} preparing to write register {:?}",
-    //         LogMarker::RegisterWrite,
-    //         register_write.address(),
-    //     );
-
-    //     match self.register_storage.write(register_write, auth).await {
-    //         Ok(_) => {
-    //             info!("Successfully wrote Register from Message: {:?}", msg_id);
-    //             Ok(vec![])
-    //         }
-    //         Err(error) => {
-    //             trace!("Problem on writing Register! {:?}", error);
-    //             let error = convert_db_error_to_error_message(error);
-
-    //             let error = CmdError::Data(error);
-    //             self.send_cmd_error_response(error, user, msg_id)
-    //         }
-    //     }
-    // }
-
-    // /// Handle register reads
-    // pub(crate) async fn handle_register_read(
-    //     &self,
-    //     msg_id: MessageId,
-    //     query: RegisterQuery,
-    //     user: Peer,
-    //     auth: AuthorityProof<ServiceAuth>,
-    // ) -> Result<Vec<Command>> {
-    //     trace!(
-    //         "{:?} preparing to read {:?}",
-    //         LogMarker::RegisterQueryReceivedAtAdult,
-    //         query.dst_address(),
-    //     );
-
-    //     match self.register_storage.read(&query, auth.public_key).await {
-    //         Ok(response) => {
-    //             if response.failed_with_data_not_found() {
-    //                 // we don't return data not found errors.
-    //                 return Ok(vec![]);
-    //             }
-
-    //             trace!(
-    //                 "Responding to register read, msg_id {:?} with {:?}",
-    //                 msg_id,
-    //                 response
-    //             );
-    //             let msg = ServiceMsg::QueryResponse {
-    //                 response,
-    //                 correlation_id: msg_id,
-    //             };
-
-    //             // FIXME: define which signature/authority this message should really carry,
-    //             // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
-    //             // Giving a random sig temporarily
-    //             let (msg_kind, payload) = Self::random_client_signature(&msg)?;
-
-    //             let dst = DstLocation::EndUser(EndUser(user.name()));
-    //             let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
-
-    //             let command = Command::SendMessage {
-    //                 recipients: vec![user],
-    //                 wire_msg,
-    //             };
-
-    //             Ok(vec![command])
-    //         }
-    //         Err(error) => {
-    //             trace!("Problem on reading Register! {:?}", error);
-    //             let error = convert_db_error_to_error_message(error);
-    //             let error = CmdError::Data(error);
-
-    //             self.send_cmd_error_response(error, user, msg_id)
-    //         }
-    //     }
-    // }
-
     /// Sign and serialize node message to be sent
     pub(crate) async fn prepare_node_msg(
         &self,
@@ -324,24 +239,18 @@ impl Core {
         msg_id: MessageId,
         msg: ServiceMsg,
         user: Peer,
-        //auth: AuthorityProof<ServiceAuth>,
     ) -> Result<Vec<Command>> {
         match msg {
             // These reads/writes are for adult nodes...
             ServiceMsg::Cmd(DataCmd::Register(cmd)) => {
                 self.send_data_to_adults(ReplicatedData::RegisterWrite(cmd), msg_id, user)
                     .await
-                // self.handle_register_write(msg_id, register_write, user, auth)
-                //     .await
             }
             ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => {
                 self.send_data_to_adults(ReplicatedData::Chunk(chunk), msg_id, user)
                     .await
             }
-            ServiceMsg::Query(query) => {
-                self.read_data_from_adults(query, msg_id, user).await
-                // self.handle_register_read(msg_id, read, user, auth).await
-            }
+            ServiceMsg::Query(query) => self.read_data_from_adults(query, msg_id, user).await,
             _ => {
                 warn!("!!!! Unexpected ServiceMsg received in routing. Was not sent to node layer: {:?}", msg);
                 Ok(vec![])
@@ -425,7 +334,6 @@ impl Core {
     pub(crate) async fn handle_service_message(
         &self,
         msg_id: MessageId,
-        //auth: AuthorityProof<ServiceAuth>,
         msg: ServiceMsg,
         dst_location: DstLocation,
         user: Peer,

@@ -59,19 +59,6 @@ pub enum RegisterQuery {
     GetOwner(Address),
 }
 
-// /// A [`Register`] cmd that is stored in a log on Adults.
-// #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
-// pub enum RegisterCmd {
-//     /// Create a new [`Register`] on the network.
-//     Create(SignedRegisterCreate),
-//     /// Edit the [`Register`].
-//     Edit(SignedRegisterEdit),
-//     /// Delete the [`Register`].
-//     Delete(SignedRegisterDelete),
-//     /// Extend the size of the [`Register`].
-//     Extend(SignedRegisterExtend),
-// }
-
 /// A [`Register`] cmd that is stored in a log on Adults.
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum RegisterCmd {
