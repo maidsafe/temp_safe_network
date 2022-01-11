@@ -56,14 +56,14 @@ fn calling_safe_cat_using_spot_file() -> Result<()> {
         safeurl.content_type(),
         ContentType::MediaType("text/markdown".to_string())
     );
-    assert_eq!(safeurl.data_type(), DataType::Bytes);
+    assert_eq!(safeurl.data_type(), DataType::File);
     Ok(())
 }
 
-/// A 'blob' file is one that's larger than 3072 bytes in size.
-/// These use self encryption and are stored in a different way from 'spot' files.
+/// A 'large' file is one that's larger than 3072 bytes in size.
+/// These use self encryption and are stored in a different way from 'small' files.
 #[test]
-fn calling_safe_cat_using_blob_file() -> Result<()> {
+fn calling_safe_cat_using_large_file() -> Result<()> {
     let output = safe_cmd_stdout(
         [
             "files",
@@ -96,7 +96,7 @@ fn calling_safe_cat_using_blob_file() -> Result<()> {
         safeurl.content_type(),
         ContentType::MediaType("text/markdown".to_string())
     );
-    assert_eq!(safeurl.data_type(), DataType::Bytes);
+    assert_eq!(safeurl.data_type(), DataType::File);
     Ok(())
 }
 
@@ -165,7 +165,7 @@ fn calling_safe_cat_hexdump() -> Result<()> {
         safeurl.content_type(),
         ContentType::MediaType("text/markdown".to_string())
     );
-    assert_eq!(safeurl.data_type(), DataType::Bytes);
+    assert_eq!(safeurl.data_type(), DataType::File);
     Ok(())
 }
 

@@ -20,7 +20,7 @@ use walkdir::{DirEntry, WalkDir};
 
 const MAX_RECURSIVE_DEPTH: usize = 10_000;
 
-// Upload a files to the Network as a Public Blob
+// Upload a file to the Network
 pub(crate) async fn upload_file_to_net(safe: &mut Safe, path: &Path) -> Result<XorUrl> {
     let data = fs::read(path).map_err(|err| {
         Error::InvalidInput(format!("Failed to read file from local location: {}", err))

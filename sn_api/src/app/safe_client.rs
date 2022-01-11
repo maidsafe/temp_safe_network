@@ -95,7 +95,7 @@ impl SafeAppClient {
     }
 
     //
-    // Blob operations
+    // File operations
     //
     pub async fn store_bytes(&self, bytes: Bytes, dry_run: bool) -> Result<XorName> {
         let address = if dry_run {
@@ -126,7 +126,7 @@ impl SafeAppClient {
         } else {
             client.read_bytes(address).await
         }
-        .map_err(|e| Error::NetDataError(format!("Failed to GET Blob: {:?}", e)))?;
+        .map_err(|e| Error::NetDataError(format!("Failed to GET file: {:?}", e)))?;
 
         debug!(
             "{} bytes of data successfully retrieved from: {:?}",

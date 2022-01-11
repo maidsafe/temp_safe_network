@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    data::{encrypt_blob, to_chunk, Blob, Spot},
+    data::{encrypt_large, to_chunk, LargeFile, SmallFile},
     Client,
 };
 use crate::{
@@ -36,7 +36,7 @@ impl Client {
     pub async fn read_bytes(&self, address: BytesAddress) -> Result<Bytes> {
         let chunk = self.get_chunk(address.name()).await?;
 
-        // first try to deserialize a blob, if it works, we go and seek it
+        // first try to deserialize a LargeFile, if it works, we go and seek it
         if let Ok(data_map) = self
             .unpack_head_chunk(HeadChunk {
                 chunk: chunk.clone(),
@@ -46,7 +46,7 @@ impl Client {
         {
             self.read_all(data_map).await
         } else {
-            // if an error occurs, we consider its a spot
+            // if an error occurs, we assume it's a SmallFile
             self.get_bytes(chunk, address.scope())
         }
     }
@@ -83,8 +83,8 @@ impl Client {
 
         let chunk = self.get_chunk(address.name()).await?;
 
-        // First try to deserialize a Blob, if it works, we go and seek it.
-        // If an error occurs, we consider it to be a Spot.
+        // First try to deserialize a LargeFile, if it works, we go and seek it.
+        // If an error occurs, we consider it to be a SmallFile.
         if let Ok(data_map) = self
             .unpack_head_chunk(HeadChunk {
                 chunk: chunk.clone(),
@@ -95,7 +95,7 @@ impl Client {
             return self.seek(data_map, position, length).await;
         }
 
-        // The error above is ignored to avoid leaking the storage format detail of Spots and Blobs.
+        // The error above is ignored to avoid leaking the storage format detail of SmallFiles and LargeFiles.
         // The basic idea is that we're trying to deserialize as one, and then the other.
         // The cost of it is that some errors will not be seen without a refactor.
         let mut bytes = self.get_bytes(chunk, address.scope())?;
@@ -139,39 +139,39 @@ impl Client {
     /// Tries to chunk the bytes, returning an address and chunks, without storing anything to network.
     #[instrument(skip_all, level = "trace")]
     pub fn chunk_bytes(&self, bytes: Bytes, scope: Scope) -> Result<(BytesAddress, Vec<Chunk>)> {
-        if let Ok(blob) = Blob::new(bytes.clone()) {
-            Self::encrypt_blob(blob, scope, self.public_key())
+        if let Ok(file) = LargeFile::new(bytes.clone()) {
+            Self::encrypt_large(file, scope, self.public_key())
         } else {
-            let spot = Spot::new(bytes)?;
-            let (address, chunk) = Self::package_spot(spot, scope, self.public_key())?;
+            let file = SmallFile::new(bytes)?;
+            let (address, chunk) = Self::package_small(file, scope, self.public_key())?;
             Ok((address, vec![chunk]))
         }
     }
 
-    /// Encrypts a binary large object (blob) and returns the resulting address and all chunks.
+    /// Encrypts a [`LargeFile`] and returns the resulting address and all chunks.
     /// Does not store anything to the network.
-    #[instrument(skip(blob), level = "trace")]
-    fn encrypt_blob(
-        blob: Blob,
+    #[instrument(skip(file), level = "trace")]
+    fn encrypt_large(
+        file: LargeFile,
         scope: Scope,
         public_key: PublicKey,
     ) -> Result<(BytesAddress, Vec<Chunk>)> {
         let owner = encryption(scope, public_key);
-        encrypt_blob(blob.bytes(), owner.as_ref())
+        encrypt_large(file.bytes(), owner.as_ref())
     }
 
-    /// Packages a small piece of data (spot) and returns the resulting address and the chunk.
+    /// Packages a [`SmallFile`] and returns the resulting address and the chunk.
     /// The chunk content will be in plain text if it has public scope, or encrypted if it is instead private.
     /// Does not store anything to the network.
-    fn package_spot(
-        spot: Spot,
+    fn package_small(
+        file: SmallFile,
         scope: Scope,
         public_key: PublicKey,
     ) -> Result<(BytesAddress, Chunk)> {
         let encryption = encryption(scope, public_key);
-        let chunk = to_chunk(spot.bytes(), encryption.as_ref())?;
+        let chunk = to_chunk(file.bytes(), encryption.as_ref())?;
         if chunk.value().len() >= self_encryption::MIN_ENCRYPTABLE_BYTES {
-            return Err(Error::SpotPaddingNeeded);
+            return Err(Error::SmallFilePaddingNeeded);
         }
         let name = *chunk.name();
         let address = if encryption.is_some() {
@@ -186,11 +186,11 @@ impl Client {
     /// form of immutable chunks, without any batching.
     #[instrument(skip(self, bytes), level = "debug")]
     pub async fn upload(&self, bytes: Bytes, scope: Scope) -> Result<BytesAddress> {
-        if let Ok(blob) = Blob::new(bytes.clone()) {
-            self.upload_blob(blob, scope).await
+        if let Ok(file) = LargeFile::new(bytes.clone()) {
+            self.upload_large(file, scope).await
         } else {
-            let spot = Spot::new(bytes)?;
-            self.upload_spot(spot, scope).await
+            let file = SmallFile::new(bytes)?;
+            self.upload_small(file, scope).await
         }
     }
 
@@ -207,27 +207,27 @@ impl Client {
         Ok(address)
     }
 
-    /// Calculates a Blob's/Spot's address from self encrypted chunks,
+    /// Calculates a LargeFile's/SmallFile's address from self encrypted chunks,
     /// without storing them onto the network.
     #[instrument(skip(bytes), level = "debug")]
     pub fn calculate_address(bytes: Bytes, scope: Scope) -> Result<BytesAddress> {
         // we use just a random BLS public key as the owner
         let public_key = PublicKey::Bls(bls::SecretKey::random().public_key());
-        if let Ok(blob) = Blob::new(bytes.clone()) {
-            let (head_address, _all_chunks) = Self::encrypt_blob(blob, scope, public_key)?;
+        if let Ok(file) = LargeFile::new(bytes.clone()) {
+            let (head_address, _all_chunks) = Self::encrypt_large(file, scope, public_key)?;
             Ok(head_address)
         } else {
-            let spot = Spot::new(bytes)?;
-            let (address, _chunk) = Self::package_spot(spot, scope, public_key)?;
+            let file = SmallFile::new(bytes)?;
+            let (address, _chunk) = Self::package_small(file, scope, public_key)?;
             Ok(address)
         }
     }
 
-    /// Directly writes a [`Blob`] to the network in the
+    /// Directly writes a [`LargeFile`] to the network in the
     /// form of immutable self encrypted chunks, without any batching.
     #[instrument(skip_all, level = "trace")]
-    async fn upload_blob(&self, blob: Blob, scope: Scope) -> Result<BytesAddress> {
-        let (head_address, all_chunks) = Self::encrypt_blob(blob, scope, self.public_key())?;
+    async fn upload_large(&self, large: LargeFile, scope: Scope) -> Result<BytesAddress> {
+        let (head_address, all_chunks) = Self::encrypt_large(large, scope, self.public_key())?;
 
         let tasks = all_chunks.into_iter().map(|chunk| {
             let writer = self.clone();
@@ -243,11 +243,11 @@ impl Client {
         Ok(head_address)
     }
 
-    /// Directly writes a [`Spot`] to the network in the
+    /// Directly writes a [`SmallFile`] to the network in the
     /// form of a single chunk, without any batching.
     #[instrument(skip_all, level = "trace")]
-    async fn upload_spot(&self, spot: Spot, scope: Scope) -> Result<BytesAddress> {
-        let (address, chunk) = Self::package_spot(spot, scope, self.public_key())?;
+    async fn upload_small(&self, small: SmallFile, scope: Scope) -> Result<BytesAddress> {
+        let (address, chunk) = Self::package_small(small, scope, self.public_key())?;
         self.send_cmd(DataCmd::StoreChunk(chunk)).await?;
         Ok(address)
     }
@@ -333,7 +333,7 @@ impl Client {
         }
     }
 
-    /// Extracts a blob DataMapLevel from a head chunk.
+    /// Extracts a file DataMapLevel from a head chunk.
     /// If the DataMapLevel is not the first level mapping directly to the user's contents,
     /// the process repeats itself until it obtains the first level DataMapLevel.
     #[instrument(skip_all, level = "trace")]
@@ -371,7 +371,7 @@ impl Client {
 mod tests {
     use crate::client::utils::test_utils::create_test_client_with;
     use crate::client::{
-        client_api::blob_apis::Blob,
+        client_api::file_apis::LargeFile,
         utils::test_utils::{create_test_client, init_test_logger},
         Client,
     };
@@ -384,24 +384,24 @@ mod tests {
     use tokio::time::Instant;
     use tracing::{instrument::Instrumented, Instrument};
 
-    const MIN_BLOB_SIZE: usize = self_encryption::MIN_ENCRYPTABLE_BYTES;
+    const LARGE_FILE_SIZE_MIN: usize = self_encryption::MIN_ENCRYPTABLE_BYTES;
 
     #[test]
     fn deterministic_chunking() -> Result<()> {
         init_test_logger();
         let keypair = Keypair::new_ed25519(&mut OsRng);
-        let blob = random_bytes(MIN_BLOB_SIZE);
+        let file = random_bytes(LARGE_FILE_SIZE_MIN);
 
-        use crate::client::client_api::data::encrypt_blob;
+        use crate::client::client_api::data::encrypt_large;
         use crate::client::utils::encryption;
         let owner = encryption(Scope::Private, keypair.public_key());
-        let (first_address, mut first_chunks) = encrypt_blob(blob.clone(), owner.as_ref())?;
+        let (first_address, mut first_chunks) = encrypt_large(file.clone(), owner.as_ref())?;
 
         first_chunks.sort();
 
         for _ in 0..100 {
             let owner = encryption(Scope::Private, keypair.public_key());
-            let (head_address, mut all_chunks) = encrypt_blob(blob.clone(), owner.as_ref())?;
+            let (head_address, mut all_chunks) = encrypt_large(file.clone(), owner.as_ref())?;
             assert_eq!(first_address, head_address);
             all_chunks.sort();
             assert_eq!(first_chunks, all_chunks);
@@ -410,7 +410,7 @@ mod tests {
         Ok(())
     }
 
-    // Test storing and reading min size blob.
+    // Test storing and reading min sized LargeFile.
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_3kb() -> Result<()> {
         init_test_logger();
@@ -418,43 +418,43 @@ mod tests {
 
         let client = create_test_client().await?;
 
-        let blob = Blob::new(random_bytes(MIN_BLOB_SIZE))?;
+        let file = LargeFile::new(random_bytes(LARGE_FILE_SIZE_MIN))?;
 
-        // Store private blob
+        // Store private file
         let private_address = client
-            .upload_and_verify(blob.bytes(), Scope::Private)
+            .upload_and_verify(file.bytes(), Scope::Private)
             .await?;
 
-        // Assert that the blob is stored.
+        // Assert that the file is stored.
         let read_data = client.read_bytes(private_address).await?;
 
-        compare(blob.bytes(), read_data)?;
+        compare(file.bytes(), read_data)?;
 
-        // Test storing private blob with the same value.
+        // Test storing private file with the same value.
         // Should not conflict and return same address
         let address = client
-            .upload_blob(blob.clone(), Scope::Private)
+            .upload_large(file.clone(), Scope::Private)
             .instrument(tracing::info_span!(
                 "checking no conflict on same private upload"
             ))
             .await?;
         assert_eq!(address, private_address);
 
-        // Test storing public blob with the same value. Should not conflict.
+        // Test storing public file with the same value. Should not conflict.
         let public_address = client
-            .upload_blob(blob.clone(), Scope::Public)
+            .upload_large(file.clone(), Scope::Public)
             .instrument(tracing::info_span!("checking no conflict on public upload"))
             .await?;
 
         assert_ne!(public_address, private_address);
 
-        // Assert that the public blob is stored.
+        // Assert that the public file is stored.
         let read_data = client
             .read_bytes(public_address)
             .instrument(tracing::info_span!("reading_public"))
             .await?;
 
-        compare(blob.bytes(), read_data)?;
+        compare(file.bytes(), read_data)?;
 
         Ok(())
     }
@@ -465,19 +465,19 @@ mod tests {
         let _outer_span = tracing::info_span!("seek_with_unknown_length").entered();
         let client = create_test_client().await?;
 
-        // create content which is stored as Blob, i.e. its size is larger than MIN_BLOB_SIZE
-        let size = 2 * MIN_BLOB_SIZE;
-        let blob = Blob::new(random_bytes(size))?;
+        // create content which is stored as LargeFile, i.e. its size is larger than LARGE_FILE_SIZE_MIN
+        let size = 2 * LARGE_FILE_SIZE_MIN;
+        let file = LargeFile::new(random_bytes(size))?;
 
         let address = client
-            .upload_and_verify(blob.bytes(), Scope::Public)
+            .upload_and_verify(file.bytes(), Scope::Public)
             .await?;
 
         let pos = 512;
-        let read_data = read_from_pos(&blob, address, pos, usize::MAX, &client).await?;
+        let read_data = read_from_pos(&file, address, pos, usize::MAX, &client).await?;
 
         assert_eq!(read_data.len(), size - pos);
-        compare(blob.bytes().split_off(pos), read_data)?;
+        compare(file.bytes().split_off(pos), read_data)?;
 
         Ok(())
     }
@@ -489,27 +489,27 @@ mod tests {
         let client = create_test_client().await?;
 
         for i in 1..5 {
-            let size = i * MIN_BLOB_SIZE;
+            let size = i * LARGE_FILE_SIZE_MIN;
             let _outer_span = tracing::info_span!("size:", size).entered();
             for divisor in 2..5 {
                 let _outer_span = tracing::info_span!("divisor", divisor).entered();
                 let len = size / divisor;
-                let blob = Blob::new(random_bytes(size))?;
+                let file = LargeFile::new(random_bytes(size))?;
 
                 let address = client
-                    .upload_and_verify(blob.bytes(), Scope::Public)
+                    .upload_and_verify(file.bytes(), Scope::Public)
                     .await?;
 
                 // Read first part
                 let read_data_1 = {
                     let pos = 0;
-                    read_from_pos(&blob, address, pos, len, &client).await?
+                    read_from_pos(&file, address, pos, len, &client).await?
                 };
 
                 // Read second part
                 let read_data_2 = {
                     let pos = len;
-                    read_from_pos(&blob, address, pos, len, &client).await?
+                    read_from_pos(&file, address, pos, len, &client).await?
                 };
 
                 // Join parts
@@ -518,33 +518,33 @@ mod tests {
                     .flat_map(|bytes| bytes.clone())
                     .collect();
 
-                compare(blob.bytes().slice(0..(2 * len)), read_data)?;
+                compare(file.bytes().slice(0..(2 * len)), read_data)?;
             }
         }
 
         Ok(())
     }
 
-    // Test storing and reading min size blob. Try and read from many clients and ensure we do not overwelm nodes.
+    // Test storing and reading 5mb file. Try and read from many clients and ensure we do not overwelm nodes.
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_5mb_from_many_clients() -> Result<()> {
         init_test_logger();
         let _start_span = tracing::info_span!("store_and_read_3kb_from_many_clients").entered();
 
         let client = create_test_client().await?;
-        // create Blob with random bytes 5mb
-        let blob_bytes = random_bytes(5 * 1024 * 1024);
-        let blob = Blob::new(blob_bytes)?;
+        // create file with random bytes 5mb
+        let bytes = random_bytes(5 * 1024 * 1024);
+        let file = LargeFile::new(bytes)?;
 
-        // Store blob
+        // Store file
         let address = client
-            .upload_and_verify(blob.bytes(), Scope::Public)
+            .upload_and_verify(file.bytes(), Scope::Public)
             .await?;
 
-        // Assert that the blob is stored.
+        // Assert that the file is stored.
         let read_data = client.read_bytes(address).await?;
 
-        compare(blob.bytes(), read_data)?;
+        compare(file.bytes(), read_data)?;
 
         let mut tasks = vec![];
 
@@ -578,10 +578,10 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "Testnet network_assert_ tests should be excluded from normal tests runs, they need to be run in sequence to ensure validity of checks"]
-    async fn blob_network_assert_expected_log_counts() -> Result<()> {
+    async fn file_network_assert_expected_log_counts() -> Result<()> {
         init_test_logger();
 
-        let _outer_span = tracing::info_span!("blob_network_assert").entered();
+        let _outer_span = tracing::info_span!("file_network_assert").entered();
 
         let network_assert_delay: u64 = std::env::var("NETWORK_ASSERT_DELAY")
             .unwrap_or_else(|_| "3".to_string())
@@ -590,7 +590,7 @@ mod tests {
         let delay = tokio::time::Duration::from_secs(network_assert_delay);
         debug!("Running network asserts with delay of {:?}", delay);
 
-        let bytes = random_bytes(MIN_BLOB_SIZE / 3);
+        let bytes = random_bytes(LARGE_FILE_SIZE_MIN / 3);
         let client = create_test_client().await?;
 
         let mut the_logs = crate::testnet_grep::NetworkLogState::new()?;
@@ -620,8 +620,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_1kb() -> Result<()> {
         init_test_logger();
-        let size = MIN_BLOB_SIZE / 3;
-        let _outer_span = tracing::info_span!("store_and_read_1kb_spot", size).entered();
+        let size = LARGE_FILE_SIZE_MIN / 3;
+        let _outer_span = tracing::info_span!("store_and_read_1kb", size).entered();
         let client = create_test_client().await?;
         store_and_read(&client, size, Scope::Public).await?;
         store_and_read(&client, size, Scope::Private).await
@@ -637,9 +637,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn ae_checks_blob_test() -> Result<()> {
+    async fn ae_checks_file_test() -> Result<()> {
         init_test_logger();
-        let _outer_span = tracing::info_span!("ae_checks_blob_test").entered();
+        let _outer_span = tracing::info_span!("ae_checks_file_test").entered();
         let client = create_test_client_with(None, None, false).await?;
         store_and_read(&client, 10 * 1024 * 1024, Scope::Private).await
     }
@@ -682,8 +682,8 @@ mod tests {
             .map(|i| (i, client.clone()))
             .map(|(i, client)| {
                 tokio::spawn(async move {
-                    let blob = Blob::new(random_bytes(MIN_BLOB_SIZE))?;
-                    let _ = client.upload_blob(blob, Scope::Public).await?;
+                    let file = LargeFile::new(random_bytes(LARGE_FILE_SIZE_MIN))?;
+                    let _ = client.upload_large(file, Scope::Public).await?;
                     println!("Iter: {}", i);
                     let res: Result<()> = Ok(());
                     res
@@ -714,9 +714,9 @@ mod tests {
         let client = create_test_client().await?;
 
         for i in 0..1000_usize {
-            let blob = Blob::new(random_bytes(MIN_BLOB_SIZE))?;
+            let file = LargeFile::new(random_bytes(LARGE_FILE_SIZE_MIN))?;
             let now = Instant::now();
-            let _ = client.upload_blob(blob, Scope::Public).await?;
+            let _ = client.upload_large(file, Scope::Public).await?;
             let elapsed = now.elapsed();
             println!("Iter: {}, in {} millis", i, elapsed.as_millis());
         }
@@ -732,34 +732,34 @@ mod tests {
             tracing::info_span!("store_and_read_private_bytes", size).entered()
         };
 
-        // create Blob with random bytes of requested size
-        let blob_bytes = random_bytes(size);
+        // random bytes of requested size
+        let bytes = random_bytes(size);
 
         // we'll also test we can calculate address offline using `calculate_address` API
-        let expected_address = Client::calculate_address(blob_bytes.clone(), scope)?;
+        let expected_address = Client::calculate_address(bytes.clone(), scope)?;
 
         // we use upload_and_verify since it uploads and also confirms it was uploaded
-        let address = client.upload_and_verify(blob_bytes.clone(), scope).await?;
+        let address = client.upload_and_verify(bytes.clone(), scope).await?;
         assert_eq!(address, expected_address);
 
         // now that it was written to the network we should be able to retrieve it
         let read_data = client.read_bytes(address).await?;
 
         // then the content should be what we stored
-        compare(blob_bytes, read_data)?;
+        compare(bytes, read_data)?;
 
         Ok(())
     }
 
     async fn read_from_pos(
-        blob: &Blob,
+        file: &LargeFile,
         address: BytesAddress,
         pos: usize,
         len: usize,
         client: &Client,
     ) -> Result<Bytes> {
         let read_data = client.read_from(address, pos, len).await?;
-        let mut expected = blob.bytes();
+        let mut expected = file.bytes();
         let _ = expected.split_to(pos);
         expected.truncate(len);
         compare(expected, read_data.clone())?;

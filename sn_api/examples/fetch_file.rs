@@ -12,8 +12,8 @@ use color_eyre::{eyre::eyre, Result};
 use sn_api::{resolver::SafeData, PublicKey, Safe};
 use std::{collections::BTreeSet, env::args, net::SocketAddr};
 
-// To be executed passing Safe network contact address and Blob Safe URL, e.g.:
-// $ cargo run --release --example fetch_blob 127.0.0.1:12000 safe://hy8oyeyqhd1e8keggcjyb9zjyje1m7ihod1pyru6h5y6jkmmihdnym4ngdf
+// To be executed passing Safe network contact address and file Safe URL, e.g.:
+// $ cargo run --release --example fetch_file 127.0.0.1:12000 safe://hy8oyeyqhd1e8keggcjyb9zjyje1m7ihod1pyru6h5y6jkmmihdnym4ngdf
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
@@ -35,7 +35,7 @@ async fn main() -> Result<()> {
     let url = args_received
         .next()
         .ok_or_else(|| eyre!("No Safe URL provided as argument"))?;
-    println!("Fetching Blob from Safe with URL: {}", url);
+    println!("Fetching file from Safe with URL: {}", url);
 
     // The Safe instance is what will give us access to the API.
     let mut safe = Safe::default();
@@ -59,12 +59,12 @@ async fn main() -> Result<()> {
     // but its metadata too, so we can distinguish what has
     // been fetched from the provided Safe-URL.
     match safe.fetch(&url, None).await {
-        Ok(SafeData::PublicBlob { data, .. }) => {
+        Ok(SafeData::PublicFile { data, .. }) => {
             let data = String::from_utf8(data.chunk().to_vec())?;
-            println!("Blob content retrieved:\n{}", data);
+            println!("File content retrieved:\n{}", data);
         }
-        Ok(other) => println!("Failed to retrieve Blob, instead obtained: {:?}", other),
-        Err(err) => println!("Failed to retrieve Blob: {:?}", err),
+        Ok(other) => println!("Failed to retrieve file, instead obtained: {:?}", other),
+        Err(err) => println!("Failed to retrieve file: {:?}", err),
     }
 
     Ok(())

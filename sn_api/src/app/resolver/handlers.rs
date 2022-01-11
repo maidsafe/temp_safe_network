@@ -105,7 +105,7 @@ impl Safe {
                 };
                 Ok(safe_data)
             }
-            DataType::Bytes => {
+            DataType::File => {
                 self.retrieve_data(&input_url, retrieve_data, None, &metadata, range)
                     .await
             }
@@ -148,7 +148,7 @@ impl Safe {
         ensure_no_subnames(&input_url, "media type")?;
 
         match input_url.data_type() {
-            DataType::Bytes => {
+            DataType::File => {
                 self.retrieve_data(
                     &input_url,
                     retrieve_data,
@@ -263,7 +263,7 @@ impl Safe {
             Bytes::new()
         };
 
-        let safe_data = SafeData::PublicBlob {
+        let safe_data = SafeData::PublicFile {
             xorurl: input_url.to_xorurl_string(),
             xorname: input_url.xorname(),
             data,
