@@ -43,13 +43,29 @@ use tracing_subscriber::filter::EnvFilter;
 const MODULE_NAME: &str = "safe_network";
 const BOOTSTRAP_RETRY_TIME: u64 = 3; // in minutes
 
-/// Runs a Safe Network node.
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     color_eyre::install()?;
     #[cfg(feature = "tokio-console")]
     console_subscriber::init();
-    run_node().await
+
+    let handle = std::thread::Builder::new()
+        .name("sn_node".to_string())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(move || {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(run_node())?;
+            Ok(())
+        })
+        .wrap_err("Failed to spawn node thread")?;
+
+    match handle.join() {
+        Ok(result) => result,
+        Err(error) => {
+            // thread panic errors cannot be converted to `eyre::Report` as they are not `Sync`, so
+            // the best thing to do is propagate the panic.
+            std::panic::resume_unwind(error)
+        }
+    }
 }
 
 async fn run_node() -> Result<()> {
