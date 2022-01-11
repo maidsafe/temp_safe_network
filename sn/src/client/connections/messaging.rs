@@ -62,7 +62,6 @@ impl Session {
         let session = Session {
             pending_queries: Arc::new(DashMap::default()),
             incoming_err_sender: Arc::new(err_sender),
-            #[cfg(any(test, feature = "test-utils"))]
             pending_cmds: Arc::new(DashMap::default()),
             endpoint,
             network: Arc::new(prefix_map),
@@ -77,74 +76,6 @@ impl Session {
         Ok(session)
     }
 
-    #[cfg(not(any(test, feature = "test-utils")))]
-    /// Send a `ServiceMsg` to the network without awaiting for a response.
-    #[instrument(skip(self, auth, payload), level = "debug", name = "session send cmd")]
-    pub(crate) async fn send_cmd(
-        &self,
-        dst_address: XorName,
-        auth: ServiceAuth,
-        payload: Bytes,
-        targets_count: usize,
-    ) -> Result<(), Error> {
-        let endpoint = self.endpoint.clone();
-        // TODO: Consider other approach: Keep a session per section!
-
-        // Get DataSection elders details.
-        let (elders, section_pk) =
-            if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
-                let sap_elders: Vec<_> = sap.elders_vec().into_iter().take(targets_count).collect();
-
-                trace!("{:?} SAP elders found", sap_elders);
-                (sap_elders, sap.section_key())
-            } else {
-                return Err(Error::NoNetworkKnowledge);
-            };
-
-        let msg_id = MessageId::new();
-
-        if elders.len() < targets_count {
-            return Err(Error::InsufficientElderKnowledge {
-                connections: elders.len(),
-                required: targets_count,
-                section_pk,
-            });
-        }
-
-        debug!(
-            "Sending command w/id {:?}, from {}, to {} Elders w/ dst: {:?}",
-            msg_id,
-            endpoint.public_addr(),
-            elders.len(),
-            dst_address
-        );
-
-        let dst_location = DstLocation::Section {
-            name: dst_address,
-            section_pk,
-        };
-        let msg_kind = MsgKind::ServiceMsg(auth);
-        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
-
-        let res = send_message(
-            self.clone(),
-            elders.clone(),
-            wire_msg,
-            self.endpoint.clone(),
-            msg_id,
-        )
-        .await;
-
-        // lets wait for any potential AE response while we're here.
-        // TODO: be smart about this. Check AE Retry cache for related msg id eg, continue early if we've seen some.
-        // (cannot continue earlier if everything goes okay first time though, which is a shame)
-        tokio::time::sleep(self.standard_wait).await;
-
-        trace!("Wait for any cmd response/reaction (AE msgs eg), is over)");
-        res
-    }
-
-    #[cfg(any(test, feature = "test-utils"))]
     #[instrument(skip(self, auth, payload), level = "debug", name = "session send cmd")]
     pub(crate) async fn send_cmd(
         &self,

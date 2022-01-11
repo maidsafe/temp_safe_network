@@ -52,17 +52,6 @@ impl Core {
             return self.send_cmd_error_response(error, origin, msg_id);
         }
 
-        #[cfg(any(test, feature = "test-utils"))]
-        {
-            let mut commands = self
-                .send_node_msg_to_targets(msg, targets, aggregation)
-                .await?;
-            commands.extend(self.send_cmd_ack(origin, msg_id)?);
-
-            Ok(commands)
-        }
-
-        #[cfg(not(any(test, feature = "test-utils")))]
         self.send_node_msg_to_targets(msg, targets, aggregation)
             .await
     }

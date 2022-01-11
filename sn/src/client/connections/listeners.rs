@@ -178,7 +178,6 @@ impl Session {
     ) -> Result<(), Error> {
         debug!("ServiceMsg with id {:?} received from {:?}", msg_id, src);
         let queries = session.pending_queries.clone();
-        #[cfg(any(test, feature = "test-utils"))]
         let cmds = session.pending_cmds.clone();
         let error_sender = session.incoming_err_sender;
 
@@ -232,7 +231,6 @@ impl Session {
                         }
                     }
                 }
-                #[cfg(any(test, feature = "test-utils"))]
                 ServiceMsg::CmdAck { correlation_id } => {
                     debug!(
                         "CmdAck was received for Message{:?} w/ID: {:?} from {:?}",
