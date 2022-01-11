@@ -28,7 +28,6 @@ type PendingQueryResponses = Arc<DashMap<OperationId, Vec<(MessageId, QueryRespo
 use uluru::LRUCache;
 type QueryResponseSender = Sender<QueryResponse>;
 
-#[cfg(any(test, feature = "test-utils"))]
 type PendingCmdAcks = Arc<DashMap<MessageId, Sender<std::net::SocketAddr>>>;
 
 #[derive(Debug)]
@@ -47,7 +46,6 @@ pub(super) struct Session {
     pending_queries: PendingQueryResponses,
     // Channels for sending errors to upper layer
     incoming_err_sender: Arc<Sender<CmdError>>,
-    #[cfg(any(test, feature = "test-utils"))]
     // Channels for sending CmdAck to upper layers
     pending_cmds: PendingCmdAcks,
     /// All elders we know about from AE messages
