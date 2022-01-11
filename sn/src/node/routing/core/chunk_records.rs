@@ -148,7 +148,7 @@ impl Core {
             let _existed = fresh_targets.insert(target);
         }
 
-        let correlation_id = XorName::random();
+        let correlation_id = *address.name();
         let overwrote = self
             .pending_chunk_queries
             .set(correlation_id, origin, None)
