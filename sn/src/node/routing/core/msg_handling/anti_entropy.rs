@@ -58,17 +58,9 @@ impl Core {
             )
             .await?;
 
-        let mut commands = vec![];
-
-        commands.extend(self.fire_node_event_for_any_new_adults().await?);
-
         // always run this, only changes will trigger events
-        commands.extend(
-            self.update_self_for_new_node_state_and_fire_events(snapshot)
-                .await?,
-        );
-
-        Ok(commands)
+        self.update_self_for_new_node_state_and_fire_events(snapshot)
+            .await
     }
 
     pub(crate) async fn handle_anti_entropy_retry_msg(

@@ -14,7 +14,6 @@ mod proposals;
 mod relocation;
 mod resource_proof;
 mod service_msgs;
-mod update_section;
 
 use crate::messaging::{
     data::{ServiceMsg, StorageLevel},
