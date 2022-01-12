@@ -290,7 +290,7 @@ impl Session {
         .await?;
 
         // TODO:
-        // We are now simply accepting the very first valid response we receive, (shall be the concensused result?)
+        // We are now simply accepting the very first valid response we receive,
         // but we may want to revisit this to compare multiple responses and validate them,
         // similar to what we used to do up to the following commit:
         // https://github.com/maidsafe/sn_client/blob/9091a4f1f20565f25d3a8b00571cc80751918928/src/connection_manager.rs#L328

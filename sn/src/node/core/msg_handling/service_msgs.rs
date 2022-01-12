@@ -23,7 +23,7 @@ use xor_name::XorName;
 
 impl Core {
     /// Forms a CmdError msg to send back to the client
-    pub(crate) fn send_cmd_error_response(
+    pub(crate) async fn send_cmd_error_response(
         &self,
         error: CmdError,
         target: Peer,
@@ -33,25 +33,26 @@ impl Core {
             error,
             correlation_id: msg_id,
         };
-        self.send_cmd_response(target, the_error_msg)
+        self.send_cmd_response(target, the_error_msg).await
     }
 
     /// Forms a CmdAck msg to send back to the client
-    pub(crate) fn send_cmd_ack(&self, target: Peer, msg_id: MessageId) -> Result<Vec<Command>> {
+    pub(crate) async fn send_cmd_ack(
+        &self,
+        target: Peer,
+        msg_id: MessageId,
+    ) -> Result<Vec<Command>> {
         let the_ack_msg = ServiceMsg::CmdAck {
             correlation_id: msg_id,
         };
-        self.send_cmd_response(target, the_ack_msg)
+        self.send_cmd_response(target, the_ack_msg).await
     }
 
     /// Forms a command to send a cmd response error/ack to the client
-    fn send_cmd_response(&self, target: Peer, msg: ServiceMsg) -> Result<Vec<Command>> {
+    async fn send_cmd_response(&self, target: Peer, msg: ServiceMsg) -> Result<Vec<Command>> {
         let dst = DstLocation::EndUser(EndUser(target.name()));
 
-        // FIXME: define which signature/authority this message should really carry,
-        // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
-        // Giving a random sig temporarily
-        let (msg_kind, payload) = Self::random_client_signature(&msg)?;
+        let (msg_kind, payload) = self.ed_sign_client_message(&msg).await?;
         let wire_msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, dst)?;
 
         let command = Command::SendMessage {
@@ -201,11 +202,7 @@ impl Core {
             response: query_response,
             correlation_id,
         };
-
-        // FIXME: define which signature/authority this message should really carry,
-        // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
-        // Giving a random sig temporarily
-        let (msg_kind, payload) = Self::random_client_signature(&msg)?;
+        let (msg_kind, payload) = self.ed_sign_client_message(&msg).await?;
 
         for peer in waiting_client_peers {
             let dst = DstLocation::EndUser(EndUser(peer.name()));
@@ -237,14 +234,14 @@ impl Core {
                 let mut commands = self
                     .send_data_to_adults(ReplicatedData::RegisterWrite(cmd), msg_id, user.clone())
                     .await?;
-                commands.extend(self.send_cmd_ack(user, msg_id)?);
+                commands.extend(self.send_cmd_ack(user, msg_id).await?);
                 Ok(commands)
             }
             ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => {
                 let mut commands = self
                     .send_data_to_adults(ReplicatedData::Chunk(chunk), msg_id, user.clone())
                     .await?;
-                commands.extend(self.send_cmd_ack(user, msg_id)?);
+                commands.extend(self.send_cmd_ack(user, msg_id).await?);
                 Ok(commands)
             }
             ServiceMsg::Query(query) => self.read_data_from_adults(query, msg_id, auth, user).await,

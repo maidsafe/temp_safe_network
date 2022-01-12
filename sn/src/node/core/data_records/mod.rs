@@ -49,7 +49,7 @@ impl Core {
             let error = CmdError::Data(ErrorMessage::InsufficientAdults(
                 self.network_knowledge().prefix().await,
             ));
-            return self.send_cmd_error_response(error, origin, msg_id);
+            return self.send_cmd_error_response(error, origin, msg_id).await;
         }
 
         self.send_node_msg_to_targets(msg, targets, aggregation)
