@@ -23,7 +23,6 @@ jobs:
     name: Build sn bins
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
         os: [self-hosted-ubuntu, windows-latest, macos-latest]
     steps:
@@ -54,7 +53,6 @@ jobs:
     name: Unit Tests
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
         os: [self-hosted-ubuntu, windows-latest, macos-latest]
     steps:
@@ -176,6 +174,14 @@ jobs:
       - name: Start the network
         run: ./target/release/testnet --interval 15000
         id: section-startup
+        if: matrix.os != 'self-hosted-ubuntu'
+
+      - name: Start the network (ubuntu self hosted)
+        run: ./target/release/testnet --interval 15000
+        id: section-startup
+        if: matrix.os == 'self-hosted-ubuntu'
+        env:
+            NODE_COUNT: 33
 
       - name: Print Network Log Stats at start
         shell: bash
