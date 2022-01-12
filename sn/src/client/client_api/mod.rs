@@ -75,6 +75,7 @@ impl Client {
         Client::create_with(config, bootstrap_nodes, optional_keypair, true).await
     }
 
+    #[instrument]
     pub(crate) async fn create_with(
         config: ClientConfig,
         bootstrap_nodes: BTreeSet<SocketAddr>,
