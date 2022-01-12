@@ -178,7 +178,7 @@ jobs:
 
       - name: Start the network (ubuntu self hosted)
         run: ./target/release/testnet --interval 15000
-        id: section-startup
+        id: section-startup2
         if: matrix.os == 'self-hosted-ubuntu'
         env:
             NODE_COUNT: 33
@@ -186,7 +186,7 @@ jobs:
       - name: Print Network Log Stats at start
         shell: bash
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+        if: matrix.os != 'windows-latest'
 
       - name: ubuntu install zsh
         if: matrix.os == 'self-hosted-ubuntu'
@@ -294,7 +294,7 @@ jobs:
         shell: bash
         continue-on-error: true
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' &&  matrix.os != 'windows-latest'
+        if: matrix.os != 'windows-latest'
 
       - name: Upload Node Logs to AWS for Windowns
           # Upload artifacts.
