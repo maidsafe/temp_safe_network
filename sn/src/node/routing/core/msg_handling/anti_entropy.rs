@@ -27,6 +27,7 @@ use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
+use std::collections::BTreeSet;
 use std::time::Duration;
 use xor_name::XorName;
 
@@ -40,6 +41,13 @@ impl Core {
         members: Option<SectionPeers>,
     ) -> Result<Vec<Command>> {
         let snapshot = self.state_snapshot().await;
+        let old_adults: BTreeSet<_> = self
+            .network_knowledge
+            .live_adults()
+            .await
+            .iter()
+            .map(|p| p.name())
+            .collect();
 
         let our_name = self.node.read().await.name();
         let signed_sap = SectionAuth {
@@ -60,7 +68,7 @@ impl Core {
 
         let mut commands = vec![];
 
-        commands.extend(self.fire_node_event_for_any_new_adults().await?);
+        commands.extend(self.fire_node_event_for_any_new_adults(old_adults).await?);
 
         // always run this, only changes will trigger events
         commands.extend(
