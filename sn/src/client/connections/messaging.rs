@@ -10,6 +10,7 @@ use super::{QueryResult, Session};
 
 use super::AeCache;
 use crate::client::Error;
+use crate::elder_count;
 use crate::messaging::{
     data::{CmdError, DataQuery, QueryResponse},
     DstLocation, MessageId, MsgKind, ServiceAuth, WireMsg,
@@ -367,6 +368,7 @@ impl Session {
             .into_iter()
             .take(NODES_TO_CONTACT_PER_STARTUP_BATCH)
             .collect();
+
         send_message(
             self.clone(),
             initial_contacts,
@@ -383,8 +385,8 @@ impl Session {
         let mut last_start_pos = 0;
 
         let mut backoff = ExponentialBackoff {
-            initial_interval: Duration::from_millis(1500),
-            max_interval: Duration::from_secs(25),
+            initial_interval: Duration::from_millis(500),
+            max_interval: Duration::from_secs(5),
             max_elapsed_time: Some(Duration::from_secs(60)),
             ..Default::default()
         };
@@ -398,15 +400,22 @@ impl Session {
 
         // If we start with genesis key here, we should wait until we have _at least_ one AE-Retry in
         if section_pk == self.genesis_key {
-            info!("On client startup, awaiting for some network knowledge");
+            info!("On client startup, awaiting some network knowledge");
+
+            let known_sap = self.network.closest_or_opposite(&dst_address, None);
+
+            let mut insufficient_sap_peers = false;
+
+            if let Some(sap) = known_sap.clone() {
+                if sap.elders_vec().len() < elder_count() {
+                    insufficient_sap_peers = true;
+                }
+            }
+
             // wait until we have _some_ network knowledge
-            while self
-                .network
-                .closest_or_opposite(&dst_address, None)
-                .is_none()
-            {
+            while known_sap.is_none() || insufficient_sap_peers {
                 let stats = self.network.known_sections_count();
-                debug!("Client still has not received any AE-Retry message... {:?}. Current sections known", stats);
+                debug!("Client still has not received a complete section's AE-Retry message... {:?}. Current sections known", stats);
 
                 knowledge_checks += 1;
 
