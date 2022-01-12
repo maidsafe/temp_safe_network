@@ -8,7 +8,7 @@
 
 mod pac_man;
 
-pub(crate) use pac_man::{encrypt_blob, to_chunk, DataMapLevel};
+pub(crate) use pac_man::{encrypt_large, to_chunk, DataMapLevel};
 
 use crate::client::{Error, Result};
 
@@ -20,27 +20,27 @@ use self_encryption::MIN_ENCRYPTABLE_BYTES;
 /// A `Spot` cannot be self-encrypted, thus is encrypted using the client encryption keys instead.
 #[allow(missing_debug_implementations)]
 #[derive(Clone)]
-pub(crate) struct Spot {
+pub(crate) struct SmallFile {
     bytes: Bytes,
 }
 
 /// Data of size larger than or equal to [`MIN_ENCRYPTABLE_BYTES`] bytes.
 ///
-/// A `Blob` is spread across multiple chunks in the network.
+/// A `LargeFile` is spread across multiple chunks in the network.
 /// This is done using self-encryption, which produces at least 4 chunks (3 for the contents, 1 for the `DataMap`).
 #[allow(missing_debug_implementations)]
 #[derive(Clone)]
-pub(crate) struct Blob {
+pub(crate) struct LargeFile {
     bytes: Bytes,
 }
 
-impl Spot {
+impl SmallFile {
     /// Enforces size > 0 and size < [`MIN_ENCRYPTABLE_BYTES`] bytes.
     pub(crate) fn new(bytes: Bytes) -> Result<Self> {
         if bytes.len() >= MIN_ENCRYPTABLE_BYTES {
-            Err(Error::TooLargeToBeSpot)
+            Err(Error::TooLargeAsSmallFile)
         } else if bytes.is_empty() {
-            Err(Error::EmptyBytesProvided)
+            Err(Error::EmptyFileProvided)
         } else {
             Ok(Self { bytes })
         }
@@ -52,11 +52,11 @@ impl Spot {
     }
 }
 
-impl Blob {
+impl LargeFile {
     /// Enforces size >= [`MIN_ENCRYPTABLE_BYTES`] bytes.
     pub(crate) fn new(bytes: Bytes) -> Result<Self> {
         if MIN_ENCRYPTABLE_BYTES > bytes.len() {
-            Err(Error::TooSmallToBeBlob)
+            Err(Error::TooSmallForSelfEncryption)
         } else {
             Ok(Self { bytes })
         }

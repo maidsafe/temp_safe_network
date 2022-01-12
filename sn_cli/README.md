@@ -375,7 +375,7 @@ It's also possible to join a network without adding a network to the networks li
 
 We can use the CLI to upload files and folders and keep them in sync with local modifications.
 
-Files are uploaded and stored as a `Blob`. When we upload a directory, its hierarchy is flattened and represented in a map, with each file's path mapped to a `Blob` XOR-URL. This map is maintained in a special container called `FilesContainer`. The data representation in the `FilesContainer` is planned to be implemented with [RDF](https://en.wikipedia.org/wiki/Resource_Description_Framework), and the corresponding `FilesContainer` RFC will be submitted; however, at this stage, the implementation is a simple serialised structure.
+Files are uploaded and stored as one or more chunks. When we upload a directory, its hierarchy is flattened and represented in a map, with each file's path mapped to a file XOR-URL. This map is maintained in a special container called `FilesContainer`. The data representation in the `FilesContainer` is planned to be implemented with [RDF](https://en.wikipedia.org/wiki/Resource_Description_Framework), and the corresponding `FilesContainer` RFC will be submitted; however, at this stage, the implementation is a simple serialised structure.
 
 For brevity, in the rest of this section we'll refer to the `FilesContainer` just using the term "container".
 
@@ -720,7 +720,7 @@ FilesContainer updated (version h6zr4xmy7pw6bcpcat5ofs4rt9zfu3x4shjctm1mqx8it7uc
 
 ## Xorurl
 
-As we've seen, when uploading files to the network, each file is uploaded as an `Blob` using the [self-encryption algorithm](https://github.com/maidsafe/self_encryption) in the client, splitting the files into encrypted chunks, and the resulting file's XOR-URL is linked from a `FilesContainer`.
+As we've seen, when uploading files to the network, each file is uploaded as one or more chunks using the [self-encryption algorithm](https://github.com/maidsafe/self_encryption) in the client, splitting the files into encrypted chunks, and the resulting file's XOR-URL is linked from a `FilesContainer`.
 
 The file's XOR-URL is deterministic based on its content, i.e. the location where each of its chunks are stored is determined based on the file's content, and performed at the client before uploading the chunks to the network. Therefore the XOR-URL is always the same if the content of a file doesn't change. All this means is we can know what the file's XOR-URL will be without uploading it to the network.
 
@@ -804,7 +804,7 @@ $ safe cat safe://hnyynyixxj9uewuhh64rgg9zsdhaynwhc88mpyfpor5carg8xx6qs6jknnbnc/
 hello tests!
 ```
 
-As seen above, the `safe cat` command can be used to fetch any type of content from the Safe Network. At this point it only supports files (`Blob`), `FilesContainer`s, `Wallet`s, and `NRS-Container`s (see further below about NRS Containers and commands), but it will be expanded as more types are supported by the CLI and its API.
+As seen above, the `safe cat` command can be used to fetch any type of content from the Safe Network. At this point it only supports files, `FilesContainer`s, `Wallet`s, and `NRS-Container`s (see further below about NRS Containers and commands), but it will be expanded as more types are supported by the CLI and its API.
 
 ### Retrieving Binary Files
 
@@ -885,10 +885,10 @@ XOR-URL: safe://hnyynywttiyr6tf3qk811b3rto9azx8579h95ewbs3ikwpctxdhtqesmwnbnc
 
 In this case we see the location where this data is stored on the Network (this is called the XOR name), a type tag number associated with the content (1100 was set for this particular type of container), and the native Safe Network data type where this data is being held on (`PublicSequence`), and since this type of data is versionable we also see which is the version of the content the URL resolves to.
 
-Of course the `safe dog` command can be used also with other type of content like files (`Blob`), e.g. if we use it with a `FilesContainer`'s XOR-URL and the path of one of the files it contains:
+Of course the `safe dog` command can be used also with other type of content like files, e.g. if we use it with a `FilesContainer`'s XOR-URL and the path of one of the files it contains:
 ```shell
 $ safe dog safe://hnyynywttiyr6tf3qk811b3rto9azx8579h95ewbs3ikwpctxdhtqesmwnbnc/subfolder/index.html
-Native data type: PublicBlob
+Native data type: PublicFile
 XOR name: 0xda4ce4aa59889874921817e79c2b98dc3dbede7fd9a9808a60aa2d35efaa05f4
 XOR-URL: safe://hbhybyds1ch1ifunraq1jbof98uoi3tzb7z5x89spjonfgbktpgzz4wbxw
 Media type: text/html
@@ -897,7 +897,7 @@ Media type: text/html
 But how about using the `dog` command with an NRS URL, as we now know it's resolved using the NRS rules and following the links found in the NRS Map Container:
 ```shell
 $ safe dog safe://mywebsite/contact/form.html
-Native data type: PublicBlob
+Native data type: PublicFile
 XOR name: 0xda4ce4aa59889874921817e79c2b98dc3dbede7fd9a9808a60aa2d35efaa05f4
 XOR-URL: safe://hbhybyds1ch1ifunraq1jbof98uoi3tzb7z5x89spjonfgbktpgzz4wbxw
 Media type: text/html

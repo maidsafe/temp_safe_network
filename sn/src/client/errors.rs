@@ -68,18 +68,20 @@ pub enum Error {
     /// Peer connection retrieval failed
     #[error("Error with Peer's connection: {0:?}")]
     PeerConnection(SocketAddr),
-    /// Cannot store empty bytes..
-    #[error("Cannot store empty bytes.")]
-    EmptyBytesProvided,
-    /// The provided bytes is too small to be a `Blob`.
-    #[error("The provided bytes is too small to be a `Blob`")]
-    TooSmallToBeBlob,
-    /// Encryption oversized the Spot, so it cannot be stored as a Spot and be encrypted
-    #[error("You might need to pad the `Spot` contents and then store it as a `Blob`, as the encryption has made it slightly too big")]
-    SpotPaddingNeeded,
-    /// The provided bytes is too large to be a `Spot`.
-    #[error("The provided bytes is too large to be a `Spot`")]
-    TooLargeToBeSpot,
+    /// Cannot store empty file..
+    #[error("Cannot store empty file.")]
+    EmptyFileProvided,
+    /// Not enough bytes for self-encryption.
+    #[error("Not enough bytes for self-encryption. Try storing it as a SmallFile.")]
+    TooSmallForSelfEncryption,
+    /// Encryption oversized the SmallFile, so it cannot be stored as a SmallFile and be encrypted
+    #[error("You might need to pad the `SmallFile` contents and then store it as a `LargeFile`, as the encryption has made it slightly too big")]
+    SmallFilePaddingNeeded,
+    /// The provided bytes is too large to store as a `SmallFile`.
+    #[error(
+        "The provided bytes is too large to store as a `SmallFile`. Store as a LargeFile instead."
+    )]
+    TooLargeAsSmallFile,
     /// No query response before timeout
     #[error("Query timed out")]
     QueryTimedOut,

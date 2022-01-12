@@ -581,7 +581,7 @@ impl Safe {
         update_nrs: bool,
     ) -> Result<VersionHash> {
         // The FilesContainer is updated by adding an entry containing the link to
-        // the Blob with the serialised new version of the FilesMap.
+        // the file with the serialised new version of the FilesMap.
         let files_map_xorurl = if !self.dry_run_mode {
             self.store_files_map(new_files_map).await?
         } else {
@@ -610,9 +610,9 @@ impl Safe {
 
     /// # Store a public file
     ///
-    /// Put data blobs onto the network. The data will either be saved as a blob or a spot,
-    /// depending on the size of the data. If it's less than 3072 bytes, it'll be stored as a spot,
-    /// otherwise, it'll be stored as a blob.
+    /// Store files onto the network. The data will be saved as one or more chunks,
+    /// depending on the size of the data. If it's less than 3072 bytes, it'll be stored in a single chunk,
+    /// otherwise, it'll be stored in multiple chunks.
     ///
     /// ## Example
     /// ```no_run
@@ -623,7 +623,7 @@ impl Safe {
     /// #   safe.connect(None, None, None).await.unwrap();
     ///     let data = b"Something super good";
     ///     let xorurl = safe.store_public_data(data, Some("text/plain")).await.unwrap();
-    ///     let received_data = safe.files_get_public_blob(&xorurl, None).await.unwrap();
+    ///     let received_data = safe.files_get_public(&xorurl, None).await.unwrap();
     ///     assert_eq!(received_data, data);
     /// # });
     /// ```
@@ -659,8 +659,8 @@ impl Safe {
         Ok(xorurl)
     }
 
-    /// # Get a Public Blob
-    /// Get blob from the network.
+    /// # Get a file
+    /// Get file from the network.
     ///
     /// ## Example
     /// ```no_run
@@ -670,25 +670,25 @@ impl Safe {
     /// # rt.block_on(async {
     /// #   safe.connect(None, None, None).await.unwrap();
     ///     let data = b"Something super good";
-    ///     let xorurl = safe.files_store_public_blob(data, None).await.unwrap();
-    ///     let received_data = safe.files_get_public_blob(&xorurl, None).await.unwrap();
+    ///     let xorurl = safe.files_store_public(data, None).await.unwrap();
+    ///     let received_data = safe.files_get_public(&xorurl, None).await.unwrap();
     ///     assert_eq!(received_data, data);
     /// # });
     /// ```
-    pub async fn files_get_public_data(&mut self, url: &str, range: Range) -> Result<Bytes> {
+    pub async fn files_get_public(&mut self, url: &str, range: Range) -> Result<Bytes> {
         // TODO: do we want ownership from other PKs yet?
         let safe_url = self.parse_and_resolve_url(url).await?;
         self.fetch_public_data(&safe_url, range).await
     }
 
-    /// Fetch an Blob from a SafeUrl without performing any type of URL resolution
+    /// Fetch an file from a SafeUrl without performing any type of URL resolution
     pub(crate) async fn fetch_public_data(
         &self,
         safe_url: &SafeUrl,
         range: Range,
     ) -> Result<Bytes> {
         let data = match safe_url.data_type() {
-            DataType::Bytes => {
+            DataType::File => {
                 self.safe_client
                     .get_bytes(BytesAddress::Public(safe_url.xorname()), range)
                     .await?
@@ -700,10 +700,10 @@ impl Safe {
         Ok(data)
     }
 
-    // Private helper to serialise a FilesMap and store it in a Public Blob
+    // Private helper to serialise a FilesMap and store it in a file
     async fn store_files_map(&mut self, files_map: &FilesMap) -> Result<String> {
         // The FilesMapContainer is a Register where each NRS Map version is
-        // an entry containing the XOR-URL of the Blob that contains the serialised NrsMap.
+        // an entry containing the XOR-URL of the file that contains the serialised NrsMap.
         let serialised_files_map = serde_json::to_string(&files_map).map_err(|err| {
             Error::Serialisation(format!(
                 "Couldn't serialise the FilesMap generated: {:?}",
@@ -746,10 +746,10 @@ async fn validate_files_add_params(
     // Let's act according to if it's a local file path or a safe:// location
     if source_file.starts_with("safe://") {
         let source_safe_url = Safe::parse_url(source_file)?;
-        if source_safe_url.data_type() != DataType::Bytes {
+        if source_safe_url.data_type() != DataType::File {
             return Err(Error::InvalidInput(format!(
                 "The source URL should target a file ('{}'), but the URL provided targets a '{}'",
-                DataType::Bytes,
+                DataType::File,
                 source_safe_url.content_type()
             )));
         }
@@ -1337,17 +1337,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_files_store_pub_blob() -> Result<()> {
+    async fn test_files_store_public() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let random_blob_content: String =
-            thread_rng().sample_iter(&Alphanumeric).take(20).collect();
+        let random_content: String = thread_rng().sample_iter(&Alphanumeric).take(20).collect();
 
         let file_xorurl = safe
-            .store_public_bytes(Bytes::from(random_blob_content.to_owned()), None)
+            .store_public_bytes(Bytes::from(random_content.to_owned()), None)
             .await?;
 
-        let retrieved = retry_loop!(safe.files_get_public_data(&file_xorurl, None));
-        assert_eq!(retrieved, random_blob_content.as_bytes());
+        let retrieved = retry_loop!(safe.files_get_public(&file_xorurl, None));
+        assert_eq!(retrieved, random_content.as_bytes());
 
         Ok(())
     }

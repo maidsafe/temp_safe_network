@@ -19,7 +19,7 @@ harness = false
 required-features = ["test-utils"]
 
 [[example]]
-name = "client_blob"
+name = "client_files"
 required-features = ["test-utils"]
 
 [[example]]

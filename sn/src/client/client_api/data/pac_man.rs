@@ -34,7 +34,7 @@ pub(crate) fn encrypt_from_path(
     pack(data_map, encrypted_chunks, encryption)
 }
 
-pub(crate) fn encrypt_blob(
+pub(crate) fn encrypt_large(
     data: Bytes,
     encryption: Option<&impl Encryption>,
 ) -> Result<(BytesAddress, Vec<Chunk>)> {
