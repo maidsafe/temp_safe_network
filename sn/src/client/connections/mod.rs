@@ -21,6 +21,7 @@ use qp2p::Endpoint;
 use std::sync::Arc;
 use tokio::sync::{mpsc::Sender, RwLock};
 use tokio::time::Duration;
+use xor_name::XorName;
 
 // Here we dont track the msg_id across the network, but just use it as a local identifier to remove the correct listener
 type PendingQueryResponses = Arc<DashMap<OperationId, Vec<(MessageId, QueryResponseSender)>>>;
@@ -55,4 +56,6 @@ pub(super) struct Session {
     initial_connection_check_msg_id: Arc<RwLock<Option<MessageId>>>,
     /// Standard time to await potential AE messages:
     standard_wait: Duration,
+    /// Closed connection tracking, used to validate if a new connection is needed or not. Xorname to ConnectionId
+    elder_last_closed_connections: Arc<DashMap<XorName, usize>>,
 }
