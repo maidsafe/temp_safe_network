@@ -293,10 +293,10 @@ impl Core {
         if !self.network_knowledge.prefix().await.matches(&peer.name())
             || join_request.section_key != self.network_knowledge.section_key().await
         {
+            let prefix = self.network_knowledge.prefix().await;
             debug!(
                 "JoinAsRelocatedRequest from {} - name doesn't match our prefix {:?}.",
-                peer,
-                self.network_knowledge.prefix().await
+                peer, prefix
             );
 
             let node_msg =
@@ -335,13 +335,12 @@ impl Core {
 
         let details = relocate_payload.relocate_details()?;
 
-        if !self.network_knowledge.prefix().await.matches(&details.dst) {
+        let prefix = self.network_knowledge.prefix().await;
+        if !prefix.matches(&details.dst) {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - destination {} doesn't match \
                          our prefix {:?}.",
-                peer,
-                details.dst,
-                self.network_knowledge.prefix().await
+                peer, details.dst, prefix
             );
             return Ok(vec![]);
         }

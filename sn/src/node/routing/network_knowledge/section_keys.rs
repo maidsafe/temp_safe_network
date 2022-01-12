@@ -90,10 +90,11 @@ impl SectionKeysProvider {
         if let Some(evicted) = self.cache.write().await.insert(share) {
             trace!("evicted old key share from cache: {:?}", evicted);
         }
+        let cache_len = self.cache.read().await.len();
         trace!(
             "{} in cache (total {}): {:?}",
             LogMarker::NewKeyShareStored,
-            self.cache.read().await.len(),
+            cache_len,
             public_key
         );
     }

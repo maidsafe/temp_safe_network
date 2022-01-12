@@ -186,11 +186,8 @@ impl Core {
         node_state: SectionAuth<NodeState>,
     ) -> Vec<Command> {
         let peer = node_state.peer().clone();
-        info!(
-            "Our section with {:?} has approved peer {}.",
-            self.network_knowledge.prefix().await,
-            peer,
-        );
+        let prefix = self.network_knowledge.prefix().await;
+        info!("Our section with {:?} has approved peer {}.", prefix, peer,);
 
         let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
             genesis_key: *self.network_knowledge.genesis_key(),

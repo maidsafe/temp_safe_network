@@ -305,15 +305,15 @@ impl Dispatcher {
     pub(super) async fn enqueue_and_handle_next_command_and_any_offshoots(
         self: Arc<Self>,
         command: Command,
-        cmd_id: Option<String>,
+        cmd_id: Option<CmdId>,
     ) -> Result<()> {
         let _ = tokio::spawn(async {
-            let cmd_id = cmd_id.unwrap_or_else(|| rand::random::<u32>().to_string());
-
+            let cmd_id: CmdId = cmd_id.unwrap_or_else(|| rand::random::<u32>().to_string());
             self.acquire_permit_or_wait(command.priority()?, cmd_id.clone())
                 .await?;
 
-            self.handle_command_and_any_offshoots(command, cmd_id).await
+            self.handle_command_and_any_offshoots(command, Some(cmd_id))
+                .await
         });
         Ok(())
     }
@@ -325,15 +325,16 @@ impl Dispatcher {
     pub(super) async fn handle_command_and_any_offshoots(
         self: Arc<Self>,
         command: Command,
-        cmd_id: String,
+        cmd_id: Option<CmdId>,
     ) -> Result<()> {
+        let cmd_id = cmd_id.unwrap_or_else(|| rand::random::<u32>().to_string());
         let cmd_id_clone = cmd_id.clone();
         let command_display = command.to_string();
-        let _ = tokio::spawn(async move {
+        let _task = tokio::spawn(async move {
             match self.process_command(command, &cmd_id).await {
                 Ok(commands) => {
                     for (sub_cmd_count, command) in commands.into_iter().enumerate() {
-                        let sub_cmd_id = format!("{}.{}", cmd_id, sub_cmd_count);
+                        let sub_cmd_id = format!("{}.{}", &cmd_id, sub_cmd_count);
                         // Error here is only related to queueing, and so a dropped command will be logged
                         let _result = self.clone().spawn_handle_commands(command, sub_cmd_id);
                     }
@@ -348,21 +349,17 @@ impl Dispatcher {
             "{:?} {} cmd_id={}",
             LogMarker::CommandHandleSpawned,
             command_display,
-            cmd_id_clone
+            &cmd_id_clone
         );
-
         Ok(())
     }
 
     // Note: this indirecton is needed. Trying to call `spawn(self.handle_commands(...))` directly
     // inside `handle_commands` causes compile error about type check cycle.
     fn spawn_handle_commands(self: Arc<Self>, command: Command, cmd_id: String) -> Result<()> {
-        // self.enqueue_command(command)?;
-        // if let Some(command) = self.get_next_command_to_handle() {
-        let _ = tokio::spawn(
+        let _task = tokio::spawn(
             self.enqueue_and_handle_next_command_and_any_offshoots(command, Some(cmd_id)),
         );
-        // }
         Ok(())
     }
 

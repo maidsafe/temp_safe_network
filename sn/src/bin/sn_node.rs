@@ -43,9 +43,10 @@ use tracing_subscriber::filter::EnvFilter;
 const MODULE_NAME: &str = "safe_network";
 const BOOTSTRAP_RETRY_TIME: u64 = 3; // in minutes
 
-/// Runs a Safe Network node.
 fn main() -> Result<()> {
     color_eyre::install()?;
+    #[cfg(feature = "tokio-console")]
+    console_subscriber::init();
 
     let handle = std::thread::Builder::new()
         .name("sn_node".to_string())
@@ -82,60 +83,64 @@ async fn run_node() -> Result<()> {
     // Set up logging
     // ==============
 
-    let filter = match EnvFilter::try_from_env("RUST_LOG") {
-        Ok(filter) => filter,
-        // If we have an error (ie RUST_LOG not set or otherwise), we check the verbosity flags
-        Err(_) => {
-            // we manually determine level filter instead of using tracing EnvFilter.
-            let level_filter = config.verbose();
-            let module_filter = format!("{}={}", MODULE_NAME, level_filter)
-                .parse()
-                .wrap_err("BUG: invalid module filter constructed")?;
-            EnvFilter::from_default_env().add_directive(module_filter)
-        }
-    };
+    #[cfg(not(feature = "tokio-console"))]
+    {
+        let filter = match EnvFilter::try_from_env("RUST_LOG") {
+            Ok(filter) => filter,
+            // If we have an error (ie RUST_LOG not set or otherwise), we check the verbosity flags
+            Err(_) => {
+                // we manually determine level filter instead of using tracing EnvFilter.
+                let level_filter = config.verbose();
+                let module_filter = format!("{}={}", MODULE_NAME, level_filter)
+                    .parse()
+                    .wrap_err("BUG: invalid module filter constructed")?;
+                EnvFilter::from_default_env().add_directive(module_filter)
+            }
+        };
 
-    let _optional_guard = if let Some(log_dir) = config.log_dir() {
-        println!("Starting logging to file: {:?}", log_dir);
-        let file_appender = tracing_appender::rolling::hourly(log_dir, "sn_node.log");
+        let _optional_guard = if let Some(log_dir) = config.log_dir() {
+            println!("Starting logging to file: {:?}", log_dir);
+            let file_appender = tracing_appender::rolling::hourly(log_dir, "sn_node.log");
 
-        // configure how tracing non-blocking works: https://tracing.rs/tracing_appender/non_blocking/struct.nonblockingbuilder#method.default
-        let non_blocking_builder = tracing_appender::non_blocking::NonBlockingBuilder::default();
+            // configure how tracing non-blocking works: https://tracing.rs/tracing_appender/non_blocking/struct.nonblockingbuilder#method.default
+            let non_blocking_builder =
+                tracing_appender::non_blocking::NonBlockingBuilder::default();
 
-        let (non_blocking, guard) = non_blocking_builder
-            // lose lines and keep perf, or exert backpressure?
-            .lossy(false)
-            // optionally change buffered lines limit
-            // .buffered_lines_limit(buffered_lines_limit)
-            .finish(file_appender);
+            let (non_blocking, guard) = non_blocking_builder
+                // lose lines and keep perf, or exert backpressure?
+                .lossy(false)
+                // optionally change buffered lines limit
+                // .buffered_lines_limit(buffered_lines_limit)
+                .finish(file_appender);
 
-        let builder = tracing_subscriber::fmt()
-        // eg : RUST_LOG=my_crate=info,my_crate::my_mod=debug,[my_span]=trace
-            .with_env_filter(filter)
-            .with_thread_names(true)
-            .with_ansi(false)
-            .with_writer(non_blocking);
+            let builder = tracing_subscriber::fmt()
+            // eg : RUST_LOG=my_crate=info,my_crate::my_mod=debug,[my_span]=trace
+                .with_env_filter(filter)
+                .with_thread_names(true)
+                .with_ansi(false)
+                .with_writer(non_blocking);
 
-        if config.json_logs {
-            builder.json().init();
+            if config.json_logs {
+                builder.json().init();
+            } else {
+                builder.event_format(LogFormatter::default()).init();
+            }
+
+            Some(guard)
         } else {
-            builder.event_format(LogFormatter::default()).init();
-        }
+            println!("Starting logging to stdout");
 
-        Some(guard)
-    } else {
-        println!("Starting logging to stdout");
+            tracing_subscriber::fmt()
+                .with_thread_names(true)
+                .with_ansi(false)
+                .with_env_filter(EnvFilter::from_default_env())
+                .with_target(false)
+                .event_format(LogFormatter::default())
+                .init();
 
-        tracing_subscriber::fmt()
-            .with_thread_names(true)
-            .with_ansi(false)
-            .with_env_filter(EnvFilter::from_default_env())
-            .with_target(false)
-            .event_format(LogFormatter::default())
-            .init();
-
-        None
-    };
+            None
+        };
+    }
 
     if config.update() || config.update_only() {
         match update() {
