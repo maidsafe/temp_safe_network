@@ -69,6 +69,7 @@ impl Session {
             genesis_key,
             initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
             standard_wait,
+            elder_last_closed_connections: Arc::new(DashMap::default()),
         };
 
         Ok(session)
@@ -494,21 +495,32 @@ pub(super) async fn send_message(
         let endpoint = endpoint.clone();
 
         let mut reused_connection = true;
-
+        let peer_name = peer.name();
+        let cloned_peer = peer.clone();
+        // let addr = peer.addr();
+        let failed_connection_id = session
+            .elder_last_closed_connections
+            .get(&peer_name)
+            .map(|entry| *entry.value());
         let connection = peer
             .ensure_connection(
+                // map closed conns to elders here and in listeners and compare here...
                 // TODO: log any connections that failed's IDs and then check if that conn is valid here
-                // `is_valid = |connection| connection.id() != last_connection_id`).
-                |_| true,
+                // `is_valid = |connection| connection.id() != failed_connection_id`).
+                |connection| Some(connection.id()) != failed_connection_id,
                 |addr| {
                     reused_connection = false;
                     async move {
+                        trace!(
+                            "Prior connection no longer valid, opening a new connection to: {:?} ",
+                            addr
+                        );
                         let (connection, connection_incoming) = endpoint.connect_to(&addr).await?;
                         let conn_id = connection.id();
                         Session::spawn_message_listener_thread(
                             session.clone(),
                             conn_id,
-                            addr,
+                            cloned_peer,
                             connection_incoming,
                         );
                         Ok(connection)
@@ -517,26 +529,38 @@ pub(super) async fn send_message(
             )
             .await;
 
-        if let (true, Ok(connection)) = (reused_connection, connection) {
+        let connection_id = connection?.id();
+
+        if reused_connection {
             trace!(
-                connection_id = connection.id(),
-                src = %connection.remote_address(),
+                connection_id,
+                src = %peer.addr(),
                 "Client::ConnectionReused",
             );
         }
 
-        let task_handle: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
-            let connection = peer.connection().await;
-            if let Some(connection) = connection {
-                connection
-                    .send_with(msg_bytes_clone, priority, None)
-                    .await
-                    .map_err(Error::from)
-            } else {
-                error!("Peer connection did not exist, even after using 'ensure_connection'. Message to {:?} was not sent.",peer);
-                Err(Error::PeerConnection(peer.addr()))
-            }
-        });
+        let task_handle: JoinHandle<(XorName, usize, Result<(), Error>)> = tokio::spawn(
+            async move {
+                let connection = peer.connection().await;
+                if let Some(connection) = connection {
+                    (
+                        peer_name,
+                        connection_id,
+                        connection
+                            .send_with(msg_bytes_clone, priority, None)
+                            .await
+                            .map_err(Error::from),
+                    )
+                } else {
+                    error!("Peer connection did not exist, even after using 'ensure_connection'. Message to {:?} was not sent.",peer);
+                    (
+                        peer_name,
+                        connection_id,
+                        Err(Error::PeerConnection(peer.addr())),
+                    )
+                }
+            },
+        );
 
         tasks.push(task_handle);
     }
@@ -546,7 +570,7 @@ pub(super) async fn send_message(
 
     for r in results {
         match r {
-            Ok(send_result) => {
+            Ok((peer_name, connection_id, send_result)) => {
                 if let Err(Error::QuicP2pSend(SendError::ConnectionLost(
                     ConnectionError::Closed(Close::Application { reason, .. }),
                 ))) = send_result
@@ -555,8 +579,12 @@ pub(super) async fn send_message(
                         "Connection was closed by the node: {:?}",
                         String::from_utf8(reason.to_vec())
                     );
+
+                    let _old = session
+                        .elder_last_closed_connections
+                        .insert(peer_name, connection_id);
                     // this is not necessarily an error
-                    *successes.write().await += 1;
+                    // *successes.write().await += 1;
                 } else if send_result.is_err() {
                     error!("Error during {:?} send: {:?}", msg_id, send_result);
                 } else {
