@@ -39,15 +39,6 @@ impl ChunkStore {
         })
     }
 
-    pub(crate) fn keys(&self) -> Result<Vec<ChunkAddress>> {
-        self.disk_store.list_all_chunk_addresses()
-    }
-
-    pub(crate) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
-        trace!("Removing chunk, {:?}", address);
-        self.disk_store.delete_chunk(address).await
-    }
-
     pub(crate) async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
         debug!("Getting chunk {:?}", address);
 

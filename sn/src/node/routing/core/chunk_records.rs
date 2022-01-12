@@ -20,8 +20,7 @@ use crate::{
     types::{log_markers::LogMarker, Chunk, ChunkAddress, PublicKey},
 };
 
-use itertools::Itertools;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use tracing::info;
 use xor_name::XorName;
 
@@ -170,87 +169,5 @@ impl Core {
 
         self.send_node_msg_to_targets(msg, fresh_targets, aggregation)
             .await
-    }
-
-    #[allow(clippy::mutable_key_type)]
-    pub(crate) async fn reorganize_chunks(
-        &self,
-        our_name: XorName,
-        new_adults: BTreeSet<XorName>,
-        lost_adults: BTreeSet<XorName>,
-        remaining: BTreeSet<XorName>,
-    ) -> Result<Vec<Command>> {
-        let chunks = self.chunk_storage.clone();
-        let keys = chunks.keys()?;
-        let mut data_for_replication = BTreeMap::new();
-        for addr in keys.iter() {
-            if let Some((data, holders)) = self
-                .republish_and_cache(addr, &our_name, &new_adults, &lost_adults, &remaining)
-                .await
-            {
-                let _prev = data_for_replication.insert(data, holders);
-            }
-        }
-
-        let mut commands = vec![];
-        let section_pk = self.network_knowledge.section_key().await;
-        for (chunk, targets) in data_for_replication {
-            for name in targets {
-                commands.push(Command::PrepareNodeMsgToSend {
-                    msg: SystemMsg::NodeCmd(NodeCmd::ReplicateChunk(chunk.clone())),
-                    dst: crate::messaging::DstLocation::Node { name, section_pk },
-                })
-            }
-        }
-
-        Ok(commands)
-    }
-
-    async fn republish_and_cache(
-        &self,
-        address: &ChunkAddress,
-        our_name: &XorName,
-        new_adults: &BTreeSet<XorName>,
-        lost_adults: &BTreeSet<XorName>,
-        remaining: &BTreeSet<XorName>,
-    ) -> Option<(Chunk, BTreeSet<XorName>)> {
-        let chunks = self.chunk_storage.clone();
-
-        let old_adult_list = remaining.union(lost_adults).copied().collect();
-        let new_adult_list = remaining.union(new_adults).copied().collect();
-        let new_holders = self.compute_holders(address, &new_adult_list);
-        let old_holders = self.compute_holders(address, &old_adult_list);
-
-        let we_are_not_holder_anymore = !new_holders.contains(our_name);
-        let new_adult_is_holder = !new_holders.is_disjoint(new_adults);
-        let lost_old_holder = !old_holders.is_disjoint(lost_adults);
-
-        if we_are_not_holder_anymore || new_adult_is_holder || lost_old_holder {
-            info!("Republishing chunk at {:?}", address);
-            trace!("We are not a holder anymore? {}, New Adult is Holder? {}, Lost Adult was holder? {}", we_are_not_holder_anymore, new_adult_is_holder, lost_old_holder);
-            let chunk = chunks.get_chunk(address).await.ok()?;
-            if we_are_not_holder_anymore {
-                if let Err(err) = chunks.remove_chunk(address).await {
-                    warn!("Error deleting chunk during republish: {:?}", err);
-                }
-            }
-            // TODO: Push to LRU cache
-            Some((chunk, new_holders))
-        } else {
-            None
-        }
-    }
-
-    fn compute_holders(
-        &self,
-        addr: &ChunkAddress,
-        adult_list: &BTreeSet<XorName>,
-    ) -> BTreeSet<XorName> {
-        adult_list
-            .iter()
-            .sorted_by(|lhs, rhs| addr.name().cmp_distance(lhs, rhs))
-            .take(chunk_copy_count())
-            .cloned()
-            .collect()
     }
 }

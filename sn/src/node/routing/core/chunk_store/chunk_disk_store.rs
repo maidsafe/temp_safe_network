@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Error, Result};
+use super::Result;
 
 use crate::types::{Chunk, ChunkAddress};
 use crate::UsedSpace;
@@ -14,8 +14,7 @@ use crate::UsedSpace;
 use bytes::Bytes;
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt;
-use walkdir::WalkDir;
-use xor_name::{Prefix, XorName};
+use xor_name::XorName;
 
 const BIT_TREE_DEPTH: usize = 20;
 const CHUNK_DB_DIR: &str = "chunkdb";
@@ -74,15 +73,6 @@ impl ChunkDiskStore {
         Ok(path)
     }
 
-    fn filepath_to_address(&self, path: &str) -> Result<ChunkAddress> {
-        let filename = Path::new(path)
-            .file_name()
-            .ok_or(Error::NoFilename)?
-            .to_str()
-            .ok_or(Error::InvalidFilename)?;
-        Ok(ChunkAddress::decode_from_zbase32(filename)?)
-    }
-
     // ---------------------- api methods ----------------------
 
     pub(crate) fn used_space_ratio(&self) -> f64 {
@@ -108,14 +98,6 @@ impl ChunkDiskStore {
         Ok(*addr)
     }
 
-    pub(crate) async fn delete_chunk(&self, addr: &ChunkAddress) -> Result<()> {
-        let filepath = self.address_to_filepath(addr)?;
-        let meta = tokio::fs::metadata(filepath.clone()).await?;
-        tokio::fs::remove_file(filepath).await?;
-        self.used_space.decrease(meta.len() as usize);
-        Ok(())
-    }
-
     pub(crate) async fn read_chunk(&self, addr: &ChunkAddress) -> Result<Chunk> {
         let file_path = self.address_to_filepath(addr)?;
         let bytes = Bytes::from(tokio::fs::read(file_path).await?);
@@ -127,56 +109,6 @@ impl ChunkDiskStore {
         let filepath = self.address_to_filepath(addr)?;
         Ok(filepath.exists())
     }
-
-    pub(crate) fn list_all_files(&self) -> Result<Vec<String>> {
-        list_files_in(&self.chunk_store_path)
-    }
-
-    pub(crate) fn list_all_chunk_addresses(&self) -> Result<Vec<ChunkAddress>> {
-        let all_files = self.list_all_files()?;
-        let all_addrs = all_files
-            .iter()
-            .map(|filepath| self.filepath_to_address(filepath))
-            .collect();
-        all_addrs
-    }
-
-    #[allow(unused)]
-    /// quickly find chunks related or not to a section, might be useful when adults change sections
-    /// not used yet
-    pub(crate) fn list_files_without_prefix(&self, prefix: Prefix) -> Result<Vec<String>> {
-        let all_files = self.list_all_files()?;
-        let prefix_path = self.prefix_tree_path(prefix.name(), prefix.bit_count());
-        let outside_prefix = all_files
-            .into_iter()
-            .filter(|p| !Path::new(&p).starts_with(&prefix_path.as_path()))
-            .collect();
-        Ok(outside_prefix)
-    }
-
-    #[allow(unused)]
-    /// quickly find chunks related or not to a section, might be useful when adults change sections
-    /// not used yet
-    pub(crate) fn list_files_with_prefix(&self, prefix: Prefix) -> Result<Vec<String>> {
-        let prefix_path = self.prefix_tree_path(prefix.name(), prefix.bit_count());
-        list_files_in(prefix_path.as_path())
-    }
-}
-
-fn list_files_in(path: &Path) -> Result<Vec<String>> {
-    let files = WalkDir::new(path)
-        .into_iter()
-        .filter_map(|e| match e {
-            Ok(direntry) => Some(direntry),
-            Err(err) => {
-                warn!("ChunkDiskStore: failed to process file entry: {}", err);
-                None
-            }
-        })
-        .filter(|e| e.file_type().is_file())
-        .map(|e| e.path().display().to_string())
-        .collect();
-    Ok(files)
 }
 
 #[cfg(test)]
