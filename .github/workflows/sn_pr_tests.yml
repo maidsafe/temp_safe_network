@@ -169,6 +169,18 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
+      - name: Mac install ripgrep
+        if: matrix.os == 'macos-latest'
+        run: brew install ripgrep
+
+      - name: ubuntu install ripgrep
+        if: matrix.os == 'self-hosted-ubuntu'
+        run: sudo apt-get -y install ripgrep
+
+      - name: windows install ripgrep
+        if: matrix.os == 'windows-latest'
+        run: choco install ripgrep
+
       - name: Build all safe_network tests
         run: cd sn && cargo test --no-run --release --features=always-joinable,test-utils
         timeout-minutes: 60
@@ -349,6 +361,18 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
+      - name: Mac install ripgrep
+        if: matrix.os == 'macos-latest'
+        run: brew install ripgrep
+
+      - name: ubuntu install ripgrep
+        if: matrix.os == 'self-hosted-ubuntu'
+        run: sudo apt-get -y install ripgrep
+
+      - name: windows install ripgrep
+        if: matrix.os == 'windows-latest'
+        run: choco install ripgrep
+
       - name: Build all sn_api tests
         run: cargo test --no-run -p sn_api --release --lib
 
@@ -441,6 +465,19 @@ jobs:
         with:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
+
+      - name: Mac install ripgrep
+        if: matrix.os == 'macos-latest'
+        run: brew install ripgrep
+
+      - name: ubuntu install ripgrep
+        if: matrix.os == 'self-hosted-ubuntu'
+        run: sudo apt-get -y install ripgrep
+
+      - name: windows install ripgrep
+        if: matrix.os == 'windows-latest'
+        run: choco install ripgrep
+
 
       - name: Build all CLI tests
         run: cargo test --no-run -p sn_cli --release
