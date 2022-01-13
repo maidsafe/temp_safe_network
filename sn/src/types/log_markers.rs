@@ -77,7 +77,7 @@ pub enum LogMarker {
     SendDKGUnderway,
     SendNodeApproval,
     // approved to join
-    ReceivedJoinApproved,
+    ReceivedJoinApproval,
     // Connections
     ConnectionOpened,
     ConnectionClosed,
