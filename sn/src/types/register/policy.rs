@@ -162,14 +162,6 @@ pub struct PublicPolicy {
 }
 
 impl PublicPolicy {
-    /// Returns `Some(true)` if `action` is allowed for the provided user and `Some(false)` if it's
-    /// not permitted. `None` means that default permissions should be applied.
-    pub fn is_action_allowed_by_user(&self, user: &User, action: Action) -> Option<bool> {
-        self.permissions
-            .get(user)
-            .and_then(|perms| perms.is_allowed(action))
-    }
-
     /// Returns `Ok(())` if `action` is allowed for the provided user and `Err(AccessDenied)` if
     /// this action is not permitted.
     pub fn is_action_allowed(&self, requester: User, action: Action) -> Result<()> {
@@ -188,9 +180,24 @@ impl PublicPolicy {
         }
     }
 
+    /// Returns `Some(true)` if `action` is allowed for the provided user and `Some(false)` if it's
+    /// not permitted. `None` means that default permissions should be applied.
+    fn is_action_allowed_by_user(&self, user: &User, action: Action) -> Option<bool> {
+        self.permissions
+            .get(user)
+            .and_then(|perms| perms.is_allowed(action))
+    }
+
     /// Gets the permissions for a user if applicable.
     pub fn permissions(&self, user: User) -> Option<Permissions> {
-        self.permissions.get(&user).map(|p| Permissions::Public(*p))
+        if user == self.owner {
+            // i.e. it won't be possible to circumvent the semantics of `owner`
+            // by setting some other permissions for the user.
+            // the permissions can still be kept in the state though, so that switching owners gives an immediate permission update as well
+            Some(Permissions::Public(PublicPermissions::new(true)))
+        } else {
+            self.permissions.get(&user).map(|p| Permissions::Public(*p))
+        }
     }
 
     /// Returns the owner.
@@ -232,12 +239,19 @@ impl PrivatePolicy {
 
     /// Gets the permissions for a user if applicable.
     pub fn permissions(&self, user: User) -> Option<Permissions> {
-        match user {
-            User::Anyone => None,
-            user @ User::Key(_) => self
-                .permissions
-                .get(&user)
-                .map(|p| Permissions::Private(*p)),
+        if user == self.owner {
+            // i.e. it won't be possible to circumvent the semantics of `owner`
+            // by setting some other permissions for the user.
+            // the permissions can still be kept in the state though, so that switching owners gives an immediate permission update as well
+            Some(Permissions::Private(PrivatePermissions::new(true, true)))
+        } else {
+            match user {
+                User::Anyone => None,
+                user @ User::Key(_) => self
+                    .permissions
+                    .get(&user)
+                    .map(|p| Permissions::Private(*p)),
+            }
         }
     }
 

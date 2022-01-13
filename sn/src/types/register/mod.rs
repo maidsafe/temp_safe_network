@@ -460,7 +460,7 @@ mod tests {
         let authority2 = User::Key(authority_keypair2.public_key());
 
         let mut perms1 = BTreeMap::default();
-        let user_perms1 = PrivatePermissions::new(/*read*/ true, /*write*/ false);
+        let user_perms1 = PrivatePermissions::new(/*read*/ true, /*write*/ false); // trying to set write perms to false for the owner (will not be reflected as long as the user is the owner, as an owner will have full authority)
         let _prev = perms1.insert(authority1, user_perms1);
 
         let mut perms2 = BTreeMap::default();
@@ -491,13 +491,15 @@ mod tests {
 
         assert_eq!(replica1.owner(), authority1);
         assert_eq!(replica1.replica_authority(), authority1);
+        // above the owner perms were set to more restrictive than full, we test below that
+        // write&read perms for the owner will always be true, as an owner will always have full authority (even if perms were explicitly set some other way)
         assert_eq!(
             replica1.policy(Some(authority1))?.permissions(authority1),
-            Some(Permissions::Private(PrivatePermissions::new(true, false))),
+            Some(Permissions::Private(PrivatePermissions::new(true, true))),
         );
         assert_eq!(
             replica1.permissions(authority1, Some(authority1))?,
-            Permissions::Private(PrivatePermissions::new(true, false)),
+            Permissions::Private(PrivatePermissions::new(true, true)),
         );
 
         assert_eq!(replica2.owner(), authority2);
