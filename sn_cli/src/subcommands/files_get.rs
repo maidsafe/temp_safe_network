@@ -180,10 +180,7 @@ pub async fn process_get_command(
                         FileExistsAction::Overwrite => true,
                         FileExistsAction::Preserve => false,
                         FileExistsAction::Ask => {
-                            let prompt = format!(
-                                "overwrite '{}'? ",
-                                status.path_local.display().to_string()
-                            );
+                            let prompt = format!("overwrite '{}'? ", status.path_local.display());
                             prompt_yes_no(&prompt, "Y")
                         }
                     };

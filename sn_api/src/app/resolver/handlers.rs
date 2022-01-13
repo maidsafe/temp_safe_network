@@ -207,11 +207,10 @@ impl Safe {
 
             // try to gather file link and metadata for a file
             let (link, metadata) = files::get_file_link_and_metadata(&files_map_for_path, &path)
-                .map_err(|e| {
+                .map_err(|err| {
                     Error::ContentError(format!(
                         "Failed to obtain file link or info on FileContainer at: {}: {}",
-                        input_url,
-                        e.to_string(),
+                        input_url, err,
                     ))
                 })?;
 

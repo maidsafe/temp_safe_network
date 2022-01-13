@@ -532,7 +532,7 @@ impl NetworkKnowledge {
         self.authority_provider().await.elders_vec()
     }
 
-    /// Return weather the name provided belongs to an Elder, by checking if
+    /// Return whether the name provided belongs to an Elder, by checking if
     /// it is one of the current section's SAP member,
     pub(super) async fn is_elder(&self, name: &XorName) -> bool {
         self.signed_sap.read().await.contains_elder(name)

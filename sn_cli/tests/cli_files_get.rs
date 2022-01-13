@@ -551,11 +551,7 @@ fn files_get_src_is_nrs_recursive_and_dst_not_existing() -> Result<()> {
         .content_version()
         .ok_or_else(|| eyre!("failed to read content version from xorurl"))?;
 
-    let src = format!(
-        "safe://{}/subfolder?v={}",
-        tmp_data_nrs,
-        version.to_string()
-    );
+    let src = format!("safe://{}/subfolder?v={}", tmp_data_nrs, version);
     let dst = assert_fs::TempDir::new()?;
     let dst = dst.path().display().to_string();
 
@@ -1875,7 +1871,6 @@ fn files_get_symlinks_after_sync() -> Result<()> {
     new_symlink_target.write_str("content for target file")?;
     create_symlink(&new_symlink_target, &new_symlink_path, false).map_err(|e| eyre!("{:?}", e))?;
 
-    println!("safeurl: {}", safeurl.to_string());
     safe_cmd_stdout(
         [
             "files",

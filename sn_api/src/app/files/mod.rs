@@ -1928,7 +1928,7 @@ mod tests {
                 msg,
                 format!(
                     "The linked content (FilesContainer) is versionable, therefore NRS requires the link to specify a hash: {}",
-                    unversioned_link.to_string()
+                    unversioned_link
                 )
             );
                 Ok(())
