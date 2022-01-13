@@ -172,7 +172,7 @@ impl Session {
     }
 
     #[instrument(skip(cmds), level = "debug")]
-    async fn send_cmd_response(
+    fn send_cmd_response(
         cmds: PendingCmdAcks,
         correlation_id: MessageId,
         src: SocketAddr,
@@ -184,7 +184,7 @@ impl Session {
                 src,
                 correlation_id
             );
-            let result = sender.send((src, error)).await;
+            let result = sender.try_send((src, error));
             if result.is_err() {
                 trace!("Error sending cmd response on a channel for cmd_id {:?}: {:?}. (It has likely been removed)", correlation_id, result)
             }
@@ -220,7 +220,7 @@ impl Session {
                             let all_senders = entry.value();
                             for (_msg_id, sender) in all_senders {
                                 trace!("Sending response for query w/{:?} via channel.", op_id);
-                                let result = sender.send(response.clone()).await;
+                                let result = sender.try_send(response.clone());
                                 if result.is_err() {
                                     trace!("Error sending query response on a channel for {:?} op_id {:?}: {:?}. (It has likely been removed)", msg_id, op_id, result)
                                 }
@@ -249,14 +249,14 @@ impl Session {
                         correlation_id
                     );
                     warn!("CmdError received is: {:?}", error);
-                    Self::send_cmd_response(cmds, correlation_id, src, Some(error)).await;
+                    Self::send_cmd_response(cmds, correlation_id, src, Some(error));
                 }
                 ServiceMsg::CmdAck { correlation_id } => {
                     debug!(
                         "CmdAck was received for Message{:?} w/ID: {:?} from {:?}",
                         msg_id, correlation_id, src
                     );
-                    Self::send_cmd_response(cmds, correlation_id, src, None).await;
+                    Self::send_cmd_response(cmds, correlation_id, src, None);
                 }
                 msg => {
                     warn!("Ignoring unexpected message type received: {:?}", msg);
