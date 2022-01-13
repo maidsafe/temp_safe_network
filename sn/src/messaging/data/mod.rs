@@ -136,6 +136,8 @@ pub enum QueryResponse {
     //
     /// Response to [`RegisterQuery::Get`].
     GetRegister((Result<Register>, OperationId)),
+    /// Response to [`RegisterQuery::GetEntry`].
+    GetRegisterEntry((Result<Entry>, OperationId)),
     /// Response to [`RegisterQuery::GetOwner`].
     GetRegisterOwner((Result<User>, OperationId)),
     /// Response to [`RegisterQuery::Read`].
@@ -158,6 +160,7 @@ impl QueryResponse {
         match self {
             GetChunk(result) => result.is_ok(),
             GetRegister((result, _op_id)) => result.is_ok(),
+            GetRegisterEntry((result, _op_id)) => result.is_ok(),
             GetRegisterOwner((result, _op_id)) => result.is_ok(),
             ReadRegister((result, _op_id)) => result.is_ok(),
             GetRegisterPolicy((result, _op_id)) => result.is_ok(),
@@ -176,6 +179,10 @@ impl QueryResponse {
                 Err(error) => matches!(*error, ErrorMessage::ChunkNotFound(_)),
             },
             GetRegister((result, _op_id)) => match result {
+                Ok(_) => false,
+                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
+            },
+            GetRegisterEntry((result, _op_id)) => match result {
                 Ok(_) => false,
                 Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
             },
@@ -225,6 +232,7 @@ impl QueryResponse {
                 }
             },
             GetRegister((_, operation_id))
+            | GetRegisterEntry((_, operation_id))
             | GetRegisterOwner((_, operation_id))
             | ReadRegister((_, operation_id))
             | GetRegisterPolicy((_, operation_id))

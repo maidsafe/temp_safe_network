@@ -147,10 +147,10 @@ impl Register {
     }
 
     /// Return a value corresponding to the provided 'hash', if present.
-    pub fn get(&self, hash: EntryHash, requester: Option<User>) -> Result<Option<&Entry>> {
+    pub fn get(&self, hash: EntryHash, requester: Option<User>) -> Result<&Entry> {
         self.check_permissions(Action::Read, requester)?;
 
-        Ok(self.crdt.get(hash))
+        self.crdt.get(hash).ok_or(Error::NoSuchEntry)
     }
 
     /// Read the last entry, or entries when there are branches, if the register is not empty.
@@ -367,17 +367,17 @@ mod tests {
         assert_eq!(register.size(None)?, 3);
 
         let first_entry = register.get(entry1_hash, None)?;
-        assert_eq!(first_entry, Some(&entry1));
+        assert_eq!(first_entry, &entry1);
 
         let second_entry = register.get(entry2_hash, None)?;
-        assert_eq!(second_entry, Some(&entry2));
+        assert_eq!(second_entry, &entry2);
 
         let third_entry = register.get(entry3_hash, None)?;
-        assert_eq!(third_entry, Some(&entry3));
+        assert_eq!(third_entry, &entry3);
 
         let non_existing_hash = EntryHash::default();
-        let entry_not_found = register.get(non_existing_hash, None)?;
-        assert!(entry_not_found.is_none());
+        let entry_not_found = register.get(non_existing_hash, None);
+        assert_eq!(entry_not_found, Err(Error::NoSuchEntry));
 
         Ok(())
     }
@@ -620,7 +620,7 @@ mod tests {
         // let's check authority1 can read from replica1 and replica2
         let data = replica1.get(entry1_hash, Some(authority1))?;
         let last = replica1.read(Some(authority1))?;
-        assert_eq!(data, Some(&item1));
+        assert_eq!(data, &item1);
         assert_eq!(
             last,
             vec![(entry1_hash, item1), (entry2_hash, item2.clone())]
@@ -630,7 +630,7 @@ mod tests {
 
         let data = replica2.get(entry2_hash, Some(authority1))?;
         let last = replica2.read(Some(authority1))?;
-        assert_eq!(data, Some(&item2));
+        assert_eq!(data, &item2);
         assert_eq!(
             last,
             vec![(entry2_hash, item2.clone())].into_iter().collect()
@@ -643,7 +643,7 @@ mod tests {
         // but authority2 can read from replica2
         let data = replica2.get(entry2_hash, Some(authority2))?;
         let last = replica2.read(Some(authority2))?;
-        assert_eq!(data, Some(&item2));
+        assert_eq!(data, &item2);
         assert_eq!(last, vec![(entry2_hash, item2)].into_iter().collect());
 
         Ok(())

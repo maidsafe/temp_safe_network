@@ -19,6 +19,7 @@ use crate::messaging::{
     system::NodeQueryResponse,
     SectionAuth, VerifyAuthority,
 };
+use crate::types::register::EntryHash;
 use crate::types::{
     register::{Action, Register, User},
     DataAddress, RegisterAddress as Address,
@@ -468,11 +469,15 @@ impl RegisterStorage {
             Get(address) => self.get(*address, requester, operation_id).await,
             Read(address) => self.read_register(*address, requester, operation_id).await,
             GetOwner(address) => self.get_owner(*address, requester, operation_id).await,
+            GetEntry { address, hash } => {
+                self.get_entry(*address, *hash, requester, operation_id)
+                    .await
+            }
+            GetPolicy(address) => self.get_policy(*address, requester, operation_id).await,
             GetUserPermissions { address, user } => {
                 self.get_user_permissions(*address, *user, requester, operation_id)
                     .await
             }
-            GetPolicy(address) => self.get_policy(*address, requester, operation_id).await,
         }
     }
 
@@ -540,6 +545,29 @@ impl RegisterStorage {
         };
 
         NodeQueryResponse::GetRegisterOwner((result, operation_id))
+    }
+
+    async fn get_entry(
+        &self,
+        address: Address,
+        hash: EntryHash,
+        requester: User,
+        operation_id: OperationId,
+    ) -> NodeQueryResponse {
+        let result = match self
+            .get_register(&address, Action::Read, requester)
+            .await
+            .and_then(|register| {
+                register
+                    .get(hash, Some(requester))
+                    .map(|c| c.clone())
+                    .map_err(Error::from)
+            }) {
+            Ok(res) => Ok(res),
+            Err(error) => Err(convert_to_error_message(error)),
+        };
+
+        NodeQueryResponse::GetRegisterEntry((result, operation_id))
     }
 
     async fn get_user_permissions(

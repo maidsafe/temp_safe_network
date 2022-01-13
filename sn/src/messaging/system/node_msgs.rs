@@ -100,10 +100,12 @@ pub enum NodeQueryResponse {
     GetRegister((Result<Register>, OperationId)),
     /// Response to [`RegisterQuery::GetOwner`].
     GetRegisterOwner((Result<User>, OperationId)),
-    /// Response to [`RegisterQuery::Read`].
-    ReadRegister((Result<BTreeSet<(EntryHash, Entry)>>, OperationId)),
+    /// Response to [`RegisterQuery::GetEntry`].
+    GetRegisterEntry((Result<Entry>, OperationId)),
     /// Response to [`RegisterQuery::GetPolicy`].
     GetRegisterPolicy((Result<Policy>, OperationId)),
+    /// Response to [`RegisterQuery::Read`].
+    ReadRegister((Result<BTreeSet<(EntryHash, Entry)>>, OperationId)),
     /// Response to [`RegisterQuery::GetUserPermissions`].
     GetRegisterUserPermissions((Result<Permissions>, OperationId)),
     //
@@ -119,6 +121,7 @@ impl NodeQueryResponse {
         match self {
             GetChunk(res) => QueryResponse::GetChunk(res),
             GetRegister(res) => QueryResponse::GetRegister(res),
+            GetRegisterEntry(res) => QueryResponse::GetRegisterEntry(res),
             GetRegisterOwner(res) => QueryResponse::GetRegisterOwner(res),
             ReadRegister(res) => QueryResponse::ReadRegister(res),
             GetRegisterPolicy(res) => QueryResponse::GetRegisterPolicy(res),

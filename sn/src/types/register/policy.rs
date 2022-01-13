@@ -11,7 +11,6 @@ use super::super::{Error, PublicKey, Result};
 use super::Action;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, hash::Hash};
-use xor_name::XorName;
 
 /// Wrapper type for permissions, which can be public or private.
 #[derive(Clone, Serialize, Deserialize, PartialEq, PartialOrd, Ord, Eq, Hash, Debug)]
@@ -150,8 +149,6 @@ pub enum User {
     Anyone,
     /// User identified by its public key.
     Key(PublicKey),
-    /// User identified by an XorName.
-    Id(XorName),
 }
 
 /// Public permissions.
@@ -238,10 +235,6 @@ impl PrivatePolicy {
         match user {
             User::Anyone => None,
             user @ User::Key(_) => self
-                .permissions
-                .get(&user)
-                .map(|p| Permissions::Private(*p)),
-            user @ User::Id(_) => self
                 .permissions
                 .get(&user)
                 .map(|p| Permissions::Private(*p)),

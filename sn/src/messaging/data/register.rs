@@ -9,6 +9,7 @@
 use super::{CmdError, Error, QueryResponse, Result};
 
 use crate::messaging::{data::OperationId, SectionAuth};
+use crate::types::register::EntryHash;
 use crate::types::{
     register::{Entry, Policy, RegisterOp, User},
     RegisterAddress as Address,
@@ -34,6 +35,17 @@ pub enum RegisterQuery {
     ///
     /// [`ReadRegister`]: QueryResponse::ReadRegister
     Read(Address),
+    /// Get an entry from a [`Register`] on the Network by its hash
+    ///
+    /// This should eventually lead to a [`GetRegisterEntry`] response.
+    ///
+    /// [`GetEntry`]: QueryResponse::GetRegisterEntry
+    GetEntry {
+        /// Register address.
+        address: Address,
+        /// The hash of the entry.
+        hash: EntryHash,
+    },
     /// Retrieve the policy of the [`Register`] at the given address.
     ///
     /// This should eventually lead to a [`GetRegisterPolicy`] response.
@@ -231,6 +243,10 @@ impl RegisterQuery {
             RegisterQuery::GetUserPermissions { .. } => Ok(
                 QueryResponse::GetRegisterUserPermissions((Err(error), self.operation_id()?)),
             ),
+            RegisterQuery::GetEntry { .. } => Ok(QueryResponse::GetRegisterEntry((
+                Err(error),
+                self.operation_id()?,
+            ))),
             RegisterQuery::GetOwner(_) => Ok(QueryResponse::GetRegisterOwner((
                 Err(error),
                 self.operation_id()?,
@@ -245,6 +261,7 @@ impl RegisterQuery {
             | RegisterQuery::Read(ref address)
             | RegisterQuery::GetPolicy(ref address)
             | RegisterQuery::GetUserPermissions { ref address, .. }
+            | RegisterQuery::GetEntry { ref address, .. }
             | RegisterQuery::GetOwner(ref address) => *address,
         }
     }
@@ -256,6 +273,7 @@ impl RegisterQuery {
             | RegisterQuery::Read(ref address)
             | RegisterQuery::GetPolicy(ref address)
             | RegisterQuery::GetUserPermissions { ref address, .. }
+            | RegisterQuery::GetEntry { ref address, .. }
             | RegisterQuery::GetOwner(ref address) => *address.name(),
         }
     }
@@ -264,6 +282,7 @@ impl RegisterQuery {
     /// and responses at clients.
     /// Must be the same as the query response
     /// Right now returning result to fail for anything non-chunk, as that's all we're tracking from other nodes here just now.
+    /// TODO: Track unique requests. Currently GetEntry and GetUserPermissions would give same op id for different queries (diff users and entries asked for).
     pub fn operation_id(&self) -> Result<OperationId> {
         match self {
             RegisterQuery::Get(ref address) => Ok(format!(
@@ -286,6 +305,12 @@ impl RegisterQuery {
             )),
             RegisterQuery::GetUserPermissions { ref address, .. } => Ok(format!(
                 "GetUserPermissions-{:?}",
+                address
+                    .encode_to_zbase32()
+                    .map_err(|_| Error::NoOperationId)?
+            )),
+            RegisterQuery::GetEntry { ref address, .. } => Ok(format!(
+                "GetEntry-{:?}",
                 address
                     .encode_to_zbase32()
                     .map_err(|_| Error::NoOperationId)?
