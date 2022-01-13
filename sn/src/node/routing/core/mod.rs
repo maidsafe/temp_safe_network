@@ -231,15 +231,12 @@ impl Core {
 
         if new.section_key != old.section_key {
             if new.is_elder {
+                let sap = self.network_knowledge.authority_provider().await;
                 info!(
                     "Section updated: prefix: ({:b}), key: {:?}, elders: {}",
                     new.prefix,
                     new.section_key,
-                    self.network_knowledge
-                        .authority_provider()
-                        .await
-                        .elders()
-                        .format(", ")
+                    sap.elders().format(", ")
                 );
 
                 if !self.section_keys_provider.is_empty().await {
