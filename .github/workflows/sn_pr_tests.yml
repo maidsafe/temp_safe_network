@@ -182,6 +182,16 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
+      - name: Wait for all nodes to join
+        shell: bash
+        run: ./resources/scripts/wait_for_nodes_to_join.sh
+        timeout-minutes: 5
+
+      - name: Print Network Log Stats after nodes joined
+        shell: bash
+        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+
       - name: ubuntu install zsh
         if: matrix.os == 'self-hosted-ubuntu'
         run: |
@@ -351,6 +361,15 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
+      - name: Wait for all nodes to join
+        shell: bash
+        run: ./resources/scripts/wait_for_nodes_to_join.sh
+        timeout-minutes: 5
+
+      - name: Print Network Log Stats after nodes joined
+        shell: bash
+        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
       - name: Run sn_api tests
         shell: bash
@@ -435,6 +454,15 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
+      - name: Wait for all nodes to join
+        shell: bash
+        run: ./resources/scripts/wait_for_nodes_to_join.sh
+        timeout-minutes: 5
+
+      - name: Print Network Log Stats after nodes joined
+        shell: bash
+        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
       - name: Run CLI tests
         shell: bash
