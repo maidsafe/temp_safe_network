@@ -282,46 +282,25 @@ impl RegisterQuery {
     /// and responses at clients.
     /// Must be the same as the query response
     /// Right now returning result to fail for anything non-chunk, as that's all we're tracking from other nodes here just now.
-    /// TODO: Track unique requests. Currently GetEntry and GetUserPermissions would give same op id for different queries (diff users and entries asked for).
     pub fn operation_id(&self) -> Result<OperationId> {
         match self {
-            RegisterQuery::Get(ref address) => Ok(format!(
-                "Get-{:?}",
-                address
-                    .encode_to_zbase32()
-                    .map_err(|_| Error::NoOperationId)?
-            )),
-            RegisterQuery::Read(ref address) => Ok(format!(
-                "Read-{:?}",
-                address
-                    .encode_to_zbase32()
-                    .map_err(|_| Error::NoOperationId)?
-            )),
-            RegisterQuery::GetPolicy(ref address) => Ok(format!(
-                "GetPolicy-{:?}",
-                address
-                    .encode_to_zbase32()
-                    .map_err(|_| Error::NoOperationId)?
-            )),
-            RegisterQuery::GetUserPermissions { ref address, .. } => Ok(format!(
+            RegisterQuery::Get(_) => Ok(format!("Get-{:?}", self.encode_to_zbase32()?)),
+            RegisterQuery::Read(_) => Ok(format!("Read-{:?}", self.encode_to_zbase32()?)),
+            RegisterQuery::GetPolicy(_) => Ok(format!("GetPolicy-{:?}", self.encode_to_zbase32()?)),
+            RegisterQuery::GetUserPermissions { .. } => Ok(format!(
                 "GetUserPermissions-{:?}",
-                address
-                    .encode_to_zbase32()
-                    .map_err(|_| Error::NoOperationId)?
+                self.encode_to_zbase32()?
             )),
-            RegisterQuery::GetEntry { ref address, .. } => Ok(format!(
-                "GetEntry-{:?}",
-                address
-                    .encode_to_zbase32()
-                    .map_err(|_| Error::NoOperationId)?
-            )),
-            RegisterQuery::GetOwner(ref address) => Ok(format!(
-                "GetOwner-{:?}",
-                address
-                    .encode_to_zbase32()
-                    .map_err(|_| Error::NoOperationId)?
-            )),
+            RegisterQuery::GetEntry { .. } => {
+                Ok(format!("GetEntry-{:?}", self.encode_to_zbase32()?))
+            }
+            RegisterQuery::GetOwner(_) => Ok(format!("GetOwner-{:?}", self.encode_to_zbase32()?)),
         }
+    }
+
+    /// Returns the query serialised and encoded in z-base-32.
+    fn encode_to_zbase32(&self) -> Result<String> {
+        crate::types::utils::encode(&self).map_err(|_| Error::NoOperationId)
     }
 }
 

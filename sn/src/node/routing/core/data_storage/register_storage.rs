@@ -744,46 +744,46 @@ mod test {
     use xor_name::{Prefix, XorName};
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_basic_read_and_write() -> Result<()> {
-        basic_read_and_write(|| create_private_register()).await?;
-        basic_read_and_write(|| create_public_register()).await?;
+    async fn test_register_write() -> Result<()> {
+        register_write(create_private_register).await?;
+        register_write(create_public_register).await?;
 
         Ok(())
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_register_delete() -> Result<()> {
-        register_delete(|| create_private_register()).await?;
-        register_delete(|| create_public_register()).await?;
+        register_delete(create_private_register).await?;
+        register_delete(create_public_register).await?;
 
         Ok(())
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_register_export() -> Result<()> {
-        register_export(|| create_private_register()).await?;
-        register_export(|| create_public_register()).await?;
+        register_export(create_private_register).await?;
+        register_export(create_public_register).await?;
 
         Ok(())
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_register_non_existing_entry() -> Result<()> {
-        register_non_existing_entry(|| create_private_register()).await?;
-        register_non_existing_entry(|| create_public_register()).await?;
+        register_non_existing_entry(create_private_register).await?;
+        register_non_existing_entry(create_public_register).await?;
 
         Ok(())
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_register_non_existing_permissions() -> Result<()> {
-        register_non_existing_permissions(|| create_private_register()).await?;
-        register_non_existing_permissions(|| create_public_register()).await?;
+        register_non_existing_permissions(create_private_register).await?;
+        register_non_existing_permissions(create_public_register).await?;
 
         Ok(())
     }
 
-    async fn basic_read_and_write<F>(create_register: F) -> Result<()>
+    async fn register_write<F>(create_register: F) -> Result<()>
     where
         F: Fn() -> Result<(RegisterCmd, User)>,
     {

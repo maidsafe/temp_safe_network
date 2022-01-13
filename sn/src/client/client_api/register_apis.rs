@@ -537,8 +537,8 @@ mod tests {
             Err(Error::ErrorMessage {
                 source: ErrorMessage::NoSuchEntry,
                 ..
-            }) => return Ok(()),
-            Err(err) => return Err(eyre!(
+            }) => Ok(()),
+            Err(err) => Err(eyre!(
                 "Unexpected error returned when retrieving non-existing Register user permission: {:?}", err,
             )),
         }
@@ -590,8 +590,8 @@ mod tests {
             Err(Error::ErrorMessage {
                 source: ErrorMessage::NoSuchEntry,
                 ..
-            }) => return Ok(()),
-            Err(err) => return Err(eyre!(
+            }) => Ok(()),
+            Err(err) => Err(eyre!(
                 "Unexpected error returned when retrieving non-existing Register user permission: {:?}", err,
             )),
         }
@@ -678,7 +678,7 @@ mod tests {
             .await?;
         assert_eq!(retrieved_value_2, value_2);
 
-        // Requesting a hash which doesn't exist returns an error
+        // Requesting an entry which doesn't exist returns an error
         match client
             .get_register_entry(address, EntryHash(rand::thread_rng().gen::<[u8; 32]>()))
             .instrument(tracing::info_span!("final get"))
