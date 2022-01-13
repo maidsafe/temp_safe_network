@@ -412,9 +412,10 @@ impl Session {
                 }
             }
 
+            let stats = self.network.known_sections_count();
+
             // wait until we have _some_ network knowledge
             while known_sap.is_none() || insufficient_sap_peers {
-                let stats = self.network.known_sections_count();
                 debug!("Client still has not received a complete section's AE-Retry message... {:?}. Current sections known", stats);
 
                 knowledge_checks += 1;
@@ -460,6 +461,8 @@ impl Session {
                     }
                 }
             }
+
+            debug!("Client has received updated network knowledge. Current sections known: {:?}. Sap for our startup-query: {:?}", stats, known_sap);
         }
 
         Ok(())
