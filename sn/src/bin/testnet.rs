@@ -30,7 +30,6 @@
 use dirs_next::home_dir;
 use eyre::{eyre, Result, WrapErr as _};
 use sn_launch_tool::Launch;
-#[cfg(not(target_os = "windows"))]
 use std::process::{Command, Stdio};
 use std::{io, path::PathBuf};
 use structopt::StructOpt;
@@ -83,53 +82,45 @@ async fn main() -> Result<()> {
         .await
         .wrap_err("Cannot create nodes directory")?;
 
-    // TODO:: Remove this conditional compilation once the issue on Windows
-    // got resoved within the new version of Rust.
-    #[cfg(not(target_os = "windows"))]
-    // For Windows guys, rember to use
-    // `cargo build --release --features=always-joinable,test-utils --bins`
-    // before executing the testnet.exe.
-    {
-        let mut args = vec!["build", "--release"];
+    let mut args = vec!["build", "--release"];
 
-        // Keep features consistent to avoid recompiling when possible
-        if cfg!(feature = "unstable-command-prioritisation") {
-            args.push("--features");
-            args.push("unstable-command-prioritisation");
-        }
-        if cfg!(feature = "always-joinable") {
-            args.push("--features");
-            args.push("always-joinable");
-        }
-        if cfg!(feature = "test-utils") {
-            args.push("--features");
-            args.push("test-utils");
-        }
-        if cfg!(feature = "unstable-no-connection-pooling") {
-            args.push("--features");
-            args.push("unstable-no-connection-pooling");
-        }
-        if cfg!(feature = "unstable-wiremsg-debuginfo") {
-            args.push("--features");
-            args.push("unstable-wiremsg-debuginfo");
-        }
-
-        info!("Building current sn_node");
-        debug!("Building current sn_node with args: {:?}", args);
-        Command::new("cargo")
-            .args(args.clone())
-            .current_dir("sn")
-            // .env("RUST_LOG", "debug")
-            // .env("RUST_BACKTRACE", "1")
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
-            .output()
-            .map_err(Into::into)
-            .and_then(|result| result.status.success().then(|| ()).ok_or_else(|| eyre!("Command exited with error")))
-            .wrap_err_with(|| format!("Failed to run build command with args: {:?}", args))?;
-
-        info!("sn_node built successfully");
+    // Keep features consistent to avoid recompiling when possible
+    if cfg!(feature = "unstable-command-prioritisation") {
+        args.push("--features");
+        args.push("unstable-command-prioritisation");
     }
+    if cfg!(feature = "always-joinable") {
+        args.push("--features");
+        args.push("always-joinable");
+    }
+    if cfg!(feature = "test-utils") {
+        args.push("--features");
+        args.push("test-utils");
+    }
+    if cfg!(feature = "unstable-no-connection-pooling") {
+        args.push("--features");
+        args.push("unstable-no-connection-pooling");
+    }
+    if cfg!(feature = "unstable-wiremsg-debuginfo") {
+        args.push("--features");
+        args.push("unstable-wiremsg-debuginfo");
+    }
+
+    info!("Building current sn_node");
+    debug!("Building current sn_node with args: {:?}", args);
+    Command::new("cargo")
+        .args(args.clone())
+        .current_dir("sn")
+        // .env("RUST_LOG", "debug")
+        // .env("RUST_BACKTRACE", "1")
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .output()
+        .map_err(Into::into)
+        .and_then(|result| result.status.success().then(|| ()).ok_or_else(|| eyre!("Command exited with error")))
+        .wrap_err_with(|| format!("Failed to run build command with args: {:?}", args))?;
+
+    info!("sn_node built successfully");
 
     run_network().await?;
 
