@@ -11,17 +11,13 @@ use crate::node::{
     routing::{api::command::Command, core::Core},
 };
 use std::collections::BTreeSet;
+use xor_name::XorName;
 
 impl Core {
-    pub(crate) async fn fire_node_event_for_any_new_adults(&self) -> Result<Vec<Command>> {
-        let old_adults: BTreeSet<_> = self
-            .network_knowledge
-            .live_adults()
-            .await
-            .iter()
-            .map(|p| p.name())
-            .collect();
-
+    pub(crate) async fn fire_node_event_for_any_new_adults(
+        &self,
+        old_adults: BTreeSet<XorName>,
+    ) -> Result<Vec<Command>> {
         let mut commands = vec![];
         if self.is_not_elder().await {
             let current_adults: BTreeSet<_> = self
