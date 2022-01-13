@@ -31,7 +31,7 @@ use crate::node::{
         api::command::Command,
         core::{ChunkStoreError, Core, DkgSessionInfo},
         messages::{NodeMsgAuthorityUtils, WireMsgUtils},
-        network_knowledge::{NetworkKnowledge, SectionPeers},
+        network_knowledge::NetworkKnowledge,
         relocation::RelocateState,
         Event, MessageReceived, MIN_LEVEL_WHEN_FULL,
     },
@@ -307,11 +307,7 @@ impl Core {
                     section_auth.into_state(),
                     section_signed,
                     proof_chain,
-                    members.map(|members| {
-                        SectionPeers::new(
-                            members.into_iter().map(|member| member.into_authed_state()),
-                        )
-                    }),
+                    members,
                 )
                 .await
             }
@@ -485,8 +481,12 @@ impl Core {
                                         signed_sap,
                                         Some(prefix_map),
                                     )?;
-                                    let _ = new_network_knowledge
-                                        .merge_members(SectionPeers::from_msg(members));
+                                    let _ = new_network_knowledge.merge_members(
+                                        members
+                                            .into_iter()
+                                            .map(|member| member.into_authed_state())
+                                            .collect(),
+                                    );
 
                                     // TODO: confirm whether carry out the switch immediately here
                                     //       or still using the Command pattern.

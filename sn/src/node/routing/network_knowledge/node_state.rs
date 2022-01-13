@@ -13,12 +13,8 @@ use crate::peer::Peer;
 use std::net::SocketAddr;
 use xor_name::XorName;
 
-/// The minimum age a node can have. The Infants will start at age 4. This is to prevent frequent
-/// relocations during the beginning of a node's lifetime.
-pub const MIN_AGE: u8 = 4;
-
 /// The minimum age a node becomes an adult node.
-pub const MIN_ADULT_AGE: u8 = MIN_AGE + 1;
+pub const MIN_ADULT_AGE: u8 = 5;
 
 /// During the first section, nodes can start at a range of age to avoid too many nodes having the
 /// same time get relocated at the same time.
@@ -87,11 +83,6 @@ impl NodeState {
 
     pub(crate) fn age(&self) -> u8 {
         self.peer.age()
-    }
-
-    // Is the age > `MIN_AGE`?
-    pub(crate) fn is_mature(&self) -> bool {
-        self.age() > MIN_AGE
     }
 
     pub(crate) fn leave(self) -> Result<Self, Error> {

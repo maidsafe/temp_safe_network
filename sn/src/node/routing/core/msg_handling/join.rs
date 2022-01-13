@@ -31,19 +31,6 @@ const FIRST_SECTION_MIN_ELDER_AGE: u8 = 90;
 
 // Message handling
 impl Core {
-    /// Check if we already have this peer in our section
-    fn peer_is_already_a_member(&self, peer: &Peer) -> bool {
-        if self.network_knowledge.members().is_joined(&peer.name()) {
-            debug!(
-                "Ignoring JoinRequest from {} - already member of our section.",
-                peer
-            );
-            return true;
-        }
-
-        false
-    }
-
     pub(crate) async fn handle_join_request(
         &self,
         peer: Peer,
@@ -61,9 +48,6 @@ impl Core {
             if response.verify(&self.section_chain().await) {
                 info!("Handling Online agreement of {:?}", peer);
                 return Ok(vec![Command::HandleNewNodeOnline(response)]);
-                // self
-                // .handle_online_agreement(response.value.clone(), response.sig.clone())
-                // .await;
             }
         }
 
@@ -107,7 +91,12 @@ impl Core {
             return Ok(vec![]);
         }
 
-        if self.peer_is_already_a_member(&peer) {
+        // Check if we already have this peer in our section
+        if self.network_knowledge.is_section_member(&peer.name()) {
+            debug!(
+                "Ignoring JoinRequest from {} - already member of our section.",
+                peer
+            );
             return Ok(vec![]);
         }
 
@@ -152,12 +141,11 @@ impl Core {
         // During the first section, nodes shall use ranged age to avoid too many nodes getting
         // relocated at the same time. After the first section splits, nodes shall only
         // start with an age of MIN_ADULT_AGE
-        let mut section_members = 0;
+        let current_section_size = self.network_knowledge.section_size();
 
         // Prefix will be empty for first section
         let (is_age_invalid, expected_age): (bool, u8) = if our_prefix.is_empty() {
             let elders = self.network_knowledge.elders().await;
-            section_members = self.network_knowledge.active_members().await.len();
             // Forces the joining node to be younger than the youngest elder in genesis section
             // avoiding unnecessary churn.
 
@@ -165,13 +153,13 @@ impl Core {
             if elders.len() == elder_count() {
                 // Check if the joining node is younger than the youngest elder and older than
                 // MIN_ADULT_AGE in the first section, to avoid unnecessary churn during genesis.
-                let expected_age = FIRST_SECTION_MIN_ELDER_AGE - section_members as u8 * 2;
+                let expected_age = FIRST_SECTION_MIN_ELDER_AGE - current_section_size as u8 * 2;
                 let is_age_invalid = peer.age() <= MIN_ADULT_AGE || peer.age() > expected_age;
                 (is_age_invalid, expected_age)
             } else {
                 // Since enough elders haven't joined the first section calculate a value
                 // within the range [FIRST_SECTION_MIN_ELDER_AGE, FIRST_SECTION_MAX_AGE].
-                let expected_age = FIRST_SECTION_MAX_AGE - section_members as u8 * 2;
+                let expected_age = FIRST_SECTION_MAX_AGE - current_section_size as u8 * 2;
                 // TODO: avoid looping by ensure can only update to lower non-FIRST_SECTION_MIN_ELDER_AGE age
                 let is_age_invalid = peer.age() != expected_age;
                 (is_age_invalid, expected_age)
@@ -183,9 +171,9 @@ impl Core {
         };
 
         trace!(
-            "our_prefix {:?} section_members {:?} expected_age {:?} is_age_invalid {:?}",
+            "our_prefix {:?} current_section_size {:?} expected_age {:?} is_age_invalid {:?}",
             our_prefix,
-            section_members,
+            current_section_size,
             expected_age,
             is_age_invalid
         );
@@ -317,7 +305,7 @@ impl Core {
             ]);
         }
 
-        if self.network_knowledge.members().is_joined(&peer.name()) {
+        if self.network_knowledge.is_section_member(&peer.name()) {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - already member of our section.",
                 peer
@@ -380,7 +368,6 @@ impl Core {
 
         if self
             .network_knowledge
-            .members()
             .is_relocated_to_our_section(&details.pub_id)
         {
             debug!(

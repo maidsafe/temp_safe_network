@@ -14,7 +14,7 @@ use crate::node::{
         core::{Core, Proposal},
         dkg::SectionAuthUtils,
         network_knowledge::{NodeState, SectionAuthorityProvider},
-        Event, MIN_AGE,
+        Event, MIN_ADULT_AGE,
     },
 };
 use crate::types::log_markers::LogMarker;
@@ -55,8 +55,7 @@ impl Core {
         let mut commands = vec![];
         if let Some(old_info) = self
             .network_knowledge
-            .members()
-            .get_section_signed(&new_info.name())
+            .get_section_signed_member(&new_info.name())
         {
             // This node is rejoin with same name.
 
@@ -70,9 +69,9 @@ impl Core {
                 return Ok(commands);
             }
 
-            let new_age = cmp::max(MIN_AGE, old_info.age() / 2);
-
-            if new_age > MIN_AGE {
+            // We would approve and relocate it only if half its age is at least MIN_ADULT_AGE
+            let new_age = cmp::max(MIN_ADULT_AGE - 1, old_info.age() / 2);
+            if new_age >= MIN_ADULT_AGE {
                 // TODO: consider handling the relocation inside the bootstrap phase, to avoid
                 // having to send this `NodeApproval`.
                 commands.extend(self.send_node_approval(old_info.clone()).await);
@@ -173,7 +172,7 @@ impl Core {
 
         commands.extend(result);
 
-        self.retain_members_only(
+        self.liveness_retain_only(
             self.network_knowledge
                 .adults()
                 .await

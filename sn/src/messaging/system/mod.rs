@@ -10,24 +10,26 @@ mod agreement;
 mod join;
 mod join_as_relocated;
 mod node_msgs;
+mod node_state;
 mod relocation;
-mod section;
 mod signed;
 
-use crate::messaging::{EndUser, MessageId, SectionAuthorityProvider};
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SectionAuth};
-use bls_dkg::key_gen::message::Message as DkgMessage;
-use bytes::Bytes;
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use node_msgs::{NodeCmd, NodeQuery, NodeQueryResponse};
+pub use node_state::{MembershipState, NodeState};
 pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise};
-pub use section::MembershipState;
-pub use section::NodeState;
-pub use section::SectionPeers;
+pub use signed::{KeyedSig, SigShare};
+
+/// List of peers of a section
+pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
+
+use crate::messaging::{EndUser, MessageId, SectionAuthorityProvider};
+use bls_dkg::key_gen::message::Message as DkgMessage;
+use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
-pub use signed::{KeyedSig, SigShare};
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
@@ -81,7 +83,7 @@ pub enum SystemMsg {
         /// Our section chain truncated from the triggering msg's dst section_key (or genesis key for full proof)
         proof_chain: SecuredLinkedList,
         /// Optional section members if we're updating our own section adults
-        members: Option<BTreeSet<SectionAuth<NodeState>>>,
+        members: Option<SectionPeers>,
     },
     /// Probes the network by sending a message to a random dst triggering an AE flow.
     AntiEntropyProbe(XorName),

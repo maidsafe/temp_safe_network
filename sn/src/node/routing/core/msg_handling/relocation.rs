@@ -227,7 +227,7 @@ impl Core {
             return Ok(commands);
         }
 
-        if let Some(info) = self.network_knowledge.members().get(&promise.name) {
+        if let Some(info) = self.network_knowledge.get_section_member(&promise.name) {
             let peer = info.peer();
             let details = RelocateDetails::new(&self.network_knowledge, peer, promise.dst).await;
             commands.extend(self.send_relocate(peer.clone(), details).await?);

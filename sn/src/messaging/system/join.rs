@@ -6,11 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::agreement::SectionAuth;
-use crate::messaging::{
-    system::{section::SectionPeers, KeyedSig, NodeState, SigShare},
-    SectionAuthorityProvider,
-};
+use super::{agreement::SectionAuth, KeyedSig, NodeState, SectionPeers, SigShare};
+use crate::messaging::SectionAuthorityProvider;
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Signature;
 use secured_linked_list::SecuredLinkedList;

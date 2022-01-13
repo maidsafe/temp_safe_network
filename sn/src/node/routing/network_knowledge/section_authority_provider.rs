@@ -194,7 +194,7 @@ impl SectionAuth<SectionAuthorityProviderMsg> {
 pub(crate) mod test_utils {
     use super::*;
     use crate::node::routing::api::tests::SecretKeySet;
-    use crate::node::routing::{ed25519, node::Node, MIN_ADULT_AGE, MIN_AGE};
+    use crate::node::routing::{ed25519, node::Node, MIN_ADULT_AGE};
     use itertools::Itertools;
     use std::{cell::Cell, net::SocketAddr};
     use xor_name::Prefix;
@@ -218,7 +218,7 @@ pub(crate) mod test_utils {
         (0..count)
             .map(|index| {
                 let age = if age_diff && index < count - 1 {
-                    MIN_AGE + 2
+                    MIN_ADULT_AGE + 1
                 } else {
                     MIN_ADULT_AGE
                 };

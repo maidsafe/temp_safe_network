@@ -22,7 +22,7 @@ impl Core {
         if self.is_not_elder().await {
             let current_adults: BTreeSet<_> = self
                 .network_knowledge
-                .live_adults()
+                .adults()
                 .await
                 .iter()
                 .map(|p| p.name())

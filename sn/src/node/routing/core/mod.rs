@@ -293,7 +293,7 @@ impl Core {
                 }
 
                 commands.extend(self.send_updates_to_sibling_section(&old).await?);
-                self.retain_members_only(
+                self.liveness_retain_only(
                     self.network_knowledge
                         .adults()
                         .await

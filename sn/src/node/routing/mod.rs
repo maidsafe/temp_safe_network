@@ -37,9 +37,7 @@ pub use self::{
         Routing,
     },
     dkg::SectionAuthUtils,
-    network_knowledge::node_state::{
-        FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE, MIN_AGE,
-    },
+    network_knowledge::node_state::{FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE},
 };
 pub use qp2p::{Config as NetworkConfig, SendStream};
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update

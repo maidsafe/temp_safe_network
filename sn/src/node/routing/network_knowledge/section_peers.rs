@@ -6,45 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::{MembershipState, SectionAuth, SectionPeers as SectionPeersMsg};
+use crate::messaging::system::{MembershipState, SectionAuth};
 use crate::node::routing::network_knowledge::{NodeState, SectionAuthorityProvider};
 use crate::peer::Peer;
 use dashmap::{mapref::entry::Entry, DashMap};
 use itertools::Itertools;
-use std::{
-    cmp::Ordering,
-    collections::{BTreeMap, BTreeSet},
-    ops::Deref,
-    sync::Arc,
-};
+use std::{cmp::Ordering, collections::BTreeSet, ops::Deref, sync::Arc};
 use xor_name::{Prefix, XorName};
 
 /// Container for storing information about members of our section.
 #[derive(Clone, Default, Debug)]
-pub(crate) struct SectionPeers {
+pub(super) struct SectionPeers {
     members: Arc<DashMap<XorName, SectionAuth<NodeState>>>,
-}
-
-impl Eq for SectionPeers {}
-
-impl PartialEq for SectionPeers {
-    fn eq(&self, other: &Self) -> bool {
-        // TODO: there must be a better way of doing this...
-        let mut us: BTreeMap<XorName, SectionAuth<NodeState>> = BTreeMap::default();
-        let mut them: BTreeMap<XorName, SectionAuth<NodeState>> = BTreeMap::default();
-
-        for refmulti in self.members.iter() {
-            let (key, value) = refmulti.pair();
-            let _prev = us.insert(*key, value.clone());
-        }
-
-        for refmulti in other.members.iter() {
-            let (key, value) = refmulti.pair();
-            let _prev = them.insert(*key, value.clone());
-        }
-
-        us == them
-    }
 }
 
 impl<'a> IntoIterator for &'a SectionPeers {
@@ -58,70 +31,69 @@ impl<'a> IntoIterator for &'a SectionPeers {
 }
 
 impl SectionPeers {
-    pub(crate) fn new(members: impl IntoIterator<Item = SectionAuth<NodeState>>) -> Self {
-        Self {
-            members: Arc::new(
-                members
-                    .into_iter()
-                    .map(|state| (state.name(), state))
-                    .collect(),
-            ),
-        }
-    }
-
-    pub(crate) fn iter(
+    pub(super) fn iter(
         &self,
     ) -> impl Iterator<Item = impl Deref<Target = SectionAuth<NodeState>> + '_> + '_ {
         IntoIterator::into_iter(self)
     }
 
-    /// Returns joined nodes from our section`
-    pub(crate) fn all_members(&self) -> Vec<Peer> {
-        self.joined()
-            .into_iter()
-            .map(|info| info.peer().clone())
-            .collect()
-    }
-
     /// Returns members that have state == `Joined`.
-    pub(crate) fn joined(&self) -> Vec<NodeState> {
-        let mut joined = vec![];
-        let members = &*self.members;
-        for entry in members.into_iter() {
-            let (_, state) = entry.pair();
-            if state.state() == MembershipState::Joined {
-                joined.push(state.value.clone())
-            }
-        }
-
-        joined
+    pub(super) fn joined(&self) -> BTreeSet<SectionAuth<NodeState>> {
+        self.members
+            .iter()
+            .filter(|entry| {
+                let (_, state) = entry.pair();
+                state.state() == MembershipState::Joined
+            })
+            .map(|entry| {
+                let (_, state) = entry.pair();
+                state.clone()
+            })
+            .collect()
     }
 
-    /// Returns joined nodes from our section with age greater than `MIN_AGE`
-    pub(crate) fn mature(&self) -> Vec<Peer> {
-        self.joined()
-            .into_iter()
-            .filter(|info| info.is_mature())
-            .map(|info| info.peer().clone())
-            .collect()
+    /// Returns number of members that have state == `Joined`.
+    pub(super) fn num_of_joined(&self) -> usize {
+        self.members
+            .iter()
+            .filter(|entry| {
+                let (_, state) = entry.pair();
+                state.state() == MembershipState::Joined
+            })
+            .count()
     }
 
     /// Get info for the member with the given name.
-    pub(crate) fn get(&self, name: &XorName) -> Option<NodeState> {
-        self.members.get(name).map(|info| info.value.clone())
+    pub(super) fn get(&self, name: &XorName) -> Option<NodeState> {
+        self.members
+            .get(name)
+            .filter(|state| state.state() == MembershipState::Joined)
+            .map(|state| state.value.clone())
+    }
+
+    /// Returns whether the given peer is a joined member of our section.
+    pub(super) fn is_joined(&self, name: &XorName) -> bool {
+        self.members
+            .get(name)
+            .map(|info| info.state() == MembershipState::Joined)
+            .unwrap_or(false)
+    }
+
+    /// Returns whether the given peer is already relocated to our section.
+    pub(super) fn is_relocated_to_our_section(&self, name: &XorName) -> bool {
+        self.members
+            .get(name)
+            .map(|state| state.previous_name() == Some(*name))
+            .unwrap_or(false)
     }
 
     /// Get section_signed info for the member with the given name.
-    pub(crate) fn get_section_signed(&self, name: &XorName) -> Option<SectionAuth<NodeState>> {
-        if let Some(oneref) = self.members.get(name) {
-            return Some(oneref.value().clone());
-        }
-
-        None
+    pub(super) fn get_section_signed(&self, name: &XorName) -> Option<SectionAuth<NodeState>> {
+        self.members.get(name).map(|oneref| oneref.value().clone())
     }
 
     /// Returns the candidates for elders out of all the nodes in this section.
-    pub(crate) fn elder_candidates(
+    pub(super) fn elder_candidates(
         &self,
         elder_size: usize,
         current_elders: &SectionAuthorityProvider,
@@ -142,7 +114,7 @@ impl SectionPeers {
     }
 
     /// Returns the candidates for elders out of all nodes matching the prefix.
-    pub(crate) fn elder_candidates_matching_prefix(
+    pub(super) fn elder_candidates_matching_prefix(
         &self,
         prefix: &Prefix,
         elder_size: usize,
@@ -166,29 +138,9 @@ impl SectionPeers {
         elder_candidates(elder_size, current_elders, candidates)
     }
 
-    /// Returns whether the given peer is a joined member of our section.
-    pub(crate) fn is_joined(&self, name: &XorName) -> bool {
-        self.members
-            .get(name)
-            .map(|info| info.state() == MembershipState::Joined)
-            .unwrap_or(false)
-    }
-
-    /// Returns whether the given peer is already relocated to our section.
-    pub(crate) fn is_relocated_to_our_section(&self, name: &XorName) -> bool {
-        for peer in self.members.iter() {
-            let state = peer.value();
-            if state.previous_name() == Some(*name) {
-                return true;
-            }
-        }
-
-        false
-    }
-
     /// Update a member of our section.
     /// Returns whether anything actually changed.
-    pub(crate) fn update(&self, new_info: SectionAuth<NodeState>) -> bool {
+    pub(super) fn update(&self, new_info: SectionAuth<NodeState>) -> bool {
         match self.members.entry(new_info.name()) {
             Entry::Vacant(entry) => {
                 let _prev = entry.insert(new_info);
@@ -216,27 +168,8 @@ impl SectionPeers {
     }
 
     /// Remove all members whose name does not match `prefix`.
-    pub(crate) fn retain(&self, prefix: &Prefix) {
+    pub(super) fn retain(&self, prefix: &Prefix) {
         self.members.retain(|name, _value| prefix.matches(name))
-    }
-
-    /// Create a message from the current state.
-    pub(crate) fn to_msg(&self) -> SectionPeersMsg {
-        let members = self
-            .members
-            .iter()
-            .map(|itr| itr.value().clone().into_authed_msg())
-            .collect();
-        SectionPeersMsg { members }
-    }
-
-    /// Construct from message.
-    pub(crate) fn from_msg(msg: SectionPeersMsg) -> Self {
-        SectionPeers::new(
-            msg.members
-                .into_iter()
-                .map(|member| member.into_authed_state()),
-        )
     }
 }
 

@@ -249,17 +249,27 @@ impl Core {
         let (index, signature_share) = self
             .sign_with_section_key_share(&serialized_details, &section_key)
             .await?;
+
         let sig_share = SigShare {
             public_key_set,
             index,
             signature_share,
         };
+
+        let members = self
+            .network_knowledge
+            .section_signed_members()
+            .into_iter()
+            .map(|itr| itr.into_authed_msg())
+            .collect();
+
         let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::ApprovalShare {
             node_state,
             sig_share,
             section_chain: self.network_knowledge.section_chain().await,
-            members: self.network_knowledge.members().to_msg(),
+            members,
         }));
+
         Ok(vec![
             self.send_direct_message(peer, node_msg, section_key)
                 .await?,
