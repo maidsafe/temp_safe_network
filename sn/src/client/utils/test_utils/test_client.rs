@@ -102,7 +102,7 @@ pub fn init_test_logger() {
 
 /// Create a test client without providing any specific keypair, bootstrap_config, or timeout.
 pub async fn create_test_client() -> Result<Client> {
-    create_test_client_with(None, None, true).await
+    create_test_client_with(None, None, false).await
 }
 
 /// Create a test client optionally providing keypair and/or bootstrap_config
