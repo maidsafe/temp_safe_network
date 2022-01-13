@@ -14,6 +14,7 @@ use crate::messaging::{
 };
 use crate::types::{PublicKey, Signature};
 use bytes::Bytes;
+use rand::Rng;
 use tracing::{debug, info_span};
 
 // We divide the total query timeout by this number.
@@ -50,7 +51,12 @@ impl Client {
         let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
         let signature = self.keypair.sign(&serialised_query);
 
-        let attempt_timeout = self.query_timeout.div_f32(retry_count + 1.0);
+        let mut rng = rand::rngs::OsRng;
+
+        // Add jitter so not all clients retry at the same rate. This divider will knock on to the overall retry window
+        // and should help prevent elders from being conseceutively overwhelmed
+        let jitter = rng.gen_range(1.0, 1.5);
+        let attempt_timeout = self.query_timeout.div_f32(retry_count + jitter);
         trace!("Setting up query retry, interval is: {:?}", attempt_timeout);
 
         let span = info_span!("Attempting a query");

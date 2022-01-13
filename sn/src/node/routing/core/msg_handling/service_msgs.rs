@@ -207,13 +207,39 @@ impl Core {
             sending_nodes_pk
         );
 
+        let node_id = XorName::from(sending_nodes_pk);
         let NodeQueryResponse::GetChunk(response) = response;
+
+        let origin = if let Some(origin) = self.pending_chunk_queries.remove(&user.0).await {
+            // Check for data correctness now that we know the returned data XorName was tracked by us
+            if let Ok(chunk) = &response {
+                let received_name = XorName::from_content(chunk.value());
+                if user.0 != received_name {
+                    warn!("Received response from the Adult did not correspond to the requested address. \n\
+                    Received content name {:?}: Requested name {:?}", received_name, user.0);
+                    warn!("Penalising the Adult and dropping this response");
+                    self.liveness.penalise_member(node_id).await;
+                    return Ok(commands);
+                }
+            }
+
+            origin
+        } else {
+            warn!(
+                "Dropping query response from Adult {}. We might have already forwarded this response to the requesting client or \
+                have not registered the client: {}",
+                sending_nodes_pk, user.0
+            );
+            return Ok(commands);
+        };
+
+        // Clear expired queries from the cache.
+        self.pending_chunk_queries.remove_expired().await;
 
         let query_response = QueryResponse::GetChunk(response);
 
         let pending_removed = match query_response.operation_id() {
             Ok(op_id) => {
-                let node_id = XorName::from(sending_nodes_pk);
                 self.liveness
                     .request_operation_fulfilled(&node_id, op_id)
                     .await
@@ -257,20 +283,6 @@ impl Core {
             response: query_response,
             correlation_id,
         };
-
-        let origin = if let Some(origin) = self.pending_chunk_queries.remove(&user.0).await {
-            origin
-        } else {
-            warn!(
-                "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client or \
-                have not registered the client: {}",
-                sending_nodes_pk, user.0
-            );
-            return Ok(commands);
-        };
-
-        // Clear expired queries from the cache.
-        self.pending_chunk_queries.remove_expired().await;
 
         // FIXME: define which signature/authority this message should really carry,
         // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.

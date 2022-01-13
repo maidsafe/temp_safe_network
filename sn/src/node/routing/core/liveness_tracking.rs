@@ -8,7 +8,8 @@
 
 use crate::node::routing::XorName;
 
-use crate::messaging::data::OperationId;
+use crate::messaging::data::{operation_id, OperationId};
+use crate::types::ChunkAddress;
 use dashmap::DashMap;
 use itertools::Itertools;
 use std::collections::BTreeSet;
@@ -71,6 +72,16 @@ impl Liveness {
         }
 
         self.recompute_closest_nodes();
+    }
+
+    /// Inserts a random OperationId to decrease the credibility of the given Adult node.
+    pub(crate) async fn penalise_member(&self, member: XorName) {
+        if let Ok(random_op_id) = operation_id(&ChunkAddress(XorName::random())) {
+            self.add_a_pending_request_operation(member, random_op_id)
+                .await
+        } else {
+            error!("Error generating a random OperationID for penalising member")
+        }
     }
 
     /// Removes a pending_operation from the node liveness records
