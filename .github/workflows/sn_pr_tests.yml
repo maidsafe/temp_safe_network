@@ -333,6 +333,12 @@ jobs:
         if: failure()
         continue-on-error: true
 
+      # if we don't clean up, the .safe folder might persist between runs
+      - name: Cleanup self-hosted runner
+        if: matrix.os == 'self-hosted-ubuntu' && always()
+        run: |
+          rm -rf ~/.safe
+
 
   api:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -439,6 +445,13 @@ jobs:
         if: failure()
         continue-on-error: true
 
+
+      # if we don't clean up, the .safe folder might persist between runs
+      - name: Cleanup self-hosted runner
+        if: matrix.os == 'self-hosted-ubuntu' && always()
+        run: |
+          rm -rf ~/.safe
+
   cli:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Run CLI tests
@@ -534,3 +547,10 @@ jobs:
           path: ~/.safe/node/local-test-network/**/*.log*
         if: failure()
         continue-on-error: true
+
+
+      # if we don't clean up, the .safe folder might persist between runs
+      - name: Cleanup self-hosted runner
+        if: matrix.os == 'self-hosted-ubuntu' && always()
+        run: |
+          rm -rf ~/.safe
