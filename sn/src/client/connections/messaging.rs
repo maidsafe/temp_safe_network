@@ -453,12 +453,8 @@ impl Session {
             ..Default::default()
         };
 
-        let next_wait = backoff.next_backoff();
-
         // wait here to give a chance for AE responses to come in and be parsed
-        if let Some(wait) = next_wait {
-            tokio::time::sleep(wait).await;
-        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
         // If we start with genesis key here, we should wait until we have _at least_ one AE-Retry in
         if section_pk == self.genesis_key {
@@ -476,14 +472,13 @@ impl Session {
 
             let stats = self.network.known_sections_count();
 
-            // wait until we have _some_ network knowledge
+            // wait until we have sufficient network knowledge
             while known_sap.is_none() || insufficient_sap_peers {
                 if tried_every_contact {
                     return Err(Error::NetworkContact);
                 }
 
                 debug!("Client still has not received a complete section's AE-Retry message... Current sections known: {:?}. Do we have insufficient peers: {:?}", stats, insufficient_sap_peers);
-
                 knowledge_checks += 1;
 
                 // only after a couple of waits do we try contacting more nodes...
