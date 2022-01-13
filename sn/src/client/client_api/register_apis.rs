@@ -795,7 +795,7 @@ mod tests {
 
         let batch2 = client.delete_register(address).await?;
         match client.publish_register_ops(batch2).await {
-            Err(Error::ErrorMessage {
+            Err(Error::ErrorCmd {
                 source: ErrorMessage::InvalidOperation(_),
                 ..
             }) => {}

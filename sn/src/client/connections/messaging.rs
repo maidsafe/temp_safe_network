@@ -176,8 +176,7 @@ impl Session {
                     if received_err >= expected_acks {
                         error!("Received majority of error response for cmd {:?}", msg_id);
                         let _ = self.pending_cmds.remove(&msg_id);
-                        let _ = self.incoming_err_sender.send(error);
-                        break;
+                        return Err(Error::from((error, msg_id)));
                     }
                 }
                 Err(err) => {

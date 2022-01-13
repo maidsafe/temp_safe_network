@@ -46,6 +46,7 @@ pub(super) struct Session {
     // Channels for sending responses to upper layers
     pending_queries: PendingQueryResponses,
     // Channels for sending errors to upper layer
+    #[allow(dead_code)]
     incoming_err_sender: Arc<Sender<CmdError>>,
     // Channels for sending CmdAck to upper layers
     pending_cmds: PendingCmdAcks,
