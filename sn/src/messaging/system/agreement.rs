@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{section::NodeState, signed::KeyedSig};
+use super::{KeyedSig, NodeState};
 use crate::messaging::SectionAuthorityProvider;
 use ed25519_dalek::{PublicKey, Signature};
 use hex_fmt::HexFmt;

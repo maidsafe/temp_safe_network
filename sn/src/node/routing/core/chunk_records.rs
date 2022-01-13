@@ -39,7 +39,7 @@ impl Core {
 
     /// Registered holders not present in provided list of members
     /// will be removed from adult_storage_info and no longer tracked for liveness.
-    pub(crate) async fn retain_members_only(&self, members: BTreeSet<XorName>) -> Result<()> {
+    pub(crate) async fn liveness_retain_only(&self, members: BTreeSet<XorName>) -> Result<()> {
         // full adults
         self.capacity.retain_members_only(&members).await;
 

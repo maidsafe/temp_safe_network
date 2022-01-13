@@ -57,7 +57,7 @@ fn nrs_register_should_register_a_topname_with_a_versioned_content_link() -> Res
     )))
     .stdout(predicate::str::contains(format!(
         "The entry points to {}",
-        url.to_string()
+        url
     )));
     Ok(())
 }
@@ -93,7 +93,7 @@ fn nrs_register_should_register_a_topname_with_an_immutable_content_link() -> Re
     )))
     .stdout(predicate::str::contains(format!(
         "The entry points to {}",
-        url.to_string()
+        url
     )));
     Ok(())
 }

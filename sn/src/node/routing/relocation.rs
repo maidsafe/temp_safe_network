@@ -35,7 +35,7 @@ pub(crate) async fn actions(
     // Find the peers that pass the relocation check and take only the oldest ones to avoid
     // relocating too many nodes at the same time.
     // Capped by criteria that cannot relocate too many node at once.
-    let joined_nodes = network_knowledge.members().joined();
+    let joined_nodes = network_knowledge.section_members();
 
     if joined_nodes.len() < recommended_section_size() {
         return vec![];
@@ -260,7 +260,7 @@ mod tests {
     use crate::elder_count;
     use crate::node::routing::{
         api::tests::SecretKeySet, dkg::test_utils::section_signed,
-        network_knowledge::SectionAuthorityProvider, MIN_AGE,
+        network_knowledge::SectionAuthorityProvider, MIN_ADULT_AGE,
     };
     use crate::peer::test_utils::arbitrary_unique_peers;
     use assert_matches::assert_matches;
@@ -283,12 +283,12 @@ mod tests {
         assert_eq!(trailing_zeros(&[2, 0]), 9);
     }
 
-    const MAX_AGE: u8 = MIN_AGE + 4;
+    const MAX_AGE: u8 = MIN_ADULT_AGE + 3;
 
     proptest! {
         #[test]
         fn proptest_actions(
-            peers in arbitrary_unique_peers(2..(recommended_section_size() + elder_count()), MIN_AGE..MAX_AGE),
+            peers in arbitrary_unique_peers(2..(recommended_section_size() + elder_count()), MIN_ADULT_AGE..MAX_AGE),
             signature_trailing_zeros in 0..MAX_AGE,
             seed in any::<u64>().no_shrink())
         {

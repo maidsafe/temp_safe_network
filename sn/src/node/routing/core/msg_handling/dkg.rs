@@ -44,7 +44,6 @@ impl Core {
             return Ok(vec![]);
         }
         let section_auth = self.network_knowledge().authority_provider().await;
-        let section_peers = self.network_knowledge().members();
 
         let elder_candidates = ElderCandidates::new(
             prefix,
@@ -55,10 +54,8 @@ impl Core {
                     .filter(|elder| elder.addr() == addr)
                 {
                     elder.clone()
-                } else if let Some(node) =
-                    section_peers.get(&name).filter(|node| node.addr() == addr)
-                {
-                    node.peer().clone()
+                } else if let Some(peer) = self.network_knowledge().find_member_by_addr(&addr) {
+                    peer
                 } else {
                     Peer::new(name, addr)
                 }
@@ -202,7 +199,7 @@ impl Core {
         sender: &XorName,
         failure_set: &DkgFailureSigSet,
     ) -> Result<Vec<Command>> {
-        if self.network_knowledge.members().get(sender).is_none() {
+        if !self.network_knowledge.is_section_member(sender) {
             return Err(Error::InvalidSrcLocation);
         }
 

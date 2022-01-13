@@ -521,7 +521,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
 
     //// but in version 0 of the NRS name it should still link to version 0 of the FilesContainer
     //// where all files should still be there
-    let versioned_nrsurl = format!("{}?v={}", nrsurl, nrs_version.to_string());
+    let versioned_nrsurl = format!("{}?v={}", nrsurl, nrs_version);
     let output = safe_cmd_stdout(["cat", &versioned_nrsurl, "--json"], Some(0))?;
     let (xorurl, files_map) = parse_files_container_output(&output)?;
     assert_eq!(xorurl, versioned_nrsurl);

@@ -163,7 +163,7 @@ impl Core {
         let members = if add_peer_info_to_update {
             Some(
                 self.network_knowledge
-                    .members()
+                    .section_signed_members()
                     .iter()
                     .map(|state| state.clone().into_authed_msg())
                     .collect(),
@@ -218,10 +218,10 @@ impl Core {
         let our_name = self.node.read().await.name();
         let nodes: Vec<_> = self
             .network_knowledge
-            .active_members()
-            .await
+            .section_members()
             .into_iter()
-            .filter(|peer| peer.name() != our_name)
+            .filter(|info| info.name() != our_name)
+            .map(|info| info.peer().clone())
             .collect();
 
         if nodes.is_empty() {
@@ -342,9 +342,9 @@ impl Core {
     }
 
     pub(crate) async fn send_ae_update_to_adults(&self) -> Vec<Command> {
-        let adults = self.network_knowledge.live_adults().await;
-
+        let adults = self.network_knowledge.adults().await;
         let dst_section_pk = self.network_knowledge.section_key().await;
+
         let node_msg = match self.generate_ae_update(dst_section_pk, true).await {
             Ok(node_msg) => node_msg,
             Err(err) => {

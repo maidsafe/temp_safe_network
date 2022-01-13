@@ -159,7 +159,7 @@ async fn candidates(
 
 // Returns a `Peer` for a known node.
 fn get_peer(name: &XorName, network_knowledge: &NetworkKnowledge) -> Option<Peer> {
-    match network_knowledge.members().get(name) {
+    match network_knowledge.get_section_member(name) {
         Some(info) => Some(info.peer().clone()),
         None => network_knowledge
             .section_by_name(name)

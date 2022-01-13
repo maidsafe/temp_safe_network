@@ -7,16 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    system::{KeyedSig, SectionAuth, SystemMsg},
+    system::{KeyedSig, SectionAuth, SectionPeers, SystemMsg},
     MessageId, MessageType, SrcLocation, WireMsg,
 };
 use crate::node::{
     error::{Error, Result},
     routing::{
-        api::command::Command,
-        core::Core,
-        messages::WireMsgUtils,
-        network_knowledge::{SectionAuthorityProvider, SectionPeers},
+        api::command::Command, core::Core, messages::WireMsgUtils,
+        network_knowledge::SectionAuthorityProvider,
     },
 };
 use crate::peer::Peer;
@@ -43,7 +41,7 @@ impl Core {
         let snapshot = self.state_snapshot().await;
         let old_adults: BTreeSet<_> = self
             .network_knowledge
-            .live_adults()
+            .adults()
             .await
             .iter()
             .map(|p| p.name())

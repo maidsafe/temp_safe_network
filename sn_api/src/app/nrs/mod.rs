@@ -225,8 +225,7 @@ impl Safe {
             Err(Error::EmptyContent(_)) => Ok(BTreeSet::new()),
             Err(Error::ContentNotFound(e)) => Err(Error::ContentNotFound(format!(
                 "No Nrs Map entry found at {}: {}",
-                safe_url.to_string(),
-                e
+                safe_url, e
             ))),
             Err(e) => Err(Error::NetDataError(format!(
                 "Failed to get Nrs Map entries: {}",
@@ -344,12 +343,12 @@ fn validate_nrs_url(link: &SafeUrl) -> Result<()> {
         {
             return Err(Error::UnversionedContentError(format!(
                 "The linked content ({}) is versionable, therefore NRS requires the link to specify a hash: {}",
-                content_type, link.to_string()
+                content_type, link
             )));
         } else if data_type == DataType::Register {
             return Err(Error::UnversionedContentError(format!(
                 "The linked content ({}) is versionable, therefore NRS requires the link to specify a hash: {}",
-                data_type, link.to_string()
+                data_type, link
             )));
         }
     }

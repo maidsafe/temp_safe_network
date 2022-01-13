@@ -36,7 +36,6 @@ use crate::node::{
         recommended_section_size,
         relocation::{self, RelocatePayloadUtils},
         supermajority, Event, Peer, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
-        MIN_AGE,
     },
 };
 use crate::peer::UnnamedPeer;
@@ -271,7 +270,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE);
     let relocated_node_old_name = ed25519::name(&relocated_node_old_keypair.public);
     let relocated_node = Node::new(
-        ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_AGE + 2),
+        ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
         gen_addr(),
     );
 
@@ -367,14 +366,14 @@ async fn handle_agreement_on_online() -> Result<()> {
     .await?;
     let dispatcher = Dispatcher::new(core);
 
-    let new_peer = create_peer(MIN_AGE);
+    let new_peer = create_peer(MIN_ADULT_AGE);
 
     let status = handle_online_command(&new_peer, &sk_set, &dispatcher, &section_auth).await?;
     assert!(status.node_approval_sent);
 
     assert_matches!(event_rx.recv().await, Some(Event::MemberJoined { name, age, .. }) => {
         assert_eq!(name, new_peer.name());
-        assert_eq!(age, MIN_AGE);
+        assert_eq!(age, MIN_ADULT_AGE);
     });
 
     Ok(())
@@ -407,7 +406,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 sig,
             })
             .await;
-        if peer.age() == MIN_AGE + 2 {
+        if peer.age() == MIN_ADULT_AGE + 1 {
             let _changed = expected_new_elders.insert(peer);
         }
     }
@@ -431,7 +430,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
     // Handle agreement on Online of a peer that is older than the youngest
     // current elder - that means this peer is going to be promoted.
-    let new_peer = create_peer(MIN_AGE + 2);
+    let new_peer = create_peer(MIN_ADULT_AGE + 1);
     let node_state = NodeState::joined(new_peer.clone(), Some(XorName::random()));
 
     let node_state_serialized = bincode::serialize(&node_state)?;
@@ -603,7 +602,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
     let status = handle_online_command(&peer, &sk_set, &dispatcher, &section_auth).await?;
 
     // A rejoin node with low age will be rejected.
-    if age / 2 <= MIN_AGE {
+    if age / 2 < MIN_ADULT_AGE {
         assert!(!status.node_approval_sent);
         assert!(status.relocate_details.is_none());
         return Ok(());
@@ -612,7 +611,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
     assert!(status.node_approval_sent);
     assert_matches!(status.relocate_details, Some(details) => {
         assert_eq!(details.dst, peer.name());
-        assert_eq!(details.age, (age / 2).max(MIN_AGE));
+        assert_eq!(details.age, (age / 2).max(MIN_ADULT_AGE));
     });
 
     Ok(())
@@ -647,7 +646,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
 
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
 
-    let existing_peer = create_peer(MIN_AGE);
+    let existing_peer = create_peer(MIN_ADULT_AGE);
 
     let node_state = NodeState::joined(existing_peer.clone(), None);
     let node_state = section_signed(sk_set.secret_key(), node_state)?;
@@ -669,7 +668,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let dispatcher = Dispatcher::new(core);
 
     let node_state = NodeState::left(existing_peer.clone(), None);
-    let proposal = Proposal::Offline(node_state);
+    let proposal = Proposal::Offline(node_state.clone());
     let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
     let _commands = dispatcher
@@ -679,9 +678,8 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     assert!(!dispatcher
         .core
         .network_knowledge()
-        .members()
-        .all_members()
-        .contains(&existing_peer));
+        .section_members()
+        .contains(&node_state));
 
     Ok(())
 }
@@ -692,7 +690,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
 
-    let existing_peer = create_peer(MIN_AGE);
+    let existing_peer = create_peer(MIN_ADULT_AGE);
     let node_state = NodeState::joined(existing_peer.clone(), None);
     let node_state = section_signed(sk_set.secret_key(), node_state)?;
     let _updated = section.update_member(node_state).await;
@@ -702,8 +700,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let remove_peer = auth_peers.last().expect("section_auth is empty");
 
     let remove_node_state = section
-        .members()
-        .get(&remove_peer.name())
+        .get_section_member(&remove_peer.name())
         .expect("member not found")
         .leave()?;
 
@@ -725,7 +722,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let dispatcher = Dispatcher::new(core);
 
     // Handle agreement on the Offline proposal
-    let proposal = Proposal::Offline(remove_node_state);
+    let proposal = Proposal::Offline(remove_node_state.clone());
     let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
     let commands = dispatcher
@@ -776,9 +773,8 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     assert!(!dispatcher
         .core
         .network_knowledge()
-        .members()
-        .all_members()
-        .contains(remove_peer));
+        .section_members()
+        .contains(&remove_node_state));
 
     // The removed peer is still our elder because we haven't yet processed the section update.
     assert!(dispatcher
@@ -844,7 +840,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let src_section_pk = pk2;
 
     // Create the new `SectionAuthorityProvider` by replacing the last peer with a new one.
-    let new_peer = create_peer(MIN_AGE);
+    let new_peer = create_peer(MIN_ADULT_AGE);
     let new_elders = old_sap
         .elders()
         .take(old_sap.elder_count() - 1)
@@ -1035,7 +1031,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         assert!(section.update_member(node_state).await);
     }
 
-    let non_elder_peer = create_peer(MIN_AGE);
+    let non_elder_peer = create_peer(MIN_ADULT_AGE - 1);
     let node_state = NodeState::joined(non_elder_peer.clone(), None);
     let node_state = section_signed(sk_set.secret_key(), node_state)?;
     assert!(section.update_member(node_state).await);
@@ -1208,12 +1204,12 @@ async fn handle_elders_update() -> Result<()> {
     let _span = tracing::info_span!("handle_elders_update").entered();
     // Start with section that has `elder_count()` elders with age 6, 1 non-elder with age 5 and one
     // to-be-elder with age 7:
-    let node = create_node(MIN_AGE + 2, None);
-    let mut other_elder_peers: Vec<_> = iter::repeat_with(|| create_peer(MIN_AGE + 2))
+    let node = create_node(MIN_ADULT_AGE + 1, None);
+    let mut other_elder_peers: Vec<_> = iter::repeat_with(|| create_peer(MIN_ADULT_AGE + 1))
         .take(elder_count() - 1)
         .collect();
     let adult_peer = create_peer(MIN_ADULT_AGE);
-    let promoted_peer = create_peer(MIN_AGE + 3);
+    let promoted_peer = create_peer(MIN_ADULT_AGE + 2);
 
     let sk_set0 = SecretKeySet::random();
     let pk0 = sk_set0.secret_key().public_key();

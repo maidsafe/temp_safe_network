@@ -213,8 +213,7 @@ pub mod util {
             "Failed to create path: {}",
             path_emptyfolder.display()
         ))?;
-        let empty_folder_path_trailing_slash =
-            format!("{}/", path_emptyfolder.display().to_string());
+        let empty_folder_path_trailing_slash = format!("{}/", path_emptyfolder.display());
         Ok((
             path_random.display().to_string(),
             empty_folder_path_trailing_slash,
