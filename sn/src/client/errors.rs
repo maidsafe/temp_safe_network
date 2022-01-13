@@ -9,7 +9,7 @@
 pub use crate::messaging::data::Error as ErrorMessage;
 use crate::messaging::{
     data::{CmdError, OperationId, QueryResponse},
-    Error as MessagingError,
+    Error as MessagingError, MessageId,
 };
 use crate::types::Error as DtError;
 use bls::PublicKey;
@@ -115,6 +115,14 @@ pub enum Error {
         /// operation ID that was used to send the query
         op_id: OperationId,
     },
+    /// Error response received for a client cmd sent to the network
+    #[error("Error received from the network: {:?} for cmd: {:?}", source, msg_id)]
+    ErrorCmd {
+        /// The source of an error message
+        source: ErrorMessage,
+        /// message ID that was used to send the cmd
+        msg_id: MessageId,
+    },
     /// Errors occurred when serialising or deserialising messages
     #[error(transparent)]
     MessagingProtocol(#[from] MessagingError),
@@ -160,10 +168,10 @@ pub enum Error {
     },
 }
 
-impl From<(CmdError, OperationId)> for Error {
-    fn from((error, op_id): (CmdError, OperationId)) -> Self {
+impl From<(CmdError, MessageId)> for Error {
+    fn from((error, msg_id): (CmdError, MessageId)) -> Self {
         let CmdError::Data(source) = error;
-        Error::ErrorMessage { source, op_id }
+        Error::ErrorCmd { source, msg_id }
     }
 }
 
