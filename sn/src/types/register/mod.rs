@@ -439,6 +439,13 @@ mod tests {
             Permissions::Public(PublicPermissions::new(true)),
         );
 
+        let random_keypair = Keypair::new_ed25519(&mut OsRng);
+        let random_user = User::Key(random_keypair.public_key());
+        assert_eq!(
+            replica2.permissions(random_user, None),
+            Err(Error::NoSuchEntry),
+        );
+
         Ok(())
     }
 
@@ -506,6 +513,13 @@ mod tests {
         assert_eq!(
             replica2.permissions(authority1, None)?,
             Permissions::Private(PrivatePermissions::new(false, true)),
+        );
+
+        let random_keypair = Keypair::new_ed25519(&mut OsRng);
+        let random_user = User::Key(random_keypair.public_key());
+        assert_eq!(
+            replica2.permissions(random_user, None),
+            Err(Error::NoSuchEntry),
         );
 
         Ok(())

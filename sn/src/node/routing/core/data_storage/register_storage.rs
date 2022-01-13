@@ -725,6 +725,7 @@ mod test {
 
     use crate::messaging::SectionAuth;
     use crate::node::{Error, Result};
+    use crate::types::register::{EntryHash, PrivatePolicy};
     use crate::types::DataAddress;
     use crate::types::{register::User, Keypair};
     use crate::UsedSpace;
@@ -738,53 +739,65 @@ mod test {
     };
 
     use rand::rngs::OsRng;
-    use std::path::Path;
+    use rand::Rng;
     use tempfile::tempdir;
     use xor_name::{Prefix, XorName};
 
-    fn new_store(path: &Path) -> Result<RegisterStorage> {
-        let used_space = UsedSpace::new(usize::MAX);
-        let store = RegisterStorage::new(path, used_space)?;
-        Ok(store)
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_basic_read_and_write() -> Result<()> {
+        basic_read_and_write(|| create_private_register()).await?;
+        basic_read_and_write(|| create_public_register()).await?;
+
+        Ok(())
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_basic_read_and_write() -> Result<()> {
-        let tmp_dir = tempdir()?;
-        let first = tmp_dir.path().join("first");
-        let store = new_store(first.as_path())?;
+    async fn test_register_delete() -> Result<()> {
+        register_delete(|| create_private_register()).await?;
+        register_delete(|| create_public_register()).await?;
 
-        let mut rng = OsRng;
-        let keypair = Keypair::new_ed25519(&mut rng);
-        let name = XorName::random();
-        let authority = User::Key(keypair.public_key());
+        Ok(())
+    }
 
-        let op = CreateRegister {
-            name,
-            tag: 1,
-            size: u16::MAX,
-            policy: Policy::Public(PublicPolicy {
-                owner: authority,
-                permissions: Default::default(),
-            }),
-        };
-        let signature = keypair.sign(&bincode::serialize(&op)?);
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_register_export() -> Result<()> {
+        register_export(|| create_private_register()).await?;
+        register_export(|| create_public_register()).await?;
 
-        let auth = ServiceAuth {
-            public_key: keypair.public_key(),
-            signature,
-        };
+        Ok(())
+    }
 
-        let cmd = RegisterCmd::Create {
-            cmd: SignedRegisterCreate { op, auth },
-            section_auth: section_auth(),
-        };
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_register_non_existing_entry() -> Result<()> {
+        register_non_existing_entry(|| create_private_register()).await?;
+        register_non_existing_entry(|| create_public_register()).await?;
 
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_register_non_existing_permissions() -> Result<()> {
+        register_non_existing_permissions(|| create_private_register()).await?;
+        register_non_existing_permissions(|| create_public_register()).await?;
+
+        Ok(())
+    }
+
+    async fn basic_read_and_write<F>(create_register: F) -> Result<()>
+    where
+        F: Fn() -> Result<(RegisterCmd, User)>,
+    {
+        // setup store
+        let store = new_store()?;
+
+        // create register
+        let (cmd, authority) = create_register()?;
         let _ = store.write(cmd.clone()).await?;
+
+        // get register
 
         let address = cmd.dst_address();
         let res = store.read(&RegisterQuery::Get(address), authority).await;
-
         match res {
             NodeQueryResponse::GetRegister((Ok(reg), _)) => {
                 assert_eq!(reg.address(), &address, "Should have same address!");
@@ -793,7 +806,9 @@ mod test {
             e => panic!("Could not read! {:?}", e),
         }
 
-        // should fail to write same register again
+        // try to create the register again
+        // (should fail)
+
         let res = store.write(cmd.clone()).await;
 
         assert_eq!(
@@ -802,16 +817,62 @@ mod test {
             "Should not be able to create twice!"
         );
 
+        Ok(())
+    }
+
+    async fn register_delete<F>(create_register: F) -> Result<()>
+    where
+        F: Fn() -> Result<(RegisterCmd, User)>,
+    {
+        // setup store
+        let store = new_store()?;
+
+        // create register
+        let (cmd, authority) = create_register()?;
+        let _ = store.write(cmd.clone()).await?;
+
+        // try remove it
+        let _ = store.drop_register_key(cmd.dst_address().id()?).await?;
+
+        // should not get the removed register
+        let res = store
+            .read(&RegisterQuery::Get(cmd.dst_address()), authority)
+            .await;
+
+        use crate::messaging::data::Error as MsgError;
+
+        match res {
+            NodeQueryResponse::GetRegister((Ok(_), _)) => panic!("Was not removed!"),
+            NodeQueryResponse::GetRegister((Err(MsgError::DataNotFound(addr)), _)) => {
+                assert_eq!(addr, DataAddress::Register(cmd.dst_address()))
+            }
+            e => panic!("Unexpected response! {:?}", e),
+        }
+
+        Ok(())
+    }
+
+    async fn register_export<F>(create_register: F) -> Result<()>
+    where
+        F: Fn() -> Result<(RegisterCmd, User)>,
+    {
+        // setup store
+        let store = new_store()?;
+
+        // create register
+        let (cmd, authority) = create_register()?;
+        let _ = store.write(cmd.clone()).await?;
+
+        // export db
         // get all data in db
-        let prefix = Prefix::new(0, name);
+        let prefix = Prefix::new(0, cmd.name());
         let for_update = store.get_data_of(prefix).await?;
 
         // create new db and update it with the data from first db
-        let second = tmp_dir.path().join("second");
-        let new_store = new_store(second.as_path())?;
+        let new_store = new_store()?;
 
         let _ = new_store.update(for_update).await?;
-
+        let address = cmd.dst_address();
         // assert the same tests hold as for the first db
 
         // should fail to write same register again, also on this new store
@@ -836,22 +897,126 @@ mod test {
             e => panic!("Could not read! {:?}", e),
         }
 
-        let _ = store.drop_register_key(address.id()?).await?;
+        Ok(())
+    }
 
-        // should not get the removed register
-        let res = store.read(&RegisterQuery::Get(address), authority).await;
+    async fn register_non_existing_entry<F>(create_register: F) -> Result<()>
+    where
+        F: Fn() -> Result<(RegisterCmd, User)>,
+    {
+        // setup store
+        let store = new_store()?;
 
-        use crate::messaging::data::Error as MsgError;
+        // create register
+        let (cmd, authority) = create_register()?;
+        let _ = store.write(cmd.clone()).await?;
 
+        let hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
+
+        // try get permissions of random user
+        let address = cmd.dst_address();
+        let res = store
+            .read(&RegisterQuery::GetEntry { address, hash }, authority)
+            .await;
         match res {
-            NodeQueryResponse::GetRegister((Ok(_), _)) => panic!("Was not removed!"),
-            NodeQueryResponse::GetRegister((Err(MsgError::DataNotFound(addr)), _)) => {
-                assert_eq!(addr, DataAddress::Register(address))
+            NodeQueryResponse::GetRegisterEntry((Err(e), _)) => {
+                assert_eq!(e, crate::messaging::data::Error::NoSuchEntry)
             }
-            e => panic!("Unexpected response! {:?}", e),
+            NodeQueryResponse::GetRegisterEntry((Ok(entry), _)) => {
+                panic!("Should not exist any entry for random hash! {:?}", entry)
+            }
+            e => panic!("Could not read! {:?}", e),
         }
 
         Ok(())
+    }
+
+    async fn register_non_existing_permissions<F>(create_register: F) -> Result<()>
+    where
+        F: Fn() -> Result<(RegisterCmd, User)>,
+    {
+        // setup store
+        let store = new_store()?;
+
+        // create register
+        let (cmd, authority) = create_register()?;
+        let _ = store.write(cmd.clone()).await?;
+
+        let (user, _) = random_user();
+
+        // try get permissions of random user
+        let address = cmd.dst_address();
+        let res = store
+            .read(
+                &RegisterQuery::GetUserPermissions { address, user },
+                authority,
+            )
+            .await;
+        match res {
+            NodeQueryResponse::GetRegisterUserPermissions((Err(e), _)) => {
+                assert_eq!(e, crate::messaging::data::Error::NoSuchEntry)
+            }
+            NodeQueryResponse::GetRegisterUserPermissions((Ok(perms), _)) => panic!(
+                "Should not exist any permissions for random user! {:?}",
+                perms
+            ),
+            e => panic!("Could not read! {:?}", e),
+        }
+
+        Ok(())
+    }
+
+    fn new_store() -> Result<RegisterStorage> {
+        let tmp_dir = tempdir()?;
+        let path = tmp_dir.path();
+        let used_space = UsedSpace::new(usize::MAX);
+        let store = RegisterStorage::new(path, used_space)?;
+        Ok(store)
+    }
+
+    fn random_user() -> (User, Keypair) {
+        let mut rng = OsRng;
+        let keypair = Keypair::new_ed25519(&mut rng);
+        let authority = User::Key(keypair.public_key());
+        (authority, keypair)
+    }
+
+    fn create_private_register() -> Result<(RegisterCmd, User)> {
+        let (authority, keypair) = random_user();
+        let policy = Policy::Private(PrivatePolicy {
+            owner: authority,
+            permissions: Default::default(),
+        });
+        Ok((create_reg_w_policy(policy, keypair)?, authority))
+    }
+
+    fn create_public_register() -> Result<(RegisterCmd, User)> {
+        let (authority, keypair) = random_user();
+        let policy = Policy::Public(PublicPolicy {
+            owner: authority,
+            permissions: Default::default(),
+        });
+        Ok((create_reg_w_policy(policy, keypair)?, authority))
+    }
+
+    fn create_reg_w_policy(policy: Policy, keypair: Keypair) -> Result<RegisterCmd> {
+        let op = CreateRegister {
+            name: XorName::random(),
+            tag: 1,
+            size: u16::MAX,
+            policy,
+        };
+        let signature = keypair.sign(&bincode::serialize(&op)?);
+
+        let auth = ServiceAuth {
+            public_key: keypair.public_key(),
+            signature,
+        };
+
+        Ok(RegisterCmd::Create {
+            cmd: SignedRegisterCreate { op, auth },
+            section_auth: section_auth(),
+        })
     }
 
     fn section_auth() -> SectionAuth {

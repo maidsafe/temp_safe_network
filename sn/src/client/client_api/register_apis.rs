@@ -286,8 +286,8 @@ mod tests {
     use crate::types::{
         log_markers::LogMarker,
         register::{
-            Action, EntryHash, Permissions, Policy, PrivatePermissions, PrivatePolicy,
-            PublicPermissions, PublicPolicy, User,
+            Action, EntryHash, Permissions, Policy, PrivatePolicy, PublicPermissions, PublicPolicy,
+            User,
         },
     };
     use eyre::{bail, eyre, Result};
@@ -528,19 +528,19 @@ mod tests {
 
         let other_user = User::Key(gen_ed_keypair().public_key());
 
-        loop {
-            match client
-                .get_register_permissions_for_user(address, other_user)
-                .instrument(tracing::info_span!("get other user perms"))
-                .await
-            {
-                Ok(_) => bail!("Should not be able to retrieve an entry for a random user"),
-                Err(Error::ErrorMessage {
-                    source: ErrorMessage::NoSuchEntry,
-                    ..
-                }) => return Ok(()),
-                _ => continue,
-            }
+        match client
+            .get_register_permissions_for_user(address, other_user)
+            .instrument(tracing::info_span!("get other user perms"))
+            .await
+        {
+            Ok(_) => bail!("Should not be able to retrieve an entry for a random user"),
+            Err(Error::ErrorMessage {
+                source: ErrorMessage::NoSuchEntry,
+                ..
+            }) => return Ok(()),
+            Err(err) => return Err(eyre!(
+                "Unexpected error returned when retrieving non-existing Register user permission: {:?}", err,
+            )),
         }
     }
 
@@ -581,19 +581,19 @@ mod tests {
 
         let other_user = User::Key(gen_ed_keypair().public_key());
 
-        loop {
-            match client
-                .get_register_permissions_for_user(address, other_user)
-                .instrument(tracing::info_span!("get other user perms"))
-                .await
-            {
-                Ok(_) => bail!("Should not be able to retrieve an entry for a random user"),
-                Err(Error::ErrorMessage {
-                    source: ErrorMessage::NoSuchEntry,
-                    ..
-                }) => return Ok(()),
-                _ => continue,
-            }
+        match client
+            .get_register_permissions_for_user(address, other_user)
+            .instrument(tracing::info_span!("get other user perms"))
+            .await
+        {
+            Ok(_) => bail!("Should not be able to retrieve an entry for a random user"),
+            Err(Error::ErrorMessage {
+                source: ErrorMessage::NoSuchEntry,
+                ..
+            }) => return Ok(()),
+            Err(err) => return Err(eyre!(
+                "Unexpected error returned when retrieving non-existing Register user permission: {:?}", err,
+            )),
         }
     }
 
@@ -672,21 +672,26 @@ mod tests {
 
         tokio::time::sleep(delay).await;
 
-        // loop here until we see the value set...
-        // TODO: writes should be stable enough that we can remove this...
         let retrieved_value_2 = client
             .get_register_entry(address, value2_hash)
             .instrument(tracing::info_span!("get_value_2"))
             .await?;
         assert_eq!(retrieved_value_2, value_2);
 
-        // Requesting a hash which doesn't exist throws an error
+        // Requesting a hash which doesn't exist returns an error
         match client
             .get_register_entry(address, EntryHash(rand::thread_rng().gen::<[u8; 32]>()))
             .instrument(tracing::info_span!("final get"))
             .await
         {
-            Err(_) => Ok(()),
+            Err(Error::ErrorMessage {
+                source: ErrorMessage::NoSuchEntry,
+                ..
+            }) => Ok(()),
+            Err(err) => Err(eyre!(
+                "Unexpected error returned when retrieving a non-existing Register entry: {:?}",
+                err,
+            )),
             Ok(_data) => Err(eyre!(
                 "Unexpectedly retrieved a register entry with a random hash!",
             )),
@@ -756,7 +761,7 @@ mod tests {
         match res {
             Err(Error::NoResponse) => Ok(()),
             Err(err) => Err(eyre!(
-                "Unexpected error returned when deleting a nonexisting Private Register: {:?}",
+                "Unexpected error returned when deleting a non-existing Private Register: {:?}",
                 err
             )),
             Ok(_data) => Err(eyre!("Unexpectedly retrieved a deleted Private Register!",)),
@@ -835,14 +840,12 @@ mod tests {
     }
 
     fn private_policy(owner: User) -> Policy {
-        let mut permissions = BTreeMap::new();
-        let _ = permissions.insert(owner, PrivatePermissions::new(true, true));
+        let permissions = BTreeMap::new();
         Policy::Private(PrivatePolicy { owner, permissions })
     }
 
     fn public_policy(owner: User) -> Policy {
-        let mut permissions = BTreeMap::new();
-        let _ = permissions.insert(owner, PublicPermissions::new(true));
+        let permissions = BTreeMap::new();
         Policy::Public(PublicPolicy { owner, permissions })
     }
 
