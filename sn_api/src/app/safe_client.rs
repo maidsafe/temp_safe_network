@@ -233,7 +233,11 @@ impl SafeAppClient {
             .get_register_entry(address, hash)
             .await
             .map_err(|err| {
-                if let ClientError::NetworkDataError(SafeNdError::NoSuchEntry) = err {
+                if let ClientError::ErrorMessage {
+                    source: safe_network::messaging::data::Error::NoSuchEntry,
+                    ..
+                } = err
+                {
                     Error::HashNotFound(hash)
                 } else {
                     Error::NetDataError(format!(

@@ -556,7 +556,7 @@ mod tests {
         let owner = User::Key(client.public_key());
 
         let (address, batch) = client
-            .create_register(name, tag, public_none_policy(owner))
+            .create_register(name, tag, public_none_policy(owner)) // trying to set write perms to false for the owner (will not be reflected as long as the user is the owner, as an owner will have full authority)
             .await?;
         client.publish_register_ops(batch).await?;
 
@@ -570,9 +570,11 @@ mod tests {
             .await?;
 
         match permissions {
+            // above the owner perms were set to more restrictive than full, we test below that
+            // write&read perms for the owner will always be true, as an owner will always have full authority (even if perms were explicitly set some other way)
             Permissions::Public(user_perms) => {
                 assert_eq!(Some(true), user_perms.is_allowed(Action::Read));
-                assert_eq!(None, user_perms.is_allowed(Action::Write));
+                assert_eq!(Some(true), user_perms.is_allowed(Action::Write));
             }
             Permissions::Private(_) => {
                 return Err(eyre!("Unexpectedly obtained incorrect user permissions",));
