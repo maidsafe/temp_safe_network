@@ -83,6 +83,7 @@ async fn run_node() -> Result<()> {
     // Set up logging
     // ==============
 
+    let mut _optional_guard = None;
     #[cfg(not(feature = "tokio-console"))]
     {
         let filter = match EnvFilter::try_from_env("RUST_LOG") {
@@ -98,7 +99,7 @@ async fn run_node() -> Result<()> {
             }
         };
 
-        let _optional_guard = if let Some(log_dir) = config.log_dir() {
+        _optional_guard = if let Some(log_dir) = config.log_dir() {
             println!("Starting logging to file: {:?}", log_dir);
             let file_appender = tracing_appender::rolling::hourly(log_dir, "sn_node.log");
 
