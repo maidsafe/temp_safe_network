@@ -31,7 +31,7 @@ use std::{
 use structopt::StructOpt;
 use tokio::{
     sync::mpsc::{self, Sender},
-    task, time,
+    time, // task,
 };
 use tokio_util::time::delay_queue::DelayQueue;
 use tracing_subscriber::EnvFilter;
@@ -226,7 +226,9 @@ impl Network {
             ..Default::default()
         };
 
-        let _handle = task::spawn(add_node(id, config, event_tx));
+        // TODO: Fix this: future returned by `add_node` is not `Send`
+        //let _handle = task::spawn(add_node(id, config, event_tx));
+        let _ = add_node(id, config, event_tx).await;
 
         self.try_print_status();
     }

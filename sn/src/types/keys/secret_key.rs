@@ -17,6 +17,7 @@ use super::super::{Error, Result};
 use bls::{self, serde_impl::SerdeSecret};
 use serde::{Deserialize, Serialize};
 use std::fmt::{self, Debug, Display, Formatter};
+
 // TODO: remove clones. We need to restructure to hold keypair ones and only require references for this.
 /// Wrapper for different secret key types.
 #[derive(Debug, Serialize, Deserialize)]

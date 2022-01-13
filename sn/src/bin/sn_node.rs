@@ -26,6 +26,8 @@
     unused_qualifications,
     unused_results
 )]
+#![allow(unused_imports)] // TODO: FIX THIS, clippy went mad on this file w last rust update
+#![allow(dead_code)] // TODO: FIX THIS, clippy went mad on this file w last rust update
 
 use color_eyre::{Section, SectionExt};
 use eyre::{eyre, Result, WrapErr};
@@ -38,7 +40,7 @@ use std::{io::Write, process::exit};
 use structopt::{clap, StructOpt};
 use tokio::time::{sleep, Duration};
 use tracing::{self, error, info, trace, warn};
-use tracing_subscriber::filter::EnvFilter;
+use tracing_subscriber::EnvFilter;
 
 const MODULE_NAME: &str = "safe_network";
 const BOOTSTRAP_RETRY_TIME: u64 = 3; // in minutes
@@ -83,7 +85,7 @@ async fn run_node() -> Result<()> {
     // Set up logging
     // ==============
 
-    let mut _optional_guard = None;
+    let mut _optional_guard = None::<tracing_appender::non_blocking::WorkerGuard>;
     #[cfg(not(feature = "tokio-console"))]
     {
         let filter = match EnvFilter::try_from_env("RUST_LOG") {
