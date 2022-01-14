@@ -970,19 +970,35 @@ fn calling_files_tree() -> Result<()> {
     assert_eq!(root["sub"][1]["name"], ".subhidden");
     assert_eq!(root["sub"][1]["details"]["type"], "inode/directory");
     assert_eq!(root["sub"][1]["sub"][0]["name"], "test.md");
+
+    // It seems to be possible for the sizes of files to vary based on the the OS they were
+    // uploaded from, so we won't hard code the values.
+    let another_file_len = get_file_len("../resources/testdata/another.md")?;
     assert_eq!(root["sub"][2]["name"], "another.md");
-    assert_eq!(root["sub"][2]["details"]["size"], "6");
+    assert_eq!(
+        root["sub"][2]["details"]["size"],
+        another_file_len.to_string()
+    );
     assert_eq!(root["sub"][2]["details"]["type"], "text/markdown");
+
     assert_eq!(root["sub"][3]["name"], "emptyfolder");
     assert_eq!(root["sub"][3]["details"]["size"], "0");
     assert_eq!(root["sub"][3]["details"]["type"], "inode/directory");
 
+    let markdown_file_len = get_file_len("../resources/testdata/large_markdown_file.md")?;
     assert_eq!(root["sub"][4]["name"], "large_markdown_file.md");
-    assert_eq!(root["sub"][4]["details"]["size"], "95864");
+    assert_eq!(
+        root["sub"][4]["details"]["size"],
+        markdown_file_len.to_string()
+    );
     assert_eq!(root["sub"][4]["details"]["type"], "text/markdown");
 
+    let noextension_file_len = get_file_len("../resources/testdata/noextension")?;
     assert_eq!(root["sub"][5]["name"], "noextension");
-    assert_eq!(root["sub"][5]["details"]["size"], "20");
+    assert_eq!(
+        root["sub"][5]["details"]["size"],
+        noextension_file_len.to_string()
+    );
     assert_eq!(root["sub"][5]["details"]["type"], "Raw");
     assert_eq!(root["sub"][6]["name"], "subfolder");
     assert_eq!(root["sub"][6]["sub"][0]["name"], "sub2.md");
