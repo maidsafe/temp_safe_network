@@ -36,9 +36,6 @@ async fn main() -> Result<()> {
         .ok_or_else(|| eyre!("No Safe URL provided as argument"))?;
     println!("Fetching file from Safe with URL: {}", url);
 
-    // The Safe instance is what will give us access to the API.
-    let mut safe = Safe::default();
-
     // We assume there is a local network running which we can
     // bootstrap to using the provided contact address.
     let genesis_key = PublicKey::bls_from_hex("8640e62cc44e75cf4fadc8ee91b74b4cf0fd2c0984fb0e3ab40f026806857d8c41f01d3725223c55b1ef87d669f5e2cc")?
@@ -48,8 +45,8 @@ async fn main() -> Result<()> {
     nodes.insert(network_addr);
     let node_config = (genesis_key, nodes);
 
-    // Using our safe instance we connect to the network
-    safe.connect(None, None, node_config).await?;
+    // The Safe instance is what will give us access to the network API.
+    let safe = Safe::connect(node_config, None, None, None, None).await?;
 
     println!("Connected to Safe!");
 
