@@ -26,6 +26,7 @@
     unused_qualifications,
     unused_results
 )]
+#![allow(unused_imports, dead_code)] // clippy went mad, bad workaround applied
 
 use color_eyre::{Section, SectionExt};
 use eyre::{eyre, Result, WrapErr};
@@ -83,7 +84,7 @@ async fn run_node() -> Result<()> {
     // Set up logging
     // ==============
 
-    let mut _optional_guard = None;
+    let mut _optional_guard = None::<tracing_appender::non_blocking::WorkerGuard>;
     #[cfg(not(feature = "tokio-console"))]
     {
         let filter = match EnvFilter::try_from_env("RUST_LOG") {

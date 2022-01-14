@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under the MIT license <LICENSE-MIT
 // http://opensource.org/licenses/MIT> or the Modified BSD license <LICENSE-BSD
@@ -10,11 +10,12 @@
 use super::config::Config;
 use crate::{APP_ID, APP_NAME, APP_VENDOR};
 use color_eyre::{eyre::eyre, eyre::WrapErr, Result};
-use sn_api::{Keypair, Safe};
+use sn_api::{Keypair, Safe, XorUrlBase};
 use std::{
     fs::{create_dir_all, File},
     io::{Read, Write},
     path::PathBuf,
+    time::Duration,
 };
 use tracing::{debug, info, warn};
 
@@ -47,7 +48,12 @@ pub async fn authorise_cli(endpoint: Option<String>, is_self_authing: bool) -> R
 // otherwise it creates a read only connection.
 // Returns the app's keypair if connection was succesfully made with credentials,
 // otherwise it returns 'None' if conneciton is read only.
-pub async fn connect(safe: &mut Safe, config: Config) -> Result<Option<Keypair>> {
+pub async fn connect(
+    config: Config,
+    xorurl_base: Option<XorUrlBase>,
+    timeout: Option<Duration>,
+    dry_run: bool,
+) -> Result<Safe> {
     debug!("Connecting...");
 
     let app_keypair = if let Ok((_, keypair)) = read_credentials() {
@@ -63,25 +69,38 @@ pub async fn connect(safe: &mut Safe, config: Config) -> Result<Option<Keypair>>
 
     let (_, bootstrap_contacts) = config.read_current_node_config().await?;
     let client_cfg = client_config_path();
-    match safe
-        .connect(
+
+    let safe = if dry_run {
+        Safe::dry_runner(
+            bootstrap_contacts,
+            app_keypair,
+            client_cfg.as_deref(),
+            xorurl_base,
+            timeout,
+        )
+        .await?
+    } else {
+        match Safe::connect(
+            bootstrap_contacts.clone(),
             app_keypair.clone(),
             client_cfg.as_deref(),
-            bootstrap_contacts.clone(),
+            xorurl_base,
+            timeout,
         )
         .await
-    {
-        Err(_) if found_app_keypair => {
-            warn!("Credentials found for CLI are invalid, connecting with read-only access...");
-            safe.connect(None, None, bootstrap_contacts)
-                .await
-                .wrap_err("Failed to connect with read-only access")?;
-
-            Ok(None)
+        {
+            Ok(safe) => safe,
+            Err(_) if found_app_keypair => {
+                warn!("Credentials found for CLI are invalid, connecting with read-only access...");
+                Safe::connect(bootstrap_contacts, None, None, xorurl_base, timeout)
+                    .await
+                    .wrap_err("Failed to connect with read-only access")?
+            }
+            Err(err) => return Err(eyre!("Failed to connect: {}", err)),
         }
-        Err(err) => Err(eyre!("Failed to connect: {}", err)),
-        Ok(()) => Ok(app_keypair),
-    }
+    };
+
+    Ok(safe)
 }
 
 pub fn create_credentials_file() -> Result<(File, PathBuf)> {

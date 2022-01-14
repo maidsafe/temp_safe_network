@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -41,6 +41,33 @@ impl Client {
             self.send_cmd(cmd.clone()).await?;
         }
         Ok(())
+    }
+
+    /// Create a Private Register onto the Network
+    ///
+    /// Creates a private Register on the network which can then be written to.
+    /// Private data can be removed from the network at a later date.
+    ///
+    /// Returns a write ahead log (WAL) of register operations, note that the changes are not uploaded to the
+    /// network until the WAL is published with `publish_register_ops`
+    ///
+    /// A tag must be supplied.
+    /// A xorname must be supplied, this can be random or deterministic as per your apps needs.
+    #[instrument(skip(self), level = "debug")]
+    pub async fn create_register(
+        &self,
+        name: XorName,
+        tag: u64,
+        policy: Policy,
+    ) -> Result<(Address, RegisterWriteAheadLog), Error> {
+        let register = Register::new(name, tag, policy);
+        let address = *register.address();
+
+        let batch = self
+            .batch_up_pay_write_register_to_network(register)
+            .await?;
+
+        Ok((address, batch))
     }
 
     /// Create a Private Register onto the Network

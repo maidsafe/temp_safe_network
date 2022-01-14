@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under the MIT license <LICENSE-MIT
 // http://opensource.org/licenses/MIT> or the Modified BSD license <LICENSE-BSD
@@ -13,13 +13,12 @@ use super::{
     Safe,
 };
 use crate::{
-    ipc::{IpcMsg, IpcResp, NodeConfig},
+    ipc::{IpcMsg, IpcResp},
     Error, Result,
 };
 use log::{debug, info};
 use safe_network::types::Keypair;
 use serde_json::json;
-use std::path::Path;
 
 // Method for requesting application's authorisation
 const SN_AUTHD_METHOD_AUTHORISE: &str = "authorise";
@@ -67,18 +66,6 @@ impl Safe {
                 )))
             }
         }
-    }
-
-    /// Connect to the SAFE Network using the provided auth credentials
-    pub async fn connect(
-        &mut self,
-        app_keypair: Option<Keypair>,
-        config_path: Option<&Path>,
-        bootstrap_config: NodeConfig,
-    ) -> Result<()> {
-        self.safe_client
-            .connect(app_keypair, config_path, bootstrap_config)
-            .await
     }
 }
 

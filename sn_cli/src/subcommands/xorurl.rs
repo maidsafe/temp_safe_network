@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under the MIT license <LICENSE-MIT
 // http://opensource.org/licenses/MIT> or the Modified BSD license <LICENSE-BSD
@@ -12,7 +12,7 @@ use super::{
     OutputFmt,
 };
 use color_eyre::{eyre::eyre, Result};
-use sn_api::{files::FilesMapChange, PublicKey, Safe, SafeUrl, XorName};
+use sn_api::{files::FilesMapChange, PublicKey, Safe, SafeUrl, XorName, XorUrlBase};
 use structopt::StructOpt;
 
 // Defines subcommands of 'xorurl'
@@ -32,15 +32,12 @@ pub enum XorurlSubCommands {
 }
 
 pub async fn xorurl_commander(
-    cmd: Option<XorurlSubCommands>,
-    location: Option<String>,
-    recursive: bool,
-    follow_symlinks: bool,
+    cmd: XorurlSubCommands,
     output_fmt: OutputFmt,
-    safe: &mut Safe,
+    xorurl_base: XorUrlBase,
 ) -> Result<()> {
     match cmd {
-        Some(XorurlSubCommands::Decode { xorurl }) => {
+        XorurlSubCommands::Decode { xorurl } => {
             let url = get_from_arg_or_stdin(xorurl, Some("...awaiting XOR-URL from stdin"))?;
             let safeurl = SafeUrl::from_url(&url)?;
             if OutputFmt::Pretty == output_fmt {
@@ -74,13 +71,13 @@ pub async fn xorurl_commander(
                 println!("{}", serialise_output(&safeurl, output_fmt));
             }
         }
-        Some(XorurlSubCommands::Pk { pk }) => {
+        XorurlSubCommands::Pk { pk } => {
             let public_key = PublicKey::ed25519_from_hex(&pk)
                 .or_else(|_| PublicKey::bls_from_hex(&pk))
                 .map_err(|_| eyre!("Invalid (Ed25519/BLS) public key bytes: {}", pk))?;
 
             let xorname = XorName::from(public_key);
-            let xorurl = SafeUrl::encode_safekey(xorname, safe.xorurl_base)?;
+            let xorurl = SafeUrl::encode_safekey(xorname, xorurl_base)?;
 
             // Now let's just print out the SafeKey xorurl
             if OutputFmt::Pretty == output_fmt {
@@ -89,40 +86,46 @@ pub async fn xorurl_commander(
                 println!("{}", xorurl);
             }
         }
-        None => {
-            let location =
-                get_from_arg_or_stdin(location, Some("...awaiting location path from stdin"))?;
+    }
+    Ok(())
+}
 
-            // Do a dry-run on the location
-            safe.dry_run_mode = true;
-            let (_version, processed_files, _) = safe
-                .files_container_create_from(&location, None, recursive, follow_symlinks)
-                .await?;
+pub async fn xorurl_com(
+    location: Option<String>,
+    recursive: bool,
+    follow_symlinks: bool,
+    output_fmt: OutputFmt,
+    safe: &mut Safe,
+) -> Result<()> {
+    let location = get_from_arg_or_stdin(location, Some("...awaiting location path from stdin"))?;
+    // Do a dry-run on the location
+    safe.dry_run_mode = true;
+    let (_version, processed_files, _) = safe
+        .files_container_create_from(&location, None, recursive, follow_symlinks)
+        .await?;
 
-            // Now let's just print out a list of the xorurls
-            if OutputFmt::Pretty == output_fmt {
-                if processed_files.is_empty() {
-                    println!("No files were processed");
-                } else {
-                    let (table, success_count) = gen_processed_files_table(&processed_files, false);
-                    println!("{} file/s processed:", success_count);
-                    table.printstd();
-                }
-            } else {
-                let mut list = Vec::<(String, String)>::new();
-                for (file_name, change) in processed_files {
-                    let link = match change {
-                        FilesMapChange::Failed(err) => format!("<{}>", err),
-                        FilesMapChange::Added(link)
-                        | FilesMapChange::Updated(link)
-                        | FilesMapChange::Removed(link) => link,
-                    };
-
-                    list.push((file_name.display().to_string(), link));
-                }
-                println!("{}", serialise_output(&list, output_fmt));
-            }
+    // Now let's just print out a list of the xorurls
+    if OutputFmt::Pretty == output_fmt {
+        if processed_files.is_empty() {
+            println!("No files were processed");
+        } else {
+            let (table, success_count) = gen_processed_files_table(&processed_files, false);
+            println!("{} file/s processed:", success_count);
+            table.printstd();
         }
+    } else {
+        let mut list = Vec::<(String, String)>::new();
+        for (file_name, change) in processed_files {
+            let link = match change {
+                FilesMapChange::Failed(err) => format!("<{}>", err),
+                FilesMapChange::Added(link)
+                | FilesMapChange::Updated(link)
+                | FilesMapChange::Removed(link) => link,
+            };
+
+            list.push((file_name.display().to_string(), link));
+        }
+        println!("{}", serialise_output(&list, output_fmt));
     }
     Ok(())
 }

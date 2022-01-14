@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under the MIT license <LICENSE-MIT
 // http://opensource.org/licenses/MIT> or the Modified BSD license <LICENSE-BSD
@@ -8,8 +8,10 @@
 // Software.
 
 use super::register::EntryHash;
+
 use crate::safeurl::{ContentType, SafeUrl, XorUrl};
-use crate::{Error, Result, Safe, Scope};
+use crate::{Error, Result, Safe};
+
 use log::debug;
 use safe_network::types::DataAddress;
 use std::collections::BTreeSet;
@@ -31,30 +33,8 @@ impl Safe {
         private: bool,
     ) -> Result<XorUrl> {
         debug!("Creating a Multimap");
-        let (xorname, op_batch) = self
-            .safe_client
-            .create_register(name, type_tag, None, private, self.dry_run_mode)
-            .await?;
-
-        if !self.dry_run_mode {
-            self.safe_client.apply_register_ops(op_batch).await?;
-        }
-
-        let scope = if private {
-            Scope::Private
-        } else {
-            Scope::Public
-        };
-
-        let xorurl = SafeUrl::encode_register(
-            xorname,
-            type_tag,
-            scope,
-            ContentType::Multimap,
-            self.xorurl_base,
-        )?;
-
-        Ok(xorurl)
+        self.register_create(name, type_tag, private, ContentType::Multimap)
+            .await
     }
 
     /// Return the value of a Multimap on the network corresponding to the key provided
@@ -120,12 +100,12 @@ impl Safe {
         };
 
         let (entry_hash, op_batch) = self
-            .safe_client
+            .client
             .write_to_register(address, data, replace)
             .await?;
 
         if !self.dry_run_mode {
-            self.safe_client.apply_register_ops(op_batch).await?;
+            self.client.publish_register_ops(op_batch).await?;
         }
 
         Ok(entry_hash)
@@ -153,12 +133,12 @@ impl Safe {
             }
         };
         let (entry_hash, op_batch) = self
-            .safe_client
+            .client
             .write_to_register(address, MULTIMAP_REMOVED_MARK.to_vec(), to_remove)
             .await?;
 
         if !self.dry_run_mode {
-            self.safe_client.apply_register_ops(op_batch).await?;
+            self.client.publish_register_ops(op_batch).await?;
         }
 
         Ok(entry_hash)

@@ -44,6 +44,15 @@ pub struct Register {
 }
 
 impl Register {
+    /// Create a new Register.
+    pub fn new(name: XorName, tag: u64, policy: Policy) -> Self {
+        Self {
+            authority: *policy.owner(),
+            crdt: RegisterCrdt::new(Address::Public { name, tag }),
+            policy,
+        }
+    }
+
     /// Construct a new Public Register.
     /// The 'authority' is assumed to be the PK which the messages were and will be
     /// signed with.
