@@ -226,7 +226,13 @@ impl Network {
             ..Default::default()
         };
 
-        let _handle = task::spawn(add_node(id, config, event_tx));
+        // this was shipped out to a thread before...
+        let _ = task::spawn(
+            add_node(id, config, event_tx)
+        );
+        // add_node(id, config, event_tx)
+        //     .await
+        //     .expect("Node was node added successfully");
 
         self.try_print_status();
     }

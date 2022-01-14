@@ -38,13 +38,13 @@ impl SecretKey {
         let bytes = hex::decode(hex).map_err(|e| {
             Error::FailedToParse(format!(
                 "Couldn't parse edd25519 secret key bytes from hex: {}",
-                e.to_string()
+                e
             ))
         })?;
         let ed25519_sk = ed25519_dalek::SecretKey::from_bytes(bytes.as_ref()).map_err(|e| {
             Error::FailedToParse(format!(
                 "Couldn't parse ed25519 secret key from bytes: {}",
-                e.to_string()
+                e
             ))
         })?;
         Ok(Self::Ed25519(ed25519_sk))

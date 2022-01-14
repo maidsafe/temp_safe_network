@@ -29,17 +29,14 @@
 
 use color_eyre::{Section, SectionExt};
 use eyre::{eyre, Result, WrapErr};
-use safe_network::{
-    node::{add_connection_info, set_connection_info, Config, Error, Node},
-    LogFormatter,
-};
+use safe_network::node::{add_connection_info, set_connection_info, Config, Error, Node};
 use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process::exit};
 use structopt::{clap, StructOpt};
 use tokio::time::{sleep, Duration};
 use tracing::{self, error, info, trace, warn};
-use tracing_subscriber::filter::EnvFilter;
 
+#[cfg(not(feature = "tokio-console"))]
 const MODULE_NAME: &str = "safe_network";
 const BOOTSTRAP_RETRY_TIME: u64 = 3; // in minutes
 
