@@ -10,35 +10,90 @@ pub use safe_network::types::register::{Entry, EntryHash};
 
 use crate::safeurl::{ContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe};
+
 use log::debug;
-use safe_network::types::{DataAddress, RegisterAddress, Scope};
-use std::collections::BTreeSet;
+use safe_network::{
+    client::Error as ClientError,
+    types::{
+        register::{
+            Policy, PrivatePermissions, PrivatePolicy, PublicPermissions, PublicPolicy, User,
+        },
+        DataAddress, Error as SafeNdError, RegisterAddress, Scope,
+    },
+};
+use std::collections::{BTreeMap, BTreeSet};
+use tracing::info;
 use xor_name::XorName;
 
 impl Safe {
+    // === Register data operations ===
     /// Create a Register on the network
+    /// Returns a register operation batch that can be used to apply changes on the network.
+    /// Nothing is sent to the network, without applying the batch, it's pretty much a dry run.
     pub async fn register_create(
         &self,
         name: Option<XorName>,
-        type_tag: u64,
+        tag: u64,
+        //_permissions: Option<String>,
         private: bool,
+        content_type: ContentType,
     ) -> Result<XorUrl> {
-        let (xorname, op_batch) = self
-            .safe_client
-            .create_register(name, type_tag, None, private, self.dry_run_mode)
-            .await?;
+        debug!(
+            "Storing {} Register data with tag type: {}, xorname: {:?}, dry_run: {}",
+            if private { "Private" } else { "Public" },
+            tag,
+            name,
+            self.dry_run_mode
+        );
+
+        let xorname = name.unwrap_or_else(rand::random);
 
         let scope = if private {
             Scope::Private
         } else {
             Scope::Public
         };
-        let xorurl =
-            SafeUrl::encode_register(xorname, type_tag, scope, ContentType::Raw, self.xorurl_base)?;
 
-        if !self.dry_run_mode {
-            self.safe_client.apply_register_ops(op_batch).await?;
+        // return early if dry_run_mode
+        if self.dry_run_mode {
+            return Ok(SafeUrl::encode_register(
+                xorname,
+                tag,
+                scope,
+                content_type,
+                self.xorurl_base,
+            )?);
         }
+
+        info!("Xorname for new Register storage: {:?}", &xorname);
+
+        // The Register's owner will be the client's public key
+        let my_pk = User::Key(self.client.public_key());
+
+        let create = |policy| async {
+            self.client
+                .create_register(xorname, tag, policy)
+                .await
+                .map_err(|e| {
+                    Error::NetDataError(format!(
+                        "Failed to prepare store Private Register operation: {:?}",
+                        e
+                    ))
+                })
+        };
+
+        // Store the Register on the network
+        let (_, op_batch) = if private {
+            create(private_policy(my_pk)).await?
+        } else {
+            // Set write permissions to this application
+            let user_app = my_pk;
+            create(public_policy(user_app)).await?
+        };
+
+        let xorurl = SafeUrl::encode_register(xorname, tag, scope, content_type, self.xorurl_base)?;
+
+        self.client.publish_register_ops(op_batch).await?;
 
         Ok(xorurl)
     }
@@ -78,7 +133,16 @@ impl Safe {
             None => {
                 debug!("No version so take latest entry from Register at: {}", url);
                 let address = self.get_register_address(url)?;
-                self.safe_client.read_register(address).await
+                self.client.read_register(address).await.map_err(|err| {
+                    if let ClientError::NetworkDataError(SafeNdError::NoSuchEntry) = err {
+                        Error::EmptyContent(format!("Empty Register found at {:?}", address))
+                    } else {
+                        Error::NetDataError(format!(
+                            "Failed to read latest value from Register data: {:?}",
+                            err
+                        ))
+                    }
+                })
             }
         };
 
@@ -108,7 +172,24 @@ impl Safe {
         // TODO: allow to specify the hash with the SafeUrl as well: safeurl.content_hash(),
         // e.g. safe://mysafeurl#ce56a3504c8f27bfeb13bdf9051c2e91409230ea
         let address = self.get_register_address(url)?;
-        self.safe_client.get_register_entry(address, hash).await
+        self.client
+            .get_register_entry(address, hash)
+            .await
+            .map_err(|err| {
+                if let ClientError::ErrorMessage {
+                    source: safe_network::messaging::data::Error::NoSuchEntry,
+                    ..
+                } = err
+                {
+                    Error::HashNotFound(hash)
+                } else {
+                    Error::NetDataError(format!(
+                        "Failed to retrieve entry with hash '{}' from Register data: {:?}",
+                        hex::encode(hash.0),
+                        err
+                    ))
+                }
+            })
     }
 
     /// Write value to a Register on the network
@@ -121,12 +202,12 @@ impl Safe {
         let reg_url = self.parse_and_resolve_url(url).await?;
         let address = self.get_register_address(&reg_url)?;
         let (entry_hash, op_batch) = self
-            .safe_client
+            .client
             .write_to_register(address, entry, parents)
             .await?;
 
         if !self.dry_run_mode {
-            self.safe_client.apply_register_ops(op_batch).await?;
+            self.client.publish_register_ops(op_batch).await?;
         }
 
         Ok(entry_hash)
@@ -147,17 +228,33 @@ impl Safe {
     }
 }
 
+fn private_policy(owner: User) -> Policy {
+    let mut permissions = BTreeMap::new();
+    let _ = permissions.insert(owner, PrivatePermissions::new(true, true));
+    Policy::Private(PrivatePolicy { owner, permissions })
+}
+
+fn public_policy(owner: User) -> Policy {
+    let mut permissions = BTreeMap::new();
+    let _ = permissions.insert(owner, PublicPermissions::new(true));
+    Policy::Public(PublicPolicy { owner, permissions })
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::app::test_helpers::new_safe_instance;
+    use crate::{app::test_helpers::new_safe_instance, ContentType};
     use anyhow::Result;
 
     #[tokio::test]
     async fn test_register_create() -> Result<()> {
         let safe = new_safe_instance().await?;
 
-        let xorurl = safe.register_create(None, 25_000, false).await?;
-        let xorurl_priv = safe.register_create(None, 25_000, true).await?;
+        let xorurl = safe
+            .register_create(None, 25_000, false, ContentType::Raw)
+            .await?;
+        let xorurl_priv = safe
+            .register_create(None, 25_000, true, ContentType::Raw)
+            .await?;
 
         let received_data = safe.register_read(&xorurl).await?;
         let received_data_priv = safe.register_read(&xorurl_priv).await?;
