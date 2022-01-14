@@ -2660,9 +2660,9 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.27.3"
+version = "0.27.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfde25ca398c0fd0555be619a6cb69d7b9432756f741944272c7d6272e986b00"
+checksum = "5bd523751fe2e83db806e7810460dec3ad1f9186fd14f599c6b2fb47c1485d7e"
 dependencies = [
  "backoff",
  "bincode",

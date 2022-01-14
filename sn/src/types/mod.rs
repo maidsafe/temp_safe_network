@@ -50,7 +50,6 @@ use xor_name::XorName;
 pub enum ReplicatedData {
     /// A chunk of data.
     Chunk(Chunk),
-    // auth: SectionAuth,
     /// A single cmd for a register.
     RegisterWrite(RegisterCmd),
     /// An entire op log of a register.

@@ -125,36 +125,6 @@ impl Core {
 
         let node_id = XorName::from(sending_node_pk);
 
-        // let NodeQueryResponse::GetChunk(response) = response;
-
-        // let origin = if let Some(origin) = self.pending_chunk_queries.remove(&user.0).await {
-        //     // Check for data correctness now that we know the returned data XorName was tracked by us
-        //     if let Ok(chunk) = &response {
-        //         let received_name = XorName::from_content(chunk.value());
-        //         if user.0 != received_name {
-        //             warn!("Received response from the Adult did not correspond to the requested address. \n\
-        //             Received content name {:?}: Requested name {:?}", received_name, user.0);
-        //             warn!("Penalising the Adult and dropping this response");
-        //             self.liveness.penalise_member(node_id).await;
-        //             return Ok(commands);
-        //         }
-        //     }
-
-        //     origin
-        // } else {
-        //     warn!(
-        //         "Dropping query response from Adult {}. We might have already forwarded this response to the requesting client or \
-        //         have not registered the client: {}",
-        //         sending_node_pk, user.0
-        //     );
-        //     return Ok(commands);
-        // };
-
-        // // Clear expired queries from the cache.
-        // self.pending_chunk_queries.remove_expired().await;
-
-        // let query_response = QueryResponse::GetChunk(response);
-
         let origin = if let Some(origin) = self.pending_data_queries.remove(&user.0).await {
             origin
         } else {
