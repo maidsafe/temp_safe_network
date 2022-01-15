@@ -40,11 +40,12 @@ pub struct Register {
     authority: User,
     crdt: RegisterCrdt,
     policy: Policy,
+    cap: u16,
 }
 
 impl Register {
     ///
-    pub fn new(name: XorName, tag: u64, policy: Policy) -> Self {
+    pub fn new(name: XorName, tag: u64, policy: Policy, cap: u16) -> Self {
         let address = if matches!(policy, Policy::Public(_)) {
             Address::Public { name, tag }
         } else {
@@ -54,6 +55,7 @@ impl Register {
             authority: *policy.owner(),
             crdt: RegisterCrdt::new(address),
             policy,
+            cap,
         }
     }
 
@@ -67,6 +69,7 @@ impl Register {
         name: XorName,
         tag: u64,
         policy: Option<PublicPolicy>,
+        cap: u16,
     ) -> Self {
         let policy = policy.unwrap_or(PublicPolicy {
             owner: authority,
@@ -77,6 +80,7 @@ impl Register {
             authority,
             crdt: RegisterCrdt::new(Address::Public { name, tag }),
             policy: policy.into(),
+            cap,
         }
     }
 
@@ -90,6 +94,7 @@ impl Register {
         name: XorName,
         tag: u64,
         policy: Option<PrivatePolicy>,
+        cap: u16,
     ) -> Self {
         let policy = policy.unwrap_or(PrivatePolicy {
             owner: authority,
@@ -100,6 +105,7 @@ impl Register {
             authority,
             crdt: RegisterCrdt::new(Address::Private { name, tag }),
             policy: policy.into(),
+            cap,
         }
     }
 
@@ -143,6 +149,11 @@ impl Register {
         self.authority
     }
 
+    /// Return the max number of items that can be held in the register.
+    pub fn cap(&self) -> u16 {
+        self.cap
+    }
+
     /// Return the number of items held in the register
     pub fn size(&self) -> u64 {
         self.crdt.size()
@@ -173,6 +184,11 @@ impl Register {
         &self.policy
     }
 
+    /// Increment the size cap of the register, returning the previous value.
+    pub fn increment_cap(&mut self, add: u16) {
+        self.cap += add;
+    }
+
     /// Write an entry to the Register, returning the generated unsigned
     /// CRDT operation so the caller can sign and broadcast it to other replicas,
     /// along with the hash of the entry just written.
@@ -184,6 +200,9 @@ impl Register {
         let size = entry.len();
         if size > MAX_REG_ENTRY_SIZE {
             return Err(Error::EntryTooBig(size, MAX_REG_ENTRY_SIZE));
+        }
+        if self.crdt.size() >= self.cap() as u64 {
+            return Err(Error::TooManyEntries(self.crdt.size() as usize));
         }
 
         self.crdt.write(entry, children, self.authority)
@@ -273,6 +292,7 @@ mod tests {
 
         let name: XorName = rand::random();
         let tag = 43_000u64;
+        let cap = u16::MAX;
 
         // We'll have 'authority1' as the owner in both replicas and
         // grant permissions for Write to 'authority2' in both replicas too
@@ -289,6 +309,7 @@ mod tests {
                 owner: authority1,
                 permissions: perms.clone(),
             }),
+            cap,
         );
         let mut replica2 = Register::new_public(
             authority2,
@@ -298,6 +319,7 @@ mod tests {
                 owner: authority1,
                 permissions: perms,
             }),
+            cap,
         );
 
         // And let's write an item to replica1 with autority1
@@ -525,7 +547,7 @@ mod tests {
                     .clone()
                     .unwrap_or_else(|| Keypair::new_ed25519(&mut OsRng));
                 let authority = User::Key(authority_keypair.public_key());
-                let register = Register::new_public(authority, name, tag, policy.clone());
+                let register = Register::new_public(authority, name, tag, policy.clone(), u16::MAX);
                 (authority_keypair, register)
             })
             .collect();
@@ -547,7 +569,8 @@ mod tests {
                     .clone()
                     .unwrap_or_else(|| Keypair::new_ed25519(&mut OsRng));
                 let authority = User::Key(authority_keypair.public_key());
-                let register = Register::new_private(authority, name, tag, policy.clone());
+                let register =
+                    Register::new_private(authority, name, tag, policy.clone(), u16::MAX);
                 (authority_keypair, register)
             })
             .collect();
@@ -616,7 +639,8 @@ mod tests {
         (1..max_quantity + 1).prop_map(move |quantity| {
             let mut replicas = Vec::with_capacity(quantity);
             for _ in 0..quantity {
-                let replica = Register::new_public(owner, xorname, tag, Some(policy.clone()));
+                let replica =
+                    Register::new_public(owner, xorname, tag, Some(policy.clone()), u16::MAX);
 
                 replicas.push(replica);
             }
@@ -981,8 +1005,9 @@ mod tests {
             // set up a replica that has nothing to do with the rest, random xor... different owner...
             let xorname = XorName::random();
             let tag = 45_000u64;
+            let cap = u16::MAX;
             let random_owner_keypair = Keypair::new_ed25519(&mut OsRng);
-            let mut bogus_replica = Register::new_public(User::Key(random_owner_keypair.public_key()), xorname, tag, None);
+            let mut bogus_replica = Register::new_public(User::Key(random_owner_keypair.public_key()), xorname, tag, None, cap);
 
             // add bogus ops from bogus replica + bogus data
             let mut children = BTreeSet::new();

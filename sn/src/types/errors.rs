@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under the MIT license <LICENSE-MIT
 // https://opensource.org/licenses/MIT> or the Modified BSD license <LICENSE-BSD
@@ -57,6 +57,9 @@ pub enum Error {
     /// Entry is too big to fit inside a register
     #[error("Entry is too big to fit inside a register: {0}, max: {1}")]
     EntryTooBig(usize, usize),
+    /// Cannot add another entry since the register entry cap has been reached.
+    #[error("Cannot add another entry since the register entry cap has been reached: {0}")]
+    TooManyEntries(usize),
     /// Supplied actions are not valid
     #[error("Some entry actions are not valid")]
     InvalidEntryActions(BTreeMap<Vec<u8>, Error>),

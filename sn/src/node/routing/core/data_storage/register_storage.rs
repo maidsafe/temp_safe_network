@@ -26,7 +26,6 @@ use crate::types::{
 use bincode::serialize;
 use rayon::prelude::*;
 use sled::Db;
-use std::sync::atomic::{AtomicU16, Ordering};
 use std::{
     fmt::{self, Display, Formatter},
     path::Path,
@@ -60,7 +59,6 @@ struct CacheEntry {
     state: Arc<RwLock<Register>>,
     store: RegOpStore,
     section_auth: SectionAuth,
-    size: Arc<AtomicU16>,
 }
 
 impl RegisterStorage {
@@ -424,13 +422,18 @@ impl RegisterStorage {
                 let ExtendRegister { extend_with, .. } = op;
 
                 let entry = self.try_load_cache_entry(&key).await?;
-                let prev = entry.size.fetch_add(extend_with, Ordering::SeqCst);
+                entry.store.append(cmd)?;
+
+                let mut write = entry.state.write().await;
+                let prev = write.cap();
+                write.increment_cap(extend_with);
+
                 info!(
                     "Extended Register size from {} to {}",
                     prev,
-                    prev + extend_with
+                    prev + extend_with,
                 );
-                entry.store.append(cmd)?;
+
                 self.used_space.increase(required_space);
                 Ok(())
             }
@@ -627,7 +630,6 @@ impl RegisterStorage {
         // read from disk
         let store = self.get_or_create_store(key)?;
         let mut hydrated_register = None;
-        let mut current_size: u16 = 0;
         // apply all ops
         use RegisterCmd::*;
         for stored_cmd in store.get_all()? {
@@ -643,8 +645,8 @@ impl RegisterStorage {
                         policy,
                     } = op;
                     // first op shall be New
-                    hydrated_register = Some((Register::new(name, tag, policy), section_auth));
-                    current_size = size;
+                    hydrated_register =
+                        Some((Register::new(name, tag, policy, size), section_auth));
                 }
                 Edit(SignedRegisterEdit {
                     op: EditRegister { edit, .. },
@@ -666,7 +668,9 @@ impl RegisterStorage {
                         },
                     ..
                 } => {
-                    current_size += extend_with;
+                    if let Some((reg, _)) = &mut hydrated_register {
+                        reg.increment_cap(extend_with);
+                    }
                 }
             }
         }
@@ -678,7 +682,6 @@ impl RegisterStorage {
                     state: Arc::new(RwLock::new(reg)),
                     store,
                     section_auth,
-                    size: Arc::new(AtomicU16::new(current_size)),
                 });
                 // populate cache
                 self.cache.insert(key, entry.clone()).await;
