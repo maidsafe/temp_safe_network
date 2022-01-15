@@ -85,7 +85,7 @@ impl Core {
     /// Handle data query
     pub(crate) async fn handle_data_query_at_adult(
         &self,
-        msg_id: MessageId,
+        correlation_id: MessageId,
         query: &DataQuery,
         auth: ServiceAuth,
         user: EndUser,
@@ -99,7 +99,8 @@ impl Core {
                 .data_storage
                 .query(query, User::Key(auth.public_key))
                 .await,
-            correlation_id: msg_id,
+            // This shall be the original client's request' msg_id.
+            correlation_id,
             user,
         };
 

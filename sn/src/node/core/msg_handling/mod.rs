@@ -738,12 +738,13 @@ impl Core {
                         query,
                         auth,
                         origin,
+                        correlation_id,
                     } => {
                         // There is no point in verifying a sig from a sender A or B here.
                         // Send back response to the sending elder
                         let sender_xorname = msg_authority.get_auth_xorname();
                         self.handle_data_query_at_adult(
-                            msg_id,
+                            correlation_id,
                             &query,
                             auth,
                             origin,
