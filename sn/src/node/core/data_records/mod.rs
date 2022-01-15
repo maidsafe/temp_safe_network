@@ -118,7 +118,8 @@ impl Core {
         let msg = SystemMsg::NodeQuery(NodeQuery::Data {
             query,
             auth: auth.into_inner(),
-            origin: EndUser(origin.name()),
+            origin: EndUser(correlation_id),
+            correlation_id: MessageId::from_xor_name(correlation_id),
         });
         let aggregation = false;
 

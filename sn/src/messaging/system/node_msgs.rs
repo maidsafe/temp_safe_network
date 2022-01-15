@@ -8,7 +8,7 @@
 
 use crate::messaging::{
     data::{DataCmd, DataExchange, DataQuery, OperationId, QueryResponse, Result, StorageLevel},
-    EndUser, ServiceAuth,
+    EndUser, MessageId, ServiceAuth,
 };
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
@@ -81,6 +81,8 @@ pub enum NodeQuery {
         auth: ServiceAuth,
         /// The user that has initiated this query
         origin: EndUser,
+        ///
+        correlation_id: MessageId,
     },
 }
 
