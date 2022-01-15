@@ -138,7 +138,7 @@ impl Session {
         )
         .await;
 
-        let expected_acks = std::cmp::min(1, targets_count * 2 / 3);
+        let expected_acks = std::cmp::max(1, targets_count * 2 / 3);
         // We are not wait for the receive of majority of cmd Acks.
         // This could be further strict to wait for ALL the Acks get received.
         // The period is expected to have AE completed, hence no extra wait is required.
@@ -146,7 +146,8 @@ impl Session {
         let mut received_err = 0;
         let mut attempts = 0;
         let interval = Duration::from_millis(100);
-        let expected_attempts = self.standard_wait.as_millis() / interval.as_millis();
+        let expected_attempts =
+            std::cmp::max(10, self.standard_wait.as_millis() / interval.as_millis());
         loop {
             match receiver.try_recv() {
                 Ok((src, None)) => {
@@ -194,6 +195,7 @@ impl Session {
                 );
                 break;
             }
+            trace!("current attempt {:?}/{:?}", attempts, expected_attempts);
             tokio::time::sleep(interval).await;
         }
 
@@ -558,142 +560,161 @@ pub(super) async fn send_message(
     endpoint: Endpoint,
     msg_id: MessageId,
 ) -> Result<(), Error> {
-    let priority = wire_msg.clone().into_message()?.priority();
+    let _ = tokio::spawn(async move {
+        let priority = if let Ok(msg) = wire_msg.clone().into_message() {
+            msg.priority()
+        } else {
+            error!("Failed to convert wire_msg {:?} into message", msg_id);
+            return;
+        };
 
-    let msg_bytes = wire_msg.serialize()?;
+        let msg_bytes = if let Ok(res) = wire_msg.serialize() {
+            res
+        } else {
+            error!("Failed to serialize wire_msg {:?}", msg_id);
+            return;
+        };
 
-    // Send message to all Elders concurrently
-    let mut tasks = Vec::default();
+        // Send message to all Elders concurrently
+        let mut tasks = Vec::default();
 
-    let successes = Arc::new(RwLock::new(0));
+        let successes = Arc::new(RwLock::new(0));
 
-    // let contactable_elders = elders.clone();
-    // clone elders as we want to update them in this process
-    for peer in elders.clone() {
-        let session = session.clone();
-        let msg_bytes_clone = msg_bytes.clone();
-        let endpoint = endpoint.clone();
+        // let contactable_elders = elders.clone();
+        // clone elders as we want to update them in this process
+        for peer in elders.clone() {
+            let session = session.clone();
+            let msg_bytes_clone = msg_bytes.clone();
+            let endpoint = endpoint.clone();
 
-        let mut reused_connection = true;
-        let peer_name = peer.name();
-        let cloned_peer = peer.clone();
-        // let addr = peer.addr();
-        let failed_connection_id = session
-            .elder_last_closed_connections
-            .get(&peer_name)
-            .map(|entry| *entry.value());
-        let connection = peer
-            .ensure_connection(
-                // map closed conns to elders here and in listeners and compare here...
-                // TODO: log any connections that failed's IDs and then check if that conn is valid here
-                // `is_valid = |connection| connection.id() != failed_connection_id`).
-                |connection| Some(connection.id()) != failed_connection_id,
-                |addr| {
-                    reused_connection = false;
-                    async move {
-                        trace!(
-                            "Prior connection no longer valid, opening a new connection to: {:?} ",
-                            addr
-                        );
-                        let (connection, connection_incoming) = endpoint.connect_to(&addr).await?;
-                        let conn_id = connection.id();
-                        Session::spawn_message_listener_thread(
-                            session.clone(),
-                            conn_id,
-                            cloned_peer,
-                            connection_incoming,
-                        );
-                        Ok(connection)
+            let mut reused_connection = true;
+            let peer_name = peer.name();
+            let cloned_peer = peer.clone();
+            // let addr = peer.addr();
+            let failed_connection_id = session
+                .elder_last_closed_connections
+                .get(&peer_name)
+                .map(|entry| *entry.value());
+            let cur_peer = peer.clone();
+            let connection = cur_peer
+                .ensure_connection(
+                    // map closed conns to elders here and in listeners and compare here...
+                    // TODO: log any connections that failed's IDs and then check if that conn is valid here
+                    // `is_valid = |connection| connection.id() != failed_connection_id`).
+                    |connection| Some(connection.id()) != failed_connection_id,
+                    |addr| {
+                        reused_connection = false;
+                        async move {
+                            trace!(
+                                "Prior connection no longer valid, opening a new connection to: {:?} ",
+                                addr
+                            );
+                            let (connection, connection_incoming) = endpoint.connect_to(&addr).await?;
+                            let conn_id = connection.id();
+                            Session::spawn_message_listener_thread(
+                                session.clone(),
+                                conn_id,
+                                cloned_peer,
+                                connection_incoming,
+                            );
+                            Ok(connection)
+                        }
+                    },
+                )
+                .await;
+
+            let connection_id = match connection {
+                Ok(conn) => conn.id(),
+                Err(err) => {
+                    error!("Failed to get connection_id of {:?}", peer_name);
+                    return;
+                }
+            };
+
+            if reused_connection {
+                trace!(
+                    connection_id,
+                    src = %peer.addr(),
+                    "Client::ConnectionReused",
+                );
+            }
+
+            let task_handle: JoinHandle<(XorName, usize, Result<(), Error>)> = tokio::spawn(
+                async move {
+                    let connection = peer.connection().await;
+                    if let Some(connection) = connection {
+                        (
+                            peer_name,
+                            connection_id,
+                            connection
+                                .send_with(msg_bytes_clone, priority, None)
+                                .await
+                                .map_err(Error::from),
+                        )
+                    } else {
+                        error!("Peer connection did not exist, even after using 'ensure_connection'. Message to {:?} was not sent.",peer);
+                        (
+                            peer_name,
+                            connection_id,
+                            Err(Error::PeerConnection(peer.addr())),
+                        )
                     }
                 },
-            )
-            .await;
+            );
 
-        let connection_id = connection?.id();
+            tasks.push(task_handle);
+        }
 
-        if reused_connection {
-            trace!(
-                connection_id,
-                src = %peer.addr(),
-                "Client::ConnectionReused",
+        // Let's await for all messages to be sent
+        let results = join_all(tasks).await;
+
+        for r in results {
+            match r {
+                Ok((peer_name, connection_id, send_result)) => {
+                    if let Err(Error::QuicP2pSend(SendError::ConnectionLost(
+                        ConnectionError::Closed(Close::Application { reason, .. }),
+                    ))) = send_result
+                    {
+                        warn!(
+                            "Connection was closed by the node: {:?}",
+                            String::from_utf8(reason.to_vec())
+                        );
+
+                        let _old = session
+                            .elder_last_closed_connections
+                            .insert(peer_name, connection_id);
+                        // this is not necessarily an error
+                        // *successes.write().await += 1;
+                    } else if send_result.is_err() {
+                        error!("Error during {:?} send: {:?}", msg_id, send_result);
+                    } else {
+                        *successes.write().await += 1;
+                    }
+                }
+                Err(join_error) => {
+                    warn!("Tokio join error as we send: {:?}", join_error)
+                }
+            }
+        }
+
+        let failures = elders.len() - *successes.read().await;
+
+        if failures > 0 {
+            error!(
+                "Sending the message ({:?}) from {} to {}/{} of the elders failed: {:?}",
+                msg_id,
+                endpoint.public_addr(),
+                failures,
+                elders.len(),
+                elders,
             );
         }
 
-        let task_handle: JoinHandle<(XorName, usize, Result<(), Error>)> = tokio::spawn(
-            async move {
-                let connection = peer.connection().await;
-                if let Some(connection) = connection {
-                    (
-                        peer_name,
-                        connection_id,
-                        connection
-                            .send_with(msg_bytes_clone, priority, None)
-                            .await
-                            .map_err(Error::from),
-                    )
-                } else {
-                    error!("Peer connection did not exist, even after using 'ensure_connection'. Message to {:?} was not sent.",peer);
-                    (
-                        peer_name,
-                        connection_id,
-                        Err(Error::PeerConnection(peer.addr())),
-                    )
-                }
-            },
-        );
-
-        tasks.push(task_handle);
-    }
-
-    // Let's await for all messages to be sent
-    let results = join_all(tasks).await;
-
-    for r in results {
-        match r {
-            Ok((peer_name, connection_id, send_result)) => {
-                if let Err(Error::QuicP2pSend(SendError::ConnectionLost(
-                    ConnectionError::Closed(Close::Application { reason, .. }),
-                ))) = send_result
-                {
-                    warn!(
-                        "Connection was closed by the node: {:?}",
-                        String::from_utf8(reason.to_vec())
-                    );
-
-                    let _old = session
-                        .elder_last_closed_connections
-                        .insert(peer_name, connection_id);
-                    // this is not necessarily an error
-                    // *successes.write().await += 1;
-                } else if send_result.is_err() {
-                    error!("Error during {:?} send: {:?}", msg_id, send_result);
-                } else {
-                    *successes.write().await += 1;
-                }
-            }
-            Err(join_error) => {
-                warn!("Tokio join error as we send: {:?}", join_error)
-            }
+        let successful_sends = *successes.read().await;
+        if failures > successful_sends {
+            error!("More errors when sending a message than successes");
         }
-    }
-
-    let failures = elders.len() - *successes.read().await;
-
-    if failures > 0 {
-        error!(
-            "Sending the message ({:?}) from {} to {}/{} of the elders failed: {:?}",
-            msg_id,
-            endpoint.public_addr(),
-            failures,
-            elders.len(),
-            elders,
-        );
-    }
-
-    let successful_sends = *successes.read().await;
-    if failures > successful_sends {
-        error!("More errors when sending a message than successes");
-    }
+    });
     Ok(())
 }
 
