@@ -65,7 +65,7 @@ impl Client {
             Address::Private { name, tag }
         };
 
-        let op = CreateRegister {
+        let op = CreateRegister::Empty {
             name,
             tag,
             size: u16::MAX, // TODO: use argument

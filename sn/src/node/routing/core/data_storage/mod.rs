@@ -57,7 +57,7 @@ impl DataStorage {
     pub(super) async fn store(&self, data: &ReplicatedData) -> Result<Option<StorageLevel>> {
         match data.clone() {
             ReplicatedData::Chunk(chunk) => self.chunks.store(&chunk).await?,
-            ReplicatedData::Register(data) => {
+            ReplicatedData::RegisterLog(data) => {
                 self.registers
                     .update(RegisterStoreExport(vec![data]))
                     .await?
@@ -117,7 +117,7 @@ impl DataStorage {
                 .registers
                 .get_register_replica(addr)
                 .await
-                .map(ReplicatedData::Register),
+                .map(ReplicatedData::RegisterLog),
         }
     }
 

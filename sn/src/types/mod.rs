@@ -39,7 +39,7 @@ pub use keys::{
 };
 pub use token::Token;
 
-use crate::messaging::data::{RegisterCmd, ReplicatedRegister};
+use crate::messaging::data::{RegisterCmd, ReplicatedRegisterLog};
 
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
@@ -51,18 +51,17 @@ pub enum ReplicatedData {
     /// A chunk of data.
     Chunk(Chunk),
     // auth: SectionAuth,
-    //
-    /// An entire op log of a register.
-    Register(ReplicatedRegister),
     /// A single cmd for a register.
     RegisterWrite(RegisterCmd),
+    /// An entire op log of a register.
+    RegisterLog(ReplicatedRegisterLog),
 }
 
 impl ReplicatedData {
     pub(crate) fn name(&self) -> XorName {
         match self {
             Self::Chunk(chunk) => *chunk.name(),
-            Self::Register(register) => *register.address.name(),
+            Self::RegisterLog(log) => *log.address.name(),
             Self::RegisterWrite(cmd) => *cmd.dst_address().name(),
         }
     }

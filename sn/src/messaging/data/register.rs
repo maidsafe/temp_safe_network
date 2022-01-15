@@ -9,7 +9,7 @@
 use super::{CmdError, Error, QueryResponse, Result};
 
 use crate::messaging::{data::OperationId, SectionAuth};
-use crate::types::register::EntryHash;
+use crate::types::register::{EntryHash, Register};
 use crate::types::{
     register::{Entry, Policy, RegisterOp, User},
     RegisterAddress as Address,
@@ -72,6 +72,7 @@ pub enum RegisterQuery {
 }
 
 /// A [`Register`] cmd that is stored in a log on Adults.
+#[allow(clippy::large_enum_variant)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum RegisterCmd {
     /// Create a new [`Register`] on the network.
@@ -97,30 +98,62 @@ pub enum RegisterCmd {
 }
 
 ///
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct CreateRegister {
-    /// The name of the [`Register`].
-    pub name: XorName,
-    /// The tag on the [`Register`].
-    pub tag: u64,
-    /// The initial size of the [`Register`].
-    pub size: u16,
-    /// The policy of the [`Register`].
-    pub policy: Policy,
+pub enum CreateRegister {
+    /// Populated with entries
+    Populated(Register),
+    /// Without entries
+    Empty {
+        /// The name of the [`Register`].
+        name: XorName,
+        /// The tag on the [`Register`].
+        tag: u64,
+        /// The initial size of the [`Register`].
+        size: u16,
+        /// The policy of the [`Register`].
+        policy: Policy,
+    },
 }
 
 impl CreateRegister {
     ///
+    pub fn owner(&self) -> User {
+        use CreateRegister::*;
+        match self {
+            Populated(reg) => reg.owner(),
+            Empty { policy, .. } => *policy.owner(),
+        }
+    }
+
+    ///
+    pub fn size(&self) -> u16 {
+        use CreateRegister::*;
+        match self {
+            Populated(reg) => reg.size() as u16,
+            Empty { size, .. } => *size,
+        }
+    }
+
+    ///
     pub fn address(&self) -> Address {
-        if let Policy::Public { .. } = self.policy {
-            Address::Public {
-                name: self.name,
-                tag: self.tag,
-            }
-        } else {
-            Address::Private {
-                name: self.name,
-                tag: self.tag,
+        use CreateRegister::*;
+        match self {
+            Populated(reg) => *reg.address(),
+            Empty {
+                policy, name, tag, ..
+            } => {
+                if let Policy::Public { .. } = policy {
+                    Address::Public {
+                        name: *name,
+                        tag: *tag,
+                    }
+                } else {
+                    Address::Private {
+                        name: *name,
+                        tag: *tag,
+                    }
+                }
             }
         }
     }
@@ -336,16 +369,12 @@ impl RegisterCmd {
     }
 
     /// Owner of the Register
-    pub fn owner(&self) -> Option<&User> {
+    pub fn owner(&self) -> Option<User> {
         match self {
             Self::Create {
-                cmd:
-                    SignedRegisterCreate {
-                        op: CreateRegister { policy, .. },
-                        ..
-                    },
+                cmd: SignedRegisterCreate { op, .. },
                 ..
-            } => Some(policy.owner()),
+            } => Some(op.owner()),
             _ => None,
         }
     }

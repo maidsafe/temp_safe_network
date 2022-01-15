@@ -12,7 +12,7 @@ use crate::dbs::{
 use crate::messaging::{
     data::{
         CreateRegister, DeleteRegister, EditRegister, ExtendRegister, OperationId, RegisterCmd,
-        RegisterQuery, RegisterStoreExport, ReplicatedRegister, SignedRegisterCreate,
+        RegisterQuery, RegisterStoreExport, ReplicatedRegisterLog, SignedRegisterCreate,
         SignedRegisterDelete, SignedRegisterEdit, SignedRegisterExtend,
     },
     system::NodeQueryResponse,
@@ -139,7 +139,7 @@ impl RegisterStorage {
     pub(crate) async fn get_register_replica(
         &self,
         address: &Address,
-    ) -> Result<ReplicatedRegister> {
+    ) -> Result<ReplicatedRegisterLog> {
         let key = address.id()?;
         let entry = match self.try_load_cache_entry(&key).await {
             Ok(entry) => entry,
@@ -152,7 +152,11 @@ impl RegisterStorage {
         self.create_replica(key, entry)
     }
 
-    fn create_replica(&self, key: XorName, entry: Arc<CacheEntry>) -> Result<ReplicatedRegister> {
+    fn create_replica(
+        &self,
+        key: XorName,
+        entry: Arc<CacheEntry>,
+    ) -> Result<ReplicatedRegisterLog> {
         let mut address = None;
         let op_log = entry
             .store
@@ -202,7 +206,7 @@ impl RegisterStorage {
             })
             .collect();
 
-        Ok(ReplicatedRegister {
+        Ok(ReplicatedRegisterLog {
             address: address.ok_or(Error::InvalidStore)?,
             section_auth: entry.section_auth.clone(),
             op_log,
@@ -273,7 +277,7 @@ impl RegisterStorage {
             for replicated_cmd in data.op_log {
                 if replicated_cmd.dst_address() != data.address {
                     warn!(
-                        "Corrupt ReplicatedRegister, op log contains foreign ops: {}",
+                        "Corrupt ReplicatedRegisterLog, op log contains foreign ops: {}",
                         key
                     );
                     continue;
@@ -319,10 +323,8 @@ impl RegisterStorage {
                     .verify_authority(serialize(&op)?)
                     .or(Err(Error::InvalidSignature(public_key)))?;
 
-                let CreateRegister { size, .. } = op;
-
                 let old_value = None::<Vec<u8>>;
-                let new_value = Some(serialize(&size)?); // inserts size (not yet used)
+                let new_value = Some(vec![]); // inserts empty value
 
                 // init store first, to allow append to happen asap after key insert
                 // could be races, but edge case for later todos.
@@ -634,19 +636,26 @@ impl RegisterStorage {
         use RegisterCmd::*;
         for stored_cmd in store.get_all()? {
             match stored_cmd {
+                // first op would be create
                 Create {
                     cmd: SignedRegisterCreate { op, .. },
                     section_auth,
                 } => {
-                    let CreateRegister {
-                        name,
-                        tag,
-                        size,
-                        policy,
-                    } = op;
-                    // first op shall be New
-                    hydrated_register =
-                        Some((Register::new(name, tag, policy, size), section_auth));
+                    hydrated_register = match op {
+                        CreateRegister::Empty {
+                            name,
+                            tag,
+                            size,
+                            policy,
+                        } => Some((Register::new(name, tag, policy, size), section_auth)),
+                        CreateRegister::Populated(instance) => {
+                            if instance.size() > (u16::MAX as u64) {
+                                // this would mean the instance has been modified on disk outside of the software
+                                warn!("Data corruption! Encountered stored register with {} entries, wich is larger than max size of {}", instance.size(), u16::MAX);
+                            }
+                            Some((instance, section_auth))
+                        }
+                    };
                 }
                 Edit(SignedRegisterEdit {
                     op: EditRegister { edit, .. },
@@ -978,7 +987,7 @@ mod test {
     }
 
     fn create_reg_w_policy(policy: Policy, keypair: Keypair) -> Result<RegisterCmd> {
-        let op = CreateRegister {
+        let op = CreateRegister::Empty {
             name: XorName::random(),
             tag: 1,
             size: u16::MAX,
