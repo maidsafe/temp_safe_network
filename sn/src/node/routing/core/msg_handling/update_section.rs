@@ -14,33 +14,38 @@ use std::collections::BTreeSet;
 use xor_name::XorName;
 
 impl Core {
-    pub(crate) async fn fire_node_event_for_any_new_adults(
+    /// Will reorganize data if we are an adult,
+    /// and there were changes to adults (any added or removed).
+    pub(crate) async fn try_reorganize_data(
         &self,
         old_adults: BTreeSet<XorName>,
     ) -> Result<Vec<Command>> {
-        let mut commands = vec![];
-        if self.is_not_elder().await {
-            let current_adults: BTreeSet<_> = self
-                .network_knowledge
-                .adults()
-                .await
-                .iter()
-                .map(|p| p.name())
-                .collect();
-            let added: BTreeSet<_> = current_adults.difference(&old_adults).copied().collect();
-            let removed: BTreeSet<_> = old_adults.difference(&current_adults).copied().collect();
-
-            if !added.is_empty() || !removed.is_empty() {
-                // reorganise the data stored in this section
-                let our_name = self.node.read().await.name();
-                let remaining = old_adults.intersection(&current_adults).copied().collect();
-                commands.extend(
-                    self.reorganize_data(our_name, added, removed, remaining)
-                        .await?,
-                );
-            }
+        if self.is_elder().await {
+            // only adults carry out the ops in this method
+            return Ok(vec![]);
         }
 
-        Ok(commands)
+        let current_adults: BTreeSet<_> = self
+            .network_knowledge
+            .adults()
+            .await
+            .iter()
+            .map(|p| p.name())
+            .collect();
+        let added: BTreeSet<_> = current_adults.difference(&old_adults).copied().collect();
+        let removed: BTreeSet<_> = old_adults.difference(&current_adults).copied().collect();
+
+        if added.is_empty() && removed.is_empty() {
+            // no adults added or removed, so nothing to do
+            return Ok(vec![]);
+        }
+
+        // we are an adult, and there were changes to adults
+        // so we reorganise the data stored in this section..:
+        let our_name = self.node.read().await.name();
+        let remaining = old_adults.intersection(&current_adults).copied().collect();
+        self.reorganize_data(our_name, added, removed, remaining)
+            .await
+            .map_err(super::Error::from)
     }
 }

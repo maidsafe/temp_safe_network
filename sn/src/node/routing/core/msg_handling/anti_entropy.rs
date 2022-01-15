@@ -64,7 +64,7 @@ impl Core {
             )
             .await?;
 
-        let mut commands = self.fire_node_event_for_any_new_adults(old_adults).await?;
+        let mut commands = self.try_reorganize_data(old_adults).await?;
 
         // always run this, only changes will trigger events
         commands.extend(
