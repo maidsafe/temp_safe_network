@@ -1205,6 +1205,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "file-rotate"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "31c2536ee16e019920dbef075aa3edc7efa8029fe17fe4330dd9690ee155a411"
+dependencies = [
+ "chrono",
+ "flate2",
+]
+
+[[package]]
 name = "filetime"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3219,6 +3229,7 @@ dependencies = [
  "ed25519",
  "ed25519-dalek",
  "eyre",
+ "file-rotate",
  "futures",
  "grep",
  "hex 0.3.2",
