@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under the MIT license <LICENSE-MIT
 // https://opensource.org/licenses/MIT> or the Modified BSD license <LICENSE-BSD
@@ -103,6 +103,16 @@ impl Register {
         }
     }
 
+    /// Return `true` if public.
+    pub fn is_public(&self) -> bool {
+        self.address().is_public()
+    }
+
+    /// Return `true` if private.
+    pub fn is_private(&self) -> bool {
+        self.address().is_private()
+    }
+
     /// Return the address.
     pub fn address(&self) -> &Address {
         self.crdt.address()
@@ -123,41 +133,44 @@ impl Register {
         self.address().tag()
     }
 
-    /// Return `true` if public.
-    pub fn is_public(&self) -> bool {
-        self.address().is_public()
+    /// Return the owner of the data.
+    pub fn owner(&self) -> User {
+        *self.policy.owner()
     }
 
-    /// Return `true` if private.
-    pub fn is_private(&self) -> bool {
-        self.address().is_private()
+    /// Return the PK which the messages are expected to be signed with by this replica.
+    pub fn replica_authority(&self) -> User {
+        self.authority
     }
 
-    /// Return the number of items held in the register, optionally
-    /// verifying read permissions if a pk is provided
-    pub fn size(&self, requester: Option<User>) -> Result<u64> {
-        self.check_permissions(Action::Read, requester)?;
-
-        Ok(self.crdt.size())
+    /// Return the number of items held in the register
+    pub fn size(&self) -> u64 {
+        self.crdt.size()
     }
 
     /// Return true if the register is empty.
-    pub fn is_empty(&self, requester: Option<User>) -> Result<bool> {
-        Ok(self.size(requester)? == 0)
+    pub fn is_empty(&self) -> bool {
+        self.size() == 0
     }
 
     /// Return a value corresponding to the provided 'hash', if present.
-    pub fn get(&self, hash: EntryHash, requester: Option<User>) -> Result<&Entry> {
-        self.check_permissions(Action::Read, requester)?;
-
+    pub fn get(&self, hash: EntryHash) -> Result<&Entry> {
         self.crdt.get(hash).ok_or(Error::NoSuchEntry)
     }
 
     /// Read the last entry, or entries when there are branches, if the register is not empty.
-    pub fn read(&self, requester: Option<User>) -> Result<BTreeSet<(EntryHash, Entry)>> {
-        self.check_permissions(Action::Read, requester)?;
+    pub fn read(&self) -> BTreeSet<(EntryHash, Entry)> {
+        self.crdt.read()
+    }
 
-        Ok(self.crdt.read())
+    /// Return user permissions, if applicable.
+    pub fn permissions(&self, user: User) -> Result<Permissions> {
+        self.policy.permissions(user).ok_or(Error::NoSuchEntry)
+    }
+
+    /// Return the policy.
+    pub fn policy(&self) -> &Policy {
+        &self.policy
     }
 
     /// Write an entry to the Register, returning the generated unsigned
@@ -168,8 +181,6 @@ impl Register {
         entry: Entry,
         children: BTreeSet<EntryHash>,
     ) -> Result<(EntryHash, RegisterOp<Entry>)> {
-        self.check_permissions(Action::Write, None)?;
-
         let size = entry.len();
         if size > MAX_REG_ENTRY_SIZE {
             return Err(Error::EntryTooBig(size, MAX_REG_ENTRY_SIZE));
@@ -180,23 +191,7 @@ impl Register {
 
     /// Apply a signed data CRDT operation.
     pub fn apply_op(&mut self, op: RegisterOp<Entry>) -> Result<()> {
-        self.check_permissions(Action::Write, Some(op.source))?;
-
         self.crdt.apply_op(op)
-    }
-
-    /// Return user permissions, if applicable.
-    pub fn permissions(&self, user: User, requester: Option<User>) -> Result<Permissions> {
-        self.check_permissions(Action::Read, requester)?;
-
-        self.policy.permissions(user).ok_or(Error::NoSuchEntry)
-    }
-
-    /// Return the policy.
-    pub fn policy(&self, requester: Option<User>) -> Result<&Policy> {
-        self.check_permissions(Action::Read, requester)?;
-
-        Ok(&self.policy)
     }
 
     /// Helper to check permissions for given `action`
@@ -208,16 +203,6 @@ impl Register {
     pub fn check_permissions(&self, action: Action, requester: Option<User>) -> Result<()> {
         let requester = requester.unwrap_or(self.authority);
         self.policy.is_action_allowed(requester, action)
-    }
-
-    /// Return the owner of the data.
-    pub fn owner(&self) -> User {
-        *self.policy.owner()
-    }
-
-    /// Return the PK which the messages are expected to be signed with by this replica.
-    pub fn replica_authority(&self) -> User {
-        self.authority
     }
 }
 
@@ -231,7 +216,6 @@ mod tests {
         utils, Error, Keypair, Result,
     };
     use crate::{types::RegisterAddress as Address, types::Scope};
-    use eyre::eyre;
     use proptest::prelude::*;
     use rand::{rngs::OsRng, seq::SliceRandom, thread_rng};
     use std::{
@@ -242,14 +226,13 @@ mod tests {
 
     #[test]
     fn register_create_public() {
-        let register_name = XorName::random();
-        let register_tag = 43_000;
-        let (authority_keypair, register) =
-            &gen_pub_reg_replicas(None, register_name, register_tag, None, 1)[0];
+        let name = XorName::random();
+        let tag = 43_000;
+        let (authority_keypair, register) = &gen_pub_reg_replicas(None, name, tag, None, 1)[0];
 
         assert_eq!(register.scope(), Scope::Public);
-        assert_eq!(*register.name(), register_name);
-        assert_eq!(register.tag(), register_tag);
+        assert_eq!(*register.name(), name);
+        assert_eq!(register.tag(), tag);
         assert!(register.is_public());
         assert!(!register.is_private());
 
@@ -257,20 +240,19 @@ mod tests {
         assert_eq!(register.owner(), authority);
         assert_eq!(register.replica_authority(), authority);
 
-        let register_address = Address::new(register_name, Scope::Public, register_tag);
-        assert_eq!(*register.address(), register_address);
+        let address = Address::new(name, Scope::Public, tag);
+        assert_eq!(*register.address(), address);
     }
 
     #[test]
     fn register_create_private() {
-        let register_name = XorName::random();
-        let register_tag = 43_000;
-        let (authority_keypair, register) =
-            &gen_priv_reg_replicas(None, register_name, register_tag, None, 1)[0];
+        let name = XorName::random();
+        let tag = 43_000;
+        let (authority_keypair, register) = &gen_priv_reg_replicas(None, name, tag, None, 1)[0];
 
         assert_eq!(register.scope(), Scope::Private);
-        assert_eq!(*register.name(), register_name);
-        assert_eq!(register.tag(), register_tag);
+        assert_eq!(*register.name(), name);
+        assert_eq!(register.tag(), tag);
         assert!(!register.is_public());
         assert!(register.is_private());
 
@@ -278,8 +260,8 @@ mod tests {
         assert_eq!(register.owner(), authority);
         assert_eq!(register.replica_authority(), authority);
 
-        let register_address = Address::new(register_name, Scope::Private, register_tag);
-        assert_eq!(*register.address(), register_address);
+        let address = Address::new(name, Scope::Private, tag);
+        assert_eq!(*register.address(), address);
     }
 
     #[test]
@@ -289,8 +271,8 @@ mod tests {
         let authority_keypair2 = Keypair::new_ed25519(&mut OsRng);
         let authority2 = User::Key(authority_keypair2.public_key());
 
-        let register_name: XorName = rand::random();
-        let register_tag = 43_000u64;
+        let name: XorName = rand::random();
+        let tag = 43_000u64;
 
         // We'll have 'authority1' as the owner in both replicas and
         // grant permissions for Write to 'authority2' in both replicas too
@@ -301,8 +283,8 @@ mod tests {
         // Instantiate the same Register on two replicas with the two diff authorities
         let mut replica1 = Register::new_public(
             authority1,
-            register_name,
-            register_tag,
+            name,
+            tag,
             Some(PublicPolicy {
                 owner: authority1,
                 permissions: perms.clone(),
@@ -310,8 +292,8 @@ mod tests {
         );
         let mut replica2 = Register::new_public(
             authority2,
-            register_name,
-            register_tag,
+            name,
+            tag,
             Some(PublicPolicy {
                 owner: authority1,
                 permissions: perms,
@@ -324,8 +306,8 @@ mod tests {
         let signed_write_op1 = sign_register_op(op1, &authority_keypair1)?;
 
         // Let's assert current state on both replicas
-        assert_eq!(replica1.size(None)?, 1);
-        assert_eq!(replica2.size(None)?, 0);
+        assert_eq!(replica1.size(), 1);
+        assert_eq!(replica2.size(), 0);
 
         // Concurrently write another item with authority2 on replica2
         let item2 = random_register_entry();
@@ -333,7 +315,7 @@ mod tests {
         let signed_write_op2 = sign_register_op(op2, &authority_keypair2)?;
 
         // Item should be writeed on replica2
-        assert_eq!(replica2.size(None)?, 1);
+        assert_eq!(replica2.size(), 1);
 
         // Write operations are now broadcasted and applied to both replicas
         replica1.apply_op(signed_write_op2)?;
@@ -364,19 +346,19 @@ mod tests {
 
         let (entry3_hash, _) = register.write(entry3.clone(), children)?;
 
-        assert_eq!(register.size(None)?, 3);
+        assert_eq!(register.size(), 3);
 
-        let first_entry = register.get(entry1_hash, None)?;
+        let first_entry = register.get(entry1_hash)?;
         assert_eq!(first_entry, &entry1);
 
-        let second_entry = register.get(entry2_hash, None)?;
+        let second_entry = register.get(entry2_hash)?;
         assert_eq!(second_entry, &entry2);
 
-        let third_entry = register.get(entry3_hash, None)?;
+        let third_entry = register.get(entry3_hash)?;
         assert_eq!(third_entry, &entry3);
 
         let non_existing_hash = EntryHash::default();
-        let entry_not_found = register.get(non_existing_hash, None);
+        let entry_not_found = register.get(non_existing_hash);
         assert_eq!(entry_not_found, Err(Error::NoSuchEntry));
 
         Ok(())
@@ -384,8 +366,8 @@ mod tests {
 
     #[test]
     fn register_query_public_policy() -> eyre::Result<()> {
-        let register_name = XorName::random();
-        let register_tag = 43_666;
+        let name = XorName::random();
+        let tag = 43_666;
 
         // one replica will allow write ops to anyone
         let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
@@ -393,8 +375,8 @@ mod tests {
         let mut perms1 = BTreeMap::default();
         let _prev = perms1.insert(User::Anyone, PublicPermissions::new(true));
         let replica1 = create_public_reg_replica_with(
-            register_name,
-            register_tag,
+            name,
+            tag,
             Some(authority_keypair1),
             Some(PublicPolicy {
                 owner: owner1,
@@ -408,8 +390,8 @@ mod tests {
         let mut perms2 = BTreeMap::default();
         let _prev = perms2.insert(owner1, PublicPermissions::new(true));
         let replica2 = create_public_reg_replica_with(
-            register_name,
-            register_tag,
+            name,
+            tag,
             Some(authority_keypair2),
             Some(PublicPolicy {
                 owner: authority2,
@@ -420,39 +402,36 @@ mod tests {
         assert_eq!(replica1.owner(), owner1);
         assert_eq!(replica1.replica_authority(), owner1);
         assert_eq!(
-            replica1.policy(None)?.permissions(User::Anyone),
+            replica1.policy().permissions(User::Anyone),
             Some(Permissions::Public(PublicPermissions::new(true))),
         );
         assert_eq!(
-            replica1.permissions(User::Anyone, None)?,
+            replica1.permissions(User::Anyone)?,
             Permissions::Public(PublicPermissions::new(true)),
         );
 
         assert_eq!(replica2.owner(), authority2);
         assert_eq!(replica2.replica_authority(), authority2);
         assert_eq!(
-            replica2.policy(None)?.permissions(owner1),
+            replica2.policy().permissions(owner1),
             Some(Permissions::Public(PublicPermissions::new(true))),
         );
         assert_eq!(
-            replica2.permissions(owner1, None)?,
+            replica2.permissions(owner1)?,
             Permissions::Public(PublicPermissions::new(true)),
         );
 
         let random_keypair = Keypair::new_ed25519(&mut OsRng);
         let random_user = User::Key(random_keypair.public_key());
-        assert_eq!(
-            replica2.permissions(random_user, None),
-            Err(Error::NoSuchEntry),
-        );
+        assert_eq!(replica2.permissions(random_user), Err(Error::NoSuchEntry),);
 
         Ok(())
     }
 
     #[test]
     fn register_query_private_policy() -> eyre::Result<()> {
-        let register_name = XorName::random();
-        let register_tag = 43_666;
+        let name = XorName::random();
+        let tag = 43_666;
 
         let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
         let authority1 = User::Key(authority_keypair1.public_key());
@@ -470,8 +449,8 @@ mod tests {
         let _prev = perms2.insert(authority1, user_perms2);
 
         let replica1 = create_private_reg_replica_with(
-            register_name,
-            register_tag,
+            name,
+            tag,
             Some(authority_keypair1),
             Some(PrivatePolicy {
                 owner: authority1,
@@ -480,8 +459,8 @@ mod tests {
         );
 
         let replica2 = create_private_reg_replica_with(
-            register_name,
-            register_tag,
+            name,
+            tag,
             Some(authority_keypair2),
             Some(PrivatePolicy {
                 owner: authority2,
@@ -494,173 +473,32 @@ mod tests {
         // above the owner perms were set to more restrictive than full, we test below that
         // write&read perms for the owner will always be true, as an owner will always have full authority (even if perms were explicitly set some other way)
         assert_eq!(
-            replica1.policy(Some(authority1))?.permissions(authority1),
+            replica1.policy().permissions(authority1),
             Some(Permissions::Private(PrivatePermissions::new(true, true))),
         );
         assert_eq!(
-            replica1.permissions(authority1, Some(authority1))?,
+            replica1.permissions(authority1)?,
             Permissions::Private(PrivatePermissions::new(true, true)),
         );
 
         assert_eq!(replica2.owner(), authority2);
         assert_eq!(replica2.replica_authority(), authority2);
         assert_eq!(
-            replica2.policy(Some(authority2))?.permissions(authority2),
+            replica2.policy().permissions(authority2),
             Some(Permissions::Private(PrivatePermissions::new(true, true))),
         );
         assert_eq!(
-            replica2.permissions(authority2, Some(authority2))?,
+            replica2.permissions(authority2)?,
             Permissions::Private(PrivatePermissions::new(true, true)),
         );
         assert_eq!(
-            replica2.permissions(authority1, None)?,
+            replica2.permissions(authority1)?,
             Permissions::Private(PrivatePermissions::new(false, true)),
         );
 
         let random_keypair = Keypair::new_ed25519(&mut OsRng);
         let random_user = User::Key(random_keypair.public_key());
-        assert_eq!(
-            replica2.permissions(random_user, None),
-            Err(Error::NoSuchEntry),
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn register_public_write_fails_when_no_perms_for_authority() -> eyre::Result<()> {
-        let register_name = XorName::random();
-        let register_tag = 43_666;
-
-        // one replica will allow write ops to anyone
-        let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
-        let owner1 = User::Key(authority_keypair1.public_key());
-        let mut perms1 = BTreeMap::default();
-        let _prev = perms1.insert(User::Anyone, PublicPermissions::new(true));
-        let mut replica1 = create_public_reg_replica_with(
-            register_name,
-            register_tag,
-            Some(authority_keypair1.clone()),
-            Some(PublicPolicy {
-                owner: owner1,
-                permissions: perms1,
-            }),
-        );
-
-        // the other replica will *not* allow write ops to 'owner1'
-        let authority_keypair2 = Keypair::new_ed25519(&mut OsRng);
-        let authority2 = User::Key(authority_keypair2.public_key());
-        let mut perms2 = BTreeMap::default();
-        let _prev = perms2.insert(owner1, PublicPermissions::new(false));
-        let mut replica2 = create_public_reg_replica_with(
-            register_name,
-            register_tag,
-            Some(authority_keypair2.clone()),
-            Some(PublicPolicy {
-                owner: authority2,
-                permissions: perms2,
-            }),
-        );
-
-        // let's write to both replicas with one first item
-        let item1 = random_register_entry();
-        let item2 = random_register_entry();
-        let (_, op1) = replica1.write(item1, BTreeSet::new())?;
-        let write_op1 = sign_register_op(op1, &authority_keypair1)?;
-        check_op_not_allowed_failure(replica2.apply_op(write_op1))?;
-
-        let (_, op2) = replica2.write(item2, BTreeSet::new())?;
-        let write_op2 = sign_register_op(op2, &authority_keypair2)?;
-        replica1.apply_op(write_op2)?;
-
-        assert_eq!(replica1.size(None)?, 2);
-        assert_eq!(replica2.size(None)?, 1);
-
-        Ok(())
-    }
-
-    #[test]
-    fn register_private_write_fails_when_no_perms_for_authority() -> eyre::Result<()> {
-        let register_name = XorName::random();
-        let register_tag = 43_666;
-        let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
-        let authority1 = User::Key(authority_keypair1.public_key());
-        let authority_keypair2 = Keypair::new_ed25519(&mut OsRng);
-        let authority2 = User::Key(authority_keypair2.public_key());
-
-        let mut perms1 = BTreeMap::default();
-        let user_perms1 = PrivatePermissions::new(/*read*/ false, /*write*/ true);
-        let _prev = perms1.insert(authority2, user_perms1);
-
-        let mut perms2 = BTreeMap::default();
-        let user_perms2 = PrivatePermissions::new(/*read*/ true, /*write*/ false);
-        let _prev = perms2.insert(authority1, user_perms2);
-
-        let mut replica1 = create_private_reg_replica_with(
-            register_name,
-            register_tag,
-            Some(authority_keypair1.clone()),
-            Some(PrivatePolicy {
-                owner: authority1,
-                permissions: perms1,
-            }),
-        );
-
-        let mut replica2 = create_private_reg_replica_with(
-            register_name,
-            register_tag,
-            Some(authority_keypair2.clone()),
-            Some(PrivatePolicy {
-                owner: authority2,
-                permissions: perms2,
-            }),
-        );
-
-        // let's try to write to both registers
-        let item1 = random_register_entry();
-        let item2 = random_register_entry();
-
-        let (entry1_hash, op1) = replica1.write(item1.clone(), BTreeSet::new())?;
-        let write_op1 = sign_register_op(op1, &authority_keypair1)?;
-        check_op_not_allowed_failure(replica2.apply_op(write_op1))?;
-
-        let (entry2_hash, op2) = replica2.write(item2.clone(), BTreeSet::new())?;
-        let write_op2 = sign_register_op(op2, &authority_keypair2)?;
-        replica1.apply_op(write_op2)?;
-
-        assert_eq!(replica1.size(None)?, 2);
-        assert_eq!(replica2.size(None)?, 1);
-
-        // Let's do some read permissions check now...
-
-        // let's check authority1 can read from replica1 and replica2
-        let data = replica1.get(entry1_hash, Some(authority1))?;
-        let last = replica1.read(Some(authority1))?;
-        assert_eq!(data, &item1);
-        assert_eq!(
-            last,
-            vec![(entry1_hash, item1), (entry2_hash, item2.clone())]
-                .into_iter()
-                .collect()
-        );
-
-        let data = replica2.get(entry2_hash, Some(authority1))?;
-        let last = replica2.read(Some(authority1))?;
-        assert_eq!(data, &item2);
-        assert_eq!(
-            last,
-            vec![(entry2_hash, item2.clone())].into_iter().collect()
-        );
-
-        // authority2 cannot read from replica1
-        check_op_not_allowed_failure(replica1.get(entry1_hash, Some(authority2)))?;
-        check_op_not_allowed_failure(replica1.read(Some(authority2)))?;
-
-        // but authority2 can read from replica2
-        let data = replica2.get(entry2_hash, Some(authority2))?;
-        let last = replica2.read(Some(authority2))?;
-        assert_eq!(data, &item2);
-        assert_eq!(last, vec![(entry2_hash, item2)].into_iter().collect());
+        assert_eq!(replica2.permissions(random_user), Err(Error::NoSuchEntry),);
 
         Ok(())
     }
@@ -719,10 +557,10 @@ mod tests {
     }
 
     fn create_public_reg_replicas(count: usize) -> Vec<(Keypair, Register)> {
-        let register_name = XorName::random();
-        let register_tag = 43_000;
+        let name = XorName::random();
+        let tag = 43_000;
 
-        gen_pub_reg_replicas(None, register_name, register_tag, None, count)
+        gen_pub_reg_replicas(None, name, tag, None, count)
     }
 
     fn create_public_reg_replica_with(
@@ -745,26 +583,11 @@ mod tests {
         replicas[0].1.clone()
     }
 
-    // check it fails due to not having permissions
-    fn check_op_not_allowed_failure<T>(result: Result<T>) -> eyre::Result<()> {
-        match result {
-            Err(Error::AccessDenied(_)) => Ok(()),
-            Err(err) => Err(eyre!(
-                "Error returned was the unexpected one for a non-allowed op: {}",
-                err
-            )),
-            Ok(_) => Err(eyre!(
-                "Register operation succeded unexpectedly, an AccessDenied error was expected"
-                    .to_string(),
-            )),
-        }
-    }
-
     // verify data convergence on a set of replicas and with the expected length
     fn verify_data_convergence(replicas: Vec<Register>, expected_size: u64) -> Result<()> {
         // verify all replicas have the same and expected size
         for r in &replicas {
-            assert_eq!(r.size(None)?, expected_size);
+            assert_eq!(r.size(), expected_size);
         }
 
         // now verify that the items are the same in all replicas
@@ -826,8 +649,8 @@ mod tests {
             _data in generate_reg_entry()
         ) {
             // Instantiate the same Register on two replicas
-            let register_name = XorName::random();
-            let register_tag = 45_000u64;
+            let name = XorName::random();
+            let tag = 45_000u64;
             let owner_keypair = Keypair::new_ed25519(&mut OsRng);
             let policy = PublicPolicy {
                 owner: User::Key(owner_keypair.public_key()),
@@ -836,8 +659,8 @@ mod tests {
 
             let mut replicas = gen_pub_reg_replicas(
                 Some(owner_keypair.clone()),
-                register_name,
-                register_tag,
+                name,
+                tag,
                 Some(policy),
                 2);
             let (_, mut replica1) = replicas.remove(0);
@@ -856,8 +679,8 @@ mod tests {
             dataset in generate_dataset(1000)
         ) {
             // Instantiate the same Register on two replicas
-            let register_name = XorName::random();
-            let register_tag = 43_001u64;
+            let name = XorName::random();
+            let tag = 43_000u64;
             let owner_keypair = Keypair::new_ed25519(&mut OsRng);
             let policy = PublicPolicy {
                 owner: User::Key(owner_keypair.public_key()),
@@ -867,8 +690,8 @@ mod tests {
             // Instantiate the same Register on two replicas
             let mut replicas = gen_pub_reg_replicas(
                 Some(owner_keypair.clone()),
-                register_name,
-                register_tag,
+                name,
+                tag,
                 Some(policy),
                 2);
             let (_, mut replica1) = replicas.remove(0);
@@ -895,8 +718,8 @@ mod tests {
             dataset in generate_dataset(1000)
         ) {
             // Instantiate the same Register on two replicas
-            let register_name = XorName::random();
-            let register_tag = 43_002u64;
+            let name = XorName::random();
+            let tag = 43_000u64;
             let owner_keypair = Keypair::new_ed25519(&mut OsRng);
             let policy = PublicPolicy {
                 owner: User::Key(owner_keypair.public_key()),
@@ -906,8 +729,8 @@ mod tests {
             // Instantiate the same Register on two replicas
             let mut replicas = gen_pub_reg_replicas(
                 Some(owner_keypair.clone()),
-                register_name,
-                register_tag,
+                name,
+                tag,
                 Some(policy),
                 2);
             let (_, mut replica1) = replicas.remove(0);
@@ -1035,8 +858,8 @@ mod tests {
             dataset in generate_dataset_and_probability(1000),
         ) {
             // Instantiate the same Register on two replicas
-            let register_name = XorName::random();
-            let register_tag = 43_001u64;
+            let name = XorName::random();
+            let tag = 43_000u64;
             let owner_keypair = Keypair::new_ed25519(&mut OsRng);
             let policy = PublicPolicy {
                 owner: User::Key(owner_keypair.public_key()),
@@ -1046,8 +869,8 @@ mod tests {
             // Instantiate the same Register on two replicas
             let mut replicas = gen_pub_reg_replicas(
                 Some(owner_keypair.clone()),
-                register_name,
-                register_tag,
+                name,
+                tag,
                 Some(policy),
                 2);
             let (_, mut replica1) = replicas.remove(0);
@@ -1073,7 +896,7 @@ mod tests {
 
             // here we statistically should have dropped some messages
             if dataset_length > 50 {
-                assert_ne!(replica2.size(None), replica1.size(None));
+                assert_ne!(replica2.size(), replica1.size());
             }
 
             // reapply all ops

@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -343,14 +343,14 @@ mod tests {
         assert!(priv_register.is_private());
         assert_eq!(*priv_register.name(), name);
         assert_eq!(priv_register.tag(), tag);
-        assert_eq!(priv_register.size(None)?, 0);
+        assert_eq!(priv_register.size(), 0);
         assert_eq!(priv_register.owner(), owner);
 
         let pub_register = client.get_register(address2).await?;
         assert!(pub_register.is_public());
         assert_eq!(*pub_register.name(), name);
         assert_eq!(pub_register.tag(), tag);
-        assert_eq!(pub_register.size(None)?, 0);
+        assert_eq!(pub_register.size(), 0);
         assert_eq!(pub_register.owner(), owner);
 
         Ok(())
@@ -465,7 +465,7 @@ mod tests {
         assert!(register.is_private());
         assert_eq!(*register.name(), name);
         assert_eq!(register.tag(), tag);
-        assert_eq!(register.size(None)?, 0);
+        assert_eq!(register.size(), 0);
         assert_eq!(register.owner(), owner);
 
         // store a Public Register
@@ -480,7 +480,7 @@ mod tests {
         assert!(register.is_public());
         assert_eq!(*register.name(), name);
         assert_eq!(register.tag(), tag);
-        assert_eq!(register.size(None)?, 0);
+        assert_eq!(register.size(), 0);
         assert_eq!(register.owner(), owner);
 
         Ok(())
@@ -507,7 +507,7 @@ mod tests {
 
         let register = client.get_register(address).await?;
 
-        assert_eq!(register.size(None)?, 0);
+        assert_eq!(register.size(), 0);
 
         tokio::time::sleep(delay).await;
         let permissions = client

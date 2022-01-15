@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -26,8 +26,7 @@
     unused_qualifications,
     unused_results
 )]
-#![allow(unused_imports)] // TODO: FIX THIS, clippy went mad on this file w last rust update
-#![allow(dead_code)] // TODO: FIX THIS, clippy went mad on this file w last rust update
+#![allow(unused_imports, dead_code)] // clippy went mad, bad workaround applied
 
 use color_eyre::{Section, SectionExt};
 use eyre::{eyre, Result, WrapErr};
