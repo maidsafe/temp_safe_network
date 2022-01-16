@@ -79,9 +79,6 @@ fn main() -> Result<()> {
 ///  - optional compression of rotated logfiles
 //
 // The above functionality is provided using crate file_rotation
-//
-// TODO: raise issue on file_rotate for FileRotate support for fmt::Debug
-// #[derive(Debug)]
 pub struct FileRotateAppender {
     writer: FileRotate<CountSuffix>,
 }
@@ -174,7 +171,6 @@ async fn run_node() -> Result<()> {
         };
 
         _optional_guard = if let Some(log_dir) = config.log_dir() {
-            // match fs::create_dir(log_dir) { Ok(_) => (), Err(_) => () }
             println!("Starting logging to directory: {:?}", log_dir);
 
             let mut content_limit = ContentLimit::BytesSurpassed(config.logs_max_bytes);
