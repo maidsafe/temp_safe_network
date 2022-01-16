@@ -247,7 +247,7 @@ impl Config {
         self.logs_retained = config.logs_retained();
         self.logs_max_bytes = config.logs_max_bytes();
         self.logs_max_lines = config.logs_max_lines();
-        self.logs_uncompressed= config.logs_uncompressed();
+        self.logs_uncompressed = config.logs_uncompressed();
 
         self.update = config.update || self.update;
         self.update_only = config.update_only || self.update_only;
