@@ -137,6 +137,14 @@ impl Write for FileRotateAppender {
     }
 }
 
+use std::fmt;
+
+impl Debug for FileRotateAppender {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FileRotateAppender")
+         .finish()
+    }
+}
 async fn run_node() -> Result<()> {
     let config = Config::new().await?;
 
