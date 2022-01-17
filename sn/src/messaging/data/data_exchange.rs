@@ -7,7 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::RegisterCmd;
-use crate::types::{Error, Result};
+use crate::{
+    messaging::SectionAuth,
+    types::{Error, RegisterAddress as Address, Result},
+};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use xor_name::XorName;
@@ -15,22 +18,25 @@ use xor_name::XorName;
 /// Metadata (register and chunk holders) replication.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DataExchange {
-    /// Chunk data exchange.
-    pub chunk_data: ChunkDataExchange,
-    /// Register data exchange.
-    pub reg_data: RegisterDataExchange,
-}
-
-/// Chunk data exchange.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ChunkDataExchange {
     /// Adult storage levels.
     pub adult_levels: BTreeMap<XorName, StorageLevel>,
 }
 
+/// Data to be exchanged between Register stores.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RegisterStoreExport(pub Vec<ReplicatedRegisterLog>);
+
 /// Register data exchange.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RegisterDataExchange(pub BTreeMap<XorName, Vec<RegisterCmd>>);
+pub struct ReplicatedRegisterLog {
+    ///
+    pub address: Address,
+    /// section sig over address.id()
+    /// This is a duplicated entry as it should exist in first cmd
+    pub section_auth: SectionAuth,
+    ///
+    pub op_log: Vec<RegisterCmd>,
+}
 
 /// The degree to which storage has been used.
 /// Expressed in values between 0-10, where each unit represents 10-percentage points.

@@ -10,28 +10,25 @@ mod api;
 mod back_pressure;
 mod bootstrap;
 mod capacity;
-mod chunk_records;
-mod chunk_store;
 mod comm;
 mod connectivity;
+mod data_records;
+mod data_storage;
 mod delivery_group;
 mod liveness_tracking;
 mod messaging;
 mod msg_count;
 mod msg_handling;
 mod proposal;
-mod register_storage;
 mod split_barrier;
 
 pub(crate) use back_pressure::BackPressure;
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use capacity::MIN_LEVEL_WHEN_FULL;
-pub(crate) use chunk_store::{ChunkStore, Error as ChunkStoreError};
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
 pub(crate) use proposal::Proposal;
-pub(crate) use register_storage::RegisterStorage;
 
-use self::split_barrier::SplitBarrier;
+use self::{data_storage::DataStorage, split_barrier::SplitBarrier};
 
 use super::{
     super::error::Result,
@@ -48,7 +45,6 @@ use crate::messaging::{
     system::{DkgSessionId, SystemMsg},
     AuthorityProof, SectionAuth,
 };
-
 use crate::peer::Peer;
 use crate::types::{log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk, Cache};
 use crate::UsedSpace;
@@ -78,7 +74,7 @@ pub(crate) const CONCURRENT_JOINS: usize = 7;
 // How long to hold on to correlated `Peer`s for chunk queries. Since chunk queries are forwarded
 // from elders (with whom the client is connected) to adults (who hold the data), the elder handling
 // the query cannot reply immediately. For now, they stash a reference to the client `Peer` in
-// `Core::pending_chunk_queries`, which is a cache with duration-based expiry.
+// `Core::pending_data_queries`, which is a cache with duration-based expiry.
 // TODO: The value chosen here is longer than the default client timeout (see
 // `crate::client::SN_CLIENT_QUERY_TIMEOUT`), but the timeout is configurable. Ideally this would be
 // based on liveness properties (e.g. the timeout should be dynamic based on the responsiveness of
@@ -113,11 +109,10 @@ pub(crate) struct Core {
     joins_allowed: Arc<RwLock<bool>>,
     current_joins_semaphore: Arc<Semaphore>,
     resource_proof: ResourceProof,
-    pub(super) register_storage: RegisterStorage,
-    pub(super) chunk_storage: ChunkStore,
+    pub(super) data_storage: DataStorage,
     capacity: Capacity,
     liveness: Liveness,
-    pending_chunk_queries: Arc<Cache<XorName, Peer>>,
+    pending_data_queries: Arc<Cache<XorName, Peer>>,
     ae_backoff_cache: AeBackoffCache,
 }
 
@@ -138,8 +133,7 @@ impl Core {
         // make sure the Node has the correct local addr as Comm
         node.addr = comm.our_connection_info();
 
-        let register_storage = RegisterStorage::new(&root_storage_dir, used_space.clone())?;
-        let chunk_storage = ChunkStore::new(&root_storage_dir, used_space.clone())?;
+        let data_storage = DataStorage::new(&root_storage_dir, used_space.clone())?;
 
         let capacity = Capacity::new(BTreeMap::new());
         let adult_liveness = Liveness::new();
@@ -159,11 +153,10 @@ impl Core {
             joins_allowed: Arc::new(RwLock::new(true)),
             current_joins_semaphore: Arc::new(Semaphore::new(CONCURRENT_JOINS)),
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
-            register_storage,
-            chunk_storage,
+            data_storage,
             capacity,
             liveness: adult_liveness,
-            pending_chunk_queries: Arc::new(Cache::with_expiry_duration(CHUNK_QUERY_TIMEOUT)),
+            pending_data_queries: Arc::new(Cache::with_expiry_duration(CHUNK_QUERY_TIMEOUT)),
             ae_backoff_cache: AeBackoffCache::default(),
         })
     }

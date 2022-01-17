@@ -6,36 +6,31 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{data::StorageLevel, system::NodeQueryResponse};
+mod chunk_disk_store;
+
+use crate::dbs::{convert_to_error_message, Error, Result};
+use crate::messaging::system::NodeQueryResponse;
 use crate::types::{log_markers::LogMarker, Chunk, ChunkAddress};
+use crate::UsedSpace;
+
+use chunk_disk_store::ChunkDiskStore;
 use std::{
     fmt::{self, Display, Formatter},
     io::ErrorKind,
     path::Path,
-    sync::Arc,
 };
-use tokio::sync::RwLock;
 use tracing::info;
-
-use crate::UsedSpace;
-mod errors;
-pub(crate) use errors::{convert_to_error_message, Error, Result};
-
-mod chunk_disk_store;
-use chunk_disk_store::ChunkDiskStore;
 
 /// Operations on data chunks.
 #[derive(Clone)]
-pub(crate) struct ChunkStore {
+pub(crate) struct ChunkStorage {
     disk_store: ChunkDiskStore,
-    last_recorded_level: Arc<RwLock<StorageLevel>>,
 }
 
-impl ChunkStore {
+impl ChunkStorage {
     pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
             disk_store: ChunkDiskStore::new(path, used_space)?,
-            last_recorded_level: Arc::new(RwLock::new(StorageLevel::zero())),
         })
     }
 
@@ -75,7 +70,7 @@ impl ChunkStore {
     /// Store a chunk in the local disk store
     /// If that chunk was already in the local store, just overwrites it
     #[instrument(skip_all)]
-    pub(super) async fn store(&self, data: &Chunk) -> Result<Option<StorageLevel>> {
+    pub(super) async fn store(&self, data: &Chunk) -> Result<()> {
         if self.disk_store.chunk_file_exists(data.address())? {
             info!(
                 "{}: Chunk already exists, not storing: {:?}",
@@ -83,7 +78,7 @@ impl ChunkStore {
                 data.address()
             );
             // Nothing more to do here
-            return Ok(None);
+            return Ok(());
         }
 
         // cheap extra security check for space (prone to race conditions)
@@ -98,38 +93,12 @@ impl ChunkStore {
         let _addr = self.disk_store.write_chunk(data).await?;
         trace!("{:?}", LogMarker::StoredNewChunk);
 
-        // check if we've filled another apprx. 10%-points of our storage
-        // if so, update the recorded level
-        let last_recorded_level = { *self.last_recorded_level.read().await };
-        if let Ok(next_level) = last_recorded_level.next() {
-            // used_space_ratio is a heavy task that's why we don't do it all the time
-            let used_space_ratio = self.disk_store.used_space_ratio();
-            let used_space_level = 10.0 * used_space_ratio;
-            // every level represents 10 percentage points
-            if used_space_level as u8 >= next_level.value() {
-                debug!("Next level for storage has been reached");
-                *self.last_recorded_level.write().await = next_level;
-                return Ok(Some(next_level));
-            }
-        }
-
-        Ok(None)
-    }
-
-    /// Stores a chunk that Elders sent to it for replication.
-    /// Chunk should already have network authority
-    /// TODO: define what authority is needed here...
-    pub(crate) async fn store_for_replication(&self, chunk: Chunk) -> Result<Option<StorageLevel>> {
-        debug!(
-            "Trying to store for replication of chunk: {:?}",
-            chunk.name()
-        );
-        self.store(&chunk).await
+        Ok(())
     }
 }
 
-impl Display for ChunkStore {
+impl Display for ChunkStorage {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "ChunkStore")
+        write!(formatter, "ChunkStorage")
     }
 }

@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{operation_id, register::RegisterRead, Error, OperationId, QueryResponse, Result};
-use crate::types::ChunkAddress;
+use super::{operation_id, register::RegisterQuery, Error, OperationId, QueryResponse, Result};
+use crate::types::{ChunkAddress, ReplicatedDataAddress as DataAddress};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -29,7 +29,7 @@ pub enum DataQuery {
     /// [`Register`] read operation.
     ///
     /// [`Register`]: crate::types::register::Register
-    Register(RegisterRead),
+    Register(RegisterQuery),
 }
 
 impl DataQuery {
@@ -49,6 +49,14 @@ impl DataQuery {
         match self {
             GetChunk(address) => *address.name(),
             Register(q) => q.dst_name(),
+        }
+    }
+
+    /// Returns the address of the data
+    pub fn address(&self) -> DataAddress {
+        match self {
+            DataQuery::GetChunk(address) => DataAddress::Chunk(*address),
+            DataQuery::Register(read) => DataAddress::Register(read.dst_address()),
         }
     }
 

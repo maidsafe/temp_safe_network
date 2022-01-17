@@ -48,7 +48,15 @@ impl RegisterAddress {
         }
     }
 
+    /// This is a unique identifier of the Register,
+    /// since it also encodes the Public | Private scope,
+    /// as well as the tag of the Address.
+    pub fn id(&self) -> Result<XorName> {
+        Ok(XorName::from_content(self.encode_to_zbase32()?.as_bytes()))
+    }
+
     /// Returns the name.
+    /// This is not a unique identifier.
     pub fn name(&self) -> &XorName {
         match self {
             Self::Public { ref name, .. } | Self::Private { ref name, .. } => name,

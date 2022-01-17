@@ -16,20 +16,12 @@ mod resource_proof;
 mod service_msgs;
 mod update_section;
 
-use crate::messaging::{
-    data::{ServiceMsg, StorageLevel},
-    signature_aggregator::Error as AggregatorError,
-    system::{
-        JoinRequest, JoinResponse, NodeCmd, NodeQuery, SectionAuth as SystemSectionAuth, SystemMsg,
-    },
-    AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth,
-    ServiceAuth, WireMsg,
-};
+use crate::dbs::Error as DbError;
 use crate::node::{
     error::{Error, Result},
     routing::{
         api::command::Command,
-        core::{ChunkStoreError, Core, DkgSessionInfo},
+        core::{Core, DkgSessionInfo},
         messages::{NodeMsgAuthorityUtils, WireMsgUtils},
         network_knowledge::NetworkKnowledge,
         relocation::RelocateState,
@@ -37,7 +29,20 @@ use crate::node::{
     },
 };
 use crate::peer::{Peer, UnnamedPeer};
-use crate::types::{log_markers::LogMarker, Chunk, Keypair, PublicKey};
+use crate::types::{log_markers::LogMarker, Keypair, PublicKey};
+use crate::{
+    messaging::{
+        data::{ServiceMsg, StorageLevel},
+        signature_aggregator::Error as AggregatorError,
+        system::{
+            JoinRequest, JoinResponse, NodeCmd, NodeQuery, SectionAuth as SystemSectionAuth,
+            SystemMsg,
+        },
+        AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority,
+        SectionAuth, ServiceAuth, WireMsg,
+    },
+    types::ReplicatedData,
+};
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -179,9 +184,9 @@ impl Core {
             }
             MessageType::Service {
                 msg_id,
-                auth,
                 msg,
                 dst_location,
+                auth,
             } => {
                 let dst_name = match msg.dst_address() {
                     Some(name) => name,
@@ -233,7 +238,7 @@ impl Core {
                 }
 
                 cmds.extend(
-                    self.handle_service_message(msg_id, auth, msg, dst_location, sender)
+                    self.handle_service_message(msg_id, msg, dst_location, auth, sender)
                         .await?,
                 );
 
@@ -663,66 +668,61 @@ impl Core {
                 }
                 Ok(vec![])
             }
-            SystemMsg::NodeCmd(NodeCmd::ReceiveExistingData { metadata }) => {
+            SystemMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }) => {
                 info!("Processing received DataExchange packet: {:?}", msg_id);
-
-                self.register_storage.update(metadata.reg_data).await?;
-                self.update_chunks(metadata.chunk_data).await;
+                self.set_adult_levels(metadata).await;
                 Ok(vec![])
             }
-            SystemMsg::NodeCmd(NodeCmd::StoreChunk { chunk, .. }) => {
+            SystemMsg::NodeCmd(NodeCmd::StoreData { data, .. }) => {
                 info!("Processing chunk write with MessageId: {:?}", msg_id);
                 // There is no point in verifying a sig from a sender A or B here.
 
                 // This may return a DatabaseFull error... but we should have reported storage increase
                 // well before this
-                match self.chunk_storage.store(&chunk).await {
+                match self.data_storage.store(&data).await {
                     Ok(level_report) => {
                         info!("Storage level report: {:?}", level_report);
                         return Ok(self.record_if_any(level_report).await);
                     }
                     Err(error) => {
-                        error!("Error storing chunk: {:?}", error);
+                        error!("Error storing data: {:?}", error);
                         let mut commands = vec![];
 
                         // if the error was Disk Full
-                        if matches!(error, ChunkStoreError::NotEnoughSpace) {
+                        if matches!(error, DbError::NotEnoughSpace) {
                             warn!("Db errored as full. Informing elders");
                             let level = StorageLevel::from(10)?;
                             commands.extend(self.record_if_any(Some(level)).await);
                         }
 
-                        let msg = SystemMsg::NodeCmd(NodeCmd::RepublishChunk(chunk));
+                        let msg = SystemMsg::NodeCmd(NodeCmd::RepublishData(data));
                         commands.push(self.send_message_to_our_elders(msg).await?);
 
                         Ok(commands)
                     }
                 }
             }
-            SystemMsg::NodeCmd(NodeCmd::ReplicateChunk(chunk)) => {
-                info!(
-                    "Processing replicate chunk cmd with MessageId: {:?}",
-                    msg_id
-                );
+            SystemMsg::NodeCmd(NodeCmd::ReplicateData(data)) => {
+                info!("Processing replicate data cmd with MessageId: {:?}", msg_id);
 
                 return if self.is_elder().await {
-                    self.republish_chunk(chunk).await
+                    self.republish_data(data).await
                 } else {
                     // We are an adult here, so just store away!
 
                     // TODO: should this be a cmd returned for threading?
-                    let level_report = self.chunk_storage.store_for_replication(chunk).await?;
+                    let level_report = self.data_storage.store_for_replication(&data).await?;
                     Ok(self.record_if_any(level_report).await)
                 };
             }
-            SystemMsg::NodeCmd(NodeCmd::RepublishChunk(chunk)) => {
+            SystemMsg::NodeCmd(NodeCmd::RepublishData(data)) => {
                 info!(
-                    "Republishing chunk {:?} with MessageId {:?}",
-                    chunk.name(),
+                    "Republishing data {:?} with MessageId {:?}",
+                    data.name(),
                     msg_id
                 );
 
-                return self.republish_chunk(chunk).await;
+                return self.republish_data(data).await;
             }
             SystemMsg::NodeCmd(node_cmd) => {
                 self.send_event(Event::MessageReceived {
@@ -735,17 +735,25 @@ impl Core {
 
                 Ok(vec![])
             }
-
             SystemMsg::NodeQuery(node_query) => {
                 match node_query {
-                    // A request from EndUser - via elders - for locally stored chunk
-                    NodeQuery::GetChunk { origin, address } => {
+                    // A request from EndUser - via elders - for locally stored data
+                    NodeQuery::Data {
+                        query,
+                        auth,
+                        origin,
+                    } => {
                         // There is no point in verifying a sig from a sender A or B here.
                         // Send back response to the sending elder
-
                         let sender_xorname = msg_authority.get_auth_xorname();
-                        self.handle_get_chunk_at_adult(msg_id, &address, origin, sender_xorname)
-                            .await
+                        self.handle_data_query_at_adult(
+                            msg_id,
+                            &query,
+                            auth,
+                            origin,
+                            sender_xorname,
+                        )
+                        .await
                     }
                     _ => {
                         self.send_event(Event::MessageReceived {
@@ -770,7 +778,7 @@ impl Core {
                     _ => return Err(Error::InvalidQueryResponseAuthority),
                 };
 
-                self.handle_chunk_query_response_at_elder(
+                self.handle_data_query_response_at_elder(
                     correlation_id,
                     response,
                     user,
@@ -900,17 +908,17 @@ impl Core {
         cmds
     }
 
-    // Locate ideal chunk holders for this chunk, line up wiremsgs for those to instruct them to store the chunk
-    async fn republish_chunk(&self, chunk: Chunk) -> Result<Vec<Command>> {
+    // Locate ideal holders for this data, line up wiremsgs for those to instruct them to store the data
+    async fn republish_data(&self, data: ReplicatedData) -> Result<Vec<Command>> {
         if self.is_elder().await {
-            let target_holders = self.get_adults_who_should_store_chunk(chunk.name()).await;
+            let target_holders = self.get_adults_who_should_store_data(data.name()).await;
             info!(
-                "Republishing chunk {:?} to holders {:?}",
-                chunk.name(),
+                "Republishing data {:?} to holders {:?}",
+                data.name(),
                 &target_holders,
             );
 
-            let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateChunk(chunk));
+            let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(data));
             let aggregation = false;
 
             self.send_node_msg_to_targets(msg, target_holders, aggregation)

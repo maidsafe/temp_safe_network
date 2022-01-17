@@ -6,15 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::types::{Chunk, PublicKey};
-use crate::{
-    messaging::{
-        data::{DataCmd, DataExchange, DataQuery, Result, StorageLevel},
-        EndUser, ServiceAuth,
-    },
-    types::ChunkAddress,
+use crate::messaging::{
+    data::{DataCmd, DataExchange, DataQuery, OperationId, QueryResponse, Result, StorageLevel},
+    EndUser, ServiceAuth,
 };
+use crate::types::{
+    register::{Entry, EntryHash, Permissions, Policy, Register, User},
+    Chunk, PublicKey, ReplicatedData,
+};
+
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
 /// Command message sent among nodes
@@ -23,19 +25,17 @@ use xor_name::XorName;
 pub enum NodeCmd {
     /// Metadata is handled by Elders
     Metadata {
-        /// The contianed command
+        /// The contained command
         cmd: DataCmd,
         /// Requester pk and signature
         auth: ServiceAuth,
         /// Message source
         origin: EndUser,
     },
-    /// Chunks are stored by Adults
-    StoreChunk {
-        /// The chunk
-        chunk: Chunk,
-        /// Requester pk and signature
-        auth: ServiceAuth,
+    /// Data is stored by Adults
+    StoreData {
+        /// The data
+        data: ReplicatedData,
         /// Message source
         origin: EndUser,
     },
@@ -48,13 +48,13 @@ pub enum NodeCmd {
         /// The storage level reported by the node.
         level: StorageLevel,
     },
-    /// Replicate a given chunk at an Adult (sent from elders on receipt of RepublishChunk)
-    ReplicateChunk(Chunk),
+    /// Replicate a given chunk at an Adult (sent from elders on receipt of RepublishData)
+    ReplicateData(ReplicatedData),
     /// Tells the Elders to re-publish a chunk in the data section
-    RepublishChunk(Chunk),
+    RepublishData(ReplicatedData),
     /// Sent to all promoted nodes (also sibling if any) after
     /// a completed transition to a new constellation.
-    ReceiveExistingData {
+    ReceiveMetadata {
         /// Metadata
         metadata: DataExchange,
     },
@@ -73,19 +73,60 @@ pub enum NodeQuery {
         /// The user that has initiated this query
         origin: EndUser,
     },
-    /// Chunks are handled by Adults
-    GetChunk {
-        /// The chunk address
-        address: ChunkAddress,
+    /// Data is handled by Adults
+    Data {
+        /// The query
+        query: DataQuery,
+        /// Client signature
+        auth: ServiceAuth,
         /// The user that has initiated this query
         origin: EndUser,
     },
 }
 
-///
+/// Responses to queries from Elders to Adults.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeQueryResponse {
-    /// Elder to Adult Get.
+    //
+    // ===== Chunk =====
+    //
+    /// Response to [`ChunkRead::Get`].
     GetChunk(Result<Chunk>),
+    //
+    // ===== Register Data =====
+    //
+    /// Response to [`RegisterQuery::Get`].
+    GetRegister((Result<Register>, OperationId)),
+    /// Response to [`RegisterQuery::GetOwner`].
+    GetRegisterOwner((Result<User>, OperationId)),
+    /// Response to [`RegisterQuery::GetEntry`].
+    GetRegisterEntry((Result<Entry>, OperationId)),
+    /// Response to [`RegisterQuery::GetPolicy`].
+    GetRegisterPolicy((Result<Policy>, OperationId)),
+    /// Response to [`RegisterQuery::Read`].
+    ReadRegister((Result<BTreeSet<(EntryHash, Entry)>>, OperationId)),
+    /// Response to [`RegisterQuery::GetUserPermissions`].
+    GetRegisterUserPermissions((Result<Permissions>, OperationId)),
+    //
+    // ===== Other =====
+    //
+    /// Failed to create id generation
+    FailedToCreateOperationId,
+}
+
+impl NodeQueryResponse {
+    pub(crate) fn convert(self) -> QueryResponse {
+        use NodeQueryResponse::*;
+        match self {
+            GetChunk(res) => QueryResponse::GetChunk(res),
+            GetRegister(res) => QueryResponse::GetRegister(res),
+            GetRegisterEntry(res) => QueryResponse::GetRegisterEntry(res),
+            GetRegisterOwner(res) => QueryResponse::GetRegisterOwner(res),
+            ReadRegister(res) => QueryResponse::ReadRegister(res),
+            GetRegisterPolicy(res) => QueryResponse::GetRegisterPolicy(res),
+            GetRegisterUserPermissions(res) => QueryResponse::GetRegisterUserPermissions(res),
+            FailedToCreateOperationId => QueryResponse::FailedToCreateOperationId,
+        }
+    }
 }

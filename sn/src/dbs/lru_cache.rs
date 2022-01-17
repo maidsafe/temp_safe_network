@@ -17,6 +17,15 @@ use xor_name::XorName;
 
 type Priority = u16;
 
+/// An lru cache with a neat implementation to evict least recently used
+/// element, by using a priority queue.
+///
+/// Implemented as a map of data and a priority queue. The cache stores the items inside a [`DashMap`]
+/// to be able to retrieve them quickly. The key is kept in a [`PriorityQueue`], and every time it is accessed,
+/// the priority is changed to a lower number.
+///
+/// At an insert of a new value, when the cache is full, the priority queue will simply be popped, and the least
+/// recently used value will have the largest number, so it will be at the top of the queue.
 #[derive(Clone, Debug)]
 pub(crate) struct LruCache<T> {
     data: DashMap<XorName, Arc<T>>,

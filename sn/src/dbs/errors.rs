@@ -86,9 +86,15 @@ pub enum Error {
     /// There were Error(s) while batching for Sled operations.
     #[error("Errors found when batching for Sled")]
     SledBatching,
+    /// Invalid filename
+    #[error("Invalid chunk filename")]
+    InvalidFilename,
     /// NetworkData error.
     #[error("Network data error:: {0}")]
     NetworkData(#[from] crate::types::Error),
+    /// No filename found
+    #[error("Path contains no file name")]
+    NoFilename,
 }
 
 /// Convert db error to messaging error message for sending over the network.

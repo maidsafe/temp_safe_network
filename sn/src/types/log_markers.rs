@@ -25,6 +25,9 @@ pub enum LogMarker {
     // messaging
     ServiceMsgToBeHandled,
     SystemMsgToBeHandled,
+    // data
+    DataStorageReceivedAtElder,
+    DataQueryReceviedAtElder,
     // chunks
     StoringChunk,
     ChunkStoreReceivedAtElder,
@@ -34,7 +37,8 @@ pub enum LogMarker {
     ChunkQueryReceviedAtAdult,
     // register
     RegisterWrite,
-    RegisterQueryReceived,
+    RegisterQueryReceivedAtElder,
+    RegisterQueryReceivedAtAdult,
     // routing commands
     DispatchHandleMsgCmd,
     DispatchSendMsgCmd,

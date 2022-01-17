@@ -31,11 +31,11 @@ impl Core {
             let removed: BTreeSet<_> = old_adults.difference(&current_adults).copied().collect();
 
             if !added.is_empty() || !removed.is_empty() {
-                // reorganise the chunks stored in this section
+                // reorganise the data stored in this section
                 let our_name = self.node.read().await.name();
                 let remaining = old_adults.intersection(&current_adults).copied().collect();
                 commands.extend(
-                    self.reorganize_chunks(our_name, added, removed, remaining)
+                    self.reorganize_data(our_name, added, removed, remaining)
                         .await?,
                 );
             }

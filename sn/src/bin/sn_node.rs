@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -29,17 +29,20 @@
 
 use color_eyre::{Section, SectionExt};
 use eyre::{eyre, Result, WrapErr};
-use safe_network::{
-    node::{add_connection_info, set_connection_info, Config, Error, Node},
-    LogFormatter,
-};
+use safe_network::node::{add_connection_info, set_connection_info, Config, Error, Node};
+#[cfg(not(feature = "tokio-console"))]
+use safe_network::LogFormatter;
 use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process::exit};
 use structopt::{clap, StructOpt};
 use tokio::time::{sleep, Duration};
 use tracing::{self, error, info, trace, warn};
+
+use tracing_appender::non_blocking::WorkerGuard;
+#[cfg(not(feature = "tokio-console"))]
 use tracing_subscriber::filter::EnvFilter;
 
+#[cfg(not(feature = "tokio-console"))]
 const MODULE_NAME: &str = "safe_network";
 const BOOTSTRAP_RETRY_TIME: u64 = 3; // in minutes
 
@@ -83,7 +86,8 @@ async fn run_node() -> Result<()> {
     // Set up logging
     // ==============
 
-    let mut _optional_guard = None;
+    let mut _optional_guard: Option<WorkerGuard> = None;
+
     #[cfg(not(feature = "tokio-console"))]
     {
         let filter = match EnvFilter::try_from_env("RUST_LOG") {

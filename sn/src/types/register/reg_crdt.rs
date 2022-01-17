@@ -7,10 +7,13 @@
 // specific language governing permissions and limitations relating to use of the SAFE Network
 // Software.
 
-use super::super::{
-    RegisterAddress as Address, Signature, {utils, Error, PublicKey, Result},
-};
 use super::metadata::Entry;
+use super::{
+    super::{
+        RegisterAddress as Address, Signature, {Error, Result},
+    },
+    User,
+};
 use crdts::{
     merkle_reg::{MerkleReg, Node},
     CmRDT,
@@ -50,7 +53,7 @@ pub struct CrdtOperation<T> {
     /// The data operation to apply.
     pub crdt_op: Node<T>,
     /// The PublicKey of the entity that generated the operation
-    pub source: PublicKey,
+    pub source: User,
     /// The signature of source on the crdt_top, required to apply the op
     pub signature: Option<Signature>,
 }
@@ -102,7 +105,7 @@ impl RegisterCrdt {
         &mut self,
         entry: Entry,
         children: BTreeSet<EntryHash>,
-        source: PublicKey,
+        source: User,
     ) -> Result<(EntryHash, CrdtOperation<Entry>)> {
         let address = *self.address();
 
@@ -125,15 +128,7 @@ impl RegisterCrdt {
     /// Apply a remote data CRDT operation to this replica of the RegisterCrdt.
     pub(super) fn apply_op(&mut self, op: CrdtOperation<Entry>) -> Result<()> {
         // Let's first check the op is validly signed.
-        // Note: Perms for the op are checked at the upper Register layer.
-        let sig = op.signature.ok_or(Error::CrdtMissingOpSignature)?;
-        let bytes_to_verify = utils::serialise(&op.crdt_op).map_err(|err| {
-            Error::Serialisation(format!(
-                "Could not serialise CRDT operation to verify signature: {}",
-                err
-            ))
-        })?;
-        op.source.verify(&sig, &bytes_to_verify)?;
+        // Note: Perms and valid sig for the op are checked at the upper Register layer.
 
         // Check the targetting address is correct
         if self.address != op.address {

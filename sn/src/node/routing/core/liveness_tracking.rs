@@ -75,6 +75,7 @@ impl Liveness {
     }
 
     /// Inserts a random OperationId to decrease the credibility of the given Adult node.
+    #[allow(unused)]
     pub(crate) async fn penalise_member(&self, member: XorName) {
         if let Ok(random_op_id) = operation_id(&ChunkAddress(XorName::random())) {
             self.add_a_pending_request_operation(member, random_op_id)

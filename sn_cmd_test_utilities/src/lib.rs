@@ -47,7 +47,7 @@ pub mod util {
         let tag_name = response_json["tag_name"].as_str().ok_or_else(|| {
             eyre!(format!(
                 "Failed to parse the tag_name field from the response: {}",
-                response_json.to_string()
+                response_json
             ))
         })?;
         let version = get_version_from_release_version(tag_name)?;

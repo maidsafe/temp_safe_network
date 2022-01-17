@@ -13,6 +13,7 @@ use bytes::Bytes;
 use hex::encode;
 use log::{debug, info};
 use safe_network::client::{Client, ClientConfig, Error as ClientError, RegisterWriteAheadLog};
+use safe_network::types::register::{Policy, PrivatePolicy, PublicPolicy};
 use safe_network::types::{
     register::{Entry, EntryHash, PrivatePermissions, PublicPermissions, User},
     BytesAddress, Error as SafeNdError, Keypair, RegisterAddress, Scope,
@@ -167,16 +168,12 @@ impl SafeAppClient {
         info!("Xorname for new Register storage: {:?}", &xorname);
 
         // The Register's owner will be the client's public key
-        let my_pk = client.public_key();
+        let my_pk = User::Key(client.public_key());
 
         // Store the Register on the network
         let (_, op_batch) = if private {
-            // Set read and write  permissions to this application
-            let mut perms = BTreeMap::default();
-            let _ = perms.insert(my_pk, PrivatePermissions::new(true, true));
-
             client
-                .store_private_register(xorname, tag, my_pk, perms)
+                .create_register(xorname, tag, private_policy(my_pk))
                 .await
                 .map_err(|e| {
                     Error::NetDataError(format!(
@@ -186,12 +183,10 @@ impl SafeAppClient {
                 })?
         } else {
             // Set write permissions to this application
-            let user_app = User::Key(my_pk);
-            let mut perms = BTreeMap::default();
-            let _ = perms.insert(user_app, PublicPermissions::new(true));
+            let user_app = my_pk;
 
             client
-                .store_public_register(xorname, tag, my_pk, perms)
+                .create_register(xorname, tag, public_policy(user_app))
                 .await
                 .map_err(|e| {
                     Error::NetDataError(format!(
@@ -204,7 +199,7 @@ impl SafeAppClient {
         Ok((xorname, op_batch))
     }
 
-    /// Low level method to read all register entries
+    /// Low level method to read latest register entries
     pub async fn read_register(
         &self,
         address: RegisterAddress,
@@ -238,7 +233,11 @@ impl SafeAppClient {
             .get_register_entry(address, hash)
             .await
             .map_err(|err| {
-                if let ClientError::NetworkDataError(SafeNdError::NoSuchEntry) = err {
+                if let ClientError::ErrorMessage {
+                    source: safe_network::messaging::data::Error::NoSuchEntry,
+                    ..
+                } = err
+                {
                     Error::HashNotFound(hash)
                 } else {
                     Error::NetDataError(format!(
@@ -281,4 +280,16 @@ impl SafeAppClient {
         client.publish_register_ops(batch).await?;
         Ok(())
     }
+}
+
+fn private_policy(owner: User) -> Policy {
+    let mut permissions = BTreeMap::new();
+    let _ = permissions.insert(owner, PrivatePermissions::new(true, true));
+    Policy::Private(PrivatePolicy { owner, permissions })
+}
+
+fn public_policy(owner: User) -> Policy {
+    let mut permissions = BTreeMap::new();
+    let _ = permissions.insert(owner, PublicPermissions::new(true));
+    Policy::Public(PublicPolicy { owner, permissions })
 }

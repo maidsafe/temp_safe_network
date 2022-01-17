@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::types::register::User;
 use crate::types::DataAddress;
 use crate::types::PublicKey;
 use serde::{Deserialize, Serialize};
@@ -21,9 +22,9 @@ pub type Result<T, E = Error> = result::Result<T, E>;
 #[non_exhaustive]
 #[allow(clippy::large_enum_variant)]
 pub enum Error {
-    /// Access denied for supplied PublicKey
-    #[error("Access denied for PublicKey: {0}")]
-    AccessDenied(PublicKey),
+    /// Access denied for user
+    #[error("Access denied for user: {0:?}")]
+    AccessDenied(User),
     /// Requested data not found
     #[error("Requested chunk not found: {0:?}")]
     ChunkNotFound(XorName),

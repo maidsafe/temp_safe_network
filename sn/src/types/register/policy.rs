@@ -23,7 +23,7 @@ pub enum Policy {
 
 impl Policy {
     /// Returns true if `action` is allowed for the provided user.
-    pub fn is_action_allowed(&self, requester: PublicKey, action: Action) -> Result<()> {
+    pub fn is_action_allowed(&self, requester: User, action: Action) -> Result<()> {
         match self {
             Policy::Public(policy) => policy.is_action_allowed(requester, action),
             Policy::Private(policy) => policy.is_action_allowed(requester, action),
@@ -39,7 +39,7 @@ impl Policy {
     }
 
     /// Returns the owner.
-    pub fn owner(&self) -> &PublicKey {
+    pub fn owner(&self) -> &User {
         match self {
             Policy::Public(policy) => policy.owner(),
             Policy::Private(policy) => policy.owner(),
@@ -142,7 +142,7 @@ impl PrivatePermissions {
     }
 }
 
-/// User that can access Register.
+/// User that can access a Register.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Debug)]
 pub enum User {
     /// Any user.
@@ -156,29 +156,21 @@ pub enum User {
 pub struct PublicPolicy {
     /// An owner could represent an individual user, or a group of users,
     /// depending on the `public_key` type.
-    pub owner: PublicKey,
+    pub owner: User,
     /// Map of users to their public permission set.
     pub permissions: BTreeMap<User, PublicPermissions>,
 }
 
 impl PublicPolicy {
-    /// Returns `Some(true)` if `action` is allowed for the provided user and `Some(false)` if it's
-    /// not permitted. `None` means that default permissions should be applied.
-    pub fn is_action_allowed_by_user(&self, user: &User, action: Action) -> Option<bool> {
-        self.permissions
-            .get(user)
-            .and_then(|perms| perms.is_allowed(action))
-    }
-
     /// Returns `Ok(())` if `action` is allowed for the provided user and `Err(AccessDenied)` if
     /// this action is not permitted.
-    pub fn is_action_allowed(&self, requester: PublicKey, action: Action) -> Result<()> {
+    pub fn is_action_allowed(&self, requester: User, action: Action) -> Result<()> {
         // First checks if the requester is the owner.
         if action == Action::Read || requester == self.owner {
             Ok(())
         } else {
             match self
-                .is_action_allowed_by_user(&User::Key(requester), action)
+                .is_action_allowed_by_user(&requester, action)
                 .or_else(|| self.is_action_allowed_by_user(&User::Anyone, action))
             {
                 Some(true) => Ok(()),
@@ -188,13 +180,28 @@ impl PublicPolicy {
         }
     }
 
+    /// Returns `Some(true)` if `action` is allowed for the provided user and `Some(false)` if it's
+    /// not permitted. `None` means that default permissions should be applied.
+    fn is_action_allowed_by_user(&self, user: &User, action: Action) -> Option<bool> {
+        self.permissions
+            .get(user)
+            .and_then(|perms| perms.is_allowed(action))
+    }
+
     /// Gets the permissions for a user if applicable.
     pub fn permissions(&self, user: User) -> Option<Permissions> {
-        self.permissions.get(&user).map(|p| Permissions::Public(*p))
+        if user == self.owner {
+            // i.e. it won't be possible to circumvent the semantics of `owner`
+            // by setting some other permissions for the user.
+            // the permissions can still be kept in the state though, so that switching owners gives an immediate permission update as well
+            Some(Permissions::Public(PublicPermissions::new(true)))
+        } else {
+            self.permissions.get(&user).map(|p| Permissions::Public(*p))
+        }
     }
 
     /// Returns the owner.
-    pub fn owner(&self) -> &PublicKey {
+    pub fn owner(&self) -> &User {
         &self.owner
     }
 }
@@ -204,15 +211,15 @@ impl PublicPolicy {
 pub struct PrivatePolicy {
     /// An owner could represent an individual user, or a group of users,
     /// depending on the `public_key` type.
-    pub owner: PublicKey,
+    pub owner: User,
     /// Map of users to their private permission set.
-    pub permissions: BTreeMap<PublicKey, PrivatePermissions>,
+    pub permissions: BTreeMap<User, PrivatePermissions>,
 }
 
 impl PrivatePolicy {
     /// Returns `Ok(())` if `action` is allowed for the provided user and `Err(AccessDenied)` if
     /// this action is not permitted.
-    pub fn is_action_allowed(&self, requester: PublicKey, action: Action) -> Result<()> {
+    pub fn is_action_allowed(&self, requester: User, action: Action) -> Result<()> {
         // First checks if the requester is the owner.
         if requester == self.owner {
             Ok(())
@@ -232,14 +239,24 @@ impl PrivatePolicy {
 
     /// Gets the permissions for a user if applicable.
     pub fn permissions(&self, user: User) -> Option<Permissions> {
-        match user {
-            User::Anyone => None,
-            User::Key(key) => self.permissions.get(&key).map(|p| Permissions::Private(*p)),
+        if user == self.owner {
+            // i.e. it won't be possible to circumvent the semantics of `owner`
+            // by setting some other permissions for the user.
+            // the permissions can still be kept in the state though, so that switching owners gives an immediate permission update as well
+            Some(Permissions::Private(PrivatePermissions::new(true, true)))
+        } else {
+            match user {
+                User::Anyone => None,
+                user @ User::Key(_) => self
+                    .permissions
+                    .get(&user)
+                    .map(|p| Permissions::Private(*p)),
+            }
         }
     }
 
     /// Returns the owner.
-    pub fn owner(&self) -> &PublicKey {
+    pub fn owner(&self) -> &User {
         &self.owner
     }
 }
