@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -82,8 +82,8 @@ pub enum SystemMsg {
         section_signed: KeyedSig,
         /// Our section chain truncated from the triggering msg's dst section_key (or genesis key for full proof)
         proof_chain: SecuredLinkedList,
-        /// Optional section members if we're updating our own section adults
-        members: Option<SectionPeers>,
+        /// Section members
+        members: SectionPeers,
     },
     /// Probes the network by sending a message to a random dst triggering an AE flow.
     AntiEntropyProbe(XorName),
