@@ -180,7 +180,7 @@ impl Core {
         let error = convert_to_error_message(error);
         let error = CmdError::Data(error);
 
-        self.send_cmd_error_response(error, origin, msg_id)
+        self.send_cmd_error_response(error, origin, msg_id).await
     }
 
     pub(crate) fn compute_holders(

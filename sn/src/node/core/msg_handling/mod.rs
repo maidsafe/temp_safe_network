@@ -25,7 +25,7 @@ use crate::node::{
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
 };
 use crate::peer::{Peer, UnnamedPeer};
-use crate::types::{log_markers::LogMarker, Keypair, PublicKey, Signature};
+use crate::types::{log_markers::LogMarker, PublicKey, Signature};
 use crate::{
     messaging::{
         data::{ServiceMsg, StorageLevel},
