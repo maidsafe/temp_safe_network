@@ -31,6 +31,7 @@ use color_eyre::{Section, SectionExt};
 use eyre::{eyre, Result, WrapErr};
 use file_rotate::{compression::Compression, suffix::CountSuffix, ContentLimit, FileRotate};
 use safe_network::node::{add_connection_info, set_connection_info, Config, Error, Node};
+
 #[cfg(not(feature = "tokio-console"))]
 use safe_network::LogFormatter;
 use self_update::{cargo_crate_version, Status};
