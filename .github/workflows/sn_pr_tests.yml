@@ -388,7 +388,13 @@ jobs:
 
       - name: Wait for all nodes to join
         shell: bash
-        run: ./resources/scripts/wait_for_nodes_to_join.sh
+        # we are not running with 'always-joinable' set, so we should not have the full 33 nodes as yet.
+        run: NODE_COUNT=28 ./resources/scripts/wait_for_nodes_to_join.sh
+        timeout-minutes: 5
+
+      - name: Is the network split and ready?
+        shell: bash
+        run: ./resources/scripts/network_is_ready.sh
         timeout-minutes: 5
 
       - name: Print Network Log Stats after nodes joined
