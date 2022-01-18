@@ -666,7 +666,7 @@ mod tests {
         let send_comm = Comm::new(local_addr(), Config::default(), tx).await?;
 
         let (recv_endpoint, mut incoming_connections, _) =
-            Endpoint::new(local_addr(), &[], Config::default()).await?;
+            Endpoint::new_peer(local_addr(), &[], Config::default()).await?;
         let recv_addr = recv_endpoint.public_addr();
         let name = XorName::random();
 
@@ -768,7 +768,7 @@ mod tests {
 
     async fn new_peer() -> Result<(Peer, mpsc::Receiver<Bytes>)> {
         let (endpoint, mut incoming_connections, _) =
-            Endpoint::new(local_addr(), &[], Config::default()).await?;
+            Endpoint::new_peer(local_addr(), &[], Config::default()).await?;
         let addr = endpoint.public_addr();
 
         let (tx, rx) = mpsc::channel(1);
