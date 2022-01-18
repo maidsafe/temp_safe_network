@@ -196,7 +196,6 @@ impl Session {
 
     // Handle messages intended for client consumption (re: queries + commands)
     #[instrument(skip(session), level = "debug")]
-    #[allow(clippy::redundant_clone)]
     fn handle_client_msg(
         session: Session,
         msg_id: MessageId,
@@ -205,7 +204,7 @@ impl Session {
     ) -> Result<(), Error> {
         debug!("ServiceMsg with id {:?} received from {:?}", msg_id, src);
         let queries = session.pending_queries.clone();
-        let cmds = session.pending_cmds.clone();
+        let cmds = session.pending_cmds;
 
         let _handle = tokio::spawn(async move {
             match msg {
@@ -258,7 +257,7 @@ impl Session {
                     );
                     Self::send_cmd_response(cmds, correlation_id, src, None);
                 }
-                msg => {
+                _ => {
                     warn!("Ignoring unexpected message type received: {:?}", msg);
                 }
             };
