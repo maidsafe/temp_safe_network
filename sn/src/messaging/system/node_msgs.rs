@@ -81,7 +81,7 @@ pub enum NodeQuery {
         auth: ServiceAuth,
         /// The user that has initiated this query
         origin: EndUser,
-        ///
+        /// The correlation id that recorded in Elders for this query
         correlation_id: MessageId,
     },
 }

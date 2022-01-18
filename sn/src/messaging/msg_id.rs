@@ -27,7 +27,7 @@ impl MessageId {
         Self(XorName::random().0)
     }
 
-    ///
+    /// Convert an XorName into a MessageId
     pub fn from_xor_name(xor_name: XorName) -> Self {
         Self(xor_name.0)
     }

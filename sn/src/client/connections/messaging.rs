@@ -44,6 +44,9 @@ pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 // Number of bootstrap nodes to attempt to contact per batch (if provided by the node_config)
 pub(crate) const NODES_TO_CONTACT_PER_STARTUP_BATCH: usize = 3;
 
+// Duration of wait for the node to have chance to pickup network knowledge at the beginning
+const INITIAL_WAIT: u64 = 1;
+
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
     #[instrument(skip(err_sender), level = "debug")]
@@ -456,7 +459,7 @@ impl Session {
         };
 
         // wait here to give a chance for AE responses to come in and be parsed
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        tokio::time::sleep(Duration::from_secs(INITIAL_WAIT)).await;
 
         // If we start with genesis key here, we should wait until we have _at least_ one AE-Retry in
         if section_pk == self.genesis_key {
@@ -560,7 +563,7 @@ pub(super) async fn send_message(
     endpoint: Endpoint,
     msg_id: MessageId,
 ) -> Result<(), Error> {
-    let _ = tokio::spawn(async move {
+    let _spawn_result = tokio::spawn(async move {
         let priority = if let Ok(msg) = wire_msg.clone().into_message() {
             msg.priority()
         } else {
@@ -626,7 +629,7 @@ pub(super) async fn send_message(
             let connection_id = match connection {
                 Ok(conn) => conn.id(),
                 Err(err) => {
-                    error!("Failed to get connection_id of {:?}", peer_name);
+                    error!("Failed to get connection_id of {:?} {:?}", peer_name, err);
                     return;
                 }
             };
@@ -715,6 +718,10 @@ pub(super) async fn send_message(
             error!("More errors when sending a message than successes");
         }
     });
+    debug!(
+        "result of spawn a send_message thread of {:?} is {:?}",
+        msg_id, _spawn_result
+    );
     Ok(())
 }
 
