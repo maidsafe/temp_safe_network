@@ -52,7 +52,7 @@ impl Comm {
         // This also returns the a channel where we can listen for
         // disconnection events.
         let (endpoint, incoming_connections, _) =
-            Endpoint::new(local_addr, Default::default(), config).await?;
+            Endpoint::new_peer(local_addr, Default::default(), config).await?;
 
         let msg_count = MsgCount::new();
 
@@ -81,7 +81,7 @@ impl Comm {
         // Bootstrap to the network returning the connection to a node.
         // We can use the returned channels to listen for incoming messages and disconnection events
         let (endpoint, incoming_connections, bootstrap_peer) =
-            Endpoint::new(local_addr, bootstrap_nodes, config).await?;
+            Endpoint::new_peer(local_addr, bootstrap_nodes, config).await?;
         let (bootstrap_peer, peer_incoming) = bootstrap_peer.ok_or(Error::BootstrapFailed)?;
 
         let msg_count = MsgCount::new();
