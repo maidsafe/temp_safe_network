@@ -67,7 +67,7 @@ pub struct Config {
     #[structopt(long, default_value = "0")]
     pub logs_max_lines: usize,
     /// Number of rotated files left not compressed
-    #[structopt(long, default_value = "0")]
+    #[structopt(long, default_value = "100")] // 100*10mb files by default
     pub logs_uncompressed: usize,
     /// Attempt to self-update?
     #[structopt(long)]
