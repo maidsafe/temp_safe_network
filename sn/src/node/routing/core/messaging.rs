@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -132,13 +132,8 @@ impl Core {
     // ------------------------------------------------------------------------------------------------------------
     // ------------------------------------------------------------------------------------------------------------
 
-    /// Generate AntiEntropyUpdate message to update a peer with proof_chain,
-    /// and members_info if required.
-    pub(crate) async fn generate_ae_update(
-        &self,
-        dst_section_key: BlsPublicKey,
-        add_peer_info_to_update: bool,
-    ) -> Result<SystemMsg> {
+    /// Generate AntiEntropyUpdate message to update a peer with proof_chain and members list.
+    async fn generate_ae_update_msg(&self, dst_section_key: BlsPublicKey) -> Result<SystemMsg> {
         let section_signed_auth = self
             .network_knowledge
             .section_signed_authority_provider()
@@ -159,17 +154,12 @@ impl Core {
             }
         };
 
-        let members = if add_peer_info_to_update {
-            Some(
-                self.network_knowledge
-                    .section_signed_members()
-                    .iter()
-                    .map(|state| state.clone().into_authed_msg())
-                    .collect(),
-            )
-        } else {
-            None
-        };
+        let members = self
+            .network_knowledge
+            .section_signed_members()
+            .iter()
+            .map(|state| state.clone().into_authed_msg())
+            .collect();
 
         Ok(SystemMsg::AntiEntropyUpdate {
             section_auth: sap.to_msg(),
@@ -232,7 +222,7 @@ impl Core {
         let dst_section_pk = self.network_knowledge.section_key().await;
         // the previous PK which is likely what adults know
         let previous_pk = *self.section_chain().await.prev_key();
-        let node_msg = match self.generate_ae_update(previous_pk, true).await {
+        let node_msg = match self.generate_ae_update_msg(previous_pk).await {
             Ok(node_msg) => node_msg,
             Err(err) => {
                 warn!(
@@ -338,7 +328,7 @@ impl Core {
         let adults = self.network_knowledge.adults().await;
         let dst_section_pk = self.network_knowledge.section_key().await;
 
-        let node_msg = match self.generate_ae_update(dst_section_pk, true).await {
+        let node_msg = match self.generate_ae_update_msg(dst_section_pk).await {
             Ok(node_msg) => node_msg,
             Err(err) => {
                 warn!(
