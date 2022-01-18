@@ -184,7 +184,7 @@ dependencies = [
  "parking",
  "polling",
  "slab",
- "socket2 0.4.3",
+ "socket2 0.4.4",
  "waker-fn",
  "winapi",
 ]
@@ -257,9 +257,9 @@ dependencies = [
 
 [[package]]
 name = "async-task"
-version = "4.0.3"
+version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e91831deabf0d6d7ec49552e489aed63b7456a7a3c46cff62adad428110b0af0"
+checksum = "677d306121baf53310a3fd342d88dc0824f6bbeace68347593658525565abee8"
 
 [[package]]
 name = "async-trait"
@@ -719,7 +719,7 @@ dependencies = [
  "tonic",
  "tracing",
  "tracing-core",
- "tracing-subscriber 0.3.6",
+ "tracing-subscriber 0.3.7",
 ]
 
 [[package]]
@@ -1577,9 +1577,9 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.3.10"
+version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c9de88456263e249e241fcd211d3954e2c9b0ef7ccfc235a444eb367cae3689"
+checksum = "d9f1f717ddc7b2ba36df7e871fd88db79326551d3d6f1fc406fbfd28b582ff8e"
 dependencies = [
  "bytes",
  "fnv",
@@ -1737,7 +1737,7 @@ dependencies = [
  "httpdate",
  "itoa 0.4.8",
  "pin-project-lite",
- "socket2 0.4.3",
+ "socket2 0.4.4",
  "tokio",
  "tower-service",
  "tracing",
@@ -1939,9 +1939,9 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
-version = "0.2.113"
+version = "0.2.115"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eef78b64d87775463c549fbd80e19249ef436ea3bf1de2a1eb7e717ec7fab1e9"
+checksum = "0a8d982fa7a96a000f6ec4cfe966de9703eccde29750df2bb8949da91b0e818d"
 
 [[package]]
 name = "linked-hash-map"
@@ -2248,9 +2248,9 @@ dependencies = [
 
 [[package]]
 name = "num_threads"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71a1eb3a36534514077c1e079ada2fb170ef30c47d203aa6916138cf882ecd52"
+checksum = "97ba99ba6393e2c3734791401b66902d981cb03bf190af674ca69949b6d5fb15"
 dependencies = [
  "libc",
 ]
@@ -2670,7 +2670,7 @@ checksum = "1b2c16f879bf66823534fb35666cafcb7b8de2d35e4e6fbfe38fff3c832d6b1e"
 dependencies = [
  "futures",
  "log",
- "quinn",
+ "quinn 0.7.2",
  "rand 0.7.3",
  "rcgen 0.7.0",
  "serde",
@@ -2680,19 +2680,19 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.27.4"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5bd523751fe2e83db806e7810460dec3ad1f9186fd14f599c6b2fb47c1485d7e"
+checksum = "e2fc25e3ac9db1359413ae728b1e0bffb65ec8f7e593991378c1e3eb3fdeac4f"
 dependencies = [
  "backoff",
  "bincode",
  "bytes",
  "futures",
  "igd",
- "quinn",
- "quinn-proto",
+ "quinn 0.8.0",
+ "quinn-proto 0.8.0",
  "rcgen 0.8.14",
- "rustls 0.19.1",
+ "rustls 0.20.2",
  "serde",
  "thiserror",
  "tokio",
@@ -2738,13 +2738,32 @@ dependencies = [
  "lazy_static",
  "libc",
  "mio",
- "quinn-proto",
+ "quinn-proto 0.7.3",
  "rustls 0.19.1",
  "socket2 0.3.19",
  "thiserror",
  "tokio",
  "tracing",
  "webpki 0.21.4",
+]
+
+[[package]]
+name = "quinn"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61a84d97630b137463c8e6802adc1dfe9de81457b41bb1ac59189e6761ab9255"
+dependencies = [
+ "bytes",
+ "futures-channel",
+ "futures-util",
+ "fxhash",
+ "quinn-proto 0.8.0",
+ "quinn-udp",
+ "rustls 0.20.2",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "webpki 0.22.0",
 ]
 
 [[package]]
@@ -2762,6 +2781,40 @@ dependencies = [
  "tinyvec",
  "tracing",
  "webpki 0.21.4",
+]
+
+[[package]]
+name = "quinn-proto"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "063dedf7983c8d57db474218f258daa85b627de6f2dbc458b690a93b1de790e8"
+dependencies = [
+ "bytes",
+ "fxhash",
+ "rand 0.8.4",
+ "ring",
+ "rustls 0.20.2",
+ "rustls-pemfile",
+ "slab",
+ "thiserror",
+ "tinyvec",
+ "tracing",
+ "webpki 0.22.0",
+]
+
+[[package]]
+name = "quinn-udp"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5f7996776e9ee3fc0e5c14476c1a640a17e993c847ae9c81191c2c102fbef903"
+dependencies = [
+ "futures-util",
+ "libc",
+ "mio",
+ "quinn-proto 0.8.0",
+ "socket2 0.4.4",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -3277,7 +3330,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-core",
- "tracing-subscriber 0.3.6",
+ "tracing-subscriber 0.3.7",
  "uluru",
  "url",
  "walkdir",
@@ -3424,9 +3477,9 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.135"
+version = "1.0.136"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2cf9235533494ea2ddcdb794665461814781c53f19d87b76e571a1c35acbad2b"
+checksum = "ce31e24b01e1e524df96f1c2fdd054405f8d7376249a5110886fb4b658484789"
 dependencies = [
  "serde_derive",
 ]
@@ -3452,9 +3505,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.135"
+version = "1.0.136"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8dcde03d87d4c973c04be249e7d8f0b35db1c848c487bd43032808e59dd8328d"
+checksum = "08597e7152fcd306f41838ed3e37be9eaeed2b61c42e2117266a554fab4662f9"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3615,11 +3668,11 @@ dependencies = [
  "serde_json",
  "sha3",
  "thiserror",
- "time 0.3.6",
+ "time 0.3.7",
  "tiny-keccak 2.0.2",
  "tokio",
  "tracing",
- "tracing-subscriber 0.3.6",
+ "tracing-subscriber 0.3.7",
  "uhttp_uri",
  "url",
  "urlencoding",
@@ -3705,7 +3758,7 @@ dependencies = [
  "serde_json",
  "structopt",
  "tracing",
- "tracing-subscriber 0.3.6",
+ "tracing-subscriber 0.3.7",
 ]
 
 [[package]]
@@ -3721,9 +3774,9 @@ dependencies = [
 
 [[package]]
 name = "socket2"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f82496b90c36d70af5fcd482edaa2e0bd16fade569de1330405fecbbdac736b"
+checksum = "66d72b759436ae32898a2af0a14218dbf55efde3feeb170eb623637db85ee1e0"
 dependencies = [
  "libc",
  "winapi",
@@ -3960,9 +4013,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.6"
+version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8d54b9298e05179c335de2b9645d061255bcd5155f843b3e328d2cfe0a5b413"
+checksum = "004cbc98f30fa233c61a38bc77e96a9106e65c88f2d3bef182ae952027e5753d"
 dependencies = [
  "itoa 1.0.1",
  "libc",
@@ -4014,9 +4067,9 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tokio"
-version = "1.15.0"
+version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbbf1c778ec206785635ce8ad57fe52b3009ae9e0c9f574a728f3049d3e55838"
+checksum = "95e99d373042c30406d317cfc5bfad7b5d604bdd31dab72cf8739abebaa64aee"
 dependencies = [
  "bytes",
  "libc",
@@ -4192,8 +4245,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94571df2eae3ed4353815ea5a90974a594a1792d8782ff2cbcc9392d1101f366"
 dependencies = [
  "crossbeam-channel",
- "time 0.3.6",
- "tracing-subscriber 0.3.6",
+ "time 0.3.7",
+ "tracing-subscriber 0.3.7",
 ]
 
 [[package]]
@@ -4281,9 +4334,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.3.6"
+version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77be66445c4eeebb934a7340f227bfe7b338173d3f8c00a60a5a58005c9faecf"
+checksum = "5312f325fe3588e277415f5a6cca1f4ccad0f248c4cd5a4bd33032d7286abc22"
 dependencies = [
  "ansi_term 0.12.1",
  "lazy_static",
@@ -4738,9 +4791,9 @@ dependencies = [
 
 [[package]]
 name = "zeroize"
-version = "1.5.0"
+version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc222aec311c323c717f56060324f32b82da1ce1dd81d9a09aa6a9030bfe08db"
+checksum = "4062c749be08d90be727e9c5895371c3a0e49b90ba2b9592dc7afda95cc2b719"
 dependencies = [
  "zeroize_derive",
 ]
