@@ -5,6 +5,9 @@
 # they're all independent of one another.
 exit=0
 
+# The tests parse output from the CLI process and they are expecting it to be in a certain form, so
+# any additional logging needs to be disabled.
+unset RUST_LOG
 export RUST_BACKTRACE=full
 
 cargo run --package sn_cli --release -- keys create --for-cli || ((exit++))
