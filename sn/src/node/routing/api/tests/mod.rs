@@ -23,7 +23,8 @@ use crate::node::{
     error::{Error, Result as RoutingResult},
     routing::{
         core::{
-            ConnectionEvent, Core, Proposal, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
+            relocation_check, ConnectionEvent, Core, Proposal, RelocatePayloadUtils,
+            RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
         },
         create_test_max_capacity_and_root_storage,
         dkg::test_utils::{prove, section_signed},
@@ -33,9 +34,8 @@ use crate::node::{
             test_utils::*, NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare,
         },
         node::Node,
-        recommended_section_size,
-        relocation::{self, RelocatePayloadUtils},
-        supermajority, Event, Peer, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+        recommended_section_size, supermajority, Event, Peer, FIRST_SECTION_MAX_AGE,
+        FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
     },
 };
 use crate::peer::UnnamedPeer;
@@ -1536,7 +1536,7 @@ fn create_relocation_trigger(sk: &bls::SecretKey, age: u8) -> Result<SectionAuth
 
         let signature = sk.sign(node_state_serialized);
 
-        if relocation::check(age, &signature) && !relocation::check(age + 1, &signature) {
+        if relocation_check(age, &signature) && !relocation_check(age + 1, &signature) {
             let sig = KeyedSig {
                 public_key: sk.public_key(),
                 signature,

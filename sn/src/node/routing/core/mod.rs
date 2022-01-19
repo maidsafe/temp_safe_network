@@ -20,6 +20,7 @@ mod messaging;
 mod msg_count;
 mod msg_handling;
 mod proposal;
+mod relocation;
 mod split_barrier;
 
 pub(crate) use back_pressure::BackPressure;
@@ -27,16 +28,16 @@ pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use capacity::MIN_LEVEL_WHEN_FULL;
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
 pub(crate) use proposal::Proposal;
+#[cfg(test)]
+pub(crate) use relocation::{check as relocation_check, RelocatePayloadUtils};
 
-use self::{data_storage::DataStorage, split_barrier::SplitBarrier};
+use self::{data_storage::DataStorage, relocation::RelocateState, split_barrier::SplitBarrier};
 
 use super::{
-    super::error::Result,
     api::command::Command,
     dkg::DkgVoter,
     network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider},
     node::Node,
-    relocation::RelocateState,
     Elders, Event, NodeElderChange,
 };
 
@@ -45,6 +46,7 @@ use crate::messaging::{
     system::{DkgSessionId, SystemMsg},
     AuthorityProof, SectionAuth,
 };
+use crate::node::error::Result;
 use crate::peer::Peer;
 use crate::types::{log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk, Cache};
 use crate::UsedSpace;

@@ -17,8 +17,8 @@ use crate::messaging::{
 use crate::node::{
     error::{Error, Result},
     routing::{
-        api::command::Command, ed25519, messages::WireMsgUtils,
-        network_knowledge::SectionAuthorityProvider, node::Node, relocation::RelocatePayloadUtils,
+        api::command::Command, core::relocation::RelocatePayloadUtils, ed25519,
+        messages::WireMsgUtils, network_knowledge::SectionAuthorityProvider, node::Node,
     },
 };
 use crate::peer::Peer;
