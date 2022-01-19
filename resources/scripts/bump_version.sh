@@ -31,6 +31,7 @@ function perform_smart_release_dry_run() {
 }
 
 function crate_has_changes() {
+  local crate_name="$1"
   if [[ $dry_run_output == *"WOULD auto-bump provided package '$crate_name'"* ]]; then
     echo "true"
   else
