@@ -635,44 +635,16 @@ impl NetworkKnowledge {
             return None;
         }
 
-        let next_bit_index = if let Ok(index) = self.prefix().await.bit_count().try_into() {
-            index
-        } else {
-            error!("We cannot split as we are at longest prefix possible");
-            // Already at the longest prefix, can't split further.
-            return None;
-        };
-
-        let next_bit = our_name.bit(next_bit_index);
-
-        let (our_new_size, sibling_new_size) = self
-            .section_peers
-            .joined()
-            .iter()
-            .filter(|info| !excluded_names.contains(&info.name()))
-            .map(|info| info.name().bit(next_bit_index) == next_bit)
-            .fold((0, 0), |(ours, siblings), is_our_prefix| {
-                if is_our_prefix {
-                    (ours + 1, siblings)
-                } else {
-                    (ours, siblings + 1)
-                }
-            });
+        let (prefix_next_bit, our_new_size, sibling_new_size) =
+            self.get_split_info(our_name, excluded_names).await?;
 
         debug!(
             "Upon section split attempt: our section size {:?}, theirs {:?}",
             our_new_size, sibling_new_size
         );
 
-        // If none of the two new sections would contain enough entries, return `None`.
-        if our_new_size < recommended_section_size()
-            || sibling_new_size < recommended_section_size()
-        {
-            return None;
-        }
-
-        let our_prefix = self.prefix().await.pushed(next_bit);
-        let other_prefix = self.prefix().await.pushed(!next_bit);
+        let our_prefix = self.prefix().await.pushed(prefix_next_bit);
+        let other_prefix = self.prefix().await.pushed(!prefix_next_bit);
 
         let our_elders = self.section_peers.elder_candidates_matching_prefix(
             &our_prefix,
@@ -691,6 +663,45 @@ impl NetworkKnowledge {
         let other_elder_candidates = ElderCandidates::new(other_prefix, other_elders);
 
         Some((our_elder_candidates, other_elder_candidates))
+    }
+
+    pub(crate) async fn get_split_info(
+        &self,
+        our_name: &XorName,
+        excluded_names: &BTreeSet<XorName>,
+    ) -> Option<(bool, usize, usize)> {
+        let (next_bit_index, prefix_next_bit) =
+            if let Ok(index) = self.prefix().await.bit_count().try_into() {
+                let prefix_next_bit = our_name.bit(index);
+                (index, prefix_next_bit)
+            } else {
+                // Already at the longest prefix, can't split further.
+                warn!("We cannot split as we are at longest prefix possible");
+                return None;
+            };
+
+        let (our_new_size, sibling_new_size) = self
+            .section_peers
+            .joined()
+            .iter()
+            .filter(|info| !excluded_names.contains(&info.name()))
+            .map(|info| info.name().bit(next_bit_index) == prefix_next_bit)
+            .fold((0, 0), |(ours, siblings), is_our_prefix| {
+                if is_our_prefix {
+                    (ours + 1, siblings)
+                } else {
+                    (ours, siblings + 1)
+                }
+            });
+
+        // If none of the two new sections would contain enough entries, return `None`.
+        if our_new_size < recommended_section_size()
+            || sibling_new_size < recommended_section_size()
+        {
+            return None;
+        }
+
+        Some((prefix_next_bit, our_new_size, sibling_new_size))
     }
 }
 
