@@ -30,7 +30,7 @@
 use color_eyre::{Section, SectionExt};
 use eyre::{eyre, Result, WrapErr};
 use file_rotate::{compression::Compression, suffix::CountSuffix, ContentLimit, FileRotate};
-use safe_network::node::{add_connection_info, set_connection_info, Config, Error, Node};
+use safe_network::node::{add_connection_info, set_connection_info, Config, Error, NodeApi};
 
 #[cfg(not(feature = "tokio-console"))]
 use safe_network::LogFormatter;
@@ -260,7 +260,7 @@ async fn run_node() -> Result<()> {
 
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME * 60);
     let (node, mut event_stream) = loop {
-        match Node::new(&config, bootstrap_retry_duration).await {
+        match NodeApi::new(&config, bootstrap_retry_duration).await {
             Ok(result) => break result,
             Err(Error::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
                 return Err(error).suggestion(

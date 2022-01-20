@@ -17,7 +17,7 @@ use crate::messaging::{
     system::{KeyedSig, SectionAuth, SystemMsg},
     AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, ServiceAuth, WireMsg,
 };
-use crate::node::routing::SectionAuthorityProvider;
+use crate::node::SectionAuthorityProvider;
 use crate::peer::Peer;
 use crate::types::{log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk};
 use crate::{at_least_one_correct_elder, elder_count};

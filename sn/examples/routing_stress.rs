@@ -41,10 +41,11 @@ use yansi::{Color, Style};
 use safe_network::messaging::{
     data::Error::FailedToWriteFile, system::SystemMsg, DstLocation, MessageId,
 };
-use safe_network::node::routing::create_test_max_capacity_and_root_storage;
-use safe_network::node::routing::{Config, Event as RoutingEvent, NodeElderChange, Routing};
+use safe_network::node::{
+    create_test_max_capacity_and_root_storage, Config, Event as RoutingEvent, NodeApi,
+    NodeElderChange,
+};
 use safe_network::types::Cache;
-use safe_network::UsedSpace;
 
 // Minimal delay between two consecutive prints of the network status.
 const MIN_PRINT_DELAY: Duration = Duration::from_millis(500);
@@ -160,7 +161,7 @@ async fn main() -> Result<()> {
 #[allow(clippy::large_enum_variant)]
 enum Event {
     // Node successfully joined the network.
-    JoinSuccess { id: u64, node: Routing },
+    JoinSuccess { id: u64, node: NodeApi },
     // Node failed to join the network.
     JoinFailure { id: u64, error: Error },
     // Node fired a routing event.
@@ -173,7 +174,7 @@ enum Node {
     Joining,
     // Node has joined the network and is either a member of a section or being relocated
     Joined {
-        node: Routing,
+        node: NodeApi,
         name: XorName,
         age: u8,
         prefix: Prefix,
@@ -222,7 +223,7 @@ impl Network {
 
         let config = Config {
             first: bootstrap_nodes.is_empty(),
-            bootstrap_nodes,
+            hard_coded_contacts: bootstrap_nodes,
             ..Default::default()
         };
 
@@ -447,7 +448,7 @@ impl Network {
         Ok(())
     }
 
-    async fn try_send_probe(&self, node: &Routing, dst: XorName) -> Result<bool> {
+    async fn try_send_probe(&self, node: &NodeApi, dst: XorName) -> Result<bool> {
         let public_key_set = if let Ok(public_key_set) = node.public_key_set().await {
             public_key_set
         } else {
@@ -633,22 +634,25 @@ impl Network {
     }
 }
 
-async fn add_node(id: u64, config: Config, event_tx: Sender<Event>) -> Result<()> {
+async fn add_node(id: u64, mut config: Config, event_tx: Sender<Event>) -> Result<()> {
     let (max_capacity, root_dir) = create_test_max_capacity_and_root_storage()?;
 
-    let (node, mut events) =
-        match Routing::new(config, UsedSpace::new(max_capacity), root_dir).await {
-            Ok(output) => output,
-            Err(error) => {
-                let _res = event_tx
-                    .send(Event::JoinFailure {
-                        id,
-                        error: error.into(),
-                    })
-                    .await;
-                return Ok(());
-            }
-        };
+    config.max_capacity = Some(max_capacity);
+    config.root_dir = Some(root_dir);
+    let joining_timeout = Duration::from_secs(3 * 60);
+
+    let (node, mut events) = match NodeApi::new(&config, joining_timeout).await {
+        Ok(output) => output,
+        Err(error) => {
+            let _res = event_tx
+                .send(Event::JoinFailure {
+                    id,
+                    error: error.into(),
+                })
+                .await;
+            return Ok(());
+        }
+    };
 
     let _res = event_tx.send(Event::JoinSuccess { id, node }).await;
 

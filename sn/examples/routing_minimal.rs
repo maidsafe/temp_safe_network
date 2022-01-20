@@ -35,14 +35,14 @@
 
 use eyre::Result;
 use futures::future::join_all;
-use safe_network::node::routing::{
-    create_test_max_capacity_and_root_storage, Config, Event, EventStream, Routing,
+use safe_network::node::{
+    create_test_max_capacity_and_root_storage, Config, Event, EventStream, NodeApi,
 };
-use safe_network::UsedSpace;
 use std::{
     convert::TryInto,
     iter,
     net::{IpAddr, Ipv4Addr, SocketAddr},
+    time::Duration,
 };
 use structopt::StructOpt;
 use tokio::task::JoinHandle;
@@ -183,16 +183,20 @@ async fn start_node(
 
     info!("Node #{} starting...", index);
 
+    let (max_capacity, root) = create_test_max_capacity_and_root_storage()?;
+
     let config = Config {
         first,
-        local_addr: SocketAddr::new(ip, local_port),
-        bootstrap_nodes: bootstrap_nodes.into_iter().collect(),
+        local_addr: Some(SocketAddr::new(ip, local_port)),
+        hard_coded_contacts: bootstrap_nodes.into_iter().collect(),
+        max_capacity: Some(max_capacity),
+        root_dir: Some(root),
         ..Default::default()
     };
 
-    let (max_capacity, root) = create_test_max_capacity_and_root_storage()?;
+    let joining_timeout = Duration::from_secs(3 * 60);
 
-    let (node, event_stream) = Routing::new(config, UsedSpace::new(max_capacity), root)
+    let (node, event_stream) = NodeApi::new(&config, joining_timeout)
         .await
         .expect("Failed to instantiate a Node");
 
@@ -211,7 +215,7 @@ async fn start_node(
 }
 
 // Spawns a task to run the node until terminated.
-fn run_node(index: usize, mut node: Routing, mut event_stream: EventStream) -> JoinHandle<()> {
+fn run_node(index: usize, mut node: NodeApi, mut event_stream: EventStream) -> JoinHandle<()> {
     tokio::spawn(async move {
         while let Some(event) = event_stream.next().await {
             if !handle_event(index, &mut node, event).await {
@@ -222,7 +226,7 @@ fn run_node(index: usize, mut node: Routing, mut event_stream: EventStream) -> J
 }
 
 // Handles the event emitted by the node.
-async fn handle_event(index: usize, node: &mut Routing, event: Event) -> bool {
+async fn handle_event(index: usize, node: &mut NodeApi, event: Event) -> bool {
     match event {
         Event::MemberJoined {
             name,

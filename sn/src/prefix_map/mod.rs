@@ -20,10 +20,7 @@ mod stats;
 use self::stats::NetworkStats;
 
 use crate::messaging::system::SectionAuth;
-use crate::node::{
-    routing::{SectionAuthUtils, SectionAuthorityProvider},
-    Error, Result,
-};
+use crate::node::{Error, Result, SectionAuthUtils, SectionAuthorityProvider};
 
 use bls::PublicKey as BlsPublicKey;
 use dashmap::{self, mapref::multiple::RefMulti, DashMap};
@@ -421,7 +418,7 @@ impl Eq for NetworkPrefixMap {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::node::routing::{gen_section_authority_provider, section_signed};
+    use crate::node::{gen_section_authority_provider, section_signed};
     use eyre::{eyre, Context, Result};
     use rand::Rng;
 

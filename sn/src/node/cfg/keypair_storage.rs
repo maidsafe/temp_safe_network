@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{Error, Result};
-pub use ed25519_dalek::{Keypair, PublicKey, SecretKey, KEYPAIR_LENGTH, PUBLIC_KEY_LENGTH};
+use ed25519_dalek::{Keypair, PublicKey, KEYPAIR_LENGTH};
 use hex::{decode, encode};
 use std::path::Path;
 use tokio::fs;
@@ -20,7 +20,7 @@ const REWARD_SECRET_KEY_FILENAME: &str = "reward_secret_key";
 const NETWORK_KEYPAIR_FILENAME: &str = "network_keypair";
 
 /// Writes the network keypair to disk.
-pub async fn store_network_keypair(
+pub(crate) async fn store_network_keypair(
     root_dir: &Path,
     keypair_as_bytes: [u8; KEYPAIR_LENGTH],
 ) -> Result<()> {
@@ -31,7 +31,8 @@ pub async fn store_network_keypair(
 }
 
 /// Returns Some(KeyPair) or None if file doesn't exist.
-pub async fn get_network_keypair(root_dir: &Path) -> Result<Option<Keypair>> {
+#[allow(dead_code)]
+pub(crate) async fn get_network_keypair(root_dir: &Path) -> Result<Option<Keypair>> {
     let path = root_dir.join(NETWORK_KEYPAIR_FILENAME);
     if !path.is_file() {
         return Ok(None);
@@ -58,7 +59,7 @@ pub async fn get_network_keypair(root_dir: &Path) -> Result<Option<Keypair>> {
 }
 
 /// Writes the public and secret key (hex-encoded) to different locations at disk.
-pub async fn store_new_reward_keypair(root_dir: &Path, keypair: &Keypair) -> Result<()> {
+pub(crate) async fn store_new_reward_keypair(root_dir: &Path, keypair: &Keypair) -> Result<()> {
     let secret_key_path = root_dir.join(REWARD_SECRET_KEY_FILENAME);
     let public_key_path = root_dir.join(REWARD_PUBLIC_KEY_FILENAME);
     fs::write(secret_key_path, encode(keypair.secret.to_bytes())).await?;
@@ -68,7 +69,7 @@ pub async fn store_new_reward_keypair(root_dir: &Path, keypair: &Keypair) -> Res
 }
 
 /// Returns Some(PublicKey) or None if file doesn't exist. It assumes it's hex-encoded.
-pub async fn get_reward_pk(root_dir: &Path) -> Result<Option<PublicKey>> {
+pub(crate) async fn get_reward_pk(root_dir: &Path) -> Result<Option<PublicKey>> {
     let path = root_dir.join(REWARD_PUBLIC_KEY_FILENAME);
     if !path.is_file() {
         return Ok(None);

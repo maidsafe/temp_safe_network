@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::routing::Prefix;
+use super::Prefix;
 
 use crate::messaging::data::Error as ErrorMessage;
 use crate::types::{convert_dt_error_to_error_message, DataAddress, PublicKey};

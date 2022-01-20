@@ -12,7 +12,6 @@ use super::{
 };
 use crate::{
     messaging::signature_aggregator::{Error as AggregatorError, SignatureAggregator},
-    node::routing::SectionKeyShare,
     types::{PublicKey, Signature},
 };
 use bls::PublicKey as BlsPublicKey;
@@ -72,26 +71,6 @@ pub struct BlsShareAuth {
     pub sig_share: SigShare,
 }
 
-impl BlsShareAuth {
-    /// Construct verified authority of a single node's share of section authority.
-    pub(crate) fn authorize(
-        section_pk: BlsPublicKey,
-        src_name: XorName,
-        key_share: &SectionKeyShare,
-        payload: impl AsRef<[u8]>,
-    ) -> AuthorityProof<Self> {
-        AuthorityProof(BlsShareAuth {
-            section_pk,
-            src_name,
-            sig_share: SigShare {
-                public_key_set: key_share.public_key_set.clone(),
-                index: key_share.index,
-                signature_share: key_share.secret_key_share.sign(payload),
-            },
-        })
-    }
-}
-
 /// Authority of a whole section.
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct SectionAuth {
@@ -135,7 +114,7 @@ impl SectionAuth {
 ///
 /// Validation is defined by the [`VerifyAuthority`] impl for `T`.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct AuthorityProof<T>(T);
+pub struct AuthorityProof<T>(pub T);
 
 impl<T: VerifyAuthority> AuthorityProof<T> {
     /// Verify the authority of `inner`.
