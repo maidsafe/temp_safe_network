@@ -5,6 +5,127 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.53.0 (2022-01-20)
+
+### Documentation
+
+ - <csr-id-1d36f019159296db6d5a6bb4ebeec8699ea39f96/> add doc for usage of DKG in safe_network
+   - also moves README from the .github folder so it doesn't show up in the
+   repo root
+
+### New Features
+
+ - <csr-id-f81ade56b2b43cfbf81c6112d4c687d5b540b101/> verify blobs QueryResponse from adults and penalise if faulty
+
+### Bug Fixes
+
+ - <csr-id-5102396bd1cc1bc8c7765a9c8da74abe8ff02a1e/> new rust v and new clippy warnings
+ - <csr-id-d4634f0e5e89e22d6ab3c70ec9135bfb80360c7e/> make owner semantics unbreakable
+ - <csr-id-5bd1198aa8bd7f1b78282fb02b262e38f9121d78/> include ServiceAuth in DataQuery to Adults
+ - <csr-id-42d3b932f69c3680e8aaff488395406983728ed6/> only send data cmd to 3 elders
+ - <csr-id-a1de919c3d96c3ea5f566178989c9db9af01e468/> Store logging guard outwith of optional feat block.
+   A code block was added to not log when using tokio console.
+   This was resulting in our  being dropped and no node logging!
+   This stores the gaurd outwith this block.
+ - <csr-id-39f2cc24c1ad706cb7700b8a89585c2098f589c4/> on ae update, use pre update adults for checks
+   Previously we'd had the  checking current
+   against current adults. Which obviously did nothing.
+   
+   Now we grab adults before we update from AE flows. So we _should_ see
+   changes, and initiate reorganisational flows for chunks etc.
+ - <csr-id-2d339a094f3ccf589304dcddf6a16956280ca7a4/> use async/await over BoxFuture
+   this seems to affect the regular functioning of the node
+ - <csr-id-841b917977a484568615b540b267e3192cc95ed5/> dont .await on the root task
+ - <csr-id-b55a7044fae9e578cb10b82a3b1db2ab6400b3db/> revert to original way of creating the Runtime
+   at first tokio-console didn't work without the use of #[tokio::main]
+   turns out it was something else, preventing the console from starting up
+ - <csr-id-0f0ef819f4b36e5056dfa7f1983238bd4752caba/> read from disk on cache miss
+ - <csr-id-e18c88019d37ab4f7618dde1a90e19ddf94db1c7/> VersioinHash use Display for encode
+ - <csr-id-edefd2d7860e6f79c07060e078cdaa433da9e804/> use latest PK to send DataExchange messages
+
+### chore (BREAKING)
+
+ - <csr-id-8f58c5d900ce00d90bf7421f34122f4ca5ff5601/> making section members list non optional in AntiEntropyUpdate message type
+
+
+### refactor (BREAKING)
+
+ - <csr-id-f22e4dce22492079170cbaeb8c29b3911faaf89a/> removing MIN_AGE and the concept of mature node
+   - Also refactoring routing internal API for querying section peers from its network knowledge.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 56 commits contributed to the release over the course of 13 calendar days.
+ - 36 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge branch 'main' into fix-update-section ([`1b41609`](https://github.com/maidsafe/safe_network/commit/1b4160969789f706b49534dbeb08bd920ecdb80a))
+    - lessen nesting and indentation ([`96a955e`](https://github.com/maidsafe/safe_network/commit/96a955e5b124db3250c3d0fd09926cec10322632))
+    - ignore many_client tests ([`d84ac52`](https://github.com/maidsafe/safe_network/commit/d84ac520676b83f39d5cf356e89ac3ec2d6478cc))
+    - update year on files modified 2022 ([`7a7752f`](https://github.com/maidsafe/safe_network/commit/7a7752f830785ec39d301e751dc75f228d43d595))
+    - making section members list non optional in AntiEntropyUpdate message type ([`8f58c5d`](https://github.com/maidsafe/safe_network/commit/8f58c5d900ce00d90bf7421f34122f4ca5ff5601))
+    - qp2p update/ clippy fixes and code comment cleanup ([`b06bc6e`](https://github.com/maidsafe/safe_network/commit/b06bc6eb0fd210b6abc9039d1f20ab8d93befc16))
+    - re-enable init with populated register ([`4eef4d3`](https://github.com/maidsafe/safe_network/commit/4eef4d3a9356d6a0724c0c670809e8d9fd1f11c0))
+    - store cap within the register ([`c222370`](https://github.com/maidsafe/safe_network/commit/c222370b52befaedebe895fcf7feb2c1da99aeaa))
+    - only check permissions once ([`a018022`](https://github.com/maidsafe/safe_network/commit/a018022e4eb298a9a66513c770c0edc1b415a886))
+    - fix additional wrongly setup test cases ([`941b83f`](https://github.com/maidsafe/safe_network/commit/941b83f3960c84cfee86a8c818233fbbc403c189))
+    - new rust v and new clippy warnings ([`5102396`](https://github.com/maidsafe/safe_network/commit/5102396bd1cc1bc8c7765a9c8da74abe8ff02a1e))
+    - make owner semantics unbreakable ([`d4634f0`](https://github.com/maidsafe/safe_network/commit/d4634f0e5e89e22d6ab3c70ec9135bfb80360c7e))
+    - fix(operation_id): make register query op-ids unique Querying for an entry or a user's permissions, would give the same op-id for any entry and any user, since it was only based on address, and not the contents of the query. This caused failing tests, and would also cause unexpected behaviour for clients. ([`4542a57`](https://github.com/maidsafe/safe_network/commit/4542a579ac4baadaeb06c10592f6d65fe148bafc))
+    - cleanup and cover both public/private ([`08cde85`](https://github.com/maidsafe/safe_network/commit/08cde8586e018e19df6b35270bd999f45d30596e))
+    - fix(register_api): make use of all the queries We were fetching the entire register in every type of request exposed in the api, instead of using the queries for each operation. ([`83ef7a6`](https://github.com/maidsafe/safe_network/commit/83ef7a66bb245e2303b80d98d6b8fa888b93d6ba))
+    - include ServiceAuth in DataQuery to Adults ([`5bd1198`](https://github.com/maidsafe/safe_network/commit/5bd1198aa8bd7f1b78282fb02b262e38f9121d78))
+    - only send data cmd to 3 elders ([`42d3b93`](https://github.com/maidsafe/safe_network/commit/42d3b932f69c3680e8aaff488395406983728ed6))
+    - misc fixes ([`9f1bd81`](https://github.com/maidsafe/safe_network/commit/9f1bd81b269ec06fd5d379ab4b07f18f814da865))
+    - ties up the loose ends in unified data flow ([`9c9a537`](https://github.com/maidsafe/safe_network/commit/9c9a537ad12cc809540df321297c8552c52a8648))
+    - move to adults ([`7928ce6`](https://github.com/maidsafe/safe_network/commit/7928ce6411d237078f7ed3ba83823f438f3a991f))
+    - solving new clippy findings ([`57749b7`](https://github.com/maidsafe/safe_network/commit/57749b7d0671423fe205447bc84d9f8bfc99f54b))
+    - removing MIN_AGE and the concept of mature node ([`f22e4dc`](https://github.com/maidsafe/safe_network/commit/f22e4dce22492079170cbaeb8c29b3911faaf89a))
+    - Store logging guard outwith of optional feat block. ([`a1de919`](https://github.com/maidsafe/safe_network/commit/a1de919c3d96c3ea5f566178989c9db9af01e468))
+    - add checks to ensure all nodes have joined ([`026458c`](https://github.com/maidsafe/safe_network/commit/026458c6afa9848bb58a694da6ae4b81196b8f19))
+    - use AE on all client tests ([`fdda641`](https://github.com/maidsafe/safe_network/commit/fdda641b3874c425616352daf7db7429219bb858))
+    - fix(sn/client): wait for a full section's info ([`d080586`](https://github.com/maidsafe/safe_network/commit/d080586074dea44b53a9901cb2e85599cc997379))
+    - Merge #935 #937 ([`cbd1125`](https://github.com/maidsafe/safe_network/commit/cbd1125403511b25d6563b1f302a92f554ace43e))
+    - Merge #942 ([`0cd2893`](https://github.com/maidsafe/safe_network/commit/0cd289366d9bd41b27df4d03ca80d4de03323915))
+    - Merge branch 'main' into verify-blob ([`da43bd7`](https://github.com/maidsafe/safe_network/commit/da43bd72dbd5ffdf9b6bbdc735b0350f1b43e859))
+    - Merge #885 ([`72a3f12`](https://github.com/maidsafe/safe_network/commit/72a3f1269c9c38add9b88455837655f2bc33b551))
+    - remove unused old file ([`40b00cb`](https://github.com/maidsafe/safe_network/commit/40b00cbd899c72889439b9f94b34b173ff3af837))
+    - on ae update, use pre update adults for checks ([`39f2cc2`](https://github.com/maidsafe/safe_network/commit/39f2cc24c1ad706cb7700b8a89585c2098f589c4))
+    - Merge branch 'main' into verify-blob ([`df7bf60`](https://github.com/maidsafe/safe_network/commit/df7bf601d1f30048aa33602094b7224ac043558e))
+    - Don't tie idle_timeout to query_timeout ([`252f81e`](https://github.com/maidsafe/safe_network/commit/252f81e155dce2b8d774c8999b730e763674d93f))
+    - fix client config query timeout check ([`893df83`](https://github.com/maidsafe/safe_network/commit/893df83ec9a1c4231f09b4e7bad9c15ef2944036))
+    - verify blobs QueryResponse from adults and penalise if faulty ([`f81ade5`](https://github.com/maidsafe/safe_network/commit/f81ade56b2b43cfbf81c6112d4c687d5b540b101))
+    - use async/await over BoxFuture ([`2d339a0`](https://github.com/maidsafe/safe_network/commit/2d339a094f3ccf589304dcddf6a16956280ca7a4))
+    - dont .await on the root task ([`841b917`](https://github.com/maidsafe/safe_network/commit/841b917977a484568615b540b267e3192cc95ed5))
+    - revert to original way of creating the Runtime ([`b55a704`](https://github.com/maidsafe/safe_network/commit/b55a7044fae9e578cb10b82a3b1db2ab6400b3db))
+    - Merge #898 ([`99fd463`](https://github.com/maidsafe/safe_network/commit/99fd46375154a7efca6f795795832234f57e9f5c))
+    - feat(sn/client): Add jitter into client query request timing ([`5cf1dc8`](https://github.com/maidsafe/safe_network/commit/5cf1dc87b67e9af9e50299a75cdaf9d571408e10))
+    - Merge branch 'main' into kill-the-blob ([`5a055ba`](https://github.com/maidsafe/safe_network/commit/5a055ba679e6a4f2cd92700af68f8b36ac12a544))
+    - Merge #930 ([`5606698`](https://github.com/maidsafe/safe_network/commit/560669861b6e35d7af8f82091a49cb35200cc7f5))
+    - Merge branch 'main' into tokio-console ([`e67cf62`](https://github.com/maidsafe/safe_network/commit/e67cf629d7c36389bba3aaa5a921932cb0da4db1))
+    - Merge branch 'main' into kill-the-blob ([`411ce5b`](https://github.com/maidsafe/safe_network/commit/411ce5b9d4c396484d2384324ae09d346c79013f))
+    - removing unused routing Command and API ([`56bed01`](https://github.com/maidsafe/safe_network/commit/56bed01344ca5ec74a49c2a41116ef76fb33e3b4))
+    - read from disk on cache miss ([`0f0ef81`](https://github.com/maidsafe/safe_network/commit/0f0ef819f4b36e5056dfa7f1983238bd4752caba))
+    - Merge branch 'main' into kill-the-blob ([`9c5cd80`](https://github.com/maidsafe/safe_network/commit/9c5cd80c286308c6d075c5418d8a1650e87fddd5))
+    - add doc for usage of DKG in safe_network ([`1d36f01`](https://github.com/maidsafe/safe_network/commit/1d36f019159296db6d5a6bb4ebeec8699ea39f96))
+    - VersioinHash use Display for encode ([`e18c880`](https://github.com/maidsafe/safe_network/commit/e18c88019d37ab4f7618dde1a90e19ddf94db1c7))
+    - use latest PK to send DataExchange messages ([`edefd2d`](https://github.com/maidsafe/safe_network/commit/edefd2d7860e6f79c07060e078cdaa433da9e804))
+    - Merge branch 'main' into tokio-console ([`1549a2e`](https://github.com/maidsafe/safe_network/commit/1549a2e1407b2ace0c301c7b5fa42803ed2674a8))
+    - Merge branch 'main' into kill-the-blob ([`fe814a6`](https://github.com/maidsafe/safe_network/commit/fe814a69e5ef5fbe4c62a056498ef88ce5897fef))
+    - Merge #917 ([`0eb6439`](https://github.com/maidsafe/safe_network/commit/0eb643910098ab6021561e5b997b6289be9e2c57))
+    - log EntryHash human readable ([`bf16c5e`](https://github.com/maidsafe/safe_network/commit/bf16c5ea7051386064233443921438cbbd79d907))
+    - Merge #916 #918 #919 ([`5c4d3a9`](https://github.com/maidsafe/safe_network/commit/5c4d3a92ff28126468f07d599c6caf416661aba2))
+</details>
+
 ## v0.52.13 (2022-01-06)
 
 ### Bug Fixes
@@ -15,8 +136,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -26,11 +147,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - use latest PK to send DataExchange messages ([`edefd2d`](https://github.com/maidsafe/safe_network/commit/edefd2d7860e6f79c07060e078cdaa433da9e804))
-    - log EntryHash human readable ([`bf16c5e`](https://github.com/maidsafe/safe_network/commit/bf16c5ea7051386064233443921438cbbd79d907))
+    - safe_network-0.52.13/sn_api-0.50.6 ([`155ee03`](https://github.com/maidsafe/safe_network/commit/155ee032ee56cbbb34928f2d14529273ccb69559))
 </details>
 
 ## v0.52.12 (2022-01-06)
+
+### Bug Fixes
+
+ - <csr-id-06f980874357872e16535b0371c7e0e15a8d0a1c/> set DEFAULT_CHUNK_COPY_COUNT to 4 once again
 
 ### New Features
 
@@ -44,8 +168,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -56,6 +180,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - safe_network-0.52.12 ([`4f29c28`](https://github.com/maidsafe/safe_network/commit/4f29c285a0b48220df1f1c6c52c4b487350eae08))
+    - set DEFAULT_CHUNK_COPY_COUNT to 4 once again ([`06f9808`](https://github.com/maidsafe/safe_network/commit/06f980874357872e16535b0371c7e0e15a8d0a1c))
+    - Merge branch 'main' into tokio-console ([`5bebdf7`](https://github.com/maidsafe/safe_network/commit/5bebdf792e297d15d2d3acfb68f4654f67985e62))
     - locally track query listeners to avoid overwrite/removal ([`878e4bb`](https://github.com/maidsafe/safe_network/commit/878e4bb43865933502a22f7cefb861bb6d72195c))
 </details>
 
@@ -87,7 +213,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release.
+ - 6 commits contributed to the release.
  - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -101,6 +227,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - safe_network-0.52.10 ([`7b0cd4d`](https://github.com/maidsafe/safe_network/commit/7b0cd4d183a9f82d1d78dbb56572e5bf36714a0a))
     - Merge #840 #906 #912 #915 ([`099d41b`](https://github.com/maidsafe/safe_network/commit/099d41b4a576343df636190b4f2956e0f9d7a1a5))
     - increase testnet startup interval on CI only. ([`f1afc59`](https://github.com/maidsafe/safe_network/commit/f1afc5933dc782bc6a7840cd12cebb32a189a5df))
+    - Merge branch 'main' into kill-the-blob ([`40268a5`](https://github.com/maidsafe/safe_network/commit/40268a598aea8d14c1dbeb1c00712b9f9a664ef8))
+    - Merge branch 'main' into kill-the-blob ([`6f89f12`](https://github.com/maidsafe/safe_network/commit/6f89f129ece75dee45f311d30e52ca71b6b7bc98))
     - rename dest to dst ([`bebdae9`](https://github.com/maidsafe/safe_network/commit/bebdae9d52d03bd13b679ee19446452990d1e2cf))
 </details>
 
@@ -114,7 +242,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
+ - 4 commits contributed to the release.
  - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -128,6 +256,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - safe_network-0.52.9/sn_api-0.50.4 ([`a64c7e0`](https://github.com/maidsafe/safe_network/commit/a64c7e0414b77f545cb8cdbf64af0fb7212d1f2e))
     - substract space from used_space on register delete ([`fff2d52`](https://github.com/maidsafe/safe_network/commit/fff2d52b700dfe7ec9a8909a0d5adf176de4c5c7))
     - some detailed logging for debugging ([`6ccb792`](https://github.com/maidsafe/safe_network/commit/6ccb792c18481ffd8218cd7c27b28d8a10d1f528))
+    - Merge branch 'main' into kill-the-blob ([`7d38c3d`](https://github.com/maidsafe/safe_network/commit/7d38c3df14d03c042b645ad05be6cd3cc540d631))
 </details>
 
 ## v0.52.8 (2022-01-04)
@@ -136,17 +265,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-a7531b434591c39fc91bdffc413fcb2d6ed47e7a/> restore NotEnoughSpace checks and reunite reg and chunk storage tracking
  - <csr-id-19d7d3ad04a428485738ffc916b4f14388ad10d5/> optimise disk space checks by doing them less often
+ - <csr-id-c47aeca2618d54a8b3d7b21c82f6ac6e62acd10c/> refactor node to support tokio-console and resolve issues
 
 ### Bug Fixes
 
  - <csr-id-112d0b474b8dd141d0daf1302b80055482d65a15/> unnecessary fetch_add for loading
+ - <csr-id-ad202c9d24da5a5e47d93a3793d665e1b844b38d/> dont .await on threads spawned for subtasks
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 11 commits contributed to the release.
- - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 15 commits contributed to the release.
+ - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -157,6 +288,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - safe_network-0.52.8 ([`5214d5e`](https://github.com/maidsafe/safe_network/commit/5214d5e7f84a3c1cf213097a5d55bfb293f03324))
+    - Merge branch 'main' into tokio-console ([`3626696`](https://github.com/maidsafe/safe_network/commit/3626696d32a4955a2078800feb899d1fb7246891))
     - ignore GA failing test ([`233e64a`](https://github.com/maidsafe/safe_network/commit/233e64af3b2af63bbba06ba8f43d0a7becece913))
     - remove unused dep async recursion ([`012e91a`](https://github.com/maidsafe/safe_network/commit/012e91a60e01cd2ce9155d5c56045f211865ff2c))
     - unnecessary fetch_add for loading ([`112d0b4`](https://github.com/maidsafe/safe_network/commit/112d0b474b8dd141d0daf1302b80055482d65a15))
@@ -165,8 +297,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - fix(used_space): add decrease fn Not used yet in Register, as it's not clear yet how much space we actually clear up.. ([`a9e753d`](https://github.com/maidsafe/safe_network/commit/a9e753de1465d3f6abeb4ccf9a5b31fc3a2172f5))
     - refactor(used_space): record it in an atomic usize ([`da3bbe1`](https://github.com/maidsafe/safe_network/commit/da3bbe16084b71ec42343035087848c8f6996ec4))
     - optimise disk space checks by doing them less often ([`19d7d3a`](https://github.com/maidsafe/safe_network/commit/19d7d3ad04a428485738ffc916b4f14388ad10d5))
+    - rename blob to file ([`c790077`](https://github.com/maidsafe/safe_network/commit/c790077bebca691f974000278d5525f4b011b8a7))
     - Merge branch 'main' into some_detailed_logging ([`eedd75c`](https://github.com/maidsafe/safe_network/commit/eedd75c266d39e4f290b894fa38fb5e237722722))
+    - dont .await on threads spawned for subtasks ([`ad202c9`](https://github.com/maidsafe/safe_network/commit/ad202c9d24da5a5e47d93a3793d665e1b844b38d))
     - rename + use glob const ([`838c495`](https://github.com/maidsafe/safe_network/commit/838c495c8858b85c693da1a3e45baafa57ba03ea))
+    - refactor node to support tokio-console and resolve issues ([`c47aeca`](https://github.com/maidsafe/safe_network/commit/c47aeca2618d54a8b3d7b21c82f6ac6e62acd10c))
 </details>
 
 ## v0.52.7 (2022-01-04)
