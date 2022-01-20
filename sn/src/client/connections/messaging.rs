@@ -387,8 +387,8 @@ impl Session {
         let mut tried_every_contact = false;
 
         let mut backoff = ExponentialBackoff {
-            initial_interval: Duration::from_millis(500),
-            max_interval: Duration::from_secs(3),
+            initial_interval: Duration::from_millis(1500),
+            max_interval: Duration::from_secs(5),
             max_elapsed_time: Some(Duration::from_secs(60)),
             ..Default::default()
         };

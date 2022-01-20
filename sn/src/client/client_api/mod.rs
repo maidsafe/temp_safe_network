@@ -39,7 +39,7 @@ pub use register_apis::RegisterWriteAheadLog;
 const CHUNK_CACHE_SIZE: usize = 50;
 
 // Number of times to retry network probe on client startup
-const PROBE_RETRY_COUNT: usize = 3;
+const NETWORK_PROBE_RETRY_COUNT: usize = 5; // 5 x 5 second wait in between = ~25 seconds (plus ~ 3 seconds in between attempts internal to `make_contact`)
 
 // LRU cache to keep the Chunks we retrieve.
 type ChunksCache = LRUCache<Chunk, CHUNK_CACHE_SIZE>;
@@ -221,14 +221,17 @@ impl Client {
             )
             .await;
         // Send the dummy message to probe the network for it's infrastructure details.
-        while attempts < PROBE_RETRY_COUNT && initial_probe.is_err() {
+        while attempts < NETWORK_PROBE_RETRY_COUNT && initial_probe.is_err() {
             error!("Initial probe msg to network failed. Trying again, attempt: {attempts}");
-            attempts += 1;
 
-            if attempts == PROBE_RETRY_COUNT {
+            if attempts == NETWORK_PROBE_RETRY_COUNT {
                 // we've failed
                 return Err(Error::NetworkContact);
             }
+
+            attempts += 1;
+
+            tokio::time::sleep(Duration::from_secs(5)).await;
 
             let (random_dst_addr, auth, serialised_cmd) = generate_probe_msg(&client, client_pk)?;
 
