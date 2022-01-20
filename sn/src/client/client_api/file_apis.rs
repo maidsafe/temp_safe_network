@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -527,6 +527,7 @@ mod tests {
 
     // Test storing and reading 5mb file. Try and read from many clients and ensure we do not overwelm nodes.
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "Too heavy at the moment"]
     async fn store_and_read_5mb_from_many_clients() -> Result<()> {
         init_test_logger();
         let _start_span = tracing::info_span!("store_and_read_3kb_from_many_clients").entered();

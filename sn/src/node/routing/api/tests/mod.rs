@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -861,7 +861,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         },
         SystemMsg::AntiEntropyUpdate {
             section_auth: new_sap.to_msg(),
-            members: None,
+            members: BTreeSet::default(),
             section_signed: signed_new_sap.sig,
             proof_chain: chain,
         },
@@ -924,7 +924,7 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
         section_auth: section_signed_our_section_auth.value.clone().to_msg(),
         section_signed: section_signed_our_section_auth.sig,
         proof_chain: SecuredLinkedList::new(bogus_section_pk),
-        members: None,
+        members: BTreeSet::default(),
     };
 
     let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);

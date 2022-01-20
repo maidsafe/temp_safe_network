@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -36,7 +36,7 @@ impl Core {
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
-        members: Option<SectionPeers>,
+        members: SectionPeers,
     ) -> Result<Vec<Command>> {
         let snapshot = self.state_snapshot().await;
         let old_adults: BTreeSet<_> = self
@@ -58,15 +58,13 @@ impl Core {
             .update_knowledge_if_valid(
                 signed_sap.clone(),
                 &proof_chain,
-                members,
+                Some(members),
                 &our_name,
                 &self.section_keys_provider,
             )
             .await?;
 
-        let mut commands = vec![];
-
-        commands.extend(self.fire_node_event_for_any_new_adults(old_adults).await?);
+        let mut commands = self.try_reorganize_data(old_adults).await?;
 
         // always run this, only changes will trigger events
         commands.extend(
