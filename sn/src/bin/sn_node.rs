@@ -29,12 +29,16 @@
 
 use color_eyre::{Section, SectionExt};
 use eyre::{eyre, Result, WrapErr};
+use file_rotate::{compression::Compression, suffix::CountSuffix, ContentLimit, FileRotate};
 use safe_network::node::{add_connection_info, set_connection_info, Config, Error, Node};
+
 #[cfg(not(feature = "tokio-console"))]
 use safe_network::LogFormatter;
 use self_update::{cargo_crate_version, Status};
+use std::{fmt::Debug, fs::File, io, path::Path};
 use std::{io::Write, process::exit};
 use structopt::{clap, StructOpt};
+use tokio::sync::RwLockReadGuard;
 use tokio::time::{sleep, Duration};
 use tracing::{self, error, info, trace, warn};
 
@@ -71,6 +75,74 @@ fn main() -> Result<()> {
     }
 }
 
+/// FileRotateAppender is a tracing_appender with extra logrotate features:
+///  - most recent logfile name re-used to support following (e.g. 'tail -f=logfile')
+///  - numbered rotation (logfile.1, logfile.2 etc)
+///  - limit logfile by size, lines or time
+///  - limit maximum number of logfiles
+///  - optional compression of rotated logfiles
+//
+// The above functionality is provided using crate file_rotation
+pub struct FileRotateAppender {
+    writer: FileRotate<CountSuffix>,
+}
+
+#[derive(Debug)]
+struct RollingWriter<'a>(RwLockReadGuard<'a, File>);
+
+impl<'a> FileRotateAppender {
+    /// Create default FileRotateAppender
+    pub fn new(
+        directory: impl AsRef<Path>,
+        file_name_prefix: impl AsRef<Path>,
+    ) -> FileRotateAppender {
+        let log_directory = directory.as_ref().to_str().unwrap();
+        let log_filename_prefix = file_name_prefix.as_ref().to_str().unwrap();
+        let path = Path::new(&log_directory).join(&log_filename_prefix);
+        let writer = FileRotate::new(
+            &Path::new(&path),
+            CountSuffix::new(9),
+            ContentLimit::Bytes(10 * 1024 * 1024),
+            Compression::OnRotate(1),
+        );
+
+        Self { writer }
+    }
+
+    /// Create FileRotateAppender using parameters
+    pub fn make_rotate_appender(
+        directory: impl AsRef<Path>,
+        file_name_prefix: impl AsRef<Path>,
+        num_logs: CountSuffix,
+        max_log_size: ContentLimit,
+        compression: Compression,
+    ) -> FileRotateAppender {
+        let log_directory = directory.as_ref().to_str().unwrap();
+        let log_filename_prefix = file_name_prefix.as_ref().to_str().unwrap();
+        let path = Path::new(&log_directory).join(&log_filename_prefix);
+        let writer = FileRotate::new(&Path::new(&path), num_logs, max_log_size, compression);
+
+        Self { writer }
+    }
+}
+
+impl Write for FileRotateAppender {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.writer.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.writer.flush()
+    }
+}
+
+use std::fmt;
+
+impl Debug for FileRotateAppender {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FileRotateAppender").finish()
+    }
+}
 async fn run_node() -> Result<()> {
     let config = Config::new().await?;
 
@@ -104,8 +176,19 @@ async fn run_node() -> Result<()> {
         };
 
         _optional_guard = if let Some(log_dir) = config.log_dir() {
-            println!("Starting logging to file: {:?}", log_dir);
-            let file_appender = tracing_appender::rolling::hourly(log_dir, "sn_node.log");
+            println!("Starting logging to directory: {:?}", log_dir);
+
+            let mut content_limit = ContentLimit::BytesSurpassed(config.logs_max_bytes);
+            if config.logs_max_lines > 0 {
+                content_limit = ContentLimit::Lines(config.logs_max_lines);
+            }
+            let file_appender = FileRotateAppender::make_rotate_appender(
+                log_dir,
+                "sn_node.log",
+                CountSuffix::new(config.logs_retained),
+                content_limit,
+                Compression::OnRotate(config.logs_uncompressed),
+            );
 
             // configure how tracing non-blocking works: https://tracing.rs/tracing_appender/non_blocking/struct.nonblockingbuilder#method.default
             let non_blocking_builder =

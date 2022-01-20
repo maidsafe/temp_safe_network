@@ -97,6 +97,7 @@ uluru="~3.0.0"
 url = "2.2.0"
 walkdir = "2"
 xor_name = "3.1.0"
+file-rotate = "0.5.3"
 
 [dependencies.backoff]
 version = "0.3.0"
