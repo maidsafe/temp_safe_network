@@ -57,6 +57,18 @@ pub struct Config {
     /// Send logs to a file within the specified directory
     #[structopt(long)]
     pub log_dir: Option<PathBuf>,
+    /// Number of rotated log files to keep (0 to keep all)
+    #[structopt(long, default_value = "9")]
+    pub logs_retained: usize,
+    /// Maximum bytes per log file
+    #[structopt(long, default_value = "10485760")]
+    pub logs_max_bytes: usize,
+    /// Maximum lines per log file (overrides logs_max_bytes)
+    #[structopt(long, default_value = "0")]
+    pub logs_max_lines: usize,
+    /// Number of rotated files left not compressed
+    #[structopt(long, default_value = "100")] // 100*10mb files by default
+    pub logs_uncompressed: usize,
     /// Attempt to self-update?
     #[structopt(long)]
     pub update: bool,
@@ -232,6 +244,11 @@ impl Config {
             self.log_dir = Some(log_dir.clone());
         }
 
+        self.logs_retained = config.logs_retained();
+        self.logs_max_bytes = config.logs_max_bytes();
+        self.logs_max_lines = config.logs_max_lines();
+        self.logs_uncompressed = config.logs_uncompressed();
+
         self.update = config.update || self.update;
         self.update_only = config.update_only || self.update_only;
         self.clear_data = config.clear_data || self.clear_data;
@@ -339,6 +356,26 @@ impl Config {
     /// Directory where to write log file/s if specified
     pub fn log_dir(&self) -> &Option<PathBuf> {
         &self.log_dir
+    }
+
+    /// Number of rotated log files retained
+    pub fn logs_retained(&self) -> usize {
+        self.logs_retained
+    }
+
+    /// Max lines per logfile
+    pub fn logs_max_lines(&self) -> usize {
+        self.logs_max_lines
+    }
+
+    /// Max bytes per logfile
+    pub fn logs_max_bytes(&self) -> usize {
+        self.logs_max_bytes
+    }
+
+    /// Number of rotated logs left not compressed
+    pub fn logs_uncompressed(&self) -> usize {
+        self.logs_uncompressed
     }
 
     /// Attempt to self-update?
@@ -484,7 +521,7 @@ fn smoke() {
     // NOTE: IF this value is being changed due to a change in the config,
     // the change in config also be handled in Config::merge()
     // and in examples/config_handling.rs
-    let expected_size = 440;
+    let expected_size = 472;
 
     assert_eq!(std::mem::size_of::<Config>(), expected_size);
 }

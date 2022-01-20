@@ -15,8 +15,11 @@ use crate::node::{
     error::Result,
     routing::{
         api::command::Command,
-        core::{bootstrap::JoiningAsRelocated, Core, Proposal},
-        relocation::{self, RelocateAction, RelocateDetailsUtils, RelocateState},
+        core::{
+            bootstrap::JoiningAsRelocated,
+            relocation::{self, RelocateAction, RelocateDetailsUtils, RelocateState},
+            Core, Proposal,
+        },
         Event,
     },
 };

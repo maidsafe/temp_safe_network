@@ -25,6 +25,9 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
+    /// Initial network contact failed
+    #[error("Initial network contact probe failed.")]
+    NetworkContact,
     /// Genesis Key from the config and the PrefixMap mismatch
     #[error("Genesis Key from the config and the PrefixMap mismatch. You may need to remove your prefixmap or update your config file.")]
     GenesisKeyMismatch,
@@ -133,6 +136,9 @@ pub enum Error {
     /// QuicP2p Connection error.
     #[error(transparent)]
     QuicP2pConnection(#[from] qp2p::ConnectionError),
+    /// QuicP2p Send error.
+    #[error(transparent)]
+    QuicP2pSend(#[from] qp2p::SendError),
     /// Bincode error
     #[error(transparent)]
     Serialisation(#[from] Box<bincode::ErrorKind>),
@@ -164,12 +170,6 @@ impl From<(CmdError, OperationId)> for Error {
 impl From<(ErrorMessage, OperationId)> for Error {
     fn from((source, op_id): (ErrorMessage, OperationId)) -> Self {
         Self::ErrorMessage { source, op_id }
-    }
-}
-
-impl From<qp2p::SendError> for Error {
-    fn from(error: qp2p::SendError) -> Self {
-        Self::QuicP2p(error.into())
     }
 }
 

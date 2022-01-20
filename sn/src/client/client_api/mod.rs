@@ -18,6 +18,7 @@ use crate::messaging::{ServiceAuth, WireMsg};
 use crate::peer::Peer;
 use crate::prefix_map::NetworkPrefixMap;
 use crate::types::{utils::read_prefix_map_from_disk, Chunk, Keypair, PublicKey, RegisterAddress};
+use bytes::Bytes;
 use itertools::Itertools;
 use rand::rngs::OsRng;
 use std::collections::BTreeSet;
@@ -36,6 +37,9 @@ pub use register_apis::RegisterWriteAheadLog;
 // Maximum amount of Chunks to keep in our cal Chunks cache.
 // Each Chunk is maximum types::MAX_CHUNK_SIZE_IN_BYTES, i.e. ~1MB
 const CHUNK_CACHE_SIZE: usize = 50;
+
+// Number of times to retry network probe on client startup
+const NETWORK_PROBE_RETRY_COUNT: usize = 5; // 5 x 5 second wait in between = ~25 seconds (plus ~ 3 seconds in between attempts internal to `make_contact`)
 
 // LRU cache to keep the Chunks we retrieve.
 type ChunksCache = LRUCache<Chunk, CHUNK_CACHE_SIZE>;
@@ -166,22 +170,31 @@ impl Client {
         // the client. Ideally the client should be able to send proper AE-Probe messages to the
         // trigger the AE flows.
 
-        // Generate a random query to send a dummy message
-        let random_dst_addr = XorName::random();
-        let serialised_cmd = {
-            let msg = ServiceMsg::Query(DataQuery::Register(RegisterQuery::Get(
-                RegisterAddress::Public {
-                    name: random_dst_addr,
-                    tag: 1,
-                },
-            )));
-            WireMsg::serialize_msg_payload(&msg)?
-        };
-        let signature = client.keypair.sign(&serialised_cmd);
-        let auth = ServiceAuth {
-            public_key: client_pk,
-            signature,
-        };
+        fn generate_probe_msg(
+            client: &Client,
+            pk: PublicKey,
+        ) -> Result<(XorName, ServiceAuth, Bytes), Error> {
+            // Generate a random query to send a dummy message
+            let random_dst_addr = XorName::random();
+            let serialised_cmd = {
+                let msg = ServiceMsg::Query(DataQuery::Register(RegisterQuery::Get(
+                    RegisterAddress::Public {
+                        name: random_dst_addr,
+                        tag: 1,
+                    },
+                )));
+                WireMsg::serialize_msg_payload(&msg)?
+            };
+            let signature = client.keypair.sign(&serialised_cmd);
+            let auth = ServiceAuth {
+                public_key: pk,
+                signature,
+            };
+
+            Ok((random_dst_addr, auth, serialised_cmd))
+        }
+
+        let (random_dst_addr, auth, serialised_cmd) = generate_probe_msg(&client, client_pk)?;
 
         // either use our known prefixmap elders, or fallback to plain node config file
         let bootstrap_nodes = {
@@ -197,17 +210,41 @@ impl Client {
             }
         };
 
-        // TODO: check for the initial msg id and DO NOT RESEND in ae retry.
-        // Send the dummy message to probe the network for it's infrastructure details.
-        client
+        let mut attempts = 0;
+        let mut initial_probe = client
             .session
             .make_contact_with_nodes(
                 bootstrap_nodes.clone(),
                 random_dst_addr,
-                auth,
+                auth.clone(),
                 serialised_cmd,
             )
-            .await?;
+            .await;
+        // Send the dummy message to probe the network for it's infrastructure details.
+        while attempts < NETWORK_PROBE_RETRY_COUNT && initial_probe.is_err() {
+            error!("Initial probe msg to network failed. Trying again, attempt: {attempts}");
+
+            if attempts == NETWORK_PROBE_RETRY_COUNT {
+                // we've failed
+                return Err(Error::NetworkContact);
+            }
+
+            attempts += 1;
+
+            tokio::time::sleep(Duration::from_secs(5)).await;
+
+            let (random_dst_addr, auth, serialised_cmd) = generate_probe_msg(&client, client_pk)?;
+
+            initial_probe = client
+                .session
+                .make_contact_with_nodes(
+                    bootstrap_nodes.clone(),
+                    random_dst_addr,
+                    auth,
+                    serialised_cmd,
+                )
+                .await;
+        }
 
         Ok(client)
     }

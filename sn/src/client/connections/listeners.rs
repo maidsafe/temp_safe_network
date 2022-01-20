@@ -24,7 +24,7 @@ use crate::{at_least_one_correct_elder, elder_count};
 
 use bytes::Bytes;
 use itertools::Itertools;
-use qp2p::ConnectionIncoming;
+use qp2p::{Close, ConnectionError, ConnectionIncoming, SendError};
 use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
 use tracing::Instrument;
@@ -35,10 +35,11 @@ impl Session {
     pub(crate) fn spawn_message_listener_thread(
         session: Session,
         connection_id: usize,
-        src: SocketAddr,
+        connected_peer: Peer,
         mut incoming_messages: ConnectionIncoming,
     ) {
-        debug!("Listening for incoming messages from {}", src);
+        let src = connected_peer.addr();
+        debug!("Listening for incoming messages from {}", connected_peer);
 
         trace!(
             "{} to {} (id: {})",
@@ -59,9 +60,21 @@ impl Session {
                         info!("IncomingMessages listener has closed for connection {}.", connection_id);
                         break;
                     }
+                    Err( Error::QuicP2pSend(SendError::ConnectionLost(
+                        ConnectionError::Closed(Close::Application { reason, .. }),
+                    ))) => {
+                        warn!(
+                            "Connection was closed by the node: {:?}",
+                            String::from_utf8(reason.to_vec())
+                        );
+
+                        let _old = session.elder_last_closed_connections.insert(connected_peer.name(), connection_id);
+                    },
                     Err(Error::QuicP2p(qp2p_err)) => {
                           // TODO: Can we recover here?
                           info!("Error from Qp2p received, closing listener loop. {:?}", qp2p_err);
+
+
                           break;
                     },
                     Err(error) => {

@@ -23,7 +23,7 @@ use bytes::Bytes;
 use dashmap::DashMap;
 use futures::future::join_all;
 use itertools::Itertools;
-use qp2p::{Config as QuicP2pConfig, Endpoint};
+use qp2p::{Close, Config as QuicP2pConfig, ConnectionError, Endpoint, SendError};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use std::path::PathBuf;
@@ -69,6 +69,7 @@ impl Session {
             genesis_key,
             initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
             standard_wait,
+            elder_last_closed_connections: Arc::new(DashMap::default()),
         };
 
         Ok(session)
@@ -383,9 +384,10 @@ impl Session {
         let mut knowledge_checks = 0;
         let mut outgoing_msg_rounds = 1;
         let mut last_start_pos = 0;
+        let mut tried_every_contact = false;
 
         let mut backoff = ExponentialBackoff {
-            initial_interval: Duration::from_millis(500),
+            initial_interval: Duration::from_millis(1500),
             max_interval: Duration::from_secs(5),
             max_elapsed_time: Some(Duration::from_secs(60)),
             ..Default::default()
@@ -416,13 +418,21 @@ impl Session {
 
             // wait until we have _some_ network knowledge
             while known_sap.is_none() || insufficient_sap_peers {
-                debug!("Client still has not received a complete section's AE-Retry message... {:?}. Current sections known", stats);
+                if tried_every_contact {
+                    return Err(Error::NetworkContact);
+                }
+
+                debug!("Client still has not received a complete section's AE-Retry message... Current sections known: {:?}. Do we have insufficient peers: {:?}", stats, insufficient_sap_peers);
 
                 knowledge_checks += 1;
 
+                // only after a couple of waits do we try contacting more nodes...
+                // This just gives the initial contacts more time.
                 if knowledge_checks > 2 {
                     let mut start_pos = outgoing_msg_rounds * NODES_TO_CONTACT_PER_STARTUP_BATCH;
+                    outgoing_msg_rounds += 1;
 
+                    // if we'd run over known contacts, then we just go to the end
                     if start_pos > elders_or_adults.len() {
                         start_pos = last_start_pos;
                     }
@@ -430,14 +440,30 @@ impl Session {
                     last_start_pos = start_pos;
 
                     let next_batch_end = start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH;
+
+                    // if we'd run over known contacts, then we just go to the end
                     let next_contacts = if next_batch_end > elders_or_adults.len() {
-                        elders_or_adults[start_pos..].to_vec()
+                        // but incase we _still_ dont know anything after this
+                        let next = elders_or_adults[start_pos..].to_vec();
+                        // mark as tried all
+                        tried_every_contact = true;
+
+                        // Now mark prior attempted Peers as failed for retries in future.
+                        for peer in &elders_or_adults {
+                            if let Some(conn) = peer.connection().await {
+                                let connection_id = conn.id();
+
+                                let _old = self
+                                    .elder_last_closed_connections
+                                    .insert(peer.name(), connection_id);
+                            }
+                        }
+
+                        next
                     } else {
                         elders_or_adults[start_pos..start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH]
                             .to_vec()
                     };
-
-                    outgoing_msg_rounds += 1;
 
                     trace!("Sending out another batch of initial contact msgs to new nodes");
                     send_message(
@@ -494,21 +520,32 @@ pub(super) async fn send_message(
         let endpoint = endpoint.clone();
 
         let mut reused_connection = true;
-
+        let peer_name = peer.name();
+        let cloned_peer = peer.clone();
+        // let addr = peer.addr();
+        let failed_connection_id = session
+            .elder_last_closed_connections
+            .get(&peer_name)
+            .map(|entry| *entry.value());
         let connection = peer
             .ensure_connection(
+                // map closed conns to elders here and in listeners and compare here...
                 // TODO: log any connections that failed's IDs and then check if that conn is valid here
-                // `is_valid = |connection| connection.id() != last_connection_id`).
-                |_| true,
+                // `is_valid = |connection| connection.id() != failed_connection_id`).
+                |connection| Some(connection.id()) != failed_connection_id,
                 |addr| {
                     reused_connection = false;
                     async move {
+                        trace!(
+                            "Prior connection no longer valid, opening a new connection to: {:?} ",
+                            addr
+                        );
                         let (connection, connection_incoming) = endpoint.connect_to(&addr).await?;
                         let conn_id = connection.id();
                         Session::spawn_message_listener_thread(
                             session.clone(),
                             conn_id,
-                            addr,
+                            cloned_peer,
                             connection_incoming,
                         );
                         Ok(connection)
@@ -517,26 +554,38 @@ pub(super) async fn send_message(
             )
             .await;
 
-        if let (true, Ok(connection)) = (reused_connection, connection) {
+        let connection_id = connection?.id();
+
+        if reused_connection {
             trace!(
-                connection_id = connection.id(),
-                src = %connection.remote_address(),
+                connection_id,
+                src = %peer.addr(),
                 "Client::ConnectionReused",
             );
         }
 
-        let task_handle: JoinHandle<Result<(), Error>> = tokio::spawn(async move {
-            let connection = peer.connection().await;
-            if let Some(connection) = connection {
-                connection
-                    .send_with(msg_bytes_clone, priority, None)
-                    .await
-                    .map_err(Error::from)
-            } else {
-                error!("Peer connection did not exist, even after using 'ensure_connection'. Message to {:?} was not sent.",peer);
-                Err(Error::PeerConnection(peer.addr()))
-            }
-        });
+        let task_handle: JoinHandle<(XorName, usize, Result<(), Error>)> = tokio::spawn(
+            async move {
+                let connection = peer.connection().await;
+                if let Some(connection) = connection {
+                    (
+                        peer_name,
+                        connection_id,
+                        connection
+                            .send_with(msg_bytes_clone, priority, None)
+                            .await
+                            .map_err(Error::from),
+                    )
+                } else {
+                    error!("Peer connection did not exist, even after using 'ensure_connection'. Message to {:?} was not sent.",peer);
+                    (
+                        peer_name,
+                        connection_id,
+                        Err(Error::PeerConnection(peer.addr())),
+                    )
+                }
+            },
+        );
 
         tasks.push(task_handle);
     }
@@ -546,8 +595,22 @@ pub(super) async fn send_message(
 
     for r in results {
         match r {
-            Ok(send_result) => {
-                if send_result.is_err() {
+            Ok((peer_name, connection_id, send_result)) => {
+                if let Err(Error::QuicP2pSend(SendError::ConnectionLost(
+                    ConnectionError::Closed(Close::Application { reason, .. }),
+                ))) = send_result
+                {
+                    warn!(
+                        "Connection was closed by the node: {:?}",
+                        String::from_utf8(reason.to_vec())
+                    );
+
+                    let _old = session
+                        .elder_last_closed_connections
+                        .insert(peer_name, connection_id);
+                    // this is not necessarily an error
+                    // *successes.write().await += 1;
+                } else if send_result.is_err() {
                     error!("Error during {:?} send: {:?}", msg_id, send_result);
                 } else {
                     *successes.write().await += 1;

@@ -21,11 +21,12 @@ use crate::node::{
         dkg::DkgSessionIdUtils,
         messages::WireMsgUtils,
         network_knowledge::{ElderCandidates, NodeState, SectionKeyShare},
-        relocation::RelocateState,
     },
 };
 use crate::peer::{Peer, UnnamedPeer};
 use crate::types::log_markers::LogMarker;
+
+use super::relocation::RelocateState;
 
 use bls::PublicKey as BlsPublicKey;
 use xor_name::{Prefix, XorName};

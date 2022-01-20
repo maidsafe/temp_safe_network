@@ -8,18 +8,18 @@
 
 //! Relocation related types and utilities.
 
-use super::{
-    super::error::Error,
-    core::JoiningAsRelocated,
-    ed25519::{self, Keypair, Verifier},
-    network_knowledge::{NetworkKnowledge, NodeState},
-    recommended_section_size, Peer,
-};
+use super::JoiningAsRelocated;
 
 use crate::elder_count;
 use crate::messaging::{
     system::{RelocateDetails, RelocatePayload, RelocatePromise, SystemMsg},
     AuthorityProof, SectionAuth,
+};
+use crate::node::error::Error;
+use crate::node::routing::{
+    ed25519::{self, Keypair, Verifier},
+    network_knowledge::{NetworkKnowledge, NodeState},
+    recommended_section_size, Peer,
 };
 
 use async_trait::async_trait;
@@ -114,7 +114,7 @@ impl RelocateDetailsUtils for RelocateDetails {
     }
 }
 
-pub(super) trait RelocatePayloadUtils {
+pub(crate) trait RelocatePayloadUtils {
     fn new(
         details: SystemMsg,
         section_auth: AuthorityProof<SectionAuth>,

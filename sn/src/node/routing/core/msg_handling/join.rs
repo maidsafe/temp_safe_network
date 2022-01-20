@@ -17,8 +17,9 @@ use crate::messaging::{
 use crate::node::{
     error::{Error, Result},
     routing::{
-        api::command::Command, core::Core, relocation::RelocatePayloadUtils, SectionAuthUtils,
-        FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE,
+        api::command::Command,
+        core::{relocation::RelocatePayloadUtils, Core},
+        SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE,
     },
 };
 use crate::peer::Peer;

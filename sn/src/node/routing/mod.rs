@@ -27,7 +27,6 @@ mod ed25519;
 mod messages;
 mod network_knowledge;
 mod node;
-mod relocation;
 
 pub use self::{
     api::{

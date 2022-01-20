@@ -17,13 +17,13 @@ echo "Checking logfiles to check for split"
 log_dir="$HOME/.safe/node/local-test-network"
 
 # -u needed here to search log dirs
-prefix1_prior_elder_nodes=$(rg "StillElderAfterSplit: Prefix\(1\)" "$log_dir" -g "*.log.*"  -u -c | wc -l)
-prefix1_new_elder_nodes=$(rg "PromotedToElder: Prefix\(1\)" "$log_dir" -g "*.log.*"  -u -c | wc -l)
-prefix0_prior_elder_nodes=$(rg "StillElderAfterSplit: Prefix\(0\)" "$log_dir" -g "*.log.*"  -u -c | wc -l)
-prefix0_new_elder_nodes=$(rg "PromotedToElder: Prefix\(0\)" "$log_dir" -g "*.log.*"  -u -c | wc -l)
-split_count=$(rg "SplitSuccess" "$log_dir" -g "*.log.*"  -u -c | wc -l)
-relocation_start_nodes=$(rg "RelocateStart" "$log_dir" -g "*.log.*"  -u -c | wc -l)
-relocation_end_nodes=$(rg "RelocateEnd" "$log_dir" -g "*.log.*"  -u -c | wc -l)
+prefix1_prior_elder_nodes=$(rg "StillElderAfterSplit: Prefix\(1\)" "$log_dir" -g "*.log*"  -u -c | wc -l)
+prefix1_new_elder_nodes=$(rg "PromotedToElder: Prefix\(1\)" "$log_dir" -g "*.log*"  -u -c | wc -l)
+prefix0_prior_elder_nodes=$(rg "StillElderAfterSplit: Prefix\(0\)" "$log_dir" -g "*.log*"  -u -c | wc -l)
+prefix0_new_elder_nodes=$(rg "PromotedToElder: Prefix\(0\)" "$log_dir" -g "*.log*"  -u -c | wc -l)
+split_count=$(rg "SplitSuccess" "$log_dir" -g "*.log*"  -u -c | wc -l)
+relocation_start_nodes=$(rg "RelocateStart" "$log_dir" -g "*.log*"  -u -c | wc -l)
+relocation_end_nodes=$(rg "RelocateEnd" "$log_dir" -g "*.log*"  -u -c | wc -l)
 
 echo "Prefix(1) prior nodes found: $prefix1_prior_elder_nodes ."
 echo "Prefix(1) new nodes found: $prefix1_new_elder_nodes ."
