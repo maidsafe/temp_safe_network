@@ -21,10 +21,9 @@ use crate::node::{
     error::{Error, Result},
     routing::{
         api::command::Command,
-        core::{Core, DkgSessionInfo},
+        core::{relocation::RelocateState, Core, DkgSessionInfo},
         messages::{NodeMsgAuthorityUtils, WireMsgUtils},
         network_knowledge::NetworkKnowledge,
-        relocation::RelocateState,
         Event, MessageReceived, MIN_LEVEL_WHEN_FULL,
     },
 };
