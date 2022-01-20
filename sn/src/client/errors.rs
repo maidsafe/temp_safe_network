@@ -25,6 +25,9 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
+    /// Initial network contact failed
+    #[error("Initial network contact probe failed.")]
+    NetworkContact,
     /// Genesis Key from the config and the PrefixMap mismatch
     #[error("Genesis Key from the config and the PrefixMap mismatch. You may need to remove your prefixmap or update your config file.")]
     GenesisKeyMismatch,
