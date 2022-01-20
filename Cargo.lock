@@ -2672,8 +2672,7 @@ dependencies = [
 
 [[package]]
 name = "qp2p"
-version = "0.27.3"
-source = "git+https://github.com/joshuef/qp2p?branch=0.8-TryTestFixing#e65e1d1ce12e7ac3cea9420728d85f713d8fbae0"
+version = "0.27.4"
 dependencies = [
  "backoff",
  "bincode",
