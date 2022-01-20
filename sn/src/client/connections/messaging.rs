@@ -384,10 +384,11 @@ impl Session {
         let mut knowledge_checks = 0;
         let mut outgoing_msg_rounds = 1;
         let mut last_start_pos = 0;
+        let mut tried_every_contact = false;
 
         let mut backoff = ExponentialBackoff {
             initial_interval: Duration::from_millis(500),
-            max_interval: Duration::from_secs(5),
+            max_interval: Duration::from_secs(3),
             max_elapsed_time: Some(Duration::from_secs(60)),
             ..Default::default()
         };
@@ -417,13 +418,21 @@ impl Session {
 
             // wait until we have _some_ network knowledge
             while known_sap.is_none() || insufficient_sap_peers {
-                debug!("Client still has not received a complete section's AE-Retry message... {:?}. Current sections known", stats);
+                if tried_every_contact {
+                    return Err(Error::NetworkContact);
+                }
+
+                debug!("Client still has not received a complete section's AE-Retry message... Current sections known: {:?}. Do we have insufficient peers: {:?}", stats, insufficient_sap_peers);
 
                 knowledge_checks += 1;
 
+                // only after a couple of waits do we try contacting more nodes...
+                // This just gives the initial contacts more time.
                 if knowledge_checks > 2 {
                     let mut start_pos = outgoing_msg_rounds * NODES_TO_CONTACT_PER_STARTUP_BATCH;
+                    outgoing_msg_rounds += 1;
 
+                    // if we'd run over known contacts, then we just go to the end
                     if start_pos > elders_or_adults.len() {
                         start_pos = last_start_pos;
                     }
@@ -431,14 +440,30 @@ impl Session {
                     last_start_pos = start_pos;
 
                     let next_batch_end = start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH;
+
+                    // if we'd run over known contacts, then we just go to the end
                     let next_contacts = if next_batch_end > elders_or_adults.len() {
-                        elders_or_adults[start_pos..].to_vec()
+                        // but incase we _still_ dont know anything after this
+                        let next = elders_or_adults[start_pos..].to_vec();
+                        // mark as tried all
+                        tried_every_contact = true;
+
+                        // Now mark prior attempted Peers as failed for retries in future.
+                        for peer in &elders_or_adults {
+                            if let Some(conn) = peer.connection().await {
+                                let connection_id = conn.id();
+
+                                let _old = self
+                                    .elder_last_closed_connections
+                                    .insert(peer.name(), connection_id);
+                            }
+                        }
+
+                        next
                     } else {
                         elders_or_adults[start_pos..start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH]
                             .to_vec()
                     };
-
-                    outgoing_msg_rounds += 1;
 
                     trace!("Sending out another batch of initial contact msgs to new nodes");
                     send_message(
