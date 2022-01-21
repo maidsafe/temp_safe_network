@@ -7,7 +7,7 @@ env:
   # RUST_BACKTRACE: 1
   # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
-  RUST_LOG: "safe_network,sn_api,sn_node=trace"
+  # RUST_LOG: "safe_network,sn_api,sn_node=trace"
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
   NODE_COUNT: 11
@@ -187,6 +187,8 @@ jobs:
       - name: Start the network
         run: ./target/release/testnet --interval 15000
         id: section-startup
+        env:
+          RUST_LOG: "safe_network,sn_api,sn_node=trace"
 
       - name: Print Network Log Stats at start
         shell: bash
@@ -536,6 +538,8 @@ jobs:
       - name: Start the network
         run: ./target/release/testnet --interval 15000
         id: section-startup
+        env:
+          RUST_LOG: "safe_network,sn_api,sn_node=trace"
 
       - name: Print Network Log Stats at start
         shell: bash
@@ -649,6 +653,8 @@ jobs:
       - name: Start the network
         run: ./target/release/testnet --interval 15000
         id: section-startup
+        env:
+          RUST_LOG: "safe_network,sn_api,sn_node=trace"
 
       - name: Print Network Log Stats at start
         shell: bash
