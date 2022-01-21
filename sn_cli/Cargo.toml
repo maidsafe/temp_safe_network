@@ -6,7 +6,7 @@ authors = [
   "bochaco <gabrielviganotti@gmail.com>",
   "Josh Wilson <joshuef@gmail.com>"
 ]
-license = "MIT OR BSD-3-Clause"
+license = "GPL-3.0"
 default-run = "safe"
 repository = "https://github.com/maidsafe/sn_cli"
 edition = "2021"
