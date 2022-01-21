@@ -4,7 +4,7 @@ version = "1.1.0"
 description = "Safe CLI Test Utilities"
 authors = ["bochaco <gabrielviganotti@gmail.com>", "Josh Wilson <joshuef@gmail.com>"]
 publish = false
-license = "MIT OR BSD-3-Clause"
+license = "GPL-3.0"
 repository = "https://github.com/maidsafe/safe_network/sn_cmd_test_utilities"
 edition = "2021"
 
