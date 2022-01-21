@@ -169,7 +169,7 @@ impl Client {
         }
     }
 
-    /// Get the leaf entries from a Register, i.e. the latest entry of each branch.
+    /// Get the latest entry (or entries if branching)
     #[instrument(skip(self), level = "debug")]
     pub async fn read_register(
         &self,

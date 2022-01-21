@@ -263,8 +263,7 @@ impl Safe {
         };
 
         let data = if retrieve_data {
-            self.safe_client
-                .get_bytes(BytesAddress::Public(input_url.xorname()), range)
+            self.get_bytes(BytesAddress::Public(input_url.xorname()), range)
                 .await?
         } else {
             Bytes::new()

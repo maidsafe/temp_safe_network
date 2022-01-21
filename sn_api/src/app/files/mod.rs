@@ -22,7 +22,7 @@ use file_system::{
 use files_map::add_or_update_file_item;
 use log::{debug, info, warn};
 use relative_path::RelativePath;
-use safe_network::types::BytesAddress;
+use safe_network::{client::Client, types::BytesAddress};
 use std::{
     collections::{BTreeMap, HashSet},
     iter::FromIterator,
@@ -60,31 +60,16 @@ impl Safe {
     /// ```
     pub async fn files_container_create(&mut self) -> Result<XorUrl> {
         // Build a Register creation operation
-        let (xorname, reg_op) = self
-            .safe_client
-            .create_register(
+        let xorurl = self
+            .register_create(
                 None,
                 FILES_CONTAINER_TYPE_TAG,
-                None,
                 false,
-                self.dry_run_mode,
+                ContentType::FilesContainer,
             )
             .await?;
 
-        let xorurl = SafeUrl::encode_register(
-            xorname,
-            FILES_CONTAINER_TYPE_TAG,
-            Scope::Public,
-            ContentType::FilesContainer,
-            self.xorurl_base,
-        )?;
-
-        if !self.dry_run_mode {
-            // Send the Register creation op to the network
-            self.safe_client.apply_register_ops(reg_op).await?;
-        }
-
-        Ok(xorurl.to_string())
+        Ok(xorurl)
     }
 
     /// # Create a FilesContainer containing files uploaded from a local folder.
@@ -138,11 +123,11 @@ impl Safe {
             let reg_address = self.get_register_address(&reg_url)?;
             let entry = files_map_xorurl.as_bytes().to_vec();
             let (entry_hash, reg_op) = self
-                .safe_client
+                .client
                 .write_to_register(reg_address, entry, Default::default())
                 .await?;
 
-            self.safe_client.apply_register_ops(reg_op).await?;
+            self.client.publish_register_ops(reg_op).await?;
 
             // We return versioned xorurl
             reg_url.set_content_version(Some(VersionHash::from(&entry_hash)));
@@ -645,15 +630,17 @@ impl Safe {
             },
         )?;
 
-        let xorname = self
-            .safe_client
-            .store_bytes(bytes.clone(), self.dry_run_mode)
-            .await?;
-        let xorurl = SafeUrl::encode_bytes(
-            BytesAddress::Public(xorname),
-            content_type,
-            self.xorurl_base,
-        )?;
+        let address = if self.dry_run_mode {
+            debug!(
+                "Calculating network address for {} bytes of data",
+                bytes.len()
+            );
+            Client::calculate_address(bytes, Scope::Public)?
+        } else {
+            debug!("Storing {} bytes of data", bytes.len());
+            self.client.upload_and_verify(bytes, Scope::Public).await?
+        };
+        let xorurl = SafeUrl::encode_bytes(address, content_type, self.xorurl_base)?;
 
         Ok(xorurl)
     }
@@ -686,16 +673,37 @@ impl Safe {
         safe_url: &SafeUrl,
         range: Range,
     ) -> Result<Bytes> {
-        let data = match safe_url.data_type() {
+        match safe_url.data_type() {
             DataType::File => {
-                self.safe_client
-                    .get_bytes(BytesAddress::Public(safe_url.xorname()), range)
-                    .await?
+                self.get_bytes(BytesAddress::Public(safe_url.xorname()), range)
+                    .await
             }
             other => {
                 return Err(Error::ContentError(format!("{}", other)));
             }
-        };
+        }
+    }
+
+    pub async fn get_bytes(&self, address: BytesAddress, range: Range) -> Result<Bytes> {
+        debug!("Attempting to fetch data from {:?}", address.name());
+        let data = if let Some((start, end)) = range {
+            let start = start.map(|start_index| start_index as usize).unwrap_or(0);
+            let len = end
+                .map(|end_index| end_index as usize - start)
+                .unwrap_or(usize::MAX);
+
+            self.client.read_from(address, start, len).await
+        } else {
+            self.client.read_bytes(address).await
+        }
+        .map_err(|e| Error::NetDataError(format!("Failed to GET file: {:?}", e)))?;
+
+        debug!(
+            "{} bytes of data successfully retrieved from: {:?}",
+            data.len(),
+            address.name()
+        );
+
         Ok(data)
     }
 

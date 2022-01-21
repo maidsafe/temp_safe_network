@@ -23,9 +23,6 @@ async fn main() -> Result<()> {
     // which is the file we'll then upload to the network.
     let file_path = create_tmp_file()?;
 
-    // The Safe instance is what will give us access to the API.
-    let mut safe = Safe::default();
-
     // We assume there is a local network running which we can
     // bootstrap to using 127.0.0.1:12000 contact address.
     // We would also need to be supplied the 'genesis key' (BLS public key) from the running
@@ -39,8 +36,8 @@ async fn main() -> Result<()> {
     nodes.insert("127.0.0.1:12000".parse()?);
     let bootstrap_config = (genesis_key, nodes);
 
-    // Using our Safe instance we connect to the network
-    safe.connect(None, None, bootstrap_config).await?;
+    // The Safe instance is what will give us access to the network API.
+    let mut safe = Safe::connect(bootstrap_config, None, None, None, None).await?;
 
     // We can now upload the file to the network, using the following information
     let dst = None; // root path at destination container

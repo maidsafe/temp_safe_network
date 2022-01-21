@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -41,7 +41,6 @@ fn init_logger() {
 // Instantiate a Safe instance
 pub async fn new_safe_instance() -> Result<Safe> {
     init_logger();
-    let mut safe = Safe::default();
     let credentials = match var(TEST_AUTH_CREDENTIALS) {
         Ok(val) => serde_json::from_str(&val).with_context(|| {
             format!(
@@ -56,8 +55,7 @@ pub async fn new_safe_instance() -> Result<Safe> {
     };
 
     let bootstrap_contacts = get_bootstrap_contacts()?;
-    safe.connect(Some(credentials), None, bootstrap_contacts)
-        .await?;
+    let safe = Safe::connect(bootstrap_contacts, Some(credentials), None, None, None).await?;
 
     Ok(safe)
 }
