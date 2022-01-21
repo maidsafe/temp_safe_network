@@ -236,14 +236,14 @@ jobs:
         shell: zsh {0}
         if: matrix.os != 'windows-latest'
         run: cd sn && repeat 5 cargo test --release --features=always-joinable,test-utils -- client_api::reg --test-threads=1 --skip ae --skip batching && sleep $POST_TEST_SLEEP
-        timeout-minutes: 10
+        timeout-minutes: 20
 
       # register api
       - name: Client reg tests against local network (win)
         shell: bash
         if: matrix.os == 'windows-latest'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::reg --test-threads=1 --skip ae --skip batching && sleep $POST_TEST_SLEEP
-        timeout-minutes: 10
+        timeout-minutes: 20
 
       # register api batching check, only run this once as it's slow, and we verify the basic tests above
       - name: Client register batching
