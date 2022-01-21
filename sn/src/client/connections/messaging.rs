@@ -598,52 +598,52 @@ pub(super) async fn send_message(
                 .elder_last_closed_connections
                 .get(&peer_name)
                 .map(|entry| *entry.value());
-            let cur_peer = peer.clone();
-            let connection = cur_peer
-                .ensure_connection(
-                    // map closed conns to elders here and in listeners and compare here...
-                    // TODO: log any connections that failed's IDs and then check if that conn is valid here
-                    // `is_valid = |connection| connection.id() != failed_connection_id`).
-                    |connection| Some(connection.id()) != failed_connection_id,
-                    |addr| {
-                        reused_connection = false;
-                        async move {
-                            trace!(
-                                "Prior connection no longer valid, opening a new connection to: {:?} ",
-                                addr
-                            );
-                            let (connection, connection_incoming) = endpoint.connect_to(&addr).await?;
-                            let conn_id = connection.id();
-                            Session::spawn_message_listener_thread(
-                                session.clone(),
-                                conn_id,
-                                cloned_peer,
-                                connection_incoming,
-                            );
-                            Ok(connection)
-                        }
-                    },
-                )
-                .await;
-
-            let connection_id = match connection {
-                Ok(conn) => conn.id(),
-                Err(err) => {
-                    error!("Failed to get connection_id of {:?} {:?}", peer_name, err);
-                    return;
-                }
-            };
-
-            if reused_connection {
-                trace!(
-                    connection_id,
-                    src = %peer.addr(),
-                    "Client::ConnectionReused",
-                );
-            }
 
             let task_handle: JoinHandle<(XorName, usize, Result<(), Error>)> = tokio::spawn(
                 async move {
+                    let connection = peer
+                        .ensure_connection(
+                            // map closed conns to elders here and in listeners and compare here...
+                            // TODO: log any connections that failed's IDs and then check if that conn is valid here
+                            // `is_valid = |connection| connection.id() != failed_connection_id`).
+                            |connection| Some(connection.id()) != failed_connection_id,
+                            |addr| {
+                                reused_connection = false;
+                                async move {
+                                    trace!(
+                                        "Prior connection no longer valid, opening a new connection to: {:?} ",
+                                        addr
+                                    );
+                                    let (connection, connection_incoming) = endpoint.connect_to(&addr).await?;
+                                    let conn_id = connection.id();
+                                    Session::spawn_message_listener_thread(
+                                        session.clone(),
+                                        conn_id,
+                                        cloned_peer,
+                                        connection_incoming,
+                                    );
+                                    Ok(connection)
+                                }
+                            },
+                        )
+                        .await;
+
+                    let connection_id = match connection {
+                        Ok(conn) => conn.id(),
+                        Err(err) => {
+                            error!("Failed to get connection_id of {:?} {:?}", peer_name, err);
+                            return (peer_name, 0, Err(Error::from(err)));
+                        }
+                    };
+
+                    if reused_connection {
+                        trace!(
+                            connection_id,
+                            src = %peer.addr(),
+                            "Client::ConnectionReused",
+                        );
+                    }
+
                     let connection = peer.connection().await;
                     if let Some(connection) = connection {
                         (
