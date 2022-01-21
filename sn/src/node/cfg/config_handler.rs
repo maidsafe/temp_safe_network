@@ -6,8 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::routing::NetworkConfig;
-use crate::node::{Error, Result};
+use crate::node::{Error, NetworkConfig, Result};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeSet,

@@ -1,52 +1,51 @@
-# sn_node
+# sn_routing
 
-|Crate|Documentation|Safe Rust|
-|:---:|:-----------:|:-------:|
-|[![](https://img.shields.io/crates/v/sn_node)](https://crates.io/crates/sn_node)|[![Documentation](https://docs.rs/sn_node/badge.svg)](https://docs.rs/sn_node)|[![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
+sn_routing - a specialised storage DHT
 
-| [MaidSafe website](https://maidsafe.net) | [Safe Dev Forum](https://forum.safedev.org) | [Safe Network Forum](https://safenetforum.org) |
-|:----------------------------------------:|:-------------------------------------------:|:----------------------------------------------:|
+|Crate|LoC|
+|:---:|:--:|
+|[![](https://img.shields.io/crates/v/sn_routing)](https://crates.io/crates/sn_routing)|[![LoC](https://tokei.rs/b1/github/maidsafe/sn_routing)](https://github.com/maidsafe/sn_routing)|
+
+| [Documentation](https://maidsafe.github.io/sn_routing/sn_routing) | [MaidSafe website](https://maidsafe.net) | [Safe Dev Forum](https://forum.safedev.org) | [Safe Network Forum](https://safenetforum.org) |
+|:----------------------------------------:|:----------------------------------------:|:-------------------------------------------:|:----------------------------------------------:|
 
 ## Overview
 
-An autonomous network capable of data storage/publishing/sharing as well as computation, value transfer (crypto currency support) and more. See the documentation for a more detailed description of the operations involved in data storage.
+A secured [DHT](http://en.wikipedia.org/wiki/Distributed_hash_table), based on a [kademlia-like](http://en.wikipedia.org/wiki/Kademlia) implementation, but with some very stark differences. This is a recursive as opposed to iterative network, enabling easier NAT traversal and providing more efficient use of routers and larger networks. This also allows very fast reconfiguration of network changes, aleviating the requirement for a refresh algorithm. A recursive solution based on a network protocol layer that is 'connection oriented' also allows a close group to be aligned with security protocols.
 
-## Crate Dependencies
-Crate dependencies graph:
+This library makes use of [Public-key cryptography](http://en.wikipedia.org/wiki/Public-key_cryptography) to allow a mechanism to ensure nodes are well recognised and cryptographically secured. This pattern
+allows the creation of a DHT based PKI and this in turn allows a decentralised network to make use of groups as fixed in relation to any address. This is particularly useful in a continually fluid network as described [here,](http://docs.maidsafe.net/Whitepapers/pdf/MaidSafeDistributedHashTable.pdf) creating a server-less and [autonomous network](http://docs.maidsafe.net/Whitepapers/pdf/TheSafeNetwork.pdf).
 
-![sn_node MaidSafe dependencies](https://github.com/maidsafe/sn_node/blob/png_generator/sn_node_maidsafe_dependencies.png)
+This is a very under researched area. For a general introduction to some of the ideas behind the design related to XOR Space, watching [The Safe Network from First Principles series](https://www.youtube.com/watch?v=Lr9FJRDcNzk&list=PLiYqQVdgdw_sSDkdIZzDRQR9xZlsukIxD) is recommended. The slides for XOR Distance Metric and Basic Routing lecture are also [available here](http://ericklavoie.com/talks/safenetwork/1-xor-routing.pdf). The last video from the series on how the same ideas were applied to decentralised BitTorrent trackers is available [here](https://www.youtube.com/watch?v=YFV908uoLPY). A proper formalisation of the Routing algorithm is in progress.
 
+## Logging
 
-### Legend
-Dependencies are coloured depending on their kind:
-* **Black:** regular dependency
-* **Purple:** build dependency
-* **Blue:** dev dependency
-* **Red:** optional dependency
+Messages are logged via the standard `log` crate, and where enabled, printed
+via `env_logger`. By default this prints messages of level "warn" and higher
+("error"), but not lower levels ("info", "debug", "trace"). The level can be set
+explicitly (any of the above or "off"), e.g.:
 
-A dependency can be of more than one kind. In such cases, it is coloured with the following priority:
-`Regular -> Build -> Dev -> Optional`
+    export RUST_LOG=sn_routing=info
 
-<details>
-<summary> View all sn_node dependencies</summary>
-<p>
+Optionally, the following sub-targets can be controlled independently:
 
-![sn_node all dependencies](https://github.com/maidsafe/sn_node/blob/png_generator/sn_node_all_dependencies.png)
+*   stats — messages about connections and sn_routing table size
+*   crust — messages from the mock Crust layer (not real Crust)
 
-</p>
-</details>
+Example:
 
-Click [here](https://maidsafe.github.io/interdependency-svg-generator/) for an overview of the interdependencies of all the main MaidSafe components.
+    export RUST_LOG=sn_routing=info,stats=off
+
 
 ## License
 
-This Safe Network library is licensed under the General Public License (GPL), version 3 ([LICENSE](LICENSE) https://www.gnu.org/licenses/gpl-3.0.en.html).
+Licensed under the General Public License (GPL), version 3 ([LICENSE](LICENSE) http://www.gnu.org/licenses/gpl-3.0.en.html).
 
 ### Linking exception
 
-sn_node is licensed under GPLv3 with linking exception. This means you can link to and use the library from any program, proprietary or open source; paid or gratis. However, if you modify sn_node, you must distribute the source to your modified version under the terms of the GPLv3.
+sn_routing is licensed under GPLv3 with linking exception. This means you can link to and use the library from any program, proprietary or open source; paid or gratis. However, if you modify sn_routing, you must distribute the source to your modified version under the terms of the GPLv3.
 
-See [the LICENSE file](LICENSE) for more details.
+See the LICENSE file for more details.
 
 ## Contributing
 
