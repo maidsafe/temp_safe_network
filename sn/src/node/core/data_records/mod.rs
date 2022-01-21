@@ -140,6 +140,14 @@ impl Core {
         Ok(())
     }
 
+    /// Adds the new adult to the Capacity and Liveness trackers.
+    pub(crate) async fn add_new_adult_to_trackers(&self, adult: XorName) {
+        info!("Adding new Adult: {adult} to trackers");
+        self.capacity.add_new_adult(adult).await;
+
+        self.liveness.add_new_adult(adult);
+    }
+
     /// Set storage level of a given node.
     /// Returns whether the level changed or not.
     pub(crate) async fn set_storage_level(&self, node_id: &PublicKey, level: StorageLevel) -> bool {

@@ -138,7 +138,16 @@ impl Core {
         let data_storage = DataStorage::new(&root_storage_dir, used_space.clone())?;
 
         let capacity = Capacity::new(BTreeMap::new());
-        let adult_liveness = Liveness::new();
+        info!("Creating Liveness checks");
+        let adult_liveness = Liveness::new(
+            network_knowledge
+                .adults()
+                .await
+                .iter()
+                .map(|peer| peer.name())
+                .collect::<Vec<XorName>>(),
+        );
+        info!("Liveness check: {:?}", adult_liveness);
 
         Ok(Self {
             comm,

@@ -40,6 +40,15 @@ impl Capacity {
         }
     }
 
+    pub(super) async fn add_new_adult(&self, adult: XorName) {
+        info!("Adding new adult:{adult} to Capacity tracker");
+
+        if let Some(old_entry) = self.adult_levels.write().await.insert(adult, Arc::new(RwLock::new(StorageLevel::zero()))) {
+            let _level = old_entry.read().await.value();
+            warn!("Throwing old storage level for Adult {adult}:{_level}");
+        }
+    }
+
     /// Whether the adult is considered full.
     /// This happens when it has reported at least `MIN_LEVEL_WHEN_FULL`.
     pub(super) async fn is_full(&self, adult: &XorName) -> Option<bool> {
@@ -119,7 +128,7 @@ impl Capacity {
         info!("No current level, aqcuiring top level write lock..");
         // locks to prevent racing
         let mut all_levels = self.adult_levels.write().await;
-        info!("Top level write lock aqcuired.");
+        info!("Top level write lock acquired.");
         // checking the value again, if there was a concurrent insert..
         if let Some(level) = all_levels.get(&adult) {
             info!("Oh wait, a value was just recorded..");

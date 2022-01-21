@@ -31,10 +31,48 @@ pub(crate) struct Liveness {
 }
 
 impl Liveness {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(our_adults: Vec<NodeIdentifier>) -> Self {
+        let closest_nodes_to = DashMap::new();
+
+        for adult in our_adults.iter() {
+            let closest_nodes = our_adults
+                .iter()
+                .filter(|&key| key != adult)
+                .sorted_by(|lhs, rhs| adult.cmp_distance(lhs, rhs))
+                .take(NEIGHBOUR_COUNT)
+                .cloned()
+                .collect::<Vec<_>>();
+            let length = closest_nodes.len();
+            info!("Length of closest nodes to {adult}:{length}");
+            let _old_entry = closest_nodes_to.insert(adult.clone(), closest_nodes);
+        }
         Self {
             unfulfilled_requests: Arc::new(DashMap::new()),
-            closest_nodes_to: Arc::new(DashMap::new()),
+            closest_nodes_to: Arc::new(closest_nodes_to),
+        }
+    }
+
+    pub(crate) fn add_new_adult(&self, adult: XorName) {
+        info!("Adding new adult:{adult} to Liveness tracker");
+
+        let our_adults: Vec<_> = self
+            .closest_nodes_to
+            .iter()
+            .map(|entry| *entry.key())
+            .collect();
+
+        let closest_nodes = our_adults
+            .iter()
+            .filter(|&key| key != &adult)
+            .sorted_by(|lhs, rhs| adult.cmp_distance(lhs, rhs))
+            .take(NEIGHBOUR_COUNT)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        info!("Closest nodes to {adult}:{closest_nodes:?}");
+
+        if let Some(_old_entry) = self.closest_nodes_to.insert(adult.clone(), closest_nodes) {
+            warn!("Throwing old liveness tracker for Adult {adult}:{_old_entry:?}");
         }
     }
 
@@ -147,9 +185,13 @@ impl Liveness {
 
     // this is not an exact definition, thus has tolerance for variance due to concurrency
     pub(crate) async fn find_unresponsive_nodes(&self) -> Vec<(XorName, usize)> {
+        info!("Checking unresponsive nodes");
         let mut unresponsive_nodes = Vec::new();
+        let length = self.closest_nodes_to.len();
+        info!("Length of closest nodes to {length}");
         for entry in self.closest_nodes_to.iter() {
             let (node, neighbours) = entry.pair();
+            info!("Checking node/neighbours: {:?}/{:?}", node, neighbours);
 
             let node = *node;
             let mut max_pending_by_neighbours = 0;
