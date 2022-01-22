@@ -5,7 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.54.0 (2022-01-22)
+
+### New Features
+
+ - <csr-id-61e87de077bd47b3dd106dc1e1dd65aa1f5b2d0e/> retry intial client contact if it fails
+   Previously we tried to connect to all known nodes, but if we reached the end of the list, we'd keep hitting the same nodes over and over.
+   Now we fail after trying all candidates, and retry with a new xorname to get new candidates (if we know a prefixmap).
+   We also mark the attempted connections as failed, so the client attempts to create
+   fresh new connections instead of using possibly dead connections
+ - <csr-id-a02f5f0de50c7c58b1cda55a14cb63d805c772c5/> clients mark closed connections as such
+   And now check that the current connection is valid before trying to use it.
+   Otherwise they reconnect
+
+### refactor (BREAKING)
+
+ - <csr-id-959e909d8c61230ea143702858cb7b4c42caffbf/> removing the internal routing layer
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 12 commits contributed to the release over the course of 1 calendar day.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - update remaining places ([`3dc2327`](https://github.com/maidsafe/safe_network/commit/3dc23278c6a4fabc250b27f4312f5c51f0f271a4))
+    - Merge #958 ([`437a113`](https://github.com/maidsafe/safe_network/commit/437a113e6e5736e4eb4287f41228806678a9762e))
+    - Merge #955 ([`b7581b9`](https://github.com/maidsafe/safe_network/commit/b7581b91ed7778b1b962a0fdfc7d33a65cc7098c))
+    - Merge branch 'main' into simplify-sn-api ([`33ef052`](https://github.com/maidsafe/safe_network/commit/33ef0524ae238391f25c8fb340627c34ea79fcb2))
+    - chore(sn/client): wait before attempting to make_contact again ([`1b3c0eb`](https://github.com/maidsafe/safe_network/commit/1b3c0eb4443cff3f4575164907a7a1fbf92cebe2))
+    - retry intial client contact if it fails ([`61e87de`](https://github.com/maidsafe/safe_network/commit/61e87de077bd47b3dd106dc1e1dd65aa1f5b2d0e))
+    - clients mark closed connections as such ([`a02f5f0`](https://github.com/maidsafe/safe_network/commit/a02f5f0de50c7c58b1cda55a14cb63d805c772c5))
+    - dont fail client send w/ closed conn ([`d96ded1`](https://github.com/maidsafe/safe_network/commit/d96ded11ca74e75dde3dcc0d0b865712895d3dcc))
+    - removing the internal routing layer ([`959e909`](https://github.com/maidsafe/safe_network/commit/959e909d8c61230ea143702858cb7b4c42caffbf))
+    - Merge #951 ([`7f42d4e`](https://github.com/maidsafe/safe_network/commit/7f42d4e38d3bbf5b946c499b6a3543e50096a036))
+    - Merge branch 'main' into node-logrotate ([`4c86c16`](https://github.com/maidsafe/safe_network/commit/4c86c16fca4a5eb63c37c74344fa726542fa3422))
+    - Merge #962 ([`29d01da`](https://github.com/maidsafe/safe_network/commit/29d01da5233fd2a10b30699b555a0d85d7a7409a))
+</details>
+
 ## v0.53.0 (2022-01-20)
+
+<csr-id-8f58c5d900ce00d90bf7421f34122f4ca5ff5601/>
 
 ### Documentation
 
@@ -42,6 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-0f0ef819f4b36e5056dfa7f1983238bd4752caba/> read from disk on cache miss
  - <csr-id-e18c88019d37ab4f7618dde1a90e19ddf94db1c7/> VersioinHash use Display for encode
  - <csr-id-edefd2d7860e6f79c07060e078cdaa433da9e804/> use latest PK to send DataExchange messages
+ - <csr-id-687434b5cccc3b796e18e4356ce2114b72c2c1ad/> update config smoke test expected size
 
 ### chore (BREAKING)
 
@@ -57,8 +107,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 56 commits contributed to the release over the course of 13 calendar days.
- - 36 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 72 commits contributed to the release over the course of 13 calendar days.
+ - 41 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -68,12 +118,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.53.0/sn_api-0.51.0/sn_cli-0.44.0 ([`923930a`](https://github.com/maidsafe/safe_network/commit/923930acb3769cfa7047954a1fee1853ec9e3062))
+    - refactor(sn_api): remove one layer of indirection Also simplifies instantiation and handling of the safe instance. ([`3b5ce19`](https://github.com/maidsafe/safe_network/commit/3b5ce194213a7090ee83c02b0043700cda230796))
+    - moving relocation module within routing::Core where it belongs ([`82f3997`](https://github.com/maidsafe/safe_network/commit/82f39977ec965429269a31639ce83be9749b5d80))
+    - moving logic to check for split into a helper function ([`565711d`](https://github.com/maidsafe/safe_network/commit/565711d4bc58f18181d279e5f29d9adb3acb051a))
     - Merge branch 'main' into fix-update-section ([`1b41609`](https://github.com/maidsafe/safe_network/commit/1b4160969789f706b49534dbeb08bd920ecdb80a))
     - lessen nesting and indentation ([`96a955e`](https://github.com/maidsafe/safe_network/commit/96a955e5b124db3250c3d0fd09926cec10322632))
     - ignore many_client tests ([`d84ac52`](https://github.com/maidsafe/safe_network/commit/d84ac520676b83f39d5cf356e89ac3ec2d6478cc))
+    - update config smoke test expected size ([`687434b`](https://github.com/maidsafe/safe_network/commit/687434b5cccc3b796e18e4356ce2114b72c2c1ad))
+    - allow 1gb uncompressed logs by default ([`f7f5936`](https://github.com/maidsafe/safe_network/commit/f7f59369d09a4d25a94328d031f00cc61b187eed))
     - update year on files modified 2022 ([`7a7752f`](https://github.com/maidsafe/safe_network/commit/7a7752f830785ec39d301e751dc75f228d43d595))
+    - Merge branch 'main' into node-logrotate ([`6bb5166`](https://github.com/maidsafe/safe_network/commit/6bb5166749e421964e8074ad7db003eaca5437f7))
     - making section members list non optional in AntiEntropyUpdate message type ([`8f58c5d`](https://github.com/maidsafe/safe_network/commit/8f58c5d900ce00d90bf7421f34122f4ca5ff5601))
+    - Merge node-logrotate origin for rebase with main ([`6df7f6f`](https://github.com/maidsafe/safe_network/commit/6df7f6fec3ee9d37b44db188fd670e4b65796e8c))
+    - Apply rustfmt changes ([`8151219`](https://github.com/maidsafe/safe_network/commit/815121952c4f6bf85725828214fe439a647d7260))
+    - Remove a couple of commented out lines ([`54e7325`](https://github.com/maidsafe/safe_network/commit/54e7325bbdb9de25bd2f329122e2e132c5338544))
+    - Provide dummy fmt::Debug for FileRotateAppender ([`49884c0`](https://github.com/maidsafe/safe_network/commit/49884c0bd545c297b9089250681b925acf932931))
+    - sn_node support for logrotate style logs (issue #938) ([`96adbf9`](https://github.com/maidsafe/safe_network/commit/96adbf995c72abd9d98235a76a36263b81a07adf))
     - qp2p update/ clippy fixes and code comment cleanup ([`b06bc6e`](https://github.com/maidsafe/safe_network/commit/b06bc6eb0fd210b6abc9039d1f20ab8d93befc16))
+    - Apply rustfmt changes ([`76b772c`](https://github.com/maidsafe/safe_network/commit/76b772c949626e9e5ffe6aef804a556aad2b8abd))
+    - Remove a couple of commented out lines ([`3c40347`](https://github.com/maidsafe/safe_network/commit/3c40347abfdc4c7bd40ca702cf869a19abf67cb1))
+    - Provide dummy fmt::Debug for FileRotateAppender ([`e07cfc0`](https://github.com/maidsafe/safe_network/commit/e07cfc040e415783d37ce91ed4af301b8bf19c15))
+    - sn_node support for logrotate style logs (issue #938) ([`faf27a5`](https://github.com/maidsafe/safe_network/commit/faf27a5c7a69c7484f3f873e08575e40de190e00))
     - re-enable init with populated register ([`4eef4d3`](https://github.com/maidsafe/safe_network/commit/4eef4d3a9356d6a0724c0c670809e8d9fd1f11c0))
     - store cap within the register ([`c222370`](https://github.com/maidsafe/safe_network/commit/c222370b52befaedebe895fcf7feb2c1da99aeaa))
     - only check permissions once ([`a018022`](https://github.com/maidsafe/safe_network/commit/a018022e4eb298a9a66513c770c0edc1b415a886))

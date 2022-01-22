@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.45.0 (2022-01-22)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release over the course of 1 calendar day.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - update remaining places ([`3dc2327`](https://github.com/maidsafe/safe_network/commit/3dc23278c6a4fabc250b27f4312f5c51f0f271a4))
+    - Merge #958 ([`437a113`](https://github.com/maidsafe/safe_network/commit/437a113e6e5736e4eb4287f41228806678a9762e))
+    - Merge branch 'main' into simplify-sn-api ([`33ef052`](https://github.com/maidsafe/safe_network/commit/33ef0524ae238391f25c8fb340627c34ea79fcb2))
+    - Merge #962 ([`29d01da`](https://github.com/maidsafe/safe_network/commit/29d01da5233fd2a10b30699b555a0d85d7a7409a))
+</details>
+
 ## v0.44.0 (2022-01-20)
 
 ### Documentation
@@ -14,20 +37,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
    
    Also changed:
    * Fixed the indentation levels for the table of contents.
-   * Provide a small section to describe an example directory used by all commands.
-   * Update other sections to use the above examples directory.
-   * Clarify description of container base paths.
-   * Move the `files ls` section immediately after `files put`, as I think it makes sense to introduce
+* Provide a small section to describe an example directory used by all commands.
+* Update other sections to use the above examples directory.
+* Clarify description of container base paths.
+* Move the `files ls` section immediately after `files put`, as I think it makes sense to introduce
      the concept of listing files after you've uploaded them.
-   * Trim down the `files get` section.
-   * Trim down the `files tree` section.
+* Trim down the `files get` section.
+* Trim down the `files tree` section.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 14 commits contributed to the release over the course of 13 calendar days.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 16 commits contributed to the release over the course of 13 calendar days.
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -37,6 +60,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.53.0/sn_api-0.51.0/sn_cli-0.44.0 ([`923930a`](https://github.com/maidsafe/safe_network/commit/923930acb3769cfa7047954a1fee1853ec9e3062))
+    - refactor(sn_api): remove one layer of indirection Also simplifies instantiation and handling of the safe instance. ([`3b5ce19`](https://github.com/maidsafe/safe_network/commit/3b5ce194213a7090ee83c02b0043700cda230796))
     - update from MIT/BSD3 to GPL3 ([`20f416c`](https://github.com/maidsafe/safe_network/commit/20f416cb7d0960a1d8d6f167a1ad1eed33ed6a7b))
     - update year on files modified 2022 ([`7a7752f`](https://github.com/maidsafe/safe_network/commit/7a7752f830785ec39d301e751dc75f228d43d595))
     - nightly release run ([`ad2e30c`](https://github.com/maidsafe/safe_network/commit/ad2e30cf52cd8be01c00353d722ea1107c43a641))
