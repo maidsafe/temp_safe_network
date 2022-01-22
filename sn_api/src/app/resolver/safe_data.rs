@@ -9,7 +9,7 @@
 pub use super::{ContentType, DataType, SafeUrl, VersionHash, XorUrlBase};
 use crate::app::{
     files::{FileInfo, FilesMap},
-    multimap::MultimapKeyValues,
+    multimap::Multimap,
     nrs::NrsMap,
     register::{Entry, EntryHash},
     XorName,
@@ -62,7 +62,7 @@ pub enum SafeData {
         xorurl: String,
         xorname: XorName,
         type_tag: u64,
-        data: MultimapKeyValues,
+        data: Multimap,
         resolved_from: String,
     },
     PublicRegister {

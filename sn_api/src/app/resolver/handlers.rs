@@ -7,9 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Range, SafeData};
+use crate::app::nrs::validate_nrs_url;
 use crate::app::{
     files::{self, FileInfo, FilesMap},
-    multimap::MultimapKeyValues,
+    multimap::Multimap,
     DataType, Safe, SafeUrl,
 };
 use crate::{Error, Result};
@@ -36,6 +37,7 @@ impl Safe {
         target_url.set_path(&format!("{}{}", target_path, url_path));
 
         // create safe_data ignoring the input path or subnames
+        validate_nrs_url(&target_url)?;
         let version = target_url.content_version().ok_or_else(|| {
             Error::ContentError(format!(
                 "Missing content version in Url: {} while resolving: {}",
@@ -69,9 +71,9 @@ impl Safe {
         input_url: SafeUrl,
         retrieve_data: bool,
     ) -> Result<SafeData> {
-        let data: MultimapKeyValues = if retrieve_data {
+        let data: Multimap = if retrieve_data {
             match input_url.content_version() {
-                None => self.fetch_multimap_values(&input_url).await?,
+                None => self.fetch_multimap(&input_url).await?,
                 Some(v) => vec![(
                     v.entry_hash(),
                     self.fetch_multimap_value_by_hash(&input_url, v.entry_hash())
@@ -81,7 +83,7 @@ impl Safe {
                 .collect(),
             }
         } else {
-            MultimapKeyValues::new()
+            Multimap::new()
         };
 
         let safe_data = SafeData::Multimap {

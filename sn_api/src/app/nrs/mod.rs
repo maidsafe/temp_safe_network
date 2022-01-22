@@ -8,6 +8,7 @@
 
 mod nrs_map;
 
+pub use crate::app::multimap::Multimap;
 pub use crate::safeurl::{ContentType, DataType, VersionHash};
 pub use nrs_map::NrsMap;
 
@@ -85,7 +86,7 @@ impl Safe {
         let safe_url = Safe::parse_url(public_name)?;
         let subname = parse_out_subnames(public_name);
         let current_versions = self
-            .fetch_multimap_value_by_key(&safe_url, subname.as_bytes())
+            .fetch_multimap_values_by_key(&safe_url, subname.as_bytes())
             .await?
             .into_iter()
             .map(|(hash, _)| hash)
@@ -156,7 +157,7 @@ impl Safe {
         let safe_url = Safe::parse_url(public_name)?;
         let subname = parse_out_subnames(public_name);
         let current_versions = self
-            .fetch_multimap_value_by_key(&safe_url, subname.as_bytes())
+            .fetch_multimap_values_by_key(&safe_url, subname.as_bytes())
             .await?
             .into_iter()
             .map(|(hash, _)| hash)
@@ -216,10 +217,8 @@ impl Safe {
         public_name: &str,
         version: Option<VersionHash>,
     ) -> Result<NrsMap> {
-        // fetch multimap entries
         let safe_url = Safe::parse_url(public_name)?;
-        let res = self.fetch_multimap_values(&safe_url).await;
-        let multimap_keyvals = match res {
+        let mut multimap = match self.fetch_multimap(&safe_url).await {
             Ok(s) => Ok(s),
             Err(Error::EmptyContent(_)) => Ok(BTreeSet::new()),
             Err(Error::ContentNotFound(e)) => Err(Error::ContentNotFound(format!(
@@ -232,70 +231,77 @@ impl Safe {
             ))),
         }?;
 
-        // collect a raw map with serialized data, get specific version if needed
-        let raw_set = match version {
-            Some(v) => {
-                let hash = v.entry_hash();
-                if multimap_keyvals
-                    .iter()
-                    .any(|(h, _)| VersionHash::from(h) == v)
-                {
-                    // just return the key val set if we have the version we're looking for
-                    multimap_keyvals
-                        .into_iter()
-                        .map(|(_hash, key_val)| key_val)
-                        .collect()
-                } else {
-                    // manually fetch the missing versionned entry
-                    let mut key_vals: BTreeSet<_> = multimap_keyvals
-                        .into_iter()
-                        .map(|(_hash, key_val)| key_val)
-                        .collect();
-                    let key_val = self.fetch_multimap_value_by_hash(&safe_url, hash).await?;
-                    let fetched_key = &key_val.0;
-
-                    // remove other entries with the same key
-                    key_vals.retain(|(k, _)| k != fetched_key);
-
-                    // insert the versioned entry
-                    key_vals.insert(key_val);
-                    key_vals
-                }
+        if let Some(version) = version {
+            if multimap
+                .iter()
+                .find(|(h, _)| VersionHash::from(h) == version)
+                .is_none()
+            {
+                let key_val = self
+                    .fetch_multimap_value_by_hash(&safe_url, version.entry_hash())
+                    .await?;
+                multimap.insert((version.entry_hash(), key_val));
             }
-            None => multimap_keyvals
-                .into_iter()
-                .map(|(_hash, key_val)| key_val)
-                .collect(),
-        };
+        }
 
-        // deserialize
-        let clean_set: BTreeSet<(String, SafeUrl)> = raw_set
-            .into_iter()
-            .map(|(subname_bytes, url_bytes)| {
-                let subname = str::from_utf8(&subname_bytes)?;
-                let url = SafeUrl::from_url(str::from_utf8(&url_bytes)?)?;
-                Ok((subname.to_owned(), url))
-            })
-            .collect::<Result<BTreeSet<(String, SafeUrl)>>>()?;
-
-        // turn into map
-        let subnames_map: BTreeMap<String, SafeUrl> = clean_set.clone().into_iter().collect();
+        // The set may have duplicate entries; the map doesn't.
+        let (_, subnames_set) = convert_multimap_to_nrs_set(&multimap)?;
+        let subnames_map = convert_multimap_to_nrs_map(&multimap)?;
         let nrs_map = NrsMap {
             map: subnames_map.clone(),
         };
 
-        // check for conflicting entries (same subname, different url)
-        let set_len = clean_set.len();
-        let map_len = subnames_map.len();
-        if map_len != set_len {
-            let set_from_map: BTreeSet<(String, SafeUrl)> = subnames_map.into_iter().collect();
+        if subnames_map.len() != subnames_set.len() {
+            let diff_set: BTreeSet<(String, SafeUrl)> = subnames_map.into_iter().collect();
             let conflicting_entries: Vec<(String, SafeUrl)> =
-                clean_set.difference(&set_from_map).cloned().collect();
-            return Err(Error::ConflictingNrsEntries("Found multiple entries for the same name, this happens when 2 clients write concurrently to the same NRS mapping. It can be fixed by simply associating a new link to the conflicting names.".to_string(), conflicting_entries, nrs_map));
+                subnames_set.difference(&diff_set).cloned().collect();
+            return Err(Error::ConflictingNrsEntries(
+                "Found multiple entries for the same name. This happens when 2 clients write \
+                concurrently to the same NRS mapping. It can be fixed by associating a new link to \
+                the conflicting names."
+                    .to_string(),
+                conflicting_entries,
+                nrs_map,
+            ));
         }
-
         Ok(nrs_map)
     }
+}
+
+fn convert_multimap_to_nrs_set(
+    multimap: &Multimap,
+) -> Result<(Option<VersionHash>, BTreeSet<(String, SafeUrl)>)> {
+    let set: BTreeSet<(VersionHash, String, SafeUrl)> = multimap
+        .clone()
+        .into_iter()
+        .map(|x| {
+            let kv = x.1;
+            let subname = str::from_utf8(&kv.0)?;
+            let url = SafeUrl::from_url(str::from_utf8(&kv.1)?)?;
+            let version_hash = VersionHash::from(&x.0);
+            Ok((version_hash, subname.to_owned(), url))
+        })
+        .collect::<Result<BTreeSet<(VersionHash, String, SafeUrl)>>>()?;
+    let nrs_map_version = set.iter().last().map(|x| x.0);
+    let subnames_set = set
+        .into_iter()
+        .map(|x| (x.1, x.2))
+        .collect::<BTreeSet<(String, SafeUrl)>>();
+    Ok((nrs_map_version, subnames_set))
+}
+
+fn convert_multimap_to_nrs_map(multimap: &Multimap) -> Result<BTreeMap<String, SafeUrl>> {
+    let subnames_map: BTreeMap<String, SafeUrl> = multimap
+        .clone()
+        .into_iter()
+        .map(|x| {
+            let kv = x.1;
+            let subname = str::from_utf8(&kv.0)?;
+            let url = SafeUrl::from_url(str::from_utf8(&kv.1)?)?;
+            Ok((subname.to_owned(), url))
+        })
+        .collect::<Result<BTreeMap<String, SafeUrl>>>()?;
+    Ok(subnames_map)
 }
 
 // Makes a versionned Nrs Map Container SafeUrl from a SafeUrl and EntryHash
