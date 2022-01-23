@@ -37,6 +37,7 @@ pub(crate) struct LargeFile {
 impl SmallFile {
     /// Enforces size > 0 and size < [`MIN_ENCRYPTABLE_BYTES`] bytes.
     pub(crate) fn new(bytes: Bytes) -> Result<Self> {
+        debug!("BYTES HERE: {bytes:?}, is empty? {:?}", bytes.is_empty());
         if bytes.len() >= MIN_ENCRYPTABLE_BYTES {
             Err(Error::TooLargeAsSmallFile)
         } else if bytes.is_empty() {

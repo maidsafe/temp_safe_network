@@ -186,6 +186,7 @@ impl Client {
     /// form of immutable chunks, without any batching.
     #[instrument(skip(self, bytes), level = "debug")]
     pub async fn upload(&self, bytes: Bytes, scope: Scope) -> Result<BytesAddress> {
+        debug!("uppppp: {bytes:?}");
         if let Ok(file) = LargeFile::new(bytes.clone()) {
             self.upload_large(file, scope).await
         } else {
