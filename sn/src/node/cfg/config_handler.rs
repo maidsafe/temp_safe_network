@@ -57,7 +57,7 @@ pub struct Config {
     #[structopt(long)]
     pub log_dir: Option<PathBuf>,
     /// Number of rotated log files to keep (0 to keep all)
-    #[structopt(long, default_value = "9")]
+    #[structopt(long, default_value = "0")]
     pub logs_retained: usize,
     /// Maximum bytes per log file
     #[structopt(long, default_value = "10485760")]
