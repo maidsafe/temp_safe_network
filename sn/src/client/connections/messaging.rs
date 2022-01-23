@@ -94,7 +94,11 @@ impl Session {
         // Get DataSection elders details.
         let (elders, section_pk) =
             if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
-                let sap_elders: Vec<_> = sap.elders_vec().into_iter().take(targets_count).collect();
+                let mut sap_elders = sap.elders_vec();
+
+                sap_elders.shuffle(&mut OsRng);
+
+                let sap_elders: Vec<_> = sap_elders.into_iter().take(targets_count).collect();
 
                 trace!("{:?} SAP elders found", sap_elders);
                 (sap_elders, sap.section_key())
