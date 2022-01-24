@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::safeurl::VersionHash;
 use crate::{Error, Result, SafeUrl};
 use log::debug;
 use serde::{Deserialize, Serialize};
@@ -13,7 +14,7 @@ use std::collections::BTreeMap;
 
 pub(crate) type SubName = String;
 
-/// Mapping SubNames to SafeUrls
+/// Mapping Subnames to SafeUrls
 /// For a given Top Name : "example"
 ///
 /// | SubName Key   | Full Name        | SafeUrl Value|
@@ -22,9 +23,12 @@ pub(crate) type SubName = String;
 /// | "sub"         | "sub.example"    | "safe://eg2" |
 /// | "sub.sub"     | "sub.sub.example"| "safe://eg3" |
 ///
+/// The map also has a subname_version, which can be used if you want a subname at a particular
+/// version.
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize, Clone)]
 pub struct NrsMap {
     pub map: BTreeMap<SubName, SafeUrl>,
+    pub subname_version: Option<VersionHash>,
 }
 
 impl NrsMap {

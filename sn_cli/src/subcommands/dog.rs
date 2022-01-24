@@ -41,7 +41,6 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &mut S
                     xorurl,
                     xorname,
                     type_tag,
-                    version,
                     nrs_map,
                     data_type,
                     resolved_from,
@@ -54,7 +53,12 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &mut S
                         None => {}
                     }
                     println!("XOR-URL: {}", xorurl);
-                    println!("Version: {}", version);
+                    println!(
+                        "Version: {}",
+                        nrs_map
+                            .subname_version
+                            .map_or("none".to_string(), |v| v.to_string())
+                    );
                     println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: {}", data_type);

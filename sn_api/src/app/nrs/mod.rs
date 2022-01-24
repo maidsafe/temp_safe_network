@@ -23,6 +23,33 @@ use std::str;
 // Type tag to use for the NrsMapContainer stored on Register
 pub(crate) const NRS_MAP_TYPE_TAG: u64 = 1_500;
 
+/// Helper to check if an NRS SafeUrl:
+/// - is valid
+/// - has a version (if its data is versionable)
+///
+/// It's public because we perform the same check in the resolver.
+pub fn validate_nrs_url(link: &SafeUrl) -> Result<()> {
+    if link.content_version().is_none() {
+        let content_type = link.content_type();
+        let data_type = link.data_type();
+        if content_type == ContentType::FilesContainer
+            || content_type == ContentType::NrsMapContainer
+        {
+            return Err(Error::UnversionedContentError(format!(
+                "The linked content ({}) is versionable, therefore NRS requires the link to specify a hash: {}",
+                content_type, link
+            )));
+        } else if data_type == DataType::Register {
+            return Err(Error::UnversionedContentError(format!(
+                "The linked content ({}) is versionable, therefore NRS requires the link to specify a hash: {}",
+                data_type, link
+            )));
+        }
+    }
+
+    Ok(())
+}
+
 impl Safe {
     pub fn parse_url(url: &str) -> Result<SafeUrl> {
         let safe_url = SafeUrl::from_url(&sanitised_url(url))?;
@@ -195,7 +222,7 @@ impl Safe {
 
         // get nrs_map, ignoring conflicting entries if they are not the ones we're getting
         let nrs_map = match self.nrs_get_subnames_map(public_name, version).await {
-            Ok(map) => Ok(map),
+            Ok(result) => Ok(result),
             Err(Error::ConflictingNrsEntries(str, conflicting_entries, map)) => {
                 let subname = parse_out_subnames(public_name);
                 if conflicting_entries.iter().any(|(sub, _)| sub == &subname) {
@@ -232,10 +259,9 @@ impl Safe {
         }?;
 
         if let Some(version) = version {
-            if multimap
+            if !multimap
                 .iter()
-                .find(|(h, _)| VersionHash::from(h) == version)
-                .is_none()
+                .any(|(h, _)| VersionHash::from(h) == version)
             {
                 let key_val = self
                     .fetch_multimap_value_by_hash(&safe_url, version.entry_hash())
@@ -245,14 +271,11 @@ impl Safe {
         }
 
         // The set may have duplicate entries; the map doesn't.
-        let (_, subnames_set) = convert_multimap_to_nrs_set(&multimap)?;
-        let subnames_map = convert_multimap_to_nrs_map(&multimap)?;
-        let nrs_map = NrsMap {
-            map: subnames_map.clone(),
-        };
+        let subnames_set = convert_multimap_to_nrs_set(&multimap)?;
+        let nrs_map = convert_multimap_to_nrs_map(&multimap)?;
 
-        if subnames_map.len() != subnames_set.len() {
-            let diff_set: BTreeSet<(String, SafeUrl)> = subnames_map.into_iter().collect();
+        if nrs_map.map.len() != subnames_set.len() {
+            let diff_set: BTreeSet<(String, SafeUrl)> = nrs_map.map.clone().into_iter().collect();
             let conflicting_entries: Vec<(String, SafeUrl)> =
                 subnames_set.difference(&diff_set).cloned().collect();
             return Err(Error::ConflictingNrsEntries(
@@ -268,29 +291,22 @@ impl Safe {
     }
 }
 
-fn convert_multimap_to_nrs_set(
-    multimap: &Multimap,
-) -> Result<(Option<VersionHash>, BTreeSet<(String, SafeUrl)>)> {
-    let set: BTreeSet<(VersionHash, String, SafeUrl)> = multimap
+fn convert_multimap_to_nrs_set(multimap: &Multimap) -> Result<BTreeSet<(String, SafeUrl)>> {
+    let set: BTreeSet<(String, SafeUrl)> = multimap
         .clone()
         .into_iter()
         .map(|x| {
             let kv = x.1;
             let subname = str::from_utf8(&kv.0)?;
             let url = SafeUrl::from_url(str::from_utf8(&kv.1)?)?;
-            let version_hash = VersionHash::from(&x.0);
-            Ok((version_hash, subname.to_owned(), url))
+            Ok((subname.to_owned(), url))
         })
-        .collect::<Result<BTreeSet<(VersionHash, String, SafeUrl)>>>()?;
-    let nrs_map_version = set.iter().last().map(|x| x.0);
-    let subnames_set = set
-        .into_iter()
-        .map(|x| (x.1, x.2))
-        .collect::<BTreeSet<(String, SafeUrl)>>();
-    Ok((nrs_map_version, subnames_set))
+        .collect::<Result<BTreeSet<(String, SafeUrl)>>>()?;
+    Ok(set)
 }
 
-fn convert_multimap_to_nrs_map(multimap: &Multimap) -> Result<BTreeMap<String, SafeUrl>> {
+fn convert_multimap_to_nrs_map(multimap: &Multimap) -> Result<NrsMap> {
+    let nrs_map_version = multimap.iter().map(|x| VersionHash::from(&x.0)).last();
     let subnames_map: BTreeMap<String, SafeUrl> = multimap
         .clone()
         .into_iter()
@@ -301,7 +317,11 @@ fn convert_multimap_to_nrs_map(multimap: &Multimap) -> Result<BTreeMap<String, S
             Ok((subname.to_owned(), url))
         })
         .collect::<Result<BTreeMap<String, SafeUrl>>>()?;
-    Ok(subnames_map)
+    let nrs_map = NrsMap {
+        map: subnames_map,
+        subname_version: nrs_map_version,
+    };
+    Ok(nrs_map)
 }
 
 // Makes a versionned Nrs Map Container SafeUrl from a SafeUrl and EntryHash
@@ -334,31 +354,6 @@ fn validate_nrs_public_name(public_name: &str) -> Result<String> {
         ));
     }
     Ok(sanitised_url)
-}
-
-// helper function to check a SafeUrl used for NRS
-// - checks if the url is valid
-// - checks if it has a version if its data is versionable
-fn validate_nrs_url(link: &SafeUrl) -> Result<()> {
-    if link.content_version().is_none() {
-        let content_type = link.content_type();
-        let data_type = link.data_type();
-        if content_type == ContentType::FilesContainer
-            || content_type == ContentType::NrsMapContainer
-        {
-            return Err(Error::UnversionedContentError(format!(
-                "The linked content ({}) is versionable, therefore NRS requires the link to specify a hash: {}",
-                content_type, link
-            )));
-        } else if data_type == DataType::Register {
-            return Err(Error::UnversionedContentError(format!(
-                "The linked content ({}) is versionable, therefore NRS requires the link to specify a hash: {}",
-                data_type, link
-            )));
-        }
-    }
-
-    Ok(())
 }
 
 // Makes sure there’s a (and only one) "safe://" in front of input name

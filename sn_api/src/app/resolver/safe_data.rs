@@ -52,7 +52,6 @@ pub enum SafeData {
         xorurl: String,
         xorname: XorName,
         type_tag: u64,
-        version: VersionHash,
         nrs_map: NrsMap,
         data_type: DataType,
         resolves_into: Option<SafeUrl>,
