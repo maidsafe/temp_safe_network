@@ -77,6 +77,10 @@ pub enum JoinResponse {
         node_state: NodeState,
         /// SignatureShare of an elder over the NodeState
         sig_share: SigShare,
+        /// Current `SectionAuthorityProvider` of the section.
+        section_auth: SectionAuthorityProvider,
+        /// Section signature over the `SectionAuthorityProvider`.
+        section_signed: KeyedSig,
         /// Section chain of the current section
         section_chain: SecuredLinkedList,
         /// Signed NodeState of section members

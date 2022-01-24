@@ -424,6 +424,7 @@ impl Core {
                         sig_share,
                         section_chain,
                         members,
+                        ..
                     } => {
                         let serialized_details = bincode::serialize(&node_state)?;
 
