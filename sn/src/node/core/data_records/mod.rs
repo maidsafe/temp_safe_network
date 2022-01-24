@@ -49,7 +49,7 @@ impl Core {
             let error = CmdError::Data(ErrorMessage::InsufficientAdults(
                 self.network_knowledge().prefix().await,
             ));
-            return self.send_cmd_error_response(error, origin, msg_id);
+            return self.send_cmd_error_response(error, origin, msg_id).await;
         }
 
         self.send_node_msg_to_targets(msg, targets, aggregation)
@@ -92,24 +92,25 @@ impl Core {
             let _existed = fresh_targets.insert(target);
         }
 
-        let correlation_id = *address.name();
+        let address_name = *address.name();
         let overwrote = self
             .pending_data_queries
-            .set(correlation_id, origin, None)
+            .set(address_name, origin, None)
             .await;
         if let Some(overwrote) = overwrote {
             // Since `XorName` is a 256 bit value, we consider the probability negligible, but warn
             // anyway so we're not totally lost if it does happen.
             warn!(
                 "Overwrote an existing pending data query for {} from {} - what are the chances?",
-                correlation_id, overwrote
+                address_name, overwrote
             );
         }
 
         let msg = SystemMsg::NodeQuery(NodeQuery::Data {
             query,
             auth: auth.into_inner(),
-            origin: EndUser(correlation_id),
+            origin: EndUser(address_name),
+            correlation_id: MessageId::from_xor_name(address_name),
         });
         let aggregation = false;
 
@@ -170,7 +171,7 @@ impl Core {
         let error = convert_to_error_message(error);
         let error = CmdError::Data(error);
 
-        self.send_cmd_error_response(error, origin, msg_id)
+        self.send_cmd_error_response(error, origin, msg_id).await
     }
 
     pub(crate) fn compute_holders(

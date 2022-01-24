@@ -27,6 +27,11 @@ impl MessageId {
         Self(XorName::random().0)
     }
 
+    /// Convert an XorName into a MessageId
+    pub fn from_xor_name(xor_name: XorName) -> Self {
+        Self(xor_name.0)
+    }
+
     fn fmt_bytes(bytes: &[u8; MESSAGE_ID_LEN], f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:0.10}", HexFmt(bytes))
     }

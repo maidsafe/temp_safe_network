@@ -22,8 +22,8 @@ use std::{cmp::Ordering, collections::BTreeSet};
 use xor_name::XorName;
 
 impl Core {
-    /// Forms a command to send the provided node error out
-    pub(crate) fn send_cmd_error_response(
+    /// Forms a CmdError msg to send back to the client
+    pub(crate) async fn send_cmd_error_response(
         &self,
         error: CmdError,
         target: Peer,
@@ -33,13 +33,26 @@ impl Core {
             error,
             correlation_id: msg_id,
         };
+        self.send_cmd_response(target, the_error_msg).await
+    }
 
+    /// Forms a CmdAck msg to send back to the client
+    pub(crate) async fn send_cmd_ack(
+        &self,
+        target: Peer,
+        msg_id: MessageId,
+    ) -> Result<Vec<Command>> {
+        let the_ack_msg = ServiceMsg::CmdAck {
+            correlation_id: msg_id,
+        };
+        self.send_cmd_response(target, the_ack_msg).await
+    }
+
+    /// Forms a command to send a cmd response error/ack to the client
+    async fn send_cmd_response(&self, target: Peer, msg: ServiceMsg) -> Result<Vec<Command>> {
         let dst = DstLocation::EndUser(EndUser(target.name()));
 
-        // FIXME: define which signature/authority this message should really carry,
-        // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
-        // Giving a random sig temporarily
-        let (msg_kind, payload) = Self::random_client_signature(&the_error_msg)?;
+        let (msg_kind, payload) = self.ed_sign_client_message(&msg).await?;
         let wire_msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, dst)?;
 
         let command = Command::SendMessage {
@@ -72,7 +85,7 @@ impl Core {
     /// Handle data query
     pub(crate) async fn handle_data_query_at_adult(
         &self,
-        msg_id: MessageId,
+        correlation_id: MessageId,
         query: &DataQuery,
         auth: ServiceAuth,
         user: EndUser,
@@ -86,7 +99,8 @@ impl Core {
                 .data_storage
                 .query(query, User::Key(auth.public_key))
                 .await,
-            correlation_id: msg_id,
+            // This shall be the original client's request' msg_id.
+            correlation_id,
             user,
         };
 
@@ -183,11 +197,7 @@ impl Core {
             response: query_response,
             correlation_id,
         };
-
-        // FIXME: define which signature/authority this message should really carry,
-        // perhaps it needs to carry Node signature on a NodeMsg::QueryResponse msg type.
-        // Giving a random sig temporarily
-        let (msg_kind, payload) = Self::random_client_signature(&msg)?;
+        let (msg_kind, payload) = self.ed_sign_client_message(&msg).await?;
 
         let dst = DstLocation::EndUser(EndUser(origin.name()));
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
@@ -216,12 +226,18 @@ impl Core {
         match msg {
             // These reads/writes are for adult nodes...
             ServiceMsg::Cmd(DataCmd::Register(cmd)) => {
-                self.send_data_to_adults(ReplicatedData::RegisterWrite(cmd), msg_id, user)
-                    .await
+                let mut commands = self
+                    .send_data_to_adults(ReplicatedData::RegisterWrite(cmd), msg_id, user.clone())
+                    .await?;
+                commands.extend(self.send_cmd_ack(user, msg_id).await?);
+                Ok(commands)
             }
             ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => {
-                self.send_data_to_adults(ReplicatedData::Chunk(chunk), msg_id, user)
-                    .await
+                let mut commands = self
+                    .send_data_to_adults(ReplicatedData::Chunk(chunk), msg_id, user.clone())
+                    .await?;
+                commands.extend(self.send_cmd_ack(user, msg_id).await?);
+                Ok(commands)
             }
             ServiceMsg::Query(query) => self.read_data_from_adults(query, msg_id, auth, user).await,
             _ => {

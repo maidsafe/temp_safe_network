@@ -25,7 +25,7 @@ use crate::node::{
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
 };
 use crate::peer::{Peer, UnnamedPeer};
-use crate::types::{log_markers::LogMarker, Keypair, PublicKey};
+use crate::types::{log_markers::LogMarker, PublicKey, Signature};
 use crate::{
     messaging::{
         data::{ServiceMsg, StorageLevel},
@@ -42,7 +42,7 @@ use crate::{
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
-use rand::rngs::OsRng;
+use ed25519_dalek::Signer;
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -738,12 +738,13 @@ impl Core {
                         query,
                         auth,
                         origin,
+                        correlation_id,
                     } => {
                         // There is no point in verifying a sig from a sender A or B here.
                         // Send back response to the sending elder
                         let sender_xorname = msg_authority.get_auth_xorname();
                         self.handle_data_query_at_adult(
-                            msg_id,
+                            correlation_id,
                             &query,
                             auth,
                             origin,
@@ -1020,16 +1021,15 @@ impl Core {
         }
     }
 
-    // TODO: Dedupe this w/ node
-    fn random_client_signature(client_msg: &ServiceMsg) -> Result<(MsgKind, Bytes)> {
-        let mut rng = OsRng;
-        let keypair = Keypair::new_ed25519(&mut rng);
+    // Currently using node's Ed key. May need to use bls key share for concensus purpose.
+    async fn ed_sign_client_message(&self, client_msg: &ServiceMsg) -> Result<(MsgKind, Bytes)> {
+        let keypair = self.node.read().await.keypair.clone();
         let payload = WireMsg::serialize_msg_payload(client_msg)?;
         let signature = keypair.sign(&payload);
 
         let msg = MsgKind::ServiceMsg(ServiceAuth {
-            public_key: keypair.public_key(),
-            signature,
+            public_key: PublicKey::Ed25519(keypair.public),
+            signature: Signature::Ed25519(signature),
         });
 
         Ok((msg, payload))

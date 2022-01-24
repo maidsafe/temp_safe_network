@@ -9,6 +9,7 @@
 use super::{QueryResult, Session};
 
 use super::AeCache;
+use crate::client::connections::CmdResponse;
 use crate::client::Error;
 use crate::elder_count;
 use crate::messaging::{
@@ -43,6 +44,9 @@ pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 // Number of bootstrap nodes to attempt to contact per batch (if provided by the node_config)
 pub(crate) const NODES_TO_CONTACT_PER_STARTUP_BATCH: usize = 3;
 
+// Duration of wait for the node to have chance to pickup network knowledge at the beginning
+const INITIAL_WAIT: u64 = 1;
+
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
     #[instrument(skip(err_sender), level = "debug")]
@@ -62,6 +66,7 @@ impl Session {
         let session = Session {
             pending_queries: Arc::new(DashMap::default()),
             incoming_err_sender: Arc::new(err_sender),
+            pending_cmds: Arc::new(DashMap::default()),
             endpoint,
             network: Arc::new(prefix_map),
             ae_redirect_cache: Arc::new(RwLock::new(AeCache::default())),
@@ -75,7 +80,6 @@ impl Session {
         Ok(session)
     }
 
-    /// Send a `ServiceMsg` to the network without awaiting for a response.
     #[instrument(skip(self, auth, payload), level = "debug", name = "session send cmd")]
     pub(crate) async fn send_cmd(
         &self,
@@ -123,6 +127,11 @@ impl Session {
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
+        // The insertion of channel will be executed AFTER the completion of the `send_message`.
+        let (sender, mut receiver) = channel::<CmdResponse>(targets_count);
+        let _ = self.pending_cmds.insert(msg_id, sender);
+        trace!("Inserted channel for cmd {:?}", msg_id);
+
         let res = send_message(
             self.clone(),
             elders.clone(),
@@ -132,10 +141,66 @@ impl Session {
         )
         .await;
 
-        // lets wait for any potential AE response while we're here.
-        // TODO: be smart about this. Check AE Retry cache for related msg id eg, continue early if we've seen some.
-        // (cannot continue earlier if everything goes okay first time though, which is a shame)
-        tokio::time::sleep(self.standard_wait).await;
+        let expected_acks = std::cmp::max(1, targets_count * 2 / 3);
+        // We are not wait for the receive of majority of cmd Acks.
+        // This could be further strict to wait for ALL the Acks get received.
+        // The period is expected to have AE completed, hence no extra wait is required.
+        let mut received_ack = 0;
+        let mut received_err = 0;
+        let mut attempts = 0;
+        let interval = Duration::from_millis(100);
+        let expected_attempts =
+            std::cmp::max(10, self.standard_wait.as_millis() / interval.as_millis());
+        loop {
+            match receiver.try_recv() {
+                Ok((src, None)) => {
+                    received_ack += 1;
+                    trace!(
+                        "received CmdAck of {:?} from {:?}, so far {:?} / {:?}",
+                        msg_id,
+                        src,
+                        received_ack,
+                        expected_acks
+                    );
+                    if received_ack >= expected_acks {
+                        let _ = self.pending_cmds.remove(&msg_id);
+                        break;
+                    }
+                }
+                Ok((src, Some(error))) => {
+                    received_err += 1;
+                    trace!(
+                        "received error response {:?} of cmd {:?} from {:?}, so far {:?} vs. {:?}",
+                        error,
+                        msg_id,
+                        src,
+                        received_ack,
+                        received_err
+                    );
+                    if received_err >= expected_acks {
+                        error!("Received majority of error response for cmd {:?}", msg_id);
+                        let _ = self.pending_cmds.remove(&msg_id);
+                        return Err(Error::from((error, msg_id)));
+                    }
+                }
+                Err(err) => {
+                    warn!(
+                        "CmdAck channel with err {:?}, CmdAcks received {:?} / {:?} / {:?}.",
+                        err, received_ack, expected_acks, targets_count
+                    );
+                }
+            }
+            attempts += 1;
+            if attempts >= expected_attempts {
+                warn!(
+                    "Terminated with insufficient CmdAcks of {:?}, {:?} / {:?}",
+                    msg_id, received_ack, expected_acks
+                );
+                break;
+            }
+            trace!("current attempt {:?}/{:?}", attempts, expected_attempts);
+            tokio::time::sleep(interval).await;
+        }
 
         trace!("Wait for any cmd response/reaction (AE msgs eg), is over)");
         res
@@ -393,12 +458,8 @@ impl Session {
             ..Default::default()
         };
 
-        let next_wait = backoff.next_backoff();
-
         // wait here to give a chance for AE responses to come in and be parsed
-        if let Some(wait) = next_wait {
-            tokio::time::sleep(wait).await;
-        }
+        tokio::time::sleep(Duration::from_secs(INITIAL_WAIT)).await;
 
         // If we start with genesis key here, we should wait until we have _at least_ one AE-Retry in
         if section_pk == self.genesis_key {
@@ -416,14 +477,13 @@ impl Session {
 
             let stats = self.network.known_sections_count();
 
-            // wait until we have _some_ network knowledge
+            // wait until we have sufficient network knowledge
             while known_sap.is_none() || insufficient_sap_peers {
                 if tried_every_contact {
                     return Err(Error::NetworkContact);
                 }
 
                 debug!("Client still has not received a complete section's AE-Retry message... Current sections known: {:?}. Do we have insufficient peers: {:?}", stats, insufficient_sap_peers);
-
                 knowledge_checks += 1;
 
                 // only after a couple of waits do we try contacting more nodes...
@@ -503,142 +563,165 @@ pub(super) async fn send_message(
     endpoint: Endpoint,
     msg_id: MessageId,
 ) -> Result<(), Error> {
-    let priority = wire_msg.clone().into_message()?.priority();
+    let _spawn_result = tokio::spawn(async move {
+        let priority = if let Ok(msg) = wire_msg.clone().into_message() {
+            msg.priority()
+        } else {
+            error!("Failed to convert wire_msg {:?} into message", msg_id);
+            return;
+        };
 
-    let msg_bytes = wire_msg.serialize()?;
+        let msg_bytes = if let Ok(res) = wire_msg.serialize() {
+            res
+        } else {
+            error!("Failed to serialize wire_msg {:?}", msg_id);
+            return;
+        };
 
-    // Send message to all Elders concurrently
-    let mut tasks = Vec::default();
+        // Send message to all Elders concurrently
+        let mut tasks = Vec::default();
 
-    let successes = Arc::new(RwLock::new(0));
+        let successes = Arc::new(RwLock::new(0));
 
-    // let contactable_elders = elders.clone();
-    // clone elders as we want to update them in this process
-    for peer in elders.clone() {
-        let session = session.clone();
-        let msg_bytes_clone = msg_bytes.clone();
-        let endpoint = endpoint.clone();
+        // let contactable_elders = elders.clone();
+        // clone elders as we want to update them in this process
+        for peer in elders.clone() {
+            let session = session.clone();
+            let msg_bytes_clone = msg_bytes.clone();
+            let endpoint = endpoint.clone();
 
-        let mut reused_connection = true;
-        let peer_name = peer.name();
-        let cloned_peer = peer.clone();
-        // let addr = peer.addr();
-        let failed_connection_id = session
-            .elder_last_closed_connections
-            .get(&peer_name)
-            .map(|entry| *entry.value());
-        let connection = peer
-            .ensure_connection(
-                // map closed conns to elders here and in listeners and compare here...
-                // TODO: log any connections that failed's IDs and then check if that conn is valid here
-                // `is_valid = |connection| connection.id() != failed_connection_id`).
-                |connection| Some(connection.id()) != failed_connection_id,
-                |addr| {
-                    reused_connection = false;
-                    async move {
+            let mut reused_connection = true;
+            let peer_name = peer.name();
+            let cloned_peer = peer.clone();
+            // let addr = peer.addr();
+            let failed_connection_id = session
+                .elder_last_closed_connections
+                .get(&peer_name)
+                .map(|entry| *entry.value());
+
+            let task_handle: JoinHandle<(XorName, usize, Result<(), Error>)> = tokio::spawn(
+                async move {
+                    let connection = peer
+                        .ensure_connection(
+                            // map closed conns to elders here and in listeners and compare here...
+                            // TODO: log any connections that failed's IDs and then check if that conn is valid here
+                            // `is_valid = |connection| connection.id() != failed_connection_id`).
+                            |connection| Some(connection.id()) != failed_connection_id,
+                            |addr| {
+                                reused_connection = false;
+                                async move {
+                                    trace!(
+                                        "Prior connection no longer valid, opening a new connection to: {:?} ",
+                                        addr
+                                    );
+                                    let (connection, connection_incoming) = endpoint.connect_to(&addr).await?;
+                                    let conn_id = connection.id();
+                                    Session::spawn_message_listener_thread(
+                                        session.clone(),
+                                        conn_id,
+                                        cloned_peer,
+                                        connection_incoming,
+                                    );
+                                    Ok(connection)
+                                }
+                            },
+                        )
+                        .await;
+
+                    let connection_id = match connection {
+                        Ok(conn) => conn.id(),
+                        Err(err) => {
+                            error!("Failed to get connection_id of {:?} {:?}", peer_name, err);
+                            return (peer_name, 0, Err(Error::from(err)));
+                        }
+                    };
+
+                    if reused_connection {
                         trace!(
-                            "Prior connection no longer valid, opening a new connection to: {:?} ",
-                            addr
+                            connection_id,
+                            src = %peer.addr(),
+                            "Client::ConnectionReused",
                         );
-                        let (connection, connection_incoming) = endpoint.connect_to(&addr).await?;
-                        let conn_id = connection.id();
-                        Session::spawn_message_listener_thread(
-                            session.clone(),
-                            conn_id,
-                            cloned_peer,
-                            connection_incoming,
-                        );
-                        Ok(connection)
+                    }
+
+                    let connection = peer.connection().await;
+                    if let Some(connection) = connection {
+                        (
+                            peer_name,
+                            connection_id,
+                            connection
+                                .send_with(msg_bytes_clone, priority, None)
+                                .await
+                                .map_err(Error::from),
+                        )
+                    } else {
+                        error!("Peer connection did not exist, even after using 'ensure_connection'. Message to {:?} was not sent.",peer);
+                        (
+                            peer_name,
+                            connection_id,
+                            Err(Error::PeerConnection(peer.addr())),
+                        )
                     }
                 },
-            )
-            .await;
+            );
 
-        let connection_id = connection?.id();
+            tasks.push(task_handle);
+        }
 
-        if reused_connection {
-            trace!(
-                connection_id,
-                src = %peer.addr(),
-                "Client::ConnectionReused",
+        // Let's await for all messages to be sent
+        let results = join_all(tasks).await;
+
+        for r in results {
+            match r {
+                Ok((peer_name, connection_id, send_result)) => {
+                    if let Err(Error::QuicP2pSend(SendError::ConnectionLost(
+                        ConnectionError::Closed(Close::Application { reason, .. }),
+                    ))) = send_result
+                    {
+                        warn!(
+                            "Connection was closed by the node: {:?}",
+                            String::from_utf8(reason.to_vec())
+                        );
+
+                        let _old = session
+                            .elder_last_closed_connections
+                            .insert(peer_name, connection_id);
+                        // this is not necessarily an error
+                        // *successes.write().await += 1;
+                    } else if send_result.is_err() {
+                        error!("Error during {:?} send: {:?}", msg_id, send_result);
+                    } else {
+                        *successes.write().await += 1;
+                    }
+                }
+                Err(join_error) => {
+                    warn!("Tokio join error as we send: {:?}", join_error)
+                }
+            }
+        }
+
+        let failures = elders.len() - *successes.read().await;
+
+        if failures > 0 {
+            error!(
+                "Sending the message ({:?}) from {} to {}/{} of the elders failed: {:?}",
+                msg_id,
+                endpoint.public_addr(),
+                failures,
+                elders.len(),
+                elders,
             );
         }
 
-        let task_handle: JoinHandle<(XorName, usize, Result<(), Error>)> = tokio::spawn(
-            async move {
-                let connection = peer.connection().await;
-                if let Some(connection) = connection {
-                    (
-                        peer_name,
-                        connection_id,
-                        connection
-                            .send_with(msg_bytes_clone, priority, None)
-                            .await
-                            .map_err(Error::from),
-                    )
-                } else {
-                    error!("Peer connection did not exist, even after using 'ensure_connection'. Message to {:?} was not sent.",peer);
-                    (
-                        peer_name,
-                        connection_id,
-                        Err(Error::PeerConnection(peer.addr())),
-                    )
-                }
-            },
-        );
-
-        tasks.push(task_handle);
-    }
-
-    // Let's await for all messages to be sent
-    let results = join_all(tasks).await;
-
-    for r in results {
-        match r {
-            Ok((peer_name, connection_id, send_result)) => {
-                if let Err(Error::QuicP2pSend(SendError::ConnectionLost(
-                    ConnectionError::Closed(Close::Application { reason, .. }),
-                ))) = send_result
-                {
-                    warn!(
-                        "Connection was closed by the node: {:?}",
-                        String::from_utf8(reason.to_vec())
-                    );
-
-                    let _old = session
-                        .elder_last_closed_connections
-                        .insert(peer_name, connection_id);
-                    // this is not necessarily an error
-                    // *successes.write().await += 1;
-                } else if send_result.is_err() {
-                    error!("Error during {:?} send: {:?}", msg_id, send_result);
-                } else {
-                    *successes.write().await += 1;
-                }
-            }
-            Err(join_error) => {
-                warn!("Tokio join error as we send: {:?}", join_error)
-            }
+        let successful_sends = *successes.read().await;
+        if failures > successful_sends {
+            error!("More errors when sending a message than successes");
         }
-    }
-
-    let failures = elders.len() - *successes.read().await;
-
-    if failures > 0 {
-        error!(
-            "Sending the message ({:?}) from {} to {}/{} of the elders failed: {:?}",
-            msg_id,
-            endpoint.public_addr(),
-            failures,
-            elders.len(),
-            elders,
-        );
-    }
-
-    let successful_sends = *successes.read().await;
-    if failures > successful_sends {
-        error!("More errors when sending a message than successes");
-    }
+    });
+    debug!(
+        "result of spawn a send_message thread of {:?} is {:?}",
+        msg_id, _spawn_result
+    );
     Ok(())
 }
 
