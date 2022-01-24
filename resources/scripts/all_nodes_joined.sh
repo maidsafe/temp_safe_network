@@ -17,7 +17,7 @@ echo "Checking logfiles to check all nodes have joined"
 log_dir="$HOME/.safe/node/local-test-network"
 
 # -u needed here to search log dirs
-nodes_joined=$(rg "ReceivedJoinApproval" "$log_dir" -g "*.log*"  -u -c | wc -l)
+nodes_joined=$(rg "Joined the network" "$log_dir" -g "*.log*"  -u -c | wc -l)
 
 echo "Joined nodes found: $nodes_joined ."
 
