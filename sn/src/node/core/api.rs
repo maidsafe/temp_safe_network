@@ -260,10 +260,16 @@ impl Core {
             .into_iter()
             .map(|itr| itr.into_authed_msg())
             .collect();
+        let signed_sap = self
+            .network_knowledge
+            .section_signed_authority_provider()
+            .await;
 
         let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::ApprovalShare {
             node_state,
             sig_share,
+            section_auth: signed_sap.value.to_msg(),
+            section_signed: signed_sap.sig,
             section_chain: self.network_knowledge.section_chain().await,
             members,
         }));

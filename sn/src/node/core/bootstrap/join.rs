@@ -214,8 +214,35 @@ impl<'a> Join<'a> {
                 JoinResponse::ApprovalShare {
                     node_state,
                     sig_share,
+                    section_auth,
+                    section_signed,
+                    section_chain,
                     ..
                 } => {
+                    // The JoinResponse::Redirect doesn't contains the proof_chain of the target
+                    // section. Hence self.prefix_map didn't get updated on receiving it.
+                    // In such case, we have to update self.prefix_map based on the received infos
+                    // within JoinResponse::ApprovalShare
+                    let section_auth = section_auth.into_state();
+                    let signed_sap = SectionAuth {
+                        value: section_auth,
+                        sig: section_signed,
+                    };
+                    match self.prefix_map.update(signed_sap, &section_chain) {
+                        Ok(updated) => {
+                            debug!(
+                                "Update prefix_map via JoinResponse::ApprovalShare: {:?}",
+                                updated
+                            );
+                        }
+                        Err(err) => {
+                            debug!(
+                                "Failed to update prefix_map via JoinResponse::ApprovalShare: {:?}",
+                                err
+                            );
+                        }
+                    }
+
                     let serialized_details =
                         if let Some(node_state_serialized) = &self.node_state_serialized {
                             node_state_serialized.clone()
