@@ -177,7 +177,7 @@ impl<'a> Join<'a> {
                     section_chain,
                     node_state,
                 } => {
-                    trace!("{}", LogMarker::ReceivedJoinApproval);
+                    info!("{}", LogMarker::ReceivedJoinApproval);
                     if node_state.name != self.node.name() {
                         trace!("Ignore NodeApproval not for us: {:?}", node_state);
                         continue;
