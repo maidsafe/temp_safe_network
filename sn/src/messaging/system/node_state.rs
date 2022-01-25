@@ -6,12 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use bls::PublicKey as BlsPublicKey;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use xor_name::{XorName, XOR_NAME_LEN};
 
 /// Information about a member of our section.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub struct NodeState {
     /// Peer's name.
     pub name: XorName,
@@ -30,7 +31,7 @@ impl NodeState {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 /// Node's current section membership state
 pub enum MembershipState {
     /// Node is active member of the section.
@@ -38,5 +39,19 @@ pub enum MembershipState {
     /// Node went offline.
     Left,
     /// Node was relocated to a different section.
-    Relocated(XorName),
+    Relocated(Box<RelocateDetails>),
+}
+
+/// Details of a node that has been relocated
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+pub struct RelocateDetails {
+    /// Name of the node to relocate (this is the node's name before relocation).
+    pub previous_name: XorName,
+    /// Relocation destination, the node will be relocated to
+    /// a section whose prefix matches this name.
+    pub dst: XorName,
+    /// The BLS key of the destination section used by the relocated node to verify messages.
+    pub dst_section_key: BlsPublicKey,
+    /// The age the node will have post-relocation.
+    pub age: u8,
 }

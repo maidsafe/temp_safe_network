@@ -170,7 +170,14 @@ impl Comm {
         Ok(())
     }
 
+    /// Fake function used as replacement for testing only.
+    #[cfg(test)]
+    pub(crate) async fn is_reachable(&self, _peer: &SocketAddr) -> Result<(), Error> {
+        Ok(())
+    }
+
     /// Tests whether the peer is reachable.
+    #[cfg(not(test))]
     pub(crate) async fn is_reachable(&self, peer: &SocketAddr) -> Result<(), Error> {
         let qp2p_config = qp2p::Config {
             forward_port: false,

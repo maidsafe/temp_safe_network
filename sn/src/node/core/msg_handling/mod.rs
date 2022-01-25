@@ -19,7 +19,7 @@ mod update_section;
 use crate::dbs::Error as DbError;
 use crate::node::{
     api::command::Command,
-    core::{relocation::RelocateState, Core, DkgSessionInfo},
+    core::{Core, DkgSessionInfo},
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::NetworkKnowledge,
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
@@ -312,25 +312,13 @@ impl Core {
                 )
                 .await
             }
-            SystemMsg::Relocate(ref details) => {
+            SystemMsg::Relocate(node_state) => {
                 trace!("Handling msg: Relocate from {}: {:?}", sender, msg_id);
-                if let NodeMsgAuthority::Section(section_signed) = msg_authority {
-                    Ok(self
-                        .handle_relocate(details.clone(), node_msg, section_signed)
-                        .await?
-                        .into_iter()
-                        .collect())
-                } else {
-                    Err(Error::InvalidSrcLocation)
-                }
-            }
-            SystemMsg::RelocatePromise(promise) => {
-                trace!(
-                    "Handling msg: RelocatePromise from {}: {:?}",
-                    sender,
-                    msg_id
-                );
-                self.handle_relocate_promise(promise, node_msg).await
+                Ok(self
+                    .handle_relocate(node_state)
+                    .await?
+                    .into_iter()
+                    .collect())
             }
             SystemMsg::StartConnectivityTest(name) => {
                 trace!(
@@ -346,9 +334,7 @@ impl Core {
             }
             SystemMsg::JoinAsRelocatedResponse(join_response) => {
                 trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
-                if let Some(RelocateState::InProgress(ref mut joining_as_relocated)) =
-                    *self.relocate_state.write().await
-                {
+                if let Some(ref mut joining_as_relocated) = *self.relocate_state.write().await {
                     if let Some(cmd) = joining_as_relocated
                         .handle_join_response(*join_response, sender.addr())
                         .await?
@@ -440,9 +426,8 @@ impl Core {
                                 info!("Relocation: Successfully aggregated ApprovalShares for joining the network");
                                 let mut commands = vec![];
 
-                                if let Some(RelocateState::InProgress(
-                                    ref mut joining_as_relocated,
-                                )) = *self.relocate_state.write().await
+                                if let Some(ref mut joining_as_relocated) =
+                                    *self.relocate_state.write().await
                                 {
                                     let new_node = joining_as_relocated.node.clone();
                                     let new_name = new_node.name();

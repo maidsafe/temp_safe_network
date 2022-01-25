@@ -29,9 +29,9 @@ pub(crate) use capacity::MIN_LEVEL_WHEN_FULL;
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
 pub(crate) use proposal::Proposal;
 #[cfg(test)]
-pub(crate) use relocation::{check as relocation_check, RelocatePayloadUtils};
+pub(crate) use relocation::check as relocation_check;
 
-use self::{data_storage::DataStorage, relocation::RelocateState, split_barrier::SplitBarrier};
+use self::{data_storage::DataStorage, split_barrier::SplitBarrier};
 
 use super::{
     api::command::Command,
@@ -84,7 +84,7 @@ pub(crate) const CONCURRENT_JOINS: usize = 7;
 // the section).
 const CHUNK_QUERY_TIMEOUT: Duration = Duration::from_secs(60 * 5 /* 5 mins */);
 
-// store up to 100 in use backoffs
+// Store up to 100 in use backoffs
 pub(crate) type AeBackoffCache =
     Arc<RwLock<LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>>>;
 
@@ -95,7 +95,7 @@ pub(crate) struct DkgSessionInfo {
     pub(crate) authority: AuthorityProof<SectionAuth>,
 }
 
-// State + logic of a routing node.
+// Core state + logic of a node.
 pub(crate) struct Core {
     pub(crate) comm: Comm,
     pub(crate) node: Arc<RwLock<Node>>,
@@ -105,9 +105,8 @@ pub(crate) struct Core {
     proposal_aggregator: SignatureAggregator,
     split_barrier: Arc<RwLock<SplitBarrier>>,
     dkg_sessions: Arc<RwLock<HashMap<DkgSessionId, DkgSessionInfo>>>,
-    // Voter for Dkg
     dkg_voter: DkgVoter,
-    relocate_state: Arc<RwLock<Option<RelocateState>>>,
+    relocate_state: Arc<RwLock<Option<Box<JoiningAsRelocated>>>>,
     pub(super) event_tx: mpsc::Sender<Event>,
     joins_allowed: Arc<RwLock<bool>>,
     current_joins_semaphore: Arc<Semaphore>,
@@ -338,10 +337,6 @@ impl Core {
             );
 
             self.send_event(event).await
-        }
-
-        if !new.is_elder {
-            commands.extend(self.return_relocate_promise().await);
         }
 
         Ok(commands)

@@ -73,8 +73,10 @@ impl Core {
                 // having to send this `NodeApproval`.
                 commands.extend(self.send_node_approval(old_info.clone()).await);
 
-                let peer = new_info.peer().clone();
-                commands.extend(self.relocate_rejoining_peer(peer, new_age).await?);
+                commands.extend(
+                    self.relocate_rejoining_peer(old_info.value, new_age)
+                        .await?,
+                );
 
                 return Ok(commands);
             }
@@ -138,12 +140,14 @@ impl Core {
         let mut commands = vec![];
         let signature = sig.signature.clone();
 
+        let signed_node_state = SectionAuth {
+            value: node_state.clone(),
+            sig,
+        };
+
         if !self
             .network_knowledge
-            .update_member(SectionAuth {
-                value: node_state.clone(),
-                sig,
-            })
+            .update_member(signed_node_state.clone())
             .await
         {
             info!(
@@ -159,6 +163,16 @@ impl Core {
             node_state.name(),
             node_state.addr()
         );
+
+        // If this is an Offline agreement where the new node state is Relocated,
+        // we then need to send the Relocate msg to the peer attaching the signed NodeState
+        // containing the relocation details.
+        if node_state.is_relocated() {
+            commands.extend(
+                self.send_relocate(node_state.peer().clone(), signed_node_state)
+                    .await?,
+            );
+        }
 
         commands.extend(self.relocate_peers(&node_state.name(), &signature).await?);
 

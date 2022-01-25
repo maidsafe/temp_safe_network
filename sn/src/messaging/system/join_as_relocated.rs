@@ -6,9 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::relocation::RelocatePayload;
+use super::{NodeState, SectionAuth};
 use crate::messaging::SectionAuthorityProvider;
 use bls::PublicKey as BlsPublicKey;
+use ed25519_dalek::Signature;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
@@ -18,7 +19,9 @@ pub struct JoinAsRelocatedRequest {
     /// The public key of the section to join.
     pub section_key: BlsPublicKey,
     /// The relocation details signed by the previous section.
-    pub relocate_payload: Option<RelocatePayload>,
+    pub relocate_proof: SectionAuth<NodeState>,
+    /// The new name of the node signed using its old public_key, to prove the node identity.
+    pub signature_over_new_name: Signature,
 }
 
 /// Response to a request to join a section as relocated
