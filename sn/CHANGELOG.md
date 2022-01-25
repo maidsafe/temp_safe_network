@@ -5,15 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.54.1 (2022-01-24)
+## v0.54.2 (2022-01-25)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 1 day passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -23,15 +22,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #929 ([`c4ba2db`](https://github.com/maidsafe/safe_network/commit/c4ba2db749c5ff57a8c74eacb22307e2358182b2))
+</details>
+
+## v0.54.1 (2022-01-24)
+
+### Bug Fixes
+
+ - <csr-id-151993ac6442224079dc02bfe476d2dfbc1a411b/> put connection ensurance and sending within the same spawned thread
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 2 days passed between releases.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.54.1 ([`5a90ec6`](https://github.com/maidsafe/safe_network/commit/5a90ec673edcb36ae954b0af6144bae7d8243cd7))
+    - put connection ensurance and sending within the same spawned thread ([`151993a`](https://github.com/maidsafe/safe_network/commit/151993ac6442224079dc02bfe476d2dfbc1a411b))
     - keep all logs by default ([`99df748`](https://github.com/maidsafe/safe_network/commit/99df748624a36e1d2457cb81f74e8cd8accb8633))
+    - address some review comments ([`4e517a1`](https://github.com/maidsafe/safe_network/commit/4e517a1fd57e63a3b5381ecd0cdf9db4f762e03f))
 </details>
 
 ## v0.54.0 (2022-01-22)
+
+<csr-id-8f58c5d900ce00d90bf7421f34122f4ca5ff5601/>
 
 ### chore (BREAKING)
 
  - <csr-id-8f58c5d900ce00d90bf7421f34122f4ca5ff5601/> making section members list non optional in AntiEntropyUpdate message type
 
+
+### Bug Fixes
+
+ - <csr-id-8f5f7fd0c57db4a2cd29dfe2dc617b796fea97f4/> make client sending message non-blocking
+ - <csr-id-36daaebd84e07c3ff55477e24598e6b9d0c0b314/> correct correlation_id for query response
+ - <csr-id-56b6b11447010485c860a55e6dbd035d826091d1/> client wait longer for AE update got triggered
+ - <csr-id-10123e6a3d18129fcb5c0090d409a02b2f762139/> using try_send to avoid blocking
+ - <csr-id-1e4049fc944f8bcab0e51671219896854a3bffaa/> return CmdError to the caller
+ - <csr-id-c0cc9807df988ca3a871720edadc4ff19e028f63/> sign to client msg with node's Ed key
 
 ### New Features
 
@@ -43,6 +81,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-a02f5f0de50c7c58b1cda55a14cb63d805c772c5/> clients mark closed connections as such
    And now check that the current connection is valid before trying to use it.
    Otherwise they reconnect
+ - <csr-id-d88890261c2ca06498914714eefb56aff61673d5/> counting ACK/Err cmd response together and notify error to upper layer
+ - <csr-id-939f353ed399d0148ba52225ca6d1676d3d7c04b/> timeout on waiting CmdAcks
+ - <csr-id-b33b7dcb7fa6eb976bff7f38ac3d6ddc62e1977a/> send CmdAck on client cmd
 
 ### refactor (BREAKING)
 
@@ -52,9 +93,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 17 commits contributed to the release over the course of 4 calendar days.
+ - 28 commits contributed to the release.
  - 1 day passed between releases.
- - 11 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 22 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -65,22 +106,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - safe_network-0.54.0/sn_api-0.52.0/sn_cli-0.45.0 ([`0190f03`](https://github.com/maidsafe/safe_network/commit/0190f0305980bdaee30f9f2ab5eb5510149916db))
+    - resolve clippy failures after rebase ([`274cc12`](https://github.com/maidsafe/safe_network/commit/274cc12ca37da5ff536a7b4ab59f803546ccefe9))
     - update remaining places ([`3dc2327`](https://github.com/maidsafe/safe_network/commit/3dc23278c6a4fabc250b27f4312f5c51f0f271a4))
+    - make client sending message non-blocking ([`8f5f7fd`](https://github.com/maidsafe/safe_network/commit/8f5f7fd0c57db4a2cd29dfe2dc617b796fea97f4))
     - Merge #958 ([`437a113`](https://github.com/maidsafe/safe_network/commit/437a113e6e5736e4eb4287f41228806678a9762e))
+    - correct correlation_id for query response ([`36daaeb`](https://github.com/maidsafe/safe_network/commit/36daaebd84e07c3ff55477e24598e6b9d0c0b314))
     - Merge #955 ([`b7581b9`](https://github.com/maidsafe/safe_network/commit/b7581b91ed7778b1b962a0fdfc7d33a65cc7098c))
+    - client wait longer for AE update got triggered ([`56b6b11`](https://github.com/maidsafe/safe_network/commit/56b6b11447010485c860a55e6dbd035d826091d1))
     - Merge branch 'main' into simplify-sn-api ([`33ef052`](https://github.com/maidsafe/safe_network/commit/33ef0524ae238391f25c8fb340627c34ea79fcb2))
+    - using try_send to avoid blocking ([`10123e6`](https://github.com/maidsafe/safe_network/commit/10123e6a3d18129fcb5c0090d409a02b2f762139))
     - removing the internal routing layer ([`959e909`](https://github.com/maidsafe/safe_network/commit/959e909d8c61230ea143702858cb7b4c42caffbf))
     - wait before attempting to make_contact again ([`1b3c0eb`](https://github.com/maidsafe/safe_network/commit/1b3c0eb4443cff3f4575164907a7a1fbf92cebe2))
     - remove one layer of indirection ([`3b5ce19`](https://github.com/maidsafe/safe_network/commit/3b5ce194213a7090ee83c02b0043700cda230796))
+    - return CmdError to the caller ([`1e4049f`](https://github.com/maidsafe/safe_network/commit/1e4049fc944f8bcab0e51671219896854a3bffaa))
     - retry intial client contact if it fails ([`61e87de`](https://github.com/maidsafe/safe_network/commit/61e87de077bd47b3dd106dc1e1dd65aa1f5b2d0e))
+    - sign to client msg with node's Ed key ([`c0cc980`](https://github.com/maidsafe/safe_network/commit/c0cc9807df988ca3a871720edadc4ff19e028f63))
     - clients mark closed connections as such ([`a02f5f0`](https://github.com/maidsafe/safe_network/commit/a02f5f0de50c7c58b1cda55a14cb63d805c772c5))
+    - counting ACK/Err cmd response together and notify error to upper layer ([`d888902`](https://github.com/maidsafe/safe_network/commit/d88890261c2ca06498914714eefb56aff61673d5))
     - dont fail client send w/ closed conn ([`d96ded1`](https://github.com/maidsafe/safe_network/commit/d96ded11ca74e75dde3dcc0d0b865712895d3dcc))
     - ignore many_client tests ([`d84ac52`](https://github.com/maidsafe/safe_network/commit/d84ac520676b83f39d5cf356e89ac3ec2d6478cc))
+    - timeout on waiting CmdAcks ([`939f353`](https://github.com/maidsafe/safe_network/commit/939f353ed399d0148ba52225ca6d1676d3d7c04b))
     - Merge #951 ([`7f42d4e`](https://github.com/maidsafe/safe_network/commit/7f42d4e38d3bbf5b946c499b6a3543e50096a036))
+    - send CmdAck on client cmd ([`b33b7dc`](https://github.com/maidsafe/safe_network/commit/b33b7dcb7fa6eb976bff7f38ac3d6ddc62e1977a))
     - Merge branch 'main' into node-logrotate ([`4c86c16`](https://github.com/maidsafe/safe_network/commit/4c86c16fca4a5eb63c37c74344fa726542fa3422))
     - Merge #962 ([`29d01da`](https://github.com/maidsafe/safe_network/commit/29d01da5233fd2a10b30699b555a0d85d7a7409a))
     - update year on files modified 2022 ([`7a7752f`](https://github.com/maidsafe/safe_network/commit/7a7752f830785ec39d301e751dc75f228d43d595))
     - making section members list non optional in AntiEntropyUpdate message type ([`8f58c5d`](https://github.com/maidsafe/safe_network/commit/8f58c5d900ce00d90bf7421f34122f4ca5ff5601))
+    - send CmdAck for client cmd during test ([`37d2522`](https://github.com/maidsafe/safe_network/commit/37d2522619e49212572aa37034e0ba1857679dc7))
 </details>
 
 ## v0.53.0 (2022-01-20)
@@ -600,7 +652,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### refactor (BREAKING)
 
  - <csr-id-e9a9cc1096e025d88f19390ad6ba7398f71bc800/> removing unnecessary Error type definitions
-
 
 ### New Features
 
