@@ -126,7 +126,9 @@ impl Core {
 
         let node_id = XorName::from(sending_node_pk);
         let op_id = response.operation_id()?;
-        let origin = if let Some(origin) = self.pending_data_queries.remove(&op_id).await {
+        let waiting_client_peers = if let Some(origin) =
+            self.pending_data_queries.remove(&op_id).await
+        {
             origin
         } else {
             warn!(
@@ -193,19 +195,19 @@ impl Core {
         // Giving a random sig temporarily
         let (msg_kind, payload) = Self::random_client_signature(&msg)?;
 
-        let dst = DstLocation::EndUser(EndUser(origin.name()));
-        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
+        for peer in waiting_client_peers {
+            let dst = DstLocation::EndUser(EndUser(peer.name()));
+            let wire_msg = WireMsg::new_msg(msg_id, payload.clone(), msg_kind.clone(), dst)?;
 
-        trace!(
-            "Responding with the first chunk query response to {:?}",
-            dst
-        );
+            trace!("Responding with the first data query response to {:?}", dst);
 
-        let command = Command::SendMessage {
-            recipients: vec![origin],
-            wire_msg,
-        };
-        commands.push(command);
+            let command = Command::SendMessage {
+                recipients: vec![peer],
+                wire_msg,
+            };
+            commands.push(command);
+        }
+
         Ok(commands)
     }
 

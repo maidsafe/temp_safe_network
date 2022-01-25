@@ -93,20 +93,27 @@ impl Core {
         }
 
         // this would be one req per client at a time...
-        // let correlation_id = origin.name();
-        // let correlation_id = *address.name();
-        let overwrote = self
+        let pending_peers =
+            if let Some(waiting_peers) = self.pending_data_queries.get(&operation_id).await {
+                let mut all_peers = vec![origin.clone()];
+                for p in waiting_peers {
+                    all_peers.push(p);
+                }
+
+                trace!(
+                    "Tracking {:?} pending peers for op_id: {operation_id:?}",
+                    all_peers.len()
+                );
+
+                all_peers
+            } else {
+                vec![origin.clone()]
+            };
+
+        let _overwrote = self
             .pending_data_queries
-            .set(operation_id, origin.clone(), None)
+            .set(operation_id, pending_peers, None)
             .await;
-        if let Some(overwrote) = overwrote {
-            // Since `XorName` is a 256 bit value, we consider the probability negligible, but warn
-            // anyway so we're not totally lost if it does happen.
-            warn!(
-                "Overwrote an existing pending data query for {:?} from {} - what are the chances?",
-                operation_id, overwrote
-            );
-        }
 
         let msg = SystemMsg::NodeQuery(NodeQuery::Data {
             query,
