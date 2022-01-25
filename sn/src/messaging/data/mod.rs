@@ -334,7 +334,10 @@ mod tests {
         if let Some(key) = gen_keys().first() {
             let errored_response = QueryResponse::GetRegister((
                 Err(Error::AccessDenied(User::Key(*key))),
-                [0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,1,2], // some op id
+                [
+                    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5,
+                    6, 7, 8, 9, 1, 2,
+                ], // some op id
             ));
             assert!(format!("{:?}", errored_response).contains("GetRegister((Err(AccessDenied("));
             Ok(())

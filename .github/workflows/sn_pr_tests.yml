@@ -414,6 +414,11 @@ jobs:
         timeout-minutes: 5
         continue-on-error: true
 
+      # many_clients test
+      - name: many client tests
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- from_many_clients  && sleep $POST_TEST_SLEEP
+        timeout-minutes: 15
+
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: Initial client tests... (unix)
         shell: zsh {0}
