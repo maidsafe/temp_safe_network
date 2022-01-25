@@ -14,6 +14,7 @@ use crate::types::{
     register::{Entry, Policy, RegisterOp, User},
     RegisterAddress as Address,
 };
+use tiny_keccak::{Hasher, Sha3};
 
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
@@ -314,26 +315,13 @@ impl RegisterQuery {
     /// Retrieves the operation identifier for this response, use in tracking node liveness
     /// and responses at clients.
     /// Must be the same as the query response
-    /// Right now returning result to fail for anything non-chunk, as that's all we're tracking from other nodes here just now.
     pub fn operation_id(&self) -> Result<OperationId> {
-        match self {
-            RegisterQuery::Get(_) => Ok(format!("Get-{:?}", self.encode_to_zbase32()?)),
-            RegisterQuery::Read(_) => Ok(format!("Read-{:?}", self.encode_to_zbase32()?)),
-            RegisterQuery::GetPolicy(_) => Ok(format!("GetPolicy-{:?}", self.encode_to_zbase32()?)),
-            RegisterQuery::GetUserPermissions { .. } => Ok(format!(
-                "GetUserPermissions-{:?}",
-                self.encode_to_zbase32()?
-            )),
-            RegisterQuery::GetEntry { .. } => {
-                Ok(format!("GetEntry-{:?}", self.encode_to_zbase32()?))
-            }
-            RegisterQuery::GetOwner(_) => Ok(format!("GetOwner-{:?}", self.encode_to_zbase32()?)),
-        }
-    }
-
-    /// Returns the query serialised and encoded in z-base-32.
-    fn encode_to_zbase32(&self) -> Result<String> {
-        crate::types::utils::encode(&self).map_err(|_| Error::NoOperationId)
+        let bytes = crate::types::utils::encode(&self).map_err(|_| Error::NoOperationId)?;
+        let mut hasher = Sha3::v256();
+        let mut output = [0; 32];
+        hasher.update(bytes.as_bytes());
+        hasher.finalize(&mut output);
+        Ok(output)
     }
 }
 

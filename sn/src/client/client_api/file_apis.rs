@@ -549,7 +549,9 @@ mod tests {
 
         let mut tasks = vec![];
 
-        for i in 1..100 {
+        debug!("======> Data uploaded");
+
+        for i in 1..50 {
             debug!("starting client on thread #{:?}", i);
             let handle: Instrumented<tokio::task::JoinHandle<Result<()>>> =
                 tokio::spawn(async move {

@@ -36,15 +36,22 @@ use crate::{
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, convert::TryFrom};
+use tiny_keccak::{Hasher, Sha3};
 use xor_name::XorName;
 
 /// Derivable Id of an operation. Query/Response should return the same id for simple tracking purposes.
 /// TODO: make uniquer per requester for some operations
-pub type OperationId = String;
+pub type OperationId = [u8; 32];
 
 /// Return operation Id of a chunk
-pub fn operation_id(address: &ChunkAddress) -> Result<OperationId> {
-    utils::encode(address).map_err(|_| Error::NoOperationId)
+pub fn chunk_operation_id(address: &ChunkAddress) -> Result<OperationId> {
+    let bytes = utils::encode(address).map_err(|_| Error::NoOperationId)?;
+    let mut hasher = Sha3::v256();
+    let mut output = [0; 32];
+    hasher.update(bytes.as_bytes());
+    hasher.finalize(&mut output);
+
+    Ok(output)
 }
 
 /// A message indicating that an error occurred as a node was handling a client's message.
@@ -222,10 +229,10 @@ impl QueryResponse {
         // TODO: Operation Id should eventually encompass _who_ the op is for.
         match self {
             GetChunk(result) => match result {
-                Ok(chunk) => operation_id(chunk.address()),
-                Err(ErrorMessage::ChunkNotFound(name)) => operation_id(&ChunkAddress(*name)),
+                Ok(chunk) => chunk_operation_id(chunk.address()),
+                Err(ErrorMessage::ChunkNotFound(name)) => chunk_operation_id(&ChunkAddress(*name)),
                 Err(ErrorMessage::DataNotFound(DataAddress::Bytes(address))) => {
-                    operation_id(&ChunkAddress(*address.name()))
+                    chunk_operation_id(&ChunkAddress(*address.name()))
                 }
                 Err(ErrorMessage::DataNotFound(another_address)) => {
                     error!(
@@ -244,7 +251,7 @@ impl QueryResponse {
             | GetRegisterOwner((_, operation_id))
             | ReadRegister((_, operation_id))
             | GetRegisterPolicy((_, operation_id))
-            | GetRegisterUserPermissions((_, operation_id)) => Ok(operation_id.clone()),
+            | GetRegisterUserPermissions((_, operation_id)) => Ok(*operation_id),
             FailedToCreateOperationId => Err(Error::NoOperationId),
         }
     }
@@ -327,7 +334,7 @@ mod tests {
         if let Some(key) = gen_keys().first() {
             let errored_response = QueryResponse::GetRegister((
                 Err(Error::AccessDenied(User::Key(*key))),
-                "some_op_id".to_string(),
+                [0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,1,2], // some op id
             ));
             assert!(format!("{:?}", errored_response).contains("GetRegister((Err(AccessDenied("));
             Ok(())
