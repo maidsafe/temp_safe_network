@@ -18,6 +18,7 @@ use tokio::sync::RwLock;
 
 const NEIGHBOUR_COUNT: usize = 2;
 const MIN_PENDING_OPS: usize = 10;
+const ACTIVE_REPLICATION_THRESHOLD: usize = MIN_PENDING_OPS / 2;
 const PENDING_OP_TOLERANCE_RATIO: f64 = 0.1;
 
 /// Some reproducible xorname derived from the operation. Which can be re-derived from the appropriate response when received (to remove from tracking)
@@ -42,7 +43,6 @@ impl Liveness {
                 .take(NEIGHBOUR_COUNT)
                 .cloned()
                 .collect::<Vec<_>>();
-
             let _old_entry = closest_nodes_to.insert(*adult, closest_nodes);
         }
         Self {
@@ -184,7 +184,7 @@ impl Liveness {
         });
     }
 
-    // this is not an exact definition, thus has tolerance for variance due to concurrency
+    // This is not an exact definition, thus has tolerance for variance due to concurrency
     pub(crate) async fn find_unresponsive_nodes(&self) -> Vec<(XorName, usize)> {
         info!("Checking unresponsive nodes");
         let mut unresponsive_nodes = Vec::new();
@@ -195,10 +195,8 @@ impl Liveness {
 
             let node = *node;
             let mut max_pending_by_neighbours = 0;
-            // if let Some(max_pending_by_neighbours) =
             for neighbour in neighbours.iter() {
                 if let Some(entry) = self.unfulfilled_requests.get(neighbour) {
-                    // let (k,v) = entry.pair();
                     let val = entry.value().read().await.len();
 
                     if val > max_pending_by_neighbours {
@@ -209,7 +207,6 @@ impl Liveness {
 
             let pending_operations_count = if let Some(entry) = self.unfulfilled_requests.get(&node)
             {
-                // let (k,v) = entry.pair();
                 entry.value().read().await.len()
             } else {
                 0
@@ -230,6 +227,46 @@ impl Liveness {
             }
         }
         unresponsive_nodes
+    }
+
+    pub(crate) async fn check_for_active_replication(&self) -> BTreeSet<XorName> {
+        let mut deviants = vec![];
+
+        for entry in self.closest_nodes_to.iter() {
+            let (node, neighbors) = entry.pair();
+            let node = *node;
+
+            let pending_operations_count = if let Some(entry) = self.unfulfilled_requests.get(&node)
+            {
+                entry.value().read().await.len()
+            } else {
+                0
+            };
+
+            let mut max_pending_by_neighbours = 0;
+            for neighbour in neighbors.iter() {
+                if let Some(entry) = self.unfulfilled_requests.get(neighbour) {
+                    let val = entry.value().read().await.len();
+
+                    if val > max_pending_by_neighbours {
+                        max_pending_by_neighbours = val
+                    }
+                }
+            }
+
+            if pending_operations_count > ACTIVE_REPLICATION_THRESHOLD
+                && max_pending_by_neighbours < ACTIVE_REPLICATION_THRESHOLD
+            {
+                tracing::info!(
+                    "Probable deviant node crossed ACTIVE Replication threshold {}: {} Neighbour max: {}",
+                    node,
+                    pending_operations_count,
+                    max_pending_by_neighbours
+                );
+                deviants.push(node);
+            }
+        }
+        deviants.into_iter().collect::<BTreeSet<XorName>>()
     }
 }
 

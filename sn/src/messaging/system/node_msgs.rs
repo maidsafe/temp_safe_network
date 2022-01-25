@@ -66,6 +66,8 @@ pub enum NodeEvent {
         /// Whether store failed due to full
         full: bool,
     },
+    /// Inform Adults of a possible deviant node
+    DeviantsDetected(BTreeSet<XorName>),
 }
 
 /// Query originating at a node
