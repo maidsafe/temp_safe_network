@@ -43,7 +43,7 @@ impl Node {
         // so we reorganise the data stored in this section..:
         let our_name = self.info.read().await.name();
         let remaining = old_adults.intersection(&current_adults).copied().collect();
-        self.reorganize_data(our_name, added, removed, remaining)
+        self.reorganize_data(our_name, added, removed, remaining, false)
             .await
             .map_err(super::Error::from)
     }
