@@ -94,7 +94,11 @@ impl Session {
         // Get DataSection elders details.
         let (elders, section_pk) =
             if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
-                let sap_elders: Vec<_> = sap.elders_vec().into_iter().take(targets_count).collect();
+                let mut sap_elders = sap.elders_vec();
+
+                sap_elders.shuffle(&mut OsRng);
+
+                let sap_elders: Vec<_> = sap_elders.into_iter().take(targets_count).collect();
 
                 trace!("{:?} SAP elders found", sap_elders);
                 (sap_elders, sap.section_key())
@@ -262,14 +266,12 @@ impl Session {
 
         if let Ok(op_id) = query.operation_id() {
             // Insert the response sender
-            trace!("Inserting channel for op_id {:?}", (msg_id, op_id.clone()));
+            trace!("Inserting channel for op_id {:?}", (msg_id, op_id));
             if let Some(mut entry) = self.pending_queries.get_mut(&op_id) {
                 let senders_vec = entry.value_mut();
                 senders_vec.push((msg_id, sender))
             } else {
-                let _nonexistant_entry = self
-                    .pending_queries
-                    .insert(op_id.clone(), vec![(msg_id, sender)]);
+                let _nonexistant_entry = self.pending_queries.insert(op_id, vec![(msg_id, sender)]);
             }
 
             trace!("Inserted channel for {:?}", op_id);

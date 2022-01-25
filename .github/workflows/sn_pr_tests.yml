@@ -238,14 +238,14 @@ jobs:
         shell: zsh {0}
         if: matrix.os != 'windows-latest'
         run: cd sn && repeat 5 cargo test --release --features=always-joinable,test-utils -- client_api::reg --test-threads=1 --skip ae --skip batching && sleep $POST_TEST_SLEEP
-        timeout-minutes: 20
+        timeout-minutes: 10
 
       # register api
       - name: Client reg tests against local network (win)
         shell: bash
         if: matrix.os == 'windows-latest'
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- client_api::reg --test-threads=1 --skip ae --skip batching && sleep $POST_TEST_SLEEP
-        timeout-minutes: 20
+        timeout-minutes: 10
 
       # register api batching check, only run this once as it's slow, and we verify the basic tests above
       - name: Client register batching
@@ -413,6 +413,11 @@ jobs:
         run: cd sn && cargo test --release --features=always-joinable,test-utils -- --ignored network_assert --test-threads=1 --skip health && sleep $POST_TEST_SLEEP
         timeout-minutes: 5
         continue-on-error: true
+
+      # many_clients test
+      - name: many client tests
+        run: cd sn && cargo test --release --features=always-joinable,test-utils -- from_many_clients  && sleep $POST_TEST_SLEEP
+        timeout-minutes: 15
 
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: Initial client tests... (unix)

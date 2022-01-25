@@ -218,7 +218,7 @@ impl Session {
                         if let Some(entry) = queries.get(&op_id) {
                             let all_senders = entry.value();
                             for (_msg_id, sender) in all_senders {
-                                trace!("Sending response for query w/{} via channel.", op_id);
+                                trace!("Sending response for query w/{:?} via channel.", op_id);
                                 let result = sender.try_send(response.clone());
                                 if result.is_err() {
                                     trace!("Error sending query response on a channel for {:?} op_id {:?}: {:?}. (It has likely been removed)", msg_id, op_id, result)

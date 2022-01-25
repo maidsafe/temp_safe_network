@@ -8,7 +8,7 @@
 
 use crate::node::XorName;
 
-use crate::messaging::data::{operation_id, OperationId};
+use crate::messaging::data::{chunk_operation_id, OperationId};
 use crate::types::ChunkAddress;
 use dashmap::DashMap;
 use itertools::Itertools;
@@ -77,7 +77,7 @@ impl Liveness {
     /// Inserts a random OperationId to decrease the credibility of the given Adult node.
     #[allow(unused)]
     pub(crate) async fn penalise_member(&self, member: XorName) {
-        if let Ok(random_op_id) = operation_id(&ChunkAddress(XorName::random())) {
+        if let Ok(random_op_id) = chunk_operation_id(&ChunkAddress(XorName::random())) {
             self.add_a_pending_request_operation(member, random_op_id)
                 .await
         } else {
