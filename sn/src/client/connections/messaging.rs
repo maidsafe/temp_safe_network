@@ -266,14 +266,12 @@ impl Session {
 
         if let Ok(op_id) = query.operation_id() {
             // Insert the response sender
-            trace!("Inserting channel for op_id {:?}", (msg_id, op_id.clone()));
+            trace!("Inserting channel for op_id {:?}", (msg_id, op_id));
             if let Some(mut entry) = self.pending_queries.get_mut(&op_id) {
                 let senders_vec = entry.value_mut();
                 senders_vec.push((msg_id, sender))
             } else {
-                let _nonexistant_entry = self
-                    .pending_queries
-                    .insert(op_id.clone(), vec![(msg_id, sender)]);
+                let _nonexistant_entry = self.pending_queries.insert(op_id, vec![(msg_id, sender)]);
             }
 
             trace!("Inserted channel for {:?}", op_id);

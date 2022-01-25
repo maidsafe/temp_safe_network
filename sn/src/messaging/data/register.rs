@@ -315,12 +315,11 @@ impl RegisterQuery {
     /// Retrieves the operation identifier for this response, use in tracking node liveness
     /// and responses at clients.
     /// Must be the same as the query response
-    /// Right now returning result to fail for anything non-chunk, as that's all we're tracking from other nodes here just now.
     pub fn operation_id(&self) -> Result<OperationId> {
         let bytes = crate::types::utils::encode(&self).map_err(|_| Error::NoOperationId)?;
         let mut hasher = Sha3::v256();
         let mut output = [0; 32];
-        hasher.update(&bytes.as_bytes());
+        hasher.update(bytes.as_bytes());
         hasher.finalize(&mut output);
         Ok(output)
     }

@@ -103,7 +103,7 @@ impl Core {
 
         let msg = SystemMsg::NodeQueryResponse {
             response,
-            correlation_id: msg_id,
+            correlation_id,
             user,
         };
 

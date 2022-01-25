@@ -87,7 +87,7 @@ impl Core {
         let mut fresh_targets = BTreeSet::new();
         for target in targets {
             self.liveness
-                .add_a_pending_request_operation(target, operation_id.clone())
+                .add_a_pending_request_operation(target, operation_id)
                 .await;
             let _existed = fresh_targets.insert(target);
         }
@@ -118,8 +118,8 @@ impl Core {
         let msg = SystemMsg::NodeQuery(NodeQuery::Data {
             query,
             auth: auth.into_inner(),
-            origin: EndUser(address_name),
-            correlation_id: MessageId::from_xor_name(address_name),
+            origin: EndUser(origin.name()),
+            correlation_id: MessageId::from_xor_name(*address.name()),
         });
         let aggregation = false;
 

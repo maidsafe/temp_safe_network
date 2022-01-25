@@ -48,7 +48,7 @@ pub fn chunk_operation_id(address: &ChunkAddress) -> Result<OperationId> {
     let bytes = utils::encode(address).map_err(|_| Error::NoOperationId)?;
     let mut hasher = Sha3::v256();
     let mut output = [0; 32];
-    hasher.update(&bytes.as_bytes());
+    hasher.update(bytes.as_bytes());
     hasher.finalize(&mut output);
 
     Ok(output)
@@ -251,7 +251,7 @@ impl QueryResponse {
             | GetRegisterOwner((_, operation_id))
             | ReadRegister((_, operation_id))
             | GetRegisterPolicy((_, operation_id))
-            | GetRegisterUserPermissions((_, operation_id)) => Ok(operation_id.clone()),
+            | GetRegisterUserPermissions((_, operation_id)) => Ok(*operation_id),
             FailedToCreateOperationId => Err(Error::NoOperationId),
         }
     }
