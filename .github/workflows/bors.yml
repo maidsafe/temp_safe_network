@@ -402,8 +402,6 @@ jobs:
         if: failure()
         continue-on-error: true
 
-
-
   e2e-split:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: E2E tests w/ full network
@@ -560,5 +558,5 @@ jobs:
         if: matrix.os == 'self-hosted-ubuntu' && always()
         run: |
           rm -rf ~/.safe
-
+          killall -9 sn_node
 
