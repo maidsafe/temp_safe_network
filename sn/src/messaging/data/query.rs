@@ -6,7 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{operation_id, register::RegisterQuery, Error, OperationId, QueryResponse, Result};
+use super::{
+    chunk_operation_id, register::RegisterQuery, Error, OperationId, QueryResponse, Result,
+};
 use crate::types::{ChunkAddress, ReplicatedDataAddress as DataAddress};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
@@ -66,7 +68,7 @@ impl DataQuery {
     /// Right now returning result to fail for anything non-chunk, as that's all we're tracking from other nodes here just now.
     pub fn operation_id(&self) -> Result<OperationId> {
         match self {
-            DataQuery::GetChunk(address) => operation_id(address),
+            DataQuery::GetChunk(address) => chunk_operation_id(address),
             DataQuery::Register(read) => read.operation_id(),
         }
     }

@@ -92,24 +92,26 @@ impl Core {
             let _existed = fresh_targets.insert(target);
         }
 
-        let correlation_id = *address.name();
+        // this would be one req per client at a time...
+        // let correlation_id = origin.name();
+        // let correlation_id = *address.name();
         let overwrote = self
             .pending_data_queries
-            .set(correlation_id, origin, None)
+            .set(operation_id, origin.clone(), None)
             .await;
         if let Some(overwrote) = overwrote {
             // Since `XorName` is a 256 bit value, we consider the probability negligible, but warn
             // anyway so we're not totally lost if it does happen.
             warn!(
-                "Overwrote an existing pending data query for {} from {} - what are the chances?",
-                correlation_id, overwrote
+                "Overwrote an existing pending data query for {:?} from {} - what are the chances?",
+                operation_id, overwrote
             );
         }
 
         let msg = SystemMsg::NodeQuery(NodeQuery::Data {
             query,
             auth: auth.into_inner(),
-            origin: EndUser(correlation_id),
+            origin: EndUser(origin.name()),
         });
         let aggregation = false;
 

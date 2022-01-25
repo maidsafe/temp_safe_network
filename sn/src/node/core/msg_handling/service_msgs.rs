@@ -81,11 +81,15 @@ impl Core {
         trace!("Handling data query at adult");
         let mut commands = vec![];
 
+        let response = self
+            .data_storage
+            .query(query, User::Key(auth.public_key))
+            .await;
+
+        trace!("data query response at adult is:  {response:?}");
+
         let msg = SystemMsg::NodeQueryResponse {
-            response: self
-                .data_storage
-                .query(query, User::Key(auth.public_key))
-                .await,
+            response,
             correlation_id: msg_id,
             user,
         };
@@ -121,8 +125,8 @@ impl Core {
         );
 
         let node_id = XorName::from(sending_node_pk);
-
-        let origin = if let Some(origin) = self.pending_data_queries.remove(&user.0).await {
+        let op_id = response.operation_id()?;
+        let origin = if let Some(origin) = self.pending_data_queries.remove(&op_id).await {
             origin
         } else {
             warn!(

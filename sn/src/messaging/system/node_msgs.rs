@@ -129,4 +129,8 @@ impl NodeQueryResponse {
             FailedToCreateOperationId => QueryResponse::FailedToCreateOperationId,
         }
     }
+
+    pub(crate) fn operation_id(&self) -> Result<OperationId> {
+        self.clone().convert().operation_id()
+    }
 }
