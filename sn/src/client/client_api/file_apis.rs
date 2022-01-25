@@ -527,7 +527,6 @@ mod tests {
 
     // Test storing and reading 5mb file. Try and read from many clients and ensure we do not overwelm nodes.
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "Too heavy at the moment"]
     async fn store_and_read_5mb_from_many_clients() -> Result<()> {
         init_test_logger();
         let _start_span = tracing::info_span!("store_and_read_5mb_from_many_clients").entered();
