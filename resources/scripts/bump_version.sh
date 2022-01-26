@@ -9,27 +9,6 @@ safe_network_has_changes=false
 sn_api_has_changes=false
 sn_cli_has_changes=false
 
-function perform_smart_release_dry_run() {
-  echo "Performing dry run for smart-release..."
-  dry_run_output=$(cargo smart-release \
-    --update-crates-index \
-    --no-push \
-    --no-publish \
-    --no-changelog-preview \
-    --allow-fully-generated-changelogs \
-    --no-changelog-github-release \
-    "safe_network" "sn_api" "sn_cli" 2>&1)
-  echo "Dry run output for smart-release:"
-  echo $dry_run_output
-
-  if [[ $dry_run_output == *"Manifest version of provided package"* ]]; then
-    echo "Dry run output contains 'Manifest version of provided package'."
-    echo "This indicates that some crate version failed to publish."
-    echo "Make sure there is a crate publish for every tag that exists."
-    exit 1
-  fi
-}
-
 function crate_has_changes() {
   local crate_name="$1"
   if [[ $dry_run_output == *"WOULD auto-bump provided package '$crate_name'"* ]]; then
@@ -113,7 +92,6 @@ function amend_tags() {
   if [[ $sn_cli_has_changes == true ]]; then git tag "sn_cli-v${sn_cli_version}" -f; fi
 }
 
-perform_smart_release_dry_run
 determine_which_crates_have_changes
 generate_version_bump_commit
 generate_new_commit_message

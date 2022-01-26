@@ -88,7 +88,6 @@ impl MessageType {
                     | SystemMsg::AntiEntropyProbe(_)
                     | SystemMsg::BackPressure(_)
                     | SystemMsg::Relocate(_)
-                    | SystemMsg::RelocatePromise(_)
                     | SystemMsg::JoinRequest(_)
                     | SystemMsg::JoinAsRelocatedRequest(_)
                     | SystemMsg::Propose { .. }

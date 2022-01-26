@@ -6,7 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::{MembershipState, NodeState as NodeStateMsg, SectionAuth};
+use crate::messaging::system::{
+    MembershipState, NodeState as NodeStateMsg, RelocateDetails, SectionAuth,
+};
 use crate::node::error::Error;
 use crate::peer::Peer;
 
@@ -61,6 +63,20 @@ impl NodeState {
         }
     }
 
+    // Creates a `NodeState` in the `Relocated` state.
+    #[cfg(test)]
+    pub(crate) fn relocated(
+        peer: Peer,
+        previous_name: Option<XorName>,
+        relocate_details: RelocateDetails,
+    ) -> Self {
+        Self {
+            peer,
+            state: MembershipState::Relocated(Box::new(relocate_details)),
+            previous_name,
+        }
+    }
+
     pub(crate) fn peer(&self) -> &Peer {
         &self.peer
     }
@@ -74,7 +90,7 @@ impl NodeState {
     }
 
     pub(crate) fn state(&self) -> MembershipState {
-        self.state
+        self.state.clone()
     }
 
     pub(crate) fn previous_name(&self) -> Option<XorName> {
@@ -85,12 +101,18 @@ impl NodeState {
         self.peer.age()
     }
 
+    // Returns true if the state is a Relocated node
+    pub(crate) fn is_relocated(&self) -> bool {
+        matches!(self.state, MembershipState::Relocated(_))
+    }
+
     pub(crate) fn leave(self) -> Result<Self, Error> {
-        // Do not allow switching to `Left` when already relocated, to avoid rejoining with the
-        // same name.
+        // Do not allow switching to `Left` when already relocated,
+        // to avoid rejoining with the same name.
         if let MembershipState::Relocated(_) = self.state {
             return Err(Error::InvalidState);
         }
+
         Ok(Self {
             state: MembershipState::Left,
             ..self
@@ -98,9 +120,9 @@ impl NodeState {
     }
 
     // Convert this info into one with the state changed to `Relocated`.
-    pub(crate) fn relocate(self, dst: XorName) -> Self {
+    pub(crate) fn relocate(self, relocate_details: RelocateDetails) -> Self {
         Self {
-            state: MembershipState::Relocated(dst),
+            state: MembershipState::Relocated(Box::new(relocate_details)),
             ..self
         }
     }
@@ -115,7 +137,7 @@ impl NodeState {
         NodeStateMsg {
             name: self.name(),
             addr: self.addr(),
-            state: self.state,
+            state: self.state.clone(),
             previous_name: self.previous_name,
         }
     }

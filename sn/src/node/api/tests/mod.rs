@@ -13,16 +13,15 @@ use crate::dbs::UsedSpace;
 use crate::messaging::{
     system::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState,
-        NodeState as NodeStateMsg, RelocateDetails, RelocatePayload, ResourceProofResponse,
-        SectionAuth, SystemMsg,
+        NodeState as NodeStateMsg, RelocateDetails, ResourceProofResponse, SectionAuth, SystemMsg,
     },
     AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeAuth,
     SectionAuth as MsgKindSectionAuth, WireMsg,
 };
 use crate::node::{
     core::{
-        relocation_check, ConnectionEvent, Core, Proposal, RelocatePayloadUtils,
-        RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
+        relocation_check, ConnectionEvent, Core, Proposal, RESOURCE_PROOF_DATA_SIZE,
+        RESOURCE_PROOF_DIFFICULTY,
     },
     create_test_max_capacity_and_root_storage,
     dkg::test_utils::{prove, section_signed},
@@ -181,16 +180,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
     let solution = prover.solve();
 
     let node_state = NodeState::joined(new_node.peer(), None);
-    let node_state_serialized = bincode::serialize(&node_state)?;
-
-    let signature = sk_set.secret_key().sign(node_state_serialized);
-    let auth = SectionAuth {
-        value: node_state.to_msg(),
-        sig: KeyedSig {
-            public_key: section_key,
-            signature,
-        },
-    };
+    let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
 
     let wire_msg = WireMsg::single_src(
         &new_node,
@@ -249,7 +239,8 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
 
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
     let node = nodes.remove(0);
-    let node_name = node.name();
+    let relocated_node_old_name = node.name();
+    let relocated_node_old_keypair = node.keypair.clone();
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let core = Core::new(
         create_comm().await?,
@@ -263,39 +254,27 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
     .await?;
     let dispatcher = Dispatcher::new(core);
 
-    let relocated_node_old_keypair =
-        ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE);
-    let relocated_node_old_name = ed25519::name(&relocated_node_old_keypair.public);
     let relocated_node = Node::new(
         ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
         gen_addr(),
     );
 
     let relocate_details = RelocateDetails {
-        pub_id: relocated_node_old_name,
-        dst: node_name,
-        dst_key: section_key,
+        previous_name: relocated_node_old_name,
+        dst: relocated_node_old_name,
+        dst_section_key: section_key,
         age: relocated_node.age(),
     };
 
-    let relocate_node_msg = SystemMsg::Relocate(relocate_details);
-    let payload = WireMsg::serialize_msg_payload(&relocate_node_msg)?;
-    let signature = sk_set.secret_key().sign(&payload);
-    let section_signed = MsgKindSectionAuth {
-        src_name: node_name,
-        sig: KeyedSig {
-            public_key: section_key,
-            signature,
-        },
-    };
-    let section_auth = AuthorityProof::verify(section_signed.clone(), &payload).unwrap();
-
-    let relocate_payload = RelocatePayload::new(
-        relocate_node_msg,
-        section_auth,
-        &relocated_node.name(),
-        &relocated_node_old_keypair,
+    let node_state = NodeState::relocated(
+        relocated_node.peer(),
+        Some(relocated_node_old_name),
+        relocate_details,
     );
+    let relocate_proof = section_signed(sk_set.secret_key(), node_state.to_msg())?;
+
+    let signature_over_new_name =
+        ed25519::sign(&relocated_node.name().0, &relocated_node_old_keypair);
 
     let wire_msg = WireMsg::single_src(
         &relocated_node,
@@ -305,7 +284,8 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         },
         SystemMsg::JoinAsRelocatedRequest(Box::new(JoinAsRelocatedRequest {
             section_key,
-            relocate_payload: Some(relocate_payload),
+            relocate_proof,
+            signature_over_new_name,
         })),
         section_key,
     )?;
@@ -407,7 +387,6 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             let _changed = expected_new_elders.insert(peer);
         }
     }
-    println!("Expected elders len {:?}", expected_new_elders.len());
 
     let node = nodes.remove(0);
     let node_name = node.name();
@@ -430,16 +409,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let new_peer = create_peer(MIN_ADULT_AGE + 1);
     let node_state = NodeState::joined(new_peer.clone(), Some(XorName::random()));
 
-    let node_state_serialized = bincode::serialize(&node_state)?;
-
-    let signature = sk_set.secret_key().sign(node_state_serialized);
-    let auth = SectionAuth {
-        value: node_state.to_msg(),
-        sig: KeyedSig {
-            public_key: sk_set.public_keys().public_key(),
-            signature,
-        },
-    };
+    let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
 
     let commands = dispatcher
         .process_command(Command::HandleNewNodeOnline(auth), "cmd-id")
@@ -491,16 +461,7 @@ async fn handle_online_command(
     section_auth: &SectionAuthorityProvider,
 ) -> Result<HandleOnlineStatus> {
     let node_state = NodeState::joined(peer.clone(), None);
-    let node_state_serialized = bincode::serialize(&node_state)?;
-
-    let signature = sk_set.secret_key().sign(node_state_serialized);
-    let auth = SectionAuth {
-        value: node_state.to_msg(),
-        sig: KeyedSig {
-            public_key: sk_set.public_keys().public_key(),
-            signature,
-        },
-    };
+    let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
 
     let commands = dispatcher
         .process_command(Command::HandleNewNodeOnline(auth), "cmd-id")
@@ -537,16 +498,19 @@ async fn handle_online_command(
                 }
             }
             Ok(MessageType::System {
-                msg: SystemMsg::Relocate(details),
+                msg:
+                    SystemMsg::Propose {
+                        proposal: crate::messaging::system::Proposal::Offline(node_state),
+                        ..
+                    },
                 ..
             }) => {
-                if details.pub_id != peer.name() {
-                    continue;
+                if let MembershipState::Relocated(details) = node_state.state {
+                    if details.previous_name != peer.name() {
+                        continue;
+                    }
+                    status.relocate_details = Some(*details.clone());
                 }
-
-                assert_eq!(recipients, [peer]);
-
-                status.relocate_details = Some(details.clone());
             }
             _ => continue,
         }
@@ -1060,56 +1024,32 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         .process_command(Command::HandleNewNodeOnline(auth), "cmd-id")
         .await?;
 
-    let mut relocate_sent = false;
+    let mut offline_relocate_sent = false;
 
     for command in commands {
-        let (recipients, wire_msg) = match command {
-            Command::SendMessage {
-                recipients,
-                wire_msg,
-                ..
-            } => (recipients, wire_msg),
+        let wire_msg = match command {
+            Command::SendMessage { wire_msg, .. } => wire_msg,
             _ => continue,
         };
 
-        if recipients
-            .into_iter()
-            .map(|recp| recp.addr())
-            .collect::<Vec<_>>()
-            != [relocated_peer.addr()]
+        if let Ok(MessageType::System {
+            msg:
+                SystemMsg::Propose {
+                    proposal: crate::messaging::system::Proposal::Offline(node_state),
+                    ..
+                },
+            ..
+        }) = wire_msg.into_message()
         {
-            continue;
-        }
-        match relocated_peer_role {
-            RelocatedPeerRole::NonElder => {
-                if let Ok(MessageType::System {
-                    msg: SystemMsg::Relocate(details),
-                    ..
-                }) = wire_msg.into_message()
-                {
-                    assert_eq!(details.pub_id, relocated_peer.name());
-                    assert_eq!(details.age, relocated_peer.age() + 1);
-                } else {
-                    continue;
-                }
-            }
-            RelocatedPeerRole::Elder => {
-                if let Ok(MessageType::System {
-                    msg: SystemMsg::RelocatePromise(promise),
-                    ..
-                }) = wire_msg.into_message()
-                {
-                    assert_eq!(promise.name, relocated_peer.name());
-                } else {
-                    continue;
-                }
+            assert_eq!(node_state.name, relocated_peer.name());
+            if let MembershipState::Relocated(relocate_details) = node_state.state {
+                assert_eq!(relocate_details.age, relocated_peer.age() + 1);
+                offline_relocate_sent = true;
             }
         }
-
-        relocate_sent = true;
     }
 
-    assert!(relocate_sent);
+    assert!(offline_relocate_sent);
 
     Ok(())
 }
@@ -1529,21 +1469,11 @@ async fn create_section(
 fn create_relocation_trigger(sk: &bls::SecretKey, age: u8) -> Result<SectionAuth<NodeStateMsg>> {
     loop {
         let node_state = NodeState::joined(create_peer(MIN_ADULT_AGE), Some(rand::random()));
-        let node_state_serialized = bincode::serialize(&node_state)?;
+        let auth = section_signed(sk, node_state.to_msg())?;
 
-        let signature = sk.sign(node_state_serialized);
-
-        if relocation_check(age, &signature) && !relocation_check(age + 1, &signature) {
-            let sig = KeyedSig {
-                public_key: sk.public_key(),
-                signature,
-            };
-
-            let auth = SectionAuth {
-                value: node_state.to_msg(),
-                sig,
-            };
-
+        if relocation_check(age, &auth.sig.signature)
+            && !relocation_check(age + 1, &auth.sig.signature)
+        {
             return Ok(auth);
         }
     }

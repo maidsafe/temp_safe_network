@@ -7,16 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::elder_count;
-use crate::messaging::{
-    system::{
-        JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
-        JoinResponse, SystemMsg,
-    },
-    WireMsg,
+use crate::messaging::system::{
+    JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
+    JoinResponse, MembershipState, SystemMsg,
 };
 use crate::node::{
     api::command::Command,
-    core::{relocation::RelocatePayloadUtils, Core},
+    core::{relocation::RelocateDetailsUtils, Core},
     Error, Result, SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE,
 };
 use crate::peer::Peer;
@@ -250,31 +247,6 @@ impl Core {
             "Received JoinAsRelocatedRequest {:?} from {}",
             join_request, peer
         );
-        let relocate_payload = if let Some(relocate_payload) = join_request.relocate_payload {
-            relocate_payload
-        } else {
-            // Do reachability check
-            let node_msg = if self.comm.is_reachable(&peer.addr()).await.is_err() {
-                SystemMsg::JoinAsRelocatedResponse(Box::new(
-                    JoinAsRelocatedResponse::NodeNotReachable(peer.addr()),
-                ))
-            } else {
-                SystemMsg::JoinAsRelocatedResponse(Box::new(JoinAsRelocatedResponse::Retry(
-                    self.network_knowledge.authority_provider().await.to_msg(),
-                )))
-            };
-            trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
-
-            trace!("Sending {:?} to {}", node_msg, peer);
-            return Ok(vec![
-                self.send_direct_message(
-                    peer,
-                    node_msg,
-                    self.network_knowledge.section_key().await,
-                )
-                .await?,
-            ]);
-        };
 
         if !self.network_knowledge.prefix().await.matches(&peer.name())
             || join_request.section_key != self.network_knowledge.section_key().await
@@ -311,28 +283,52 @@ impl Core {
             return Ok(vec![]);
         }
 
-        if !relocate_payload.verify_identity(&peer.name()) {
+        let relocate_details = if let MembershipState::Relocated(ref details) =
+            join_request.relocate_proof.value.state
+        {
+            // Check for signatures and trust of the relocate_proof
+            let is_valid_sig = join_request.relocate_proof.self_verify();
+            let is_key_unknown = !known_keys
+                .iter()
+                .any(|key| *key == join_request.relocate_proof.sig.public_key);
+
+            if !is_valid_sig || is_key_unknown {
+                debug!(
+                    "Ignoring JoinAsRelocatedRequest from {} - invalid signature or untrusted src.",
+                    peer
+                );
+                return Ok(vec![]);
+            }
+
+            details
+        } else {
             debug!(
-                "Ignoring JoinAsRelocatedRequest from {} - invalid signature.",
+                "Ignoring JoinAsRelocatedRequest from {} with invalid relocate proof state: {:?}",
+                peer, join_request.relocate_proof.value.state
+            );
+            return Ok(vec![]);
+        };
+
+        if !relocate_details.verify_identity(&peer.name(), &join_request.signature_over_new_name) {
+            debug!(
+                "Ignoring JoinAsRelocatedRequest from {} - invalid node name signature.",
                 peer
             );
             return Ok(vec![]);
         }
 
-        let details = relocate_payload.relocate_details()?;
-
         let prefix = self.network_knowledge.prefix().await;
-        if !prefix.matches(&details.dst) {
+        if !prefix.matches(&relocate_details.dst) {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - destination {} doesn't match \
                          our prefix {:?}.",
-                peer, details.dst, prefix
+                peer, relocate_details.dst, prefix
             );
             return Ok(vec![]);
         }
 
         // Requires the node name matches the age.
-        let age = details.age;
+        let age = relocate_details.age;
         if age != peer.age() {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - relocation age ({}) doesn't match peer's age ({}).",
@@ -341,43 +337,38 @@ impl Core {
             return Ok(vec![]);
         }
 
-        // Check for signatures and trust of the relocate_payload msg
-        let serialised_relocate_details =
-            WireMsg::serialize_msg_payload(&SystemMsg::Relocate(details.clone()))?;
-
-        let payload_section_signed = &relocate_payload.section_signed;
-        let is_valid_sig = payload_section_signed.sig.public_key.verify(
-            &payload_section_signed.sig.signature,
-            serialised_relocate_details,
-        );
-        let is_key_unknown = !known_keys
-            .iter()
-            .any(|key| *key == payload_section_signed.sig.public_key);
-
-        if !is_valid_sig || is_key_unknown {
-            debug!(
-                "Ignoring JoinAsRelocatedRequest from {} - invalid signature or untrusted src.",
-                peer
-            );
-            return Ok(vec![]);
-        }
-
-        let previous_name = Some(details.pub_id);
-
         if self
             .network_knowledge
-            .is_relocated_to_our_section(&details.pub_id)
+            .is_relocated_to_our_section(&relocate_details.previous_name)
         {
             debug!(
                 "Ignoring JoinAsRelocatedRequest from {} - original node {:?} already relocated to us.",
-                peer, previous_name
+                peer, relocate_details.previous_name
             );
             return Ok(vec![]);
         }
 
+        // Finally do reachability check
+        if self.comm.is_reachable(&peer.addr()).await.is_err() {
+            let node_msg = SystemMsg::JoinAsRelocatedResponse(Box::new(
+                JoinAsRelocatedResponse::NodeNotReachable(peer.addr()),
+            ));
+            trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
+
+            trace!("Sending {:?} to {}", node_msg, peer);
+            return Ok(vec![
+                self.send_direct_message(
+                    peer,
+                    node_msg,
+                    self.network_knowledge.section_key().await,
+                )
+                .await?,
+            ]);
+        };
+
         Ok(vec![Command::SendAcceptedOnlineShare {
             peer,
-            previous_name,
+            previous_name: Some(relocate_details.previous_name),
         }])
     }
 }

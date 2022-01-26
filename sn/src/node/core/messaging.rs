@@ -7,10 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    system::{
-        DkgSessionId, JoinResponse, NodeCmd, RelocateDetails, RelocatePromise, SectionAuth,
-        SystemMsg,
-    },
+    system::{DkgSessionId, JoinResponse, NodeCmd, SectionAuth, SystemMsg},
     DstLocation, MsgKind, WireMsg,
 };
 use crate::node::{
@@ -23,8 +20,6 @@ use crate::node::{
 };
 use crate::peer::{Peer, UnnamedPeer};
 use crate::types::log_markers::LogMarker;
-
-use super::relocation::RelocateState;
 
 use bls::PublicKey as BlsPublicKey;
 use xor_name::{Prefix, XorName};
@@ -358,45 +353,22 @@ impl Core {
     pub(crate) async fn send_relocate(
         &self,
         recipient: Peer,
-        details: RelocateDetails,
+        node_state: SectionAuth<NodeState>,
     ) -> Result<Vec<Command>> {
-        let src = details.pub_id;
+        let section_pk = self.network_knowledge.section_key().await;
         let dst = DstLocation::Node {
-            name: details.pub_id,
-            section_pk: self.network_knowledge.section_key().await,
+            name: recipient.name(),
+            section_pk,
         };
-        let node_msg = SystemMsg::Relocate(details);
+        let node_msg = SystemMsg::Relocate(node_state.into_authed_msg());
 
-        self.send_message_for_dst_accumulation(src, dst, node_msg, vec![recipient])
-            .await
-    }
+        let wire_msg =
+            WireMsg::single_src(&self.node.read().await.clone(), dst, node_msg, section_pk)?;
 
-    pub(crate) async fn send_relocate_promise(
-        &self,
-        recipient: Peer,
-        promise: RelocatePromise,
-    ) -> Result<Vec<Command>> {
-        // Note: this message is first sent to a single node who then sends it back to the section
-        // where it needs to be handled by all the elders. This is why the destination is
-        // `Section`, not `Node`.
-        let src = promise.name;
-        let dst = DstLocation::Section {
-            name: promise.name,
-            section_pk: self.network_knowledge.section_key().await,
-        };
-        let node_msg = SystemMsg::RelocatePromise(promise);
-
-        self.send_message_for_dst_accumulation(src, dst, node_msg, vec![recipient])
-            .await
-    }
-
-    pub(crate) async fn return_relocate_promise(&self) -> Option<Command> {
-        // TODO: keep sending this periodically until we get relocated.
-        if let Some(RelocateState::Delayed(msg)) = &*self.relocate_state.read().await {
-            self.send_message_to_our_elders(msg.clone()).await.ok()
-        } else {
-            None
-        }
+        Ok(vec![Command::SendMessage {
+            recipients: vec![recipient],
+            wire_msg,
+        }])
     }
 
     pub(crate) async fn send_dkg_start(

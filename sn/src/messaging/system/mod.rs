@@ -11,15 +11,13 @@ mod join;
 mod join_as_relocated;
 mod node_msgs;
 mod node_state;
-mod relocation;
 mod signed;
 
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SectionAuth};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use node_msgs::{NodeCmd, NodeQuery, NodeQueryResponse};
-pub use node_state::{MembershipState, NodeState};
-pub use relocation::{RelocateDetails, RelocatePayload, RelocatePromise};
+pub use node_state::{MembershipState, NodeState, RelocateDetails};
 pub use signed::{KeyedSig, SigShare};
 
 /// List of peers of a section
@@ -92,11 +90,7 @@ pub enum SystemMsg {
     /// to the node's cpu load, as given by the included `LoadReport`.
     BackPressure(LoadReport),
     /// Send from a section to the node to be immediately relocated.
-    Relocate(RelocateDetails),
-    /// Send:
-    /// - from a section to a current elder to be relocated after they are demoted.
-    /// - from the node to be relocated back to its section after it was demoted.
-    RelocatePromise(RelocatePromise),
+    Relocate(SectionAuth<NodeState>),
     /// Sent from a bootstrapping peer to the section requesting to join as a new member
     JoinRequest(Box<JoinRequest>),
     /// Response to a `JoinRequest`
