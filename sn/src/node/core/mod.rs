@@ -42,6 +42,7 @@ use super::{
 };
 
 use crate::messaging::{
+    data::OperationId,
     signature_aggregator::SignatureAggregator,
     system::{DkgSessionId, SystemMsg},
     AuthorityProof, SectionAuth,
@@ -114,7 +115,7 @@ pub(crate) struct Core {
     pub(super) data_storage: DataStorage,
     capacity: Capacity,
     liveness: Liveness,
-    pending_data_queries: Arc<Cache<XorName, Peer>>,
+    pending_data_queries: Arc<Cache<OperationId, Peer>>,
     ae_backoff_cache: AeBackoffCache,
 }
 

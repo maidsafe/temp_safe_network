@@ -87,30 +87,29 @@ impl Core {
         let mut fresh_targets = BTreeSet::new();
         for target in targets {
             self.liveness
-                .add_a_pending_request_operation(target, operation_id.clone())
+                .add_a_pending_request_operation(target, operation_id)
                 .await;
             let _existed = fresh_targets.insert(target);
         }
 
-        let address_name = *address.name();
         let overwrote = self
             .pending_data_queries
-            .set(address_name, origin, None)
+            .set(operation_id, origin.clone(), None)
             .await;
         if let Some(overwrote) = overwrote {
             // Since `XorName` is a 256 bit value, we consider the probability negligible, but warn
             // anyway so we're not totally lost if it does happen.
             warn!(
-                "Overwrote an existing pending data query for {} from {} - what are the chances?",
-                address_name, overwrote
+                "Overwrote an existing pending data query for {:?} from {} - what are the chances?",
+                operation_id, overwrote
             );
         }
 
         let msg = SystemMsg::NodeQuery(NodeQuery::Data {
             query,
             auth: auth.into_inner(),
-            origin: EndUser(address_name),
-            correlation_id: MessageId::from_xor_name(address_name),
+            origin: EndUser(origin.name()),
+            correlation_id: MessageId::from_xor_name(*address.name()),
         });
         let aggregation = false;
 
