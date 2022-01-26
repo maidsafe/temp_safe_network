@@ -3,7 +3,7 @@ name: Nightly Release Run
 on:
   schedule:
     # * is a special character in YAML so you have to quote this string
-    - cron:  '30 2 * * *'
+    - cron:  '30 4 * * *'
 
 env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -200,11 +200,11 @@ jobs:
         timeout-minutes: 90
 
   kill-testnet:
-    name: Destroy Digital Ocean testnet
+    name: kill testnet
     runs-on: ubuntu-latest
     needs: [launch-testnet, client, api, cli]
     steps:
-      - name: Kill testnet
+      - name: kill testnet
         uses: maidsafe/sn_testnet_action@master
         with:
           do-token: ${{ secrets.DO_TOKEN }}
@@ -242,7 +242,7 @@ jobs:
           tags: true
 
   kill-if-fail:
-    name: Destroy Digital Ocean testnet on fail
+    name: kill testnet on fail
     runs-on: ubuntu-latest
     if: |
       always() &&
