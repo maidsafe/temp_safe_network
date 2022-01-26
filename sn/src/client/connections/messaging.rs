@@ -467,7 +467,7 @@ impl Session {
         if section_pk == self.genesis_key {
             info!("On client startup, awaiting some network knowledge");
 
-            let known_sap = self.network.closest_or_opposite(&dst_address, None);
+            let mut known_sap = self.network.closest_or_opposite(&dst_address, None);
 
             let mut insufficient_sap_peers = false;
 
@@ -477,14 +477,13 @@ impl Session {
                 }
             }
 
-            let stats = self.network.known_sections_count();
-
             // wait until we have sufficient network knowledge
             while known_sap.is_none() || insufficient_sap_peers {
                 if tried_every_contact {
                     return Err(Error::NetworkContact);
                 }
 
+                let stats = self.network.known_sections_count();
                 debug!("Client still has not received a complete section's AE-Retry message... Current sections known: {:?}. Do we have insufficient peers: {:?}", stats, insufficient_sap_peers);
                 knowledge_checks += 1;
 
@@ -547,9 +546,18 @@ impl Session {
                     if let Some(wait) = next_wait {
                         tokio::time::sleep(wait).await;
                     }
+
+                    known_sap = self.network.closest_or_opposite(&dst_address, None);
+                    insufficient_sap_peers = false;
+                    if let Some(sap) = known_sap.clone() {
+                        if sap.elders_vec().len() < elder_count() {
+                            insufficient_sap_peers = true;
+                        }
+                    }
                 }
             }
 
+            let stats = self.network.known_sections_count();
             debug!("Client has received updated network knowledge. Current sections known: {:?}. Sap for our startup-query: {:?}", stats, known_sap);
         }
 

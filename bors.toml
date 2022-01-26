@@ -1,1 +1,3 @@
 status = ["ci"]
+# Set bors's timeout to 2.5 hours
+timeout-sec = 9000

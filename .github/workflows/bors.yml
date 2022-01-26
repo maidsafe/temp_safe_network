@@ -116,7 +116,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [self-hosted-ubuntu, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
       # Install Rust
@@ -147,7 +147,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [self-hosted-ubuntu, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
       - uses: dorny/paths-filter@v2
@@ -241,7 +241,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [self-hosted-ubuntu, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
 
@@ -274,7 +274,7 @@ jobs:
         if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
       - name: ubuntu install zsh
-        if: matrix.os == 'self-hosted-ubuntu'
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get -y install zsh
 
@@ -401,8 +401,6 @@ jobs:
           path: ~/.safe/node/local-test-network/**/*.log*
         if: failure()
         continue-on-error: true
-
-
 
   e2e-split:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -560,5 +558,5 @@ jobs:
         if: matrix.os == 'self-hosted-ubuntu' && always()
         run: |
           rm -rf ~/.safe
-
+          killall -9 sn_node
 

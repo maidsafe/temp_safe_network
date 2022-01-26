@@ -339,6 +339,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && always()
         run: |
           rm -rf ~/.safe
+          killall -9 sn_node
 
   e2e-split:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -493,9 +494,10 @@ jobs:
 
       # if we don't clean up, the .safe folder might persist between runs
       - name: Cleanup self-hosted runner
-        if: matrix.os == 'ubuntu-latest' && always()
+        if: matrix.os == 'self-hosted-ubuntu' && always()
         run: |
           rm -rf ~/.safe
+          killall -9 sn_node
 
 
   api:
@@ -611,6 +613,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && always()
         run: |
           rm -rf ~/.safe
+          killall -9 sn_node
 
   cli:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -716,3 +719,4 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && always()
         run: |
           rm -rf ~/.safe
+          killall -9 sn_node
