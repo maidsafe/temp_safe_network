@@ -182,10 +182,18 @@ async fn run_node() -> Result<()> {
             if config.logs_max_lines > 0 {
                 content_limit = ContentLimit::Lines(config.logs_max_lines);
             }
+
+            // FileRotate crate changed `0 means for all` to `0 means only original`
+            // Here set the retained value to be same as uncompressed in case of 0.
+            let logs_retained = if config.logs_retained == 0 {
+                config.logs_uncompressed
+            } else {
+                config.logs_retained
+            };
             let file_appender = FileRotateAppender::make_rotate_appender(
                 log_dir,
                 "sn_node.log",
-                CountSuffix::new(config.logs_retained),
+                CountSuffix::new(logs_retained),
                 content_limit,
                 Compression::OnRotate(config.logs_uncompressed),
             );

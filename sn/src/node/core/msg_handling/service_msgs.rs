@@ -99,7 +99,7 @@ impl Core {
             .query(query, User::Key(auth.public_key))
             .await;
 
-        trace!("data query response at adult is:  {response:?}");
+        trace!("data query response at adult is:  {:?}", response);
 
         let msg = SystemMsg::NodeQueryResponse {
             response,
