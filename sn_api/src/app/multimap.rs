@@ -19,7 +19,7 @@ use xor_name::XorName;
 pub type MultimapKey = Vec<u8>;
 pub type MultimapValue = Vec<u8>;
 pub type MultimapKeyValue = (MultimapKey, MultimapValue);
-pub type MultimapKeyValues = BTreeSet<(EntryHash, MultimapKeyValue)>;
+pub type Multimap = BTreeSet<(EntryHash, MultimapKeyValue)>;
 
 const MULTIMAP_REMOVED_MARK: &[u8] = b"";
 
@@ -37,11 +37,11 @@ impl Safe {
     }
 
     /// Return the value of a Multimap on the network corresponding to the key provided
-    pub async fn multimap_get_by_key(&self, url: &str, key: &[u8]) -> Result<MultimapKeyValues> {
+    pub async fn multimap_get_by_key(&self, url: &str, key: &[u8]) -> Result<Multimap> {
         debug!("Getting value by key from Multimap at: {}", url);
         let safeurl = self.parse_and_resolve_url(url).await?;
 
-        self.fetch_multimap_value_by_key(&safeurl, key).await
+        self.fetch_multimap_values_by_key(&safeurl, key).await
     }
 
     /// Return the value of a Multimap on the network corresponding to the hash provided
@@ -56,14 +56,15 @@ impl Safe {
         self.fetch_multimap_value_by_hash(&safeurl, hash).await
     }
 
-    // Return the value (by a provided key) of a Multimap on
-    // the network without resolving the SafeUrl
-    pub(crate) async fn fetch_multimap_value_by_key(
+    /// Fetch a multimap without resolving the URL, then filter it for all values matching a key.
+    ///
+    /// The filtered result is a Multimap itself.
+    pub(crate) async fn fetch_multimap_values_by_key(
         &self,
         safeurl: &SafeUrl,
         key: &[u8],
-    ) -> Result<MultimapKeyValues> {
-        let entries = self.fetch_multimap_values(safeurl).await?;
+    ) -> Result<Multimap> {
+        let entries = self.fetch_multimap(safeurl).await?;
         Ok(entries
             .into_iter()
             .filter(|(_, (entry_key, _))| entry_key == key)
@@ -146,10 +147,7 @@ impl Safe {
     // Crate's helper to return the value of a Multimap on
     // the network without resolving the SafeUrl,
     // filtering by hash if a version is provided
-    pub(crate) async fn fetch_multimap_values(
-        &self,
-        safeurl: &SafeUrl,
-    ) -> Result<MultimapKeyValues> {
+    pub(crate) async fn fetch_multimap(&self, safeurl: &SafeUrl) -> Result<Multimap> {
         let entries = match self.register_fetch_entries(safeurl).await {
             Ok(data) => {
                 debug!("Multimap retrieved...");
@@ -167,16 +165,16 @@ impl Safe {
         }?;
 
         // We parse each entry in the Register as a 'MultimapKeyValue'
-        let mut multimap_key_vals = MultimapKeyValues::new();
+        let mut multimap = Multimap::new();
         for (hash, entry) in entries.iter() {
             if entry == MULTIMAP_REMOVED_MARK {
                 // this is a tombstone entry created to delete some old entries
                 continue;
             }
             let key_val = Self::decode_multimap_entry(entry)?;
-            multimap_key_vals.insert((*hash, key_val));
+            multimap.insert((*hash, key_val));
         }
-        Ok(multimap_key_vals)
+        Ok(multimap)
     }
 
     // Crate's helper to return the value of a Multimap on

@@ -449,6 +449,47 @@ mod tests {
                 }
         );
 
+        let inspected_content = safe.inspect(&xorurl).await?;
+        assert!(
+            inspected_content[0]
+                == SafeData::PublicFile {
+                    xorurl: xorurl.clone(),
+                    xorname: safe_url.xorname(),
+                    data: Bytes::new(),
+                    resolved_from: xorurl,
+                    media_type: Some("text/plain".to_string()),
+                    metadata: None,
+                }
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_fetch_public_file_from_nrs_url() -> Result<()> {
+        let mut safe = new_safe_instance().await?;
+        let data = Bytes::from("Something super immutable");
+        let xorurl = safe
+            .store_public_bytes(data.clone(), Some("text/plain"))
+            .await?;
+
+        let safe_url = SafeUrl::from_url(&xorurl)?;
+        let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let public_name = format!("file.{site_name}");
+        safe.nrs_add(&public_name, &safe_url).await?;
+
+        let content = retry_loop!(safe.fetch(&format!("safe://{public_name}"), None));
+        assert!(
+            content
+                == SafeData::PublicFile {
+                    xorurl: xorurl.clone(),
+                    xorname: safe_url.xorname(),
+                    data: data.clone(),
+                    resolved_from: xorurl.clone(),
+                    media_type: Some("text/plain".to_string()),
+                    metadata: None,
+                }
+        );
+
         // let's also compare it with the result from inspecting the URL
         let inspected_content = safe.inspect(&xorurl).await?;
         assert!(

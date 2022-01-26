@@ -17,7 +17,8 @@ use sn_cmd_test_utilities::util::{
     safe_cmd_stdout, safeurl_from, test_symlinks_are_valid, upload_path,
     upload_test_symlinks_folder, CLI,
 };
-use std::{path::Path, process::Command};
+use std::path::Path;
+use std::process::Command;
 
 const TEST_DATA: &str = "../resources/testdata/";
 const TEST_FILE: &str = "../resources/testdata/test.md";
@@ -226,6 +227,45 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
     safe_cmd(["cat", &nrs_url.to_string()], Some(0))?
         .assert()
         .stdout(predicate::str::contains("hello tests!"));
+
+    Ok(())
+}
+
+#[test]
+fn calling_safe_cat_nrsurl_with_immutable_content() -> Result<()> {
+    let with_trailing_slash = true;
+    let tmp_data_path = assert_fs::TempDir::new()?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
+    let markdown_file = tmp_data_path.child("another.md");
+    let (_files_container_xor, processed_files, _) =
+        upload_path(&tmp_data_path, with_trailing_slash)?;
+
+    let change = processed_files
+        .get(&markdown_file.path().to_path_buf())
+        .ok_or_else(|| eyre!("Could not retrieve markdown file from processed files"))?;
+    let file_url = change
+        .link()
+        .ok_or_else(|| eyre!("Could not retrieve URL from processed file change"))?;
+    let url = SafeUrl::from_url(file_url)?;
+
+    let public_name = format!("test.{}", get_random_nrs_string());
+    safe_cmd_stdout(
+        [
+            "nrs",
+            "add",
+            &public_name,
+            "--link",
+            &url.to_string(), // to_string has the version on the url
+            "--register-top-name",
+            "--json",
+        ],
+        Some(0),
+    )?;
+
+    let nrs_url = SafeUrl::from_url(&format!("safe://{}", public_name))?;
+    safe_cmd(["cat", &nrs_url.to_string()], Some(0))?
+        .assert()
+        .stdout(predicate::str::contains("exists"));
 
     Ok(())
 }

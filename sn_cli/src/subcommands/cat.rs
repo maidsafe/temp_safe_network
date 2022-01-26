@@ -90,12 +90,16 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &mut S
         }
         SafeData::NrsMapContainer {
             public_name,
-            version,
             nrs_map,
             ..
         } => {
             if OutputFmt::Pretty == output_fmt {
-                println!("NRS Map Container (version {}) at \"{}\":", version, url);
+                let mut msg = String::from("NRS Map Container ");
+                if let Some(version) = nrs_map.subname_version {
+                    msg.push_str(&format!("(version {}) ", version));
+                }
+                msg.push_str(&format!("at \"{}\"", url));
+                println!("{}", msg);
                 print_nrs_map(nrs_map, public_name);
             } else {
                 println!("{}", serialise_output(&(url, nrs_map), output_fmt));

@@ -7,9 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Range, SafeData};
+use crate::app::nrs::validate_nrs_url;
 use crate::app::{
     files::{self, FileInfo, FilesMap},
-    multimap::MultimapKeyValues,
+    multimap::Multimap,
     DataType, Safe, SafeUrl,
 };
 use crate::{Error, Result};
@@ -20,7 +21,6 @@ use std::collections::BTreeSet;
 
 impl Safe {
     pub(crate) async fn resolve_nrs_map_container(&self, input_url: SafeUrl) -> Result<SafeData> {
-        // get NRS resolution
         let (mut target_url, nrs_map) = self
             .nrs_get(input_url.public_name(), input_url.content_version())
             .await
@@ -30,18 +30,11 @@ impl Safe {
             })?;
         debug!("NRS Resolved {} => {}", input_url, target_url);
 
-        // concatenate paths
         let url_path = input_url.path_decoded()?;
         let target_path = target_url.path_decoded()?;
         target_url.set_path(&format!("{}{}", target_path, url_path));
 
-        // create safe_data ignoring the input path or subnames
-        let version = target_url.content_version().ok_or_else(|| {
-            Error::ContentError(format!(
-                "Missing content version in Url: {} while resolving: {}",
-                &target_url, &input_url
-            ))
-        })?;
+        validate_nrs_url(&target_url)?;
         let mut nrs_url = input_url.clone();
         nrs_url.set_path("");
         nrs_url.set_sub_names("")?;
@@ -54,7 +47,6 @@ impl Safe {
             xorurl: nrs_url.to_xorurl_string(),
             xorname: nrs_url.xorname(),
             type_tag: nrs_url.type_tag(),
-            version,
             nrs_map,
             data_type: nrs_url.data_type(),
             resolves_into: Some(target_url),
@@ -69,9 +61,9 @@ impl Safe {
         input_url: SafeUrl,
         retrieve_data: bool,
     ) -> Result<SafeData> {
-        let data: MultimapKeyValues = if retrieve_data {
+        let data: Multimap = if retrieve_data {
             match input_url.content_version() {
-                None => self.fetch_multimap_values(&input_url).await?,
+                None => self.fetch_multimap(&input_url).await?,
                 Some(v) => vec![(
                     v.entry_hash(),
                     self.fetch_multimap_value_by_hash(&input_url, v.entry_hash())
@@ -81,7 +73,7 @@ impl Safe {
                 .collect(),
             }
         } else {
-            MultimapKeyValues::new()
+            Multimap::new()
         };
 
         let safe_data = SafeData::Multimap {
