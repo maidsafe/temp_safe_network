@@ -679,7 +679,7 @@ jobs:
       - name: Run CLI tests
         shell: bash
         run: ./resources/scripts/cli_tests.sh
-        timeout-minutes: 45
+        timeout-minutes: 90
 
       - name: Are nodes still running...?
         shell: bash
