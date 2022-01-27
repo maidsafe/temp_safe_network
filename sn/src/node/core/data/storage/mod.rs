@@ -24,6 +24,7 @@ use crate::{
 pub(crate) use chunks::ChunkStorage;
 pub(crate) use registers::RegisterStorage;
 
+use crate::messaging::DstLocation;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
@@ -137,7 +138,8 @@ impl Node {
         new_adults: BTreeSet<XorName>,
         lost_adults: BTreeSet<XorName>,
         remaining: BTreeSet<XorName>,
-    ) -> Result<Vec<Cmd>> {
+        republish: bool,
+    ) -> Result<Vec<Cmd>, crate::node::Error> {
         let data = self.data_storage.clone();
         let keys = data.keys().await?;
         let mut data_for_replication = BTreeMap::new();
