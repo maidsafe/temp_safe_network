@@ -13,40 +13,40 @@ use strum_macros::{Display as StrumDisplay, EnumIter, EnumString};
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, EnumIter, StrumDisplay, EnumString)]
 #[allow(missing_docs)]
 pub enum LogMarker {
-    // stats
+    // Stats
     TotalNetworkElders,
-    // split
+    // Split
     StillElderAfterSplit,
     SplitSuccess,
     SplitAttempt,
     NewPrefix,
     AeSendUpdateToSiblings,
     AgreementOfOnline,
-    // messaging
+    // Messaging
     ServiceMsgToBeHandled,
     SystemMsgToBeHandled,
-    // data
+    // Data
     DataStorageReceivedAtElder,
     DataQueryReceviedAtElder,
-    // chunks
+    // Chunks
     StoringChunk,
     ChunkStoreReceivedAtElder,
     StoredNewChunk,
     ChunkQueryResponseReceviedFromAdult,
     ChunkQueryReceviedAtElder,
     ChunkQueryReceviedAtAdult,
-    // register
+    // Register
     RegisterWrite,
     RegisterQueryReceivedAtElder,
     RegisterQueryReceivedAtAdult,
-    // routing commands
+    // Routing commands
     DispatchHandleMsgCmd,
     DispatchSendMsgCmd,
     CommandHandleSpawned,
     CommandHandleStart,
     CommandHandleEnd,
     CommandHandleError,
-    // dkg + promotion
+    // DKG + Promotion
     PromotedToElder,
     DemotedFromElder,
     DkgSendFailureObservation,
@@ -59,7 +59,7 @@ pub enum LogMarker {
     NewSignedSap,
     NewKeyShareStored,
     TriggeringPromotionAndDemotion,
-    // ae
+    // Anti-Entropy
     AeResendAfterRetry,
     AeResendAfterAeRedirect,
     AeSendRedirect,
@@ -80,13 +80,13 @@ pub enum LogMarker {
     SendJoinsDisallowed,
     SendDKGUnderway,
     SendNodeApproval,
-    // approved to join
+    // Approved to join
     ReceivedJoinApproval,
     // Connections
     ConnectionOpened,
     ConnectionClosed,
     ConnectionReused,
-    // relocation
+    // Relocation
     RelocateStart,
     RelocateEnd,
 }

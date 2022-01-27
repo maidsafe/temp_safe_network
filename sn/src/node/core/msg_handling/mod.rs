@@ -342,7 +342,10 @@ impl Core {
                         return Ok(vec![cmd]);
                     }
                 } else {
-                    error!("self.relocate_state is not in Progress");
+                    error!(
+                        "No relocation in progress upon receiving {:?}",
+                        join_response
+                    );
                 }
 
                 Ok(vec![])
@@ -398,7 +401,7 @@ impl Core {
             }
             SystemMsg::BackPressure(load_report) => {
                 trace!("Handling msg: BackPressure from {}: {:?}", sender, msg_id);
-                // #TODO: Factor in med/long term backpressure into general node liveness calculations
+                // TODO: Factor in med/long term backpressure into general node liveness calculations
                 self.comm.regulate(sender.addr(), load_report).await;
                 Ok(vec![])
             }
@@ -572,7 +575,6 @@ impl Core {
             } => {
                 if self.is_not_elder().await {
                     trace!("Adult handling a Propose msg from {}: {:?}", sender, msg_id);
-                    // return Ok(vec![]);
                 }
 
                 trace!("Handling msg: Propose from {}: {:?}", sender, msg_id);
@@ -640,8 +642,6 @@ impl Core {
                 self.handle_dkg_retry(session_id, message_history, message, sender)
                     .await
             }
-            // The following type of messages are all handled by upper sn_node layer.
-            // TODO: In the future the sn-node layer won't be receiving Events
             SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {
                 let changed = self.set_storage_level(&node_id, level).await;
                 if changed && level.value() == MIN_LEVEL_WHEN_FULL {
