@@ -14,7 +14,7 @@ use crate::node::{
     api::command::Command,
     core::{
         bootstrap::JoiningAsRelocated,
-        relocation::{find_nodes_to_relocate, RelocateDetailsUtils},
+        relocation::{find_nodes_to_relocate, ChurnId, RelocateDetailsUtils},
         Core, Proposal,
     },
     network_knowledge::NodeState,
@@ -22,16 +22,21 @@ use crate::node::{
 };
 use crate::types::log_markers::LogMarker;
 
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
 // Relocation
 impl Core {
     pub(crate) async fn relocate_peers(
         &self,
-        churn_name: &XorName,
-        churn_signature: &bls::Signature,
+        churn_id: ChurnId,
+        excluded: BTreeSet<XorName>,
     ) -> Result<Vec<Command>> {
-        let mut commands = vec![];
+        // Do not carry out relocations in the first section
+        // TODO: consider avoiding relocations in first 16 sections instead.
+        if self.network_knowledge.prefix().await.is_empty() {
+            return Ok(vec![]);
+        }
 
         // Do not carry out relocation when there is not enough elder nodes.
         if self
@@ -41,23 +46,18 @@ impl Core {
             .elder_count()
             < elder_count()
         {
-            return Ok(commands);
+            return Ok(vec![]);
         }
 
-        // Consider: Set <= 4, as to not carry out relocations in first 16 sections.
-        // TEMP: Do not carry out relocations in the first section
-        if self.network_knowledge.prefix().await.bit_count() < 1 {
-            return Ok(commands);
-        }
-
+        let mut commands = vec![];
         for (node_state, relocate_details) in
-            find_nodes_to_relocate(&self.network_knowledge, churn_name, churn_signature)
+            find_nodes_to_relocate(&self.network_knowledge, &churn_id, excluded)
         {
             debug!(
                 "Relocating {:?} to {} (on churn of {})",
                 node_state.peer(),
                 relocate_details.dst,
-                churn_name
+                churn_id
             );
 
             commands.extend(

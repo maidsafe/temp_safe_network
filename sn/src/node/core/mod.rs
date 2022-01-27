@@ -29,7 +29,7 @@ pub(crate) use capacity::MIN_LEVEL_WHEN_FULL;
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
 pub(crate) use proposal::Proposal;
 #[cfg(test)]
-pub(crate) use relocation::check as relocation_check;
+pub(crate) use relocation::{check as relocation_check, ChurnId};
 
 use self::{data_storage::DataStorage, split_barrier::SplitBarrier};
 

@@ -9,7 +9,7 @@
 use crate::messaging::system::{KeyedSig, MembershipState, SectionAuth};
 use crate::node::{
     api::command::Command,
-    core::{Core, Proposal},
+    core::{relocation::ChurnId, Core, Proposal},
     dkg::SectionAuthUtils,
     network_knowledge::{NodeState, SectionAuthorityProvider},
     Event, Result, MIN_ADULT_AGE,
@@ -111,8 +111,10 @@ impl Core {
             *self.joins_allowed.write().await = false;
         }
 
+        let churn_id = ChurnId(new_info.sig.signature.to_bytes().to_vec());
+        let excluded_from_relocation = vec![new_info.name()].into_iter().collect();
         commands.extend(
-            self.relocate_peers(&new_info.name(), &new_info.sig.signature)
+            self.relocate_peers(churn_id, excluded_from_relocation)
                 .await?,
         );
 
@@ -174,7 +176,8 @@ impl Core {
             );
         }
 
-        commands.extend(self.relocate_peers(&node_state.name(), &signature).await?);
+        let churn_id = ChurnId(signature.to_bytes().to_vec());
+        commands.extend(self.relocate_peers(churn_id, BTreeSet::default()).await?);
 
         let result = self.promote_and_demote_elders().await?;
         if result.is_empty() {
