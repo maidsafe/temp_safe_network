@@ -23,7 +23,6 @@ use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
 use dashmap::DashMap;
 use futures::future::join_all;
-use itertools::Itertools;
 use qp2p::{Close, Config as QuicP2pConfig, ConnectionError, Endpoint, SendError};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
@@ -230,16 +229,17 @@ impl Session {
 
         // Get DataSection elders details. Resort to own section if DataSection is not available.
         let sap = self.network.closest_or_opposite(&dst, None);
-        let (section_pk, elders) = if let Some(sap) = &sap {
+        let (section_pk, mut elders) = if let Some(sap) = &sap {
             (sap.section_key(), sap.elders_vec())
         } else {
             return Err(Error::NoNetworkKnowledge);
         };
 
+        elders.shuffle(&mut OsRng);
+
         // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying
         let chosen_elders: Vec<_> = elders
             .into_iter()
-            .sorted_by(|lhs, rhs| dst.cmp_distance(&lhs.name(), &rhs.name()))
             .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
             .collect();
 
