@@ -43,6 +43,11 @@ use ed25519_dalek::Signer;
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
+// this doesn't realistically limit concurrency
+// the prioritisation will do that, preventing lower prio messages being kicked off when
+// high prio messages exist
+const QUERY_LIMIT: usize = 1000;
+
 // Message handling
 impl Core {
     #[instrument(skip(self, original_bytes))]
@@ -53,7 +58,6 @@ impl Core {
         original_bytes: Option<Bytes>,
     ) -> Result<Vec<Command>> {
         let mut cmds = vec![];
-        trace!("handling msg");
 
         // Apply backpressure if needed.
         if let Some(load_report) = self.comm.check_strain(sender.addr()).await {
@@ -67,8 +71,9 @@ impl Core {
         }
 
         // Deserialize the payload of the incoming message
-        let payload = wire_msg.payload.clone();
         let msg_id = wire_msg.msg_id();
+        // payload needed for aggregation
+        let payload = wire_msg.payload.clone();
 
         let message_type = match wire_msg.into_message() {
             Ok(message_type) => message_type,
@@ -204,6 +209,18 @@ impl Core {
                             .await?,
                     );
                     return Ok(cmds);
+                }
+
+                // First we check if it's query and we have too many on the go at the moment...
+                if let ServiceMsg::Query(_) = msg {
+                    // we have a query, check if we have too many on the go....
+                    let pending_query_length = self.pending_data_queries.len().await;
+
+                    if pending_query_length > QUERY_LIMIT {
+                        // TODO: check if query is pending for this already.. add to that if that makes sense.
+                        warn!("Pending queries length exceeded, dropping query {msg:?}");
+                        return Ok(vec![]);
+                    }
                 }
 
                 // First we perform AE checks
