@@ -130,6 +130,7 @@ pub async fn create_test_client_with(
         genesis_key,
         None,
         timeout,
+        timeout,
         standard_wait,
     )
     .await;
