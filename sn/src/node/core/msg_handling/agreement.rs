@@ -92,6 +92,8 @@ impl Core {
             return Ok(vec![]);
         }
 
+        self.add_new_adult_to_trackers(new_info.name()).await;
+
         info!("handle Online: {} at {}", new_info.name(), new_info.addr());
 
         // still used for testing
