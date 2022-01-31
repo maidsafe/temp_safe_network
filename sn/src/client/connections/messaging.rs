@@ -732,6 +732,8 @@ pub(super) async fn send_message(
     if failures > successful_sends {
         warn!("More errors when sending a message than successes");
         if let Some(error) = last_error {
+
+            warn!("The relevant error is: {error}");
             return Err(error);
         }
     }
