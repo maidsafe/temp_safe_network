@@ -12,44 +12,44 @@ use log::debug;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-pub(crate) type SubName = String;
+pub(crate) type Subname = String;
 
-/// Mapping Subnames to SafeUrls
-/// For a given Top Name : "example"
+/// An NRS map is a description of a registered topname and all subnames associated with that.
 ///
-/// | SubName Key   | Full Name        | SafeUrl Value|
-/// |---------------|------------------|--------------|
-/// | ""            | "example"        | "safe://eg1" |
-/// | "sub"         | "sub.example"    | "safe://eg2" |
-/// | "sub.sub"     | "sub.sub.example"| "safe://eg3" |
+/// Each subname will link to some content, e.g., a `FilesContainer`, and the topname can also
+/// optionally link to something.
 ///
-/// The map also has a subname_version, which can be used if you want a subname at a particular
-/// version.
+/// The struct is stored on the network using a Multimap. The entries are subname -> SafeUrl
+/// mappings.
+///
+/// | Subname Key       | Full Name        | SafeUrl Value            |
+/// |-------------------|------------------|--------------------------|
+/// | "example"         | "example"        | "safe://example"         |
+/// | "sub.example"     | "sub.example"    | "safe://sub.example"     |
+/// | "sub.sub.example" | "sub.sub.example"| "safe://sub.sub.example" |
+///
+/// The map also has a subname version field that optionally specifies a subname at a particular
+/// version, since it's possible to have multiple entries for a given subname. If no version was
+/// requested when the map is retrieved, it will be set to `None`.
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize, Clone)]
 pub struct NrsMap {
-    pub map: BTreeMap<SubName, SafeUrl>,
+    pub map: BTreeMap<Subname, SafeUrl>,
     pub subname_version: Option<VersionHash>,
 }
 
 impl NrsMap {
-    /// Get the SafeUrl associated with the input public name in the NrsMap
+    /// Get the SafeUrl associated with the given public name.
     pub fn get(&self, public_name: &str) -> Result<SafeUrl> {
-        let subname = parse_out_subnames(public_name);
-        self.get_for_subname(&subname)
-    }
-
-    /// Get the SafeUrl associated with the input sub name in the NrsMap
-    pub fn get_for_subname(&self, sub_name: &str) -> Result<SafeUrl> {
-        match self.map.get(sub_name) {
+        match self.map.get(public_name) {
             Some(link) => {
-                debug!("NRS: Subname resolution is: {} => {}", sub_name, link);
+                debug!("NRS: Subname resolution is: {} => {}", public_name, link);
                 Ok(link.to_owned())
             }
             None => {
-                debug!("NRS: No link found for subname(s): {}", sub_name);
+                debug!("NRS: No link found for subname(s): {}", public_name);
                 Err(Error::ContentError(format!(
                     "Link not found in NRS Map Container for subname(s): \"{}\"",
-                    sub_name
+                    public_name
                 )))
             }
         }
@@ -62,16 +62,4 @@ impl NrsMap {
     pub fn get_map_summary(&self) -> BTreeMap<String, BTreeMap<String, String>> {
         BTreeMap::new()
     }
-}
-
-/// removes top name from a given name
-/// "sub.sub.topname" -> "sub.sub"
-/// "sub.cooltopname" -> "sub"
-/// "lonetopname" -> ""
-pub(super) fn parse_out_subnames(name: &str) -> String {
-    let sanitized_name = str::replace(name, "safe://", "");
-    let mut parts = sanitized_name.split('.');
-    // pop out the topname (last part)
-    let _ = parts.next_back();
-    parts.collect::<Vec<&str>>().join(".")
 }

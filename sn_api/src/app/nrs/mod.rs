@@ -12,8 +12,6 @@ pub use crate::app::multimap::Multimap;
 pub use crate::safeurl::{ContentType, DataType, VersionHash};
 pub use nrs_map::NrsMap;
 
-use nrs_map::parse_out_subnames;
-
 use crate::{app::Safe, register::EntryHash, Error, Result, SafeUrl};
 
 use log::{debug, info};
@@ -105,23 +103,19 @@ impl Safe {
             public_name, link
         );
 
-        // check input
         let url_str = validate_nrs_public_name(public_name)?;
         validate_nrs_url(link)?;
 
-        // get current latest for subname
         let safe_url = Safe::parse_url(public_name)?;
-        let subname = parse_out_subnames(public_name);
         let current_versions = self
-            .fetch_multimap_values_by_key(&safe_url, subname.as_bytes())
+            .fetch_multimap_values_by_key(&safe_url, public_name.as_bytes())
             .await?
             .into_iter()
             .map(|(hash, _)| hash)
             .collect();
 
-        // update with new entry
         let entry = (
-            subname.as_bytes().to_vec(),
+            public_name.as_bytes().to_vec(),
             link.to_string().as_bytes().to_vec(),
         );
         let entry_hash = self
@@ -182,9 +176,8 @@ impl Safe {
 
         // get current latest for subname
         let safe_url = Safe::parse_url(public_name)?;
-        let subname = parse_out_subnames(public_name);
         let current_versions = self
-            .fetch_multimap_values_by_key(&safe_url, subname.as_bytes())
+            .fetch_multimap_values_by_key(&safe_url, public_name.as_bytes())
             .await?
             .into_iter()
             .map(|(hash, _)| hash)
@@ -224,8 +217,10 @@ impl Safe {
         let nrs_map = match self.nrs_get_subnames_map(public_name, version).await {
             Ok(result) => Ok(result),
             Err(Error::ConflictingNrsEntries(str, conflicting_entries, map)) => {
-                let subname = parse_out_subnames(public_name);
-                if conflicting_entries.iter().any(|(sub, _)| sub == &subname) {
+                if conflicting_entries
+                    .iter()
+                    .any(|(sub, _)| sub == &public_name)
+                {
                     Err(Error::ConflictingNrsEntries(str, conflicting_entries, map))
                 } else {
                     Ok(map)
@@ -424,9 +419,23 @@ mod tests {
         assert_ne!(versionned_url.content_version(), Some(version0));
 
         // check that the retrieved url matches the expected
-        let (retrieved_url, nrs_map) = retry_loop!(safe.nrs_get(&associated_name, None));
+        let (_, nrs_map) = retry_loop!(safe.nrs_get(&associated_name, None));
         assert_eq!(nrs_map.map.len(), 2);
-        assert_eq!(retrieved_url, url_v1);
+        assert_eq!(
+            *nrs_map.map.get(&site_name).ok_or_else(|| anyhow!(
+                "'{site_name}' subname should have been present in retrieved NRS map"
+            ))?,
+            url_v0
+        );
+        assert_eq!(
+            *nrs_map
+                .map
+                .get(&format!("a.b.{site_name}"))
+                .ok_or_else(|| anyhow!(
+                    "'a.b.{site_name}' subname should have been present in retrieved NRS map"
+                ))?,
+            url_v1
+        );
         Ok(())
     }
 
@@ -643,7 +652,7 @@ mod tests {
         let another_valid_url = nrs_url;
         let url_str = validate_nrs_top_name(&site_name)?;
         let entry = (
-            "".as_bytes().to_vec(),
+            site_name.as_bytes().to_vec(),
             another_valid_url.to_string().as_bytes().to_vec(),
         );
         let _ = safe
@@ -663,8 +672,8 @@ mod tests {
 
         // check for the error content
         if let Err(Error::ConflictingNrsEntries(_, dups, _)) = conflict_error {
-            let got_entries: Result<()> = dups.into_iter().try_for_each(|(subname, url)| {
-                assert_eq!(subname, "");
+            let got_entries: Result<()> = dups.into_iter().try_for_each(|(public_name, url)| {
+                assert_eq!(public_name, site_name);
                 assert!(url == valid_link || url == another_valid_url);
                 Ok(())
             });
