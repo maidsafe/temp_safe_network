@@ -133,42 +133,11 @@ impl Core {
             ]);
         }
 
-        // During the first section, nodes shall use ranged age to avoid too many nodes getting
-        // relocated at the same time. After the first section splits, nodes shall only
-        // start with an age of MIN_ADULT_AGE
-        let current_section_size = self.network_knowledge.section_size();
-
-        // Prefix will be empty for first section
-        let (is_age_invalid, expected_age): (bool, u8) = if our_prefix.is_empty() {
-            let elders = self.network_knowledge.elders().await;
-            // Forces the joining node to be younger than the youngest elder in genesis section
-            // avoiding unnecessary churn.
-
-            // Check if `elder_count()` Elders are already present
-            if elders.len() == elder_count() {
-                // Check if the joining node is younger than the youngest elder and older than
-                // MIN_ADULT_AGE in the first section, to avoid unnecessary churn during genesis.
-                let expected_age = FIRST_SECTION_MIN_ELDER_AGE - current_section_size as u8 * 2;
-                let is_age_invalid = peer.age() <= MIN_ADULT_AGE || peer.age() > expected_age;
-                (is_age_invalid, expected_age)
-            } else {
-                // Since enough elders haven't joined the first section calculate a value
-                // within the range [FIRST_SECTION_MIN_ELDER_AGE, FIRST_SECTION_MAX_AGE].
-                let expected_age = FIRST_SECTION_MAX_AGE - current_section_size as u8 * 2;
-                // TODO: avoid looping by ensure can only update to lower non-FIRST_SECTION_MIN_ELDER_AGE age
-                let is_age_invalid = peer.age() != expected_age;
-                (is_age_invalid, expected_age)
-            }
-        } else {
-            // Age should be MIN_ADULT_AGE for joining nodes after genesis section.
-            let is_age_invalid = peer.age() != MIN_ADULT_AGE;
-            (is_age_invalid, MIN_ADULT_AGE)
-        };
+        let (is_age_invalid, expected_age) = self.verify_joining_node_age(&peer).await;
 
         trace!(
-            "our_prefix {:?} current_section_size {:?} expected_age {:?} is_age_invalid {:?}",
+            "our_prefix {:?} expected_age {:?} is_age_invalid {:?}",
             our_prefix,
-            current_section_size,
             expected_age,
             is_age_invalid
         );
@@ -231,6 +200,41 @@ impl Core {
         Ok(vec![cmd])
     }
 
+    pub(crate) async fn verify_joining_node_age(&self, peer: &Peer) -> (bool, u8) {
+        // During the first section, nodes shall use ranged age to avoid too many nodes getting
+        // relocated at the same time. After the first section splits, nodes shall only
+        // start with an age of MIN_ADULT_AGE
+        let current_section_size = self.network_knowledge.section_size();
+        let our_prefix = self.network_knowledge.prefix().await;
+
+        // Prefix will be empty for first section
+        if our_prefix.is_empty() {
+            let elders = self.network_knowledge.elders().await;
+            // Forces the joining node to be younger than the youngest elder in genesis section
+            // avoiding unnecessary churn.
+
+            // Check if `elder_count()` Elders are already present
+            if elders.len() == elder_count() {
+                // Check if the joining node is younger than the youngest elder and older than
+                // MIN_ADULT_AGE in the first section, to avoid unnecessary churn during genesis.
+                let expected_age = FIRST_SECTION_MIN_ELDER_AGE - current_section_size as u8 * 2;
+                let is_age_invalid = peer.age() <= MIN_ADULT_AGE || peer.age() > expected_age;
+                (is_age_invalid, expected_age)
+            } else {
+                // Since enough elders haven't joined the first section calculate a value
+                // within the range [FIRST_SECTION_MIN_ELDER_AGE, FIRST_SECTION_MAX_AGE].
+                let expected_age = FIRST_SECTION_MAX_AGE - current_section_size as u8 * 2;
+                // TODO: avoid looping by ensure can only update to lower non-FIRST_SECTION_MIN_ELDER_AGE age
+                let is_age_invalid = peer.age() != expected_age;
+                (is_age_invalid, expected_age)
+            }
+        } else {
+            // Age should be MIN_ADULT_AGE for joining nodes after genesis section.
+            let is_age_invalid = peer.age() != MIN_ADULT_AGE;
+            (is_age_invalid, MIN_ADULT_AGE)
+        }
+    }
+
     pub(crate) async fn handle_join_as_relocated_request(
         &self,
         peer: Peer,
@@ -248,13 +252,13 @@ impl Core {
             join_request, peer
         );
 
-        if !self.network_knowledge.prefix().await.matches(&peer.name())
+        let our_prefix = self.network_knowledge.prefix().await;
+        if !our_prefix.matches(&peer.name())
             || join_request.section_key != self.network_knowledge.section_key().await
         {
-            let prefix = self.network_knowledge.prefix().await;
             debug!(
                 "JoinAsRelocatedRequest from {} - name doesn't match our prefix {:?}.",
-                peer, prefix
+                peer, our_prefix
             );
 
             let node_msg =

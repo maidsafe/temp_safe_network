@@ -20,7 +20,7 @@ use crate::messaging::{
 };
 use crate::node::{
     core::{
-        relocation_check, ConnectionEvent, Core, Proposal, RESOURCE_PROOF_DATA_SIZE,
+        relocation_check, ChurnId, ConnectionEvent, Core, Proposal, RESOURCE_PROOF_DATA_SIZE,
         RESOURCE_PROOF_DIFFICULTY,
     },
     create_test_max_capacity_and_root_storage,
@@ -1471,9 +1471,8 @@ fn create_relocation_trigger(sk: &bls::SecretKey, age: u8) -> Result<SectionAuth
         let node_state = NodeState::joined(create_peer(MIN_ADULT_AGE), Some(rand::random()));
         let auth = section_signed(sk, node_state.to_msg())?;
 
-        if relocation_check(age, &auth.sig.signature)
-            && !relocation_check(age + 1, &auth.sig.signature)
-        {
+        let churn_id = ChurnId(auth.sig.signature.to_bytes().to_vec());
+        if relocation_check(age, &churn_id) && !relocation_check(age + 1, &churn_id) {
             return Ok(auth);
         }
     }

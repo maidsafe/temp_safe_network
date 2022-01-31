@@ -17,14 +17,31 @@ use crate::node::{
 };
 
 use ed25519_dalek::{Signature, Verifier};
-use std::{cmp::min, collections::BTreeSet};
+use std::{
+    cmp::min,
+    collections::BTreeSet,
+    fmt::{self, Display, Formatter},
+};
 use xor_name::XorName;
+
+// Unique identifier for a churn event, which is used to select nodes to relocate.
+pub(crate) struct ChurnId(pub(crate) Vec<u8>);
+
+impl Display for ChurnId {
+    fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+        write!(
+            fmt,
+            "Churn-{:02x}{:02x}{:02x}..",
+            self.0[0], self.0[1], self.0[2]
+        )
+    }
+}
 
 /// Find all nodes to relocate after a churn event and generate the relocation details for them.
 pub(super) fn find_nodes_to_relocate(
     network_knowledge: &NetworkKnowledge,
-    churn_name: &XorName,
-    churn_signature: &bls::Signature,
+    churn_id: &ChurnId,
+    excluded: BTreeSet<XorName>,
 ) -> Vec<(NodeState, RelocateDetails)> {
     // Find the peers that pass the relocation check and take only the oldest ones to avoid
     // relocating too many nodes at the same time.
@@ -42,9 +59,9 @@ pub(super) fn find_nodes_to_relocate(
 
     let candidates: BTreeSet<_> = joined_nodes
             .into_iter()
-            .filter(|info| check(info.age(), churn_signature))
+            .filter(|info| check(info.age(), churn_id))
             // the newly joined node shall not be relocated immediately
-            .filter(|info| &info.name() != churn_name)
+            .filter(|info| !excluded.contains(&info.name()))
             .collect();
 
     let max_age = if let Some(age) = candidates.iter().map(|info| info.age()).max() {
@@ -57,7 +74,7 @@ pub(super) fn find_nodes_to_relocate(
 
     for node_state in candidates {
         if node_state.age() == max_age {
-            let dst = dst(&node_state.name(), churn_name);
+            let dst = dst(&node_state.name(), churn_id);
             let age = node_state.age().saturating_add(1);
             let relocate_details =
                 RelocateDetails::with_age(network_knowledge, node_state.peer(), dst, age);
@@ -117,20 +134,19 @@ impl RelocateDetailsUtils for RelocateDetails {
 }
 
 // Relocation check - returns whether a member with the given age is a candidate for relocation on
-// a churn event with the given signature.
-pub(crate) fn check(age: u8, churn_signature: &bls::Signature) -> bool {
+// a churn event with the given churn id.
+pub(crate) fn check(age: u8, churn_id: &ChurnId) -> bool {
     // Evaluate the formula: `signature % 2^age == 0` Which is the same as checking the signature
     // has at least `age` trailing zero bits.
-    trailing_zeros(&churn_signature.to_bytes()[..]) >= age as u32
+    trailing_zeros(&churn_id.0) >= age as u32
 }
 
-// Compute the destination for the node with `relocating_name` to be relocated to. `churn_name` is
-// the name of the joined/left node that triggered the relocation.
-fn dst(relocating_name: &XorName, churn_name: &XorName) -> XorName {
-    XorName::from_content_parts(&[&relocating_name.0, &churn_name.0])
+// Compute the destination for the node with `relocating_name` to be relocated to.
+fn dst(relocating_name: &XorName, churn_id: &ChurnId) -> XorName {
+    XorName::from_content_parts(&[&relocating_name.0, &churn_id.0])
 }
 
-// Returns the number of trailing zero bits of the byte slice.
+// Returns the number of trailing zero bits of the bytes slice.
 fn trailing_zeros(bytes: &[u8]) -> u32 {
     let mut output = 0;
 
@@ -180,20 +196,13 @@ mod tests {
         #[test]
         fn proptest_actions(
             peers in arbitrary_unique_peers(2..(recommended_section_size() + elder_count()), MIN_ADULT_AGE..MAX_AGE),
-            signature_trailing_zeros in 0..MAX_AGE,
-            seed in any::<u64>().no_shrink())
+            signature_trailing_zeros in 0..MAX_AGE)
         {
-            proptest_actions_impl(peers, signature_trailing_zeros, seed).unwrap()
+            proptest_actions_impl(peers, signature_trailing_zeros).unwrap()
         }
     }
 
-    fn proptest_actions_impl(
-        peers: Vec<Peer>,
-        signature_trailing_zeros: u8,
-        seed: u64,
-    ) -> Result<()> {
-        let mut rng = SmallRng::seed_from_u64(seed);
-
+    fn proptest_actions_impl(peers: Vec<Peer>, signature_trailing_zeros: u8) -> Result<()> {
         let sk_set = SecretKeySet::random();
         let sk = sk_set.secret_key();
         let genesis_pk = sk.public_key();
@@ -228,10 +237,14 @@ mod tests {
         }
 
         // Simulate a churn event whose signature has the given number of trailing zeros.
-        let churn_name = rng.gen();
-        let churn_signature = signature_with_trailing_zeros(signature_trailing_zeros as u32);
+        let churn_id = ChurnId(
+            signature_with_trailing_zeros(signature_trailing_zeros as u32)
+                .to_bytes()
+                .to_vec(),
+        );
 
-        let relocations = find_nodes_to_relocate(&network_knowledge, &churn_name, &churn_signature);
+        let relocations =
+            find_nodes_to_relocate(&network_knowledge, &churn_id, BTreeSet::default());
 
         let relocations: Vec<_> = relocations
             .into_iter()

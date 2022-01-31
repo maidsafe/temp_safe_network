@@ -4,13 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.45.0 (2022-01-22)
+## v0.46.0 (2022-01-28)
+
+### New Features
+
+ - <csr-id-3d73dd03a7a6913a248e5cca7d714f8b8e4c0d01/> retrieve immutable content via nrs
+   Changes the resolver to enable retrieval of NRS links to immutable content. Previously, the
+   NRS `target_url` was incorrectly being checked to see if it contained a version. We now validate
+   this URL using the same process used by NRS, which won't assert that a file link has a version. To
+   reduce duplication, the `validate_nrs_url` function in the NRS module was changed to public.
+   
+   Tests were added to both the API and CLI to cover the scenario.
+   
+   The NrsMap struct was extended to include a subname_version field. This is going to be used to
+   request the map with a particular version of a subname. If no version was specified when the
+   container was retrieved, then the field won't be set. This is why it's an Option. Since we're
+   storing this field on the NrsMap, the `version` field on the `NrsMapContainer` was removed.
+   
+   A couple of CLI NRS tests were also re-enabled, one of which happened to be related to immutable
+   content.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release over the course of 1 calendar day.
+ - 2 commits contributed to the release over the course of 2 calendar days.
+ - 6 days passed between releases.
  - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -21,10 +40,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge branch 'main' into nrs_resolve_immutable_content ([`099bf22`](https://github.com/maidsafe/safe_network/commit/099bf224714e667bf998de80099eeeabfd869d8b))
+    - retrieve immutable content via nrs ([`3d73dd0`](https://github.com/maidsafe/safe_network/commit/3d73dd03a7a6913a248e5cca7d714f8b8e4c0d01))
+</details>
+
+## v0.45.0 (2022-01-22)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 8 commits contributed to the release over the course of 3 calendar days.
+ - 1 day passed between releases.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.54.0/sn_api-0.52.0/sn_cli-0.45.0 ([`0190f03`](https://github.com/maidsafe/safe_network/commit/0190f0305980bdaee30f9f2ab5eb5510149916db))
     - update remaining places ([`3dc2327`](https://github.com/maidsafe/safe_network/commit/3dc23278c6a4fabc250b27f4312f5c51f0f271a4))
     - Merge #958 ([`437a113`](https://github.com/maidsafe/safe_network/commit/437a113e6e5736e4eb4287f41228806678a9762e))
     - Merge branch 'main' into simplify-sn-api ([`33ef052`](https://github.com/maidsafe/safe_network/commit/33ef0524ae238391f25c8fb340627c34ea79fcb2))
+    - remove one layer of indirection ([`3b5ce19`](https://github.com/maidsafe/safe_network/commit/3b5ce194213a7090ee83c02b0043700cda230796))
+    - update from MIT/BSD3 to GPL3 ([`20f416c`](https://github.com/maidsafe/safe_network/commit/20f416cb7d0960a1d8d6f167a1ad1eed33ed6a7b))
     - Merge #962 ([`29d01da`](https://github.com/maidsafe/safe_network/commit/29d01da5233fd2a10b30699b555a0d85d7a7409a))
+    - update year on files modified 2022 ([`7a7752f`](https://github.com/maidsafe/safe_network/commit/7a7752f830785ec39d301e751dc75f228d43d595))
 </details>
 
 ## v0.44.0 (2022-01-20)
@@ -49,8 +94,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 16 commits contributed to the release over the course of 13 calendar days.
- - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits contributed to the release over the course of 13 calendar days.
+ - 13 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -61,31 +107,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - safe_network-0.53.0/sn_api-0.51.0/sn_cli-0.44.0 ([`923930a`](https://github.com/maidsafe/safe_network/commit/923930acb3769cfa7047954a1fee1853ec9e3062))
-    - refactor(sn_api): remove one layer of indirection Also simplifies instantiation and handling of the safe instance. ([`3b5ce19`](https://github.com/maidsafe/safe_network/commit/3b5ce194213a7090ee83c02b0043700cda230796))
-    - update from MIT/BSD3 to GPL3 ([`20f416c`](https://github.com/maidsafe/safe_network/commit/20f416cb7d0960a1d8d6f167a1ad1eed33ed6a7b))
-    - update year on files modified 2022 ([`7a7752f`](https://github.com/maidsafe/safe_network/commit/7a7752f830785ec39d301e751dc75f228d43d595))
     - nightly release run ([`ad2e30c`](https://github.com/maidsafe/safe_network/commit/ad2e30cf52cd8be01c00353d722ea1107c43a641))
     - solving new clippy findings ([`57749b7`](https://github.com/maidsafe/safe_network/commit/57749b7d0671423fe205447bc84d9f8bfc99f54b))
     - Merge #885 ([`72a3f12`](https://github.com/maidsafe/safe_network/commit/72a3f1269c9c38add9b88455837655f2bc33b551))
     - Merge branch 'main' into kill-the-blob ([`5a055ba`](https://github.com/maidsafe/safe_network/commit/5a055ba679e6a4f2cd92700af68f8b36ac12a544))
     - Merge branch 'main' into kill-the-blob ([`411ce5b`](https://github.com/maidsafe/safe_network/commit/411ce5b9d4c396484d2384324ae09d346c79013f))
-    - Merge branch 'main' into kill-the-blob ([`9c5cd80`](https://github.com/maidsafe/safe_network/commit/9c5cd80c286308c6d075c5418d8a1650e87fddd5))
     - Merge #924 ([`7af9b5b`](https://github.com/maidsafe/safe_network/commit/7af9b5b2ee488e2a589d273b3b204a370b7e585f))
-    - reintroduce the `files sync` command ([`0f44890`](https://github.com/maidsafe/safe_network/commit/0f44890b8d5cd7055a790f70cdf6d167532ada05))
-    - Merge branch 'main' into kill-the-blob ([`fe814a6`](https://github.com/maidsafe/safe_network/commit/fe814a69e5ef5fbe4c62a056498ef88ce5897fef))
-    - Merge #917 ([`0eb6439`](https://github.com/maidsafe/safe_network/commit/0eb643910098ab6021561e5b997b6289be9e2c57))
+    - Merge branch 'main' into kill-the-blob ([`9c5cd80`](https://github.com/maidsafe/safe_network/commit/9c5cd80c286308c6d075c5418d8a1650e87fddd5))
     - Merge #916 #918 #919 ([`5c4d3a9`](https://github.com/maidsafe/safe_network/commit/5c4d3a92ff28126468f07d599c6caf416661aba2))
-    - safe_network-0.52.13/sn_api-0.50.6 ([`155ee03`](https://github.com/maidsafe/safe_network/commit/155ee032ee56cbbb34928f2d14529273ccb69559))
+    - Merge branch 'main' into kill-the-blob ([`fe814a6`](https://github.com/maidsafe/safe_network/commit/fe814a69e5ef5fbe4c62a056498ef88ce5897fef))
 </details>
 
 ## v0.43.2 (2022-01-06)
+
+### Documentation
+
+ - <csr-id-0f44890b8d5cd7055a790f70cdf6d167532ada05/> reintroduce the `files sync` command
+   The `files sync` command is described, but this time a bit more succinctly. The `--update-nrs`
+   argument was omitted because it doesn't seem to be working any more.
+   
+   Also changed:
+   * Fixed the indentation levels for the table of contents.
+   * Provide a small section to describe an example directory used by all commands.
+   * Update other sections to use the above examples directory.
+   * Clarify description of container base paths.
+   * Move the `files ls` section immediately after `files put`, as I think it makes sense to introduce
+     the concept of listing files after you've uploaded them.
+   * Trim down the `files get` section.
+   * Trim down the `files tree` section.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 9 commits contributed to the release over the course of 1 calendar day.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 8 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -96,14 +153,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - safe_network-0.52.11/sn_api-0.50.5/sn_cli-0.43.2 ([`99d012e`](https://github.com/maidsafe/safe_network/commit/99d012ef529df78ef4c84f5e6ea99d3a77414797))
+    - reintroduce the `files sync` command ([`0f44890`](https://github.com/maidsafe/safe_network/commit/0f44890b8d5cd7055a790f70cdf6d167532ada05))
+    - Merge #917 ([`0eb6439`](https://github.com/maidsafe/safe_network/commit/0eb643910098ab6021561e5b997b6289be9e2c57))
     - Merge branch 'main' into kill-the-blob ([`40268a5`](https://github.com/maidsafe/safe_network/commit/40268a598aea8d14c1dbeb1c00712b9f9a664ef8))
+    - safe_network-0.52.13/sn_api-0.50.6 ([`155ee03`](https://github.com/maidsafe/safe_network/commit/155ee032ee56cbbb34928f2d14529273ccb69559))
     - Merge branch 'main' into kill-the-blob ([`6f89f12`](https://github.com/maidsafe/safe_network/commit/6f89f129ece75dee45f311d30e52ca71b6b7bc98))
-    - rename dest to dst ([`bebdae9`](https://github.com/maidsafe/safe_network/commit/bebdae9d52d03bd13b679ee19446452990d1e2cf))
     - safe_network-0.52.9/sn_api-0.50.4 ([`a64c7e0`](https://github.com/maidsafe/safe_network/commit/a64c7e0414b77f545cb8cdbf64af0fb7212d1f2e))
     - Merge branch 'main' into kill-the-blob ([`7d38c3d`](https://github.com/maidsafe/safe_network/commit/7d38c3df14d03c042b645ad05be6cd3cc540d631))
-    - rename blob to file ([`c790077`](https://github.com/maidsafe/safe_network/commit/c790077bebca691f974000278d5525f4b011b8a7))
-    - sn_api-0.50.3 ([`5f7000c`](https://github.com/maidsafe/safe_network/commit/5f7000c5ec5895fb3f4c4a17a74ada52bb873fc7))
-    - safe_network-0.52.6/sn_api-0.50.2 ([`0a70425`](https://github.com/maidsafe/safe_network/commit/0a70425fb314de4c165da54fdc29a127ae900d81))
 </details>
 
 ## v0.43.1 (2022-01-04)
@@ -112,8 +168,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits contributed to the release.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -124,7 +180,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - sn_cli-0.43.1 ([`db51539`](https://github.com/maidsafe/safe_network/commit/db515397771f117b3bf095e1a4afb897eb4acafe))
+    - rename dest to dst ([`bebdae9`](https://github.com/maidsafe/safe_network/commit/bebdae9d52d03bd13b679ee19446452990d1e2cf))
+    - sn_api-0.50.3 ([`5f7000c`](https://github.com/maidsafe/safe_network/commit/5f7000c5ec5895fb3f4c4a17a74ada52bb873fc7))
+    - rename blob to file ([`c790077`](https://github.com/maidsafe/safe_network/commit/c790077bebca691f974000278d5525f4b011b8a7))
     - safe_network-0.52.4/sn_api-0.50.1 ([`4bb2adf`](https://github.com/maidsafe/safe_network/commit/4bb2adf52efdac6187fffc299018bf13f3398e14))
+    - safe_network-0.52.6/sn_api-0.50.2 ([`0a70425`](https://github.com/maidsafe/safe_network/commit/0a70425fb314de4c165da54fdc29a127ae900d81))
 </details>
 
 ## v0.43.0 (2022-01-03)
@@ -219,6 +279,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <csr-read-only-do-not-edit/>
 
  - 6 commits contributed to the release over the course of 10 calendar days.
+ - 11 days passed between releases.
  - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -244,6 +305,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <csr-read-only-do-not-edit/>
 
  - 8 commits contributed to the release over the course of 6 calendar days.
+ - 6 days passed between releases.
  - 8 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -277,8 +339,8 @@ This is a manually generated changelog, as `smart-release` seemed to have some i
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -290,11 +352,36 @@ This is a manually generated changelog, as `smart-release` seemed to have some i
  * **Uncategorized**
     - sn_cli-0.39.1 ([`943166a`](https://github.com/maidsafe/safe_network/commit/943166ab6d88266909ec6cd8a8e98bbbf21ec18d))
     - sn_api-0.46.2 ([`6df94b1`](https://github.com/maidsafe/safe_network/commit/6df94b1d1fb017c9b02e566ca22a518f885397c8))
+    - safe_network-0.51.3/sn_api-0.46.1 ([`9be440b`](https://github.com/maidsafe/safe_network/commit/9be440b36db07e1c04ab688b44ef91e4a56ed576))
 </details>
 
 ## v0.39.0 (2021-12-16)
 
 This is a manual changelog entry. Subsequent CLI releases will use the automated changelog generated by `smart-release`.
+
+### New Features
+
+ - <csr-id-76fee4674f4a4933c79b90afcd66598e1a05c5fd/> refined ux and behaviour for `nrs add`
+   The behaviour for the command is mostly retained, but the user experience has been improved in the
+   following ways:
+   
+   * The documentation for the command and the arguments were elaborated to provide more information.
+   * Text was added to the command output when the `--default` argument is used, to indicate that a
+     link was created to the topname.
+   * Suggest that links to versionable content must have their version hash specified on the `--link`
+     argument.
+   
+   BREAKING CHANGES:
+   * The `--name` argument has been renamed to `--public-name`.
+   * The `--direct` flag argument was removed.
+   
+   Tests were provided for all of the scenarios and code paths explored in the command and there was
+   some refactoring done to share some code between the `create` and `add` commands. The calls to
+   `nrs_add` and `nrs_associate` were wrapped in functions, due to the slightly verbose error handling
+   required for providing suggestions to the user.
+   
+   Finally, the dry run functionality was removed since this currently isn't available for NRS. We can
+   add it back in when it is.
 
 ### New Features (BREAKING)
 
@@ -304,14 +391,19 @@ This is a manual changelog entry. Subsequent CLI releases will use the automated
 * Various commands were updated to have their error handling and suggestions improved (using the [color_eyre crate](https://docs.rs/color-eyre/latest/color_eyre/))
 * The 'self update' feature of the CLI has been disabled for the time being
 * The CLI is now compatible with various API updates that have been made
+ - <csr-id-c284f0787afe0d079e53b79b3a9d74cad04c4b0e/> `nrs create` only creates topnames
+
+ - <csr-id-d08858cde855e89b6bf44ae5194500fd6c754288/> rename nrs `create` to `register`
+
  - <csr-id-18879590ddfcf125133a6b2b8f3f372e8683be42/> rename Url to SafeUrl
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 18 commits contributed to the release over the course of 6 calendar days.
- - 15 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 17 commits contributed to the release over the course of 6 calendar days.
+ - 7 days passed between releases.
+ - 17 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -322,9 +414,8 @@ This is a manual changelog entry. Subsequent CLI releases will use the automated
 
  * **Uncategorized**
     - sn_cli-v0.39.0 ([`ae44ebb`](https://github.com/maidsafe/safe_network/commit/ae44ebbf46a72bf1897f8c6004466290f8425db7))
-    - safe_network-0.51.3/sn_api-0.46.1 ([`9be440b`](https://github.com/maidsafe/safe_network/commit/9be440b36db07e1c04ab688b44ef91e4a56ed576))
-    - remove use of `indicatif` crate ([`b09f830`](https://github.com/maidsafe/safe_network/commit/b09f8307fd1047eb92d2cfe1a6ed38731f6e09e2))
     - sn_api-0.46.0 ([`634a8f9`](https://github.com/maidsafe/safe_network/commit/634a8f9f307598c51305067444514b43c85f196d))
+    - remove use of `indicatif` crate ([`b09f830`](https://github.com/maidsafe/safe_network/commit/b09f8307fd1047eb92d2cfe1a6ed38731f6e09e2))
     - add recursion limit for clippy ([`e52a0c0`](https://github.com/maidsafe/safe_network/commit/e52a0c063f747e0be1525f07f8f759f4b9d042a7))
     - disable self update feature in sn_cli ([`1a8bbb7`](https://github.com/maidsafe/safe_network/commit/1a8bbb7ebe4737f931cec259dc7863b84531f2c3))
     - build asset download url in cli ([`8d402e8`](https://github.com/maidsafe/safe_network/commit/8d402e8b2255edf139e3c3507e6597e581719ad4))
@@ -334,10 +425,10 @@ This is a manual changelog entry. Subsequent CLI releases will use the automated
     - update use of nrs in other areas ([`45f1f02`](https://github.com/maidsafe/safe_network/commit/45f1f02bbdb61e7c698f1f6a5a62fb63ed01aae3))
     - address feedback from pr ([`735a68a`](https://github.com/maidsafe/safe_network/commit/735a68a45aa264a5462642f4fb1e26f05bdf28ca))
     - remove previous nrs tests ([`ffea442`](https://github.com/maidsafe/safe_network/commit/ffea442b710f0051483523297968c9bcbc81419b))
-    - feat(sn_cli): rename nrs `create` to `register` ([`d08858c`](https://github.com/maidsafe/safe_network/commit/d08858cde855e89b6bf44ae5194500fd6c754288))
+    - rename nrs `create` to `register` ([`d08858c`](https://github.com/maidsafe/safe_network/commit/d08858cde855e89b6bf44ae5194500fd6c754288))
     - add coverage for `nrs remove` command ([`db98472`](https://github.com/maidsafe/safe_network/commit/db98472ad8af2a61aa8edf594119ed6b7a92d3ad))
-    - feat(sn_cli): refined ux and behaviour for `nrs add` ([`76fee46`](https://github.com/maidsafe/safe_network/commit/76fee4674f4a4933c79b90afcd66598e1a05c5fd))
-    - feat(sn_cli)!: `nrs create` only creates topnames ([`c284f07`](https://github.com/maidsafe/safe_network/commit/c284f0787afe0d079e53b79b3a9d74cad04c4b0e))
+    - refined ux and behaviour for `nrs add` ([`76fee46`](https://github.com/maidsafe/safe_network/commit/76fee4674f4a4933c79b90afcd66598e1a05c5fd))
+    - `nrs create` only creates topnames ([`c284f07`](https://github.com/maidsafe/safe_network/commit/c284f0787afe0d079e53b79b3a9d74cad04c4b0e))
     - minor improvement to client log msgs related to configured timeouts ([`58632a2`](https://github.com/maidsafe/safe_network/commit/58632a27d271140fc4d777f25a76b0daea582426))
 </details>
 
@@ -404,6 +495,17 @@ This was tested against v0.33.12 of `safe_network`.
  - <csr-id-58ecf7fbae95dee0a103ce39d61efaac6e2cf550/> adapt authd client api and service names to new terminology of Safe creation and unlocking
  - <csr-id-3f23687471b846e3ad1e2492c237a21f212b753f/> reenable decoding auth reqs and basic app key generation
  - <csr-id-b994b8d6ec1fcfc540e91aa9df79ba849aee7647/> setting up IPC for auth
+ - <csr-id-f99a418a8befcb3baee84b993f4fcc2e23aed396/> genesis key argument for `node join`
+   Provides and correctly sets the genesis key argument for the `node join` command, which was
+   previously using a hard-coded placeholder value.
+   
+   This isn't actually just a feature commit, it's also a refactor to make the command unit-testable
+   using the `NetworkLauncher` trait. Unit test coverage has been provided for all the code paths
+   in the command. More elaborate documentation has also been provided for each of the arguments for
+   the command.
+   
+   In addition to the unit tests, I've tested the command for joining a local and a remote network,
+   both of which were successful.
 
 ### Documentation
 
@@ -1093,8 +1195,8 @@ like files with 0 bytes in them any more.
 
 <csr-read-only-do-not-edit/>
 
- - 153 commits contributed to the release over the course of 452 calendar days.
- - 124 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 153 commits contributed to the release over the course of 427 calendar days.
+ - 126 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1107,7 +1209,7 @@ like files with 0 bytes in them any more.
     - clippy tidyup for rust 1.57 ([`05f6d98`](https://github.com/maidsafe/safe_network/commit/05f6d98cf21f0158f4b5161484c7c15a0561b6f4))
     - cross platform support for cli unit tests ([`256c504`](https://github.com/maidsafe/safe_network/commit/256c504e49121fa0550ae1bcff33f22b8efc78df))
     - unify skip port forwarding arguments ([`3f77429`](https://github.com/maidsafe/safe_network/commit/3f77429e8bd659a5b2e7aa377437fac1b3d709c0))
-    - feat(sn_cli): genesis key argument for `node join` ([`f99a418`](https://github.com/maidsafe/safe_network/commit/f99a418a8befcb3baee84b993f4fcc2e23aed396))
+    - genesis key argument for `node join` ([`f99a418`](https://github.com/maidsafe/safe_network/commit/f99a418a8befcb3baee84b993f4fcc2e23aed396))
     - ignore for bugs that have been identified ([`ae19a45`](https://github.com/maidsafe/safe_network/commit/ae19a45f58bf8d107eea8560af17801d2f619626))
     - minor changes for out of date tests ([`06fda58`](https://github.com/maidsafe/safe_network/commit/06fda580250745abbd8a6a12bab19c05a61f5615))
     - parse different output from `nrs create` ([`578d905`](https://github.com/maidsafe/safe_network/commit/578d9054c668dcf5871cdac26f2c16aa5df13d58))
@@ -1136,17 +1238,17 @@ like files with 0 bytes in them any more.
     - Merge branch 'main' into merge_sn_cli_into_workspace ([`c337617`](https://github.com/maidsafe/safe_network/commit/c3376177e095802a7da7d49908314213c169e079))
     - move cli code into sn_cli crate directory ([`a3e0b80`](https://github.com/maidsafe/safe_network/commit/a3e0b805af544205e82ac0c6d2a6e2ed1c55011f))
     - Version change: sn_api v0.26.0; sn_cli v0.26.0; sn_authd v0.8.0 ([`3bcf8ef`](https://github.com/maidsafe/safe_network/commit/3bcf8efcee84c5fb45f5e03ec49d5a623147dc4d))
-    - files get command to query each file with a single query rather than in chunks ([`497ab1b`](https://github.com/maidsafe/safe_network/commit/497ab1b68b4053e519740335d8e8d28e07ef30f7))
     - Version change: sn_api v0.25.3; sn_cli v0.25.3; sn_authd v0.7.3 ([`ab68342`](https://github.com/maidsafe/safe_network/commit/ab683420665c54df1ae3dae95055000518b543d1))
+    - files get command to query each file with a single query rather than in chunks ([`497ab1b`](https://github.com/maidsafe/safe_network/commit/497ab1b68b4053e519740335d8e8d28e07ef30f7))
     - Version change: sn_api v0.25.2; sn_cli v0.25.2; sn_authd v0.7.2 ([`0282dd6`](https://github.com/maidsafe/safe_network/commit/0282dd6edfce91ac25314bda7b6d87fd1ae621fe))
     - moving out safe_url mod as a standalone sn_url crate ([`5780fd1`](https://github.com/maidsafe/safe_network/commit/5780fd1d6ba480cb775fd66e53e41f02d97b3a94))
-    - Version change: sn_api v0.25.0; sn_cli v0.25.0; sn_authd v0.7.0 ([`60717f1`](https://github.com/maidsafe/safe_network/commit/60717f1a09aac06911f01cb3a811731721ae5708))
     - Version change: sn_api v0.25.1; sn_cli v0.25.1; sn_authd v0.7.1 ([`7a8860d`](https://github.com/maidsafe/safe_network/commit/7a8860d71776958fb93e91fefe157b3de4277a8c))
+    - Version change: sn_api v0.25.0; sn_cli v0.25.0; sn_authd v0.7.0 ([`60717f1`](https://github.com/maidsafe/safe_network/commit/60717f1a09aac06911f01cb3a811731721ae5708))
     - change node_path arg of 'node bin-path' command to node-path ([`d91150d`](https://github.com/maidsafe/safe_network/commit/d91150d8f46003cc0fa7813e4ae907b187379de8))
     - fixing multimap_remove and adding multimap_get_by_hash API ([`c5b0f0b`](https://github.com/maidsafe/safe_network/commit/c5b0f0b630f673697367361508a30caf7ad787bd))
     - adding first set of tests for Multimap API ([`6f05016`](https://github.com/maidsafe/safe_network/commit/6f0501699b0d0620a7c9d2b013944f90884ca1c3))
-    - Version change: sn_api v0.24.0; sn_cli v0.24.0; sn_authd v0.6.0 ([`47e7f0a`](https://github.com/maidsafe/safe_network/commit/47e7f0aea943a568d767a5226b0d8e71414508bc))
     - add 'xorurl pk' subcommand which generates the SafeKey XOR-URL for the given public key ([`6e700fc`](https://github.com/maidsafe/safe_network/commit/6e700fc9776409e88abd0a2e61e450f400985801))
+    - Version change: sn_api v0.24.0; sn_cli v0.24.0; sn_authd v0.6.0 ([`47e7f0a`](https://github.com/maidsafe/safe_network/commit/47e7f0aea943a568d767a5226b0d8e71414508bc))
     - allow to pass a SafeKey URL top 'keys show' command to display its public key ([`ac02f3e`](https://github.com/maidsafe/safe_network/commit/ac02f3ed351298ab86d650ffe95b666530138138))
     - support transfers to BLS public keys ([`4f6c526`](https://github.com/maidsafe/safe_network/commit/4f6c526e194f1b949c1b5b126442150157b7b0ba))
     - re-enabling dry-run feature for Blob API as well as for CLI commands ([`0f2f3c7`](https://github.com/maidsafe/safe_network/commit/0f2f3c74dc81fefbc719e79f41af434023ac0462))
@@ -1172,9 +1274,9 @@ like files with 0 bytes in them any more.
     - customise the error message displayed when a panic occurred ([`45f11ae`](https://github.com/maidsafe/safe_network/commit/45f11ae22df242e229d01bfc5dc2b6ac9de8536d))
     - add visual c++ libs to windows requirements ([`56e076b`](https://github.com/maidsafe/safe_network/commit/56e076b74747ad4e9f82a7df7e82f1c97e2b4496))
     - Version change: sn_api v0.20.0; sn_cli v0.20.0; sn_authd v0.2.0; qjsonrpc v0.1.2 ([`a35ffb7`](https://github.com/maidsafe/safe_network/commit/a35ffb759bafd6e2b03d96bffa62747eb1965c89))
+    - Adds bin-version subcommand to node & auth, removes -V for all subcommands ([`318f694`](https://github.com/maidsafe/safe_network/commit/318f6942ac1cd40391b283349bcfa959586422b5))
     - Version change: sn_api v0.19.1; sn_cli v0.19.1 ([`edbdcb6`](https://github.com/maidsafe/safe_network/commit/edbdcb62c36a2998aab23dd3a4d0b13bae13b472))
     - update sn_client and data types ([`6c9cf24`](https://github.com/maidsafe/safe_network/commit/6c9cf24df423abae568fab63fc6615d9f7a3df68))
-    - Adds bin-version subcommand to node & auth, removes -V for all subcommands ([`318f694`](https://github.com/maidsafe/safe_network/commit/318f6942ac1cd40391b283349bcfa959586422b5))
     - Version change: sn_api-v0.19.0; sn_cli-v0.19.0; sn_authd-v0.1.1; qjsonrpc-v0.1.1 ([`21f4733`](https://github.com/maidsafe/safe_network/commit/21f4733fbc32efd2c822337c7b3f077cca0f2992))
     - adding a step to check for unused dependencies ([`de482a5`](https://github.com/maidsafe/safe_network/commit/de482a5611333d069076d7da1b7c5a6017db65eb))
     - upgrade sn_client to v0.46.12 and most of all dependencies to their latest published version ([`e3c6da3`](https://github.com/maidsafe/safe_network/commit/e3c6da38f92c354c560bd6b555d76f698779ebcf))
@@ -1238,11 +1340,18 @@ like files with 0 bytes in them any more.
     - clippy ([`106407e`](https://github.com/maidsafe/safe_network/commit/106407e8125cc003794ba6249158aa1a655d3357))
     - reenable decoding auth reqs and basic app key generation ([`3f23687`](https://github.com/maidsafe/safe_network/commit/3f23687471b846e3ad1e2492c237a21f212b753f))
     - tidying up ([`4905fae`](https://github.com/maidsafe/safe_network/commit/4905fae6259063411c5e4ef5fd2afb531980630c))
+    - update to reference renamed sn_node crate/repo ([`ee05ed3`](https://github.com/maidsafe/safe_network/commit/ee05ed31cb12d8e1d8bac7569beec90db52a5840))
     - fix merge bugs and readd some shell completion logic ([`b99e7de`](https://github.com/maidsafe/safe_network/commit/b99e7dee3e72e703b47888e3ff03d2baa933b408))
+    - update to reference renamed sn_app ([`9651140`](https://github.com/maidsafe/safe_network/commit/96511403687f23516658f1a4fab1b6c6ab3fab45))
     - Merge branch 'master' into ExploreUpdatesForApis ([`34f9bc7`](https://github.com/maidsafe/safe_network/commit/34f9bc704f301ac903f768813fbd4140cd702f21))
+    - rename artifacts and paths to match new naming convention ([`e389ab2`](https://github.com/maidsafe/safe_network/commit/e389ab24f2186fc515b115e736a06d20756ae031))
+    - update s3 bucket name to sn-api ([`67e6ce1`](https://github.com/maidsafe/safe_network/commit/67e6ce1190ec1def43d4d2437456d985b5c07642))
     - further ffi cleanup ([`d5c1cd2`](https://github.com/maidsafe/safe_network/commit/d5c1cd2808f9844b06b846ec10dfe05146137023))
-    - chore(mock/ffi): remove mock/ffi builds + files ([`8b9b481`](https://github.com/maidsafe/safe_network/commit/8b9b481df5d124857abb02158739a6ded8f02af7))
+    - update safe-cmd-test-utilities name to ([`8f309da`](https://github.com/maidsafe/safe_network/commit/8f309dada1517afa10c263a52f5597429f764890))
+    - remove mock/ffi builds + files ([`8b9b481`](https://github.com/maidsafe/safe_network/commit/8b9b481df5d124857abb02158739a6ded8f02af7))
+    - update safe-authd crate name to sn_authd ([`019370c`](https://github.com/maidsafe/safe_network/commit/019370cfd0ace44c656caf45c17248f2a547dbbf))
     - reenable wallet apis ([`873fe29`](https://github.com/maidsafe/safe_network/commit/873fe29ac9042b7ad28a29630d2c048bde3a7634))
+    - update safe-cli crate name to sn_cli ([`70c67c7`](https://github.com/maidsafe/safe_network/commit/70c67c749c504ddd552aba6663109d2b1839082a))
     - use dirs_next for dir finding ([`426158f`](https://github.com/maidsafe/safe_network/commit/426158fcbb6d7c1fe44755c138bba1ac825a0a0c))
     - getting tests compiling ([`532aed1`](https://github.com/maidsafe/safe_network/commit/532aed1ed8e6b3957627ff2cc2f9d10d87fe3cb2))
     - reenabling some authd functionality ([`5a1cd27`](https://github.com/maidsafe/safe_network/commit/5a1cd2790b159e35c734dfb1fe64a43ea4409dfc))
@@ -1250,13 +1359,6 @@ like files with 0 bytes in them any more.
     - setting up IPC for auth ([`b994b8d`](https://github.com/maidsafe/safe_network/commit/b994b8d6ec1fcfc540e91aa9df79ba849aee7647))
     - sn_data_type updates ([`b863e7e`](https://github.com/maidsafe/safe_network/commit/b863e7eb299472b0c9dbd633b1b892cc221efb46))
     - safe_nd -> sn_data_types ([`4466c48`](https://github.com/maidsafe/safe_network/commit/4466c48a3fcec76f6c90cf6fcf1f28b177978c90))
-    - update to reference renamed sn_node crate/repo ([`ee05ed3`](https://github.com/maidsafe/safe_network/commit/ee05ed31cb12d8e1d8bac7569beec90db52a5840))
-    - update to reference renamed sn_app ([`9651140`](https://github.com/maidsafe/safe_network/commit/96511403687f23516658f1a4fab1b6c6ab3fab45))
-    - rename artifacts and paths to match new naming convention ([`e389ab2`](https://github.com/maidsafe/safe_network/commit/e389ab24f2186fc515b115e736a06d20756ae031))
-    - update s3 bucket name to sn-api ([`67e6ce1`](https://github.com/maidsafe/safe_network/commit/67e6ce1190ec1def43d4d2437456d985b5c07642))
-    - update safe-cmd-test-utilities name to ([`8f309da`](https://github.com/maidsafe/safe_network/commit/8f309dada1517afa10c263a52f5597429f764890))
-    - update safe-authd crate name to sn_authd ([`019370c`](https://github.com/maidsafe/safe_network/commit/019370cfd0ace44c656caf45c17248f2a547dbbf))
-    - update safe-cli crate name to sn_cli ([`70c67c7`](https://github.com/maidsafe/safe_network/commit/70c67c749c504ddd552aba6663109d2b1839082a))
 </details>
 
 ## 0.14.0 (2020-06-11)

@@ -5,77 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.52.0 (2022-01-22)
+## v0.53.0 (2022-01-28)
+
+### New Features
+
+ - <csr-id-3d73dd03a7a6913a248e5cca7d714f8b8e4c0d01/> retrieve immutable content via nrs
+   Changes the resolver to enable retrieval of NRS links to immutable content. Previously, the
+   NRS `target_url` was incorrectly being checked to see if it contained a version. We now validate
+   this URL using the same process used by NRS, which won't assert that a file link has a version. To
+   reduce duplication, the `validate_nrs_url` function in the NRS module was changed to public.
+   
+   Tests were added to both the API and CLI to cover the scenario.
+   
+   The NrsMap struct was extended to include a subname_version field. This is going to be used to
+   request the map with a particular version of a subname. If no version was specified when the
+   container was retrieved, then the field won't be set. This is why it's an Option. Since we're
+   storing this field on the NrsMap, the `version` field on the `NrsMapContainer` was removed.
+   
+   A couple of CLI NRS tests were also re-enabled, one of which happened to be related to immutable
+   content.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release over the course of 1 calendar day.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - update remaining places ([`3dc2327`](https://github.com/maidsafe/safe_network/commit/3dc23278c6a4fabc250b27f4312f5c51f0f271a4))
-    - Merge #958 ([`437a113`](https://github.com/maidsafe/safe_network/commit/437a113e6e5736e4eb4287f41228806678a9762e))
-    - Merge branch 'main' into simplify-sn-api ([`33ef052`](https://github.com/maidsafe/safe_network/commit/33ef0524ae238391f25c8fb340627c34ea79fcb2))
-    - Merge #962 ([`29d01da`](https://github.com/maidsafe/safe_network/commit/29d01da5233fd2a10b30699b555a0d85d7a7409a))
-</details>
-
-## v0.51.0 (2022-01-20)
-
-### Bug Fixes
-
- - <csr-id-e18c88019d37ab4f7618dde1a90e19ddf94db1c7/> VersioinHash use Display for encode
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 18 commits contributed to the release over the course of 13 calendar days.
- - 8 commits where understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - safe_network-0.53.0/sn_api-0.51.0/sn_cli-0.44.0 ([`923930a`](https://github.com/maidsafe/safe_network/commit/923930acb3769cfa7047954a1fee1853ec9e3062))
-    - refactor(sn_api): remove one layer of indirection Also simplifies instantiation and handling of the safe instance. ([`3b5ce19`](https://github.com/maidsafe/safe_network/commit/3b5ce194213a7090ee83c02b0043700cda230796))
-    - update from MIT/BSD3 to GPL3 ([`20f416c`](https://github.com/maidsafe/safe_network/commit/20f416cb7d0960a1d8d6f167a1ad1eed33ed6a7b))
-    - update year on files modified 2022 ([`7a7752f`](https://github.com/maidsafe/safe_network/commit/7a7752f830785ec39d301e751dc75f228d43d595))
-    - Merge node-logrotate origin for rebase with main ([`6df7f6f`](https://github.com/maidsafe/safe_network/commit/6df7f6fec3ee9d37b44db188fd670e4b65796e8c))
-    - fix additional wrongly setup test cases ([`941b83f`](https://github.com/maidsafe/safe_network/commit/941b83f3960c84cfee86a8c818233fbbc403c189))
-    - fix(register_api): make use of all the queries We were fetching the entire register in every type of request exposed in the api, instead of using the queries for each operation. ([`83ef7a6`](https://github.com/maidsafe/safe_network/commit/83ef7a66bb245e2303b80d98d6b8fa888b93d6ba))
-    - ties up the loose ends in unified data flow ([`9c9a537`](https://github.com/maidsafe/safe_network/commit/9c9a537ad12cc809540df321297c8552c52a8648))
-    - solving new clippy findings ([`57749b7`](https://github.com/maidsafe/safe_network/commit/57749b7d0671423fe205447bc84d9f8bfc99f54b))
-    - Merge #885 ([`72a3f12`](https://github.com/maidsafe/safe_network/commit/72a3f1269c9c38add9b88455837655f2bc33b551))
-    - Merge branch 'main' into kill-the-blob ([`5a055ba`](https://github.com/maidsafe/safe_network/commit/5a055ba679e6a4f2cd92700af68f8b36ac12a544))
-    - Merge branch 'main' into kill-the-blob ([`411ce5b`](https://github.com/maidsafe/safe_network/commit/411ce5b9d4c396484d2384324ae09d346c79013f))
-    - Merge branch 'main' into kill-the-blob ([`9c5cd80`](https://github.com/maidsafe/safe_network/commit/9c5cd80c286308c6d075c5418d8a1650e87fddd5))
-    - VersioinHash use Display for encode ([`e18c880`](https://github.com/maidsafe/safe_network/commit/e18c88019d37ab4f7618dde1a90e19ddf94db1c7))
-    - Merge branch 'main' into kill-the-blob ([`fe814a6`](https://github.com/maidsafe/safe_network/commit/fe814a69e5ef5fbe4c62a056498ef88ce5897fef))
-    - Merge #917 ([`0eb6439`](https://github.com/maidsafe/safe_network/commit/0eb643910098ab6021561e5b997b6289be9e2c57))
-    - log EntryHash human readable ([`bf16c5e`](https://github.com/maidsafe/safe_network/commit/bf16c5ea7051386064233443921438cbbd79d907))
-    - Merge #916 #918 #919 ([`5c4d3a9`](https://github.com/maidsafe/safe_network/commit/5c4d3a92ff28126468f07d599c6caf416661aba2))
-</details>
-
-## v0.50.6 (2022-01-06)
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 2 commits contributed to the release.
+ - 3 commits contributed to the release over the course of 2 calendar days.
+ - 6 days passed between releases.
  - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -86,8 +41,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge branch 'main' into nrs_resolve_immutable_content ([`099bf22`](https://github.com/maidsafe/safe_network/commit/099bf224714e667bf998de80099eeeabfd869d8b))
+    - retrieve immutable content via nrs ([`3d73dd0`](https://github.com/maidsafe/safe_network/commit/3d73dd03a7a6913a248e5cca7d714f8b8e4c0d01))
+    - nrs map fetch and rename multimap ([`889e0d9`](https://github.com/maidsafe/safe_network/commit/889e0d99a6f096329e875c812a29ec165e61f5ae))
+</details>
+
+## v0.52.0 (2022-01-22)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 8 commits contributed to the release over the course of 3 calendar days.
+ - 1 day passed between releases.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.54.0/sn_api-0.52.0/sn_cli-0.45.0 ([`0190f03`](https://github.com/maidsafe/safe_network/commit/0190f0305980bdaee30f9f2ab5eb5510149916db))
+    - update remaining places ([`3dc2327`](https://github.com/maidsafe/safe_network/commit/3dc23278c6a4fabc250b27f4312f5c51f0f271a4))
+    - Merge #958 ([`437a113`](https://github.com/maidsafe/safe_network/commit/437a113e6e5736e4eb4287f41228806678a9762e))
+    - Merge branch 'main' into simplify-sn-api ([`33ef052`](https://github.com/maidsafe/safe_network/commit/33ef0524ae238391f25c8fb340627c34ea79fcb2))
+    - remove one layer of indirection ([`3b5ce19`](https://github.com/maidsafe/safe_network/commit/3b5ce194213a7090ee83c02b0043700cda230796))
+    - update from MIT/BSD3 to GPL3 ([`20f416c`](https://github.com/maidsafe/safe_network/commit/20f416cb7d0960a1d8d6f167a1ad1eed33ed6a7b))
+    - Merge #962 ([`29d01da`](https://github.com/maidsafe/safe_network/commit/29d01da5233fd2a10b30699b555a0d85d7a7409a))
+    - update year on files modified 2022 ([`7a7752f`](https://github.com/maidsafe/safe_network/commit/7a7752f830785ec39d301e751dc75f228d43d595))
+</details>
+
+## v0.51.0 (2022-01-20)
+
+### Bug Fixes
+
+ - <csr-id-e18c88019d37ab4f7618dde1a90e19ddf94db1c7/> VersioinHash use Display for encode
+ - <csr-id-83ef7a66bb245e2303b80d98d6b8fa888b93d6ba/> make use of all the queries
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 11 commits contributed to the release over the course of 13 calendar days.
+ - 13 days passed between releases.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.53.0/sn_api-0.51.0/sn_cli-0.44.0 ([`923930a`](https://github.com/maidsafe/safe_network/commit/923930acb3769cfa7047954a1fee1853ec9e3062))
+    - solving new clippy findings ([`57749b7`](https://github.com/maidsafe/safe_network/commit/57749b7d0671423fe205447bc84d9f8bfc99f54b))
+    - Merge node-logrotate origin for rebase with main ([`6df7f6f`](https://github.com/maidsafe/safe_network/commit/6df7f6fec3ee9d37b44db188fd670e4b65796e8c))
+    - Merge #885 ([`72a3f12`](https://github.com/maidsafe/safe_network/commit/72a3f1269c9c38add9b88455837655f2bc33b551))
+    - fix additional wrongly setup test cases ([`941b83f`](https://github.com/maidsafe/safe_network/commit/941b83f3960c84cfee86a8c818233fbbc403c189))
+    - Merge branch 'main' into kill-the-blob ([`5a055ba`](https://github.com/maidsafe/safe_network/commit/5a055ba679e6a4f2cd92700af68f8b36ac12a544))
+    - Merge branch 'main' into kill-the-blob ([`411ce5b`](https://github.com/maidsafe/safe_network/commit/411ce5b9d4c396484d2384324ae09d346c79013f))
+    - make use of all the queries ([`83ef7a6`](https://github.com/maidsafe/safe_network/commit/83ef7a66bb245e2303b80d98d6b8fa888b93d6ba))
+    - Merge branch 'main' into kill-the-blob ([`9c5cd80`](https://github.com/maidsafe/safe_network/commit/9c5cd80c286308c6d075c5418d8a1650e87fddd5))
+    - Merge #916 #918 #919 ([`5c4d3a9`](https://github.com/maidsafe/safe_network/commit/5c4d3a92ff28126468f07d599c6caf416661aba2))
+    - Merge branch 'main' into kill-the-blob ([`fe814a6`](https://github.com/maidsafe/safe_network/commit/fe814a69e5ef5fbe4c62a056498ef88ce5897fef))
+</details>
+
+## v0.50.6 (2022-01-06)
+
+### Bug Fixes
+
+ - <csr-id-e18c88019d37ab4f7618dde1a90e19ddf94db1c7/> VersioinHash use Display for encode
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 1 day passed between releases.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
     - safe_network-0.52.13/sn_api-0.50.6 ([`155ee03`](https://github.com/maidsafe/safe_network/commit/155ee032ee56cbbb34928f2d14529273ccb69559))
-    - safe_network-0.52.12 ([`4f29c28`](https://github.com/maidsafe/safe_network/commit/4f29c285a0b48220df1f1c6c52c4b487350eae08))
+    - safe_network-0.52.10 ([`7b0cd4d`](https://github.com/maidsafe/safe_network/commit/7b0cd4d183a9f82d1d78dbb56572e5bf36714a0a))
+    - VersioinHash use Display for encode ([`e18c880`](https://github.com/maidsafe/safe_network/commit/e18c88019d37ab4f7618dde1a90e19ddf94db1c7))
+    - Merge branch 'main' into kill-the-blob ([`6f89f12`](https://github.com/maidsafe/safe_network/commit/6f89f129ece75dee45f311d30e52ca71b6b7bc98))
+    - log EntryHash human readable ([`bf16c5e`](https://github.com/maidsafe/safe_network/commit/bf16c5ea7051386064233443921438cbbd79d907))
+    - ties up the loose ends in unified data flow ([`9c9a537`](https://github.com/maidsafe/safe_network/commit/9c9a537ad12cc809540df321297c8552c52a8648))
 </details>
 
 ## v0.50.5 (2022-01-06)
@@ -96,8 +146,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release over the course of 1 calendar day.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -108,10 +158,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - safe_network-0.52.11/sn_api-0.50.5/sn_cli-0.43.2 ([`99d012e`](https://github.com/maidsafe/safe_network/commit/99d012ef529df78ef4c84f5e6ea99d3a77414797))
-    - safe_network-0.52.10 ([`7b0cd4d`](https://github.com/maidsafe/safe_network/commit/7b0cd4d183a9f82d1d78dbb56572e5bf36714a0a))
+    - Merge #917 ([`0eb6439`](https://github.com/maidsafe/safe_network/commit/0eb643910098ab6021561e5b997b6289be9e2c57))
     - Merge branch 'main' into kill-the-blob ([`40268a5`](https://github.com/maidsafe/safe_network/commit/40268a598aea8d14c1dbeb1c00712b9f9a664ef8))
-    - Merge branch 'main' into kill-the-blob ([`6f89f12`](https://github.com/maidsafe/safe_network/commit/6f89f129ece75dee45f311d30e52ca71b6b7bc98))
-    - rename dest to dst ([`bebdae9`](https://github.com/maidsafe/safe_network/commit/bebdae9d52d03bd13b679ee19446452990d1e2cf))
 </details>
 
 ## v0.50.4 (2022-01-04)
@@ -120,8 +168,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release.
- - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits contributed to the release.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -133,9 +181,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * **Uncategorized**
     - safe_network-0.52.9/sn_api-0.50.4 ([`a64c7e0`](https://github.com/maidsafe/safe_network/commit/a64c7e0414b77f545cb8cdbf64af0fb7212d1f2e))
     - Merge branch 'main' into kill-the-blob ([`7d38c3d`](https://github.com/maidsafe/safe_network/commit/7d38c3df14d03c042b645ad05be6cd3cc540d631))
-    - safe_network-0.52.8 ([`5214d5e`](https://github.com/maidsafe/safe_network/commit/5214d5e7f84a3c1cf213097a5d55bfb293f03324))
+    - safe_network-0.52.12 ([`4f29c28`](https://github.com/maidsafe/safe_network/commit/4f29c285a0b48220df1f1c6c52c4b487350eae08))
+    - rename dest to dst ([`bebdae9`](https://github.com/maidsafe/safe_network/commit/bebdae9d52d03bd13b679ee19446452990d1e2cf))
     - revert change of fn name ([`ab8109c`](https://github.com/maidsafe/safe_network/commit/ab8109cf5aede62596abfdeb813a019d03201f96))
-    - rename blob to file ([`c790077`](https://github.com/maidsafe/safe_network/commit/c790077bebca691f974000278d5525f4b011b8a7))
+    - safe_network-0.52.8 ([`5214d5e`](https://github.com/maidsafe/safe_network/commit/5214d5e7f84a3c1cf213097a5d55bfb293f03324))
 </details>
 
 ## v0.50.3 (2022-01-04)
@@ -144,8 +193,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -156,7 +205,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_api-0.50.3 ([`5f7000c`](https://github.com/maidsafe/safe_network/commit/5f7000c5ec5895fb3f4c4a17a74ada52bb873fc7))
-    - safe_network-0.52.7 ([`40d1844`](https://github.com/maidsafe/safe_network/commit/40d1844e0b28578e8b8c6b270151dbb86961a766))
+    - rename blob to file ([`c790077`](https://github.com/maidsafe/safe_network/commit/c790077bebca691f974000278d5525f4b011b8a7))
+    - safe_network-0.52.5 ([`ab00eca`](https://github.com/maidsafe/safe_network/commit/ab00eca916d6ed8a0a137004a6b9fd24e7217a70))
 </details>
 
 ## v0.50.2 (2022-01-04)
@@ -166,6 +216,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
+ - 1 day passed between releases.
  - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -177,7 +228,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - safe_network-0.52.6/sn_api-0.50.2 ([`0a70425`](https://github.com/maidsafe/safe_network/commit/0a70425fb314de4c165da54fdc29a127ae900d81))
-    - safe_network-0.52.5 ([`ab00eca`](https://github.com/maidsafe/safe_network/commit/ab00eca916d6ed8a0a137004a6b9fd24e7217a70))
+    - safe_network-0.52.3 ([`2924661`](https://github.com/maidsafe/safe_network/commit/292466119e2d99c36043e7f2247b1bde9ec9ced9))
 </details>
 
 ## v0.50.1 (2022-01-04)
@@ -198,7 +249,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - safe_network-0.52.4/sn_api-0.50.1 ([`4bb2adf`](https://github.com/maidsafe/safe_network/commit/4bb2adf52efdac6187fffc299018bf13f3398e14))
-    - safe_network-0.52.3 ([`2924661`](https://github.com/maidsafe/safe_network/commit/292466119e2d99c36043e7f2247b1bde9ec9ced9))
+    - safe_network-0.52.7 ([`40d1844`](https://github.com/maidsafe/safe_network/commit/40d1844e0b28578e8b8c6b270151dbb86961a766))
 </details>
 
 ## v0.50.0 (2022-01-03)
@@ -274,6 +325,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-read-only-do-not-edit/>
 
  - 6 commits contributed to the release over the course of 11 calendar days.
+ - 11 days passed between releases.
  - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -306,7 +358,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release over the course of 5 calendar days.
+ - 7 commits contributed to the release over the course of 6 calendar days.
+ - 6 days passed between releases.
  - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -322,8 +375,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - safe_network-0.51.7 ([`c76c3ab`](https://github.com/maidsafe/safe_network/commit/c76c3ab638188cba38911f037829c209fcc45fc3))
     - calm down the retry loop tests ([`1d1487f`](https://github.com/maidsafe/safe_network/commit/1d1487f1c8e8f3e33df626af1ff027eea653f84c))
     - safe_network-0.51.6 ([`79b2d0a`](https://github.com/maidsafe/safe_network/commit/79b2d0a3f52de0335323773936dee9bdbe12a0cf))
-    - use upload_and_verify by default in safe_client ([`1078e59`](https://github.com/maidsafe/safe_network/commit/1078e59be3a58ffedcd3c1460385b4bf00f18f6b))
     - safe_network-0.51.5 ([`45df3d7`](https://github.com/maidsafe/safe_network/commit/45df3d71cc4b3185602b9d27b8cb0f5bf65a4b43))
+    - use upload_and_verify by default in safe_client ([`1078e59`](https://github.com/maidsafe/safe_network/commit/1078e59be3a58ffedcd3c1460385b4bf00f18f6b))
 </details>
 
 ## v0.46.2 (2021-12-16)
@@ -379,6 +432,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-read-only-do-not-edit/>
 
  - 11 commits contributed to the release over the course of 2 calendar days.
+ - 5 days passed between releases.
  - 11 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -394,9 +448,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - safe_network-0.51.0 ([`c685838`](https://github.com/maidsafe/safe_network/commit/c685838d8f9c10b0f4e7541fe201862bb84e8555))
     - safe_network-0.50.0 ([`653f653`](https://github.com/maidsafe/safe_network/commit/653f653a775a101679904ab75c8012a72dfdedfb))
     - safe_network-0.49.3 ([`36ca20e`](https://github.com/maidsafe/safe_network/commit/36ca20e606899ecbdea24d845c34ba11ab889cf7))
+    - adding a test for retrieving Blob with range over data length ([`edb8de8`](https://github.com/maidsafe/safe_network/commit/edb8de8b4d923e97d68eed40a7953f38461b0281))
     - fmt ([`d30aa0c`](https://github.com/maidsafe/safe_network/commit/d30aa0cb7440b9f3a44fefc3b6b9f7855480958c))
     - rename Url to SafeUrl ([`1887959`](https://github.com/maidsafe/safe_network/commit/18879590ddfcf125133a6b2b8f3f372e8683be42))
-    - adding a test for retrieving Blob with range over data length ([`edb8de8`](https://github.com/maidsafe/safe_network/commit/edb8de8b4d923e97d68eed40a7953f38461b0281))
     - safe_network-0.49.2 ([`62d7479`](https://github.com/maidsafe/safe_network/commit/62d747969b739172910aabca6fcb273d2827fc8a))
     - safe_network-0.49.1 ([`69ae8c2`](https://github.com/maidsafe/safe_network/commit/69ae8c20e91dd9959ebfa5456efdf9c218a9d66f))
     - safe_network-0.49.0 ([`6f5516d`](https://github.com/maidsafe/safe_network/commit/6f5516d8bb677462ea6def46aa65a1094767d68c))
@@ -424,12 +478,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Features (BREAKING)
 
  - <csr-id-3fe9d7a6624fe5503f80395f6ed11426b131d3b1/> move Url to sn_api
+ - <csr-id-c284f0787afe0d079e53b79b3a9d74cad04c4b0e/> `nrs create` only creates topnames
+
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 34 commits contributed to the release over the course of 15 calendar days.
+ - 33 commits contributed to the release over the course of 14 calendar days.
+ - 15 days passed between releases.
  - 33 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -440,7 +497,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - feat(sn_cli)!: `nrs create` only creates topnames ([`c284f07`](https://github.com/maidsafe/safe_network/commit/c284f0787afe0d079e53b79b3a9d74cad04c4b0e))
+    - `nrs create` only creates topnames ([`c284f07`](https://github.com/maidsafe/safe_network/commit/c284f0787afe0d079e53b79b3a9d74cad04c4b0e))
     - read_from client API was incorrectly using provided length value as an end index ([`8955fcf`](https://github.com/maidsafe/safe_network/commit/8955fcf9d69e869725177340d1de6b6b1e7a203b))
     - safe_network-0.48.0 ([`9eff035`](https://github.com/maidsafe/safe_network/commit/9eff03598ba09aa339180d7ecd57b50174180095))
     - files_container_create API was trying to send Register op to the network in dry-run ([`b26833d`](https://github.com/maidsafe/safe_network/commit/b26833d80cf88b9a2dc1bb8478e74d9e37d6dc51))
@@ -473,7 +530,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - safe_network-0.44.1 ([`14c84c9`](https://github.com/maidsafe/safe_network/commit/14c84c9db23557626e4889eff0ff403a574dccad))
     - safe_network-0.44.0 ([`75a4b53`](https://github.com/maidsafe/safe_network/commit/75a4b537573d4e5e8767e38fa7d1b1126dffe148))
     - safe_network-0.43.0 ([`c78f470`](https://github.com/maidsafe/safe_network/commit/c78f4703a970e8b7466b091ad331d0f2233aa9a3))
-    - move Url to sn_api ([`3fe9d7a`](https://github.com/maidsafe/safe_network/commit/3fe9d7a6624fe5503f80395f6ed11426b131d3b1))
 </details>
 
 ## v0.43.0 (2021-11-25)
@@ -486,8 +542,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -498,6 +554,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - safe_network-0.42.0/sn_api-0.43.0 ([`ca21d1e`](https://github.com/maidsafe/safe_network/commit/ca21d1e97fcd28ca351887636affffff78e3aeb3))
+    - move Url to sn_api ([`3fe9d7a`](https://github.com/maidsafe/safe_network/commit/3fe9d7a6624fe5503f80395f6ed11426b131d3b1))
 </details>
 
 ## v0.42.0 (2021-11-25)
@@ -510,8 +567,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -522,7 +579,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - safe_network-0.41.4/sn_api-0.42.0 ([`8b8a361`](https://github.com/maidsafe/safe_network/commit/8b8a3616673405005d77868dc397bd7542ab3ea7))
-    - propagate registers (with vec u8 instead of Url) change to sn_api ([`11750ed`](https://github.com/maidsafe/safe_network/commit/11750ed18391c7e8cb112d4a34a19f15eedaed1d))
     - safe_network-0.41.3 ([`4b72bfc`](https://github.com/maidsafe/safe_network/commit/4b72bfc9a6c3a0db4821e7ebf1f4b5daa7cc56d1))
 </details>
 
@@ -536,8 +592,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -548,6 +604,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_api-0.41.0 ([`df25e49`](https://github.com/maidsafe/safe_network/commit/df25e4920c570771f6813ca03da02f6dfc8e59fb))
+    - propagate registers (with vec u8 instead of Url) change to sn_api ([`11750ed`](https://github.com/maidsafe/safe_network/commit/11750ed18391c7e8cb112d4a34a19f15eedaed1d))
 </details>
 
 ## v0.40.1 (2021-11-24)
@@ -580,6 +637,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
+ - 8 days passed between releases.
  - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -635,6 +693,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-3f23687471b846e3ad1e2492c237a21f212b753f/> reenable decoding auth reqs and basic app key generation
  - <csr-id-b994b8d6ec1fcfc540e91aa9df79ba849aee7647/> setting up IPC for auth
  - <csr-id-07dd1956d4a53e2f4d09310b48e2a43a3a10e795/> moving in basics of auth func into the repo
+ - <csr-id-de64d44d336611f4f7f427fd6b627a8c0880fd80/> remove sn_url crate form this repo and depend on the one just published on crates.io
+ - <csr-id-7d2bd2f7ad27724866d04b7e10d69418f6decad9/> check for existing balance + err when creating acct
 
 ### Bug Fixes
 
@@ -656,6 +716,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-5a30bf331242ba8dd9b3189dc255b134fdf24587/> keys_create_preload_test_coins was not triggering the simulated payout on the newly created SafeKey
  - <csr-id-01cc2894b37908377eb822a826f46c7fef39347e/> ed_sk_from_hex was deserialising sk with bincode rather than just from raw bytes
  - <csr-id-87d64dc3fe865b68f014da373aa253caf50d6512/> remove repeated data storing in SafeAppClient::store_sequence()
+ - <csr-id-4bb48397cbe321bd551ec9530ca0325208dd138f/> set `formatting` feature for `time` dependency
+   We use time formatting, so this feature should be necessary for the
+   crate to compile. Weirdly, compilation only fails when publishing, not
+   when checking or building. It's assumed this has something to do with
+   feature resolution in workspaces 🤷
 
 ### chore (BREAKING)
 
@@ -674,8 +739,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 205 commits contributed to the release over the course of 431 calendar days.
- - 167 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 205 commits contributed to the release over the course of 404 calendar days.
+ - 173 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 1 unique issue was worked on: [#6](https://github.com/maidsafe/safe_network/issues/6)
 
 ### Commit Details
@@ -693,7 +758,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - safe_network v0.38.0 ([`cbdf023`](https://github.com/maidsafe/safe_network/commit/cbdf0236f7cd241e7addb1afe75ed5e5cfac00ab))
     - fix api tests. ([`3da9b26`](https://github.com/maidsafe/safe_network/commit/3da9b26f467cb8c468ffb0a319559a5a0f60e86e))
     - (cargo-release) version 0.37.0 ([`ef42af4`](https://github.com/maidsafe/safe_network/commit/ef42af483725286dd8a0cef6f922dfd1739412d8))
-    - fix(sn_api): set `formatting` feature for `time` dependency ([`4bb4839`](https://github.com/maidsafe/safe_network/commit/4bb48397cbe321bd551ec9530ca0325208dd138f))
+    - set `formatting` feature for `time` dependency ([`4bb4839`](https://github.com/maidsafe/safe_network/commit/4bb48397cbe321bd551ec9530ca0325208dd138f))
     - add env var for client query timeout ([`abfe737`](https://github.com/maidsafe/safe_network/commit/abfe7378604a74119accd7b9f86bef5682b0784a))
     - enable tests ([`d9c35b7`](https://github.com/maidsafe/safe_network/commit/d9c35b79a6d0aa787e627b747e665d96bb110c13))
     - NRS remove test ([`d0cb767`](https://github.com/maidsafe/safe_network/commit/d0cb7674071694885ebf9620a8cefcc4e62ecfcc))
@@ -705,35 +770,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - appease clippy ([`407efd1`](https://github.com/maidsafe/safe_network/commit/407efd15e0b4854864b83ccdb7d2c3adbb0a02e2))
     - Merge remote-tracking branch 'upstream/main' into merge_sn_cli_into_workspace ([`eea8307`](https://github.com/maidsafe/safe_network/commit/eea83074b9bbd334d80b80f12cfcce724d0e8ca3))
     - update cli to use new nrs api ([`8691034`](https://github.com/maidsafe/safe_network/commit/86910340897256bb4df77b6edaa0f2c9584d6dce))
-    - chore(sn_api): switch from `chrono` to `time` ([`442c1bd`](https://github.com/maidsafe/safe_network/commit/442c1bdd3f9c22424aa9642d71d4016c868b0b58))
+    - switch from `chrono` to `time` ([`442c1bd`](https://github.com/maidsafe/safe_network/commit/442c1bdd3f9c22424aa9642d71d4016c868b0b58))
+    - merge github.com:maidsafe/sn_cli into safe_network ([`414aca2`](https://github.com/maidsafe/safe_network/commit/414aca284b35f1bcb27e5d0cca2bfe451b69e27b))
     - upgrade `tracing-appender` and `tracing-subscriber` ([`0387123`](https://github.com/maidsafe/safe_network/commit/0387123114ff6ae42920577706497319c8a888cb))
+    - update actions workflows for workspace refactor ([`3703819`](https://github.com/maidsafe/safe_network/commit/3703819c7f0da220c8ff21169ca1e8161a20157b))
+    - move safe_network code into sn directory ([`2254329`](https://github.com/maidsafe/safe_network/commit/225432908839359800d301d9e5aa8274e4652ee1))
+    - move sn_api code into an sn_api directory ([`2b5d177`](https://github.com/maidsafe/safe_network/commit/2b5d17740ca74fc379cab89cb95683e200589148))
     - Merge remote-tracking branch 'upstream/main' into merge_sn_api_into_workspace ([`8ed5aff`](https://github.com/maidsafe/safe_network/commit/8ed5aff8b30ce798f71eac22d66eb3aa9b0bdcdd))
     - upgrade sn_api to use 0.36.x of safe_network ([`0118362`](https://github.com/maidsafe/safe_network/commit/01183625d7a1a60b652b1a295a908fa8ba04f6f7))
     - Merge remote-tracking branch 'upstream/main' into merge_sn_api_into_workspace ([`3a2817a`](https://github.com/maidsafe/safe_network/commit/3a2817a4c802d74b57d475d88d7bc23223994147))
     - Merge remote-tracking branch 'upstream/main' into merge_sn_api_into_workspace ([`50f48ae`](https://github.com/maidsafe/safe_network/commit/50f48aefcba272345df7d4cd45a59071a5844932))
     - Merge branch 'merge_sn_api_into_workspace' into nrs_resolver_refactor ([`a273d97`](https://github.com/maidsafe/safe_network/commit/a273d9733b8d50b94b0ea3faec1d9e721d86aa27))
     - various renamings and changes matching PR comments ([`335f9dc`](https://github.com/maidsafe/safe_network/commit/335f9dcfc4588624728b4b10c576953d51a08e1a))
-    - merge github.com:maidsafe/sn_cli into safe_network ([`414aca2`](https://github.com/maidsafe/safe_network/commit/414aca284b35f1bcb27e5d0cca2bfe451b69e27b))
     - fmt ([`49d04e1`](https://github.com/maidsafe/safe_network/commit/49d04e1414bf517cc76ebe2c6b86e0b3dd48e47a))
     - resolution test except for the blob range tests ([`c88a1bc`](https://github.com/maidsafe/safe_network/commit/c88a1bc5fda40093bb129b4351eef73d2eb7c041))
-    - update actions workflows for workspace refactor ([`3703819`](https://github.com/maidsafe/safe_network/commit/3703819c7f0da220c8ff21169ca1e8161a20157b))
     - NRS all tests except for the register issue ([`2fe38d1`](https://github.com/maidsafe/safe_network/commit/2fe38d13bc74a7c7cede96340d275ef3f94e1427))
     - parsing Url as xorurl ([`6c61764`](https://github.com/maidsafe/safe_network/commit/6c61764c7479405d2978bec1bbc5cbd11ca5e7c8))
     - nrs and resolver ([`c0ac51a`](https://github.com/maidsafe/safe_network/commit/c0ac51ae4bf4dbd9df3dd39700887df439eec4f6))
     - update actions workflows for workspace refactor ([`d0134e8`](https://github.com/maidsafe/safe_network/commit/d0134e870bb097e095e1c8a33e607cf7994e6491))
-    - move safe_network code into sn directory ([`2254329`](https://github.com/maidsafe/safe_network/commit/225432908839359800d301d9e5aa8274e4652ee1))
-    - move sn_api code into an sn_api directory ([`2b5d177`](https://github.com/maidsafe/safe_network/commit/2b5d17740ca74fc379cab89cb95683e200589148))
     - add an example app showcasing how to fetch a Blob from Safe using sn_api ([`9098cff`](https://github.com/maidsafe/safe_network/commit/9098cff4c4d2ba15321dd072c970a18781a04a49))
     - Version change: sn_api v0.26.0; sn_cli v0.26.0; sn_authd v0.8.0 ([`3bcf8ef`](https://github.com/maidsafe/safe_network/commit/3bcf8efcee84c5fb45f5e03ec49d5a623147dc4d))
     - Version change: sn_api v0.25.3; sn_cli v0.25.3; sn_authd v0.7.3 ([`ab68342`](https://github.com/maidsafe/safe_network/commit/ab683420665c54df1ae3dae95055000518b543d1))
     - Version change: sn_api v0.25.2; sn_cli v0.25.2; sn_authd v0.7.2 ([`0282dd6`](https://github.com/maidsafe/safe_network/commit/0282dd6edfce91ac25314bda7b6d87fd1ae621fe))
     - update sn_client to 0.54.4 ([`91e1f0c`](https://github.com/maidsafe/safe_network/commit/91e1f0cefe1eb6a6d70e0df3d4d3b6f97e76ecef))
-    - feat(sn_url): remove sn_url crate form this repo and depend on the one just published on crates.io ([`de64d44`](https://github.com/maidsafe/safe_network/commit/de64d44d336611f4f7f427fd6b627a8c0880fd80))
+    - remove sn_url crate form this repo and depend on the one just published on crates.io ([`de64d44`](https://github.com/maidsafe/safe_network/commit/de64d44d336611f4f7f427fd6b627a8c0880fd80))
     - minor changes to rebase with master ([`7ceab22`](https://github.com/maidsafe/safe_network/commit/7ceab22ae72535159db7fbfdc5832b1aea891388))
     - moving out safe_url mod as a standalone sn_url crate ([`5780fd1`](https://github.com/maidsafe/safe_network/commit/5780fd1d6ba480cb775fd66e53e41f02d97b3a94))
-    - Version change: sn_api v0.25.0; sn_cli v0.25.0; sn_authd v0.7.0 ([`60717f1`](https://github.com/maidsafe/safe_network/commit/60717f1a09aac06911f01cb3a811731721ae5708))
     - Version change: sn_api v0.25.1; sn_cli v0.25.1; sn_authd v0.7.1 ([`7a8860d`](https://github.com/maidsafe/safe_network/commit/7a8860d71776958fb93e91fefe157b3de4277a8c))
     - add feature gate for app-specific error ([`441be17`](https://github.com/maidsafe/safe_network/commit/441be176521c20f9372b86d6daffc44bb97207fc))
+    - Version change: sn_api v0.25.0; sn_cli v0.25.0; sn_authd v0.7.0 ([`60717f1`](https://github.com/maidsafe/safe_network/commit/60717f1a09aac06911f01cb3a811731721ae5708))
     - change node_path arg of 'node bin-path' command to node-path ([`d91150d`](https://github.com/maidsafe/safe_network/commit/d91150d8f46003cc0fa7813e4ae907b187379de8))
     - fixing multimap_remove and adding multimap_get_by_hash API ([`c5b0f0b`](https://github.com/maidsafe/safe_network/commit/c5b0f0b630f673697367361508a30caf7ad787bd))
     - adding first set of tests for Multimap API ([`6f05016`](https://github.com/maidsafe/safe_network/commit/6f0501699b0d0620a7c9d2b013944f90884ca1c3))
@@ -764,14 +829,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - adapting to new Seq type where Policy is immutable ([`85462b6`](https://github.com/maidsafe/safe_network/commit/85462b6fb58f16f4797d7ef2816e96a287af7ad9))
     - customise the error message displayed when a panic occurred ([`45f11ae`](https://github.com/maidsafe/safe_network/commit/45f11ae22df242e229d01bfc5dc2b6ac9de8536d))
     - re-enabling wallet APIs tests in CI ([`6cf5602`](https://github.com/maidsafe/safe_network/commit/6cf56022cd6beec4254d0b1667c4d654f87e6a5a))
+    - Version change: sn_api v0.20.0; sn_cli v0.20.0; sn_authd v0.2.0; qjsonrpc v0.1.2 ([`a35ffb7`](https://github.com/maidsafe/safe_network/commit/a35ffb759bafd6e2b03d96bffa62747eb1965c89))
     - re-enabling xorurl & keys APIs tests in CI ([`4518154`](https://github.com/maidsafe/safe_network/commit/4518154481dbd3aeb397353d4ec296ea98ee3e9a))
     - re-enabling sequence & fetch APIs tests in CI ([`590c4c6`](https://github.com/maidsafe/safe_network/commit/590c4c634046ab655a84093c2ed60e8289415d44))
-    - Version change: sn_api v0.20.0; sn_cli v0.20.0; sn_authd v0.2.0; qjsonrpc v0.1.2 ([`a35ffb7`](https://github.com/maidsafe/safe_network/commit/a35ffb759bafd6e2b03d96bffa62747eb1965c89))
     - remove unused utility function ([`a09c4c2`](https://github.com/maidsafe/safe_network/commit/a09c4c26230b0cf60d7d792d89f0e275f2b64bc2))
     - store serialised NrsMap in a Blob and only its XOR-URL in the NrsMapContainer's underlying Sequence ([`ddb318d`](https://github.com/maidsafe/safe_network/commit/ddb318d96c8a9bf8299bd14aa6824252296bde27))
     - store serialised FilesMap in a Blob and only its XOR-URL in the FilesContainer's underlying Sequence ([`1f37703`](https://github.com/maidsafe/safe_network/commit/1f377038ea693d5253f658d480885662df5b0542))
     - reorganise files module ([`a6107ac`](https://github.com/maidsafe/safe_network/commit/a6107accfc6950b4beb2dcb84dfaa3c0e18bbd5d))
-    - doc(sn_api): adding a README.md file for sn_api crate with a description of the current APIs ([`712d9a4`](https://github.com/maidsafe/safe_network/commit/712d9a4e72f62725a0b0ac5526bc68abe8ca503f))
+    - adding a README.md file for sn_api crate with a description of the current APIs ([`712d9a4`](https://github.com/maidsafe/safe_network/commit/712d9a4e72f62725a0b0ac5526bc68abe8ca503f))
     - Version change: sn_api v0.19.1; sn_cli v0.19.1 ([`edbdcb6`](https://github.com/maidsafe/safe_network/commit/edbdcb62c36a2998aab23dd3a4d0b13bae13b472))
     - update sn_client and data types ([`6c9cf24`](https://github.com/maidsafe/safe_network/commit/6c9cf24df423abae568fab63fc6615d9f7a3df68))
     - Version change: sn_api-v0.19.0; sn_cli-v0.19.0; sn_authd-v0.1.1; qjsonrpc-v0.1.1 ([`21f4733`](https://github.com/maidsafe/safe_network/commit/21f4733fbc32efd2c822337c7b3f077cca0f2992))
@@ -814,9 +879,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Version change: sn_api-v0.17.0; sn_cli-v0.17.0; sn_authd-v0.0.13 ([`23365d4`](https://github.com/maidsafe/safe_network/commit/23365d409b1a538b2eb8c5138623a409e45f9601))
     - temporarily disable running tests in CI ([`77e1c69`](https://github.com/maidsafe/safe_network/commit/77e1c693735760cf1c24c9a4552c9104e52cada0))
     - allocate testcoin to keypair generated for app upon being authorised the very first time ([`9f18fb5`](https://github.com/maidsafe/safe_network/commit/9f18fb51a8c173ebb07e3ab9cea7a8f66b373fc5))
-    - Update sn_api/src/api/authenticator/mod.rs ([`7209603`](https://github.com/maidsafe/safe_network/commit/72096033f5bacdfbeb5c4a5da0a4b52d74f499de))
-    - feat:check for existing balance + err when creating acct ([`7d2bd2f`](https://github.com/maidsafe/safe_network/commit/7d2bd2f7ad27724866d04b7e10d69418f6decad9))
     - updates and enhancements to the User Guide, and to some commands help messages ([`40bcd0f`](https://github.com/maidsafe/safe_network/commit/40bcd0f46dad6177b0052b73393d7789fd559b33))
+    - Update sn_api/src/api/authenticator/mod.rs ([`7209603`](https://github.com/maidsafe/safe_network/commit/72096033f5bacdfbeb5c4a5da0a4b52d74f499de))
+    - check for existing balance + err when creating acct ([`7d2bd2f`](https://github.com/maidsafe/safe_network/commit/7d2bd2f7ad27724866d04b7e10d69418f6decad9))
     - updating CLI User Guide ([`e107e13`](https://github.com/maidsafe/safe_network/commit/e107e1314957053db2d71357450cac65cba52a68))
     - store Blob API was returning the wrong xorname ([`3694efb`](https://github.com/maidsafe/safe_network/commit/3694efb16b16fcfc0d34db51187c043d0e24f09c))
     - adapt wallet tests and minor refactoring ([`7fb6bd9`](https://github.com/maidsafe/safe_network/commit/7fb6bd96a8bdaaee64592b5dc02596b9f6220165))
@@ -835,14 +900,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - update credentials location ([`7b6445a`](https://github.com/maidsafe/safe_network/commit/7b6445a5b9903b1704c45759878bced097bcb82c))
     - simplify authd messages format and serialisation ([`e814ff3`](https://github.com/maidsafe/safe_network/commit/e814ff3b8c58ae7741938a1c73a22c87ed602883))
     - reenable use of connect from auth responses ([`d64d0fd`](https://github.com/maidsafe/safe_network/commit/d64d0fd9c0d6cd9002405985ff03f6d9ff7aa695))
-    - fix lint issues ([`9c3adff`](https://github.com/maidsafe/safe_network/commit/9c3adffd0889f045ac19110072a194072d294705))
-    - adapt authd client api and service names to new terminology of Safe creation and unlocking ([`58ecf7f`](https://github.com/maidsafe/safe_network/commit/58ecf7fbae95dee0a103ce39d61efaac6e2cf550))
-    - store generated keypairs on the network ([`805298f`](https://github.com/maidsafe/safe_network/commit/805298fa5f4d1455015d2aa248143f460b4057ba))
     - fmt ([`b261640`](https://github.com/maidsafe/safe_network/commit/b261640cebdaf4f7fb1b9c13e911bf82bb46f33a))
     - simplify loop on err ([`274de45`](https://github.com/maidsafe/safe_network/commit/274de45a63122c9685617c97272deb603dd9a15b))
     - tidying up some logs ([`f9c19fa`](https://github.com/maidsafe/safe_network/commit/f9c19faa33db0fb76d392d8cbcd7d910131fedb2))
     - unwrap_or_else -> _or_ for empty funcs ([`e892a99`](https://github.com/maidsafe/safe_network/commit/e892a99f2feb0c36204cfff103b13ca2e5e96388))
     - loop seq gets w/ timeout ([`0cd75fb`](https://github.com/maidsafe/safe_network/commit/0cd75fbd9aceace5fbfc4b726a48d652177d61ce))
+    - fix lint issues ([`9c3adff`](https://github.com/maidsafe/safe_network/commit/9c3adffd0889f045ac19110072a194072d294705))
+    - adapt authd client api and service names to new terminology of Safe creation and unlocking ([`58ecf7f`](https://github.com/maidsafe/safe_network/commit/58ecf7fbae95dee0a103ce39d61efaac6e2cf550))
+    - store generated keypairs on the network ([`805298f`](https://github.com/maidsafe/safe_network/commit/805298fa5f4d1455015d2aa248143f460b4057ba))
     - unused variable `address` ([`eb88c0c`](https://github.com/maidsafe/safe_network/commit/eb88c0cc1a8e7a21d7af4004c1e1a0a49297f22c))
     - remove repeated data storing in SafeAppClient::store_sequence() ([`87d64dc`](https://github.com/maidsafe/safe_network/commit/87d64dc3fe865b68f014da373aa253caf50d6512))
     - generate_random_ed_keypair ([`19ca515`](https://github.com/maidsafe/safe_network/commit/19ca515ac84d8cf5d99c4b2cba25561248597f13))
@@ -862,16 +927,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - reenable decoding auth reqs and basic app key generation ([`3f23687`](https://github.com/maidsafe/safe_network/commit/3f23687471b846e3ad1e2492c237a21f212b753f))
     - remove merge added file ([`c56e265`](https://github.com/maidsafe/safe_network/commit/c56e26502ee44af179bfa65c8a194a2190b16842))
     - clippy ([`e0a4de8`](https://github.com/maidsafe/safe_network/commit/e0a4de8de20e5023b83256d39beca19f759ba129))
+    - update to reference renamed sn_client ([`5f8d61c`](https://github.com/maidsafe/safe_network/commit/5f8d61cf41eb547c13b65d2030beefd235b75820))
     - tidying up ([`4905fae`](https://github.com/maidsafe/safe_network/commit/4905fae6259063411c5e4ef5fd2afb531980630c))
+    - update to reference renamed sn_node crate/repo ([`ee05ed3`](https://github.com/maidsafe/safe_network/commit/ee05ed31cb12d8e1d8bac7569beec90db52a5840))
     - fix merge bugs and readd some shell completion logic ([`b99e7de`](https://github.com/maidsafe/safe_network/commit/b99e7dee3e72e703b47888e3ff03d2baa933b408))
     - Merge branch 'master' into ExploreUpdatesForApis ([`34f9bc7`](https://github.com/maidsafe/safe_network/commit/34f9bc704f301ac903f768813fbd4140cd702f21))
+    - rename artifacts and paths to match new naming convention ([`e389ab2`](https://github.com/maidsafe/safe_network/commit/e389ab24f2186fc515b115e736a06d20756ae031))
     - reenabling more transfer funcs ([`d3d04e3`](https://github.com/maidsafe/safe_network/commit/d3d04e36b8fb52ce070aecc2b1f77eb158983427))
     - further ffi cleanup ([`d5c1cd2`](https://github.com/maidsafe/safe_network/commit/d5c1cd2808f9844b06b846ec10dfe05146137023))
-    - chore(mock/ffi): remove mock/ffi builds + files ([`8b9b481`](https://github.com/maidsafe/safe_network/commit/8b9b481df5d124857abb02158739a6ded8f02af7))
+    - update safe-cmd-test-utilities name to ([`8f309da`](https://github.com/maidsafe/safe_network/commit/8f309dada1517afa10c263a52f5597429f764890))
+    - remove mock/ffi builds + files ([`8b9b481`](https://github.com/maidsafe/safe_network/commit/8b9b481df5d124857abb02158739a6ded8f02af7))
+    - update jsonrpc-quic crate name to qjsonrpc ([`6f2dd39`](https://github.com/maidsafe/safe_network/commit/6f2dd39d783812a9b3abd774b6bebd4cde2d5a1e))
     - upgrade multibase to v0.8.0 ([`08f5fec`](https://github.com/maidsafe/safe_network/commit/08f5fec47809bbf0aea61a939dfb3c909043703f))
     - tests updated for wallet changes ([`95200df`](https://github.com/maidsafe/safe_network/commit/95200df5f310911294ee72153d10d13f2e4fb737))
+    - update safe-authd crate name to sn_authd ([`019370c`](https://github.com/maidsafe/safe_network/commit/019370cfd0ace44c656caf45c17248f2a547dbbf))
     - reenable wallet apis ([`873fe29`](https://github.com/maidsafe/safe_network/commit/873fe29ac9042b7ad28a29630d2c048bde3a7634))
     - reenabling map ([`9e19113`](https://github.com/maidsafe/safe_network/commit/9e191132a4281c53bd4872a756888234adfc0e2a))
+    - update safe-api repo/crate name to sn_api ([`cb66e8f`](https://github.com/maidsafe/safe_network/commit/cb66e8f5a89872d018e48311738d96173ae8274c))
     - sn_client updated ([`4320a05`](https://github.com/maidsafe/safe_network/commit/4320a059224ef6018f7fc067f4a40a6534beeebb))
     - use dirs_next for dir finding ([`426158f`](https://github.com/maidsafe/safe_network/commit/426158fcbb6d7c1fe44755c138bba1ac825a0a0c))
     - clippy ([`0b17fdd`](https://github.com/maidsafe/safe_network/commit/0b17fddbe3418531df1d03a82d4eb510b819b811))
@@ -884,12 +956,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - moving in basics of auth func into the repo ([`07dd195`](https://github.com/maidsafe/safe_network/commit/07dd1956d4a53e2f4d09310b48e2a43a3a10e795))
     - safe_nd -> sn_data_types ([`4466c48`](https://github.com/maidsafe/safe_network/commit/4466c48a3fcec76f6c90cf6fcf1f28b177978c90))
     - initial tweaks for app / auth changes ([`1e4c47a`](https://github.com/maidsafe/safe_network/commit/1e4c47aed1aeed3488e370ab0c33a7b5519e40f5))
-    - update to reference renamed sn_client ([`5f8d61c`](https://github.com/maidsafe/safe_network/commit/5f8d61cf41eb547c13b65d2030beefd235b75820))
-    - update to reference renamed sn_node crate/repo ([`ee05ed3`](https://github.com/maidsafe/safe_network/commit/ee05ed31cb12d8e1d8bac7569beec90db52a5840))
-    - rename artifacts and paths to match new naming convention ([`e389ab2`](https://github.com/maidsafe/safe_network/commit/e389ab24f2186fc515b115e736a06d20756ae031))
-    - update safe-cmd-test-utilities name to ([`8f309da`](https://github.com/maidsafe/safe_network/commit/8f309dada1517afa10c263a52f5597429f764890))
-    - update jsonrpc-quic crate name to qjsonrpc ([`6f2dd39`](https://github.com/maidsafe/safe_network/commit/6f2dd39d783812a9b3abd774b6bebd4cde2d5a1e))
-    - update safe-authd crate name to sn_authd ([`019370c`](https://github.com/maidsafe/safe_network/commit/019370cfd0ace44c656caf45c17248f2a547dbbf))
-    - update safe-api repo/crate name to sn_api ([`cb66e8f`](https://github.com/maidsafe/safe_network/commit/cb66e8f5a89872d018e48311738d96173ae8274c))
 </details>
 
