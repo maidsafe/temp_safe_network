@@ -43,7 +43,12 @@ impl Capacity {
     pub(super) async fn add_new_adult(&self, adult: XorName) {
         info!("Adding new adult:{adult} to Capacity tracker");
 
-        if let Some(old_entry) = self.adult_levels.write().await.insert(adult, Arc::new(RwLock::new(StorageLevel::zero()))) {
+        if let Some(old_entry) = self
+            .adult_levels
+            .write()
+            .await
+            .insert(adult, Arc::new(RwLock::new(StorageLevel::zero())))
+        {
             let _level = old_entry.read().await.value();
             warn!("Throwing old storage level for Adult {adult}:{_level}");
         }

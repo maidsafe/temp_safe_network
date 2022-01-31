@@ -42,9 +42,8 @@ impl Liveness {
                 .take(NEIGHBOUR_COUNT)
                 .cloned()
                 .collect::<Vec<_>>();
-            let length = closest_nodes.len();
-            info!("Length of closest nodes to {adult}:{length}");
-            let _old_entry = closest_nodes_to.insert(adult.clone(), closest_nodes);
+
+            let _old_entry = closest_nodes_to.insert(*adult, closest_nodes);
         }
         Self {
             unfulfilled_requests: Arc::new(DashMap::new()),
@@ -52,6 +51,14 @@ impl Liveness {
         }
     }
 
+    pub(crate) fn current_nodes(&self) -> Vec<XorName> {
+        self.closest_nodes_to
+            .iter()
+            .map(|entry| *entry.key())
+            .collect::<Vec<XorName>>()
+    }
+
+    /// Add a new adult to the tracker and recompute closest nodes.
     pub(crate) fn add_new_adult(&self, adult: XorName) {
         info!("Adding new adult:{adult} to Liveness tracker");
 
@@ -71,9 +78,11 @@ impl Liveness {
 
         info!("Closest nodes to {adult}:{closest_nodes:?}");
 
-        if let Some(_old_entry) = self.closest_nodes_to.insert(adult.clone(), closest_nodes) {
+        if let Some(_old_entry) = self.closest_nodes_to.insert(adult, closest_nodes) {
             warn!("Throwing old liveness tracker for Adult {adult}:{_old_entry:?}");
         }
+
+        self.recompute_closest_nodes();
     }
 
     // Inserts a pending_operation, and is deemed as such until we get the appropriate response from the node
@@ -96,11 +105,7 @@ impl Liveness {
     }
 
     pub(crate) fn retain_members_only(&self, current_members: BTreeSet<XorName>) {
-        let all_keys: Vec<_> = self
-            .closest_nodes_to
-            .iter()
-            .map(|entry| *entry.key())
-            .collect();
+        let all_keys: Vec<_> = self.current_nodes();
 
         for key in &all_keys {
             if !current_members.contains(key) {
@@ -166,11 +171,7 @@ impl Liveness {
     }
 
     pub(crate) fn recompute_closest_nodes(&self) {
-        let all_known_nodes: Vec<_> = self
-            .closest_nodes_to
-            .iter()
-            .map(|entry| *entry.key())
-            .collect();
+        let all_known_nodes: Vec<_> = self.current_nodes();
 
         self.closest_nodes_to.alter_all(|name, _| {
             all_known_nodes
@@ -187,8 +188,7 @@ impl Liveness {
     pub(crate) async fn find_unresponsive_nodes(&self) -> Vec<(XorName, usize)> {
         info!("Checking unresponsive nodes");
         let mut unresponsive_nodes = Vec::new();
-        let length = self.closest_nodes_to.len();
-        info!("Length of closest nodes to {length}");
+
         for entry in self.closest_nodes_to.iter() {
             let (node, neighbours) = entry.pair();
             info!("Checking node/neighbours: {:?}/{:?}", node, neighbours);
@@ -230,5 +230,171 @@ impl Liveness {
             }
         }
         unresponsive_nodes
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::messaging::data::chunk_operation_id;
+    use crate::node::core::liveness_tracking::{Liveness, MIN_PENDING_OPS};
+    use crate::node::Error;
+    use crate::types::ChunkAddress;
+    use itertools::Itertools;
+    use std::collections::BTreeSet;
+    use xor_name::XorName;
+
+    #[tokio::test]
+    async fn liveness_basics() -> Result<(), Error> {
+        let adults = (0..10).map(|_| XorName::random()).collect::<Vec<XorName>>();
+        let liveness_tracker = Liveness::new(adults.clone());
+
+        // Write data 5 times to the 10 adults
+        for adult in &adults {
+            for _ in 0..5 {
+                let random_addr = ChunkAddress(XorName::random());
+                let op_id = chunk_operation_id(&random_addr)?;
+                liveness_tracker
+                    .add_a_pending_request_operation(*adult, op_id)
+                    .await;
+            }
+        }
+
+        // Assert there are not any unresponsive nodes
+        assert_eq!(liveness_tracker.find_unresponsive_nodes().await.len(), 0);
+
+        // Write data MIN_PENDING_OPS + 1 times on total to first 10 adults
+        for adult in &adults {
+            // We already wrote 5 times
+            for _ in 0..MIN_PENDING_OPS - 4 {
+                let random_addr = ChunkAddress(XorName::random());
+                let op_id = chunk_operation_id(&random_addr)?;
+                liveness_tracker
+                    .add_a_pending_request_operation(*adult, op_id)
+                    .await;
+            }
+        }
+
+        // Assert there are no unresponsive nodes.
+        // This is because all of them are within the tolerance ratio of each other
+        assert_eq!(liveness_tracker.find_unresponsive_nodes().await.len(), 0);
+
+        // Add a new adults
+        let new_adult = XorName::random();
+        liveness_tracker.add_new_adult(new_adult);
+
+        // Assert total adult count
+        assert_eq!(liveness_tracker.closest_nodes_to.len(), 11);
+
+        // Write data 100+ times to the new adult which is not cleared
+        for _ in 0..150 {
+            let random_addr = ChunkAddress(XorName::random());
+            let op_id = chunk_operation_id(&random_addr)?;
+            liveness_tracker
+                .add_a_pending_request_operation(new_adult, op_id)
+                .await;
+        }
+
+        // Assert that the new adult is detected unresponsive.
+        assert!(liveness_tracker
+            .find_unresponsive_nodes()
+            .await
+            .iter()
+            .map(|node| node.0)
+            .contains(&new_adult));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn liveness_retain_members() -> Result<(), Error> {
+        let adults = (0..10).map(|_| XorName::random()).collect::<Vec<XorName>>();
+        let liveness_tracker = Liveness::new(adults.clone());
+
+        let live_adults = adults[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
+
+        liveness_tracker.retain_members_only(live_adults.clone());
+
+        let all_known_nodes: Vec<_> = liveness_tracker.current_nodes();
+
+        for member in all_known_nodes {
+            assert!(live_adults.contains(&member));
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn liveness_compute_closest() -> Result<(), Error> {
+        // Adults with prefix 0
+        let mut adults0 = (0..5)
+            .map(|_| XorName::random().with_bit(0, false))
+            .collect::<Vec<XorName>>();
+
+        // Adults with prefix 1
+        let mut adults1 = (0..5)
+            .map(|_| XorName::random().with_bit(0, true))
+            .collect::<Vec<XorName>>();
+
+        // Whole set of Adults
+        let mut all_adults = vec![];
+        all_adults.extend(adults0.clone());
+        all_adults.extend(adults1.clone());
+
+        let liveness_tracker = Liveness::new(all_adults);
+
+        for entry in liveness_tracker.closest_nodes_to.iter() {
+            let (node, neighbours) = entry.pair();
+
+            // Assert all the neigbours fall under the correct set
+            if node.bit(0) {
+                for neigbour in neighbours {
+                    assert!(adults1.contains(neigbour))
+                }
+            } else {
+                for neigbour in neighbours {
+                    assert!(adults0.contains(neigbour))
+                }
+            }
+        }
+
+        // Add 5 new adults for each 0 and 1 prefix
+        let new_adults0 = (0..5)
+            .map(|_| XorName::random().with_bit(0, false))
+            .collect::<Vec<XorName>>();
+
+        let new_adults1 = (0..5)
+            .map(|_| XorName::random().with_bit(0, true))
+            .collect::<Vec<XorName>>();
+
+        let mut new_adults = vec![];
+        new_adults.extend(new_adults0.clone());
+        new_adults.extend(new_adults1.clone());
+
+        // Add them to the larger set
+        adults0.extend(new_adults0);
+        adults1.extend(new_adults1);
+
+        // Add all of them to the liveness tracker
+        for new_adult in new_adults {
+            liveness_tracker.add_new_adult(new_adult);
+        }
+
+        // Check if the recomputed nodes all fall within their respective sets
+        for entry in liveness_tracker.closest_nodes_to.iter() {
+            let (node, neighbours) = entry.pair();
+
+            // Assert all the neighbours fall under the correct set
+            if node.bit(0) {
+                for neigbour in neighbours {
+                    assert!(adults1.contains(neigbour))
+                }
+            } else {
+                for neigbour in neighbours {
+                    assert!(adults0.contains(neigbour))
+                }
+            }
+        }
+
+        Ok(())
     }
 }
