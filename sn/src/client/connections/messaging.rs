@@ -709,7 +709,7 @@ pub(super) async fn send_message(
         match r {
             Ok((peer_name, connection_id, send_result)) => match send_result {
                 Err(Error::QuicP2pSend(SendError::ConnectionLost(ConnectionError::Closed(
-                    Close::Application { reason, .. },
+                    Close::Application { reason, error_code },
                 )))) => {
                     warn!(
                         "Connection was closed by the node: {:?}",
@@ -717,11 +717,15 @@ pub(super) async fn send_message(
                     );
 
                     mark_connection_id_as_failed(session.clone(), peer_name, connection_id);
+                    last_error = Some(Error::QuicP2pSend(SendError::ConnectionLost(ConnectionError::Closed(
+                        Close::Application { reason, error_code },
+                    ))));
                 }
                 Err(Error::QuicP2pSend(SendError::ConnectionLost(error))) => {
                     warn!("Connection was lost: {:?}", error);
 
                     mark_connection_id_as_failed(session.clone(), peer_name, connection_id);
+                    last_error = Some(Error::QuicP2pSend(SendError::ConnectionLost(error)));
                 }
                 Err(error) => {
                     warn!("Issue during {:?} send: {:?}", msg_id, error);
