@@ -234,11 +234,16 @@ impl Client {
             task::spawn(async move { writer.send_cmd(DataCmd::StoreChunk(chunk)).await })
         });
 
-        let _ = join_all(tasks)
+        let respones = join_all(tasks)
             .await
             .into_iter()
             .flatten() // swallows errors
             .collect_vec();
+
+        for res in respones {
+            // fail with any issue here
+            let _ = res?;
+        }
 
         Ok(head_address)
     }
