@@ -30,6 +30,7 @@ pub const DEFAULT_AE_WAIT: Duration = Duration::from_secs(0);
 
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const SN_QUERY_TIMEOUT: &str = "SN_QUERY_TIMEOUT";
+const SN_CMD_TIMEOUT: &str = "SN_CMD_TIMEOUT";
 const SN_AE_WAIT: &str = "SN_AE_WAIT";
 
 /// Configuration for sn_client.
@@ -212,6 +213,7 @@ mod tests {
             Some(&config_filepath),
             None,
             None,
+            None,
         )
         .await;
         // convert to string for assert
@@ -232,6 +234,14 @@ mod tests {
             })
             .unwrap_or(DEFAULT_OPERATION_TIMEOUT);
 
+        let expected_cmd_timeout = std::env::var(SN_CMD_TIMEOUT)
+            .map(|v| {
+                v.parse()
+                    .map(Duration::from_secs)
+                    .unwrap_or(DEFAULT_OPERATION_TIMEOUT)
+            })
+            .unwrap_or(DEFAULT_OPERATION_TIMEOUT);
+
         let expected_standard_wait = std::env::var(SN_AE_WAIT)
             .map(|v| {
                 v.parse()
@@ -245,11 +255,12 @@ mod tests {
             root_dir: root_dir.clone(),
             genesis_key,
             qp2p: QuicP2pConfig {
-                idle_timeout: Some(DEFAULT_IDLE_TIMEOUT),
-                keep_alive_interval: Some(DEFAULT_KEEP_ALIVE),
+                // idle_timeout: Some(DEFAULT_IDLE_TIMEOUT),
+                // keep_alive_interval: Some(DEFAULT_KEEP_ALIVE),
                 ..Default::default()
             },
             query_timeout: expected_query_timeout,
+            cmd_timeout: expected_cmd_timeout,
             standard_wait: expected_standard_wait,
         };
         assert_eq!(format!("{:?}", config), format!("{:?}", expected_config));
@@ -259,7 +270,7 @@ mod tests {
         let mut file = File::create(&config_filepath)?;
 
         let config_on_disk =
-            ClientConfig::new(None, None, genesis_key, Some(&config_filepath), None, None).await;
+            ClientConfig::new(None, None, genesis_key, Some(&config_filepath), None, None, None).await;
         serde_json::to_writer_pretty(&mut file, &config_on_disk)?;
         file.sync_all()?;
 

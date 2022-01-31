@@ -63,5 +63,5 @@ pub(super) struct Session {
     /// Standard time to await potential AE messages:
     standard_wait: Duration,
     /// Closed connection tracking, used to validate if a new connection is needed or not. Xorname to ConnectionId
-    elder_last_closed_connections: Arc<DashMap<XorName, usize>>,
+    elder_last_closed_connections: Arc<DashMap<XorName, Vec<usize>>>,
 }

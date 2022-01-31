@@ -7,9 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{api::command::Command, core::Core, Result};
+use crate::types::log_markers::LogMarker;
 use std::collections::BTreeSet;
 use xor_name::XorName;
-use crate::types::log_markers::LogMarker;
 
 impl Core {
     /// Will reorganize data if we are an adult,

@@ -38,7 +38,6 @@ const NODES_DIR: &str = "local-test-network";
 const INTERVAL: &str = "2";
 const RUST_LOG: &str = "RUST_LOG";
 const ADDITIONAL_NODES_TO_SPLIT: u64 = 30;
-const QUERY_TIMEOUT: Duration = Duration::from_secs(90);
 #[tokio::main]
 async fn main() -> Result<()> {
     // First lets build the network and testnet launcher, to ensure we're on the latest version
@@ -181,7 +180,7 @@ pub async fn run_split() -> Result<()> {
     let (genesis_key, bootstrap_nodes) =
         read_network_conn_info().context("Could not read network bootstrap".to_string())?;
 
-    let config = ClientConfig::new(None, None, genesis_key, None, Some(QUERY_TIMEOUT), None).await;
+    let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
     for (address, hash) in all_data_put {
@@ -219,7 +218,7 @@ async fn upload_data() -> Result<(BytesAddress, [u8; 32])> {
         read_network_conn_info().context("Could not read network bootstrap".to_string())?;
 
     println!("Creating a Client to connect to {:?}", bootstrap_nodes);
-    let config = ClientConfig::new(None, None, genesis_key, None, Some(QUERY_TIMEOUT), None).await;
+    let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
     let bytes = random_bytes(1024 * 1024);
