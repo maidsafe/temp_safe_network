@@ -10,7 +10,7 @@ use super::Session;
 
 use crate::client::{
     connections::{
-        messaging::{send_message, NUM_OF_ELDERS_SUBSET_FOR_QUERIES},
+        messaging::{mark_connection_id_as_failed, send_message, NUM_OF_ELDERS_SUBSET_FOR_QUERIES},
         PendingCmdAcks,
     },
     Error, Result,
@@ -71,7 +71,8 @@ impl Session {
                             String::from_utf8(reason.to_vec())
                         );
 
-                        let _old = session.elder_last_closed_connections.insert(connected_peer.name(), connection_id);
+                        mark_connection_id_as_failed(session.clone(), connected_peer.name(), connection_id);
+
                     },
                     Err(Error::QuicP2p(qp2p_err)) => {
                           // TODO: Can we recover here?
