@@ -717,9 +717,9 @@ pub(super) async fn send_message(
                     );
 
                     mark_connection_id_as_failed(session.clone(), peer_name, connection_id);
-                    last_error = Some(Error::QuicP2pSend(SendError::ConnectionLost(ConnectionError::Closed(
-                        Close::Application { reason, error_code },
-                    ))));
+                    last_error = Some(Error::QuicP2pSend(SendError::ConnectionLost(
+                        ConnectionError::Closed(Close::Application { reason, error_code }),
+                    )));
                 }
                 Err(Error::QuicP2pSend(SendError::ConnectionLost(error))) => {
                     warn!("Connection was lost: {:?}", error);

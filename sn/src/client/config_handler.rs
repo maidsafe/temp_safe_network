@@ -269,8 +269,16 @@ mod tests {
         create_dir_all(&root_dir).await?;
         let mut file = File::create(&config_filepath)?;
 
-        let config_on_disk =
-            ClientConfig::new(None, None, genesis_key, Some(&config_filepath), None, None, None).await;
+        let config_on_disk = ClientConfig::new(
+            None,
+            None,
+            genesis_key,
+            Some(&config_filepath),
+            None,
+            None,
+            None,
+        )
+        .await;
         serde_json::to_writer_pretty(&mut file, &config_on_disk)?;
         file.sync_all()?;
 
