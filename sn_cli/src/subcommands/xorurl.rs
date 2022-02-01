@@ -89,17 +89,18 @@ pub async fn xorurl_commander(
     Ok(())
 }
 
-pub async fn xorurl_com(
+pub async fn xorurl_of_files(
     location: Option<String>,
     recursive: bool,
     follow_symlinks: bool,
     output_fmt: OutputFmt,
-    safe: &mut Safe,
+    xorurl_base: Option<XorUrlBase>,
 ) -> Result<()> {
-    let location = get_from_arg_or_stdin(location, Some("...awaiting location path from stdin"))?;
     // Do a dry-run on the location
-    safe.dry_run_mode = true;
-    let (_version, processed_files, _) = safe
+    let safe = Safe::dry_runner(xorurl_base);
+
+    let location = get_from_arg_or_stdin(location, Some("...awaiting location path from stdin"))?;
+    let (_, processed_files, _) = safe
         .files_container_create_from(&location, None, recursive, follow_symlinks)
         .await?;
 
@@ -126,5 +127,6 @@ pub async fn xorurl_com(
         }
         println!("{}", serialise_output(&list, output_fmt));
     }
+
     Ok(())
 }

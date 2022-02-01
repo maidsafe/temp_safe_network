@@ -42,49 +42,58 @@ use tracing::debug;
 use std::path::Path;
 use std::time::Duration;
 
+const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
+
 #[derive(Clone)]
 pub struct Safe {
-    client: Client,
+    client: Option<Client>,
     pub xorurl_base: XorUrlBase,
     pub dry_run_mode: bool,
 }
 
 impl Safe {
-    pub async fn dry_runner(
+    /// Create a Safe instance without connecting to the SAFE Network
+    pub fn dry_runner(xorurl_base: Option<XorUrlBase>) -> Self {
+        Self {
+            client: None,
+            xorurl_base: xorurl_base.unwrap_or(DEFAULT_XORURL_BASE),
+            dry_run_mode: true,
+        }
+    }
+
+    /// Create a Safe instance connected to the SAFE Network
+    pub async fn connected(
         bootstrap_config: NodeConfig,
-        app_keypair: Option<Keypair>,
+        keypair: Option<Keypair>,
         config_path: Option<&Path>,
         xorurl_base: Option<XorUrlBase>,
         timeout: Option<Duration>,
     ) -> Result<Self> {
-        let mut safe = Safe::connect(
-            bootstrap_config,
-            app_keypair,
-            config_path,
-            xorurl_base,
-            timeout,
-        )
-        .await?;
-        safe.dry_run_mode = true;
+        let mut safe = Self {
+            client: None,
+            xorurl_base: xorurl_base.unwrap_or(DEFAULT_XORURL_BASE),
+            dry_run_mode: false,
+        };
+
+        safe.connect(bootstrap_config, keypair, config_path, timeout)
+            .await?;
+
         Ok(safe)
     }
 
-    /// Connect to the SAFE Network using the provided auth credentials
+    /// Connect to the SAFE Network
     pub async fn connect(
+        &mut self,
         bootstrap_config: NodeConfig,
-        app_keypair: Option<Keypair>,
+        keypair: Option<Keypair>,
         config_path: Option<&Path>,
-        xorurl_base: Option<XorUrlBase>,
         timeout: Option<Duration>,
-    ) -> Result<Self> {
+    ) -> Result<()> {
         debug!("Connecting to SAFE Network...");
 
         let config_path = config_path.map(|p| p.to_path_buf());
 
-        debug!(
-            "Client to be instantiated with specific pk?: {:?}",
-            app_keypair
-        );
+        debug!("Client to be instantiated with specific pk?: {:?}", keypair);
         debug!("Bootstrap contacts list set to: {:?}", bootstrap_config);
 
         let config = ClientConfig::new(
@@ -97,8 +106,8 @@ impl Safe {
         )
         .await;
 
-        let safe = Self {
-            client: Client::new(config, bootstrap_config.1, app_keypair)
+        self.client = Some(
+            Client::new(config, bootstrap_config.1, keypair)
                 .await
                 .map_err(|err| {
                     Error::ConnectionError(format!(
@@ -106,13 +115,11 @@ impl Safe {
                         err
                     ))
                 })?,
-            xorurl_base: xorurl_base.unwrap_or(DEFAULT_XORURL_BASE),
-            dry_run_mode: false,
-        };
+        );
 
         debug!("Successfully connected to the Network!!!");
 
-        Ok(safe)
+        Ok(())
     }
 
     /// Generate a new random Ed25519 keypair
@@ -121,9 +128,11 @@ impl Safe {
         Keypair::new_ed25519(&mut rng)
     }
 
-    /// Retrieve the keypair this instance was instantiated with, i.e. the
-    /// keypair this instance uses by default to sign each outgoing message
-    pub fn get_my_keypair(&self) -> Keypair {
-        self.client.keypair()
+    // Private helper to obtain the Client instance
+    pub(crate) fn get_safe_client(&self) -> Result<&Client> {
+        match &self.client {
+            Some(client) => Ok(client),
+            None => Err(Error::ConnectionError(APP_NOT_CONNECTED.to_string())),
+        }
     }
 }

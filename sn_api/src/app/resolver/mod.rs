@@ -132,7 +132,7 @@ impl Safe {
     ///
     /// # });
     /// ```
-    pub async fn inspect(&mut self, url: &str) -> Result<Vec<SafeData>> {
+    pub async fn inspect(&self, url: &str) -> Result<Vec<SafeData>> {
         let safe_url = Safe::parse_url(url)?;
         info!("URL parsed successfully, inspecting: {}", url);
         self.fully_resolve_url(safe_url, None, false, None, true)
@@ -251,7 +251,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_files_container() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (fc_xorurl, _, original_files_map) = safe
             .files_container_create_from("./testdata/", None, true, false)
             .await?;
@@ -302,7 +302,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_resolvable_container() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         // create file container
         let (xorurl, _, the_files_map) = safe
@@ -362,7 +362,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_resolvable_map_data() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         // create file container
         let (xorurl, _, _the_files_map) = safe
@@ -429,7 +429,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_public_file() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let data = Bytes::from("Something super immutable");
         let xorurl = safe
             .store_public_bytes(data.clone(), Some("text/plain"))
@@ -466,7 +466,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_public_file_from_nrs_url() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let data = Bytes::from("Something super immutable");
         let xorurl = safe
             .store_public_bytes(data.clone(), Some("text/plain"))
@@ -543,7 +543,7 @@ mod tests {
     #[tokio::test]
     async fn test_fetch_range_from_files_container() -> Result<()> {
         use std::fs::File;
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         // create file container
         let (xorurl, _, _files_map) = safe
@@ -599,7 +599,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_unsupported_with_media_type() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let xorname = rand::random();
         let type_tag = 575_756_443;
         let xorurl = SafeUrl::encode(

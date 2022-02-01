@@ -88,7 +88,7 @@ impl GetAttr for FileInfo {
 // Helper function to add or update a FileInfo in a FilesMap
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn add_or_update_file_item(
-    safe: &mut Safe,
+    safe: &Safe,
     file_name: &Path,
     file_name_for_map: &str,
     file_path: &Path,
@@ -135,7 +135,7 @@ pub(crate) async fn add_or_update_file_item(
 
 // Generate a FileInfo for a file which can then be added to a FilesMap
 async fn gen_new_file_item(
-    safe: &mut Safe,
+    safe: &Safe,
     file_path: &Path,
     file_meta: &FileMeta,
     link: Option<&str>, // must be symlink target or None if FileMeta::is_symlink() is true.

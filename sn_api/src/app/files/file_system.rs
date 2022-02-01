@@ -20,7 +20,7 @@ use walkdir::{DirEntry, WalkDir};
 const MAX_RECURSIVE_DEPTH: usize = 10_000;
 
 // Upload a file to the Network
-pub(crate) async fn upload_file_to_net(safe: &mut Safe, path: &Path) -> Result<XorUrl> {
+pub(crate) async fn upload_file_to_net(safe: &Safe, path: &Path) -> Result<XorUrl> {
     let data = fs::read(path).map_err(|err| {
         Error::InvalidInput(format!("Failed to read file from local location: {}", err))
     })?;
@@ -45,12 +45,11 @@ pub(crate) async fn upload_file_to_net(safe: &mut Safe, path: &Path) -> Result<X
     // thus let's report the error but providing the xorurl for the user to be aware of.
     if let Err(Error::ClientError(ClientError::NotEnoughChunksRetrieved { .. })) = result {
         // Let's obtain the xorurl with using dry-run mode.
-        // Switch dry run mode ON only for this next operation
-        let prev_dry_run_mode = safe.dry_run_mode;
-        safe.dry_run_mode = true;
-        let result = safe.store_public_bytes(data, mime_type_for_xorurl).await;
-        safe.dry_run_mode = prev_dry_run_mode;
-        let xorurl = result?;
+        // Use a dry runner only for this next operation
+        let dry_runner = Safe::dry_runner(Some(safe.xorurl_base));
+        let xorurl = dry_runner
+            .store_public_bytes(data, mime_type_for_xorurl)
+            .await?;
 
         Err(Error::ContentUploadVerificationFailed(xorurl))
     } else {
@@ -67,7 +66,7 @@ pub(crate) fn normalise_path_separator(from: &str) -> String {
 // and if not requested as a `dry_run` upload the files to the network filling up
 // the list of files with their corresponding XOR-URLs
 pub(crate) async fn file_system_dir_walk(
-    safe: &mut Safe,
+    safe: &Safe,
     location: &Path,
     recursive: bool,
     follow_links: bool,
@@ -177,7 +176,7 @@ fn valid_depth(entry: &DirEntry, max_depth: usize) -> bool {
 // and if not as a `dry_run` upload the file to the network and putting
 // the obtained XOR-URL in the single file list returned
 pub(crate) async fn file_system_single_file(
-    safe: &mut Safe,
+    safe: &Safe,
     location: &Path,
 ) -> Result<ProcessedFiles> {
     info!("Reading file {}", location.display());

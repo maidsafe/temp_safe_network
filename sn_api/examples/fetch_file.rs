@@ -46,7 +46,7 @@ async fn main() -> Result<()> {
     let node_config = (genesis_key, nodes);
 
     // The Safe instance is what will give us access to the network API.
-    let safe = Safe::connect(node_config, None, None, None, None).await?;
+    let safe = Safe::connected(node_config, None, None, None, None).await?;
 
     println!("Connected to Safe!");
 
