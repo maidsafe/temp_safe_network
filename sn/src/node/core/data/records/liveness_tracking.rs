@@ -20,6 +20,7 @@ const NEIGHBOUR_COUNT: usize = 2;
 const MIN_PENDING_OPS: usize = 10;
 const ACTIVE_REPLICATION_THRESHOLD: usize = MIN_PENDING_OPS / 2;
 const PENDING_OP_TOLERANCE_RATIO: f64 = 0.1;
+const ACTIVE_REPLICATION_TOLERANCE_RATIO: f64 = 0.05;
 
 /// Some reproducible xorname derived from the operation. Which can be re-derived from the appropriate response when received (to remove from tracking)
 type NodeIdentifier = XorName;
@@ -185,9 +186,12 @@ impl Liveness {
     }
 
     // This is not an exact definition, thus has tolerance for variance due to concurrency
-    pub(crate) async fn find_unresponsive_nodes(&self) -> Vec<(XorName, usize)> {
-        info!("Checking unresponsive nodes");
+    pub(crate) async fn find_unresponsive_and_deviant_nodes(
+        &self,
+    ) -> (Vec<(XorName, usize)>, BTreeSet<XorName>) {
+        info!("Checking for unresponsive and deviant nodes");
         let mut unresponsive_nodes = Vec::new();
+        let mut deviants = Vec::new();
 
         for entry in self.closest_nodes_to.iter() {
             let (node, neighbours) = entry.pair();
@@ -214,59 +218,34 @@ impl Liveness {
 
             if pending_operations_count > MIN_PENDING_OPS
                 && max_pending_by_neighbours > MIN_PENDING_OPS
-                && pending_operations_count as f64 * PENDING_OP_TOLERANCE_RATIO
+            {
+                if pending_operations_count as f64 * PENDING_OP_TOLERANCE_RATIO
                     > max_pending_by_neighbours as f64
-            {
-                tracing::info!(
-                    "Pending ops for {}: {} Neighbour max: {}",
-                    node,
-                    pending_operations_count,
-                    max_pending_by_neighbours
-                );
-                unresponsive_nodes.push((node, pending_operations_count));
-            }
-        }
-        unresponsive_nodes
-    }
+                {
+                    tracing::info!(
+                        "Pending ops for {}: {} Neighbour max: {}",
+                        node,
+                        pending_operations_count,
+                        max_pending_by_neighbours
+                    );
+                    unresponsive_nodes.push((node, pending_operations_count));
+                }
 
-    pub(crate) async fn check_for_active_replication(&self) -> BTreeSet<XorName> {
-        let mut deviants = vec![];
-
-        for entry in self.closest_nodes_to.iter() {
-            let (node, neighbors) = entry.pair();
-            let node = *node;
-
-            let pending_operations_count = if let Some(entry) = self.unfulfilled_requests.get(&node)
-            {
-                entry.value().read().await.len()
-            } else {
-                0
-            };
-
-            let mut max_pending_by_neighbours = 0;
-            for neighbour in neighbors.iter() {
-                if let Some(entry) = self.unfulfilled_requests.get(neighbour) {
-                    let val = entry.value().read().await.len();
-
-                    if val > max_pending_by_neighbours {
-                        max_pending_by_neighbours = val
-                    }
+                if pending_operations_count as f64 * ACTIVE_REPLICATION_TOLERANCE_RATIO
+                    > max_pending_by_neighbours as f64
+                {
+                    info!(
+                    "Probable deviant {node} crossed ACTIVE_REPLICATION_THRESHOLD: {ACTIVE_REPLICATION_THRESHOLD} \
+                    {pending_operations_count}: Neighbour max: {max_pending_by_neighbours}",
+                    );
+                    deviants.push(node);
                 }
             }
-
-            if pending_operations_count > ACTIVE_REPLICATION_THRESHOLD
-                && max_pending_by_neighbours < ACTIVE_REPLICATION_THRESHOLD
-            {
-                tracing::info!(
-                    "Probable deviant node crossed ACTIVE Replication threshold {}: {} Neighbour max: {}",
-                    node,
-                    pending_operations_count,
-                    max_pending_by_neighbours
-                );
-                deviants.push(node);
-            }
         }
-        deviants.into_iter().collect::<BTreeSet<XorName>>()
+        (
+            unresponsive_nodes,
+            deviants.into_iter().collect::<BTreeSet<XorName>>(),
+        )
     }
 }
 
@@ -299,7 +278,14 @@ mod tests {
         }
 
         // Assert there are not any unresponsive nodes
-        assert_eq!(liveness_tracker.find_unresponsive_nodes().await.len(), 0);
+        assert_eq!(
+            liveness_tracker
+                .find_unresponsive_and_deviant_nodes()
+                .await
+                .0
+                .len(),
+            0
+        );
 
         // Write data MIN_PENDING_OPS + 1 times on total to first 10 adults
         for adult in &adults {
@@ -315,7 +301,14 @@ mod tests {
 
         // Assert there are no unresponsive nodes.
         // This is because all of them are within the tolerance ratio of each other
-        assert_eq!(liveness_tracker.find_unresponsive_nodes().await.len(), 0);
+        assert_eq!(
+            liveness_tracker
+                .find_unresponsive_and_deviant_nodes()
+                .await
+                .0
+                .len(),
+            0
+        );
 
         // Add a new adults
         let new_adult = XorName::random();
@@ -335,8 +328,9 @@ mod tests {
 
         // Assert that the new adult is detected unresponsive.
         assert!(liveness_tracker
-            .find_unresponsive_nodes()
+            .find_unresponsive_and_deviant_nodes()
             .await
+            .0
             .iter()
             .map(|node| node.0)
             .contains(&new_adult));

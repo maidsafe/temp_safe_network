@@ -22,6 +22,8 @@ pub enum LogMarker {
     NewPrefix,
     AeSendUpdateToSiblings,
     AgreementOfOnline,
+    // Malice
+    DeviantsDetected,
     // Messaging
     ServiceMsgToBeHandled,
     SystemMsgToBeHandled,
