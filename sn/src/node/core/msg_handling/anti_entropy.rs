@@ -64,10 +64,7 @@ impl Core {
         let mut commands = self.try_reorganize_data(old_adults).await?;
 
         // always run this, only changes will trigger events
-        commands.extend(
-            self.update_self_for_new_node_state_and_fire_events(snapshot)
-                .await?,
-        );
+        commands.extend(self.update_self_for_new_node_state(snapshot).await?);
 
         Ok(commands)
     }
@@ -108,10 +105,7 @@ impl Core {
                 self.create_or_wait_for_backoff(&sender).await;
 
                 let mut result = Vec::new();
-                if let Ok(cmds) = self
-                    .update_self_for_new_node_state_and_fire_events(snapshot)
-                    .await
-                {
+                if let Ok(cmds) = self.update_self_for_new_node_state(snapshot).await {
                     result.extend(cmds);
                 }
 

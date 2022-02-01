@@ -7,7 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    data::{DataCmd, DataExchange, DataQuery, OperationId, QueryResponse, Result, StorageLevel},
+    data::{
+        DataCmd, DataQuery, MetadataExchange, OperationId, QueryResponse, Result, StorageLevel,
+    },
     EndUser, MessageId, ServiceAuth,
 };
 use crate::types::{
@@ -32,13 +34,6 @@ pub enum NodeCmd {
         /// Message source
         origin: EndUser,
     },
-    /// Data is stored by Adults
-    StoreData {
-        /// The data
-        data: ReplicatedData,
-        /// Message source
-        origin: EndUser,
-    },
     /// Notify Elders on nearing max capacity
     RecordStorageLevel {
         /// Node Id
@@ -48,15 +43,28 @@ pub enum NodeCmd {
         /// The storage level reported by the node.
         level: StorageLevel,
     },
-    /// Replicate a given chunk at an Adult (sent from elders on receipt of RepublishData)
+    /// Tells an Adult to store a replica of the data
     ReplicateData(ReplicatedData),
-    /// Tells the Elders to re-publish a chunk in the data section
-    RepublishData(ReplicatedData),
     /// Sent to all promoted nodes (also sibling if any) after
     /// a completed transition to a new constellation.
     ReceiveMetadata {
         /// Metadata
-        metadata: DataExchange,
+        metadata: MetadataExchange,
+    },
+}
+
+/// Event message sent among nodes
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+pub enum NodeEvent {
+    /// Sent by a full Adult, and tells the Elders to store a chunk at some other Adult in the section
+    CouldNotStoreData {
+        /// Node Id
+        node_id: PublicKey,
+        /// The data that the Adult couldn't store
+        data: ReplicatedData,
+        /// Whether store failed due to full
+        full: bool,
     },
 }
 

@@ -250,7 +250,6 @@ impl Core {
         old: &StateSnapshot,
     ) -> Result<Vec<Command>> {
         debug!("{}", LogMarker::AeSendUpdateToSiblings);
-        let mut commands = vec![];
         if let Some(sibling_sap) = self
             .network_knowledge
             .prefix_map()
@@ -271,24 +270,20 @@ impl Core {
             // sibling elders shall still in the state of pre-split.
             let previous_section_key = old.section_key;
 
-            commands.extend(
-                self.send_data_updates_to(
-                    sibling_sap.prefix(),
-                    promoted_sibling_elders,
-                    previous_section_key,
-                )
-                .await?,
-            );
-
-            Ok(commands)
+            self.send_metadata_updates_to(
+                sibling_sap.prefix(),
+                promoted_sibling_elders,
+                previous_section_key,
+            )
+            .await
         } else {
             error!("Failed to get sibling SAP during split.");
             Ok(vec![])
         }
     }
 
-    /// Send DataExchange packet to the target recipients
-    pub(crate) async fn send_data_updates_to(
+    /// Send MetadataExchange packet to the target recipients
+    pub(crate) async fn send_metadata_updates_to(
         &self,
         prefix: Prefix,
         recipients: Vec<Peer>,

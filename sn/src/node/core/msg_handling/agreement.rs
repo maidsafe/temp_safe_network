@@ -322,7 +322,6 @@ impl Core {
             self.network_knowledge.prefix_map()
         );
 
-        self.update_self_for_new_node_state_and_fire_events(snapshot)
-            .await
+        self.update_self_for_new_node_state(snapshot).await
     }
 }
