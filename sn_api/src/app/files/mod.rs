@@ -1914,10 +1914,8 @@ mod tests {
             Err(Error::UnversionedContentError(msg)) => {
                 assert_eq!(
                 msg,
-                format!(
-                    "The linked content (FilesContainer) is versionable, therefore NRS requires the link to specify a hash: {}",
-                    unversioned_link
-                )
+                "FilesContainer content is versionable. NRS requires the supplied link to specify \
+                a version hash.",
             );
                 Ok(())
             }
