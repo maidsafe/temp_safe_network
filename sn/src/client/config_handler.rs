@@ -77,13 +77,10 @@ impl ClientConfig {
             .unwrap_or_else(default_dir);
         // If a config file path was provided we try to read it,
         // otherwise we use default qp2p config.
-        let mut qp2p = match &config_file_path {
+        let qp2p = match &config_file_path {
             None => QuicP2pConfig::default(),
             Some(path) => read_config_file(path).await.unwrap_or_default(),
         };
-
-        qp2p.idle_timeout = Some(DEFAULT_IDLE_TIMEOUT);
-        qp2p.keep_alive_interval = Some(DEFAULT_KEEP_ALIVE);
 
         let query_timeout = query_timeout.unwrap_or(DEFAULT_OPERATION_TIMEOUT);
         let cmd_timeout = cmd_timeout.unwrap_or(DEFAULT_OPERATION_TIMEOUT);
@@ -105,6 +102,24 @@ impl ClientConfig {
                 }
             },
             Err(_) => query_timeout,
+        };
+
+        // if we have an env var for this, let's override
+        let cmd_timeout = match std::env::var(SN_CMD_TIMEOUT) {
+            Ok(timeout) => match timeout.parse() {
+                Ok(time) => {
+                    warn!(
+                        "Query timeout set from env var {}: {}s",
+                        SN_CMD_TIMEOUT, time
+                    );
+                    Duration::from_secs(time)
+                }
+                Err(error) => {
+                    warn!("There was an error parsing {} env var value: '{}'. Default or client configured cmd timeout will be used: {:?}", SN_CMD_TIMEOUT, timeout, error);
+                    cmd_timeout
+                }
+            },
+            Err(_) => cmd_timeout,
         };
 
         // if we have an env var for this, let's override

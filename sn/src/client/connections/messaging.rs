@@ -144,7 +144,7 @@ impl Session {
         )
         .await;
 
-        if res.is_err() {
+        if res.as_ref().is_err() {
             // shortcircuit the ack awaiting
             return res;
         }
