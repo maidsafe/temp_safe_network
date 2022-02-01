@@ -144,7 +144,7 @@ impl Session {
         )
         .await;
 
-        if res.is_err() {
+        if res.as_ref().is_err() {
             // shortcircuit the ack awaiting
             return res;
         }
@@ -601,7 +601,6 @@ pub(super) async fn send_message(
     endpoint: Endpoint,
     msg_id: MessageId,
 ) -> Result<(), Error> {
-    // let _spawn_result = tokio::spawn(async move {
     let priority = wire_msg.clone().into_message()?.priority();
 
     let msg_bytes = wire_msg.serialize()?;
@@ -717,9 +716,9 @@ pub(super) async fn send_message(
                     );
 
                     mark_connection_id_as_failed(session.clone(), peer_name, connection_id);
-                    last_error = Some(Error::QuicP2pSend(SendError::ConnectionLost(ConnectionError::Closed(
-                        Close::Application { reason, error_code },
-                    ))));
+                    last_error = Some(Error::QuicP2pSend(SendError::ConnectionLost(
+                        ConnectionError::Closed(Close::Application { reason, error_code }),
+                    )));
                 }
                 Err(Error::QuicP2pSend(SendError::ConnectionLost(error))) => {
                     warn!("Connection was lost: {:?}", error);
@@ -760,11 +759,7 @@ pub(super) async fn send_message(
             return Err(error);
         }
     }
-    // });
-    // debug!(
-    //     "result of spawn a send_message thread of {:?} is {:?}",
-    //     msg_id, _spawn_result
-    // );
+
     Ok(())
 }
 
