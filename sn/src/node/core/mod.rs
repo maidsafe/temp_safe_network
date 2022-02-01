@@ -84,6 +84,11 @@ pub(crate) const CONCURRENT_JOINS: usize = 7;
 // the section).
 const DATA_QUERY_TIMEOUT: Duration = Duration::from_secs(60 * 5 /* 5 mins */);
 
+// This prevents pending query limit unbound growth
+pub(crate) const DATA_QUERY_LIMIT: usize = 100;
+// per query we can have this many peers, so the total peers waiting can be QUERY_LIMIT * MAX_WAITING_PEERS_PER_QUERY
+pub(crate) const MAX_WAITING_PEERS_PER_QUERY: usize = 25;
+
 // Store up to 100 in use backoffs
 pub(crate) type AeBackoffCache =
     Arc<RwLock<LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>>>;
@@ -114,7 +119,7 @@ pub(crate) struct Core {
     pub(super) data_storage: DataStorage,
     capacity: Capacity,
     liveness: Liveness,
-    pending_data_queries: Arc<Cache<OperationId, Peer>>,
+    pending_data_queries: Arc<Cache<OperationId, Vec<Peer>>>,
     ae_backoff_cache: AeBackoffCache,
 }
 
