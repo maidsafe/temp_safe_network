@@ -55,7 +55,7 @@ pub async fn new_safe_instance() -> Result<Safe> {
     };
 
     let bootstrap_contacts = get_bootstrap_contacts()?;
-    let safe = Safe::connect(bootstrap_contacts, Some(credentials), None, None, None).await?;
+    let safe = Safe::connected(bootstrap_contacts, Some(credentials), None, None, None).await?;
 
     Ok(safe)
 }

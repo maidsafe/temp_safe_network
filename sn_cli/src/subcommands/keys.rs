@@ -42,11 +42,7 @@ pub enum KeysSubCommands {
     },
 }
 
-pub async fn key_commander(
-    cmd: KeysSubCommands,
-    output_fmt: OutputFmt,
-    safe: &mut Safe,
-) -> Result<()> {
+pub async fn key_commander(cmd: KeysSubCommands, output_fmt: OutputFmt, safe: &Safe) -> Result<()> {
     match cmd {
         KeysSubCommands::Show { show_sk, keyurl } => {
             if let Some(url) = keyurl {
@@ -168,7 +164,7 @@ pub fn keypair_to_hex_strings(keypair: &Keypair) -> Result<(String, String)> {
 }
 
 #[cfg(feature = "testing")]
-pub async fn create_new_key(safe: &mut Safe) -> Result<(String, Keypair)> {
+pub async fn create_new_key(safe: &Safe) -> Result<(String, Keypair)> {
     // '--pay-with' is either a Wallet XOR-URL, or a secret key
     let key_pair = safe.generate_random_ed_keypair();
 

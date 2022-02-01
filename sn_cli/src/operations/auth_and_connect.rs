@@ -70,16 +70,9 @@ pub async fn connect(
     let client_cfg = client_config_path();
 
     let safe = if dry_run {
-        Safe::dry_runner(
-            bootstrap_contacts,
-            app_keypair,
-            client_cfg.as_deref(),
-            xorurl_base,
-            timeout,
-        )
-        .await?
+        Safe::dry_runner(xorurl_base)
     } else {
-        match Safe::connect(
+        match Safe::connected(
             bootstrap_contacts.clone(),
             app_keypair.clone(),
             client_cfg.as_deref(),
@@ -91,7 +84,7 @@ pub async fn connect(
             Ok(safe) => safe,
             Err(_) if found_app_keypair => {
                 warn!("Credentials found for CLI are invalid, connecting with read-only access...");
-                Safe::connect(bootstrap_contacts, None, None, xorurl_base, timeout)
+                Safe::connected(bootstrap_contacts, None, None, xorurl_base, timeout)
                     .await
                     .wrap_err("Failed to connect with read-only access")?
             }

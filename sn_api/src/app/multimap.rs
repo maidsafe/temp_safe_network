@@ -12,6 +12,7 @@ use crate::safeurl::{ContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe};
 
 use log::debug;
+use rand::Rng;
 use safe_network::types::DataAddress;
 use std::collections::BTreeSet;
 use xor_name::XorName;
@@ -99,14 +100,15 @@ impl Safe {
             }
         };
 
-        let (entry_hash, op_batch) = self
-            .client
-            .write_to_register(address, data, replace)
-            .await?;
-
-        if !self.dry_run_mode {
-            self.client.publish_register_ops(op_batch).await?;
+        if self.dry_run_mode {
+            return Ok(EntryHash(rand::thread_rng().gen::<[u8; 32]>()));
         }
+
+        let client = self.get_safe_client()?;
+
+        let (entry_hash, op_batch) = client.write_to_register(address, data, replace).await?;
+
+        client.publish_register_ops(op_batch).await?;
 
         Ok(entry_hash)
     }
@@ -132,14 +134,18 @@ impl Safe {
                 )))
             }
         };
-        let (entry_hash, op_batch) = self
-            .client
+
+        if self.dry_run_mode {
+            return Ok(EntryHash(rand::thread_rng().gen::<[u8; 32]>()));
+        }
+
+        let client = self.get_safe_client()?;
+
+        let (entry_hash, op_batch) = client
             .write_to_register(address, MULTIMAP_REMOVED_MARK.to_vec(), to_remove)
             .await?;
 
-        if !self.dry_run_mode {
-            self.client.publish_register_ops(op_batch).await?;
-        }
+        client.publish_register_ops(op_batch).await?;
 
         Ok(entry_hash)
     }

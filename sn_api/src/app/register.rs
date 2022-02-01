@@ -12,6 +12,7 @@ use crate::safeurl::{ContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe};
 
 use log::debug;
+use rand::Rng;
 use safe_network::{
     client::Error as ClientError,
     types::{
@@ -28,13 +29,10 @@ use xor_name::XorName;
 impl Safe {
     // === Register data operations ===
     /// Create a Register on the network
-    /// Returns a register operation batch that can be used to apply changes on the network.
-    /// Nothing is sent to the network, without applying the batch, it's pretty much a dry run.
     pub async fn register_create(
         &self,
         name: Option<XorName>,
         tag: u64,
-        //_permissions: Option<String>,
         private: bool,
         content_type: ContentType,
     ) -> Result<XorUrl> {
@@ -47,6 +45,7 @@ impl Safe {
         );
 
         let xorname = name.unwrap_or_else(rand::random);
+        info!("Xorname for new Register storage: {:?}", &xorname);
 
         let scope = if private {
             Scope::Private
@@ -54,46 +53,35 @@ impl Safe {
             Scope::Public
         };
 
-        // return early if dry_run_mode
-        if self.dry_run_mode {
-            return Ok(SafeUrl::encode_register(
-                xorname,
-                tag,
-                scope,
-                content_type,
-                self.xorurl_base,
-            )?);
-        }
-
-        info!("Xorname for new Register storage: {:?}", &xorname);
-
-        // The Register's owner will be the client's public key
-        let my_pk = User::Key(self.client.public_key());
-
-        let create = |policy| async {
-            self.client
-                .create_register(xorname, tag, policy)
-                .await
-                .map_err(|e| {
-                    Error::NetDataError(format!(
-                        "Failed to prepare store Private Register operation: {:?}",
-                        e
-                    ))
-                })
-        };
-
-        // Store the Register on the network
-        let (_, op_batch) = if private {
-            create(private_policy(my_pk)).await?
-        } else {
-            // Set write permissions to this application
-            let user_app = my_pk;
-            create(public_policy(user_app)).await?
-        };
-
         let xorurl = SafeUrl::encode_register(xorname, tag, scope, content_type, self.xorurl_base)?;
 
-        self.client.publish_register_ops(op_batch).await?;
+        // return early if dry_run_mode
+        if self.dry_run_mode {
+            return Ok(xorurl);
+        }
+
+        // The Register's owner will be the client's public key
+        let client = self.get_safe_client()?;
+        let my_pk = User::Key(client.public_key());
+
+        // Store the Register on the network
+        let policy = if private {
+            private_policy(my_pk)
+        } else {
+            public_policy(my_pk)
+        };
+
+        let (_, op_batch) = client
+            .create_register(xorname, tag, policy)
+            .await
+            .map_err(|e| {
+                Error::NetDataError(format!(
+                    "Failed to prepare store Private Register operation: {:?}",
+                    e
+                ))
+            })?;
+
+        client.publish_register_ops(op_batch).await?;
 
         Ok(xorurl)
     }
@@ -133,7 +121,8 @@ impl Safe {
             None => {
                 debug!("No version so take latest entry from Register at: {}", url);
                 let address = self.get_register_address(url)?;
-                self.client.read_register(address).await.map_err(|err| {
+                let client = self.get_safe_client()?;
+                client.read_register(address).await.map_err(|err| {
                     if let ClientError::NetworkDataError(SafeNdError::NoSuchEntry) = err {
                         Error::EmptyContent(format!("Empty Register found at {:?}", address))
                     } else {
@@ -172,7 +161,8 @@ impl Safe {
         // TODO: allow to specify the hash with the SafeUrl as well: safeurl.content_hash(),
         // e.g. safe://mysafeurl#ce56a3504c8f27bfeb13bdf9051c2e91409230ea
         let address = self.get_register_address(url)?;
-        self.client
+        let client = self.get_safe_client()?;
+        client
             .get_register_entry(address, hash)
             .await
             .map_err(|err| {
@@ -201,14 +191,14 @@ impl Safe {
     ) -> Result<EntryHash> {
         let reg_url = self.parse_and_resolve_url(url).await?;
         let address = self.get_register_address(&reg_url)?;
-        let (entry_hash, op_batch) = self
-            .client
-            .write_to_register(address, entry, parents)
-            .await?;
-
-        if !self.dry_run_mode {
-            self.client.publish_register_ops(op_batch).await?;
+        if self.dry_run_mode {
+            return Ok(EntryHash(rand::thread_rng().gen::<[u8; 32]>()));
         }
+
+        let client = self.get_safe_client()?;
+        let (entry_hash, op_batch) = client.write_to_register(address, entry, parents).await?;
+
+        client.publish_register_ops(op_batch).await?;
 
         Ok(entry_hash)
     }

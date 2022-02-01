@@ -395,7 +395,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_associate() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         // let's create an empty files container so we have a valid to link
         let (link, _, _) = safe
@@ -433,7 +433,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_add_or_remove_with_versioned_target() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         // let's create an empty files container so we have a valid to link
         let (link, _, _) = safe
@@ -497,7 +497,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_remove_one_of_two() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         // let's create an empty files container so we have a valid to link
         let (link, _, _) = safe
@@ -556,7 +556,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_remove_default() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         // let's create an empty files container so we have a valid to link
         let (link, _, _) = safe
@@ -611,7 +611,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_conflicting_names() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         // let's create an empty files container so we have a valid to link
         let (link, _, _) = safe

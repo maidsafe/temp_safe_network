@@ -29,7 +29,7 @@ pub struct CatCommands {
     hexdump: bool,
 }
 
-pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &mut Safe) -> Result<()> {
+pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe) -> Result<()> {
     let url = get_from_arg_or_stdin(cmd.location, None)?;
     debug!("Running cat for: {:?}", &url);
 

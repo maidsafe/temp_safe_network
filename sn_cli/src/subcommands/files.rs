@@ -202,7 +202,7 @@ pub enum FilesSubCommands {
 pub async fn files_commander(
     cmd: FilesSubCommands,
     output_fmt: OutputFmt,
-    safe: &mut Safe,
+    safe: &Safe,
 ) -> Result<()> {
     match cmd {
         FilesSubCommands::Put {
@@ -415,7 +415,7 @@ pub async fn files_commander(
 
 // processes the `safe files tree` command.
 async fn process_tree_command(
-    safe: &mut Safe,
+    safe: &Safe,
     target: Option<XorUrl>,
     details: bool,
     output_fmt: OutputFmt,
