@@ -16,7 +16,7 @@ mod register;
 
 pub use self::{
     cmd::DataCmd,
-    data_exchange::{DataExchange, RegisterStoreExport, ReplicatedRegisterLog, StorageLevel},
+    data_exchange::{MetadataExchange, RegisterStoreExport, ReplicatedRegisterLog, StorageLevel},
     errors::{Error, Result},
     query::DataQuery,
     register::{

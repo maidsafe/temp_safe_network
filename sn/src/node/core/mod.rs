@@ -226,7 +226,7 @@ impl Core {
     }
 
     /// Generate commands and fire events based upon any node state changes.
-    pub(crate) async fn update_self_for_new_node_state_and_fire_events(
+    pub(crate) async fn update_self_for_new_node_state(
         &self,
         old: StateSnapshot,
     ) -> Result<Vec<Command>> {
@@ -313,7 +313,7 @@ impl Core {
                 }
             } else {
                 commands.extend(
-                    self.send_data_updates_to(
+                    self.send_metadata_updates_to(
                         self.network_knowledge.prefix().await,
                         self.network_knowledge
                             .authority_provider()
@@ -331,7 +331,7 @@ impl Core {
             };
 
             commands.extend(
-                self.send_data_updates_to(
+                self.send_metadata_updates_to(
                     self.network_knowledge.prefix().await,
                     self.network_knowledge
                         .authority_provider()
