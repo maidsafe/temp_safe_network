@@ -15,7 +15,7 @@ use crate::{
         system::{NodeCmd, NodeQuery, SystemMsg},
         AuthorityProof, EndUser, MsgId, ServiceAuth,
     },
-    node::{error::convert_to_error_msg, Error, Result},
+    node::{core::MAX_WAITING_PEERS_PER_QUERY, error::convert_to_error_msg, Error, Result},
     peer::Peer,
     types::{log_markers::LogMarker, PublicKey, ReplicatedData, ReplicatedDataAddress},
 };
@@ -81,17 +81,36 @@ impl Core {
             let _existed = fresh_targets.insert(target);
         }
 
-        let overwrote = self
+        let mut already_waiting_on_response = false;
+        let mut this_peer_already_waiting_on_response = false;
+        let waiting_peers = if let Some(peers) = self.pending_data_queries.get(&operation_id).await
+        {
+            already_waiting_on_response = true;
+            this_peer_already_waiting_on_response = peers.contains(&origin.clone());
+            peers
+        } else {
+            vec![origin.clone()]
+        };
+
+        if this_peer_already_waiting_on_response {
+            // no need to add to pending queue then
+            return Ok(vec![]);
+        }
+
+        // drop if we exceed
+        if waiting_peers.len() > MAX_WAITING_PEERS_PER_QUERY {
+            warn!("Dropping query from {origin:?}, there are more than {MAX_WAITING_PEERS_PER_QUERY} waiting already");
+            return Ok(vec![]);
+        }
+
+        let _prior_value = self
             .pending_data_queries
-            .set(operation_id, origin.clone(), None)
+            .set(operation_id, waiting_peers, None)
             .await;
-        if let Some(overwrote) = overwrote {
-            // Since `XorName` is a 256 bit value, we consider the probability negligible, but warn
-            // anyway so we're not totally lost if it does happen.
-            warn!(
-                "Overwrote an existing pending data query for {:?} from {} - what are the chances?",
-                operation_id, overwrote
-            );
+
+        if already_waiting_on_response {
+            // no need to send query again.
+            return Ok(vec![]);
         }
 
         let msg = SystemMsg::NodeQuery(NodeQuery::Data {

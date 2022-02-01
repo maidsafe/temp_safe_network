@@ -29,7 +29,7 @@ use crate::messaging::{
 };
 use crate::node::{
     api::cmds::Cmd,
-    core::{Core, DkgSessionInfo},
+    core::{Core, DkgSessionInfo, DATA_QUERY_LIMIT},
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::NetworkKnowledge,
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
@@ -42,11 +42,6 @@ use bytes::Bytes;
 use ed25519_dalek::Signer;
 use std::collections::BTreeSet;
 use xor_name::XorName;
-
-// this doesn't realistically limit concurrency
-// the prioritisation will do that, preventing lower prio messages being kicked off when
-// high prio messages exist
-const QUERY_LIMIT: usize = 1000;
 
 // Message handling
 impl Core {
@@ -216,14 +211,14 @@ impl Core {
                     // we have a query, check if we have too many on the go....
                     let pending_query_length = self.pending_data_queries.len().await;
 
-                    if pending_query_length > QUERY_LIMIT {
+                    if pending_query_length > DATA_QUERY_LIMIT {
                         // TODO: check if query is pending for this already.. add to that if that makes sense.
                         warn!("Pending queries length exceeded, dropping query {msg:?}");
                         return Ok(vec![]);
                     }
                 }
 
-                // First we perform AE checks
+                // Then we perform AE checks
                 let received_section_pk = match dst_location.section_pk() {
                     Some(section_pk) => section_pk,
                     None => {
