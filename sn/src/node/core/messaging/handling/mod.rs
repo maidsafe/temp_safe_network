@@ -697,6 +697,14 @@ impl Node {
                     Ok(vec![])
                 };
             }
+            SystemMsg::NodeEvent(NodeEvent::DeviantsDetected(deviants)) => {
+                info!(
+                    "Received probable deviants nodes {deviants:?} Starting active data replication"
+                );
+                debug!("{}", LogMarker::DeviantsDetected);
+
+                return self.republish_data_for_deviant_nodes(deviants).await;
+            }
             SystemMsg::NodeCmd(NodeCmd::ReplicateData(data)) => {
                 info!("ReplicateData MsgId: {:?}", msg_id);
                 return if self.is_elder().await {
@@ -736,13 +744,6 @@ impl Node {
                         }
                     }
                 };
-            }
-            SystemMsg::NodeCmd(NodeEvent::DeviantsDetected(deviants)) => {
-                info!(
-                    "Received probable deviants nodes {deviants:?} Starting active data replication"
-                );
-
-                return self.republish_data_for_deviant_nodes(deviants).await;
             }
             SystemMsg::NodeCmd(node_cmd) => {
                 self.send_event(Event::MessageReceived {

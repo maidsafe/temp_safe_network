@@ -105,8 +105,10 @@ impl Node {
             }
         };
 
+        let (unresponsives, deviants) = self.liveness.find_unresponsive_and_deviant_nodes().await;
+
         // Check for unresponsive adults here.
-        for (name, count) in self.liveness.find_unresponsive_nodes().await {
+        for (name, count) in unresponsives {
             warn!(
                 "Node {} has {} pending ops. It might be unresponsive",
                 name, count
@@ -114,25 +116,26 @@ impl Node {
             cmds.push(Cmd::ProposeOffline(name));
         }
 
-        let deviants = self.liveness.check_for_active_replication().await;
-        warn!("{deviants:?} have crossed active replication threshold. Triggering active data replication");
+        if !deviants.is_empty() {
+            warn!("{deviants:?} have crossed active replication threshold. Triggering active data replication");
 
-        let our_adults = self.network_knowledge.adults().await;
-        let valid_adults = our_adults
-            .iter()
-            .filter(|peer| !deviants.contains(&peer.name()))
-            .cloned()
-            .collect::<Vec<Peer>>();
+            let our_adults = self.network_knowledge.adults().await;
+            let valid_adults = our_adults
+                .iter()
+                .filter(|peer| !deviants.contains(&peer.name()))
+                .cloned()
+                .collect::<Vec<Peer>>();
 
-        for adult in valid_adults {
-            commands.push(Command::PrepareNodeMsgToSend {
-                msg: SystemMsg::NodeCmd(NodeEvent::DeviantsDetected(deviants.clone())),
-                dst: DstLocation::Node {
-                    name: adult.name(),
-                    section_pk: *self.section_chain().await.last_key(),
-                },
-            });
-            debug!("{:?}", LogMarker::SendDeviantsDetected);
+            for adult in valid_adults {
+                commands.push(Command::PrepareNodeMsgToSendToNodes {
+                    msg: SystemMsg::NodeEvent(NodeEvent::DeviantsDetected(deviants.clone())),
+                    dst: DstLocation::Node {
+                        name: adult.name(),
+                        section_pk: *self.section_chain().await.last_key(),
+                    },
+                });
+                debug!("{:?}", LogMarker::SendDeviantsDetected);
+            }
         }
 
         if !pending_removed {
