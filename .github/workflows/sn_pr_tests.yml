@@ -329,7 +329,7 @@ jobs:
           # Upload artifacts.
         uses: actions/upload-artifact@v2
         with:
-          name: ${{github.job.name}}_sn_node_logs_${{matrix.os}}
+          name: sn_node_logs_e2e_${{matrix.os}}
           path: ~/.safe/node/local-test-network/**/*.log*
         if: failure()
         continue-on-error: true
@@ -487,7 +487,7 @@ jobs:
           # Upload artifacts.
         uses: actions/upload-artifact@v2
         with:
-          name: ${{github.job.name}}_sn_node_logs_${{matrix.os}}
+          name: sn_node_logs_e2e_split_${{matrix.os}}
           path: ~/.safe/node/local-test-network/**/*.log*
         if: failure()
         continue-on-error: true
@@ -602,7 +602,7 @@ jobs:
           # Upload artifacts.
         uses: actions/upload-artifact@v2
         with:
-          name: ${{github.job.name}}_sn_node_logs_${{matrix.os}}
+          name: sn_node_logs_api_${{matrix.os}}
           path: ~/.safe/node/local-test-network/**/*.log*
         if: failure()
         continue-on-error: true
@@ -708,7 +708,7 @@ jobs:
           # Upload artifacts.
         uses: actions/upload-artifact@v2
         with:
-          name: ${{github.job.name}}_sn_node_logs_${{matrix.os}}
+          name: sn_node_logs_cli_${{matrix.os}}
           path: ~/.safe/node/local-test-network/**/*.log*
         if: failure()
         continue-on-error: true
