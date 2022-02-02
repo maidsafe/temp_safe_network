@@ -49,11 +49,6 @@ pub fn validate_nrs_url(link: &SafeUrl) -> Result<()> {
 }
 
 impl Safe {
-    pub fn parse_url(url: &str) -> Result<SafeUrl> {
-        let safe_url = SafeUrl::from_url(&sanitised_url(url))?;
-        Ok(safe_url)
-    }
-
     /// # Creates a nrs_map_container for a chosen top name
     /// ```no_run
     /// safe://<subName>.<topName>/path/to/whatever?var=value
@@ -67,9 +62,10 @@ impl Safe {
     pub async fn nrs_create(&self, top_name: &str) -> Result<SafeUrl> {
         info!("Creating an NRS map for: {}", top_name);
 
-        let url_str = validate_nrs_top_name(top_name)?;
-        let nrs_xorname = SafeUrl::from_nrsurl(&url_str)?.xorname();
-        debug!("XorName for \"{:?}\" is \"{:?}\"", &url_str, &nrs_xorname);
+        let mut nrs_url = validate_nrs_top_name(top_name)?;
+        nrs_url.set_content_type(ContentType::NrsMapContainer)?;
+        let nrs_xorname = SafeUrl::from_nrsurl(&nrs_url.to_string())?.xorname();
+        debug!("XorName for \"{:?}\" is \"{:?}\"", &nrs_url, &nrs_xorname);
         if self.nrs_get_subnames_map(top_name, None).await.is_ok() {
             return Err(Error::NrsNameAlreadyExists(top_name.to_owned()));
         }
@@ -78,9 +74,7 @@ impl Safe {
             .multimap_create(Some(nrs_xorname), NRS_MAP_TYPE_TAG, false)
             .await?;
 
-        let mut url = SafeUrl::from_url(&url_str)?;
-        url.set_content_type(ContentType::NrsMapContainer)?;
-        Ok(url)
+        Ok(nrs_url)
     }
 
     /// # Associates a public name to a link
@@ -101,12 +95,11 @@ impl Safe {
             public_name, link
         );
 
-        let url_str = validate_nrs_public_name(public_name)?;
+        let mut url = validate_nrs_public_name(public_name)?;
         validate_nrs_url(link)?;
 
-        let safe_url = Safe::parse_url(public_name)?;
         let current_versions = self
-            .fetch_multimap_values_by_key(&safe_url, public_name.as_bytes())
+            .fetch_multimap_values_by_key(&url, public_name.as_bytes())
             .await?
             .into_iter()
             .map(|(hash, _)| hash)
@@ -117,10 +110,10 @@ impl Safe {
             link.to_string().as_bytes().to_vec(),
         );
         let entry_hash = self
-            .multimap_insert(&url_str, entry, current_versions)
+            .multimap_insert(&url.to_string(), entry, current_versions)
             .await?;
-
-        Ok(get_versioned_nrs_url(url_str, entry_hash)?)
+        set_nrs_url_props(&mut url, entry_hash)?;
+        Ok(url)
     }
 
     /// # Associates any public name to a link
@@ -135,9 +128,8 @@ impl Safe {
             public_name, link
         );
 
-        let sanitised_url = sanitised_url(public_name);
-        let safe_url = Safe::parse_url(&sanitised_url)?;
-        let top_name = safe_url.top_name();
+        let url = validate_nrs_public_name(public_name)?;
+        let top_name = url.top_name();
         let creation_result = self.nrs_create(top_name).await;
         let did_register_topname = match creation_result {
             Ok(_) => Ok(true),
@@ -167,18 +159,19 @@ impl Safe {
             public_name
         );
 
-        let url_str = validate_nrs_public_name(public_name)?;
-
-        let safe_url = Safe::parse_url(public_name)?;
+        let mut url = validate_nrs_public_name(public_name)?;
         let current_versions = self
-            .fetch_multimap_values_by_key(&safe_url, public_name.as_bytes())
+            .fetch_multimap_values_by_key(&url, public_name.as_bytes())
             .await?
             .into_iter()
             .map(|(hash, _)| hash)
             .collect();
 
-        let entry_hash = self.multimap_remove(&url_str, current_versions).await?;
-        Ok(get_versioned_nrs_url(url_str, entry_hash)?)
+        let entry_hash = self
+            .multimap_remove(&url.to_string(), current_versions)
+            .await?;
+        set_nrs_url_props(&mut url, entry_hash)?;
+        Ok(url)
     }
 
     /// # Gets a public name's associated link
@@ -211,7 +204,7 @@ impl Safe {
             Err(Error::ConflictingNrsEntries(str, conflicting_entries, map)) => {
                 if conflicting_entries
                     .iter()
-                    .any(|(sub, _)| sub == &public_name)
+                    .any(|(sub, _)| sub == public_name)
                 {
                     Err(Error::ConflictingNrsEntries(str, conflicting_entries, map))
                 } else {
@@ -231,13 +224,13 @@ impl Safe {
         public_name: &str,
         version: Option<VersionHash>,
     ) -> Result<NrsMap> {
-        let safe_url = Safe::parse_url(public_name)?;
-        let mut multimap = match self.fetch_multimap(&safe_url).await {
+        let url = get_url_from_name(public_name)?;
+        let mut multimap = match self.fetch_multimap(&url).await {
             Ok(s) => Ok(s),
             Err(Error::EmptyContent(_)) => Ok(BTreeSet::new()),
             Err(Error::ContentNotFound(e)) => Err(Error::ContentNotFound(format!(
                 "No Nrs Map entry found at {}: {}",
-                safe_url, e
+                url, e
             ))),
             Err(e) => Err(Error::NetDataError(format!(
                 "Failed to get Nrs Map entries: {}",
@@ -251,7 +244,7 @@ impl Safe {
                 .any(|(h, _)| VersionHash::from(h) == version)
             {
                 let key_val = self
-                    .fetch_multimap_value_by_hash(&safe_url, version.entry_hash())
+                    .fetch_multimap_value_by_hash(&url, version.entry_hash())
                     .await?;
                 multimap.insert((version.entry_hash(), key_val));
             }
@@ -311,41 +304,41 @@ fn convert_multimap_to_nrs_map(multimap: &Multimap) -> Result<NrsMap> {
     Ok(nrs_map)
 }
 
-// Makes a versionned Nrs Map Container SafeUrl from a SafeUrl and EntryHash
-fn get_versioned_nrs_url(url: String, entry_hash: EntryHash) -> Result<SafeUrl> {
-    let mut url = SafeUrl::from_url(&url)?;
+fn set_nrs_url_props(url: &mut SafeUrl, entry_hash: EntryHash) -> Result<()> {
     url.set_content_version(Some(VersionHash::from(&entry_hash)));
     url.set_content_type(ContentType::NrsMapContainer)?;
+    Ok(())
+}
+
+fn validate_nrs_top_name(top_name: &str) -> Result<SafeUrl> {
+    let url = get_url_from_name(top_name)?;
+    if url.top_name() != top_name {
+        return Err(Error::InvalidInput(format!(
+            "The NRS top name \"{}\" is invalid because it contains url parts. Please \
+                remove any path, version or subnames.",
+            top_name
+        )));
+    }
     Ok(url)
 }
 
-// Checks top_name for invalid content, returns a sanitised url: "safe://<top_name>"
-fn validate_nrs_top_name(top_name: &str) -> Result<String> {
-    let sanitised_url = sanitised_url(top_name);
-    let safe_url = Safe::parse_url(&sanitised_url)?;
-    if safe_url.top_name() != top_name {
-        return Err(Error::InvalidInput(
-            format!("The NRS top name \"{}\" is invalid because it contains url parts. Please remove any path, version or subnames.", top_name)
-        ));
+fn validate_nrs_public_name(public_name: &str) -> Result<SafeUrl> {
+    let url = get_url_from_name(public_name)?;
+    if url.public_name() != public_name {
+        return Err(Error::InvalidInput(format!(
+            "The NRS public name \"{}\" is invalid because it contains url parts. Please \
+                remove any path or version.",
+            public_name
+        )));
     }
-    Ok(sanitised_url)
+    Ok(url)
 }
 
-// Checks public_name for invalid content, returns a sanitised url: "safe://<public_name>"
-fn validate_nrs_public_name(public_name: &str) -> Result<String> {
-    let sanitised_url = sanitised_url(public_name);
-    let safe_url = Safe::parse_url(&sanitised_url)?;
-    if safe_url.public_name() != public_name {
-        return Err(Error::InvalidInput(
-            format!("The NRS public name \"{}\" is invalid because it contains url parts. Please remove any path or version.", public_name)
-        ));
+fn get_url_from_name(name: &str) -> Result<SafeUrl> {
+    if !name.starts_with("safe://") {
+        return Ok(SafeUrl::from_url(&format!("safe://{}", name))?);
     }
-    Ok(sanitised_url)
-}
-
-// Makes sure there’s a (and only one) "safe://" in front of input name
-fn sanitised_url(name: &str) -> String {
-    format!("safe://{}", name.strip_prefix("safe://").unwrap_or(name))
+    Ok(SafeUrl::from_url(name)?)
 }
 
 #[cfg(test)]
@@ -408,7 +401,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_associate_with_topname() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         let (container_link, _, _) = safe
             .files_container_create_from("./testdata", None, false, false)
@@ -435,7 +428,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_associate_with_subname() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         let (_, _, files_map) = safe
             .files_container_create_from("./testdata", None, false, false)
@@ -446,11 +439,11 @@ mod tests {
         let test_file_link = test_file_info
             .get("link")
             .ok_or_else(|| anyhow!("could not retrieve file link"))?;
-        let test_file_url = SafeUrl::from_url(&test_file_link)?;
+        let test_file_url = SafeUrl::from_url(test_file_link)?;
         let public_name = &format!("test.{site_name}");
 
         safe.nrs_create(&site_name).await?;
-        let url = safe.nrs_associate(&public_name, &test_file_url).await?;
+        let url = safe.nrs_associate(public_name, &test_file_url).await?;
 
         assert_eq!(url.public_name(), public_name);
         assert!(url.content_version().is_some());
@@ -471,7 +464,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_associate_with_multiple_subnames() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         let (_, _, files_map) = safe
             .files_container_create_from("./testdata", None, false, false)
@@ -482,14 +475,14 @@ mod tests {
         let test_file_link = test_file_info
             .get("link")
             .ok_or_else(|| anyhow!("could not retrieve file link"))?;
-        let test_file_url = SafeUrl::from_url(&test_file_link)?;
+        let test_file_url = SafeUrl::from_url(test_file_link)?;
         let another_file_info = files_map
             .get("/testdata/another.md")
             .ok_or_else(|| anyhow!("could not retrieve another.md from files map"))?;
         let another_file_link = another_file_info
             .get("link")
             .ok_or_else(|| anyhow!("could not retrieve file link"))?;
-        let another_file_url = SafeUrl::from_url(&another_file_link)?;
+        let another_file_url = SafeUrl::from_url(another_file_link)?;
 
         safe.nrs_create(&site_name).await?;
         safe.nrs_associate(&format!("test.{site_name}"), &test_file_url)
@@ -525,7 +518,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_associate_with_non_versioned_files_container_link() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         let (container_url, _, _) = safe
             .files_container_create_from("./testdata", None, false, false)
@@ -535,14 +528,12 @@ mod tests {
         let public_name = &format!("test.{site_name}");
 
         safe.nrs_create(&site_name).await?;
-        let result = safe.nrs_associate(&public_name, &url).await;
+        let result = safe.nrs_associate(public_name, &url).await;
         assert!(result.is_err());
         assert_eq!(
             format!("{}", result.unwrap_err()),
-            format!(
-                "UnversionedContentError: FilesContainer content is versionable. NRS requires the \
-                supplied link to specify a version hash."
-            )
+            "UnversionedContentError: FilesContainer content is versionable. NRS requires the \
+            supplied link to specify a version hash."
         );
 
         Ok(())
@@ -557,14 +548,12 @@ mod tests {
         let mut nrs_container_url = safe.nrs_create(&site_name).await?;
         nrs_container_url.set_content_version(None);
 
-        let result = safe.nrs_associate(&public_name, &nrs_container_url).await;
+        let result = safe.nrs_associate(public_name, &nrs_container_url).await;
         assert!(result.is_err());
         assert_eq!(
             format!("{}", result.unwrap_err()),
-            format!(
-                "UnversionedContentError: NrsMapContainer content is versionable. NRS requires the \
-                supplied link to specify a version hash."
-            )
+            "UnversionedContentError: NrsMapContainer content is versionable. NRS requires the \
+            supplied link to specify a version hash."
         );
 
         Ok(())
@@ -587,10 +576,8 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(
             format!("{}", result.unwrap_err()),
-            format!(
-                "UnversionedContentError: Register content is versionable. NRS requires the \
-                supplied link to specify a version hash."
-            )
+            "UnversionedContentError: Register content is versionable. NRS requires the \
+            supplied link to specify a version hash."
         );
 
         Ok(())
@@ -599,7 +586,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_associate_with_invalid_url() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         let (_, _, files_map) = safe
             .files_container_create_from("./testdata", None, false, false)
@@ -610,11 +597,11 @@ mod tests {
         let test_file_link = test_file_info
             .get("link")
             .ok_or_else(|| anyhow!("could not retrieve file link"))?;
-        let test_file_url = SafeUrl::from_url(&test_file_link)?;
+        let test_file_url = SafeUrl::from_url(test_file_link)?;
         let public_name = &format!("test./{site_name}");
 
         safe.nrs_create(&site_name).await?;
-        let result = safe.nrs_associate(&public_name, &test_file_url).await;
+        let result = safe.nrs_associate(public_name, &test_file_url).await;
         assert!(result.is_err());
         assert_eq!(
             format!("{}", result.unwrap_err()),
@@ -632,7 +619,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_add_with_subname() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         let (_, _, files_map) = safe
             .files_container_create_from("./testdata", None, false, false)
@@ -643,10 +630,10 @@ mod tests {
         let test_file_link = test_file_info
             .get("link")
             .ok_or_else(|| anyhow!("could not retrieve file link"))?;
-        let test_file_url = SafeUrl::from_url(&test_file_link)?;
+        let test_file_url = SafeUrl::from_url(test_file_link)?;
         let public_name = &format!("test.{site_name}");
 
-        let (_, topname_registered) = safe.nrs_add(&public_name, &test_file_url).await?;
+        let (_, topname_registered) = safe.nrs_add(public_name, &test_file_url).await?;
         assert!(topname_registered);
 
         let nrs_map = safe.nrs_get_subnames_map(&site_name, None).await?;
@@ -663,7 +650,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_remove_with_subname() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         let (_, _, files_map) = safe
             .files_container_create_from("./testdata", None, false, false)
@@ -674,14 +661,14 @@ mod tests {
         let test_file_link = test_file_info
             .get("link")
             .ok_or_else(|| anyhow!("could not retrieve file link"))?;
-        let test_file_url = SafeUrl::from_url(&test_file_link)?;
+        let test_file_url = SafeUrl::from_url(test_file_link)?;
         let another_file_info = files_map
             .get("/testdata/another.md")
             .ok_or_else(|| anyhow!("could not retrieve another.md from files map"))?;
         let another_file_link = another_file_info
             .get("link")
             .ok_or_else(|| anyhow!("could not retrieve file link"))?;
-        let another_file_url = SafeUrl::from_url(&another_file_link)?;
+        let another_file_url = SafeUrl::from_url(another_file_link)?;
 
         safe.nrs_create(&site_name).await?;
         safe.nrs_associate(&format!("test.{site_name}"), &test_file_url)
@@ -712,7 +699,7 @@ mod tests {
     #[tokio::test]
     async fn test_nrs_remove_with_topname() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         let (container_link, _, _) = safe
             .files_container_create_from("./testdata", None, false, false)
@@ -734,17 +721,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_nrs_no_scheme() -> Result<()> {
-        let site_name = random_nrs_name();
-        let url = Safe::parse_url(&site_name)?;
-        assert_eq!(url.public_name(), site_name);
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn test_nrs_conflicting_names() -> Result<()> {
         let site_name = random_nrs_name();
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
 
         // let's create an empty files container so we have a valid to link
         let (link, _, _) = safe
@@ -776,13 +755,13 @@ mod tests {
 
         // manually add a conflicting name
         let another_valid_url = nrs_url;
-        let url_str = validate_nrs_top_name(&site_name)?;
+        let url = validate_nrs_top_name(&site_name)?;
         let entry = (
             site_name.as_bytes().to_vec(),
             another_valid_url.to_string().as_bytes().to_vec(),
         );
         let _ = safe
-            .multimap_insert(&url_str, entry, BTreeSet::new())
+            .multimap_insert(&url.to_string(), entry, BTreeSet::new())
             .await?;
 
         // get of other name should be ok

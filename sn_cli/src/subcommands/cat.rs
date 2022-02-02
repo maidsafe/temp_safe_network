@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    helpers::{get_from_arg_or_stdin, print_nrs_map, serialise_output},
+    helpers::{get_from_arg_or_stdin, get_target_url, print_nrs_map, serialise_output},
     OutputFmt,
 };
 use color_eyre::{eyre::WrapErr, Result};
@@ -30,17 +30,18 @@ pub struct CatCommands {
 }
 
 pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe) -> Result<()> {
-    let url = get_from_arg_or_stdin(cmd.location, None)?;
-    debug!("Running cat for: {:?}", &url);
+    let link = get_from_arg_or_stdin(cmd.location, None)?;
+    let url = get_target_url(&link)?;
+    debug!("Running cat for: {:?}", &url.to_string());
 
     let mut attempts = 0;
 
-    let mut content = safe.fetch(&url, None).await;
+    let mut content = safe.fetch(&url.to_string(), None).await;
 
     while content.is_err() && attempts < MAX_RETRY_ATTEMPTS {
         trace!("cat attempt #{:?}", attempts);
         sleep(Duration::from_secs(1)).await;
-        content = safe.fetch(&url, None).await;
+        content = safe.fetch(&url.to_string(), None).await;
 
         attempts += 1;
     }
@@ -74,7 +75,10 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
                 });
                 table.printstd();
             } else {
-                println!("{}", serialise_output(&(url, files_map), output_fmt));
+                println!(
+                    "{}",
+                    serialise_output(&(url.to_string(), files_map), output_fmt)
+                );
             }
         }
         SafeData::PublicFile { data, .. } => {
@@ -102,7 +106,10 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
                 println!("{}", msg);
                 print_nrs_map(nrs_map, public_name);
             } else {
-                println!("{}", serialise_output(&(url, nrs_map), output_fmt));
+                println!(
+                    "{}",
+                    serialise_output(&(url.to_string(), nrs_map), output_fmt)
+                );
             }
         }
         SafeData::SafeKey { .. } => {

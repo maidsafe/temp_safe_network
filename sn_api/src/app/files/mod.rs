@@ -253,7 +253,7 @@ impl Safe {
             ));
         }
 
-        let safe_url = Safe::parse_url(url)?;
+        let safe_url = SafeUrl::from_url(url)?;
 
         // If NRS name shall be updated then the URL has to be an NRS-URL
         if update_nrs && safe_url.content_type() != ContentType::NrsMapContainer {
@@ -448,7 +448,7 @@ impl Safe {
         recursive: bool,
         update_nrs: bool,
     ) -> Result<(VersionHash, ProcessedFiles, FilesMap)> {
-        let safe_url = Safe::parse_url(url)?;
+        let safe_url = SafeUrl::from_url(url)?;
         let dst_path = safe_url.path();
         if dst_path.is_empty() {
             return Err(Error::InvalidInput(
@@ -729,7 +729,7 @@ async fn validate_files_add_params(
     url: &str,
     update_nrs: bool,
 ) -> Result<(SafeUrl, Option<VersionHash>, FilesMap)> {
-    let safe_url = Safe::parse_url(url)?;
+    let safe_url = SafeUrl::from_url(url)?;
 
     // If NRS name shall be updated then the URL has to be an NRS-URL
     if update_nrs && safe_url.content_type() != ContentType::NrsMapContainer {
@@ -746,7 +746,7 @@ async fn validate_files_add_params(
 
     // Let's act according to if it's a local file path or a safe:// location
     if source_file.starts_with("safe://") {
-        let source_safe_url = Safe::parse_url(source_file)?;
+        let source_safe_url = SafeUrl::from_url(source_file)?;
         if source_safe_url.data_type() != DataType::File {
             return Err(Error::InvalidInput(format!(
                 "The source URL should target a file ('{}'), but the URL provided targets a '{}'",

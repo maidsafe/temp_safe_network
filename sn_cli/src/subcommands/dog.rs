@@ -7,7 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    helpers::{get_from_arg_or_stdin, print_nrs_map, serialise_output, xorname_to_hex},
+    helpers::{
+        get_from_arg_or_stdin, get_target_url, print_nrs_map, serialise_output, xorname_to_hex,
+    },
     OutputFmt,
 };
 use color_eyre::Result;
@@ -25,12 +27,16 @@ pub struct DogCommands {
 }
 
 pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe) -> Result<()> {
-    let url = get_from_arg_or_stdin(cmd.location, None)?;
+    let link = get_from_arg_or_stdin(cmd.location, None)?;
+    let url = get_target_url(&link)?;
     debug!("Running dog for: {:?}", &url);
 
-    let resolved_content = safe.inspect(&url).await?;
+    let resolved_content = safe.inspect(&url.to_string()).await?;
     if OutputFmt::Pretty != output_fmt {
-        println!("{}", serialise_output(&(url, resolved_content), output_fmt));
+        println!(
+            "{}",
+            serialise_output(&(url.to_string(), resolved_content), output_fmt)
+        );
     } else {
         for (i, ref content) in resolved_content.iter().enumerate() {
             println!();
