@@ -154,7 +154,7 @@ impl Core {
         let section_pk = self.network_knowledge.section_key().await;
         for (_, (data, targets)) in data_for_replication {
             for name in targets {
-                commands.push(Command::PrepareNodeMsgToSend {
+                commands.push(Command::PrepareNodeMsgToSendToNodes {
                     msg: SystemMsg::NodeCmd(NodeCmd::ReplicateData(data.clone())),
                     dst: crate::messaging::DstLocation::Node { name, section_pk },
                 })

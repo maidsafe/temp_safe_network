@@ -46,6 +46,11 @@ impl SrcLocation {
         }
     }
 
+    /// Did this come from an EndUser
+    pub fn is_end_user(&self) -> bool {
+        matches!(self, Self::EndUser(_))
+    }
+
     /// Converts this source location into a [`DstLocation`].
     ///
     /// `EndUser`, `Node`, and `Section` source variants have corresponding destination variants.
