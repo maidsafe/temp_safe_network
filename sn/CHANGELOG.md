@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.55.2 (2022-02-02)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #985 ([`ba572d5`](https://github.com/maidsafe/safe_network/commit/ba572d5f909f5c1dc389b9affadffec39a4e0369))
+    - simplify data replication cmds and flow ([`7f01106`](https://github.com/maidsafe/safe_network/commit/7f01106c8266abec07c9522cb69e4fbbb493f386))
+</details>
+
 ## v0.55.1 (2022-02-01)
 
 ### Bug Fixes
@@ -15,9 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
+ - 4 commits contributed to the release.
  - 3 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -27,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.55.1/sn_api-0.54.0/sn_cli-0.47.0 ([`2ec86e2`](https://github.com/maidsafe/safe_network/commit/2ec86e28246031084d603768ffa1fddf320a10a2))
     - unit test liveness tracker basics ([`25259b2`](https://github.com/maidsafe/safe_network/commit/25259b221120c8c9258ffdfae8883c65ead38677))
     - fix liveness tracking logic and keep track of newly joining adults ([`16bd75a`](https://github.com/maidsafe/safe_network/commit/16bd75af79708f88dcb7086d04fac8475f3b3190))
     - Merge branch 'main' into Chore-ClientImprovement ([`cea6f47`](https://github.com/maidsafe/safe_network/commit/cea6f4718c5aec320279c9abe7f7a54eeecca9ad))
@@ -43,10 +65,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-fa6014e581f52615971701572a1635dfde922fb6/> remove the relocation promise step for Elders
    - Both Adults and Elders now receive the `Relocate` message with all the relocation details
    without any previous or additional steps required to proceed with their relocation.
-- The relocation details are now embedded in the `NodeState`, which is
-     sent to the relocated peer (with section authority) within the Relocate message.
-- `JoinAsRelocatedRequest` always carries the signed relocate details (`relocate_proof`).
-- `JoinAsRelocatedRequest` now contains the signature of the node's new name with its previous key (`signature_over_new_name`)
 
 ### Commit Statistics
 
@@ -77,6 +95,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - make log files rotate properly ([`6aae745`](https://github.com/maidsafe/safe_network/commit/6aae745a4ffd7302fc74d5d548ca464066d5203f))
     - Merge #968 ([`f54ed86`](https://github.com/maidsafe/safe_network/commit/f54ed86b405c8463cd2a79ae9df33f992bd06cec))
 </details>
+
+<csr-unknown>
+The relocation details are now embedded in the NodeState, which issent to the relocated peer (with section authority) within the Relocate message.JoinAsRelocatedRequest always carries the signed relocate details (relocate_proof).JoinAsRelocatedRequest now contains the signature of the node’s new name with its previous key (signature_over_new_name)<csr-unknown/>
 
 ## v0.54.2 (2022-01-25)
 
