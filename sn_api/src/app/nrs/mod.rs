@@ -50,7 +50,7 @@ pub fn validate_nrs_url(link: &SafeUrl) -> Result<()> {
 
 impl Safe {
     /// # Creates a nrs_map_container for a chosen top name
-    /// ```no_run
+    /// ```
     /// safe://<subName>.<topName>/path/to/whatever?var=value
     ///        |-----------------|
     ///            Public Name
@@ -221,7 +221,7 @@ impl Safe {
         public_name: &str,
         version: Option<VersionHash>,
     ) -> Result<NrsMap> {
-        let url = get_url_from_name(public_name)?;
+        let url = SafeUrl::from_url(&format!("safe://{}", public_name))?;
         let mut multimap = match self.fetch_multimap(&url).await {
             Ok(s) => Ok(s),
             Err(Error::EmptyContent(_)) => Ok(BTreeSet::new()),
@@ -308,7 +308,7 @@ fn set_nrs_url_props(url: &mut SafeUrl, entry_hash: EntryHash) -> Result<()> {
 }
 
 fn validate_nrs_top_name(top_name: &str) -> Result<SafeUrl> {
-    let url = get_url_from_name(top_name)?;
+    let url = SafeUrl::from_url(&format!("safe://{}", top_name))?;
     if url.top_name() != top_name {
         return Err(Error::InvalidInput(format!(
             "The NRS top name \"{}\" is invalid because it contains url parts. Please \
@@ -320,7 +320,7 @@ fn validate_nrs_top_name(top_name: &str) -> Result<SafeUrl> {
 }
 
 fn validate_nrs_public_name(public_name: &str) -> Result<SafeUrl> {
-    let url = get_url_from_name(public_name)?;
+    let url = SafeUrl::from_url(&format!("safe://{}", public_name))?;
     if url.public_name() != public_name {
         return Err(Error::InvalidInput(format!(
             "The NRS public name \"{}\" is invalid because it contains url parts. Please \
@@ -329,13 +329,6 @@ fn validate_nrs_public_name(public_name: &str) -> Result<SafeUrl> {
         )));
     }
     Ok(url)
-}
-
-fn get_url_from_name(name: &str) -> Result<SafeUrl> {
-    if !name.starts_with("safe://") {
-        return Ok(SafeUrl::from_url(&format!("safe://{}", name))?);
-    }
-    Ok(SafeUrl::from_url(name)?)
 }
 
 #[cfg(test)]

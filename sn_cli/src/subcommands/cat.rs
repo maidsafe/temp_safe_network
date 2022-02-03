@@ -32,7 +32,7 @@ pub struct CatCommands {
 pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe) -> Result<()> {
     let link = get_from_arg_or_stdin(cmd.location, None)?;
     let url = get_target_url(&link)?;
-    debug!("Running cat for: {:?}", &url.to_string());
+    debug!("Running cat for: {}", &url.to_string());
 
     let mut attempts = 0;
 

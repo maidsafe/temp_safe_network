@@ -235,9 +235,7 @@ pub fn div_or<X: Float>(num: X, den: X, default: X) -> X {
 /// If the user hasn't prefixed the link with `safe://`, we'll do that for them here.
 pub fn get_target_url(link: &str) -> Result<SafeUrl> {
     if !link.starts_with("safe://") {
-        let url = SafeUrl::from_url(&format!("safe://{}", link))?;
-        return Ok(url);
+        return Ok(SafeUrl::from_url(&format!("safe://{}", link))?);
     }
-    let url = SafeUrl::from_url(link)?;
-    Ok(url)
+    Ok(SafeUrl::from_url(link)?)
 }

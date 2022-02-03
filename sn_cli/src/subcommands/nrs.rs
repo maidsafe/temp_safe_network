@@ -79,10 +79,6 @@ async fn run_register_subcommand(
     safe: &Safe,
     output_fmt: OutputFmt,
 ) -> Result<()> {
-    if let Some(ref link) = link {
-        get_target_url(link)?;
-    }
-
     match safe.nrs_create(&name).await {
         Ok(topname_url) => {
             let (nrs_url, summary) =
