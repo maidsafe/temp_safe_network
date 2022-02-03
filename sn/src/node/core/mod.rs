@@ -34,7 +34,7 @@ pub(crate) use relocation::{check as relocation_check, ChurnId};
 use self::{data_storage::DataStorage, split_barrier::SplitBarrier};
 
 use super::{
-    api::command::Command,
+    api::cmds::Cmd,
     dkg::DkgVoter,
     network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider},
     node_info::Node,
@@ -185,7 +185,7 @@ impl Core {
         }
     }
 
-    pub(crate) async fn generate_probe_message(&self) -> Result<Command> {
+    pub(crate) async fn generate_probe_msg(&self) -> Result<Cmd> {
         // Generate a random address not belonging to our Prefix
         let mut dst = XorName::random();
 
@@ -202,12 +202,12 @@ impl Core {
         let recipients = matching_section.elders_vec();
 
         info!(
-            "ProbeMessage target {:?} w/key {:?}",
+            "ProbeMsg target {:?} w/key {:?}",
             matching_section.prefix(),
             section_key
         );
 
-        self.send_direct_message_to_nodes_in_section(recipients, message, dst_name, section_key)
+        self.send_direct_msg_to_nodes_in_section(recipients, message, dst_name, section_key)
             .await
     }
 
@@ -225,12 +225,12 @@ impl Core {
         });
     }
 
-    /// Generate commands and fire events based upon any node state changes.
+    /// Generate cmds and fire events based upon any node state changes.
     pub(crate) async fn update_self_for_new_node_state(
         &self,
         old: StateSnapshot,
-    ) -> Result<Vec<Command>> {
-        let mut commands = vec![];
+    ) -> Result<Vec<Cmd>> {
+        let mut cmds = vec![];
         let new = self.state_snapshot().await;
 
         if new.section_key != old.section_key {
@@ -244,11 +244,11 @@ impl Core {
                 );
 
                 if !self.section_keys_provider.is_empty().await {
-                    commands.extend(self.promote_and_demote_elders().await?);
+                    cmds.extend(self.promote_and_demote_elders().await?);
 
                     // Whenever there is an elders change, casting a round of joins_allowed
                     // proposals to sync.
-                    commands.extend(
+                    cmds.extend(
                         self.propose(Proposal::JoinsAllowed(*self.joins_allowed.read().await))
                             .await?,
                     );
@@ -258,7 +258,7 @@ impl Core {
             }
 
             if new.is_elder || old.is_elder {
-                commands.extend(self.send_ae_update_to_our_section().await);
+                cmds.extend(self.send_ae_update_to_our_section().await);
             }
 
             let current: BTreeSet<_> = self.network_knowledge.authority_provider().await.names();
@@ -296,7 +296,7 @@ impl Core {
                     info!("{}: {:?}", LogMarker::StillElderAfterSplit, new.prefix);
                 }
 
-                commands.extend(self.send_updates_to_sibling_section(&old).await?);
+                cmds.extend(self.send_updates_to_sibling_section(&old).await?);
                 self.liveness_retain_only(
                     self.network_knowledge
                         .adults()
@@ -312,7 +312,7 @@ impl Core {
                     self_status_change,
                 }
             } else {
-                commands.extend(
+                cmds.extend(
                     self.send_metadata_updates_to(
                         self.network_knowledge.prefix().await,
                         self.network_knowledge
@@ -330,7 +330,7 @@ impl Core {
                 }
             };
 
-            commands.extend(
+            cmds.extend(
                 self.send_metadata_updates_to(
                     self.network_knowledge.prefix().await,
                     self.network_knowledge
@@ -348,7 +348,7 @@ impl Core {
             self.send_event(event).await
         }
 
-        Ok(commands)
+        Ok(cmds)
     }
 
     pub(crate) async fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {

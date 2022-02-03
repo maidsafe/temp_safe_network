@@ -10,7 +10,7 @@ mod listeners;
 mod messaging;
 use crate::messaging::{
     data::{CmdError, OperationId, QueryResponse},
-    MessageId,
+    MsgId,
 };
 use crate::peer::Peer;
 use crate::prefix_map::NetworkPrefixMap;
@@ -24,12 +24,12 @@ use tokio::time::Duration;
 use xor_name::XorName;
 
 // Here we dont track the msg_id across the network, but just use it as a local identifier to remove the correct listener
-type PendingQueryResponses = Arc<DashMap<OperationId, Vec<(MessageId, QueryResponseSender)>>>;
+type PendingQueryResponses = Arc<DashMap<OperationId, Vec<(MsgId, QueryResponseSender)>>>;
 use uluru::LRUCache;
 type QueryResponseSender = Sender<QueryResponse>;
 
 type CmdResponse = (std::net::SocketAddr, Option<CmdError>);
-type PendingCmdAcks = Arc<DashMap<MessageId, Sender<CmdResponse>>>;
+type PendingCmdAcks = Arc<DashMap<MsgId, Sender<CmdResponse>>>;
 
 #[derive(Debug)]
 pub struct QueryResult {
@@ -58,8 +58,8 @@ pub(super) struct Session {
     ae_retry_cache: Arc<RwLock<AeCache>>,
     /// Network's genesis key
     genesis_key: bls::PublicKey,
-    /// Initial network comms messageId
-    initial_connection_check_msg_id: Arc<RwLock<Option<MessageId>>>,
+    /// Initial network comms MsgId
+    initial_connection_check_msg_id: Arc<RwLock<Option<MsgId>>>,
     /// Standard time to await potential AE messages:
     standard_wait: Duration,
     /// Closed connection tracking, used to validate if a new connection is needed or not. Xorname to ConnectionId

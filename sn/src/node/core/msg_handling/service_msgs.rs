@@ -8,12 +8,12 @@
 
 use crate::data_copy_count;
 use crate::messaging::{
-    data::{CmdError, DataCmd, DataQuery, Error as ErrorMessage, ServiceMsg},
+    data::{CmdError, DataCmd, DataQuery, Error as ErrorMsg, ServiceMsg},
     system::{NodeQueryResponse, SystemMsg},
-    DstLocation, EndUser, MessageId, MsgKind, NodeAuth, WireMsg,
+    DstLocation, EndUser, MsgId, MsgKind, NodeAuth, WireMsg,
 };
 use crate::messaging::{AuthorityProof, ServiceAuth};
-use crate::node::{api::command::Command, core::Core, Result};
+use crate::node::{api::cmds::Cmd, core::Core, Result};
 use crate::peer::Peer;
 use crate::types::{log_markers::LogMarker, register::User, PublicKey, ReplicatedData};
 
@@ -27,8 +27,8 @@ impl Core {
         &self,
         error: CmdError,
         target: Peer,
-        msg_id: MessageId,
-    ) -> Result<Vec<Command>> {
+        msg_id: MsgId,
+    ) -> Result<Vec<Cmd>> {
         let the_error_msg = ServiceMsg::CmdError {
             error,
             correlation_id: msg_id,
@@ -37,39 +37,35 @@ impl Core {
     }
 
     /// Forms a CmdAck msg to send back to the client
-    pub(crate) async fn send_cmd_ack(
-        &self,
-        target: Peer,
-        msg_id: MessageId,
-    ) -> Result<Vec<Command>> {
+    pub(crate) async fn send_cmd_ack(&self, target: Peer, msg_id: MsgId) -> Result<Vec<Cmd>> {
         let the_ack_msg = ServiceMsg::CmdAck {
             correlation_id: msg_id,
         };
         self.send_cmd_response(target, the_ack_msg).await
     }
 
-    /// Forms a command to send a cmd response error/ack to the client
-    async fn send_cmd_response(&self, target: Peer, msg: ServiceMsg) -> Result<Vec<Command>> {
+    /// Forms a cmd to send a cmd response error/ack to the client
+    async fn send_cmd_response(&self, target: Peer, msg: ServiceMsg) -> Result<Vec<Cmd>> {
         let dst = DstLocation::EndUser(EndUser(target.name()));
 
-        let (msg_kind, payload) = self.ed_sign_client_message(&msg).await?;
-        let wire_msg = WireMsg::new_msg(MessageId::new(), payload, msg_kind, dst)?;
+        let (msg_kind, payload) = self.ed_sign_client_msg(&msg).await?;
+        let wire_msg = WireMsg::new_msg(MsgId::new(), payload, msg_kind, dst)?;
 
-        let command = Command::SendMessage {
+        let cmd = Cmd::SendMsg {
             recipients: vec![target],
             wire_msg,
         };
 
-        Ok(vec![command])
+        Ok(vec![cmd])
     }
 
-    /// Sign and serialize node message to be sent
-    pub(crate) async fn prepare_node_msg(
+    /// Sign and serialize system message to be sent
+    pub(crate) async fn sign_system_msg(
         &self,
         msg: SystemMsg,
         dst: DstLocation,
-    ) -> Result<Vec<Command>> {
-        let msg_id = MessageId::new();
+    ) -> Result<Vec<Cmd>> {
+        let msg_id = MsgId::new();
         let section_pk = self.network_knowledge().section_key().await;
         let payload = WireMsg::serialize_msg_payload(&msg)?;
 
@@ -77,22 +73,21 @@ impl Core {
         let msg_kind = MsgKind::NodeAuthMsg(auth.into_inner());
 
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
-        let command = Command::ParseAndSendWireMsgToNodes(wire_msg);
 
-        Ok(vec![command])
+        Ok(vec![Cmd::SendWireMsgToNodes(wire_msg)])
     }
 
     /// Handle data query
     pub(crate) async fn handle_data_query_at_adult(
         &self,
-        correlation_id: MessageId,
+        correlation_id: MsgId,
         query: &DataQuery,
         auth: ServiceAuth,
         user: EndUser,
         requesting_elder: XorName,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         trace!("Handling data query at adult");
-        let mut commands = vec![];
+        let mut cmds = vec![];
 
         let response = self
             .data_storage
@@ -114,9 +109,9 @@ impl Core {
             section_pk,
         };
 
-        commands.push(Command::PrepareNodeMsgToSendToNodes { msg, dst });
+        cmds.push(Cmd::SignOutgoingSystemMsg { msg, dst });
 
-        Ok(commands)
+        Ok(cmds)
     }
 
     /// Handle data read
@@ -124,14 +119,14 @@ impl Core {
     /// Forms a response to send to the requester
     pub(crate) async fn handle_data_query_response_at_elder(
         &self,
-        // msg_id: MessageId,
-        correlation_id: MessageId,
+        // msg_id: MsgId,
+        correlation_id: MsgId,
         response: NodeQueryResponse,
         user: EndUser,
         sending_node_pk: PublicKey,
-    ) -> Result<Vec<Command>> {
-        let msg_id = MessageId::new();
-        let mut commands = vec![];
+    ) -> Result<Vec<Cmd>> {
+        let msg_id = MsgId::new();
+        let mut cmds = vec![];
         debug!(
             "Handling data read @ elders, received from {:?} ",
             sending_node_pk
@@ -147,7 +142,7 @@ impl Core {
                 have not registered the client: {}",
                 sending_node_pk, user.0
             );
-            return Ok(commands);
+            return Ok(cmds);
         };
 
         // Clear expired queries from the cache.
@@ -173,12 +168,12 @@ impl Core {
                 "Node {} has {} pending ops. It might be unresponsive",
                 name, count
             );
-            commands.push(Command::ProposeOffline(name));
+            cmds.push(Cmd::ProposeOffline(name));
         }
 
         if !pending_removed {
             trace!("Ignoring un-expected response");
-            return Ok(commands);
+            return Ok(cmds);
         }
 
         // Send response if one is warrented
@@ -193,14 +188,14 @@ impl Core {
             // we don't return data not found errors.
             trace!("Node {:?}, reported data not found", sending_node_pk);
 
-            return Ok(commands);
+            return Ok(cmds);
         }
 
         let msg = ServiceMsg::QueryResponse {
             response: query_response,
             correlation_id,
         };
-        let (msg_kind, payload) = self.ed_sign_client_message(&msg).await?;
+        let (msg_kind, payload) = self.ed_sign_client_msg(&msg).await?;
 
         let dst = DstLocation::EndUser(EndUser(origin.name()));
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
@@ -210,22 +205,22 @@ impl Core {
             dst
         );
 
-        let command = Command::SendMessage {
+        cmds.push(Cmd::SendMsg {
             recipients: vec![origin],
             wire_msg,
-        };
-        commands.push(command);
-        Ok(commands)
+        });
+
+        Ok(cmds)
     }
 
     /// Handle ServiceMsgs received from EndUser
     pub(crate) async fn handle_service_msg_received(
         &self,
-        msg_id: MessageId,
+        msg_id: MsgId,
         msg: ServiceMsg,
         auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         if self.is_not_elder().await {
             error!("Received unexpected message while Adult");
             return Ok(vec![]);
@@ -246,18 +241,18 @@ impl Core {
             }
         };
         // build the replication cmds
-        let mut commands = self.replicate_data(data).await?;
+        let mut cmds = self.replicate_data(data).await?;
         // make sure the expected replication factor is achieved
-        if data_copy_count() > commands.len() {
-            let error = CmdError::Data(ErrorMessage::InsufficientAdults {
+        if data_copy_count() > cmds.len() {
+            let error = CmdError::Data(ErrorMsg::InsufficientAdults {
                 prefix: self.network_knowledge().prefix().await,
                 expected: data_copy_count() as u8,
-                found: commands.len() as u8,
+                found: cmds.len() as u8,
             });
             return self.send_cmd_error_response(error, origin, msg_id).await;
         }
-        commands.extend(self.send_cmd_ack(origin, msg_id).await?);
-        Ok(commands)
+        cmds.extend(self.send_cmd_ack(origin, msg_id).await?);
+        Ok(cmds)
     }
 
     // Used to fetch the list of holders for given data name.
@@ -333,14 +328,14 @@ impl Core {
     }
 
     /// Handle incoming data msgs.
-    pub(crate) async fn handle_service_message(
+    pub(crate) async fn handle_service_msg(
         &self,
-        msg_id: MessageId,
+        msg_id: MsgId,
         msg: ServiceMsg,
         dst_location: DstLocation,
         auth: AuthorityProof<ServiceAuth>,
         user: Peer,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
         if let DstLocation::EndUser(_) = dst_location {
             warn!(

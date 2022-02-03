@@ -12,7 +12,7 @@ use crate::messaging::system::{
     JoinResponse, MembershipState, SystemMsg,
 };
 use crate::node::{
-    api::command::Command,
+    api::cmds::Cmd,
     core::{relocation::RelocateDetailsUtils, Core},
     Error, Result, SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE,
 };
@@ -30,7 +30,7 @@ impl Core {
         &self,
         peer: Peer,
         join_request: JoinRequest,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         debug!("Received {:?} from {}", join_request, peer);
 
         // To avoid existing elders hanving different view of section members,
@@ -42,7 +42,7 @@ impl Core {
         if let Some(response) = join_request.aggregated {
             if response.verify(&self.section_chain().await) {
                 info!("Handling Online agreement of {:?}", peer);
-                return Ok(vec![Command::HandleNewNodeOnline(response)]);
+                return Ok(vec![Cmd::HandleNewNodeOnline(response)]);
             }
         }
 
@@ -58,7 +58,7 @@ impl Core {
                 );
                 return Ok(vec![]);
             } else {
-                return Ok(vec![Command::SendAcceptedOnlineShare {
+                return Ok(vec![Cmd::SendAcceptedOnlineShare {
                     peer,
                     previous_name: None,
                 }]);
@@ -110,7 +110,7 @@ impl Core {
             trace!("Sending {:?} to {}", node_msg, peer);
             trace!("{}", LogMarker::SendJoinRedirected);
             return Ok(vec![
-                self.send_direct_message(peer, node_msg, our_section_key)
+                self.send_direct_msg(peer, node_msg, our_section_key)
                     .await?,
             ]);
         }
@@ -128,7 +128,7 @@ impl Core {
 
             trace!("Sending {:?} to {}", node_msg, peer);
             return Ok(vec![
-                self.send_direct_message(peer, node_msg, our_section_key)
+                self.send_direct_msg(peer, node_msg, our_section_key)
                     .await?,
             ]);
         }
@@ -176,7 +176,7 @@ impl Core {
 
             trace!("Sending {:?} to {}", node_msg, peer);
             return Ok(vec![
-                self.send_direct_message(peer, node_msg, our_section_key)
+                self.send_direct_msg(peer, node_msg, our_section_key)
                     .await?,
             ]);
         }
@@ -190,7 +190,7 @@ impl Core {
             trace!("{}", LogMarker::SendJoinRejected);
 
             trace!("Sending {:?} to {}", node_msg, peer);
-            self.send_direct_message(peer, node_msg, our_section_key)
+            self.send_direct_msg(peer, node_msg, our_section_key)
                 .await?
         } else {
             // It's reachable, let's then send the proof challenge
@@ -240,7 +240,7 @@ impl Core {
         peer: Peer,
         join_request: JoinAsRelocatedRequest,
         known_keys: Vec<BlsPublicKey>,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let _permit = self
             .current_joins_semaphore
             .acquire()
@@ -270,12 +270,8 @@ impl Core {
 
             trace!("Sending {:?} to {}", node_msg, peer);
             return Ok(vec![
-                self.send_direct_message(
-                    peer,
-                    node_msg,
-                    self.network_knowledge.section_key().await,
-                )
-                .await?,
+                self.send_direct_msg(peer, node_msg, self.network_knowledge.section_key().await)
+                    .await?,
             ]);
         }
 
@@ -362,16 +358,12 @@ impl Core {
 
             trace!("Sending {:?} to {}", node_msg, peer);
             return Ok(vec![
-                self.send_direct_message(
-                    peer,
-                    node_msg,
-                    self.network_knowledge.section_key().await,
-                )
-                .await?,
+                self.send_direct_msg(peer, node_msg, self.network_knowledge.section_key().await)
+                    .await?,
             ]);
         };
 
-        Ok(vec![Command::SendAcceptedOnlineShare {
+        Ok(vec![Cmd::SendAcceptedOnlineShare {
             peer,
             previous_name: Some(relocate_details.previous_name),
         }])

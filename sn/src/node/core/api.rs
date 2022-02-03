@@ -13,7 +13,7 @@ use crate::messaging::{
     WireMsg,
 };
 use crate::node::{
-    api::command::Command,
+    api::cmds::Cmd,
     error::Result,
     network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionKeyShare},
     node_info::Node,
@@ -142,7 +142,7 @@ impl Core {
     //   ---------------------------------- Mut ------------------------------------------
     // ----------------------------------------------------------------------------------------
 
-    pub(crate) async fn handle_timeout(&self, token: u64) -> Result<Vec<Command>> {
+    pub(crate) async fn handle_timeout(&self, token: u64) -> Result<Vec<Cmd>> {
         self.dkg_voter.handle_timeout(
             &self.node.read().await.clone(),
             token,
@@ -151,10 +151,7 @@ impl Core {
     }
 
     // Send message to peers on the network.
-    pub(crate) async fn send_msg_to_network_nodes(
-        &self,
-        mut wire_msg: WireMsg,
-    ) -> Result<Vec<Command>> {
+    pub(crate) async fn send_msg_to_nodes(&self, mut wire_msg: WireMsg) -> Result<Vec<Cmd>> {
         let dst_location = wire_msg.dst_location();
         let (targets, dg_size) = delivery_group::delivery_targets(
             dst_location,
@@ -189,18 +186,18 @@ impl Core {
         let dst_pk = self.section_key_by_name(&target_name).await;
         wire_msg.set_dst_section_pk(dst_pk);
 
-        let command = Command::SendMessageDeliveryGroup {
+        let cmd = Cmd::SendMsgDeliveryGroup {
             recipients: targets.into_iter().collect(),
             delivery_group_size: dg_size,
             wire_msg,
         };
 
-        Ok(vec![command])
+        Ok(vec![cmd])
     }
 
     // Generate a new section info based on the current set of members and if it differs from the
     // current elders, trigger a DKG.
-    pub(crate) async fn promote_and_demote_elders(&self) -> Result<Vec<Command>> {
+    pub(crate) async fn promote_and_demote_elders(&self) -> Result<Vec<Cmd>> {
         self.promote_and_demote_elders_except(&BTreeSet::new())
             .await
     }
@@ -211,8 +208,8 @@ impl Core {
     pub(crate) async fn promote_and_demote_elders_except(
         &self,
         excluded_names: &BTreeSet<XorName>,
-    ) -> Result<Vec<Command>> {
-        let mut commands = vec![];
+    ) -> Result<Vec<Cmd>> {
+        let mut cmds = vec![];
         let our_name = self.node.read().await.name();
 
         debug!("{}", LogMarker::TriggeringPromotionAndDemotion);
@@ -221,17 +218,17 @@ impl Core {
             .promote_and_demote_elders(&our_name, excluded_names)
             .await
         {
-            commands.extend(self.send_dkg_start(elder_candidates).await?);
+            cmds.extend(self.send_dkg_start(elder_candidates).await?);
         }
 
-        Ok(commands)
+        Ok(cmds)
     }
 
     pub(crate) async fn send_accepted_online_share(
         &self,
         peer: Peer,
         previous_name: Option<XorName>,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let public_key_set = self.public_key_set().await?;
         let section_key = public_key_set.public_key();
 
@@ -274,8 +271,7 @@ impl Core {
         }));
 
         Ok(vec![
-            self.send_direct_message(peer, node_msg, section_key)
-                .await?,
+            self.send_direct_msg(peer, node_msg, section_key).await?,
         ])
     }
 }

@@ -9,7 +9,7 @@
 mod chunk_storage;
 mod register_storage;
 
-use super::{Command, Core};
+use super::{Cmd, Core};
 
 use crate::{
     dbs::Result,
@@ -137,7 +137,7 @@ impl Core {
         new_adults: BTreeSet<XorName>,
         lost_adults: BTreeSet<XorName>,
         remaining: BTreeSet<XorName>,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let data = self.data_storage.clone();
         let keys = data.keys().await?;
         let mut data_for_replication = BTreeMap::new();
@@ -150,18 +150,18 @@ impl Core {
             }
         }
 
-        let mut commands = vec![];
+        let mut cmds = vec![];
         let section_pk = self.network_knowledge.section_key().await;
         for (_, (data, targets)) in data_for_replication {
             for name in targets {
-                commands.push(Command::PrepareNodeMsgToSendToNodes {
+                cmds.push(Cmd::SignOutgoingSystemMsg {
                     msg: SystemMsg::NodeCmd(NodeCmd::ReplicateData(data.clone())),
                     dst: crate::messaging::DstLocation::Node { name, section_pk },
                 })
             }
         }
 
-        Ok(commands)
+        Ok(cmds)
     }
 
     // on adults

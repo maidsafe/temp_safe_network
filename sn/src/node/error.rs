@@ -8,8 +8,8 @@
 
 use super::Prefix;
 
-use crate::messaging::data::Error as ErrorMessage;
-use crate::types::{convert_dt_error_to_error_message, DataAddress, PublicKey};
+use crate::messaging::data::Error as ErrorMsg;
+use crate::types::{convert_dt_error_to_error_msg, DataAddress, PublicKey};
 
 use secured_linked_list::error::Error as SecuredLinkedListError;
 use std::io;
@@ -24,8 +24,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug, Error)]
 #[allow(missing_docs)]
 pub enum Error {
-    #[error("Max amount of service commands being handled, dropping command.")]
-    AtMaxServiceCommandThroughput,
+    #[error("Max amount of service cmds being handled, dropping cmd.")]
+    AtMaxServiceCmdThroughput,
     #[error("Permit was not retrieved in 500 loops")]
     CouldNotGetPermitInTime,
     #[error("Node prioritisation semaphore was closed early.")]
@@ -153,14 +153,12 @@ impl From<qp2p::SendError> for Error {
     }
 }
 
-pub(crate) fn convert_to_error_message(error: Error) -> ErrorMessage {
+pub(crate) fn convert_to_error_msg(error: Error) -> ErrorMsg {
     match error {
-        Error::InvalidOwner(key) => ErrorMessage::InvalidOwner(key),
-        Error::NoSuchData(address) => ErrorMessage::DataNotFound(address),
-        Error::DataExists => ErrorMessage::DataExists,
-        Error::NetworkData(error) => convert_dt_error_to_error_message(error),
-        other => {
-            ErrorMessage::InvalidOperation(format!("Failed to perform operation: {:?}", other))
-        }
+        Error::InvalidOwner(key) => ErrorMsg::InvalidOwner(key),
+        Error::NoSuchData(address) => ErrorMsg::DataNotFound(address),
+        Error::DataExists => ErrorMsg::DataExists,
+        Error::NetworkData(error) => convert_dt_error_to_error_msg(error),
+        other => ErrorMsg::InvalidOperation(format!("Failed to perform operation: {:?}", other)),
     }
 }

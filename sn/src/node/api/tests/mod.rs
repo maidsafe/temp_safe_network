@@ -8,14 +8,14 @@
 
 #![allow(dead_code, unused_imports)]
 
-use super::{Comm, Command, Dispatcher};
+use super::{Cmd, Comm, Dispatcher};
 use crate::dbs::UsedSpace;
 use crate::messaging::{
     system::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState,
         NodeState as NodeStateMsg, RelocateDetails, ResourceProofResponse, SectionAuth, SystemMsg,
     },
-    AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeAuth,
+    AuthorityProof, DstLocation, MsgId, MsgKind, MsgType, NodeAuth,
     SectionAuth as MsgKindSectionAuth, WireMsg,
 };
 use crate::node::{
@@ -105,8 +105,8 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
         section_key,
     )?;
 
-    let mut commands = get_internal_commands(
-        Command::HandleMessage {
+    let mut cmds = get_internal_cmds(
+        Cmd::HandleMsg {
             sender: UnnamedPeer::addressed(new_node.addr),
             wire_msg,
             original_bytes: None,
@@ -116,24 +116,24 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     .await?
     .into_iter();
 
-    let mut next_cmd = commands.next();
+    let mut next_cmd = cmds.next();
 
-    if !matches!(next_cmd, Some(Command::SendMessage { .. })) {
-        next_cmd = commands.next();
+    if !matches!(next_cmd, Some(Cmd::SendMsg { .. })) {
+        next_cmd = cmds.next();
     }
 
     let response_wire_msg = assert_matches!(
-        // we want to check the command _after_ that
+        // we want to check the cmd _after_ that
         next_cmd,
-        Some(Command::SendMessage {
+        Some(Cmd::SendMsg {
             wire_msg,
             ..
         }) => wire_msg
     );
 
     assert_matches!(
-        response_wire_msg.into_message(),
-        Ok(MessageType::System {
+        response_wire_msg.into_msg(),
+        Ok(MsgType::System {
             msg: SystemMsg::JoinResponse(response),
             ..
         }) => assert_matches!(*response, JoinResponse::ResourceChallenge { .. })
@@ -201,8 +201,8 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
         section_key,
     )?;
 
-    let commands = get_internal_commands(
-        Command::HandleMessage {
+    let cmds = get_internal_cmds(
+        Cmd::HandleMsg {
             sender: UnnamedPeer::addressed(new_node.addr),
             wire_msg,
             original_bytes: None,
@@ -212,8 +212,8 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
     .await?;
 
     let mut test_connectivity = false;
-    for command in commands {
-        if let Command::HandleNewNodeOnline(response) = command {
+    for cmd in cmds {
+        if let Cmd::HandleNewNodeOnline(response) = cmd {
             assert_eq!(response.value.name, new_node.name());
             assert_eq!(response.value.addr, new_node.addr);
             assert_eq!(response.value.age(), MIN_ADULT_AGE);
@@ -292,8 +292,8 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
 
     let mut propose_cmd_returned = false;
 
-    let inner_commands = get_internal_commands(
-        Command::HandleMessage {
+    let inner_cmds = get_internal_cmds(
+        Cmd::HandleMsg {
             sender: UnnamedPeer::addressed(relocated_node.addr),
             wire_msg,
             original_bytes: None,
@@ -302,12 +302,12 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
     )
     .await?;
 
-    for command in inner_commands {
+    for cmd in inner_cmds {
         // third pass should now be handled and return propose
-        if let Command::SendAcceptedOnlineShare {
+        if let Cmd::SendAcceptedOnlineShare {
             peer,
             previous_name,
-        } = command
+        } = cmd
         {
             assert_eq!(peer, relocated_node.peer());
             assert_eq!(previous_name, Some(relocated_node_old_name));
@@ -345,7 +345,7 @@ async fn handle_agreement_on_online() -> Result<()> {
 
     let new_peer = create_peer(MIN_ADULT_AGE);
 
-    let status = handle_online_command(&new_peer, &sk_set, &dispatcher, &section_auth).await?;
+    let status = handle_online_cmd(&new_peer, &sk_set, &dispatcher, &section_auth).await?;
     assert!(status.node_approval_sent);
 
     assert_matches!(event_rx.recv().await, Some(Event::MemberJoined { name, age, .. }) => {
@@ -411,17 +411,17 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
     let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
 
-    let commands = dispatcher
-        .process_command(Command::HandleNewNodeOnline(auth), "cmd-id")
+    let cmds = dispatcher
+        .process_cmd(Cmd::HandleNewNodeOnline(auth), "cmd-id")
         .await?;
 
     // Verify we sent a `DkgStart` message with the expected participants.
     let mut dkg_start_sent = false;
     let _changed = expected_new_elders.insert(&new_peer);
 
-    for command in commands {
-        let (recipients, wire_msg) = match command {
-            Command::SendMessage {
+    for cmd in cmds {
+        let (recipients, wire_msg) = match cmd {
+            Cmd::SendMsg {
                 recipients,
                 wire_msg,
                 ..
@@ -429,8 +429,8 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             _ => continue,
         };
 
-        let actual_elder_candidates = match wire_msg.into_message() {
-            Ok(MessageType::System {
+        let actual_elder_candidates = match wire_msg.into_msg() {
+            Ok(MsgType::System {
                 msg: SystemMsg::DkgStart { elders, .. },
                 ..
             }) => elders.into_iter().map(|(name, addr)| Peer::new(name, addr)),
@@ -454,7 +454,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 }
 
 // Handles a consensus-ed Online proposal.
-async fn handle_online_command(
+async fn handle_online_cmd(
     peer: &Peer,
     sk_set: &SecretKeySet,
     dispatcher: &Dispatcher,
@@ -463,8 +463,8 @@ async fn handle_online_command(
     let node_state = NodeState::joined(peer.clone(), None);
     let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
 
-    let commands = dispatcher
-        .process_command(Command::HandleNewNodeOnline(auth), "cmd-id")
+    let cmds = dispatcher
+        .process_cmd(Cmd::HandleNewNodeOnline(auth), "cmd-id")
         .await?;
 
     let mut status = HandleOnlineStatus {
@@ -472,9 +472,9 @@ async fn handle_online_command(
         relocate_details: None,
     };
 
-    for command in commands {
-        let (recipients, wire_msg) = match command {
-            Command::SendMessage {
+    for cmd in cmds {
+        let (recipients, wire_msg) = match cmd {
+            Cmd::SendMsg {
                 recipients,
                 wire_msg,
                 ..
@@ -482,8 +482,8 @@ async fn handle_online_command(
             _ => continue,
         };
 
-        match wire_msg.into_message() {
-            Ok(MessageType::System {
+        match wire_msg.into_msg() {
+            Ok(MsgType::System {
                 msg: SystemMsg::JoinResponse(response),
                 ..
             }) => {
@@ -497,7 +497,7 @@ async fn handle_online_command(
                     status.node_approval_sent = true;
                 }
             }
-            Ok(MessageType::System {
+            Ok(MsgType::System {
                 msg:
                     SystemMsg::Propose {
                         proposal: crate::messaging::system::Proposal::Offline(node_state),
@@ -560,7 +560,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
     let dispatcher = Dispatcher::new(state);
 
     // Simulate peer with the same name is rejoin and verify resulted behaviours.
-    let status = handle_online_command(&peer, &sk_set, &dispatcher, &section_auth).await?;
+    let status = handle_online_cmd(&peer, &sk_set, &dispatcher, &section_auth).await?;
 
     // A rejoin node with low age will be rejected.
     if age / 2 < MIN_ADULT_AGE {
@@ -632,8 +632,8 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let proposal = Proposal::Offline(node_state.clone());
     let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
-    let _commands = dispatcher
-        .process_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
+    let _cmds = dispatcher
+        .process_cmd(Cmd::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     assert!(!dispatcher
@@ -688,16 +688,16 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let proposal = Proposal::Offline(remove_node_state.clone());
     let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
-    let commands = dispatcher
-        .process_command(Command::HandleAgreement { proposal, sig }, "cmd-id")
+    let cmds = dispatcher
+        .process_cmd(Cmd::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     // Verify we sent a `DkgStart` message with the expected participants.
     let mut dkg_start_sent = false;
 
-    for command in commands {
-        let (recipients, wire_msg) = match command {
-            Command::SendMessage {
+    for cmd in cmds {
+        let (recipients, wire_msg) = match cmd {
+            Cmd::SendMsg {
                 recipients,
                 wire_msg,
                 ..
@@ -705,8 +705,8 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
             _ => continue,
         };
 
-        let actual_elder_candidates = match wire_msg.into_message() {
-            Ok(MessageType::System {
+        let actual_elder_candidates = match wire_msg.into_msg() {
+            Ok(MsgType::System {
                 msg: SystemMsg::DkgStart { elders, .. },
                 ..
             }) => elders.into_iter().map(|(name, addr)| Peer::new(name, addr)),
@@ -840,8 +840,8 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
     let dispatcher = Dispatcher::new(core);
 
-    let _commands = get_internal_commands(
-        Command::HandleMessage {
+    let _cmds = get_internal_cmds(
+        Cmd::HandleMsg {
             sender: UnnamedPeer::addressed(old_node.addr),
             wire_msg,
             original_bytes: None,
@@ -866,9 +866,9 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 // Checking when we send AE info to a section from untrusted section, we do not handle it and error out
-async fn untrusted_ae_message_msg_errors() -> Result<()> {
+async fn untrusted_ae_msg_errors() -> Result<()> {
     init_test_logger();
-    let _span = tracing::info_span!("untrusted_ae_message_msg_errors").entered();
+    let _span = tracing::info_span!("untrusted_ae_msg_errors").entered();
 
     let (our_section_auth, _, sk_set0) = create_section_auth();
     let sk0 = sk_set0.secret_key();
@@ -919,8 +919,8 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
         bogus_section_pk,
     )?;
 
-    let _commands = get_internal_commands(
-        Command::HandleMessage {
+    let _cmds = get_internal_cmds(
+        Cmd::HandleMsg {
             sender: UnnamedPeer::addressed(sender.addr),
             wire_msg,
             original_bytes: None,
@@ -938,25 +938,22 @@ async fn untrusted_ae_message_msg_errors() -> Result<()> {
     Ok(())
 }
 
-/// helper to get through first command layers used for concurrency, to commands we can analyse in a useful fashion for testing
-async fn get_internal_commands(
-    command: Command,
-    dispatcher: &Dispatcher,
-) -> RoutingResult<Vec<Command>> {
-    let commands = dispatcher.process_command(command, "cmd-id").await?;
+/// helper to get through first cmd layers used for concurrency, to cmds we can analyse in a useful fashion for testing
+async fn get_internal_cmds(cmd: Cmd, dispatcher: &Dispatcher) -> RoutingResult<Vec<Cmd>> {
+    let cmds = dispatcher.process_cmd(cmd, "cmd-id").await?;
 
     let mut node_msg_handling = vec![];
     // let mut inner_handling = vec![];
 
-    for command in commands {
+    for cmd in cmds {
         // first pass gets us into node msg handling
-        let commands = dispatcher.process_command(command, "cmd-id").await?;
-        node_msg_handling.extend(commands);
+        let cmds = dispatcher.process_cmd(cmd, "cmd-id").await?;
+        node_msg_handling.extend(cmds);
     }
-    for command in node_msg_handling.clone() {
+    for cmd in node_msg_handling.clone() {
         // first pass gets us into node msg handling
-        let commands = dispatcher.process_command(command, "cmd-id").await?;
-        node_msg_handling.extend(commands);
+        let cmds = dispatcher.process_cmd(cmd, "cmd-id").await?;
+        node_msg_handling.extend(cmds);
     }
 
     Ok(node_msg_handling)
@@ -1023,26 +1020,26 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     };
 
     let auth = create_relocation_trigger(sk_set.secret_key(), relocated_peer.age())?;
-    let commands = dispatcher
-        .process_command(Command::HandleNewNodeOnline(auth), "cmd-id")
+    let cmds = dispatcher
+        .process_cmd(Cmd::HandleNewNodeOnline(auth), "cmd-id")
         .await?;
 
     let mut offline_relocate_sent = false;
 
-    for command in commands {
-        let wire_msg = match command {
-            Command::SendMessage { wire_msg, .. } => wire_msg,
+    for cmd in cmds {
+        let wire_msg = match cmd {
+            Cmd::SendMsg { wire_msg, .. } => wire_msg,
             _ => continue,
         };
 
-        if let Ok(MessageType::System {
+        if let Ok(MsgType::System {
             msg:
                 SystemMsg::Propose {
                     proposal: crate::messaging::system::Proposal::Offline(node_state),
                     ..
                 },
             ..
-        }) = wire_msg.into_message()
+        }) = wire_msg.into_msg()
         {
             assert_eq!(node_state.name, relocated_peer.name());
             if let MembershipState::Relocated(relocate_details) = node_state.state {
@@ -1058,12 +1055,12 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn node_message_to_self() -> Result<()> {
+async fn node_msg_to_self() -> Result<()> {
     message_to_self(MessageDst::Node).await
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn section_message_to_self() -> Result<()> {
+async fn section_msg_to_self() -> Result<()> {
     message_to_self(MessageDst::Section).await
 }
 
@@ -1106,13 +1103,13 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
 
     let node_msg = SystemMsg::NodeMsgError {
         error: crate::messaging::data::Error::FailedToWriteFile,
-        correlation_id: MessageId::new(),
+        correlation_id: MsgId::new(),
     };
     let wire_msg = WireMsg::single_src(&node, dst_location, node_msg.clone(), section_pk)?;
 
-    let commands = dispatcher
-        .process_command(
-            Command::SendMessage {
+    let cmds = dispatcher
+        .process_cmd(
+            Cmd::SendMsg {
                 recipients: vec![node.peer()],
                 wire_msg,
             },
@@ -1120,14 +1117,14 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
         )
         .await?;
 
-    assert!(commands.is_empty());
+    assert!(cmds.is_empty());
 
     let msg_type = assert_matches!(comm_rx.recv().await, Some(ConnectionEvent::Received((sender, bytes))) => {
         assert_eq!(sender.addr(), node.addr);
         assert_matches!(WireMsg::deserialize(bytes), Ok(msg_type) => msg_type)
     });
 
-    assert_matches!(msg_type, MessageType::System { msg, dst_location: dst, .. } => {
+    assert_matches!(msg_type, MsgType::System { msg, dst_location: dst, .. } => {
         assert_eq!(dst, dst_location);
         assert_eq!(
             msg,
@@ -1173,7 +1170,7 @@ async fn handle_elders_update() -> Result<()> {
     let sk_set1 = SecretKeySet::random();
 
     let pk1 = sk_set1.secret_key().public_key();
-    // Create `HandleAgreement` command for an `NewElders` proposal. This will demote one of the
+    // Create `HandleAgreement` cmd for an `NewElders` proposal. This will demote one of the
     // current elders and promote the oldest peer.
     let sap1 = SectionAuthorityProvider::new(
         iter::once(node.peer())
@@ -1213,18 +1210,15 @@ async fn handle_elders_update() -> Result<()> {
 
     let dispatcher = Dispatcher::new(core);
 
-    let commands = dispatcher
-        .process_command(
-            Command::HandleNewEldersAgreement { proposal, sig },
-            "cmd-id",
-        )
+    let cmds = dispatcher
+        .process_cmd(Cmd::HandleNewEldersAgreement { proposal, sig }, "cmd-id")
         .await?;
 
     let mut update_actual_recipients = HashSet::new();
 
-    for command in commands {
-        let (recipients, wire_msg) = match command {
-            Command::SendMessage {
+    for cmd in cmds {
+        let (recipients, wire_msg) = match cmd {
+            Cmd::SendMsg {
                 recipients,
                 wire_msg,
                 ..
@@ -1232,8 +1226,8 @@ async fn handle_elders_update() -> Result<()> {
             _ => continue,
         };
 
-        let (proof_chain, msg_authority) = match wire_msg.into_message() {
-            Ok(MessageType::System {
+        let (proof_chain, msg_authority) = match wire_msg.into_msg() {
+            Ok(MsgType::System {
                 msg: SystemMsg::AntiEntropyUpdate { proof_chain, .. },
                 msg_authority,
                 ..
@@ -1342,7 +1336,7 @@ async fn handle_demote_during_split() -> Result<()> {
     let dispatcher = Dispatcher::new(core);
 
     // Create agreement on `OurElder` for both sub-sections
-    let create_our_elders_command = |signed_sap| -> Result<_> {
+    let create_our_elders_cmd = |signed_sap| -> Result<_> {
         let proposal = Proposal::NewElders(signed_sap);
         let signature = sk_set_v0.secret_key().sign(&proposal.as_signable_bytes()?);
         let sig = KeyedSig {
@@ -1350,7 +1344,7 @@ async fn handle_demote_during_split() -> Result<()> {
             public_key: sk_set_v0.public_keys().public_key(),
         };
 
-        Ok(Command::HandleNewEldersAgreement { proposal, sig })
+        Ok(Cmd::HandleNewEldersAgreement { proposal, sig })
     };
 
     // Handle agreement on `NewElders` for prefix-0.
@@ -1361,25 +1355,25 @@ async fn handle_demote_during_split() -> Result<()> {
     );
 
     let signed_sap = section_signed(sk_set_v1_p0.secret_key(), section_auth)?;
-    let command = create_our_elders_command(signed_sap)?;
-    let commands = dispatcher.process_command(command, "cmd-id-1").await?;
+    let cmd = create_our_elders_cmd(signed_sap)?;
+    let cmds = dispatcher.process_cmd(cmd, "cmd-id-1").await?;
 
-    assert_matches!(&commands[..], &[]);
+    assert_matches!(&cmds[..], &[]);
 
     // Handle agreement on `NewElders` for prefix-1.
     let section_auth =
         SectionAuthorityProvider::new(peers_b.iter().cloned(), prefix1, sk_set_v1_p1.public_keys());
 
     let signed_sap = section_signed(sk_set_v1_p1.secret_key(), section_auth)?;
-    let command = create_our_elders_command(signed_sap)?;
+    let cmd = create_our_elders_cmd(signed_sap)?;
 
-    let commands = dispatcher.process_command(command, "cmd-id-2").await?;
+    let cmds = dispatcher.process_cmd(cmd, "cmd-id-2").await?;
 
     let mut update_recipients = BTreeMap::new();
 
-    for command in commands {
-        let (recipients, wire_msg) = match command {
-            Command::SendMessage {
+    for cmd in cmds {
+        let (recipients, wire_msg) = match cmd {
+            Cmd::SendMsg {
                 recipients,
                 wire_msg,
                 ..
@@ -1388,8 +1382,8 @@ async fn handle_demote_during_split() -> Result<()> {
         };
 
         if matches!(
-            wire_msg.into_message(),
-            Ok(MessageType::System {
+            wire_msg.into_msg(),
+            Ok(MsgType::System {
                 msg: SystemMsg::AntiEntropyUpdate { .. },
                 ..
             })

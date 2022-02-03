@@ -9,7 +9,7 @@
 use crate::messaging::{
     data::ServiceMsg,
     system::{NodeCmd, NodeQuery, NodeQueryResponse},
-    AuthorityProof, DstLocation, EndUser, MessageId, ServiceAuth, SrcLocation,
+    AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth, SrcLocation,
 };
 
 use bls::PublicKey as BlsPublicKey;
@@ -57,7 +57,7 @@ pub enum Event {
     /// Received a message from another Node.
     MessageReceived {
         /// The message ID
-        msg_id: MessageId,
+        msg_id: MsgId,
         /// Source location
         src: SrcLocation,
         /// Destination location
@@ -112,7 +112,7 @@ pub enum Event {
     /// Received a message from a peer.
     ServiceMsgReceived {
         /// The message ID
-        msg_id: MessageId,
+        msg_id: MsgId,
         /// The content of the message.
         msg: Box<ServiceMsg>,
         /// Data authority
@@ -148,6 +148,6 @@ pub enum MessageReceived {
         /// QueryResponse.
         response: NodeQueryResponse,
         /// ID of causing query.
-        correlation_id: MessageId,
+        correlation_id: MsgId,
     },
 }

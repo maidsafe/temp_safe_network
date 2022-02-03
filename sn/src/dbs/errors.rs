@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::data::Error as ErrorMessage;
-use crate::types::{convert_dt_error_to_error_message, DataAddress, PublicKey};
+use crate::messaging::data::Error as ErrorMsg;
+use crate::types::{convert_dt_error_to_error_msg, DataAddress, PublicKey};
 use std::io;
 use thiserror::Error;
 use xor_name::XorName;
@@ -98,17 +98,15 @@ pub enum Error {
 }
 
 /// Convert db error to messaging error message for sending over the network.
-pub(crate) fn convert_to_error_message(error: Error) -> ErrorMessage {
+pub(crate) fn convert_to_error_msg(error: Error) -> ErrorMsg {
     match error {
-        Error::NotEnoughSpace => ErrorMessage::FailedToWriteFile,
-        Error::DataIdNotFound(address) => ErrorMessage::DataNotFound(address),
-        Error::NoSuchData(address) => ErrorMessage::DataNotFound(address),
-        Error::ChunkNotFound(xorname) => ErrorMessage::ChunkNotFound(xorname),
-        Error::TempDirCreationFailed(_) => ErrorMessage::FailedToWriteFile,
-        Error::DataExists => ErrorMessage::DataExists,
-        Error::NetworkData(error) => convert_dt_error_to_error_message(error),
-        other => {
-            ErrorMessage::InvalidOperation(format!("Failed to perform operation: {:?}", other))
-        }
+        Error::NotEnoughSpace => ErrorMsg::FailedToWriteFile,
+        Error::DataIdNotFound(address) => ErrorMsg::DataNotFound(address),
+        Error::NoSuchData(address) => ErrorMsg::DataNotFound(address),
+        Error::ChunkNotFound(xorname) => ErrorMsg::ChunkNotFound(xorname),
+        Error::TempDirCreationFailed(_) => ErrorMsg::FailedToWriteFile,
+        Error::DataExists => ErrorMsg::DataExists,
+        Error::NetworkData(error) => convert_dt_error_to_error_msg(error),
+        other => ErrorMsg::InvalidOperation(format!("Failed to perform operation: {:?}", other)),
     }
 }

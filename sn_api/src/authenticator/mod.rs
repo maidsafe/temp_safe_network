@@ -415,7 +415,7 @@ impl SafeAuthenticator {
 
         //             keypair
         //         }
-        //         Err(ClientError::ErrorMessage {
+        //         Err(ClientError::ErrorMsg {
         //             source: NoSuchEntry,
         //             ..
         //         }) => {

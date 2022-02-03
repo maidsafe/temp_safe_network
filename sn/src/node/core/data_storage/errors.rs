@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::data::Error as ErrorMessage;
-use crate::types::convert_dt_error_to_error_message;
+use crate::messaging::data::Error as ErrorMsg;
+use crate::types::convert_dt_error_to_error_msg;
 use std::io;
 use thiserror::Error;
 use xor_name::XorName;

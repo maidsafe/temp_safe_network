@@ -14,7 +14,7 @@ use crate::client::Error;
 use crate::elder_count;
 use crate::messaging::{
     data::{CmdError, DataQuery, QueryResponse},
-    DstLocation, MessageId, MsgKind, ServiceAuth, WireMsg,
+    DstLocation, MsgId, MsgKind, ServiceAuth, WireMsg,
 };
 use crate::peer::Peer;
 use crate::prefix_map::NetworkPrefixMap;
@@ -105,7 +105,7 @@ impl Session {
                 return Err(Error::NoNetworkKnowledge);
             };
 
-        let msg_id = MessageId::new();
+        let msg_id = MsgId::new();
 
         if elders.len() < targets_count {
             return Err(Error::InsufficientElderKnowledge {
@@ -116,7 +116,7 @@ impl Session {
         }
 
         debug!(
-            "Sending command w/id {:?}, from {}, to {} Elders w/ dst: {:?}",
+            "Sending cmd w/id {:?}, from {}, to {} Elders w/ dst: {:?}",
             msg_id,
             endpoint.public_addr(),
             elders.len(),
@@ -135,7 +135,7 @@ impl Session {
         let _ = self.pending_cmds.insert(msg_id, sender);
         trace!("Inserted channel for cmd {:?}", msg_id);
 
-        let res = send_message(
+        let res = send_msg(
             self.clone(),
             elders.clone(),
             wire_msg,
@@ -257,7 +257,7 @@ impl Session {
             });
         }
 
-        let msg_id = MessageId::new();
+        let msg_id = MsgId::new();
 
         debug!(
             "Sending query message {:?}, msg_id: {:?}, from {}, to the {} Elders closest to data name: {:?}",
@@ -292,7 +292,7 @@ impl Session {
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
-        send_message(
+        send_msg(
             self.clone(),
             chosen_elders,
             wire_msg,
@@ -419,7 +419,7 @@ impl Session {
                 (nodes, self.genesis_key)
             };
 
-        let msg_id = MessageId::new();
+        let msg_id = MsgId::new();
 
         debug!(
             "Making initial contact with nodes. Our PublicAddr: {:?}. Using {:?} to {} nodes: {:?}",
@@ -443,7 +443,7 @@ impl Session {
             .take(NODES_TO_CONTACT_PER_STARTUP_BATCH)
             .collect();
 
-        send_message(
+        send_msg(
             self.clone(),
             initial_contacts,
             wire_msg.clone(),
@@ -534,7 +534,7 @@ impl Session {
                     };
 
                     trace!("Sending out another batch of initial contact msgs to new nodes");
-                    send_message(
+                    send_msg(
                         self.clone(),
                         next_contacts,
                         wire_msg.clone(),
@@ -594,14 +594,14 @@ pub(super) fn mark_connection_id_as_failed(
 }
 
 #[instrument(skip_all, level = "trace")]
-pub(super) async fn send_message(
+pub(super) async fn send_msg(
     session: Session,
     elders: Vec<Peer>,
     wire_msg: WireMsg,
     endpoint: Endpoint,
-    msg_id: MessageId,
+    msg_id: MsgId,
 ) -> Result<(), Error> {
-    let priority = wire_msg.clone().into_message()?.priority();
+    let priority = wire_msg.clone().into_msg()?.priority();
 
     let msg_bytes = wire_msg.serialize()?;
 
@@ -649,7 +649,7 @@ pub(super) async fn send_message(
                                     );
                                     let (connection, connection_incoming) = endpoint.connect_to(&addr).await?;
                                     let conn_id = connection.id();
-                                    Session::spawn_message_listener_thread(
+                                    Session::spawn_msg_listener_thread(
                                         session.clone(),
                                         conn_id,
                                         cloned_peer,

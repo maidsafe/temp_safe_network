@@ -100,10 +100,10 @@ pub mod util {
     }
 
     pub fn create_and_get_keys() -> Result<(String, String)> {
-        let pk_command_result = safe_cmd_stdout(["keys", "create", "--json"], Some(0))?;
+        let pk_cmd_result = safe_cmd_stdout(["keys", "create", "--json"], Some(0))?;
 
         let (xorurl, (_pk, sk)): (String, (String, String)) =
-            parse_keys_create_output(&pk_command_result)?;
+            parse_keys_create_output(&pk_cmd_result)?;
 
         Ok((xorurl, sk))
     }
@@ -342,7 +342,7 @@ pub mod util {
     ///
     /// This was changed to use the assert_cmd crate because the newer version of this crate
     /// provides *both* the stdout and stderr if the process doesn't exit as expected. This is
-    /// extremely useful in this test suite because there are lots of commands used to setup the
+    /// extremely useful in this test suite because there are lots of cmds used to setup the
     /// context for the tests, and you need to be able to see why those fail too.
     pub fn safe_cmd<'a>(
         args: impl IntoIterator<Item = &'a str>,
@@ -369,7 +369,7 @@ pub mod util {
             .to_owned())
     }
 
-    // Executes arbitrary `safe ` commands and returns
+    // Executes arbitrary `safe` cmds and returns
     // stdout output
     //
     // If expect_exit_code is Some, then an Err is returned
@@ -384,7 +384,7 @@ pub mod util {
         Ok(stdout.trim().to_string())
     }
 
-    // Executes arbitrary `safe ` commands and returns
+    // Executes arbitrary `safe` cmds and returns
     // stderr output
     //
     // If expect_exit_code is Some, then an Err is returned

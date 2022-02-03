@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{DstLocation, Error, MessageId, MsgKind, Result};
+use crate::messaging::{DstLocation, Error, MsgId, MsgKind, Result};
 use bincode::{
     config::{BigEndian, FixintEncoding, WithOtherEndian, WithOtherIntEncoding},
     Options,
@@ -37,7 +37,7 @@ pub struct WireMsgHeader {
 // all this information before deciding to deserialise the actual message payload.
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct MsgEnvelope {
-    pub msg_id: MessageId,
+    pub msg_id: MsgId,
     pub msg_kind: MsgKind,
     pub dst_location: DstLocation,
 }
@@ -73,7 +73,7 @@ lazy_static! {
 
 impl WireMsgHeader {
     // Instantiate a WireMsgHeader as per current supported version.
-    pub fn new(msg_id: MessageId, msg_kind: MsgKind, dst_location: DstLocation) -> Self {
+    pub fn new(msg_id: MsgId, msg_kind: MsgKind, dst_location: DstLocation) -> Self {
         Self {
             //header_size: Self::max_size(),
             version: MESSAGING_PROTO_VERSION,

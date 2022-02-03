@@ -23,7 +23,7 @@ use crate::types::PublicKey;
 
 pub use self::wire_msg::WireMsg;
 use super::{
-    data::ServiceMsg, system::SystemMsg, AuthorityProof, BlsShareAuth, DstLocation, MessageId,
+    data::ServiceMsg, system::SystemMsg, AuthorityProof, BlsShareAuth, DstLocation, MsgId,
     NodeAuth, SectionAuth, ServiceAuth,
 };
 
@@ -32,11 +32,11 @@ use super::{
 /// never serialised or even part of the message that is sent over the wire.
 #[derive(PartialEq, Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
-pub enum MessageType {
+pub enum MsgType {
     /// Service message
     Service {
         /// Message ID
-        msg_id: MessageId,
+        msg_id: MsgId,
         /// Requester's authority over this message
         auth: AuthorityProof<ServiceAuth>,
         /// Message destination location
@@ -47,7 +47,7 @@ pub enum MessageType {
     /// System message
     System {
         /// Message ID
-        msg_id: MessageId,
+        msg_id: MsgId,
         /// Node authority over this message
         msg_authority: NodeMsgAuthority,
         /// Message destination location
@@ -57,16 +57,16 @@ pub enum MessageType {
     },
 }
 
-impl MessageType {
+impl MsgType {
     /// The priority of the message, when handled by lower level comms.
     pub fn priority(&self) -> i32 {
         match self {
-            MessageType::System {
+            MsgType::System {
                 msg: SystemMsg::JoinResponse(_) | SystemMsg::JoinAsRelocatedResponse(_),
                 ..
             } => JOIN_RESPONSE_PRIORITY,
             // DKG messages
-            MessageType::System {
+            MsgType::System {
                 msg:
                     SystemMsg::DkgStart { .. }
                     | SystemMsg::DkgSessionUnknown { .. }
@@ -80,7 +80,7 @@ impl MessageType {
             } => DKG_MSG_PRIORITY,
 
             // Node messages for AE updates
-            MessageType::System {
+            MsgType::System {
                 msg:
                     SystemMsg::AntiEntropyRetry { .. }
                     | SystemMsg::AntiEntropyRedirect { .. }
@@ -96,7 +96,7 @@ impl MessageType {
             } => INFRASTRUCTURE_MSG_PRIORITY,
 
             // Inter-node comms related to processing client requests
-            MessageType::System {
+            MsgType::System {
                 msg:
                     SystemMsg::NodeCmd(_)
                     | SystemMsg::NodeEvent(_)
@@ -107,7 +107,7 @@ impl MessageType {
             } => NODE_DATA_MSG_PRIORITY,
 
             // Client<->node service comms
-            MessageType::Service { .. } => SERVICE_MSG_PRIORITY,
+            MsgType::Service { .. } => SERVICE_MSG_PRIORITY,
         }
     }
 }

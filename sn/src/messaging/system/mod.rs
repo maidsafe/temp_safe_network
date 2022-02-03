@@ -23,7 +23,7 @@ pub use signed::{KeyedSig, SigShare};
 /// List of peers of a section
 pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
 
-use crate::messaging::{EndUser, MessageId, SectionAuthorityProvider};
+use crate::messaging::{EndUser, MsgId, SectionAuthorityProvider};
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;
@@ -188,7 +188,7 @@ pub enum SystemMsg {
         /// QueryResponse.
         response: NodeQueryResponse,
         /// ID of causing query.
-        correlation_id: MessageId,
+        correlation_id: MsgId,
         /// TEMP: Add user here as part of return flow. Remove this as we have chunk routing etc
         user: EndUser,
     },
@@ -198,7 +198,7 @@ pub enum SystemMsg {
         // TODO: return node::Error instead
         error: crate::messaging::data::Error,
         /// ID of causing cmd.
-        correlation_id: MessageId,
+        correlation_id: MsgId,
     },
 }
 

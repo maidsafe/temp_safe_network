@@ -9,7 +9,7 @@
 use crate::messaging::{
     serialisation::{DKG_MSG_PRIORITY, INFRASTRUCTURE_MSG_PRIORITY},
     system::{DkgFailureSigSet, KeyedSig, NodeState, SectionAuth, SystemMsg},
-    DstLocation, MessageId, NodeMsgAuthority, WireMsg,
+    DstLocation, MsgId, NodeMsgAuthority, WireMsg,
 };
 use crate::node::{
     core::Proposal,
@@ -27,13 +27,13 @@ use std::{
     time::Duration,
 };
 
-/// Command for node.
+/// Internal cmds for a node.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
-pub(crate) enum Command {
+pub(crate) enum Cmd {
     /// Handle `message` from `sender`.
     /// Holding the WireMsg that has been received from the network,
-    HandleMessage {
+    HandleMsg {
         sender: UnnamedPeer,
         wire_msg: WireMsg,
         #[debug(skip)]
@@ -42,9 +42,9 @@ pub(crate) enum Command {
     },
     // TODO: rename this as/when this is all node for clarity
     /// Handle Node, either directly or notify via event listener
-    HandleSystemMessage {
+    HandleSystemMsg {
         sender: Peer,
-        msg_id: MessageId,
+        msg_id: MsgId,
         msg: SystemMsg,
         msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
@@ -72,24 +72,24 @@ pub(crate) enum Command {
     /// Handle a DKG failure that was observed by a majority of the DKG participants.
     HandleDkgFailure(DkgFailureSigSet),
     /// Send a message to the given `recipients`.
-    SendMessage {
+    SendMsg {
         recipients: Vec<Peer>,
         wire_msg: WireMsg,
     },
     /// Parses WireMsg to send to the correct location. These must be network nodes, in the NetworkKnowledge.
     /// EndUser messages can not be sent through this api
-    ParseAndSendWireMsgToNodes(WireMsg),
+    SendWireMsgToNodes(WireMsg),
     /// Performs serialisation and signing for sending of NodeMsg.
-    /// This command only send this to other nodes
-    PrepareNodeMsgToSendToNodes { msg: SystemMsg, dst: DstLocation },
+    /// This cmd only send this to other nodes
+    SignOutgoingSystemMsg { msg: SystemMsg, dst: DstLocation },
     /// Send a message to `delivery_group_size` peers out of the given `recipients`.
-    SendMessageDeliveryGroup {
+    SendMsgDeliveryGroup {
         recipients: Vec<Peer>,
         delivery_group_size: usize,
         wire_msg: WireMsg,
     },
     /// Schedule a timeout after the given duration. When the timeout expires, a `HandleTimeout`
-    /// command is raised. The token is used to identify the timeout.
+    /// cmd is raised. The token is used to identify the timeout.
     ScheduleTimeout { duration: Duration, token: u64 },
     /// Test peer's connectivity
     SendAcceptedOnlineShare {
@@ -106,17 +106,17 @@ pub(crate) enum Command {
     TestConnectivity(XorName),
 }
 
-impl Command {
-    /// Return the commands priority, higher being higher prio
+impl Cmd {
+    /// Return the cmds priority, higher being higher prio
     pub(crate) fn priority(&self) -> Result<i32> {
-        // we should not have to worry about child commands here
-        // we use the cmd_id to check for a "root cmd" and go off that commands priority
+        // we should not have to worry about child cmds here
+        // we use the cmd_id to check for a "root cmd" and go off that cmd's priority
         // so this prio may not have an impact if the root was higher/lower
         let prio = match self {
-            Self::HandleMessage { wire_msg, .. } => wire_msg.into_message()?.priority(),
+            Self::HandleMsg { wire_msg, .. } => wire_msg.into_msg()?.priority(),
             Self::HandleDkgOutcome { .. } | Self::HandleDkgFailure(_) => DKG_MSG_PRIORITY,
             Self::HandleNewEldersAgreement { .. } => DKG_MSG_PRIORITY, // its end of DKG
-            Self::HandleAgreement { .. } | Self::HandleSystemMessage { .. } => {
+            Self::HandleAgreement { .. } | Self::HandleSystemMsg { .. } => {
                 INFRASTRUCTURE_MSG_PRIORITY
             }
             _ => -2,
@@ -126,47 +126,47 @@ impl Command {
     }
 }
 
-impl fmt::Display for Command {
+impl fmt::Display for Cmd {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Command::HandleTimeout(_) => write!(f, "HandleTimeout"),
-            Command::ScheduleTimeout { .. } => write!(f, "ScheduleTimeout"),
-            Command::HandleSystemMessage { msg_id, .. } => {
-                write!(f, "HandleSystemMessage {:?}", msg_id)
+            Cmd::HandleTimeout(_) => write!(f, "HandleTimeout"),
+            Cmd::ScheduleTimeout { .. } => write!(f, "ScheduleTimeout"),
+            Cmd::HandleSystemMsg { msg_id, .. } => {
+                write!(f, "HandleSystemMsg {:?}", msg_id)
             }
-            Command::HandleMessage { wire_msg, .. } => {
-                write!(f, "HandleMessage {:?}", wire_msg.msg_id())
+            Cmd::HandleMsg { wire_msg, .. } => {
+                write!(f, "HandleMsg {:?}", wire_msg.msg_id())
             }
-            Command::HandlePeerLost(peer) => write!(f, "HandlePeerLost({:?})", peer.name()),
-            Command::HandleAgreement { .. } => write!(f, "HandleAgreement"),
-            Command::HandleNewEldersAgreement { .. } => write!(f, "HandleNewEldersAgreement"),
-            Command::HandleNewNodeOnline(_) => write!(f, "HandleNewNodeOnline"),
-            Command::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
-            Command::HandleDkgFailure(_) => write!(f, "HandleDkgFailure"),
+            Cmd::HandlePeerLost(peer) => write!(f, "HandlePeerLost({:?})", peer.name()),
+            Cmd::HandleAgreement { .. } => write!(f, "HandleAgreement"),
+            Cmd::HandleNewEldersAgreement { .. } => write!(f, "HandleNewEldersAgreement"),
+            Cmd::HandleNewNodeOnline(_) => write!(f, "HandleNewNodeOnline"),
+            Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
+            Cmd::HandleDkgFailure(_) => write!(f, "HandleDkgFailure"),
             #[cfg(not(feature = "unstable-wiremsg-debuginfo"))]
-            Command::SendMessage { wire_msg, .. } => {
-                write!(f, "SendMessage {:?}", wire_msg.msg_id())
+            Cmd::SendMsg { wire_msg, .. } => {
+                write!(f, "SendMsg {:?}", wire_msg.msg_id())
             }
             #[cfg(feature = "unstable-wiremsg-debuginfo")]
-            Command::SendMessage { wire_msg, .. } => {
+            Cmd::SendMsg { wire_msg, .. } => {
                 write!(
                     f,
-                    "SendMessage {:?} {:?}",
+                    "SendMsg {:?} {:?}",
                     wire_msg.msg_id(),
                     wire_msg.payload_debug
                 )
             }
-            Command::ParseAndSendWireMsgToNodes(wire_msg) => {
-                write!(f, "ParseAndSendWireMsg {:?}", wire_msg.msg_id())
+            Cmd::SendWireMsgToNodes(wire_msg) => {
+                write!(f, "SendWireMsgToNodes {:?}", wire_msg.msg_id())
             }
-            Command::PrepareNodeMsgToSendToNodes { .. } => write!(f, "PrepareNodeMsgToSend"),
-            Command::SendMessageDeliveryGroup { wire_msg, .. } => {
-                write!(f, "SendMessageDeliveryGroup {:?}", wire_msg.msg_id())
+            Cmd::SignOutgoingSystemMsg { .. } => write!(f, "SignOutgoingSystemMsg"),
+            Cmd::SendMsgDeliveryGroup { wire_msg, .. } => {
+                write!(f, "SendMsgDeliveryGroup {:?}", wire_msg.msg_id())
             }
-            Command::SendAcceptedOnlineShare { .. } => write!(f, "SendAcceptedOnlineShare"),
-            Command::ProposeOffline(_) => write!(f, "ProposeOffline"),
-            Command::StartConnectivityTest(_) => write!(f, "StartConnectivityTest"),
-            Command::TestConnectivity(_) => write!(f, "TestConnectivity"),
+            Cmd::SendAcceptedOnlineShare { .. } => write!(f, "SendAcceptedOnlineShare"),
+            Cmd::ProposeOffline(_) => write!(f, "ProposeOffline"),
+            Cmd::StartConnectivityTest(_) => write!(f, "StartConnectivityTest"),
+            Cmd::TestConnectivity(_) => write!(f, "TestConnectivity"),
         }
     }
 }

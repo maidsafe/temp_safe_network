@@ -24,7 +24,7 @@ const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::UNSPECIFIED, 0);
 
 /// Default amount of time to wait for operations to succeed (query/cmd) before giving up and returning an error.
 pub const DEFAULT_OPERATION_TIMEOUT: Duration = Duration::from_secs(120);
-/// Default amount of time to wait (to keep the client alive) after sending a command. This allows AE messages to be parsed/resent.
+/// Default amount of time to wait (to keep the client alive) after sending a cmd. This allows AE messages to be parsed/resent.
 /// Larger PUT operations may need larger ae wait time
 pub const DEFAULT_AE_WAIT: Duration = Duration::from_secs(0);
 
@@ -48,7 +48,7 @@ pub struct ClientConfig {
     pub query_timeout: Duration,
     /// The amount of time to wait for cmds to not error before giving up and returning an error.
     pub cmd_timeout: Duration,
-    /// The amount of time to wait after a command is sent for AE flows to complete.
+    /// The amount of time to wait after a cmd is sent for AE flows to complete.
     pub standard_wait: Duration,
 }
 

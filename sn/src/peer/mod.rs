@@ -259,7 +259,7 @@ impl Peer {
 /// in this case there is no physical connection, and we technically would know our own identity.
 /// It's possible that we're self-sending at the wrong level of the API (e.g. we currently serialise
 /// and self-deliver a `WireMsg`, when we could instead directly generate the appropriate
-/// `Command`). One benefit of this is it also works with tests, where we also often don't have an
+/// `Cmd`). One benefit of this is it also works with tests, where we also often don't have an
 /// actual connection.
 #[derive(Clone, Debug)]
 pub(crate) struct UnnamedPeer {

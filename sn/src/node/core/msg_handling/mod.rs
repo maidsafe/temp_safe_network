@@ -24,11 +24,11 @@ use crate::messaging::{
         JoinRequest, JoinResponse, NodeCmd, NodeEvent, NodeQuery, SectionAuth as SystemSectionAuth,
         SystemMsg,
     },
-    AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth,
+    AuthorityProof, DstLocation, MsgId, MsgKind, MsgType, NodeMsgAuthority, SectionAuth,
     ServiceAuth, WireMsg,
 };
 use crate::node::{
-    api::command::Command,
+    api::cmds::Cmd,
     core::{Core, DkgSessionInfo},
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::NetworkKnowledge,
@@ -46,12 +46,12 @@ use xor_name::XorName;
 // Message handling
 impl Core {
     #[instrument(skip(self, original_bytes))]
-    pub(crate) async fn handle_message(
+    pub(crate) async fn handle_msg(
         &self,
         sender: UnnamedPeer,
         wire_msg: WireMsg,
         original_bytes: Option<Bytes>,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
         trace!("handling msg");
 
@@ -59,7 +59,7 @@ impl Core {
         if let Some(load_report) = self.comm.check_strain(sender.addr()).await {
             let msg_src = wire_msg.msg_kind().src();
             if !msg_src.is_end_user() {
-                cmds.push(Command::PrepareNodeMsgToSendToNodes {
+                cmds.push(Cmd::SignOutgoingSystemMsg {
                     msg: SystemMsg::BackPressure(load_report),
                     dst: msg_src.to_dst(),
                 })
@@ -70,7 +70,7 @@ impl Core {
         let payload = wire_msg.payload.clone();
         let msg_id = wire_msg.msg_id();
 
-        let message_type = match wire_msg.into_message() {
+        let message_type = match wire_msg.into_msg() {
             Ok(message_type) => message_type,
             Err(error) => {
                 error!(
@@ -82,7 +82,7 @@ impl Core {
         };
 
         match message_type {
-            MessageType::System {
+            MsgType::System {
                 msg_id,
                 msg_authority,
                 dst_location,
@@ -143,7 +143,7 @@ impl Core {
                             Some(dst_section_pk) => {
                                 let msg_bytes = original_bytes.unwrap_or(wire_msg.serialize()?);
 
-                                if let Some(ae_command) = self
+                                if let Some(ae_cmd) = self
                                     .check_for_entropy(
                                         // a cheap clone w/ Bytes
                                         msg_bytes,
@@ -155,7 +155,7 @@ impl Core {
                                     .await?
                                 {
                                     // short circuit and send those AE responses
-                                    cmds.push(ae_command);
+                                    cmds.push(ae_cmd);
                                     return Ok(cmds);
                                 }
 
@@ -165,7 +165,7 @@ impl Core {
                     }
                 }
 
-                cmds.push(Command::HandleSystemMessage {
+                cmds.push(Cmd::HandleSystemMsg {
                     sender,
                     msg_id,
                     msg_authority,
@@ -177,7 +177,7 @@ impl Core {
 
                 Ok(cmds)
             }
-            MessageType::Service {
+            MsgType::Service {
                 msg_id,
                 msg,
                 dst_location,
@@ -233,7 +233,7 @@ impl Core {
                 }
 
                 cmds.extend(
-                    self.handle_service_message(msg_id, msg, dst_location, auth, sender)
+                    self.handle_service_msg(msg_id, msg, dst_location, auth, sender)
                         .await?,
                 );
 
@@ -244,21 +244,21 @@ impl Core {
 
     // Handler for all system messages
     #[allow(clippy::too_many_arguments)]
-    pub(crate) async fn handle_system_message(
+    pub(crate) async fn handle_system_msg(
         &self,
         sender: Peer,
-        msg_id: MessageId,
+        msg_id: MsgId,
         mut msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
         msg: SystemMsg,
         payload: Bytes,
         known_keys: Vec<BlsPublicKey>,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         trace!("{:?}", LogMarker::SystemMsgToBeHandled);
 
         // We assume to be aggregated if it contains a BLS Share sig as authority.
         match self
-            .aggregate_message_and_stop(&mut msg_authority, payload)
+            .aggregate_msg_and_stop(&mut msg_authority, payload)
             .await
         {
             Ok(false) => {
@@ -274,7 +274,7 @@ impl Core {
             }
             Ok(true) => Ok(vec![]),
             Err(err) => {
-                trace!("handle_system_message got error {:?}", err);
+                trace!("handle_system_msg got error {:?}", err);
                 Ok(vec![])
             }
         }
@@ -284,13 +284,13 @@ impl Core {
     // passed all signature checks and msg verifications
     pub(crate) async fn handle_valid_msg(
         &self,
-        msg_id: MessageId,
+        msg_id: MsgId,
         msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
         node_msg: SystemMsg,
         sender: Peer,
         known_keys: Vec<BlsPublicKey>,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         self.network_knowledge().merge_connections([&sender]).await;
 
         let src_name = msg_authority.name();
@@ -329,7 +329,7 @@ impl Core {
                     return Ok(vec![]);
                 }
 
-                Ok(vec![Command::TestConnectivity(name)])
+                Ok(vec![Cmd::TestConnectivity(name)])
             }
             SystemMsg::JoinAsRelocatedResponse(join_response) => {
                 trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
@@ -427,7 +427,7 @@ impl Core {
                         {
                             Ok(sig) => {
                                 info!("Relocation: Successfully aggregated ApprovalShares for joining the network");
-                                let mut commands = vec![];
+                                let mut cmds = vec![];
 
                                 if let Some(ref mut joining_as_relocated) =
                                     *self.relocate_state.write().await
@@ -478,7 +478,7 @@ impl Core {
                                     );
 
                                     // TODO: confirm whether carry out the switch immediately here
-                                    //       or still using the Command pattern.
+                                    //       or still using the cmd pattern.
                                     //       As the sending of the JoinRequest as notification
                                     //       may require the `node` to be switched to new already.
 
@@ -511,7 +511,7 @@ impl Core {
                                         node_msg,
                                         section_key,
                                     )?;
-                                    commands.push(Command::SendMessage {
+                                    cmds.push(Cmd::SendMsg {
                                         recipients,
                                         wire_msg,
                                     });
@@ -528,7 +528,7 @@ impl Core {
                                     return Ok(vec![]);
                                 }
 
-                                Ok(commands)
+                                Ok(cmds)
                             }
                             Err(AggregatorError::NotEnoughShares) => Ok(vec![]),
                             error => {
@@ -611,7 +611,7 @@ impl Core {
                     message,
                     sender
                 );
-                self.handle_dkg_message(session_id, message, sender).await
+                self.handle_dkg_msg(session_id, message, sender).await
             }
             SystemMsg::DkgFailureObservation {
                 session_id,
@@ -660,7 +660,7 @@ impl Core {
                 full,
             }) => {
                 info!(
-                    "Processing CouldNotStoreData event with MessageId: {:?}",
+                    "Processing CouldNotStoreData event with MsgId: {:?}",
                     msg_id
                 );
                 return if self.is_elder().await {
@@ -680,7 +680,7 @@ impl Core {
                 };
             }
             SystemMsg::NodeCmd(NodeCmd::ReplicateData(data)) => {
-                info!("ReplicateData MessageId: {:?}", msg_id);
+                info!("ReplicateData MsgId: {:?}", msg_id);
                 return if self.is_elder().await {
                     error!("Received unexpected message while Elder");
                     Ok(vec![])
@@ -714,7 +714,7 @@ impl Core {
                                 full,
                             });
 
-                            Ok(vec![self.send_message_to_our_elders(msg).await?])
+                            Ok(vec![self.send_msg_to_our_elders(msg).await?])
                         }
                     }
                 };
@@ -793,7 +793,7 @@ impl Core {
                         elders,
                         authority: section_auth,
                     } = session_info;
-                    let message_cache = self.dkg_voter.get_cached_messages(&session_id);
+                    let message_cache = self.dkg_voter.get_cached_msgs(&session_id);
                     trace!(
                         "Sending DkgSessionInfo {{ {:?}, elders {:?}, ... }} to {}",
                         &session_id,
@@ -820,7 +820,7 @@ impl Core {
                         section_pk,
                     )?;
 
-                    Ok(vec![Command::SendMessage {
+                    Ok(vec![Cmd::SendMsg {
                         recipients: vec![sender],
                         wire_msg,
                     }])
@@ -837,7 +837,7 @@ impl Core {
                 section_auth,
                 message,
             } => {
-                let mut commands = vec![];
+                let mut cmds = vec![];
                 // Reconstruct the original DKG start message and verify the section signature
                 let payload = WireMsg::serialize_msg_payload(&SystemMsg::DkgStart {
                     session_id,
@@ -848,7 +848,7 @@ impl Core {
                 if self.network_knowledge.section_key().await == auth.sig.public_key {
                     if let Err(err) = AuthorityProof::verify(auth, payload) {
                         error!("Error verifying signature for DkgSessionInfo: {:?}", err);
-                        return Ok(commands);
+                        return Ok(cmds);
                     } else {
                         trace!("DkgSessionInfo signature verified");
                     }
@@ -859,7 +859,7 @@ impl Core {
                     );
                     let chain = self.network_knowledge().section_chain().await;
                     warn!("Chain: {:?}", chain);
-                    return Ok(commands);
+                    return Ok(cmds);
                 }
                 let _existing = self.dkg_sessions.write().await.insert(
                     session_id,
@@ -870,17 +870,17 @@ impl Core {
                     },
                 );
                 trace!("DkgSessionInfo handling {:?} - {:?}", session_id, elders);
-                commands.extend(self.handle_dkg_start(session_id, prefix, elders).await?);
-                commands.extend(
+                cmds.extend(self.handle_dkg_start(session_id, prefix, elders).await?);
+                cmds.extend(
                     self.handle_dkg_retry(session_id, message_cache, message, sender)
                         .await?,
                 );
-                Ok(commands)
+                Ok(cmds)
             }
         }
     }
 
-    async fn record_storage_level_if_any(&self, level: Option<StorageLevel>) -> Vec<Command> {
+    async fn record_storage_level_if_any(&self, level: Option<StorageLevel>) -> Vec<Cmd> {
         let mut cmds = vec![];
         if let Some(level) = level {
             info!("Storage has now passed {} % used.", 10 * level.value());
@@ -899,20 +899,20 @@ impl Core {
                 section_pk: self.network_knowledge.section_key().await,
             };
 
-            cmds.push(Command::PrepareNodeMsgToSendToNodes { msg, dst });
+            cmds.push(Cmd::SignOutgoingSystemMsg { msg, dst });
         }
         cmds
     }
 
-    /// Takes a message and forms commands to send to specified targets
+    /// Takes a message and forms cmds to send to specified targets
     /// Targets are XorName specified so must be within the section
     pub(super) async fn send_node_msg_to_nodes(
         &self,
         msg: SystemMsg,
         targets: BTreeSet<XorName>,
         aggregation: bool,
-    ) -> Result<Vec<Command>> {
-        let msg_id = MessageId::new();
+    ) -> Result<Vec<Cmd>> {
+        let msg_id = MsgId::new();
 
         let our_name = self.node.read().await.name();
 
@@ -948,7 +948,7 @@ impl Core {
 
         wire_msg.set_msg_id(msg_id);
 
-        let mut commands = vec![];
+        let mut cmds = vec![];
 
         for target in targets {
             debug!("sending {:?} to {:?}", wire_msg, target);
@@ -957,16 +957,16 @@ impl Core {
             wire_msg.set_dst_section_pk(dst_section_pk);
             wire_msg.set_dst_xorname(target);
 
-            commands.push(Command::ParseAndSendWireMsgToNodes(wire_msg));
+            cmds.push(Cmd::SendWireMsgToNodes(wire_msg));
         }
 
-        Ok(commands)
+        Ok(cmds)
     }
 
     // Convert the provided NodeMsgAuthority to be a `Section` message
     // authority on successful accumulation. Also return 'true' if
     // current message shall not be processed any further.
-    async fn aggregate_message_and_stop(
+    async fn aggregate_msg_and_stop(
         &self,
         msg_authority: &mut NodeMsgAuthority,
         payload: Bytes,
@@ -1001,7 +1001,7 @@ impl Core {
     }
 
     // Currently using node's Ed key. May need to use bls key share for concensus purpose.
-    async fn ed_sign_client_message(&self, client_msg: &ServiceMsg) -> Result<(MsgKind, Bytes)> {
+    async fn ed_sign_client_msg(&self, client_msg: &ServiceMsg) -> Result<(MsgKind, Bytes)> {
         let keypair = self.node.read().await.keypair.clone();
         let payload = WireMsg::serialize_msg_payload(client_msg)?;
         let signature = keypair.sign(&payload);

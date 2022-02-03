@@ -21,14 +21,14 @@ use xor_name::XorName;
 
 impl Client {
     /// Send a Cmd to the network and await a response.
-    /// Commands are not retried if the timeout is hit.
+    /// Cmds are not retried if the timeout is hit.
     #[instrument(skip(self), level = "debug")]
     pub async fn send_cmd_without_retry(&self, cmd: DataCmd) -> Result<(), Error> {
         self.send_cmd_with_retry_count(cmd, 1.0).await
     }
 
     // Send a Cmd to the network and await a response.
-    // Commands are automatically retried if an error is returned
+    // Cmds are automatically retried if an error is returned
     // This function is a private helper.
     #[instrument(skip(self), level = "debug")]
     async fn send_cmd_with_retry_count(&self, cmd: DataCmd, retry_count: f32) -> Result<(), Error> {
@@ -62,7 +62,7 @@ impl Client {
             debug!("Attempting {:?} (attempt #{})", debug_cmd, attempt);
 
             let res = self
-                .send_signed_command(
+                .send_signed_cmd(
                     dst_name,
                     client_pk,
                     serialised_cmd.clone(),
@@ -91,8 +91,8 @@ impl Client {
 
     /// Send a signed DataCmd to the network.
     /// This is to be part of a public API, for the user to
-    /// provide the serialised and already signed command.
-    pub async fn send_signed_command(
+    /// provide the serialised and already signed cmd.
+    pub async fn send_signed_cmd(
         &self,
         dst_address: XorName,
         client_pk: PublicKey,

@@ -163,7 +163,7 @@ impl Client {
         let query_result = self.send_query(query).await?;
         match query_result.response {
             QueryResponse::GetRegister((res, op_id)) => {
-                res.map_err(|err| Error::ErrorMessage { source: err, op_id })
+                res.map_err(|err| Error::ErrorMsg { source: err, op_id })
             }
             _ => Err(Error::ReceivedUnexpectedEvent),
         }
@@ -179,7 +179,7 @@ impl Client {
         let query_result = self.send_query(query).await?;
         match query_result.response {
             QueryResponse::ReadRegister((res, op_id)) => {
-                res.map_err(|err| Error::ErrorMessage { source: err, op_id })
+                res.map_err(|err| Error::ErrorMsg { source: err, op_id })
             }
             _ => Err(Error::ReceivedUnexpectedEvent),
         }
@@ -196,7 +196,7 @@ impl Client {
         let query_result = self.send_query(query).await?;
         match query_result.response {
             QueryResponse::GetRegisterEntry((res, op_id)) => {
-                res.map_err(|err| Error::ErrorMessage { source: err, op_id })
+                res.map_err(|err| Error::ErrorMsg { source: err, op_id })
             }
             _ => Err(Error::ReceivedUnexpectedEvent),
         }
@@ -213,7 +213,7 @@ impl Client {
         let query_result = self.send_query(query).await?;
         match query_result.response {
             QueryResponse::GetRegisterOwner((res, op_id)) => {
-                res.map_err(|err| Error::ErrorMessage { source: err, op_id })
+                res.map_err(|err| Error::ErrorMsg { source: err, op_id })
             }
             _ => Err(Error::ReceivedUnexpectedEvent),
         }
@@ -234,7 +234,7 @@ impl Client {
         let query_result = self.send_query(query).await?;
         match query_result.response {
             QueryResponse::GetRegisterUserPermissions((res, op_id)) => {
-                res.map_err(|err| Error::ErrorMessage { source: err, op_id })
+                res.map_err(|err| Error::ErrorMsg { source: err, op_id })
             }
             _ => Err(Error::ReceivedUnexpectedEvent),
         }
@@ -247,7 +247,7 @@ impl Client {
         let query_result = self.send_query(query).await?;
         match query_result.response {
             QueryResponse::GetRegisterPolicy((res, op_id)) => {
-                res.map_err(|err| Error::ErrorMessage { source: err, op_id })
+                res.map_err(|err| Error::ErrorMsg { source: err, op_id })
             }
             _ => Err(Error::ReceivedUnexpectedEvent),
         }
@@ -281,7 +281,7 @@ mod tests {
         },
         Error,
     };
-    use crate::messaging::data::Error as ErrorMessage;
+    use crate::messaging::data::Error as ErrorMsg;
     use crate::retry_loop_for_pattern;
     use crate::types::{
         log_markers::LogMarker,
@@ -534,8 +534,8 @@ mod tests {
             .await
         {
             Ok(_) => bail!("Should not be able to retrieve an entry for a random user"),
-            Err(Error::ErrorMessage {
-                source: ErrorMessage::NoSuchEntry,
+            Err(Error::ErrorMsg {
+                source: ErrorMsg::NoSuchEntry,
                 ..
             }) => Ok(()),
             Err(err) => Err(eyre!(
@@ -589,8 +589,8 @@ mod tests {
             .await
         {
             Ok(_) => bail!("Should not be able to retrieve an entry for a random user"),
-            Err(Error::ErrorMessage {
-                source: ErrorMessage::NoSuchEntry,
+            Err(Error::ErrorMsg {
+                source: ErrorMsg::NoSuchEntry,
                 ..
             }) => Ok(()),
             Err(err) => Err(eyre!(
@@ -686,8 +686,8 @@ mod tests {
             .instrument(tracing::info_span!("final get"))
             .await
         {
-            Err(Error::ErrorMessage {
-                source: ErrorMessage::NoSuchEntry,
+            Err(Error::ErrorMsg {
+                source: ErrorMsg::NoSuchEntry,
                 ..
             }) => Ok(()),
             Err(err) => Err(eyre!(
@@ -796,7 +796,7 @@ mod tests {
         let batch2 = client.delete_register(address).await?;
         match client.publish_register_ops(batch2).await {
             Err(Error::ErrorCmd {
-                source: ErrorMessage::InvalidOperation(_),
+                source: ErrorMsg::InvalidOperation(_),
                 ..
             }) => {}
             Err(err) => bail!(
