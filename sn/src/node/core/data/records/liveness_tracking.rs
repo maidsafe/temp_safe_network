@@ -16,8 +16,8 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-const NEIGHBOUR_COUNT: usize = 2;
-const MIN_PENDING_OPS: usize = 10;
+const NEIGHBOUR_COUNT: usize = 3;
+const MIN_PENDING_OPS: usize = 400;
 const ACTIVE_REPLICATION_THRESHOLD: usize = MIN_PENDING_OPS / 2;
 const PENDING_OP_TOLERANCE_RATIO: f64 = 0.1;
 const ACTIVE_REPLICATION_TOLERANCE_RATIO: f64 = 0.05;
@@ -266,9 +266,9 @@ mod tests {
         let adults = (0..10).map(|_| XorName::random()).collect::<Vec<XorName>>();
         let liveness_tracker = Liveness::new(adults.clone());
 
-        // Write data 5 times to the 10 adults
+        // Write data MIN_PENDING_OPS times to the 10 adults
         for adult in &adults {
-            for _ in 0..5 {
+            for _ in 0..MIN_PENDING_OPS {
                 let random_addr = ChunkAddress(XorName::random());
                 let op_id = chunk_operation_id(&random_addr)?;
                 liveness_tracker
@@ -289,8 +289,7 @@ mod tests {
 
         // Write data MIN_PENDING_OPS + 1 times on total to first 10 adults
         for adult in &adults {
-            // We already wrote 5 times
-            for _ in 0..MIN_PENDING_OPS - 4 {
+            for _ in 0..MIN_PENDING_OPS + 1 {
                 let random_addr = ChunkAddress(XorName::random());
                 let op_id = chunk_operation_id(&random_addr)?;
                 liveness_tracker
@@ -317,8 +316,8 @@ mod tests {
         // Assert total adult count
         assert_eq!(liveness_tracker.closest_nodes_to.len(), 11);
 
-        // Write data 100+ times to the new adult which is not cleared
-        for _ in 0..150 {
+        // Write data 30 x MIN_PENDING_OPS times to the new adult which is not cleared
+        for _ in 0..MIN_PENDING_OPS * 30 {
             let random_addr = ChunkAddress(XorName::random());
             let op_id = chunk_operation_id(&random_addr)?;
             liveness_tracker
