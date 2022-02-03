@@ -578,6 +578,62 @@ fn calling_files_sync_and_fetch_without_nrs_update() -> Result<()> {
     // where all files should still be there
     let output = safe_cmd_stdout(["cat", &nrsurl, "--json"], Some(0))?;
     let (xorurl, files_map) = parse_files_container_output(&output)?;
+    assert_eq!(xorurl, format!("safe://{}", nrsurl));
+    assert_eq!(files_map.len(), orig_directory_file_count);
+    Ok(())
+}
+
+#[test]
+fn calling_files_sync_and_fetch_without_nrs_url_with_safe_prefix() -> Result<()> {
+    let with_trailing_slash = true;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    tmp_data_dir.copy_from("../resources/testdata", &["**"])?;
+    let (files_container_xor, processed_files, _) =
+        upload_path(&tmp_data_dir, with_trailing_slash)?;
+
+    let orig_directory_file_count = get_directory_file_count(&tmp_data_dir)?;
+    assert_eq!(processed_files.len(), orig_directory_file_count);
+
+    let site_name = get_random_nrs_string();
+    let nrsurl = format!("safe://{}", site_name);
+    safe_cmd(
+        [
+            "nrs",
+            "register",
+            &site_name,
+            "-l",
+            &files_container_xor,
+            "--json",
+        ],
+        Some(0),
+    )?;
+
+    let empty_dir = tmp_data_dir.child("emptyfolder2");
+    empty_dir.create_dir_all()?;
+    safe_cmd(
+        [
+            "files",
+            "sync",
+            &empty_dir.path().display().to_string(),
+            &nrsurl,
+            "--recursive",
+            "--delete",
+            "--json",
+        ],
+        Some(0),
+    )?;
+
+    // The current version should now only have the empty folder entry.
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
+    url.set_content_version(None);
+    let output = safe_cmd_stdout(["cat", &url.to_string(), "--json"], Some(0))?;
+    let (_, files_map) = parse_files_container_output(&output)?;
+    assert_eq!(files_map.len(), 1);
+
+    // but the NRS name should still link to version 0 of the FilesContainer
+    // where all files should still be there
+    let output = safe_cmd_stdout(["cat", &nrsurl, "--json"], Some(0))?;
+    let (xorurl, files_map) = parse_files_container_output(&output)?;
     assert_eq!(xorurl, nrsurl);
     assert_eq!(files_map.len(), orig_directory_file_count);
     Ok(())

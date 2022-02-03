@@ -15,6 +15,7 @@ use serde::ser::Serialize;
 use sn_api::{
     files::{FilesMapChange, ProcessedFiles},
     nrs::NrsMap,
+    SafeUrl,
 };
 use std::io::{stdin, stdout, Read, Write};
 use tracing::debug;
@@ -227,4 +228,14 @@ pub fn div_or<X: Float>(num: X, den: X, default: X) -> X {
     } else {
         num / den
     }
+}
+
+/// Get the target URL from the link as a string.
+///
+/// If the user hasn't prefixed the link with `safe://`, we'll do that for them here.
+pub fn get_target_url(link: &str) -> Result<SafeUrl> {
+    if !link.starts_with("safe://") {
+        return Ok(SafeUrl::from_url(&format!("safe://{}", link))?);
+    }
+    Ok(SafeUrl::from_url(link)?)
 }

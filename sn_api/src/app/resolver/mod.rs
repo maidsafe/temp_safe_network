@@ -24,7 +24,7 @@ impl Safe {
     /// Parses a string URL "safe://url" and returns a safe URL
     /// Resolves until it reaches the final URL
     pub async fn parse_and_resolve_url(&self, url: &str) -> Result<SafeUrl> {
-        let safe_url = Safe::parse_url(url)?;
+        let safe_url = SafeUrl::from_url(url)?;
         let orig_path = safe_url.path_decoded()?;
 
         // Obtain the resolution chain without resolving the URL's path
@@ -78,7 +78,7 @@ impl Safe {
     /// # });
     /// ```
     pub async fn fetch(&self, url: &str, range: Range) -> Result<SafeData> {
-        let safe_url = Safe::parse_url(url)?;
+        let safe_url = SafeUrl::from_url(url)?;
         info!("URL parsed successfully, fetching: {}", url);
 
         let mut resolution_chain = self
@@ -133,7 +133,7 @@ impl Safe {
     /// # });
     /// ```
     pub async fn inspect(&self, url: &str) -> Result<Vec<SafeData>> {
-        let safe_url = Safe::parse_url(url)?;
+        let safe_url = SafeUrl::from_url(url)?;
         info!("URL parsed successfully, inspecting: {}", url);
         self.fully_resolve_url(safe_url, None, false, None, true)
             .await

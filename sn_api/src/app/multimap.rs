@@ -88,7 +88,7 @@ impl Safe {
         })?;
 
         let data = serialised_entry.to_vec();
-        let safeurl = Safe::parse_url(multimap_url)?;
+        let safeurl = SafeUrl::from_url(multimap_url)?;
         let address = match safeurl.address() {
             DataAddress::Register(reg_address) => reg_address,
             other => {
@@ -123,7 +123,7 @@ impl Safe {
         to_remove: BTreeSet<EntryHash>,
     ) -> Result<EntryHash> {
         debug!("Removing from Multimap at {}: {:?}", url, to_remove);
-        let safeurl = Safe::parse_url(url)?;
+        let safeurl = SafeUrl::from_url(url)?;
         let address = match safeurl.address() {
             DataAddress::Register(reg_address) => reg_address,
             other => {
