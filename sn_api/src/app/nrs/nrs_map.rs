@@ -12,17 +12,17 @@ use log::debug;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-pub(crate) type Subname = String;
+pub(crate) type PublicName = String;
 
 /// An NRS map is a description of a registered topname and all subnames associated with that.
 ///
 /// Each subname will link to some content, e.g., a `FilesContainer`, and the topname can also
 /// optionally link to something.
 ///
-/// The struct is stored on the network using a Multimap. The entries are subname -> SafeUrl
+/// The struct is stored on the network using a Multimap. The entries are public name -> SafeUrl
 /// mappings.
 ///
-/// | Subname Key       | Full Name        | SafeUrl Value            |
+/// | PublicName Key    | Full Name        | SafeUrl Value            |
 /// |-------------------|------------------|--------------------------|
 /// | "example"         | "example"        | "safe://example"         |
 /// | "sub.example"     | "sub.example"    | "safe://sub.example"     |
@@ -33,7 +33,7 @@ pub(crate) type Subname = String;
 /// requested when the map is retrieved, it will be set to `None`.
 #[derive(Debug, PartialEq, Default, Serialize, Deserialize, Clone)]
 pub struct NrsMap {
-    pub map: BTreeMap<Subname, SafeUrl>,
+    pub map: BTreeMap<PublicName, SafeUrl>,
     pub subname_version: Option<VersionHash>,
 }
 
@@ -42,13 +42,16 @@ impl NrsMap {
     pub fn get(&self, public_name: &str) -> Result<SafeUrl> {
         match self.map.get(public_name) {
             Some(link) => {
-                debug!("NRS: Subname resolution is: {} => {}", public_name, link);
+                debug!(
+                    "NRS: public name resolution is: {} => {}",
+                    public_name, link
+                );
                 Ok(link.to_owned())
             }
             None => {
                 debug!("NRS: No link found for subname(s): {}", public_name);
                 Err(Error::ContentError(format!(
-                    "Link not found in NRS Map Container for subname(s): \"{}\"",
+                    "Link not found in NRS Map Container for public name: \"{}\"",
                     public_name
                 )))
             }

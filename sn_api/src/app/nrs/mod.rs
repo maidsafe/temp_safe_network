@@ -202,10 +202,7 @@ impl Safe {
         let nrs_map = match self.nrs_get_subnames_map(public_name, version).await {
             Ok(result) => Ok(result),
             Err(Error::ConflictingNrsEntries(str, conflicting_entries, map)) => {
-                if conflicting_entries
-                    .iter()
-                    .any(|(sub, _)| sub == public_name)
-                {
+                if conflicting_entries.iter().any(|(p, _)| p == public_name) {
                     Err(Error::ConflictingNrsEntries(str, conflicting_entries, map))
                 } else {
                     Ok(map)
@@ -277,9 +274,9 @@ fn convert_multimap_to_nrs_set(multimap: &Multimap) -> Result<BTreeSet<(String, 
         .into_iter()
         .map(|x| {
             let kv = x.1;
-            let subname = str::from_utf8(&kv.0)?;
+            let public_name = str::from_utf8(&kv.0)?;
             let url = SafeUrl::from_url(str::from_utf8(&kv.1)?)?;
-            Ok((subname.to_owned(), url))
+            Ok((public_name.to_owned(), url))
         })
         .collect::<Result<BTreeSet<(String, SafeUrl)>>>()?;
     Ok(set)
@@ -287,18 +284,18 @@ fn convert_multimap_to_nrs_set(multimap: &Multimap) -> Result<BTreeSet<(String, 
 
 fn convert_multimap_to_nrs_map(multimap: &Multimap) -> Result<NrsMap> {
     let nrs_map_version = multimap.iter().map(|x| VersionHash::from(&x.0)).last();
-    let subnames_map: BTreeMap<String, SafeUrl> = multimap
+    let public_names_map: BTreeMap<String, SafeUrl> = multimap
         .clone()
         .into_iter()
         .map(|x| {
             let kv = x.1;
-            let subname = str::from_utf8(&kv.0)?;
+            let public_name = str::from_utf8(&kv.0)?;
             let url = SafeUrl::from_url(str::from_utf8(&kv.1)?)?;
-            Ok((subname.to_owned(), url))
+            Ok((public_name.to_owned(), url))
         })
         .collect::<Result<BTreeMap<String, SafeUrl>>>()?;
     let nrs_map = NrsMap {
-        map: subnames_map,
+        map: public_names_map,
         subname_version: nrs_map_version,
     };
     Ok(nrs_map)
