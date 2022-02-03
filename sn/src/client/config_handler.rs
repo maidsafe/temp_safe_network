@@ -22,18 +22,15 @@ use tracing::{debug, warn};
 
 const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::UNSPECIFIED, 0);
 
-/// Default amount of time to wait for responses to queries before giving up and returning an error.
-pub const DEFAULT_QUERY_TIMEOUT: Duration = Duration::from_secs(120);
-/// Default idle timeout on the elder connection
-const DEFAULT_IDLE_TIMEOUT: Duration = Duration::from_secs(120);
-/// Default keep alive for elder comms
-const DEFAULT_KEEP_ALIVE: Duration = Duration::from_secs(30);
+/// Default amount of time to wait for operations to succeed (query/cmd) before giving up and returning an error.
+pub const DEFAULT_OPERATION_TIMEOUT: Duration = Duration::from_secs(120);
 /// Default amount of time to wait (to keep the client alive) after sending a command. This allows AE messages to be parsed/resent.
 /// Larger PUT operations may need larger ae wait time
 pub const DEFAULT_AE_WAIT: Duration = Duration::from_secs(0);
 
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const SN_QUERY_TIMEOUT: &str = "SN_QUERY_TIMEOUT";
+const SN_CMD_TIMEOUT: &str = "SN_CMD_TIMEOUT";
 const SN_AE_WAIT: &str = "SN_AE_WAIT";
 
 /// Configuration for sn_client.
@@ -49,6 +46,8 @@ pub struct ClientConfig {
     pub qp2p: QuicP2pConfig,
     /// The amount of time to wait for responses to queries before giving up and returning an error.
     pub query_timeout: Duration,
+    /// The amount of time to wait for cmds to not error before giving up and returning an error.
+    pub cmd_timeout: Duration,
     /// The amount of time to wait after a command is sent for AE flows to complete.
     pub standard_wait: Duration,
 }
@@ -63,13 +62,14 @@ impl ClientConfig {
     /// If `local_addr` is not specified, `127.0.0.1:0` will be used (e.g. localhost with a random
     /// port).
     ///
-    /// If `query_timeout` is not specified, [`DEFAULT_QUERY_TIMEOUT`] will be used.
+    /// If `query_timeout` is not specified, [`DEFAULT_OPERATION_TIMEOUT`] will be used.
     pub async fn new(
         root_dir: Option<&Path>,
         local_addr: Option<SocketAddr>,
         genesis_key: bls::PublicKey,
         config_file_path: Option<&Path>,
         query_timeout: Option<Duration>,
+        cmd_timeout: Option<Duration>,
         standard_wait: Option<Duration>,
     ) -> Self {
         let root_dir = root_dir
@@ -77,15 +77,13 @@ impl ClientConfig {
             .unwrap_or_else(default_dir);
         // If a config file path was provided we try to read it,
         // otherwise we use default qp2p config.
-        let mut qp2p = match &config_file_path {
+        let qp2p = match &config_file_path {
             None => QuicP2pConfig::default(),
             Some(path) => read_config_file(path).await.unwrap_or_default(),
         };
 
-        qp2p.idle_timeout = Some(DEFAULT_IDLE_TIMEOUT);
-        qp2p.keep_alive_interval = Some(DEFAULT_KEEP_ALIVE);
-
-        let query_timeout = query_timeout.unwrap_or(DEFAULT_QUERY_TIMEOUT);
+        let query_timeout = query_timeout.unwrap_or(DEFAULT_OPERATION_TIMEOUT);
+        let cmd_timeout = cmd_timeout.unwrap_or(DEFAULT_OPERATION_TIMEOUT);
         let standard_wait = standard_wait.unwrap_or(DEFAULT_AE_WAIT);
 
         // if we have an env var for this, let's override
@@ -104,6 +102,24 @@ impl ClientConfig {
                 }
             },
             Err(_) => query_timeout,
+        };
+
+        // if we have an env var for this, let's override
+        let cmd_timeout = match std::env::var(SN_CMD_TIMEOUT) {
+            Ok(timeout) => match timeout.parse() {
+                Ok(time) => {
+                    warn!(
+                        "Query timeout set from env var {}: {}s",
+                        SN_CMD_TIMEOUT, time
+                    );
+                    Duration::from_secs(time)
+                }
+                Err(error) => {
+                    warn!("There was an error parsing {} env var value: '{}'. Default or client configured cmd timeout will be used: {:?}", SN_CMD_TIMEOUT, timeout, error);
+                    cmd_timeout
+                }
+            },
+            Err(_) => cmd_timeout,
         };
 
         // if we have an env var for this, let's override
@@ -134,6 +150,7 @@ impl ClientConfig {
             genesis_key,
             qp2p,
             query_timeout,
+            cmd_timeout,
             standard_wait,
         }
     }
@@ -211,6 +228,7 @@ mod tests {
             Some(&config_filepath),
             None,
             None,
+            None,
         )
         .await;
         // convert to string for assert
@@ -227,9 +245,17 @@ mod tests {
             .map(|v| {
                 v.parse()
                     .map(Duration::from_secs)
-                    .unwrap_or(DEFAULT_QUERY_TIMEOUT)
+                    .unwrap_or(DEFAULT_OPERATION_TIMEOUT)
             })
-            .unwrap_or(DEFAULT_QUERY_TIMEOUT);
+            .unwrap_or(DEFAULT_OPERATION_TIMEOUT);
+
+        let expected_cmd_timeout = std::env::var(SN_CMD_TIMEOUT)
+            .map(|v| {
+                v.parse()
+                    .map(Duration::from_secs)
+                    .unwrap_or(DEFAULT_OPERATION_TIMEOUT)
+            })
+            .unwrap_or(DEFAULT_OPERATION_TIMEOUT);
 
         let expected_standard_wait = std::env::var(SN_AE_WAIT)
             .map(|v| {
@@ -244,11 +270,10 @@ mod tests {
             root_dir: root_dir.clone(),
             genesis_key,
             qp2p: QuicP2pConfig {
-                idle_timeout: Some(DEFAULT_IDLE_TIMEOUT),
-                keep_alive_interval: Some(DEFAULT_KEEP_ALIVE),
                 ..Default::default()
             },
             query_timeout: expected_query_timeout,
+            cmd_timeout: expected_cmd_timeout,
             standard_wait: expected_standard_wait,
         };
         assert_eq!(format!("{:?}", config), format!("{:?}", expected_config));
@@ -257,12 +282,20 @@ mod tests {
         create_dir_all(&root_dir).await?;
         let mut file = File::create(&config_filepath)?;
 
-        let config_on_disk =
-            ClientConfig::new(None, None, genesis_key, Some(&config_filepath), None, None).await;
+        let config_on_disk = ClientConfig::new(
+            None,
+            None,
+            genesis_key,
+            Some(&config_filepath),
+            None,
+            None,
+            None,
+        )
+        .await;
         serde_json::to_writer_pretty(&mut file, &config_on_disk)?;
         file.sync_all()?;
 
-        let read_cfg = ClientConfig::new(None, None, genesis_key, None, None, None).await;
+        let read_cfg = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
         assert_eq!(serialize(&config_on_disk)?, serialize(&read_cfg)?);
 
         Ok(())

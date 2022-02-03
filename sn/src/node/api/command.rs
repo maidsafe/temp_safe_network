@@ -76,10 +76,12 @@ pub(crate) enum Command {
         recipients: Vec<Peer>,
         wire_msg: WireMsg,
     },
-    /// Parses WireMsg to send to the correct location
-    ParseAndSendWireMsg(WireMsg),
-    /// Performs serialisation and signing for sending of NodeMst
-    PrepareNodeMsgToSend { msg: SystemMsg, dst: DstLocation },
+    /// Parses WireMsg to send to the correct location. These must be network nodes, in the NetworkKnowledge.
+    /// EndUser messages can not be sent through this api
+    ParseAndSendWireMsgToNodes(WireMsg),
+    /// Performs serialisation and signing for sending of NodeMsg.
+    /// This command only send this to other nodes
+    PrepareNodeMsgToSendToNodes { msg: SystemMsg, dst: DstLocation },
     /// Send a message to `delivery_group_size` peers out of the given `recipients`.
     SendMessageDeliveryGroup {
         recipients: Vec<Peer>,
@@ -154,10 +156,10 @@ impl fmt::Display for Command {
                     wire_msg.payload_debug
                 )
             }
-            Command::ParseAndSendWireMsg(wire_msg) => {
+            Command::ParseAndSendWireMsgToNodes(wire_msg) => {
                 write!(f, "ParseAndSendWireMsg {:?}", wire_msg.msg_id())
             }
-            Command::PrepareNodeMsgToSend { .. } => write!(f, "PrepareNodeMsgToSend"),
+            Command::PrepareNodeMsgToSendToNodes { .. } => write!(f, "PrepareNodeMsgToSend"),
             Command::SendMessageDeliveryGroup { wire_msg, .. } => {
                 write!(f, "SendMessageDeliveryGroup {:?}", wire_msg.msg_id())
             }

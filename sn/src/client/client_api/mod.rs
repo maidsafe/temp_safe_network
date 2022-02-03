@@ -34,6 +34,10 @@ use xor_name::XorName;
 
 pub use register_apis::RegisterWriteAheadLog;
 
+/// We divide the total operation timeout by this number.
+/// This also represents the max retries possible, while still staying within the max_timeout.
+pub(crate) const MAX_RETRY_COUNT: f32 = 5.0;
+
 // Maximum amount of Chunks to keep in our cal Chunks cache.
 // Each Chunk is maximum types::MAX_CHUNK_SIZE_IN_BYTES, i.e. ~1MB
 const CHUNK_CACHE_SIZE: usize = 50;
@@ -52,6 +56,7 @@ pub struct Client {
     incoming_errors: Arc<RwLock<Receiver<CmdError>>>,
     session: Session,
     pub(crate) query_timeout: Duration,
+    pub(crate) cmd_timeout: Duration,
     chunks_cache: Arc<RwLock<ChunksCache>>,
 }
 
@@ -163,6 +168,7 @@ impl Client {
             session,
             incoming_errors: Arc::new(RwLock::new(err_receiver)),
             query_timeout: config.query_timeout,
+            cmd_timeout: config.cmd_timeout,
             chunks_cache: Arc::new(RwLock::new(ChunksCache::default())),
         };
 

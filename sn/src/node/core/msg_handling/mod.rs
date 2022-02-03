@@ -58,10 +58,12 @@ impl Core {
         // Apply backpressure if needed.
         if let Some(load_report) = self.comm.check_strain(sender.addr()).await {
             let msg_src = wire_msg.msg_kind().src();
-            cmds.push(Command::PrepareNodeMsgToSend {
-                msg: SystemMsg::BackPressure(load_report),
-                dst: msg_src.to_dst(),
-            })
+            if !msg_src.is_end_user() {
+                cmds.push(Command::PrepareNodeMsgToSendToNodes {
+                    msg: SystemMsg::BackPressure(load_report),
+                    dst: msg_src.to_dst(),
+                })
+            }
         }
 
         // Deserialize the payload of the incoming message
@@ -678,7 +680,7 @@ impl Core {
                 };
             }
             SystemMsg::NodeCmd(NodeCmd::ReplicateData(data)) => {
-                info!("Processing replicate data cmd with MessageId: {:?}", msg_id);
+                info!("ReplicateData MessageId: {:?}", msg_id);
                 return if self.is_elder().await {
                     error!("Received unexpected message while Elder");
                     Ok(vec![])
@@ -689,16 +691,21 @@ impl Core {
                     match self.data_storage.store(&data).await {
                         Ok(level_report) => {
                             info!("Storage level report: {:?}", level_report);
-                            return Ok(self.record_if_any(level_report).await);
+                            return Ok(self.record_storage_level_if_any(level_report).await);
                         }
                         Err(error) => {
                             let full = match error {
                                 //DbError::Io(_) | DbError::Sled(_) => false, // potential transient errors
                                 DbError::NotEnoughSpace => true, // db full
-                                _ => return Ok(vec![]), // the rest seem to be non-problematic errors.. (?)
+                                _ => {
+                                    error!("Problem storing data, but it was ignored: {error}");
+                                    return Ok(vec![]);
+                                } // the rest seem to be non-problematic errors.. (?)
                             };
 
-                            error!("Error storing data: {:?}", error);
+                            if full {
+                                error!("Not enough space to store more data");
+                            }
 
                             let node_id = PublicKey::from(self.node.read().await.keypair.public);
                             let msg = SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
@@ -873,7 +880,7 @@ impl Core {
         }
     }
 
-    async fn record_if_any(&self, level: Option<StorageLevel>) -> Vec<Command> {
+    async fn record_storage_level_if_any(&self, level: Option<StorageLevel>) -> Vec<Command> {
         let mut cmds = vec![];
         if let Some(level) = level {
             info!("Storage has now passed {} % used.", 10 * level.value());
@@ -892,13 +899,14 @@ impl Core {
                 section_pk: self.network_knowledge.section_key().await,
             };
 
-            cmds.push(Command::PrepareNodeMsgToSend { msg, dst });
+            cmds.push(Command::PrepareNodeMsgToSendToNodes { msg, dst });
         }
         cmds
     }
 
     /// Takes a message and forms commands to send to specified targets
-    pub(super) async fn send_node_msg_to_targets(
+    /// Targets are XorName specified so must be within the section
+    pub(super) async fn send_node_msg_to_nodes(
         &self,
         msg: SystemMsg,
         targets: BTreeSet<XorName>,
@@ -949,7 +957,7 @@ impl Core {
             wire_msg.set_dst_section_pk(dst_section_pk);
             wire_msg.set_dst_xorname(target);
 
-            commands.push(Command::ParseAndSendWireMsg(wire_msg));
+            commands.push(Command::ParseAndSendWireMsgToNodes(wire_msg));
         }
 
         Ok(commands)

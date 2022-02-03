@@ -77,7 +77,7 @@ impl Core {
         let msg_kind = MsgKind::NodeAuthMsg(auth.into_inner());
 
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
-        let command = Command::ParseAndSendWireMsg(wire_msg);
+        let command = Command::ParseAndSendWireMsgToNodes(wire_msg);
 
         Ok(vec![command])
     }
@@ -114,7 +114,7 @@ impl Core {
             section_pk,
         };
 
-        commands.push(Command::PrepareNodeMsgToSend { msg, dst });
+        commands.push(Command::PrepareNodeMsgToSendToNodes { msg, dst });
 
         Ok(commands)
     }

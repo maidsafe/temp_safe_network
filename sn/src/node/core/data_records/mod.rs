@@ -39,7 +39,7 @@ impl Core {
             );
 
             let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(data));
-            self.send_node_msg_to_targets(msg, targets, false).await
+            self.send_node_msg_to_nodes(msg, targets, false).await
         } else {
             Err(Error::InvalidState)
         }
@@ -102,7 +102,7 @@ impl Core {
         });
         let aggregation = false;
 
-        self.send_node_msg_to_targets(msg, fresh_targets, aggregation)
+        self.send_node_msg_to_nodes(msg, fresh_targets, aggregation)
             .await
     }
 
