@@ -468,6 +468,10 @@ impl Session {
 
         // wait here to give a chance for AE responses to come in and be parsed
         tokio::time::sleep(Duration::from_secs(INITIAL_WAIT)).await;
+        eprintln!(
+            "section_pk {:?} vs. self.genesis_key: {:?}",
+            section_pk, self.genesis_key
+        );
 
         // If we start with genesis key here, we should wait until we have _at least_ one AE-Retry in
         if section_pk == self.genesis_key {
@@ -478,14 +482,18 @@ impl Session {
             let mut insufficient_sap_peers = false;
 
             if let Some(sap) = known_sap.clone() {
+                eprintln!("initial known_sap: {:?}", sap.names());
                 if sap.elders_vec().len() < elder_count() {
                     insufficient_sap_peers = true;
                 }
+            } else {
+                eprintln!("don't have a known sap yet");
             }
 
             // wait until we have sufficient network knowledge
             while known_sap.is_none() || insufficient_sap_peers {
                 if tried_every_contact {
+                    eprintln!("tried_every_contact, still not get proper networkknowledge ");
                     return Err(Error::NetworkContact);
                 }
 
@@ -507,6 +515,9 @@ impl Session {
                     last_start_pos = start_pos;
 
                     let next_batch_end = start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH;
+
+                    eprintln!("start_pos {:?} last_start_pos {:?} next_batch_end {:?} elders_or_adults {:?}",
+                        start_pos, last_start_pos, next_batch_end, elders_or_adults);
 
                     // if we'd run over known contacts, then we just go to the end
                     let next_contacts = if next_batch_end > elders_or_adults.len() {
@@ -556,7 +567,15 @@ impl Session {
 
                     known_sap = self.network.closest_or_opposite(&dst_address, None);
 
-                    debug!("Known sap: {known_sap:?}");
+                    if let Some(sap) = known_sap.clone() {
+                        eprintln!(
+                            "known_sap after {:?} rounds: {:?}",
+                            knowledge_checks, sap.names()
+                        );
+                    } else {
+                        eprintln!("don't have a known sap yet after {:?} rounds", knowledge_checks);
+                    }
+
                     insufficient_sap_peers = false;
                     if let Some(sap) = known_sap.clone() {
                         if sap.elders_vec().len() < elder_count() {
@@ -568,7 +587,16 @@ impl Session {
             }
 
             let stats = self.network.known_sections_count();
-            debug!("Client has received updated network knowledge. Current sections known: {:?}. Sap for our startup-query: {:?}", stats, known_sap);
+
+            if let Some(sap) = known_sap {
+                eprintln!(
+                    "Client has received updated network knowledge. Current sections known: {:?}. Sap for our startup-query: {:?}",
+                    stats, sap.names()
+                );
+            } else {
+                eprintln!("don't have a known sap yet , and know section is {:?}", stats);
+            }
+
         }
 
         Ok(())

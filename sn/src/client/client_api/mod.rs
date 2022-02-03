@@ -201,8 +201,10 @@ impl Client {
         // either use our known prefixmap elders, or fallback to plain node config file
         let bootstrap_nodes = {
             if let Some(sap) = prefix_map.closest_or_opposite(&XorName::random(), None) {
+                eprintln!("client bootstrap with sap {:?}", sap);
                 sap.elders_vec()
             } else {
+                eprintln!("client bootstrap with random nodes {:?}", bootstrap_nodes);
                 // these peers will be nonsense peers, and dropped after we connect. Reaplced by whatever SectionAuthorityProvider peers we have received
                 bootstrap_nodes
                     .iter()
@@ -224,8 +226,8 @@ impl Client {
             .await;
         // Send the dummy message to probe the network for it's infrastructure details.
         while attempts < NETWORK_PROBE_RETRY_COUNT && initial_probe.is_err() {
-            error!(
-                "Initial probe msg to network failed. Trying again (attempt {}): {:?}",
+            eprintln!(
+                "Initial probe msg to network failed. Trying again, (attempt {}): {:?}",
                 attempts, initial_probe
             );
 
@@ -250,6 +252,8 @@ impl Client {
                 )
                 .await;
         }
+
+        eprintln!("return with intial_probe {:?}", initial_probe);
 
         Ok(client)
     }
