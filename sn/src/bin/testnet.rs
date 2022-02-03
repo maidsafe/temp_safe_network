@@ -64,6 +64,13 @@ struct Cmd {
     /// Format logs as JSON.
     #[structopt(long)]
     json_logs: bool,
+
+    /// Use flamegraph setup.
+    /// NB. This requires cargo flamegraph to be installed
+    /// NB. This runs nodes as `sudo`, so any files created will
+    /// have to be handled as such (ie, `sudo rm -rf ~/.safe/node/local-test-network`)
+    #[structopt(long)]
+    flame: bool,
 }
 
 #[tokio::main]
@@ -90,45 +97,48 @@ async fn main() -> Result<()> {
     // `cargo build --release --features=always-joinable,test-utils --bins`
     // before executing the testnet.exe.
     {
-        let mut args = vec!["build", "--release"];
+        let cmd_args = Cmd::from_args();
+        let mut build_args = vec!["build", "--release"];
 
         // Keep features consistent to avoid recompiling when possible
         if cfg!(feature = "unstable-command-prioritisation") {
-            args.push("--features");
-            args.push("unstable-command-prioritisation");
+            build_args.push("--features");
+            build_args.push("unstable-command-prioritisation");
         }
         if cfg!(feature = "always-joinable") {
-            args.push("--features");
-            args.push("always-joinable");
+            build_args.push("--features");
+            build_args.push("always-joinable");
         }
         if cfg!(feature = "test-utils") {
-            args.push("--features");
-            args.push("test-utils");
+            build_args.push("--features");
+            build_args.push("test-utils");
         }
         if cfg!(feature = "unstable-no-connection-pooling") {
-            args.push("--features");
-            args.push("unstable-no-connection-pooling");
+            build_args.push("--features");
+            build_args.push("unstable-no-connection-pooling");
         }
         if cfg!(feature = "unstable-wiremsg-debuginfo") {
-            args.push("--features");
-            args.push("unstable-wiremsg-debuginfo");
+            build_args.push("--features");
+            build_args.push("unstable-wiremsg-debuginfo");
         }
 
         info!("Building current sn_node");
-        debug!("Building current sn_node with args: {:?}", args);
-        Command::new("cargo")
-            .args(args.clone())
-            .current_dir("sn")
-            // .env("RUST_LOG", "debug")
-            // .env("RUST_BACKTRACE", "1")
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
-            .output()
-            .map_err(Into::into)
-            .and_then(|result| result.status.success().then(|| ()).ok_or_else(|| eyre!("Command exited with error")))
-            .wrap_err_with(|| format!("Failed to run build command with args: {:?}", args))?;
+        debug!("Building current sn_node with args: {:?}", build_args);
 
-        info!("sn_node built successfully");
+        if !cmd_args.flame {
+            Command::new("cargo")
+                .args(build_args.clone())
+                .current_dir("sn")
+                // .env("RUST_LOG", "debug")
+                // .env("RUST_BACKTRACE", "1")
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .output()
+                .map_err(Into::into)
+                .and_then(|result| result.status.success().then(|| ()).ok_or_else(|| eyre!("Command exited with error")))
+                .wrap_err_with(|| format!("Failed to run build command with args: {:?}", build_args))?;
+            info!("sn_node built successfully");
+        }
     }
 
     run_network().await?;
@@ -192,6 +202,10 @@ pub async fn run_network() -> Result<()> {
 
     if args.json_logs {
         sn_launch_tool_args.push("--json-logs");
+    }
+
+    if args.flame {
+        sn_launch_tool_args.push("--flame");
     }
 
     // If RUST_LOG was set we pass it down to the launch tool
