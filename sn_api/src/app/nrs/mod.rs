@@ -370,65 +370,13 @@ fn validate_nrs_public_name(public_name: &str) -> Result<SafeUrl> {
 mod tests {
     use super::*;
     use crate::{
-        app::test_helpers::{new_safe_instance, random_nrs_name},
+        app::test_helpers::{new_safe_instance, random_nrs_name, TestDataFilesContainer},
         Error, SafeUrl,
     };
     use anyhow::{anyhow, Result};
-    use std::collections::HashMap;
     use std::matches;
-    use std::ops::Index;
 
     const TEST_DATA_FILE: &str = "./testdata/test.md";
-
-    struct TestDataFilesMap {
-        pub container_xorurl: String,
-        pub map: HashMap<String, SafeUrl>,
-    }
-
-    impl TestDataFilesMap {
-        pub fn get_url(&self, file_path: &str) -> Result<SafeUrl> {
-            Ok(self
-                .map
-                .get(file_path)
-                .ok_or_else(|| anyhow!(format!("Could not retrieve {file_path}")))?
-                .clone())
-        }
-
-        pub async fn get_test_data_file_map<'a>(
-            files: impl IntoIterator<Item = &'a str>,
-        ) -> Result<TestDataFilesMap> {
-            let mut map: HashMap<String, SafeUrl> = HashMap::new();
-            let safe = new_safe_instance().await?;
-            let (container_xorurl, _, files_map) = safe
-                .files_container_create_from("./testdata", None, false, false)
-                .await?;
-            for file in files {
-                let file_info = files_map
-                    .get(file)
-                    .ok_or_else(|| anyhow!(format!("could not retrieve {file} from files map")))?;
-                let file_link = file_info
-                    .get("link")
-                    .ok_or_else(|| anyhow!("could not retrieve file link"))?;
-                let file_url = SafeUrl::from_url(file_link)?;
-                map.insert(file.to_string(), file_url);
-            }
-            Ok(TestDataFilesMap {
-                container_xorurl,
-                map,
-            })
-        }
-    }
-
-    impl Index<&str> for TestDataFilesMap {
-        type Output = SafeUrl;
-
-        fn index(&self, file_path: &str) -> &Self::Output {
-            match self.map.get(file_path) {
-                Some(url) => url,
-                None => panic!("cannot find file in files map"),
-            }
-        }
-    }
 
     #[tokio::test]
     async fn test_nrs_create() -> Result<()> {
@@ -480,13 +428,10 @@ mod tests {
         let site_name = random_nrs_name();
         let safe = new_safe_instance().await?;
 
-        let (container_link, _, _) = safe
-            .files_container_create_from("./testdata", None, false, false)
-            .await?;
-        let container_url = SafeUrl::from_url(&container_link)?;
+        let files_container = TestDataFilesContainer::get_container([]).await?;
 
         safe.nrs_create(&site_name).await?;
-        let url = safe.nrs_associate(&site_name, &container_url).await?;
+        let url = safe.nrs_associate(&site_name, &files_container.url).await?;
 
         assert_eq!(url.public_name(), site_name);
         assert!(url.content_version().is_some());
@@ -497,7 +442,7 @@ mod tests {
                 "'{}' subname should have been present in retrieved NRS map",
                 site_name
             )))?,
-            container_url
+            files_container.url
         );
         Ok(())
     }
@@ -507,20 +452,13 @@ mod tests {
         let site_name = random_nrs_name();
         let safe = new_safe_instance().await?;
 
-        let (_, _, files_map) = safe
-            .files_container_create_from("./testdata", None, false, false)
-            .await?;
-        let test_file_info = files_map
-            .get("/testdata/test.md")
-            .ok_or_else(|| anyhow!("could not retrieve test.md from files map"))?;
-        let test_file_link = test_file_info
-            .get("link")
-            .ok_or_else(|| anyhow!("could not retrieve file link"))?;
-        let test_file_url = SafeUrl::from_url(test_file_link)?;
+        let files_container = TestDataFilesContainer::get_container(["/testdata/test.md"]).await?;
         let public_name = &format!("test.{site_name}");
 
         safe.nrs_create(&site_name).await?;
-        let url = safe.nrs_associate(public_name, &test_file_url).await?;
+        let url = safe
+            .nrs_associate(public_name, &files_container["/testdata/test.md"])
+            .await?;
 
         assert_eq!(url.public_name(), public_name);
         assert!(url.content_version().is_some());
@@ -533,7 +471,7 @@ mod tests {
                 .ok_or_else(|| anyhow!(format!(
                     "'test.{site_name}' subname should have been present in retrieved NRS map"
                 )))?,
-            test_file_url
+            files_container["/testdata/test.md"]
         );
         Ok(())
     }
@@ -543,29 +481,20 @@ mod tests {
         let site_name = random_nrs_name();
         let safe = new_safe_instance().await?;
 
-        let (_, _, files_map) = safe
-            .files_container_create_from("./testdata", None, false, false)
-            .await?;
-        let test_file_info = files_map
-            .get("/testdata/test.md")
-            .ok_or_else(|| anyhow!("could not retrieve test.md from files map"))?;
-        let test_file_link = test_file_info
-            .get("link")
-            .ok_or_else(|| anyhow!("could not retrieve file link"))?;
-        let test_file_url = SafeUrl::from_url(test_file_link)?;
-        let another_file_info = files_map
-            .get("/testdata/another.md")
-            .ok_or_else(|| anyhow!("could not retrieve another.md from files map"))?;
-        let another_file_link = another_file_info
-            .get("link")
-            .ok_or_else(|| anyhow!("could not retrieve file link"))?;
-        let another_file_url = SafeUrl::from_url(another_file_link)?;
-
+        let files_container =
+            TestDataFilesContainer::get_container(["/testdata/test.md", "/testdata/another.md"])
+                .await?;
         safe.nrs_create(&site_name).await?;
-        safe.nrs_associate(&format!("test.{site_name}"), &test_file_url)
-            .await?;
-        safe.nrs_associate(&format!("another.{site_name}"), &another_file_url)
-            .await?;
+        safe.nrs_associate(
+            &format!("test.{site_name}"),
+            &files_container["/testdata/test.md"],
+        )
+        .await?;
+        safe.nrs_associate(
+            &format!("another.{site_name}"),
+            &files_container["/testdata/another.md"],
+        )
+        .await?;
 
         // The last couple of tests verified the returned URLs are correct; for this test we don't
         // need that.
@@ -578,7 +507,7 @@ mod tests {
                 .ok_or_else(|| anyhow!(format!(
                     "'test.{site_name}' subname should have been present in retrieved NRS map"
                 )))?,
-            test_file_url
+            files_container["/testdata/test.md"]
         );
         assert_eq!(
             *nrs_map
@@ -587,7 +516,7 @@ mod tests {
                 .ok_or_else(|| anyhow!(format!(
                     "'another.{site_name}' subname should have been present in retrieved NRS map"
                 )))?,
-            another_file_url
+            files_container["/testdata/another.md"]
         );
         Ok(())
     }
@@ -597,10 +526,8 @@ mod tests {
         let site_name = random_nrs_name();
         let safe = new_safe_instance().await?;
 
-        let (container_url, _, _) = safe
-            .files_container_create_from("./testdata", None, false, false)
-            .await?;
-        let mut url = SafeUrl::from_url(&container_url)?;
+        let files_container = TestDataFilesContainer::get_container([]).await?;
+        let mut url = files_container.url.clone();
         url.set_content_version(None);
         let public_name = &format!("test.{site_name}");
 
@@ -665,20 +592,13 @@ mod tests {
         let site_name = random_nrs_name();
         let safe = new_safe_instance().await?;
 
-        let (_, _, files_map) = safe
-            .files_container_create_from("./testdata", None, false, false)
-            .await?;
-        let test_file_info = files_map
-            .get("/testdata/test.md")
-            .ok_or_else(|| anyhow!("could not retrieve test.md from files map"))?;
-        let test_file_link = test_file_info
-            .get("link")
-            .ok_or_else(|| anyhow!("could not retrieve file link"))?;
-        let test_file_url = SafeUrl::from_url(test_file_link)?;
+        let files_container = TestDataFilesContainer::get_container(["/testdata/test.md"]).await?;
         let public_name = &format!("test./{site_name}");
 
         safe.nrs_create(&site_name).await?;
-        let result = safe.nrs_associate(public_name, &test_file_url).await;
+        let result = safe
+            .nrs_associate(public_name, &files_container["/testdata/test.md"])
+            .await;
         assert!(result.is_err());
         assert_eq!(
             format!("{}", result.unwrap_err()),
@@ -698,19 +618,12 @@ mod tests {
         let site_name = random_nrs_name();
         let safe = new_safe_instance().await?;
 
-        let (_, _, files_map) = safe
-            .files_container_create_from("./testdata", None, false, false)
-            .await?;
-        let test_file_info = files_map
-            .get("/testdata/test.md")
-            .ok_or_else(|| anyhow!("could not retrieve test.md from files map"))?;
-        let test_file_link = test_file_info
-            .get("link")
-            .ok_or_else(|| anyhow!("could not retrieve file link"))?;
-        let test_file_url = SafeUrl::from_url(test_file_link)?;
+        let files_container = TestDataFilesContainer::get_container(["/testdata/test.md"]).await?;
         let public_name = &format!("test.{site_name}");
 
-        let (_, topname_registered) = safe.nrs_add(public_name, &test_file_url).await?;
+        let (_, topname_registered) = safe
+            .nrs_add(public_name, &files_container["/testdata/test.md"])
+            .await?;
         assert!(topname_registered);
 
         let nrs_map = safe.nrs_get_subnames_map(&site_name, None).await?;
@@ -719,7 +632,7 @@ mod tests {
             *nrs_map.map.get(public_name).ok_or_else(|| anyhow!(format!(
                 "'{public_name}' subname should have been present in retrieved NRS map"
             )))?,
-            test_file_url
+            files_container["/testdata/test.md"]
         );
         Ok(())
     }
@@ -729,29 +642,21 @@ mod tests {
         let site_name = random_nrs_name();
         let safe = new_safe_instance().await?;
 
-        let (_, _, files_map) = safe
-            .files_container_create_from("./testdata", None, false, false)
-            .await?;
-        let test_file_info = files_map
-            .get("/testdata/test.md")
-            .ok_or_else(|| anyhow!("could not retrieve test.md from files map"))?;
-        let test_file_link = test_file_info
-            .get("link")
-            .ok_or_else(|| anyhow!("could not retrieve file link"))?;
-        let test_file_url = SafeUrl::from_url(test_file_link)?;
-        let another_file_info = files_map
-            .get("/testdata/another.md")
-            .ok_or_else(|| anyhow!("could not retrieve another.md from files map"))?;
-        let another_file_link = another_file_info
-            .get("link")
-            .ok_or_else(|| anyhow!("could not retrieve file link"))?;
-        let another_file_url = SafeUrl::from_url(another_file_link)?;
+        let files_container =
+            TestDataFilesContainer::get_container(["/testdata/test.md", "/testdata/another.md"])
+                .await?;
 
         safe.nrs_create(&site_name).await?;
-        safe.nrs_associate(&format!("test.{site_name}"), &test_file_url)
-            .await?;
-        safe.nrs_associate(&format!("another.{site_name}"), &another_file_url)
-            .await?;
+        safe.nrs_associate(
+            &format!("test.{site_name}"),
+            &files_container["/testdata/test.md"],
+        )
+        .await?;
+        safe.nrs_associate(
+            &format!("another.{site_name}"),
+            &files_container["/testdata/another.md"],
+        )
+        .await?;
         let nrs_map = safe.nrs_get_subnames_map(&site_name, None).await?;
         assert_eq!(nrs_map.map.len(), 2);
 
@@ -768,7 +673,7 @@ mod tests {
                 .ok_or_else(|| anyhow!(format!(
                     "'test.{site_name}' subname should have been present in retrieved NRS map"
                 )))?,
-            test_file_url
+            files_container["/testdata/test.md"]
         );
         Ok(())
     }
@@ -778,13 +683,10 @@ mod tests {
         let site_name = random_nrs_name();
         let safe = new_safe_instance().await?;
 
-        let (container_link, _, _) = safe
-            .files_container_create_from("./testdata", None, false, false)
-            .await?;
-        let container_url = SafeUrl::from_url(&container_link)?;
+        let files_container = TestDataFilesContainer::get_container([]).await?;
 
         safe.nrs_create(&site_name).await?;
-        safe.nrs_associate(&site_name, &container_url).await?;
+        safe.nrs_associate(&site_name, &files_container.url).await?;
         let nrs_map = safe.nrs_get_subnames_map(&site_name, None).await?;
         assert_eq!(nrs_map.map.len(), 1);
 
@@ -871,39 +773,46 @@ mod tests {
         Ok(())
     }
 
+    /// The scenario here is:
+    /// * Register a topname
+    /// * Associate a 'test' subname 3 times with different links
+    /// * Associate an 'another' subname with a link
+    ///
+    /// We then retrieve the 'test' subname with the first version. We'd therefore expect the
+    /// returned url to be the first link 'test' was associated with and for the entry in the NRS
+    /// map to be the same link. There should also only be two entries in the map.
     #[tokio::test]
     async fn test_nrs_get_with_duplicate_subname_versions() -> Result<()> {
         let site_name = random_nrs_name();
         let safe = new_safe_instance().await?;
 
-        let files_map = TestDataFilesMap::get_test_data_file_map([
+        let files_container = TestDataFilesContainer::get_container([
             "/testdata/test.md",
             "/testdata/another.md",
             "/testdata/noextension",
         ])
         .await?;
-
         let public_name = &format!("test.{site_name}");
 
         safe.nrs_create(&site_name).await?;
         let nrs_url = safe
-            .nrs_associate(public_name, &files_map["/testdata/test.md"])
+            .nrs_associate(public_name, &files_container["/testdata/test.md"])
             .await?;
         let version = nrs_url
             .content_version()
             .ok_or_else(|| anyhow!("nrs_url should have a version"))?;
-        safe.nrs_associate(public_name, &files_map["/testdata/another.md"])
+        safe.nrs_associate(public_name, &files_container["/testdata/another.md"])
             .await?;
-        safe.nrs_associate(public_name, &files_map["/testdata/noextension"])
+        safe.nrs_associate(public_name, &files_container["/testdata/noextension"])
             .await?;
         safe.nrs_associate(
             &format!("another.{site_name}"),
-            &files_map["/testdata/another.md"],
+            &files_container["/testdata/another.md"],
         )
         .await?;
 
         let (url, nrs_map) = safe.nrs_get(public_name, Some(version)).await?;
-        assert_eq!(url, files_map["/testdata/test.md"]);
+        assert_eq!(url, files_container["/testdata/test.md"]);
         assert_eq!(nrs_map.map.len(), 2);
         assert_eq!(
             nrs_map
@@ -918,7 +827,7 @@ mod tests {
                 .ok_or_else(|| anyhow!(format!(
                     "'test.{site_name}' subname should have been present in retrieved NRS map"
                 )))?,
-            files_map["/testdata/test.md"]
+            files_container["/testdata/test.md"]
         );
         assert_eq!(
             *nrs_map
@@ -927,8 +836,25 @@ mod tests {
                 .ok_or_else(|| anyhow!(format!(
                     "'another.{site_name}' subname should have been present in retrieved NRS map"
                 )))?,
-            files_map["/testdata/another.md"]
+            files_container["/testdata/another.md"]
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_nrs_get_with_topname_link() -> Result<()> {
+        let site_name = random_nrs_name();
+        let safe = new_safe_instance().await?;
+
+        let files_container = TestDataFilesContainer::get_container([]).await?;
+
+        safe.nrs_create(&site_name).await?;
+        safe.nrs_associate(&site_name, &files_container.url).await?;
+
+        let (url, _) = safe.nrs_get(&site_name, None).await?;
+
+        assert_eq!(url, files_container.url);
+
         Ok(())
     }
 }

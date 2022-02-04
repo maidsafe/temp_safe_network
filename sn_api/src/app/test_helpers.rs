@@ -6,11 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{ipc::NodeConfig, Safe};
-use anyhow::{bail, Context, Result};
+use crate::{ipc::NodeConfig, Safe, SafeUrl};
+use anyhow::{anyhow, bail, Context, Result};
 use rand::{distributions::Alphanumeric, rngs::OsRng, thread_rng, Rng};
 use safe_network::types::{Keypair, PublicKey};
-use std::{collections::BTreeSet, env::var, fs, net::SocketAddr, sync::Once};
+use std::{
+    collections::{BTreeSet, HashMap},
+    env::var,
+    fs,
+    net::SocketAddr,
+    ops::Index,
+    sync::Once,
+};
 use tracing_subscriber::{fmt, EnvFilter};
 
 // Environment variable which can be set with the auth credentials
@@ -36,6 +43,49 @@ fn init_logger() {
             .with_target(false)
             .init()
     });
+}
+
+pub struct TestDataFilesContainer {
+    pub url: SafeUrl,
+    pub files_map: HashMap<String, SafeUrl>,
+}
+
+impl TestDataFilesContainer {
+    pub async fn get_container<'a>(
+        files: impl IntoIterator<Item = &'a str>,
+    ) -> Result<TestDataFilesContainer> {
+        let mut map: HashMap<String, SafeUrl> = HashMap::new();
+        let safe = new_safe_instance().await?;
+        let (container_xorurl, _, files_map) = safe
+            .files_container_create_from("./testdata", None, false, false)
+            .await?;
+        let container_url = SafeUrl::from_url(&container_xorurl)?;
+        for file in files {
+            let file_info = files_map
+                .get(file)
+                .ok_or_else(|| anyhow!(format!("could not retrieve {file} from files map")))?;
+            let file_link = file_info
+                .get("link")
+                .ok_or_else(|| anyhow!("could not retrieve file link"))?;
+            let file_url = SafeUrl::from_url(file_link)?;
+            map.insert(file.to_string(), file_url);
+        }
+        Ok(TestDataFilesContainer {
+            url: container_url,
+            files_map: map,
+        })
+    }
+}
+
+impl Index<&str> for TestDataFilesContainer {
+    type Output = SafeUrl;
+
+    fn index(&self, file_path: &str) -> &Self::Output {
+        match self.files_map.get(file_path) {
+            Some(url) => url,
+            None => panic!("cannot find file in files map"),
+        }
+    }
 }
 
 // Instantiate a Safe instance
