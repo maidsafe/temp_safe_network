@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{
+    operations::auth_and_connect::connect,
     operations::config::{Config, SnLaunchToolNetworkLauncher},
-    operations::safe_net::connect,
     shell,
     subcommands::{
         cat::cat_commander,
@@ -21,7 +21,7 @@ use crate::{
         nrs::nrs_commander,
         setup::setup_commander,
         update::update_commander,
-        xorurl::{xorurl_com, xorurl_commander},
+        xorurl::{xorurl_commander, xorurl_of_files},
         OutputFmt, SubCommands,
     },
 };
@@ -33,7 +33,7 @@ use std::time::Duration;
 use structopt::{clap::AppSettings::ColoredHelp, StructOpt};
 use tracing::debug;
 
-const DEFAULT_QUERY_TIMEOUT_SECS: u64 = 120; // 2mins
+const DEFAULT_OPERATION_TIMEOUT_SECS: u64 = 120; // 2mins
 
 const SN_CLI_QUERY_TIMEOUT: &str = "SN_CLI_QUERY_TIMEOUT";
 
@@ -70,7 +70,7 @@ pub async fn run() -> Result<()> {
                 timeout
             )
         })?,
-        Err(_) => DEFAULT_QUERY_TIMEOUT_SECS,
+        Err(_) => DEFAULT_OPERATION_TIMEOUT_SECS,
     };
 
     run_with(None, Some(Duration::from_secs(cli_timeout))).await
@@ -94,7 +94,7 @@ pub async fn run_with(cmd_args: Option<&[&str]>, timeout: Option<Duration>) -> R
 
     debug!("Processing command: {:?}", args);
 
-    let result = match args.cmd {
+    match args.cmd {
         Some(SubCommands::Config { cmd }) => config_commander(cmd, &mut get_config().await?).await,
         Some(SubCommands::Networks { cmd }) => {
             networks_commander(cmd, &mut get_config().await?).await
@@ -123,13 +123,18 @@ pub async fn run_with(cmd_args: Option<&[&str]>, timeout: Option<Duration>) -> R
                 xorurl_commander(
                     cmd,
                     output_fmt,
-                    args.xorurl_base.unwrap_or(XorUrlBase::Base32z), // sn_api::DEFAULT_XORURL_BASE, compiler claims it cannot find it in sn_api.. loco
+                    args.xorurl_base.unwrap_or(XorUrlBase::Base32z),
                 )
                 .await
             } else {
-                let mut safe =
-                    connect(get_config().await?, args.xorurl_base, timeout, args.dry).await?;
-                xorurl_com(location, recursive, follow_links, output_fmt, &mut safe).await
+                xorurl_of_files(
+                    location,
+                    recursive,
+                    follow_links,
+                    output_fmt,
+                    args.xorurl_base,
+                )
+                .await
             }
         }
         Some(SubCommands::Node { cmd }) => {
@@ -143,23 +148,19 @@ pub async fn run_with(cmd_args: Option<&[&str]>, timeout: Option<Duration>) -> R
             // fail if they require write access.
             // If dry-run was set, connection will still be made but no cmds will be sent to the network.
 
-            let mut safe =
-                connect(get_config().await?, args.xorurl_base, timeout, args.dry).await?;
+            let safe = connect(get_config().await?, args.xorurl_base, timeout, args.dry).await?;
 
             match other {
-                SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, &mut safe).await,
-                SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, &mut safe).await,
-                SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, &mut safe).await,
-                SubCommands::Files(cmd) => files_commander(cmd, output_fmt, &mut safe).await,
-                SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, &mut safe).await,
+                SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, &safe).await,
+                SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, &safe).await,
+                SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, &safe).await,
+                SubCommands::Files(cmd) => files_commander(cmd, output_fmt, &safe).await,
+                SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, &safe).await,
                 _ => Err(eyre!("Unknown safe subcommand")),
             }
         }
         None => shell::shell_run(), // then enter in interactive shell
-    };
-
-    //safe.xorurl_base = prev_base;
-    result
+    }
 }
 
 /// Gets the configuration, which is used by various parts of the application.

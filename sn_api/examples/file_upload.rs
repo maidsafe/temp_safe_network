@@ -37,7 +37,7 @@ async fn main() -> Result<()> {
     let bootstrap_config = (genesis_key, nodes);
 
     // The Safe instance is what will give us access to the network API.
-    let mut safe = Safe::connect(bootstrap_config, None, None, None, None).await?;
+    let safe = Safe::connected(bootstrap_config, None, None, None, None).await?;
 
     // We can now upload the file to the network, using the following information
     let dst = None; // root path at destination container

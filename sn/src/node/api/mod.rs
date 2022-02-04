@@ -446,7 +446,7 @@ impl NodeApi {
 
     /// Send a message.
     /// Messages sent here, either section to section or node to node.
-    pub async fn send_message(&self, wire_msg: WireMsg) -> Result<()> {
+    pub async fn parse_and_send_message_to_nodes(&self, wire_msg: WireMsg) -> Result<()> {
         trace!(
             "{:?} {:?}",
             LogMarker::DispatchSendMsgCmd,
@@ -455,7 +455,7 @@ impl NodeApi {
         self.dispatcher
             .clone()
             .enqueue_and_handle_next_command_and_any_offshoots(
-                Command::ParseAndSendWireMsg(wire_msg),
+                Command::ParseAndSendWireMsgToNodes(wire_msg),
                 None,
             )
             .await

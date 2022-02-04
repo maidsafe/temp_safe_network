@@ -16,7 +16,7 @@ mod signed;
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SectionAuth};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
-pub use node_msgs::{NodeCmd, NodeQuery, NodeQueryResponse};
+pub use node_msgs::{NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse};
 pub use node_state::{MembershipState, NodeState, RelocateDetails};
 pub use signed::{KeyedSig, SigShare};
 
@@ -177,10 +177,12 @@ pub enum SystemMsg {
     /// Message that notifies a section to test
     /// the connectivity to a node
     StartConnectivityTest(XorName),
-    /// Cmds only sent internally in the network.
+    /// Cmds are orders to perform some operation, only sent internally in the network.
     NodeCmd(NodeCmd),
     /// Queries is a read-only operation.
     NodeQuery(NodeQuery),
+    /// Events are facts about something that happened on a node.
+    NodeEvent(NodeEvent),
     /// The response to a query, containing the query result.
     NodeQueryResponse {
         /// QueryResponse.

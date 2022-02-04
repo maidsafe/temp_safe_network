@@ -4,6 +4,65 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.47.1 (2022-02-04)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release over the course of 2 calendar days.
+ - 2 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #993 ([`303e856`](https://github.com/maidsafe/safe_network/commit/303e856346dd1d4e5544c9ceae6d571c54cfb84e))
+    - remove get_target_url function ([`9af70e7`](https://github.com/maidsafe/safe_network/commit/9af70e7785c9329d8262de99bda68c4ad79d5154))
+    - remove url sanitisation from api ([`a58f6c5`](https://github.com/maidsafe/safe_network/commit/a58f6c5019e73ffbfa0f29965aa0fa62b026ece7))
+    - Merge #985 ([`ba572d5`](https://github.com/maidsafe/safe_network/commit/ba572d5f909f5c1dc389b9affadffec39a4e0369))
+</details>
+
+## v0.47.0 (2022-02-01)
+
+### New Features
+
+ - <csr-id-b2b0520630774d935aca1f2b602a1de9479ba6f9/> enable cmd retries
+   Previously a command error would simply error out and fail.
+   Now we use an exponential backoff to retry incase errors
+   can be overcome
+
+### Bug Fixes (BREAKING)
+
+ - <csr-id-e0885987742226f72ed761e7b78b86e2fa72e256/> dry-runner was making a connection to the network
+   - Removing unnecessary mutability in many Safe API.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.55.1/sn_api-0.54.0/sn_cli-0.47.0 ([`2ec86e2`](https://github.com/maidsafe/safe_network/commit/2ec86e28246031084d603768ffa1fddf320a10a2))
+    - enable cmd retries ([`b2b0520`](https://github.com/maidsafe/safe_network/commit/b2b0520630774d935aca1f2b602a1de9479ba6f9))
+    - dry-runner was making a connection to the network ([`e088598`](https://github.com/maidsafe/safe_network/commit/e0885987742226f72ed761e7b78b86e2fa72e256))
+</details>
+
 ## v0.46.0 (2022-01-28)
 
 ### New Features
@@ -28,9 +87,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release over the course of 2 calendar days.
+ - 3 commits contributed to the release over the course of 2 calendar days.
  - 6 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -40,6 +99,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.55.0/sn_api-0.53.0/sn_cli-0.46.0 ([`366eee2`](https://github.com/maidsafe/safe_network/commit/366eee25f4b982d5a20d90168368a1aa14aa3181))
     - Merge branch 'main' into nrs_resolve_immutable_content ([`099bf22`](https://github.com/maidsafe/safe_network/commit/099bf224714e667bf998de80099eeeabfd869d8b))
     - retrieve immutable content via nrs ([`3d73dd0`](https://github.com/maidsafe/safe_network/commit/3d73dd03a7a6913a248e5cca7d714f8b8e4c0d01))
 </details>
@@ -128,13 +188,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
    
    Also changed:
    * Fixed the indentation levels for the table of contents.
-   * Provide a small section to describe an example directory used by all commands.
-   * Update other sections to use the above examples directory.
-   * Clarify description of container base paths.
-   * Move the `files ls` section immediately after `files put`, as I think it makes sense to introduce
+* Provide a small section to describe an example directory used by all commands.
+* Update other sections to use the above examples directory.
+* Clarify description of container base paths.
+* Move the `files ls` section immediately after `files put`, as I think it makes sense to introduce
      the concept of listing files after you've uploaded them.
-   * Trim down the `files get` section.
-   * Trim down the `files tree` section.
+* Trim down the `files get` section.
+* Trim down the `files tree` section.
 
 ### Commit Statistics
 
@@ -366,22 +426,12 @@ This is a manual changelog entry. Subsequent CLI releases will use the automated
    following ways:
    
    * The documentation for the command and the arguments were elaborated to provide more information.
-   * Text was added to the command output when the `--default` argument is used, to indicate that a
+* Text was added to the command output when the `--default` argument is used, to indicate that a
      link was created to the topname.
-   * Suggest that links to versionable content must have their version hash specified on the `--link`
+* Suggest that links to versionable content must have their version hash specified on the `--link`
      argument.
-   
-   BREAKING CHANGES:
-   * The `--name` argument has been renamed to `--public-name`.
-   * The `--direct` flag argument was removed.
-   
-   Tests were provided for all of the scenarios and code paths explored in the command and there was
-   some refactoring done to share some code between the `create` and `add` commands. The calls to
-   `nrs_add` and `nrs_associate` were wrapped in functions, due to the slightly verbose error handling
-   required for providing suggestions to the user.
-   
-   Finally, the dry run functionality was removed since this currently isn't available for NRS. We can
-   add it back in when it is.
+* The `--name` argument has been renamed to `--public-name`.
+* The `--direct` flag argument was removed.
 
 ### New Features (BREAKING)
 
@@ -392,9 +442,7 @@ This is a manual changelog entry. Subsequent CLI releases will use the automated
 * The 'self update' feature of the CLI has been disabled for the time being
 * The CLI is now compatible with various API updates that have been made
  - <csr-id-c284f0787afe0d079e53b79b3a9d74cad04c4b0e/> `nrs create` only creates topnames
-
  - <csr-id-d08858cde855e89b6bf44ae5194500fd6c754288/> rename nrs `create` to `register`
-
  - <csr-id-18879590ddfcf125133a6b2b8f3f372e8683be42/> rename Url to SafeUrl
 
 ### Commit Statistics

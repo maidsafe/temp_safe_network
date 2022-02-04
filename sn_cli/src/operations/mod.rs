@@ -11,7 +11,3 @@ pub mod auth_and_connect;
 pub mod config;
 mod helpers;
 pub mod node;
-
-pub mod safe_net {
-    pub use super::auth_and_connect::*;
-}

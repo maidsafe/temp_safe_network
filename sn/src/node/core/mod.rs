@@ -138,7 +138,16 @@ impl Core {
         let data_storage = DataStorage::new(&root_storage_dir, used_space.clone())?;
 
         let capacity = Capacity::new(BTreeMap::new());
-        let adult_liveness = Liveness::new();
+        info!("Creating Liveness checks");
+        let adult_liveness = Liveness::new(
+            network_knowledge
+                .adults()
+                .await
+                .iter()
+                .map(|peer| peer.name())
+                .collect::<Vec<XorName>>(),
+        );
+        info!("Liveness check: {:?}", adult_liveness);
 
         Ok(Self {
             comm,
@@ -217,7 +226,7 @@ impl Core {
     }
 
     /// Generate commands and fire events based upon any node state changes.
-    pub(crate) async fn update_self_for_new_node_state_and_fire_events(
+    pub(crate) async fn update_self_for_new_node_state(
         &self,
         old: StateSnapshot,
     ) -> Result<Vec<Command>> {
@@ -304,7 +313,7 @@ impl Core {
                 }
             } else {
                 commands.extend(
-                    self.send_data_updates_to(
+                    self.send_metadata_updates_to(
                         self.network_knowledge.prefix().await,
                         self.network_knowledge
                             .authority_provider()
@@ -322,7 +331,7 @@ impl Core {
             };
 
             commands.extend(
-                self.send_data_updates_to(
+                self.send_metadata_updates_to(
                     self.network_knowledge.prefix().await,
                     self.network_knowledge
                         .authority_provider()

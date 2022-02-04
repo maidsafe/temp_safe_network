@@ -232,6 +232,37 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
 }
 
 #[test]
+fn calling_safe_cat_nrsurl_without_safe_prefix() -> Result<()> {
+    let with_trailing_slash = true;
+    let tmp_data_path = assert_fs::TempDir::new()?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
+    let (files_container_xor, _processed_files, _) =
+        upload_path(&tmp_data_path, with_trailing_slash)?;
+    let mut url = SafeUrl::from_url(&files_container_xor)?;
+    url.set_path("test.md");
+
+    let public_name = format!("test.{}", get_random_nrs_string());
+    safe_cmd(
+        [
+            "nrs",
+            "add",
+            &public_name,
+            "--link",
+            &url.to_string(), // to_string has the version on the url
+            "--register-top-name",
+            "--json",
+        ],
+        Some(0),
+    )?;
+
+    safe_cmd(["cat", &public_name], Some(0))?
+        .assert()
+        .stdout(predicate::str::contains("hello tests!"));
+
+    Ok(())
+}
+
+#[test]
 fn calling_safe_cat_nrsurl_with_immutable_content() -> Result<()> {
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;

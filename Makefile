@@ -148,6 +148,7 @@ run-local-baby-fleming:
 	pgrep sn_node | xargs kill -9
 	rm -rf ~/.safe
 	mkdir -p ~/.safe/node
-	(cd sn && cargo build --release)
+	cargo clean
+	cargo build --release --bin sn_node
 	cp target/release/sn_node ~/.safe/node
 	cargo run --release node run-baby-fleming

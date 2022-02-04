@@ -17,6 +17,16 @@ mod service_msgs;
 mod update_section;
 
 use crate::dbs::Error as DbError;
+use crate::messaging::{
+    data::{ServiceMsg, StorageLevel},
+    signature_aggregator::Error as AggregatorError,
+    system::{
+        JoinRequest, JoinResponse, NodeCmd, NodeEvent, NodeQuery, SectionAuth as SystemSectionAuth,
+        SystemMsg,
+    },
+    AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority, SectionAuth,
+    ServiceAuth, WireMsg,
+};
 use crate::node::{
     api::command::Command,
     core::{Core, DkgSessionInfo},
@@ -26,19 +36,6 @@ use crate::node::{
 };
 use crate::peer::{Peer, UnnamedPeer};
 use crate::types::{log_markers::LogMarker, PublicKey, Signature};
-use crate::{
-    messaging::{
-        data::{ServiceMsg, StorageLevel},
-        signature_aggregator::Error as AggregatorError,
-        system::{
-            JoinRequest, JoinResponse, NodeCmd, NodeQuery, SectionAuth as SystemSectionAuth,
-            SystemMsg,
-        },
-        AuthorityProof, DstLocation, MessageId, MessageType, MsgKind, NodeMsgAuthority,
-        SectionAuth, ServiceAuth, WireMsg,
-    },
-    types::ReplicatedData,
-};
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -61,10 +58,12 @@ impl Core {
         // Apply backpressure if needed.
         if let Some(load_report) = self.comm.check_strain(sender.addr()).await {
             let msg_src = wire_msg.msg_kind().src();
-            cmds.push(Command::PrepareNodeMsgToSend {
-                msg: SystemMsg::BackPressure(load_report),
-                dst: msg_src.to_dst(),
-            })
+            if !msg_src.is_end_user() {
+                cmds.push(Command::PrepareNodeMsgToSendToNodes {
+                    msg: SystemMsg::BackPressure(load_report),
+                    dst: msg_src.to_dst(),
+                })
+            }
         }
 
         // Deserialize the payload of the incoming message
@@ -651,60 +650,74 @@ impl Core {
                 Ok(vec![])
             }
             SystemMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }) => {
-                info!("Processing received DataExchange packet: {:?}", msg_id);
+                info!("Processing received MetadataExchange packet: {:?}", msg_id);
                 self.set_adult_levels(metadata).await;
                 Ok(vec![])
             }
-            SystemMsg::NodeCmd(NodeCmd::StoreData { data, .. }) => {
-                info!("Processing chunk write with MessageId: {:?}", msg_id);
-                // There is no point in verifying a sig from a sender A or B here.
-
-                // This may return a DatabaseFull error... but we should have reported storage increase
-                // well before this
-                match self.data_storage.store(&data).await {
-                    Ok(level_report) => {
-                        info!("Storage level report: {:?}", level_report);
-                        return Ok(self.record_if_any(level_report).await);
-                    }
-                    Err(error) => {
-                        error!("Error storing data: {:?}", error);
-                        let mut commands = vec![];
-
-                        // if the error was Disk Full
-                        if matches!(error, DbError::NotEnoughSpace) {
-                            warn!("Db errored as full. Informing elders");
-                            let level = StorageLevel::from(10)?;
-                            commands.extend(self.record_if_any(Some(level)).await);
-                        }
-
-                        let msg = SystemMsg::NodeCmd(NodeCmd::RepublishData(data));
-                        commands.push(self.send_message_to_our_elders(msg).await?);
-
-                        Ok(commands)
-                    }
-                }
-            }
-            SystemMsg::NodeCmd(NodeCmd::ReplicateData(data)) => {
-                info!("Processing replicate data cmd with MessageId: {:?}", msg_id);
-
-                return if self.is_elder().await {
-                    self.republish_data(data).await
-                } else {
-                    // We are an adult here, so just store away!
-
-                    // TODO: should this be a cmd returned for threading?
-                    let level_report = self.data_storage.store_for_replication(&data).await?;
-                    Ok(self.record_if_any(level_report).await)
-                };
-            }
-            SystemMsg::NodeCmd(NodeCmd::RepublishData(data)) => {
+            SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
+                node_id,
+                data,
+                full,
+            }) => {
                 info!(
-                    "Republishing data {:?} with MessageId {:?}",
-                    data.name(),
+                    "Processing CouldNotStoreData event with MessageId: {:?}",
                     msg_id
                 );
+                return if self.is_elder().await {
+                    if full {
+                        let changed = self
+                            .set_storage_level(&node_id, StorageLevel::from(StorageLevel::MAX)?)
+                            .await;
+                        if changed {
+                            // ..then we accept a new node in place of the full node
+                            *self.joins_allowed.write().await = true;
+                        }
+                    }
+                    self.replicate_data(data).await
+                } else {
+                    error!("Received unexpected message while Adult");
+                    Ok(vec![])
+                };
+            }
+            SystemMsg::NodeCmd(NodeCmd::ReplicateData(data)) => {
+                info!("ReplicateData MessageId: {:?}", msg_id);
+                return if self.is_elder().await {
+                    error!("Received unexpected message while Elder");
+                    Ok(vec![])
+                } else {
+                    // We are an adult here, so just store away!
+                    // This may return a DatabaseFull error... but we should have reported storage increase
+                    // well before this
+                    match self.data_storage.store(&data).await {
+                        Ok(level_report) => {
+                            info!("Storage level report: {:?}", level_report);
+                            return Ok(self.record_storage_level_if_any(level_report).await);
+                        }
+                        Err(error) => {
+                            let full = match error {
+                                //DbError::Io(_) | DbError::Sled(_) => false, // potential transient errors
+                                DbError::NotEnoughSpace => true, // db full
+                                _ => {
+                                    error!("Problem storing data, but it was ignored: {error}");
+                                    return Ok(vec![]);
+                                } // the rest seem to be non-problematic errors.. (?)
+                            };
 
-                return self.republish_data(data).await;
+                            if full {
+                                error!("Not enough space to store more data");
+                            }
+
+                            let node_id = PublicKey::from(self.node.read().await.keypair.public);
+                            let msg = SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
+                                node_id,
+                                data,
+                                full,
+                            });
+
+                            Ok(vec![self.send_message_to_our_elders(msg).await?])
+                        }
+                    }
+                };
             }
             SystemMsg::NodeCmd(node_cmd) => {
                 self.send_event(Event::MessageReceived {
@@ -867,7 +880,7 @@ impl Core {
         }
     }
 
-    async fn record_if_any(&self, level: Option<StorageLevel>) -> Vec<Command> {
+    async fn record_storage_level_if_any(&self, level: Option<StorageLevel>) -> Vec<Command> {
         let mut cmds = vec![];
         if let Some(level) = level {
             info!("Storage has now passed {} % used.", 10 * level.value());
@@ -886,34 +899,14 @@ impl Core {
                 section_pk: self.network_knowledge.section_key().await,
             };
 
-            cmds.push(Command::PrepareNodeMsgToSend { msg, dst });
+            cmds.push(Command::PrepareNodeMsgToSendToNodes { msg, dst });
         }
         cmds
     }
 
-    // Locate ideal holders for this data, line up wiremsgs for those to instruct them to store the data
-    async fn republish_data(&self, data: ReplicatedData) -> Result<Vec<Command>> {
-        if self.is_elder().await {
-            let target_holders = self.get_adults_who_should_store_data(data.name()).await;
-            info!(
-                "Republishing data {:?} to holders {:?}",
-                data.name(),
-                &target_holders,
-            );
-
-            let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(data));
-            let aggregation = false;
-
-            self.send_node_msg_to_targets(msg, target_holders, aggregation)
-                .await
-        } else {
-            error!("Received unexpected message while Adult");
-            Ok(vec![])
-        }
-    }
-
     /// Takes a message and forms commands to send to specified targets
-    pub(super) async fn send_node_msg_to_targets(
+    /// Targets are XorName specified so must be within the section
+    pub(super) async fn send_node_msg_to_nodes(
         &self,
         msg: SystemMsg,
         targets: BTreeSet<XorName>,
@@ -964,7 +957,7 @@ impl Core {
             wire_msg.set_dst_section_pk(dst_section_pk);
             wire_msg.set_dst_xorname(target);
 
-            commands.push(Command::ParseAndSendWireMsg(wire_msg));
+            commands.push(Command::ParseAndSendWireMsgToNodes(wire_msg));
         }
 
         Ok(commands)

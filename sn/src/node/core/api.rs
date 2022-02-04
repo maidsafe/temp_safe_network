@@ -151,7 +151,10 @@ impl Core {
     }
 
     // Send message to peers on the network.
-    pub(crate) async fn send_msg_to_peers(&self, mut wire_msg: WireMsg) -> Result<Command> {
+    pub(crate) async fn send_msg_to_network_nodes(
+        &self,
+        mut wire_msg: WireMsg,
+    ) -> Result<Vec<Command>> {
         let dst_location = wire_msg.dst_location();
         let (targets, dg_size) = delivery_group::delivery_targets(
             dst_location,
@@ -177,15 +180,10 @@ impl Core {
             && dst_location.is_to_node()
             && self.network_knowledge.prefix().await.matches(&target_name)
         {
-            // This actually means being an elder, we don't know the member yet. Which most likely
+            // This actually means being an elder, but we don't know the member yet. Which most likely
             // happens during the join process that a node's name is changed.
-            // The command with empty recipients results in error of EmptyRecipientList during
-            // the send attempt later on. And the message get dropped.
-            return Ok(Command::SendMessageDeliveryGroup {
-                recipients: Vec::new(),
-                delivery_group_size: 0,
-                wire_msg,
-            });
+            // we just drop the message
+            return Ok(vec![]);
         }
 
         let dst_pk = self.section_key_by_name(&target_name).await;
@@ -197,7 +195,7 @@ impl Core {
             wire_msg,
         };
 
-        Ok(command)
+        Ok(vec![command])
     }
 
     // Generate a new section info based on the current set of members and if it differs from the

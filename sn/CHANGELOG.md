@@ -5,6 +5,92 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.55.3 (2022-02-04)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #993 ([`303e856`](https://github.com/maidsafe/safe_network/commit/303e856346dd1d4e5544c9ceae6d571c54cfb84e))
+    - Merge #991 ([`a4f2c8a`](https://github.com/maidsafe/safe_network/commit/a4f2c8ac42d5d91764ca4e00a73a693f6a0221b5))
+    - renaming apis for clarity of purpose ([`2746cff`](https://github.com/maidsafe/safe_network/commit/2746cff087fd33aff523bc2df07a3462d05c6de1))
+</details>
+
+## v0.55.2 (2022-02-02)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 1 day passed between releases.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.55.2 ([`637ec03`](https://github.com/maidsafe/safe_network/commit/637ec03f9922e5d3dd0c8703eba5019256f4ec06))
+    - all env var to override cmd_timeout ([`7cd6337`](https://github.com/maidsafe/safe_network/commit/7cd63377de16dd2962961f2dd936df3276fe8d6d))
+    - session records all failed connection ids ([`f73e00c`](https://github.com/maidsafe/safe_network/commit/f73e00cc67fae6090b9c991ac4e06999ea28f22e))
+    - Merge #985 ([`ba572d5`](https://github.com/maidsafe/safe_network/commit/ba572d5f909f5c1dc389b9affadffec39a4e0369))
+    - failcmd with any error after retries ([`2479dae`](https://github.com/maidsafe/safe_network/commit/2479daea6b05c7b680bf6062407f507ad8692d57))
+    - simplify data replication cmds and flow ([`7f01106`](https://github.com/maidsafe/safe_network/commit/7f01106c8266abec07c9522cb69e4fbbb493f386))
+</details>
+
+## v0.55.1 (2022-02-01)
+
+### New Features
+
+ - <csr-id-b2b0520630774d935aca1f2b602a1de9479ba6f9/> enable cmd retries
+   Previously a command error would simply error out and fail.
+   Now we use an exponential backoff to retry incase errors
+   can be overcome
+
+### Bug Fixes
+
+ - <csr-id-16bd75af79708f88dcb7086d04fac8475f3b3190/> fix liveness tracking logic and keep track of newly joining adults
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 3 days passed between releases.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.55.1/sn_api-0.54.0/sn_cli-0.47.0 ([`2ec86e2`](https://github.com/maidsafe/safe_network/commit/2ec86e28246031084d603768ffa1fddf320a10a2))
+    - log data reorganisation ([`81298bb`](https://github.com/maidsafe/safe_network/commit/81298bb8ce1d93d7a418ff340d866fc00d9f60a4))
+    - enable cmd retries ([`b2b0520`](https://github.com/maidsafe/safe_network/commit/b2b0520630774d935aca1f2b602a1de9479ba6f9))
+    - unit test liveness tracker basics ([`25259b2`](https://github.com/maidsafe/safe_network/commit/25259b221120c8c9258ffdfae8883c65ead38677))
+    - fix liveness tracking logic and keep track of newly joining adults ([`16bd75a`](https://github.com/maidsafe/safe_network/commit/16bd75af79708f88dcb7086d04fac8475f3b3190))
+    - Merge branch 'main' into Chore-ClientImprovement ([`cea6f47`](https://github.com/maidsafe/safe_network/commit/cea6f4718c5aec320279c9abe7f7a54eeecca9ad))
+</details>
+
 ## v0.55.0 (2022-01-28)
 
 ### Bug Fixes
@@ -15,19 +101,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-fa6014e581f52615971701572a1635dfde922fb6/> remove the relocation promise step for Elders
    - Both Adults and Elders now receive the `Relocate` message with all the relocation details
-     without any previous or additional steps required to proceed with their relocation.
-   - The relocation details are now embedded in the `NodeState`, which is
-     sent to the relocated peer (with section authority) within the Relocate message.
-   - `JoinAsRelocatedRequest` always carries the signed relocate details (`relocate_proof`).
-   - `JoinAsRelocatedRequest` now contains the signature of the node's new name with its previous key (`signature_over_new_name`)
+   without any previous or additional steps required to proceed with their relocation.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 9 commits contributed to the release over the course of 2 calendar days.
+ - 12 commits contributed to the release over the course of 2 calendar days.
  - 3 days passed between releases.
- - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -37,10 +119,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.55.0/sn_api-0.53.0/sn_cli-0.46.0 ([`366eee2`](https://github.com/maidsafe/safe_network/commit/366eee25f4b982d5a20d90168368a1aa14aa3181))
+    - send queries to random elders in a section ([`90cdbce`](https://github.com/maidsafe/safe_network/commit/90cdbce964c8fd293d85b9a28f1b0d2d2a046b08))
+    - dont keep wiremsg in mem while sendin bytes ([`1ff0ab7`](https://github.com/maidsafe/safe_network/commit/1ff0ab735994f8cbfae6abd58fea0e71a90f742c))
     - use the churn signature for deciding both the destination and members to relocate ([`b1d35af`](https://github.com/maidsafe/safe_network/commit/b1d35af9c2ae6cb386c6726a432c02b9d44973c2))
-    - minor reorganisation of code ([`0c4c7d8`](https://github.com/maidsafe/safe_network/commit/0c4c7d8c973bdb1e1d055798c17be2065f0334e2))
     - Merge #972 ([`c9668f1`](https://github.com/maidsafe/safe_network/commit/c9668f19ea9a2bca5d8ed96b88ba76fa1c65fc96))
     - Merge #973 #979 ([`f44e8cf`](https://github.com/maidsafe/safe_network/commit/f44e8cf097e0a4e67bdbe83b41695fddc30d4eac))
+    - minor reorganisation of code ([`0c4c7d8`](https://github.com/maidsafe/safe_network/commit/0c4c7d8c973bdb1e1d055798c17be2065f0334e2))
     - Merge #978 ([`132f85c`](https://github.com/maidsafe/safe_network/commit/132f85c119927907516cf3f9f0d5e3e4b8d3f6fe))
     - remove the relocation promise step for Elders ([`fa6014e`](https://github.com/maidsafe/safe_network/commit/fa6014e581f52615971701572a1635dfde922fb6))
     - Merge #971 #977 ([`f8cdbc4`](https://github.com/maidsafe/safe_network/commit/f8cdbc4625b6d79fcff4b66e2ff427cdc48607f5))

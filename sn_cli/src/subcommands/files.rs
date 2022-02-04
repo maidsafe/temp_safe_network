@@ -9,8 +9,8 @@
 use super::{
     files_get::{process_get_command, FileExistsAction, ProgressIndicator},
     helpers::{
-        gen_processed_files_table, get_from_arg_or_stdin, get_from_stdin, if_tty, notice_dry_run,
-        parse_stdin_arg, pluralize, serialise_output,
+        gen_processed_files_table, get_from_arg_or_stdin, get_from_stdin, get_target_url, if_tty,
+        notice_dry_run, parse_stdin_arg, pluralize, serialise_output,
     },
     OutputFmt,
 };
@@ -202,7 +202,7 @@ pub enum FilesSubCommands {
 pub async fn files_commander(
     cmd: FilesSubCommands,
     output_fmt: OutputFmt,
-    safe: &mut Safe,
+    safe: &Safe,
 ) -> Result<()> {
     match cmd {
         FilesSubCommands::Put {
@@ -244,6 +244,7 @@ pub async fn files_commander(
             update_nrs,
         } => {
             let target = get_from_arg_or_stdin(target, None)?;
+            let mut target_url = get_target_url(&target)?;
             if safe.dry_run_mode && OutputFmt::Pretty == output_fmt {
                 notice_dry_run();
             }
@@ -251,7 +252,7 @@ pub async fn files_commander(
             let (content, processed_files) = safe
                 .files_container_sync(
                     &location,
-                    &target,
+                    &target_url.to_string(),
                     recursive,
                     follow_links,
                     delete,
@@ -265,28 +266,28 @@ pub async fn files_commander(
             if OutputFmt::Pretty == output_fmt {
                 let version_str = version.map_or("empty".to_string(), |v| format!("version {}", v));
                 if success_count > 0 {
-                    let url = match SafeUrl::from_url(&target) {
-                        Ok(mut safeurl) => {
-                            safeurl.set_content_version(version);
-                            safeurl.set_path("");
-                            safeurl.to_string()
-                        }
-                        Err(_) => target,
-                    };
-
-                    println!("FilesContainer synced up ({}): \"{}\"", version_str, url);
+                    target_url.set_content_version(version);
+                    target_url.set_path("");
+                    println!(
+                        "FilesContainer synced up ({}): \"{}\"",
+                        version_str, target_url
+                    );
                     table.printstd();
                 } else if !processed_files.is_empty() {
                     println!(
                         "No changes were made to FilesContainer ({}) at \"{}\"",
-                        version_str, target
+                        version_str, target_url
                     );
                     table.printstd();
                 } else {
-                    println!("No changes were required, source location is already in sync with FilesContainer ({}) at: \"{}\"", version_str, target);
+                    println!(
+                        "No changes were required, source location is already in sync with \
+                        FilesContainer ({}) at: \"{}\"",
+                        version_str, target
+                    );
                 }
             } else {
-                print_serialized_output(target, version, &processed_files, output_fmt);
+                print_serialized_output(target.to_string(), version, &processed_files, output_fmt);
             }
             Ok(())
         }
@@ -415,7 +416,7 @@ pub async fn files_commander(
 
 // processes the `safe files tree` command.
 async fn process_tree_command(
-    safe: &mut Safe,
+    safe: &Safe,
     target: Option<XorUrl>,
     details: bool,
     output_fmt: OutputFmt,
@@ -775,7 +776,7 @@ fn print_files_map(
 
 fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, FilesMap)> {
     let mut filtered_filesmap = FilesMap::default();
-    let mut safeurl = Safe::parse_url(target_url)?;
+    let mut safeurl = SafeUrl::from_url(target_url)?;
     let mut total = 0;
 
     for (filepath, fileitem) in files_map.iter() {

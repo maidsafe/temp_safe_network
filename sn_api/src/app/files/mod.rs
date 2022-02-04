@@ -58,7 +58,7 @@ impl Safe {
     ///     assert!(xorurl.contains("safe://"))
     /// # });
     /// ```
-    pub async fn files_container_create(&mut self) -> Result<XorUrl> {
+    pub async fn files_container_create(&self) -> Result<XorUrl> {
         // Build a Register creation operation
         let xorurl = self
             .register_create(
@@ -87,7 +87,7 @@ impl Safe {
     /// # });
     /// ```
     pub async fn files_container_create_from<P: AsRef<Path>>(
-        &mut self,
+        &self,
         location: P,
         dst: Option<&Path>,
         recursive: bool,
@@ -122,12 +122,12 @@ impl Safe {
             // Write pointer to files_map onto our register
             let reg_address = self.get_register_address(&reg_url)?;
             let entry = files_map_xorurl.as_bytes().to_vec();
-            let (entry_hash, reg_op) = self
-                .client
+            let client = self.get_safe_client()?;
+            let (entry_hash, reg_op) = client
                 .write_to_register(reg_address, entry, Default::default())
                 .await?;
 
-            self.client.publish_register_ops(reg_op).await?;
+            client.publish_register_ops(reg_op).await?;
 
             // We return versioned xorurl
             reg_url.set_content_version(Some(VersionHash::from(&entry_hash)));
@@ -152,10 +152,7 @@ impl Safe {
     ///     println!("FilesMap of fetched version is: {:?}", files_map);
     /// # });
     /// ```
-    pub async fn files_container_get(
-        &mut self,
-        url: &str,
-    ) -> Result<Option<(VersionHash, FilesMap)>> {
+    pub async fn files_container_get(&self, url: &str) -> Result<Option<(VersionHash, FilesMap)>> {
         debug!("Getting files container from: {:?}", url);
         let safe_url = self.parse_and_resolve_url(url).await?;
 
@@ -242,7 +239,7 @@ impl Safe {
     /// ```
     #[allow(clippy::too_many_arguments)]
     pub async fn files_container_sync<P: AsRef<Path>>(
-        &mut self,
+        &self,
         location: P,
         url: &str,
         recursive: bool,
@@ -256,7 +253,7 @@ impl Safe {
             ));
         }
 
-        let safe_url = Safe::parse_url(url)?;
+        let safe_url = SafeUrl::from_url(url)?;
 
         // If NRS name shall be updated then the URL has to be an NRS-URL
         if update_nrs && safe_url.content_type() != ContentType::NrsMapContainer {
@@ -278,12 +275,10 @@ impl Safe {
             };
 
         // Let's generate the list of local files paths, without uploading any new file yet.
-        // Switch dry run mode ON only for this next operation
-        let prev_dry_run_mode = self.dry_run_mode;
-        self.dry_run_mode = true;
-        let result = file_system_dir_walk(self, location.as_ref(), recursive, follow_links).await;
-        self.dry_run_mode = prev_dry_run_mode;
-        let processed_files = result?;
+        // Use a dry runner only for this next operation
+        let dry_runner = Safe::dry_runner(Some(self.xorurl_base));
+        let processed_files =
+            file_system_dir_walk(&dry_runner, location.as_ref(), recursive, follow_links).await?;
 
         let dst_path = Path::new(safe_url.path());
 
@@ -331,7 +326,7 @@ impl Safe {
     /// # });
     /// ```
     pub async fn files_container_add(
-        &mut self,
+        &self,
         source_file: &str,
         url: &str,
         force: bool,
@@ -353,12 +348,9 @@ impl Safe {
             let source_path = Path::new(source_file);
 
             // Let's generate the list of local files paths, without uploading any new file yet.
-            // Switch dry run mode ON only for this next operation
-            let prev_dry_run_mode = self.dry_run_mode;
-            self.dry_run_mode = true;
-            let result = file_system_single_file(self, source_path).await;
-            self.dry_run_mode = prev_dry_run_mode;
-            let processed_files = result?;
+            // Use dry runner only for this next operation
+            let dry_runner = Safe::dry_runner(Some(self.xorurl_base));
+            let processed_files = file_system_single_file(&dry_runner, source_path).await?;
 
             files_map_sync(
                 self,
@@ -405,7 +397,7 @@ impl Safe {
     /// # });
     /// ```
     pub async fn files_container_add_from_raw(
-        &mut self,
+        &self,
         data: Bytes,
         url: &str,
         force: bool,
@@ -451,12 +443,12 @@ impl Safe {
     /// # });
     /// ```
     pub async fn files_container_remove_path(
-        &mut self,
+        &self,
         url: &str,
         recursive: bool,
         update_nrs: bool,
     ) -> Result<(VersionHash, ProcessedFiles, FilesMap)> {
-        let safe_url = Safe::parse_url(url)?;
+        let safe_url = SafeUrl::from_url(url)?;
         let dst_path = safe_url.path();
         if dst_path.is_empty() {
             return Err(Error::InvalidInput(
@@ -510,7 +502,7 @@ impl Safe {
     // information regarding the update and new version if so
     #[allow(clippy::too_many_arguments)]
     async fn update_files_container(
-        &mut self,
+        &self,
         files_map_changes_count: u64,
         current_version: Option<VersionHash>,
         new_files_map: FilesMap,
@@ -557,7 +549,7 @@ impl Safe {
     // It flagged with `update_nrs`, it will also update the link in the corresponding NRS Map Container
     #[allow(clippy::too_many_arguments)]
     async fn append_version_to_files_container(
-        &mut self,
+        &self,
         current_version: HashSet<VersionHash>,
         new_files_map: &FilesMap,
         url: &str,
@@ -638,7 +630,8 @@ impl Safe {
             Client::calculate_address(bytes, Scope::Public)?
         } else {
             debug!("Storing {} bytes of data", bytes.len());
-            self.client.upload_and_verify(bytes, Scope::Public).await?
+            let client = self.get_safe_client()?;
+            client.upload_and_verify(bytes, Scope::Public).await?
         };
         let xorurl = SafeUrl::encode_bytes(address, content_type, self.xorurl_base)?;
 
@@ -661,7 +654,7 @@ impl Safe {
     ///     assert_eq!(received_data, data);
     /// # });
     /// ```
-    pub async fn files_get_public(&mut self, url: &str, range: Range) -> Result<Bytes> {
+    pub async fn files_get_public(&self, url: &str, range: Range) -> Result<Bytes> {
         // TODO: do we want ownership from other PKs yet?
         let safe_url = self.parse_and_resolve_url(url).await?;
         self.fetch_public_data(&safe_url, range).await
@@ -686,15 +679,16 @@ impl Safe {
 
     pub async fn get_bytes(&self, address: BytesAddress, range: Range) -> Result<Bytes> {
         debug!("Attempting to fetch data from {:?}", address.name());
+        let client = self.get_safe_client()?;
         let data = if let Some((start, end)) = range {
             let start = start.map(|start_index| start_index as usize).unwrap_or(0);
             let len = end
                 .map(|end_index| end_index as usize - start)
                 .unwrap_or(usize::MAX);
 
-            self.client.read_from(address, start, len).await
+            client.read_from(address, start, len).await
         } else {
-            self.client.read_bytes(address).await
+            client.read_bytes(address).await
         }
         .map_err(|e| Error::NetDataError(format!("Failed to GET file: {:?}", e)))?;
 
@@ -708,7 +702,7 @@ impl Safe {
     }
 
     // Private helper to serialise a FilesMap and store it in a file
-    async fn store_files_map(&mut self, files_map: &FilesMap) -> Result<String> {
+    async fn store_files_map(&self, files_map: &FilesMap) -> Result<String> {
         // The FilesMapContainer is a Register where each NRS Map version is
         // an entry containing the XOR-URL of the file that contains the serialised NrsMap.
         let serialised_files_map = serde_json::to_string(&files_map).map_err(|err| {
@@ -730,12 +724,12 @@ impl Safe {
 
 // Make sure the input params are valid for a files_container_add operation
 async fn validate_files_add_params(
-    safe: &mut Safe,
+    safe: &Safe,
     source_file: &str,
     url: &str,
     update_nrs: bool,
 ) -> Result<(SafeUrl, Option<VersionHash>, FilesMap)> {
-    let safe_url = Safe::parse_url(url)?;
+    let safe_url = SafeUrl::from_url(url)?;
 
     // If NRS name shall be updated then the URL has to be an NRS-URL
     if update_nrs && safe_url.content_type() != ContentType::NrsMapContainer {
@@ -752,7 +746,7 @@ async fn validate_files_add_params(
 
     // Let's act according to if it's a local file path or a safe:// location
     if source_file.starts_with("safe://") {
-        let source_safe_url = Safe::parse_url(source_file)?;
+        let source_safe_url = SafeUrl::from_url(source_file)?;
         if source_safe_url.data_type() != DataType::File {
             return Err(Error::InvalidInput(format!(
                 "The source URL should target a file ('{}'), but the URL provided targets a '{}'",
@@ -822,7 +816,7 @@ fn get_base_paths(location: &Path, dst_path: Option<&Path>) -> (String, String) 
 // metadata and their corresponding links, as well as generating the report of processed files
 #[allow(clippy::too_many_arguments)]
 async fn files_map_sync(
-    safe: &mut Safe,
+    safe: &Safe,
     mut current_files_map: FilesMap,
     location: &Path,
     new_content: ProcessedFiles,
@@ -984,20 +978,14 @@ async fn files_map_sync(
     Ok((processed_files, updated_files_map, success_count))
 }
 
-async fn is_file_item_modified(
-    safe: &mut Safe,
-    local_filename: &Path,
-    file_item: &FileInfo,
-) -> bool {
+async fn is_file_item_modified(safe: &Safe, local_filename: &Path, file_item: &FileInfo) -> bool {
     if FileMeta::filetype_is_file(&file_item[PREDICATE_TYPE]) {
-        // Switch dry run mode ON only for this next operation
-        let prev_dry_run_mode = safe.dry_run_mode;
-        safe.dry_run_mode = true;
-        let is_uploaded = match upload_file_to_net(safe, local_filename).await {
+        // Use a dry runner only for this next operation
+        let dry_runner = Safe::dry_runner(Some(safe.xorurl_base));
+        let is_uploaded = match upload_file_to_net(&dry_runner, local_filename).await {
             Ok(local_xorurl) => file_item[PREDICATE_LINK] != local_xorurl,
             Err(_) => false,
         };
-        safe.dry_run_mode = prev_dry_run_mode;
 
         is_uploaded
     } else {
@@ -1012,7 +1000,7 @@ async fn is_file_item_modified(
 }
 
 async fn files_map_add_link(
-    safe: &mut Safe,
+    safe: &Safe,
     mut files_map: FilesMap,
     file_link: &str,
     file_name: &Path,
@@ -1020,93 +1008,51 @@ async fn files_map_add_link(
 ) -> Result<(ProcessedFiles, FilesMap, u64)> {
     let mut processed_files = ProcessedFiles::new();
     let mut success_count = 0;
-    match SafeUrl::from_url(file_link) {
+    let file_type = match SafeUrl::from_url(file_link) {
         Err(err) => {
             info!("Skipping file \"{}\". {}", file_link, err);
             processed_files.insert(
                 PathBuf::from(file_link),
                 FilesMapChange::Failed(format!("{}", err)),
             );
-            Ok((processed_files, files_map, success_count))
+            return Ok((processed_files, files_map, success_count));
         }
-        Ok(safe_url) => {
-            let file_path = Path::new("");
-            let file_type = match safe_url.content_type() {
-                ContentType::MediaType(media_type) => media_type,
-                other => format!("{}", other),
+        Ok(safe_url) => match safe_url.content_type() {
+            ContentType::MediaType(media_type) => media_type,
+            other => format!("{}", other),
+        },
+    };
+
+    let file_path = Path::new("");
+    let file_size = ""; // unknown
+    let file_name_str = file_name.display().to_string();
+
+    // Let's update FileInfo if the link is different or it doesn't exist in the files_map
+    let dry_runner = Safe::dry_runner(Some(safe.xorurl_base));
+    match files_map.get(&file_name_str) {
+        Some(current_file_item) => {
+            let mut file_meta = FileMeta::from_file_item(current_file_item);
+            file_meta.file_type = file_type;
+            file_meta.file_size = file_size.to_string();
+
+            let is_modified = if file_meta.is_file() {
+                current_file_item[PREDICATE_LINK] != file_link
+            } else {
+                // directory: nothing to check.
+                // symlink: TODO: check if sym-link path has changed.
+                false
             };
-            let file_size = ""; // unknown
-            let file_name_str = file_name.display().to_string();
 
-            // Let's update FileInfo if the link is different or it doesn't exist in the files_map
-            match files_map.get(&file_name_str) {
-                Some(current_file_item) => {
-                    let mut file_meta = FileMeta::from_file_item(current_file_item);
-                    file_meta.file_type = file_type;
-                    file_meta.file_size = file_size.to_string();
-
-                    let is_modified = if file_meta.is_file() {
-                        current_file_item[PREDICATE_LINK] != file_link
-                    } else {
-                        // directory: nothing to check.
-                        // symlink: TODO: check if sym-link path has changed.
-                        false
-                    };
-
-                    if is_modified {
-                        if force {
-                            // switch dry run mode ON only for this next operation
-                            let prev_dry_run_mode = safe.dry_run_mode;
-                            safe.dry_run_mode = true;
-                            if add_or_update_file_item(
-                                safe,
-                                file_name,
-                                &file_name_str,
-                                file_path,
-                                &file_meta,
-                                Some(file_link),
-                                true,
-                                &mut files_map,
-                                &mut processed_files,
-                            )
-                            .await
-                            {
-                                success_count += 1;
-                            }
-                            safe.dry_run_mode = prev_dry_run_mode;
-                        } else {
-                            info!("Skipping file \"{}\" since a file with name \"{}\" already exists on target. You can use the 'force' flag to replace the existing file with the new one", file_link, file_name_str);
-                            processed_files.insert(
-                                file_name.to_path_buf(),
-                                FilesMapChange::Failed(format!(
-                                    "<{}>",
-                                    Error::FileNameConflict(file_name_str)
-                                )),
-                            );
-                        }
-                    } else {
-                        info!("Skipping file \"{}\" since a file with name \"{}\" already exists on target with the same link", file_link, file_name_str);
-                        processed_files.insert(
-                            PathBuf::from(file_link),
-                            FilesMapChange::Failed(format!(
-                                "<{}>",
-                                Error::FileAlreadyExists(file_name_str)
-                            )),
-                        );
-                    }
-                }
-                None => {
-                    // switch dry run mode ON only for this next operation
-                    let prev_dry_run_mode = safe.dry_run_mode;
-                    safe.dry_run_mode = true;
+            if is_modified {
+                if force {
                     if add_or_update_file_item(
-                        safe,
+                        &dry_runner,
                         file_name,
                         &file_name_str,
                         file_path,
-                        &FileMeta::from_type_and_size(&file_type, file_size),
+                        &file_meta,
                         Some(file_link),
-                        false,
+                        true,
                         &mut files_map,
                         &mut processed_files,
                     )
@@ -1114,13 +1060,47 @@ async fn files_map_add_link(
                     {
                         success_count += 1;
                     }
-                    safe.dry_run_mode = prev_dry_run_mode;
+                } else {
+                    info!("Skipping file \"{}\" since a file with name \"{}\" already exists on target. You can use the 'force' flag to replace the existing file with the new one", file_link, file_name_str);
+                    processed_files.insert(
+                        file_name.to_path_buf(),
+                        FilesMapChange::Failed(format!(
+                            "<{}>",
+                            Error::FileNameConflict(file_name_str)
+                        )),
+                    );
                 }
-            };
-
-            Ok((processed_files, files_map, success_count))
+            } else {
+                info!("Skipping file \"{}\" since a file with name \"{}\" already exists on target with the same link", file_link, file_name_str);
+                processed_files.insert(
+                    PathBuf::from(file_link),
+                    FilesMapChange::Failed(format!(
+                        "<{}>",
+                        Error::FileAlreadyExists(file_name_str)
+                    )),
+                );
+            }
         }
-    }
+        None => {
+            if add_or_update_file_item(
+                &dry_runner,
+                file_name,
+                &file_name_str,
+                file_path,
+                &FileMeta::from_type_and_size(&file_type, file_size),
+                Some(file_link),
+                false,
+                &mut files_map,
+                &mut processed_files,
+            )
+            .await
+            {
+                success_count += 1;
+            }
+        }
+    };
+
+    Ok((processed_files, files_map, success_count))
 }
 
 // Remove a path from the FilesMap provided
@@ -1180,7 +1160,7 @@ fn files_map_remove_path(
 // From the provided list of local files paths and corresponding files XOR-URLs,
 // create a FilesMap with file's metadata and their corresponding links
 async fn files_map_create(
-    safe: &mut Safe,
+    safe: &Safe,
     content: &mut ProcessedFiles,
     location: &Path,
     dst_path: Option<&Path>,
@@ -1233,6 +1213,7 @@ async fn files_map_create(
         )
         .await;
     }
+
     Ok(files_map)
 }
 
@@ -1261,7 +1242,7 @@ mod tests {
 
     // Helper function to create a files container with all files from TEST_DATA_FOLDER
     async fn new_files_container_from_testdata(
-        safe: &mut Safe,
+        safe: &Safe,
     ) -> Result<(String, ProcessedFiles, FilesMap)> {
         let (xorurl, processed_files, files_map) =
             retry_loop!(safe.files_container_create_from(TEST_DATA_FOLDER, None, true, true,));
@@ -1276,7 +1257,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_map_create() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let mut processed_files = ProcessedFiles::new();
         let first_xorurl = SafeUrl::from_url("safe://top_xorurl")?.to_xorurl_string();
         let second_xorurl = SafeUrl::from_url("safe://second_xorurl")?.to_xorurl_string();
@@ -1290,7 +1271,7 @@ mod tests {
             FilesMapChange::Added(second_xorurl.clone()),
         );
         let files_map = files_map_create(
-            &mut safe,
+            &safe,
             &mut processed_files,
             Path::new(TEST_DATA_FOLDER_NO_SLASH),
             Some(Path::new("")),
@@ -1312,7 +1293,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_create_empty() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let xorurl = safe.files_container_create().await?;
 
         assert!(xorurl.starts_with("safe://"));
@@ -1345,7 +1326,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_store_public() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let random_content: String = thread_rng().sample_iter(&Alphanumeric).take(20).collect();
 
         let file_xorurl = safe
@@ -1360,7 +1341,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_create_from_file() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let filename = Path::new("./testdata/test.md");
         let (xorurl, processed_files, files_map) = safe
             .files_container_create_from(&filename.display().to_string(), None, false, false)
@@ -1427,7 +1408,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_create_from_folder_without_trailing_slash() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create_from(
             TEST_DATA_FOLDER_NO_SLASH,
             None,
@@ -1472,8 +1453,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_create_from_folder_with_trailing_slash() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-        let (_, processed_files, files_map) = new_files_container_from_testdata(&mut safe).await?;
+        let safe = new_safe_instance().await?;
+        let (_, processed_files, files_map) = new_files_container_from_testdata(&safe).await?;
 
         let filename1 = Path::new("./testdata/test.md");
         assert!(processed_files[filename1].is_added());
@@ -1508,7 +1489,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_create_from_dst_path_without_trailing_slash() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create_from(
                 TEST_DATA_FOLDER_NO_SLASH,
@@ -1555,7 +1536,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_create_from_dst_path_with_trailing_slash() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create_from(
                 TEST_DATA_FOLDER_NO_SLASH,
@@ -1602,8 +1583,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, _) = new_files_container_from_testdata(&mut safe).await?;
+        let safe = new_safe_instance().await?;
+        let (xorurl, processed_files, _) = new_files_container_from_testdata(&safe).await?;
 
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
             .ok_or(anyhow!("files container was unexpectedly empty"))?;
@@ -1669,7 +1650,7 @@ mod tests {
     #[tokio::test]
     async fn test_files_container_sync_dry_run() -> Result<()> {
         let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, _) = new_files_container_from_testdata(&mut safe).await?;
+        let (xorurl, processed_files, _) = new_files_container_from_testdata(&safe).await?;
 
         // set dry_run flag on
         safe.dry_run_mode = true;
@@ -1734,7 +1715,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync_same_size() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = safe
             .files_container_create_from("./testdata/test.md", None, false, false)
             .await?;
@@ -1789,8 +1770,8 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn test_files_container_sync_with_versioned_target() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-        let (xorurl, _, _) = new_files_container_from_testdata(&mut safe).await?;
+        let safe = new_safe_instance().await?;
+        let (xorurl, _, _) = new_files_container_from_testdata(&safe).await?;
 
         match safe
             .files_container_sync(
@@ -1821,8 +1802,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync_with_delete() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-        let (xorurl, _, files_map) = new_files_container_from_testdata(&mut safe).await?;
+        let safe = new_safe_instance().await?;
+        let (xorurl, _, files_map) = new_files_container_from_testdata(&safe).await?;
 
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
@@ -1890,7 +1871,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync_delete_without_recursive() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         match safe
             .files_container_sync(
                 "./testdata/subfolder/",
@@ -1919,8 +1900,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync_update_nrs_unversioned_link() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-        let (xorurl, _, _) = new_files_container_from_testdata(&mut safe).await?;
+        let safe = new_safe_instance().await?;
+        let (xorurl, _, _) = new_files_container_from_testdata(&safe).await?;
 
         let nrsurl = random_nrs_name();
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
@@ -1933,10 +1914,8 @@ mod tests {
             Err(Error::UnversionedContentError(msg)) => {
                 assert_eq!(
                 msg,
-                format!(
-                    "The linked content (FilesContainer) is versionable, therefore NRS requires the link to specify a hash: {}",
-                    unversioned_link
-                )
+                "FilesContainer content is versionable. NRS requires the supplied link to specify \
+                a version hash.",
             );
                 Ok(())
             }
@@ -1949,8 +1928,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync_update_nrs_with_xorurl() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-        let (xorurl, _, _) = new_files_container_from_testdata(&mut safe).await?;
+        let safe = new_safe_instance().await?;
+        let (xorurl, _, _) = new_files_container_from_testdata(&safe).await?;
 
         match safe
             .files_container_sync(
@@ -1982,8 +1961,8 @@ mod tests {
     #[tokio::test]
     #[ignore] // TODO: tmp because hang
     async fn test_files_container_sync_update_nrs_versioned_link() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-        let (xorurl, _, _) = new_files_container_from_testdata(&mut safe).await?;
+        let safe = new_safe_instance().await?;
+        let (xorurl, _, _) = new_files_container_from_testdata(&safe).await?;
 
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
             .ok_or(anyhow!("files container was unexpectedly empty"))?;
@@ -2021,8 +2000,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync_target_path_without_trailing_slash() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, _) = new_files_container_from_testdata(&mut safe).await?;
+        let safe = new_safe_instance().await?;
+        let (xorurl, processed_files, _) = new_files_container_from_testdata(&safe).await?;
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_path("path/when/sync");
@@ -2087,8 +2066,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_sync_target_path_with_trailing_slash() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-        let (xorurl, processed_files, _) = new_files_container_from_testdata(&mut safe).await?;
+        let safe = new_safe_instance().await?;
+        let (xorurl, processed_files, _) = new_files_container_from_testdata(&safe).await?;
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_path("/path/when/sync/");
@@ -2153,8 +2132,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_get() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-        let (xorurl, _, files_map) = new_files_container_from_testdata(&mut safe).await?;
+        let safe = new_safe_instance().await?;
+        let (xorurl, _, files_map) = new_files_container_from_testdata(&safe).await?;
 
         let (_, fetched_files_map) = retry_loop!(safe.files_container_get(&xorurl))
             .ok_or(anyhow!("files container was unexpectedly empty"))?;
@@ -2174,8 +2153,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_version() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-        let (xorurl, _, _) = new_files_container_from_testdata(&mut safe).await?;
+        let safe = new_safe_instance().await?;
+        let (xorurl, _, _) = new_files_container_from_testdata(&safe).await?;
 
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
             .ok_or(anyhow!("files container was unexpectedly empty"))?;
@@ -2204,8 +2183,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_get_with_version() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-        let (xorurl, _, files_map) = new_files_container_from_testdata(&mut safe).await?;
+        let safe = new_safe_instance().await?;
+        let (xorurl, _, files_map) = new_files_container_from_testdata(&safe).await?;
 
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
             .ok_or(anyhow!("files container was unexpectedly empty"))?;
@@ -2288,8 +2267,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_create_from_get_empty_folder() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-        let (xorurl, _, files_map) = new_files_container_from_testdata(&mut safe).await?;
+        let safe = new_safe_instance().await?;
+        let (xorurl, _, files_map) = new_files_container_from_testdata(&safe).await?;
 
         let (_, files_map_get) = retry_loop!(safe.files_container_get(&xorurl.to_string()))
             .ok_or(anyhow!("files container was unexpectedly empty"))?;
@@ -2307,7 +2286,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "fix unknown issue"]
     async fn test_files_container_sync_with_nrs_url() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (xorurl, _, _) =
             retry_loop!(safe.files_container_create_from("./testdata/test.md", None, false, true,));
         let _ = retry_loop!(safe.fetch(&xorurl, None));
@@ -2360,7 +2339,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_add() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create_from(
             "./testdata/subfolder/",
             None,
@@ -2437,7 +2416,7 @@ mod tests {
             false,
             false,
         ));
-        let (version1, new_files_map) =
+        let (_, new_files_map) =
             version1_content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
         // skip version hash check since not NotImplemented
@@ -2452,10 +2431,9 @@ mod tests {
             false,
             false,
         ));
-        let (version2, new_files_map2) =
+        let (_, new_files_map2) =
             version2_content.ok_or(anyhow!("files container was unexpectedly empty"))?;
 
-        assert_eq!(version1, version2);
         assert_eq!(new_processed_files.len(), new_processed_files2.len());
         assert_eq!(new_files_map.len(), new_files_map2.len());
 
@@ -2476,7 +2454,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_add_dir() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create_from(
             "./testdata/subfolder/",
             None,
@@ -2510,7 +2488,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_add_existing_name() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create_from(
             "./testdata/subfolder/",
             None,
@@ -2596,7 +2574,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_fail_add_or_sync_invalid_path() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) =
             retry_loop!(safe.files_container_create_from("./testdata/test.md", None, false, true,));
         assert_eq!(processed_files.len(), 1);
@@ -2649,7 +2627,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_add_a_url() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create_from(
             "./testdata/subfolder/",
             None,
@@ -2739,7 +2717,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_add_from_raw() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
+        let safe = new_safe_instance().await?;
         let (xorurl, processed_files, files_map) = retry_loop!(safe.files_container_create_from(
             "./testdata/subfolder/",
             None,
@@ -2799,8 +2777,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_files_container_remove_path() -> Result<()> {
-        let mut safe = new_safe_instance().await?;
-        let (xorurl, _, files_map) = new_files_container_from_testdata(&mut safe).await?;
+        let safe = new_safe_instance().await?;
+        let (xorurl, _, files_map) = new_files_container_from_testdata(&safe).await?;
 
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
             .ok_or(anyhow!("files container was unexpectedly empty"))?;

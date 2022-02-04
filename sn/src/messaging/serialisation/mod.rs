@@ -99,6 +99,7 @@ impl MessageType {
             MessageType::System {
                 msg:
                     SystemMsg::NodeCmd(_)
+                    | SystemMsg::NodeEvent(_)
                     | SystemMsg::NodeQuery(_)
                     | SystemMsg::NodeQueryResponse { .. }
                     | SystemMsg::NodeMsgError { .. },

@@ -8,7 +8,7 @@
 
 use crate::data_copy_count;
 use crate::messaging::{
-    data::{CmdError, DataCmd, DataQuery, ServiceMsg},
+    data::{CmdError, DataCmd, DataQuery, Error as ErrorMessage, ServiceMsg},
     system::{NodeQueryResponse, SystemMsg},
     DstLocation, EndUser, MessageId, MsgKind, NodeAuth, WireMsg,
 };
@@ -77,7 +77,7 @@ impl Core {
         let msg_kind = MsgKind::NodeAuthMsg(auth.into_inner());
 
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
-        let command = Command::ParseAndSendWireMsg(wire_msg);
+        let command = Command::ParseAndSendWireMsgToNodes(wire_msg);
 
         Ok(vec![command])
     }
@@ -114,7 +114,7 @@ impl Core {
             section_pk,
         };
 
-        commands.push(Command::PrepareNodeMsgToSend { msg, dst });
+        commands.push(Command::PrepareNodeMsgToSendToNodes { msg, dst });
 
         Ok(commands)
     }
@@ -224,30 +224,40 @@ impl Core {
         msg_id: MessageId,
         msg: ServiceMsg,
         auth: AuthorityProof<ServiceAuth>,
-        user: Peer,
+        origin: Peer,
     ) -> Result<Vec<Command>> {
-        match msg {
+        if self.is_not_elder().await {
+            error!("Received unexpected message while Adult");
+            return Ok(vec![]);
+        }
+        // extract the data from the request
+        let data = match msg {
             // These reads/writes are for adult nodes...
-            ServiceMsg::Cmd(DataCmd::Register(cmd)) => {
-                let mut commands = self
-                    .send_data_to_adults(ReplicatedData::RegisterWrite(cmd), msg_id, user.clone())
-                    .await?;
-                commands.extend(self.send_cmd_ack(user, msg_id).await?);
-                Ok(commands)
+            ServiceMsg::Cmd(DataCmd::Register(cmd)) => ReplicatedData::RegisterWrite(cmd),
+            ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => ReplicatedData::Chunk(chunk),
+            ServiceMsg::Query(query) => {
+                return self
+                    .read_data_from_adults(query, msg_id, auth, origin)
+                    .await
             }
-            ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => {
-                let mut commands = self
-                    .send_data_to_adults(ReplicatedData::Chunk(chunk), msg_id, user.clone())
-                    .await?;
-                commands.extend(self.send_cmd_ack(user, msg_id).await?);
-                Ok(commands)
-            }
-            ServiceMsg::Query(query) => self.read_data_from_adults(query, msg_id, auth, user).await,
             _ => {
                 warn!("!!!! Unexpected ServiceMsg received in routing. Was not sent to node layer: {:?}", msg);
-                Ok(vec![])
+                return Ok(vec![]);
             }
+        };
+        // build the replication cmds
+        let mut commands = self.replicate_data(data).await?;
+        // make sure the expected replication factor is achieved
+        if data_copy_count() > commands.len() {
+            let error = CmdError::Data(ErrorMessage::InsufficientAdults {
+                prefix: self.network_knowledge().prefix().await,
+                expected: data_copy_count() as u8,
+                found: commands.len() as u8,
+            });
+            return self.send_cmd_error_response(error, origin, msg_id).await;
         }
+        commands.extend(self.send_cmd_ack(origin, msg_id).await?);
+        Ok(commands)
     }
 
     // Used to fetch the list of holders for given data name.

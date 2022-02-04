@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{api::command::Command, core::Core, Result};
+use crate::types::log_markers::LogMarker;
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -37,6 +38,7 @@ impl Core {
             return Ok(vec![]);
         }
 
+        trace!("{:?}", LogMarker::DataReorganisationUnderway);
         // we are an adult, and there were changes to adults
         // so we reorganise the data stored in this section..:
         let our_name = self.node.read().await.name();

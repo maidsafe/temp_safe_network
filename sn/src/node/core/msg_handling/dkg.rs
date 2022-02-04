@@ -269,8 +269,7 @@ impl Core {
             .try_update_current_sap(key_share_pk, &sap.prefix())
             .await
         {
-            self.update_self_for_new_node_state_and_fire_events(snapshot)
-                .await
+            self.update_self_for_new_node_state(snapshot).await
         } else {
             // This proposal is sent to the current set of elders to be aggregated
             // and section signed.

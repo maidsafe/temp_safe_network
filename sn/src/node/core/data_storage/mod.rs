@@ -93,17 +93,6 @@ impl DataStorage {
 
     /// --- System calls ---
 
-    /// Stores data that Elders sent to it for replication.
-    /// Chunk should already have network authority
-    /// TODO: define what authority is needed here...
-    pub(crate) async fn store_for_replication(
-        &self,
-        data: &ReplicatedData,
-    ) -> Result<Option<StorageLevel>> {
-        debug!("Trying to store for replication: {:?}", data.name());
-        self.store(data).await
-    }
-
     // Read data from local store
     pub(crate) async fn get_for_replication(
         &self,
@@ -154,7 +143,7 @@ impl Core {
         let mut data_for_replication = BTreeMap::new();
         for addr in keys.iter() {
             if let Some((data, holders)) = self
-                .republish_and_cache(addr, &our_name, &new_adults, &lost_adults, &remaining)
+                .get_replica_targets(addr, &our_name, &new_adults, &lost_adults, &remaining)
                 .await
             {
                 let _prev = data_for_replication.insert(data.name(), (data, holders));
@@ -165,7 +154,7 @@ impl Core {
         let section_pk = self.network_knowledge.section_key().await;
         for (_, (data, targets)) in data_for_replication {
             for name in targets {
-                commands.push(Command::PrepareNodeMsgToSend {
+                commands.push(Command::PrepareNodeMsgToSendToNodes {
                     msg: SystemMsg::NodeCmd(NodeCmd::ReplicateData(data.clone())),
                     dst: crate::messaging::DstLocation::Node { name, section_pk },
                 })
@@ -176,7 +165,7 @@ impl Core {
     }
 
     // on adults
-    async fn republish_and_cache(
+    async fn get_replica_targets(
         &self,
         address: &DataAddress,
         our_name: &XorName,
@@ -204,7 +193,6 @@ impl Core {
                     warn!("Error deleting data during republish: {:?}", err);
                 }
             }
-            // TODO: Push to LRU cache
             Some((data, new_holders))
         } else {
             None

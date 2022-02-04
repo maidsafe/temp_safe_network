@@ -92,6 +92,8 @@ impl Core {
             return Ok(vec![]);
         }
 
+        self.add_new_adult_to_trackers(new_info.name()).await;
+
         info!("handle Online: {} at {}", new_info.name(), new_info.addr());
 
         // still used for testing
@@ -320,7 +322,6 @@ impl Core {
             self.network_knowledge.prefix_map()
         );
 
-        self.update_self_for_new_node_state_and_fire_events(snapshot)
-            .await
+        self.update_self_for_new_node_state(snapshot).await
     }
 }

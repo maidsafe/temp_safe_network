@@ -505,7 +505,7 @@ impl Dispatcher {
                     )
                     .await
             }
-            Command::PrepareNodeMsgToSend { msg, dst } => {
+            Command::PrepareNodeMsgToSendToNodes { msg, dst } => {
                 self.core.prepare_node_msg(msg, dst).await
             }
             Command::HandleMessage {
@@ -562,7 +562,9 @@ impl Dispatcher {
                 self.send_message(&recipients, delivery_group_size, wire_msg)
                     .await
             }
-            Command::ParseAndSendWireMsg(wire_msg) => self.send_wire_message(wire_msg).await,
+            Command::ParseAndSendWireMsgToNodes(wire_msg) => {
+                self.send_wire_message_to_network_nodes(wire_msg).await
+            }
             Command::ScheduleTimeout { duration, token } => Ok(self
                 .handle_schedule_timeout(duration, token)
                 .await
@@ -653,16 +655,16 @@ impl Dispatcher {
     }
 
     /// Send a message, either section to section, node to node, or to an end user.
-    pub(super) async fn send_wire_message(&self, wire_msg: WireMsg) -> Result<Vec<Command>> {
+    pub(super) async fn send_wire_message_to_network_nodes(
+        &self,
+        wire_msg: WireMsg,
+    ) -> Result<Vec<Command>> {
         if let DstLocation::EndUser(EndUser(_)) = wire_msg.dst_location() {
-            error!(
-                "End user msg dropped at send. You need to remember the Peer, and use a different send API for service messages.",
-            );
+            error!("End user msg dropped at send. This API is for sending to a node's peers only",);
             Ok(vec![])
         } else {
             // This message is not for an end user, then send it to peer/s over the network
-            let cmd = self.core.send_msg_to_peers(wire_msg).await?;
-            Ok(vec![cmd])
+            self.core.send_msg_to_network_nodes(wire_msg).await
         }
     }
 

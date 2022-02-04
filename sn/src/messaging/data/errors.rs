@@ -35,8 +35,15 @@ pub enum Error {
     #[error("Failed to write file")]
     FailedToWriteFile,
     /// Insufficient Adults found to store data
-    #[error("Failed to store chunk. Insufficient space found at section {0:?} adults")]
-    InsufficientAdults(Prefix),
+    #[error("Failed to store data. Insufficient replication count at section {prefix:?}. Expected {expected}, found {found}.")]
+    InsufficientAdults {
+        /// The prefix of the section.
+        prefix: Prefix,
+        /// Expected number of Adults for minimum replication.
+        expected: u8,
+        /// Actual number of Adults found to hold the data.
+        found: u8,
+    },
     /// Provided data already exists on the network
     #[error("Data provided already exists")]
     DataExists,

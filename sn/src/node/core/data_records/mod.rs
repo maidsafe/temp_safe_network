@@ -11,7 +11,7 @@ use super::{Command, Core, Prefix};
 use crate::{
     data_copy_count,
     messaging::{
-        data::{CmdError, DataExchange, DataQuery, Error as ErrorMessage, StorageLevel},
+        data::{CmdError, DataQuery, MetadataExchange, StorageLevel},
         system::{NodeCmd, NodeQuery, SystemMsg},
         AuthorityProof, EndUser, MessageId, ServiceAuth,
     },
@@ -26,34 +26,23 @@ use tracing::info;
 use xor_name::XorName;
 
 impl Core {
-    pub(crate) async fn send_data_to_adults(
-        &self,
-        data: ReplicatedData,
-        msg_id: MessageId,
-        origin: Peer,
-    ) -> Result<Vec<Command>> {
-        trace!("{:?}: {:?}", LogMarker::DataStorageReceivedAtElder, data);
+    // Locate ideal holders for this data, line up wiremsgs for those to instruct them to store the data
+    pub(crate) async fn replicate_data(&self, data: ReplicatedData) -> Result<Vec<Command>> {
+        trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
+        if self.is_elder().await {
+            let targets = self.get_adults_who_should_store_data(data.name()).await;
 
-        let target = data.name();
+            info!(
+                "Replicating data {:?} to holders {:?}",
+                data.name(),
+                &targets,
+            );
 
-        let msg = SystemMsg::NodeCmd(NodeCmd::StoreData {
-            data,
-            origin: EndUser(origin.name()),
-        });
-
-        let targets = self.get_adults_who_should_store_data(target).await;
-
-        let aggregation = false;
-
-        if data_copy_count() > targets.len() {
-            let error = CmdError::Data(ErrorMessage::InsufficientAdults(
-                self.network_knowledge().prefix().await,
-            ));
-            return self.send_cmd_error_response(error, origin, msg_id).await;
+            let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(data));
+            self.send_node_msg_to_nodes(msg, targets, false).await
+        } else {
+            Err(Error::InvalidState)
         }
-
-        self.send_node_msg_to_targets(msg, targets, aggregation)
-            .await
     }
 
     pub(crate) async fn read_data_from_adults(
@@ -113,18 +102,18 @@ impl Core {
         });
         let aggregation = false;
 
-        self.send_node_msg_to_targets(msg, fresh_targets, aggregation)
+        self.send_node_msg_to_nodes(msg, fresh_targets, aggregation)
             .await
     }
 
-    pub(crate) async fn get_metadata_of(&self, prefix: &Prefix) -> DataExchange {
+    pub(crate) async fn get_metadata_of(&self, prefix: &Prefix) -> MetadataExchange {
         // Load tracked adult_levels
         let adult_levels = self.capacity.levels_matching(*prefix).await;
-        DataExchange { adult_levels }
+        MetadataExchange { adult_levels }
     }
 
-    pub(crate) async fn set_adult_levels(&self, adult_levels: DataExchange) {
-        let DataExchange { adult_levels } = adult_levels;
+    pub(crate) async fn set_adult_levels(&self, adult_levels: MetadataExchange) {
+        let MetadataExchange { adult_levels } = adult_levels;
         self.capacity.set_adult_levels(adult_levels).await
     }
 
@@ -138,6 +127,14 @@ impl Core {
         self.liveness.retain_members_only(members);
 
         Ok(())
+    }
+
+    /// Adds the new adult to the Capacity and Liveness trackers.
+    pub(crate) async fn add_new_adult_to_trackers(&self, adult: XorName) {
+        info!("Adding new Adult: {adult} to trackers");
+        self.capacity.add_new_adult(adult).await;
+
+        self.liveness.add_new_adult(adult);
     }
 
     /// Set storage level of a given node.

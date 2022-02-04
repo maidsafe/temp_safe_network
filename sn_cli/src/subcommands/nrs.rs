@@ -7,10 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    helpers::{get_from_arg_or_stdin, serialise_output},
+    helpers::{get_from_arg_or_stdin, get_target_url, serialise_output},
     OutputFmt,
 };
-use color_eyre::{eyre::eyre, eyre::WrapErr, Help, Result};
+use color_eyre::{eyre::eyre, Help, Result};
 use prettytable::{format::FormatBuilder, Table};
 use sn_api::Error::{InvalidInput, NetDataError, NrsNameAlreadyExists, UnversionedContentError};
 use sn_api::{Safe, SafeUrl};
@@ -58,11 +58,7 @@ pub enum NrsSubCommands {
     },
 }
 
-pub async fn nrs_commander(
-    cmd: NrsSubCommands,
-    output_fmt: OutputFmt,
-    safe: &mut Safe,
-) -> Result<()> {
+pub async fn nrs_commander(cmd: NrsSubCommands, output_fmt: OutputFmt, safe: &Safe) -> Result<()> {
     match cmd {
         NrsSubCommands::Register { name, link } => {
             run_register_subcommand(name, link, safe, output_fmt).await
@@ -80,13 +76,9 @@ pub async fn nrs_commander(
 async fn run_register_subcommand(
     name: String,
     link: Option<String>,
-    safe: &mut Safe,
+    safe: &Safe,
     output_fmt: OutputFmt,
 ) -> Result<()> {
-    if let Some(ref link) = link {
-        validate_target_link(link)?;
-    }
-
     match safe.nrs_create(&name).await {
         Ok(topname_url) => {
             let (nrs_url, summary) =
@@ -132,12 +124,11 @@ async fn run_add_subcommand(
     link: Option<String>,
     register_top_name: bool,
     default: bool,
-    safe: &mut Safe,
+    safe: &Safe,
     output_fmt: OutputFmt,
 ) -> Result<()> {
     let link = get_from_arg_or_stdin(link, Some("...awaiting link URL from stdin"))?;
-    validate_target_link(&link)?;
-    let link_url = SafeUrl::from_url(&link)?;
+    let link_url = get_target_url(&link)?;
     let (url, topname_was_registered) = if register_top_name {
         add_public_name_for_url(&name, safe, &link_url).await?
     } else {
@@ -177,7 +168,7 @@ async fn run_add_subcommand(
     Ok(())
 }
 
-async fn run_remove_subcommand(name: String, safe: &mut Safe, output_fmt: OutputFmt) -> Result<()> {
+async fn run_remove_subcommand(name: String, safe: &Safe, output_fmt: OutputFmt) -> Result<()> {
     match safe.nrs_remove(&name).await {
         Ok(url) => {
             let version = url
@@ -214,17 +205,6 @@ async fn run_remove_subcommand(name: String, safe: &mut Safe, output_fmt: Output
     }
 }
 
-/// Determine if the link is a valid url *before* creating the topname.
-///
-/// Otherwise the user receives an error even though the topname was actually registerd, which is a
-/// potentially confusing experience: they may think the topname wasn't registerd.
-fn validate_target_link(link: &str) -> Result<()> {
-    SafeUrl::from_url(link)
-        .wrap_err("The supplied link was not a valid url.")
-        .suggestion("Run the command again with a valid url for the --link argument.")?;
-    Ok(())
-}
-
 /// Get the new NRS URL that's going to be displayed to the user.
 ///
 /// If no target link has been supplied, the URL is just going to be the one returned from the
@@ -232,12 +212,12 @@ fn validate_target_link(link: &str) -> Result<()> {
 /// URL generated from the association.
 async fn get_new_nrs_url_for_topname(
     name: &str,
-    safe: &mut Safe,
+    safe: &Safe,
     topname_url: SafeUrl,
     link: Option<String>,
 ) -> Result<(SafeUrl, String)> {
     if let Some(link) = link {
-        let url = SafeUrl::from_url(&link)?;
+        let url = get_target_url(&link)?;
         let new_url = associate_url_with_public_name(name, safe, &url).await?;
         return Ok((new_url, format!("The entry points to {}", link)));
     }
@@ -246,7 +226,7 @@ async fn get_new_nrs_url_for_topname(
 
 async fn associate_url_with_public_name(
     public_name: &str,
-    safe: &mut Safe,
+    safe: &Safe,
     url: &SafeUrl,
 ) -> Result<SafeUrl> {
     match safe.nrs_associate(public_name, url).await {
@@ -269,7 +249,7 @@ async fn associate_url_with_public_name(
 
 async fn add_public_name_for_url(
     public_name: &str,
-    safe: &mut Safe,
+    safe: &Safe,
     url: &SafeUrl,
 ) -> Result<(SafeUrl, bool)> {
     match safe.nrs_add(public_name, url).await {

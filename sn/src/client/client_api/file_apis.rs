@@ -234,11 +234,16 @@ impl Client {
             task::spawn(async move { writer.send_cmd(DataCmd::StoreChunk(chunk)).await })
         });
 
-        let _ = join_all(tasks)
+        let respones = join_all(tasks)
             .await
             .into_iter()
             .flatten() // swallows errors
             .collect_vec();
+
+        for res in respones {
+            // fail with any issue here
+            let _ = res?;
+        }
 
         Ok(head_address)
     }
@@ -606,7 +611,7 @@ mod tests {
 
         // 3 elders were chosen by the client (should only be 3 as even if client chooses adults, AE should kick in prior to them attempting any of this)
         the_logs
-            .assert_count(LogMarker::ChunkStoreReceivedAtElder, 3)
+            .assert_count(LogMarker::DataStoreReceivedAtElder, 3)
             .await?;
 
         // 4 adults * reqs from 3 elders storing the chunk

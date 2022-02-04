@@ -118,20 +118,6 @@ fn nrs_register_should_return_an_error_if_a_subname_is_specified() -> Result<()>
 }
 
 #[test]
-fn nrs_register_should_return_an_error_if_an_invalid_link_is_specified() -> Result<()> {
-    let topname = get_random_nrs_string();
-    safe_cmd(["nrs", "register", &topname, "--link", "invalid"], Some(1))?
-        .assert()
-        .stderr(predicate::str::contains(
-            "The supplied link was not a valid url.",
-        ))
-        .stderr(predicate::str::contains(
-            "Run the command again with a valid url for the --link argument.",
-        ));
-    Ok(())
-}
-
-#[test]
 fn nrs_register_should_return_an_error_if_link_to_versioned_content_has_no_version() -> Result<()> {
     let with_trailing_slash = true;
     let tmp_data_path = assert_fs::TempDir::new()?;
@@ -495,22 +481,6 @@ fn nrs_add_with_default_should_return_an_error_if_link_to_versioned_content_has_
         "Please run the command again with the version hash appended to the link. \
             The link should have the form safe://<url>?v=<versionhash>.",
     ));
-    Ok(())
-}
-
-#[test]
-fn nrs_add_should_return_an_error_if_an_invalid_link_is_specified() -> Result<()> {
-    let topname = get_random_nrs_string();
-    let public_name = format!("test.{}", &topname);
-    safe_cmd(["nrs", "register", &topname], Some(0))?;
-    safe_cmd(["nrs", "add", &public_name, "--link", "invalid"], Some(1))?
-        .assert()
-        .stderr(predicate::str::contains(
-            "The supplied link was not a valid url.",
-        ))
-        .stderr(predicate::str::contains(
-            "Run the command again with a valid url for the --link argument.",
-        ));
     Ok(())
 }
 
