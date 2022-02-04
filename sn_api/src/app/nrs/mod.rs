@@ -248,8 +248,8 @@ impl Safe {
         }
 
         // The set may have duplicate entries; the map doesn't.
-        let subnames_set = convert_multimap_to_nrs_set(&multimap)?;
-        let nrs_map = convert_multimap_to_nrs_map(&multimap)?;
+        let subnames_set = convert_multimap_to_nrs_set(&multimap, public_name, version)?;
+        let nrs_map = get_nrs_map_from_set(&subnames_set, version)?;
 
         if nrs_map.map.len() != subnames_set.len() {
             let diff_set: BTreeSet<(String, SafeUrl)> = nrs_map.map.clone().into_iter().collect();
@@ -268,7 +268,44 @@ impl Safe {
     }
 }
 
-fn convert_multimap_to_nrs_set(multimap: &Multimap) -> Result<BTreeSet<(String, SafeUrl)>> {
+/// Converts the Multimap to a set, which may contain duplicate entries.
+///
+/// If the user has requested a specific version of a subname, only that version of it will be in
+/// the set. The 'versioned set' is queried for all entries matching the given subname, then any
+/// that *don't* match the specified version are removed.
+fn convert_multimap_to_nrs_set(
+    multimap: &Multimap,
+    public_name: &str,
+    subname_version: Option<VersionHash>,
+) -> Result<BTreeSet<(String, SafeUrl)>> {
+    if let Some(version) = subname_version {
+        let mut versioned_set: BTreeSet<(VersionHash, String, SafeUrl)> = multimap
+            .clone()
+            .into_iter()
+            .map(|x| {
+                let version = VersionHash::from(&x.0);
+                let kv = x.1;
+                let public_name = str::from_utf8(&kv.0)?;
+                let url = SafeUrl::from_url(str::from_utf8(&kv.1)?)?;
+                Ok((version, public_name.to_owned(), url))
+            })
+            .collect::<Result<BTreeSet<(VersionHash, String, SafeUrl)>>>()?;
+        let duplicate_entries = versioned_set
+            .clone()
+            .into_iter()
+            .filter(|x| x.1 == public_name)
+            .filter(|x| x.0 != version)
+            .collect::<BTreeSet<(VersionHash, String, SafeUrl)>>();
+        for entry in duplicate_entries.iter() {
+            versioned_set.remove(entry);
+        }
+        let set: BTreeSet<(String, SafeUrl)> = versioned_set
+            .iter()
+            .map(|x| (x.1.clone(), x.2.clone()))
+            .collect::<BTreeSet<(String, SafeUrl)>>();
+        return Ok(set);
+    }
+
     let set: BTreeSet<(String, SafeUrl)> = multimap
         .clone()
         .into_iter()
@@ -282,21 +319,19 @@ fn convert_multimap_to_nrs_set(multimap: &Multimap) -> Result<BTreeSet<(String, 
     Ok(set)
 }
 
-fn convert_multimap_to_nrs_map(multimap: &Multimap) -> Result<NrsMap> {
-    let nrs_map_version = multimap.iter().map(|x| VersionHash::from(&x.0)).last();
-    let public_names_map: BTreeMap<String, SafeUrl> = multimap
+fn get_nrs_map_from_set(
+    set: &BTreeSet<(String, SafeUrl)>,
+    version: Option<VersionHash>,
+) -> Result<NrsMap> {
+    // Duplicate entries are automatically removed from the set -> map conversion.
+    let public_names_map: BTreeMap<String, SafeUrl> = set
         .clone()
         .into_iter()
-        .map(|x| {
-            let kv = x.1;
-            let public_name = str::from_utf8(&kv.0)?;
-            let url = SafeUrl::from_url(str::from_utf8(&kv.1)?)?;
-            Ok((public_name.to_owned(), url))
-        })
-        .collect::<Result<BTreeMap<String, SafeUrl>>>()?;
+        .map(|x| (x.0, x.1))
+        .collect::<BTreeMap<String, SafeUrl>>();
     let nrs_map = NrsMap {
         map: public_names_map,
-        subname_version: nrs_map_version,
+        subname_version: version,
     };
     Ok(nrs_map)
 }
@@ -339,9 +374,61 @@ mod tests {
         Error, SafeUrl,
     };
     use anyhow::{anyhow, Result};
+    use std::collections::HashMap;
     use std::matches;
+    use std::ops::Index;
 
     const TEST_DATA_FILE: &str = "./testdata/test.md";
+
+    struct TestDataFilesMap {
+        pub container_xorurl: String,
+        pub map: HashMap<String, SafeUrl>,
+    }
+
+    impl TestDataFilesMap {
+        pub fn get_url(&self, file_path: &str) -> Result<SafeUrl> {
+            Ok(self
+                .map
+                .get(file_path)
+                .ok_or_else(|| anyhow!(format!("Could not retrieve {file_path}")))?
+                .clone())
+        }
+
+        pub async fn get_test_data_file_map<'a>(
+            files: impl IntoIterator<Item = &'a str>,
+        ) -> Result<TestDataFilesMap> {
+            let mut map: HashMap<String, SafeUrl> = HashMap::new();
+            let safe = new_safe_instance().await?;
+            let (container_xorurl, _, files_map) = safe
+                .files_container_create_from("./testdata", None, false, false)
+                .await?;
+            for file in files {
+                let file_info = files_map
+                    .get(file)
+                    .ok_or_else(|| anyhow!(format!("could not retrieve {file} from files map")))?;
+                let file_link = file_info
+                    .get("link")
+                    .ok_or_else(|| anyhow!("could not retrieve file link"))?;
+                let file_url = SafeUrl::from_url(file_link)?;
+                map.insert(file.to_string(), file_url);
+            }
+            Ok(TestDataFilesMap {
+                container_xorurl,
+                map,
+            })
+        }
+    }
+
+    impl Index<&str> for TestDataFilesMap {
+        type Output = SafeUrl;
+
+        fn index(&self, file_path: &str) -> &Self::Output {
+            match self.map.get(file_path) {
+                Some(url) => url,
+                None => panic!("cannot find file in files map"),
+            }
+        }
+    }
 
     #[tokio::test]
     async fn test_nrs_create() -> Result<()> {
@@ -781,6 +868,67 @@ mod tests {
         // get should work now
         let (res_url, _) = safe.nrs_get(&site_name, None).await?;
         assert_eq!(res_url, valid_link);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_nrs_get_with_duplicate_subname_versions() -> Result<()> {
+        let site_name = random_nrs_name();
+        let safe = new_safe_instance().await?;
+
+        let files_map = TestDataFilesMap::get_test_data_file_map([
+            "/testdata/test.md",
+            "/testdata/another.md",
+            "/testdata/noextension",
+        ])
+        .await?;
+
+        let public_name = &format!("test.{site_name}");
+
+        safe.nrs_create(&site_name).await?;
+        let nrs_url = safe
+            .nrs_associate(public_name, &files_map["/testdata/test.md"])
+            .await?;
+        let version = nrs_url
+            .content_version()
+            .ok_or_else(|| anyhow!("nrs_url should have a version"))?;
+        safe.nrs_associate(public_name, &files_map["/testdata/another.md"])
+            .await?;
+        safe.nrs_associate(public_name, &files_map["/testdata/noextension"])
+            .await?;
+        safe.nrs_associate(
+            &format!("another.{site_name}"),
+            &files_map["/testdata/another.md"],
+        )
+        .await?;
+
+        let (url, nrs_map) = safe.nrs_get(public_name, Some(version)).await?;
+        assert_eq!(url, files_map["/testdata/test.md"]);
+        assert_eq!(nrs_map.map.len(), 2);
+        assert_eq!(
+            nrs_map
+                .subname_version
+                .ok_or_else(|| anyhow!("version should be present"))?,
+            version
+        );
+        assert_eq!(
+            *nrs_map
+                .map
+                .get(&format!("test.{site_name}"))
+                .ok_or_else(|| anyhow!(format!(
+                    "'test.{site_name}' subname should have been present in retrieved NRS map"
+                )))?,
+            files_map["/testdata/test.md"]
+        );
+        assert_eq!(
+            *nrs_map
+                .map
+                .get(&format!("another.{site_name}"))
+                .ok_or_else(|| anyhow!(format!(
+                    "'another.{site_name}' subname should have been present in retrieved NRS map"
+                )))?,
+            files_map["/testdata/another.md"]
+        );
         Ok(())
     }
 }
