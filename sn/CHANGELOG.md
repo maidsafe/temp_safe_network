@@ -5,13 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.55.2 (2022-02-02)
+## v0.55.3 (2022-02-04)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 3 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
  - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -22,11 +23,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #993 ([`303e856`](https://github.com/maidsafe/safe_network/commit/303e856346dd1d4e5544c9ceae6d571c54cfb84e))
+    - Merge #991 ([`a4f2c8a`](https://github.com/maidsafe/safe_network/commit/a4f2c8ac42d5d91764ca4e00a73a693f6a0221b5))
+    - renaming apis for clarity of purpose ([`2746cff`](https://github.com/maidsafe/safe_network/commit/2746cff087fd33aff523bc2df07a3462d05c6de1))
+</details>
+
+## v0.55.2 (2022-02-02)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 1 day passed between releases.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.55.2 ([`637ec03`](https://github.com/maidsafe/safe_network/commit/637ec03f9922e5d3dd0c8703eba5019256f4ec06))
+    - all env var to override cmd_timeout ([`7cd6337`](https://github.com/maidsafe/safe_network/commit/7cd63377de16dd2962961f2dd936df3276fe8d6d))
+    - session records all failed connection ids ([`f73e00c`](https://github.com/maidsafe/safe_network/commit/f73e00cc67fae6090b9c991ac4e06999ea28f22e))
     - Merge #985 ([`ba572d5`](https://github.com/maidsafe/safe_network/commit/ba572d5f909f5c1dc389b9affadffec39a4e0369))
+    - failcmd with any error after retries ([`2479dae`](https://github.com/maidsafe/safe_network/commit/2479daea6b05c7b680bf6062407f507ad8692d57))
     - simplify data replication cmds and flow ([`7f01106`](https://github.com/maidsafe/safe_network/commit/7f01106c8266abec07c9522cb69e4fbbb493f386))
 </details>
 
 ## v0.55.1 (2022-02-01)
+
+### New Features
+
+ - <csr-id-b2b0520630774d935aca1f2b602a1de9479ba6f9/> enable cmd retries
+   Previously a command error would simply error out and fail.
+   Now we use an exponential backoff to retry incase errors
+   can be overcome
 
 ### Bug Fixes
 
@@ -36,9 +71,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release.
+ - 6 commits contributed to the release.
  - 3 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -49,6 +84,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - safe_network-0.55.1/sn_api-0.54.0/sn_cli-0.47.0 ([`2ec86e2`](https://github.com/maidsafe/safe_network/commit/2ec86e28246031084d603768ffa1fddf320a10a2))
+    - log data reorganisation ([`81298bb`](https://github.com/maidsafe/safe_network/commit/81298bb8ce1d93d7a418ff340d866fc00d9f60a4))
+    - enable cmd retries ([`b2b0520`](https://github.com/maidsafe/safe_network/commit/b2b0520630774d935aca1f2b602a1de9479ba6f9))
     - unit test liveness tracker basics ([`25259b2`](https://github.com/maidsafe/safe_network/commit/25259b221120c8c9258ffdfae8883c65ead38677))
     - fix liveness tracking logic and keep track of newly joining adults ([`16bd75a`](https://github.com/maidsafe/safe_network/commit/16bd75af79708f88dcb7086d04fac8475f3b3190))
     - Merge branch 'main' into Chore-ClientImprovement ([`cea6f47`](https://github.com/maidsafe/safe_network/commit/cea6f4718c5aec320279c9abe7f7a54eeecca9ad))
@@ -95,9 +132,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - make log files rotate properly ([`6aae745`](https://github.com/maidsafe/safe_network/commit/6aae745a4ffd7302fc74d5d548ca464066d5203f))
     - Merge #968 ([`f54ed86`](https://github.com/maidsafe/safe_network/commit/f54ed86b405c8463cd2a79ae9df33f992bd06cec))
 </details>
-
-<csr-unknown>
-The relocation details are now embedded in the NodeState, which issent to the relocated peer (with section authority) within the Relocate message.JoinAsRelocatedRequest always carries the signed relocate details (relocate_proof).JoinAsRelocatedRequest now contains the signature of the node’s new name with its previous key (signature_over_new_name)<csr-unknown/>
 
 ## v0.54.2 (2022-01-25)
 
@@ -1206,7 +1240,7 @@ The relocation details are now embedded in the NodeState, which issent to the re
 
  * **Uncategorized**
     - safe_network-0.49.1 ([`69ae8c2`](https://github.com/maidsafe/safe_network/commit/69ae8c20e91dd9959ebfa5456efdf9c218a9d66f))
-    - set DEFAULT_OPERATION_TIMEOUT to 120s ([`2e7bc0b`](https://github.com/maidsafe/safe_network/commit/2e7bc0b782da6231f54edc440fa555fa754d294c))
+    - set DEFAULT_QUERY_TIMEOUT to 120s ([`2e7bc0b`](https://github.com/maidsafe/safe_network/commit/2e7bc0b782da6231f54edc440fa555fa754d294c))
     - on initial contact put all known elders into the contact pool. ([`86ba423`](https://github.com/maidsafe/safe_network/commit/86ba4234a29137518c73b18becbf018993e104a8))
     - make contact via register get ([`99add55`](https://github.com/maidsafe/safe_network/commit/99add55c5ca5a3e3da2130797083dd449da2f7cd))
     - use backoff during make contact instead of standard_wait. ([`2bdc035`](https://github.com/maidsafe/safe_network/commit/2bdc03578f3d9144a097a947ab44d0c1286f6180))
