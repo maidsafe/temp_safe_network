@@ -424,7 +424,11 @@ impl NetworkKnowledge {
                 node_state.state()
             );
             if !node_state.verify(&chain) {
-                error!("Can't update section member {:?}", node_state.value);
+                error!(
+                    "Can't update section member, name: {:?}, new state: {:?}",
+                    node_state.name(),
+                    node_state.state()
+                );
             } else if self.section_peers.update(node_state.clone()) {
                 there_was_an_update = true;
             }
@@ -437,18 +441,30 @@ impl NetworkKnowledge {
 
     /// Update the member. Returns whether it actually updated it.
     pub(super) async fn update_member(&self, node_state: SectionAuth<NodeState>) -> bool {
+        let node_name = node_state.name();
         trace!(
             "Updating section member state, name: {:?}, new state: {:?}",
-            node_state.name(),
+            node_name,
             node_state.state()
         );
         // let's check the node state is properly signed by one of the keys in our chain
         if !node_state.verify(&*self.chain.read().await) {
-            error!("Can't update section member {:?}", node_state.value);
+            error!(
+                "Can't update section member, name: {:?}, new state: {:?}",
+                node_name,
+                node_state.state()
+            );
             return false;
         }
 
-        self.section_peers.update(node_state)
+        let updated = self.section_peers.update(node_state);
+        trace!(
+            "Section member state, name: {:?}, updated: {}",
+            node_name,
+            updated
+        );
+
+        updated
     }
 
     /// Return a copy of our section chain
