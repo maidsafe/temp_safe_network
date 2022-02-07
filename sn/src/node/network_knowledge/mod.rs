@@ -306,16 +306,18 @@ impl NetworkKnowledge {
                     "we_are_an_elder: {we_are_an_elder},we_should_be_and_elder{we_should_be_and_elder}, we_know_this_keyshare: {we_know_this_keyshare}"
                 );
 
-                let switch_to_new_sap = (!we_are_an_elder
-                    && !we_should_be_and_elder)
-                    || we_know_this_keyshare;
+                let switch_to_new_sap =
+                    (!we_are_an_elder && !we_should_be_and_elder) || we_know_this_keyshare;
                 trace!(
                     "update_knowledge_if_valid: will switch_to_new_sap {:?}",
                     switch_to_new_sap
                 );
 
-
-                trace!("Switch decision calcs: we are elder: {:?}, we should be? : {:?}", we_are_an_elder, we_should_be_and_elder);
+                trace!(
+                    "Switch decision calcs: we are elder: {:?}, we should be? : {:?}",
+                    we_are_an_elder,
+                    we_should_be_and_elder
+                );
 
                 // We try to update our SAP and own chain only if we were flagged to,
                 // otherwise this update could be due to an AE message and we still don't have
