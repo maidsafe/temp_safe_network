@@ -5,13 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.55.4 (2022-02-05)
+## v0.55.5 (2022-02-07)
+
+### New Features
+
+ - <csr-id-0c04071e2184c4e74fa8c9f264a380585e84369e/> add `flame` arg to use cargo flamegraph
+   uses the launcher option to enable flamegraph generation per node
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
+ - 1 commit contributed to the release.
+ - 2 days passed between releases.
  - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -22,6 +28,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - add `flame` arg to use cargo flamegraph ([`0c04071`](https://github.com/maidsafe/safe_network/commit/0c04071e2184c4e74fa8c9f264a380585e84369e))
+</details>
+
+## v0.55.4 (2022-02-05)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 1 day passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.55.4 ([`a0e9c52`](https://github.com/maidsafe/safe_network/commit/a0e9c52951e81018249a3bcf3b6300b3ad592136))
     - Merge branch 'main' into Feat-UpdateQp2p ([`7acc85b`](https://github.com/maidsafe/safe_network/commit/7acc85b8dd11e36abfcab3d2f9f901d25b681ab2))
     - Merge branch 'main' into Feat-UpdateQp2p ([`dbf89b5`](https://github.com/maidsafe/safe_network/commit/dbf89b5023766ab34193663a2367ff2eccb6b7e0))
     - adding a trace log when updating a section member state ([`dab972d`](https://github.com/maidsafe/safe_network/commit/dab972dccdf968e706f0c7599154e188dc74bf48))
@@ -32,7 +60,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Features (BREAKING)
 
  - <csr-id-208e73c732ae5bac184bf5848c0490b98c9a0364/> move to q2p 0.28 / quinn 0.8
-
 
 ### Bug Fixes
 
@@ -97,11 +124,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-fa6014e581f52615971701572a1635dfde922fb6/> remove the relocation promise step for Elders
    - Both Adults and Elders now receive the `Relocate` message with all the relocation details
-     without any previous or additional steps required to proceed with their relocation.
-   - The relocation details are now embedded in the `NodeState`, which is
+   without any previous or additional steps required to proceed with their relocation.
+- The relocation details are now embedded in the `NodeState`, which is
      sent to the relocated peer (with section authority) within the Relocate message.
-   - `JoinAsRelocatedRequest` always carries the signed relocate details (`relocate_proof`).
-   - `JoinAsRelocatedRequest` now contains the signature of the node's new name with its previous key (`signature_over_new_name`)
+- `JoinAsRelocatedRequest` always carries the signed relocate details (`relocate_proof`).
+- `JoinAsRelocatedRequest` now contains the signature of the node's new name with its previous key (`signature_over_new_name`)
 
 ### New Features
 
