@@ -127,7 +127,7 @@ impl Node {
                 .collect::<Vec<Peer>>();
 
             for adult in valid_adults {
-                commands.push(Command::PrepareNodeMsgToSendToNodes {
+                cmds.push(Cmd::SignOutgoingSystemMsg {
                     msg: SystemMsg::NodeEvent(NodeEvent::DeviantsDetected(deviants.clone())),
                     dst: DstLocation::Node {
                         name: adult.name(),

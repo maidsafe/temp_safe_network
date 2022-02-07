@@ -933,7 +933,7 @@ impl Node {
     async fn republish_data_for_deviant_nodes(
         &self,
         deviants: BTreeSet<XorName>,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let our_adults = self
             .network_knowledge
             .adults()

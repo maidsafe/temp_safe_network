@@ -20,23 +20,11 @@ use tokio::sync::RwLock;
 /// Count of neighbours to every node that we keep track of.
 const NEIGHBOUR_COUNT: usize = DEFAULT_DATA_COPY_COUNT - 1; // '- 1' because we exclude the original node
 
-/// Minimum no. of pending data operations that an adult is allowed to have.
-const MIN_PENDING_OPS: usize = 500; // Nodes will be scrutinized if they exceed this count.
+// If the pending ops count of a node is 5 times higher than it's neighbours, it will be kicked.
+const EXCESSIVE_OPS_TOLERANCE: f64 = 5.0; // increasing this number increases tolerance
 
-/// Threshold for replicating data preemptively.
-/// Derived from MIN_PENDING_OPS which is the limit before nodes get checked.
-const PREEMPTIVE_REPLICATION_THRESHOLD: usize = MIN_PENDING_OPS / 2;
-
-/// Tolerance ratio that is used to compare a node's pending ops with its neighbours' and
-/// the nodes that exceed this ratio will be proposed offline.
-// if the pending ops count of a node is 5 times higher than it's neighbours, it will be kicked
-const PENDING_OP_TOLERANCE_RATIO: f64 = 0.2; // increasing this number decreases tolerance
-
-/// Tolerance ratio that is used to compare a node's pending ops with its neighbours' and
-/// the nodes that exceed this ratio will be reported as Deviant nodes that are starting to perform badly
-/// while preemptive replication of their data begins.
-// if the pending ops count of a node is ~2.5 times higher than it's neighbours, preemptive replication starts
-const PREEMPTIVE_REPLICATION_TOLERANCE_RATIO: f64 = 0.4; // increasing this number decreases tolerance
+// If the pending ops count of a node is EXCESSIVE_OPS_TOLERANCE / 2 times higher than it's neighbours, preemptive replication starts.
+const PREEMPTIVE_REPLICATION_TOLERANCE: f64 = EXCESSIVE_OPS_TOLERANCE / 2.0; // increasing this number increases tolerance
 
 /// Some reproducible xorname derived from the operation. Which can be re-derived from the appropriate response when received (to remove from tracking)
 type NodeIdentifier = XorName;
@@ -232,30 +220,29 @@ impl Liveness {
                 0
             };
 
-            if pending_operations_count > MIN_PENDING_OPS
-                && max_pending_by_neighbours > MIN_PENDING_OPS
-            {
-                if pending_operations_count as f64 * PENDING_OP_TOLERANCE_RATIO
-                    > max_pending_by_neighbours as f64
-                {
-                    tracing::info!(
-                        "Pending ops for {}: {} Neighbour max: {}",
-                        node,
-                        pending_operations_count,
-                        max_pending_by_neighbours
-                    );
-                    unresponsive_nodes.push((node, pending_operations_count));
-                }
+            // TODO: Asses if a threshold before computation here helps
 
-                if pending_operations_count as f64 * PREEMPTIVE_REPLICATION_TOLERANCE_RATIO
-                    > max_pending_by_neighbours as f64
-                {
-                    info!(
-                    "Probable deviant {node} crossed PREEMPTIVE_REPLICATION_THRESHOLD: {PREEMPTIVE_REPLICATION_THRESHOLD} \
-                    {pending_operations_count}: Neighbour max: {max_pending_by_neighbours}",
-                    );
-                    deviants.push(node);
-                }
+            // Replicate preemptively at 2.5x of neighbours max pending ops and kick at 5x.
+            if pending_operations_count as f64
+                > max_pending_by_neighbours as f64 * EXCESSIVE_OPS_TOLERANCE
+            {
+                tracing::info!(
+                    "Pending ops for {}: {} Neighbour max: {}",
+                    node,
+                    pending_operations_count,
+                    max_pending_by_neighbours
+                );
+                unresponsive_nodes.push((node, pending_operations_count));
+            }
+
+            if pending_operations_count as f64
+                > max_pending_by_neighbours as f64 * PREEMPTIVE_REPLICATION_TOLERANCE
+            {
+                info!(
+                "Probable deviant {node} crossed PREEMPTIVE_REPLICATION_TOLERANCE: {PREEMPTIVE_REPLICATION_TOLERANCE} \
+                {pending_operations_count}: Neighbour max: {max_pending_by_neighbours}",
+                );
+                deviants.push(node);
             }
         }
         (
@@ -282,9 +269,9 @@ mod tests {
         let adults = (0..10).map(|_| XorName::random()).collect::<Vec<XorName>>();
         let liveness_tracker = Liveness::new(adults.clone());
 
-        // Write data MIN_PENDING_OPS times to the 10 adults
+        // Write data 50 times to the 10 adults
         for adult in &adults {
-            for _ in 0..MIN_PENDING_OPS {
+            for _ in 0..50 {
                 let random_addr = ChunkAddress(XorName::random());
                 let op_id = chunk_operation_id(&random_addr)?;
                 liveness_tracker
@@ -294,27 +281,6 @@ mod tests {
         }
 
         // Assert there are not any unresponsive nodes
-        assert_eq!(
-            liveness_tracker
-                .find_unresponsive_and_deviant_nodes()
-                .await
-                .0
-                .len(),
-            0
-        );
-
-        // Write data MIN_PENDING_OPS + 1 times on total to first 10 adults
-        for adult in &adults {
-            for _ in 0..MIN_PENDING_OPS + 1 {
-                let random_addr = ChunkAddress(XorName::random());
-                let op_id = chunk_operation_id(&random_addr)?;
-                liveness_tracker
-                    .add_a_pending_request_operation(*adult, op_id)
-                    .await;
-            }
-        }
-
-        // Assert there are no unresponsive nodes.
         // This is because all of them are within the tolerance ratio of each other
         assert_eq!(
             liveness_tracker
@@ -332,8 +298,25 @@ mod tests {
         // Assert total adult count
         assert_eq!(liveness_tracker.closest_nodes_to.len(), 11);
 
-        // Write data 30 x MIN_PENDING_OPS times to the new adult which is not cleared
-        for _ in 0..MIN_PENDING_OPS * 30 {
+        // Write data 3 x 50 times to the new adult to check for preemptive replication
+        for _ in 0..50 * 3 {
+            let random_addr = ChunkAddress(XorName::random());
+            let op_id = chunk_operation_id(&random_addr)?;
+            liveness_tracker
+                .add_a_pending_request_operation(new_adult, op_id)
+                .await;
+        }
+
+        // Assert that the new adult is detected as deviant.
+        assert!(liveness_tracker
+            .find_unresponsive_and_deviant_nodes()
+            .await
+            .1
+            .iter()
+            .contains(&new_adult));
+
+        // Write data another 3 x 50 times to the new adult to check for unresponsiveness.
+        for _ in 0..50 * 3 {
             let random_addr = ChunkAddress(XorName::random());
             let op_id = chunk_operation_id(&random_addr)?;
             liveness_tracker
