@@ -1,3 +1,7 @@
 status = ["ci"]
 # Set bors's timeout to 2.5 hours
 timeout-sec = 9000
+block_labels =["DO NOT MERGE"]
+use_squash_merge = false
+up_to_date_approvals = false
+required_approvals = 1
