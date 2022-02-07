@@ -10,17 +10,33 @@ use crate::node::XorName;
 
 use crate::messaging::data::{chunk_operation_id, OperationId};
 use crate::types::ChunkAddress;
+use crate::DEFAULT_DATA_COPY_COUNT;
 use dashmap::DashMap;
 use itertools::Itertools;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-const NEIGHBOUR_COUNT: usize = 3;
-const MIN_PENDING_OPS: usize = 400;
-const ACTIVE_REPLICATION_THRESHOLD: usize = MIN_PENDING_OPS / 2;
-const PENDING_OP_TOLERANCE_RATIO: f64 = 0.1;
-const ACTIVE_REPLICATION_TOLERANCE_RATIO: f64 = 0.05;
+/// Count of neighbours to every node that we keep track of.
+const NEIGHBOUR_COUNT: usize = DEFAULT_DATA_COPY_COUNT - 1; // '- 1' because we exclude the original node
+
+/// Minimum no. of pending data operations that an adult is allowed to have.
+const MIN_PENDING_OPS: usize = 500; // Nodes will be scrutinized if they exceed this count.
+
+/// Threshold for replicating data preemptively.
+/// Derived from MIN_PENDING_OPS which is the limit before nodes get checked.
+const PREEMPTIVE_REPLICATION_THRESHOLD: usize = MIN_PENDING_OPS / 2;
+
+/// Tolerance ratio that is used to compare a node's pending ops with its neighbours' and
+/// the nodes that exceed this ratio will be proposed offline.
+// if the pending ops count of a node is 5 times higher than it's neighbours, it will be kicked
+const PENDING_OP_TOLERANCE_RATIO: f64 = 0.2; // increasing this number decreases tolerance
+
+/// Tolerance ratio that is used to compare a node's pending ops with its neighbours' and
+/// the nodes that exceed this ratio will be reported as Deviant nodes that are starting to perform badly
+/// while preemptive replication of their data begins.
+// if the pending ops count of a node is ~2.5 times higher than it's neighbours, preemptive replication starts
+const PREEMPTIVE_REPLICATION_TOLERANCE_RATIO: f64 = 0.4; // increasing this number decreases tolerance
 
 /// Some reproducible xorname derived from the operation. Which can be re-derived from the appropriate response when received (to remove from tracking)
 type NodeIdentifier = XorName;
@@ -231,11 +247,11 @@ impl Liveness {
                     unresponsive_nodes.push((node, pending_operations_count));
                 }
 
-                if pending_operations_count as f64 * ACTIVE_REPLICATION_TOLERANCE_RATIO
+                if pending_operations_count as f64 * PREEMPTIVE_REPLICATION_TOLERANCE_RATIO
                     > max_pending_by_neighbours as f64
                 {
                     info!(
-                    "Probable deviant {node} crossed ACTIVE_REPLICATION_THRESHOLD: {ACTIVE_REPLICATION_THRESHOLD} \
+                    "Probable deviant {node} crossed PREEMPTIVE_REPLICATION_THRESHOLD: {PREEMPTIVE_REPLICATION_THRESHOLD} \
                     {pending_operations_count}: Neighbour max: {max_pending_by_neighbours}",
                     );
                     deviants.push(node);

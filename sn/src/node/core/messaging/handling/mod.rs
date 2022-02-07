@@ -699,7 +699,7 @@ impl Node {
             }
             SystemMsg::NodeEvent(NodeEvent::DeviantsDetected(deviants)) => {
                 info!(
-                    "Received probable deviants nodes {deviants:?} Starting active data replication"
+                    "Received probable deviants nodes {deviants:?} Starting preemptive data replication"
                 );
                 debug!("{}", LogMarker::DeviantsDetected);
 

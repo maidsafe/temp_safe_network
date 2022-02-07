@@ -117,7 +117,7 @@ impl Node {
         }
 
         if !deviants.is_empty() {
-            warn!("{deviants:?} have crossed active replication threshold. Triggering active data replication");
+            warn!("{deviants:?} have crossed preemptive replication threshold. Triggering preemptive data replication");
 
             let our_adults = self.network_knowledge.adults().await;
             let valid_adults = our_adults
