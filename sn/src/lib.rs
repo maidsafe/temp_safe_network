@@ -94,7 +94,7 @@ pub(crate) fn elder_count() -> usize {
         Ok(count) => match count.parse() {
             Ok(count) => {
                 warn!(
-                    "ELDER_COUNT countout set from env var SN_ELDER_COUNT: {:?}",
+                    "ELDER_COUNT count set from env var SN_ELDER_COUNT: {:?}",
                     SN_ELDER_COUNT
                 );
                 count
