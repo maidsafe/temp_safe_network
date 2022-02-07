@@ -10,12 +10,15 @@ use super::cli;
 use async_std::task;
 use color_eyre::Result;
 use shrust::{Shell, ShellIO};
-use sn_api::SafeAuthdClient;
+use sn_api::{Safe, SafeAuthdClient};
 use std::io::Write;
 
 pub fn shell_run() -> Result<()> {
+    // We create a Safe instance which we''ll use for all commands till we exit.
+    let safe = Safe::dry_runner(None);
     let sn_authd_client = SafeAuthdClient::new(None);
-    let mut shell = Shell::new(sn_authd_client);
+    let mut shell = Shell::new((safe, sn_authd_client));
+
     shell.set_default(|io, _, cmd| {
         writeln!(
             io,
@@ -30,79 +33,79 @@ pub fn shell_run() -> Result<()> {
         "cat",
         "Read data on the Safe Network",
         0,
-        |io, _sn_authd_client, args| call_cli("cat", args, io),
+        |io, (safe, _sn_authd_client), args| call_cli("cat", args, safe, io),
     );
     shell.new_command(
         "config",
         "CLI config settings",
         0,
-        |io, _sn_authd_client, args| call_cli("config", args, io),
+        |io, (safe, _sn_authd_client), args| call_cli("config", args, safe, io),
     );
     shell.new_command(
         "dog",
         "Inspect data on the Safe Network providing only metadata information about the content",
         0,
-        |io, _sn_authd_client, args| call_cli("dog", args, io),
+        |io, (safe, _sn_authd_client), args| call_cli("dog", args, safe, io),
     );
     shell.new_command(
         "files",
         "Manage files on the Safe Network",
         0,
-        |io, _sn_authd_client, args| call_cli("files", args, io),
+        |io, (safe, _sn_authd_client), args| call_cli("files", args, safe, io),
     );
     shell.new_command(
         "seq",
         "Manage Sequences on the Safe Network",
         0,
-        |io, _sn_authd_client, args| call_cli("seq", args, io),
+        |io, (safe, _sn_authd_client), args| call_cli("seq", args, safe, io),
     );
     shell.new_command(
         "keypair",
         "Generate a key pair without creating and/or storing a SafeKey on the network",
         0,
-        |io, _sn_authd_client, args| call_cli("keypair", args, io),
+        |io, (safe, _sn_authd_client), args| call_cli("keypair", args, safe, io),
     );
     shell.new_command(
         "keys",
         "Manage keys on the Safe Network",
         0,
-        |io, _sn_authd_client, args| call_cli("keys", args, io),
+        |io, (safe, _sn_authd_client), args| call_cli("keys", args, safe, io),
     );
     shell.new_command(
         "networks",
         "Switch between Safe networks",
         0,
-        |io, _sn_authd_client, args| call_cli("networks", args, io),
+        |io, (safe, _sn_authd_client), args| call_cli("networks", args, safe, io),
     );
     shell.new_command(
         "nrs",
         "Manage public names on the Safe Network",
         0,
-        |io, _sn_authd_client, args| call_cli("nrs", args, io),
+        |io, (safe, _sn_authd_client), args| call_cli("nrs", args, safe, io),
     );
     shell.new_command(
         "setup",
         "Perform setup tasks",
         0,
-        |io, _sn_authd_client, args| call_cli("setup", args, io),
+        |io, (safe, _sn_authd_client), args| call_cli("setup", args, safe, io),
     );
     shell.new_command(
         "update",
         "Update the application to the latest available version",
         0,
-        |io, _sn_authd_client, args| call_cli("update", args, io),
+        |io, (safe, _sn_authd_client), args| call_cli("update", args, safe, io),
     );
     shell.new_command(
         "node",
         "Commands to manage Safe Network Nodes",
         0,
-        |io, _sn_authd_client, args| call_cli("node", args, io),
+        |io, (safe, _sn_authd_client), args| call_cli("node", args, safe, io),
     );
     shell.new_command(
         "xorurl",
         "Obtain the XOR-URL of data without uploading it to the network, or decode XOR-URLs",
         0,
-        |io, _sn_authd_client, args| call_cli("xorurl", args, io),
+        |io, (safe, _sn_authd_client), args| call_cli("xorurl", args, safe, io),
     );
 
     println!();
@@ -121,6 +124,7 @@ pub fn shell_run() -> Result<()> {
 fn call_cli(
     subcommand: &str,
     args: &[&str],
+    safe: &mut Safe,
     io: &mut shrust::ShellIO,
 ) -> Result<(), shrust::ExecError> {
     // Let's create an args array to mimic the one we'd receive when passed to CLI
@@ -128,7 +132,7 @@ fn call_cli(
     mimic_cli_args.extend(args.iter());
 
     // We can now pass this args array to the CLI
-    match task::block_on(cli::run_with(Some(&mimic_cli_args), None)) {
+    match task::block_on(cli::run_with(Some(&mimic_cli_args), safe)) {
         Ok(()) => Ok(()),
         Err(err) => {
             writeln!(io, "{}", err)?;

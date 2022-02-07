@@ -123,6 +123,11 @@ impl Safe {
         Ok(())
     }
 
+    /// Resturns true if we already have a connection with the network
+    pub fn is_connected(&self) -> bool {
+        self.client.is_some()
+    }
+
     /// Generate a new random Ed25519 keypair
     pub fn new_keypair(&self) -> Keypair {
         let mut rng = OsRng;

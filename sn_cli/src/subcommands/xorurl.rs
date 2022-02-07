@@ -94,10 +94,10 @@ pub async fn xorurl_of_files(
     recursive: bool,
     follow_symlinks: bool,
     output_fmt: OutputFmt,
-    xorurl_base: Option<XorUrlBase>,
+    xorurl_base: XorUrlBase,
 ) -> Result<()> {
     // Do a dry-run on the location
-    let safe = Safe::dry_runner(xorurl_base);
+    let safe = Safe::dry_runner(Some(xorurl_base));
 
     let location = get_from_arg_or_stdin(location, Some("...awaiting location path from stdin"))?;
     let (_, processed_files, _) = safe

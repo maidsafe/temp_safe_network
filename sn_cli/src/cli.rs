@@ -26,7 +26,7 @@ use crate::{
     },
 };
 use color_eyre::{eyre::eyre, Result};
-use sn_api::XorUrlBase;
+use sn_api::{Safe, XorUrlBase};
 use std::env;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -62,26 +62,21 @@ pub struct CmdArgs {
 }
 
 pub async fn run() -> Result<()> {
-    let cli_timeout: u64 = match env::var(SN_CLI_QUERY_TIMEOUT) {
-        Ok(timeout) => timeout.parse::<u64>().map_err(|_| {
-            eyre!(
-                "Could not parse {} env var value: {}",
-                SN_CLI_QUERY_TIMEOUT,
-                timeout
-            )
-        })?,
-        Err(_) => DEFAULT_OPERATION_TIMEOUT_SECS,
-    };
-
-    run_with(None, Some(Duration::from_secs(cli_timeout))).await
+    let mut safe = Safe::dry_runner(None);
+    run_with(None, &mut safe).await
 }
 
-pub async fn run_with(cmd_args: Option<&[&str]>, timeout: Option<Duration>) -> Result<()> {
+pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> {
     // Let's first get all the arguments passed in, either as function's args, or CLI args
     let args = match cmd_args {
         None => CmdArgs::from_args(),
         Some(cmd_args) => CmdArgs::from_iter_safe(cmd_args)?,
     };
+
+    let prev_base = safe.xorurl_base;
+    if let Some(base) = args.xorurl_base {
+        safe.xorurl_base = base;
+    }
 
     let output_fmt = if args.output_json {
         OutputFmt::Json
@@ -92,9 +87,12 @@ pub async fn run_with(cmd_args: Option<&[&str]>, timeout: Option<Duration>) -> R
         }
     };
 
+    // Set dry run mode in Safe instance as per arg provide
+    safe.dry_run_mode = args.dry;
+
     debug!("Processing command: {:?}", args);
 
-    match args.cmd {
+    let result = match args.cmd {
         Some(SubCommands::Config { cmd }) => config_commander(cmd, &mut get_config().await?).await,
         Some(SubCommands::Networks { cmd }) => {
             networks_commander(cmd, &mut get_config().await?).await
@@ -113,6 +111,10 @@ pub async fn run_with(cmd_args: Option<&[&str]>, timeout: Option<Duration>) -> R
                 .map_err(|err| eyre!("Failed to run self update: {:?}", err))?
         }
         Some(SubCommands::Setup(cmd)) => setup_commander(cmd, output_fmt),
+        Some(SubCommands::Node { cmd }) => {
+            let mut launcher = Box::new(SnLaunchToolNetworkLauncher::default());
+            node_commander(cmd, &mut get_config().await?, &mut launcher).await
+        }
         Some(SubCommands::Xorurl {
             cmd,
             location,
@@ -120,47 +122,52 @@ pub async fn run_with(cmd_args: Option<&[&str]>, timeout: Option<Duration>) -> R
             follow_links,
         }) => {
             if let Some(cmd) = cmd {
-                xorurl_commander(
-                    cmd,
-                    output_fmt,
-                    args.xorurl_base.unwrap_or(XorUrlBase::Base32z),
-                )
-                .await
+                xorurl_commander(cmd, output_fmt, safe.xorurl_base).await
             } else {
                 xorurl_of_files(
                     location,
                     recursive,
                     follow_links,
                     output_fmt,
-                    args.xorurl_base,
+                    safe.xorurl_base,
                 )
                 .await
             }
         }
-        Some(SubCommands::Node { cmd }) => {
-            let mut launcher = Box::new(SnLaunchToolNetworkLauncher::default());
-            node_commander(cmd, &mut get_config().await?, &mut launcher).await
-        }
         Some(other) => {
-            // We treat these commands separately since we use the credentials if they
-            // are available to connect to the network with them, otherwise the connection
-            // created will be with read-only access and some of these commands will
-            // fail if they require write access.
-            // If dry-run was set, connection will still be made but no cmds will be sent to the network.
+            // We treat these commands separatelly since we use the credentials if they are
+            // available to connect to the network with them (unless dry-run was set),
+            // otherwise the connection created will be with read-only access and some
+            // of these commands will fail if they require write access.
+            if !safe.dry_run_mode && !safe.is_connected() {
+                let timeout_secs: u64 = match env::var(SN_CLI_QUERY_TIMEOUT) {
+                    Ok(timeout) => timeout.parse::<u64>().map_err(|_| {
+                        eyre!(
+                            "Could not parse {} env var value: {}",
+                            SN_CLI_QUERY_TIMEOUT,
+                            timeout
+                        )
+                    })?,
+                    Err(_) => DEFAULT_OPERATION_TIMEOUT_SECS,
+                };
 
-            let safe = connect(get_config().await?, args.xorurl_base, timeout, args.dry).await?;
+                connect(safe, get_config().await?, Duration::from_secs(timeout_secs)).await?;
+            }
 
             match other {
-                SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, &safe).await,
-                SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, &safe).await,
-                SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, &safe).await,
-                SubCommands::Files(cmd) => files_commander(cmd, output_fmt, &safe).await,
-                SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, &safe).await,
+                SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, safe).await,
+                SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, safe).await,
+                SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, safe).await,
+                SubCommands::Files(cmd) => files_commander(cmd, output_fmt, safe).await,
+                SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, safe).await,
                 _ => Err(eyre!("Unknown safe subcommand")),
             }
         }
         None => shell::shell_run(), // then enter in interactive shell
-    }
+    };
+
+    safe.xorurl_base = prev_base;
+    result
 }
 
 /// Gets the configuration, which is used by various parts of the application.
