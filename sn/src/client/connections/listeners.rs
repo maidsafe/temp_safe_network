@@ -459,10 +459,7 @@ impl Session {
 
         let (target_count, dst_address_of_bounced_msg) = match service_msg.clone() {
             ServiceMsg::Cmd(cmd) => {
-                match &cmd {
-                    DataCmd::StoreChunk(_) => (at_least_one_correct_elder(), cmd.dst_name()), // stored at Adults, so only 1 correctly functioning Elder need to relay
-                    DataCmd::Register(_) => (elder_count(), cmd.dst_name()), // only stored at Elders, all need a copy
-                }
+                (at_least_one_correct_elder(), cmd.dst_name())
             }
             ServiceMsg::Query(query) => (NUM_OF_ELDERS_SUBSET_FOR_QUERIES, query.dst_name()),
             _ => {
