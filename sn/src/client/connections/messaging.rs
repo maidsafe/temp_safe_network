@@ -177,7 +177,7 @@ impl Session {
                 }
                 Ok((src, Some(error))) => {
                     received_err += 1;
-                    trace!(
+                    error!(
                         "received error response {:?} of cmd {:?} from {:?}, so far {:?} vs. {:?}",
                         error,
                         msg_id,
