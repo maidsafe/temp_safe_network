@@ -4,15 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.47.1 (2022-02-04)
+## v0.48.0 (2022-02-08)
+
+### Bug Fixes
+
+ - <csr-id-e867b1f5aa290823e77eff95f0846f00d7c0416c/> CLI shell was creating a new Safe API instance, and connecting to the net, for every command
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release over the course of 2 calendar days.
- - 2 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 3 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -22,10 +26,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge branch 'main' into fix-cli-shell-api-instances ([`5fe7e54`](https://github.com/maidsafe/safe_network/commit/5fe7e54874e5d665fd10906c4c973f24d613aeba))
+    - CLI shell was creating a new Safe API instance, and connecting to the net, for every command ([`e867b1f`](https://github.com/maidsafe/safe_network/commit/e867b1f5aa290823e77eff95f0846f00d7c0416c))
+</details>
+
+## v0.47.1 (2022-02-04)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 6 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.55.3/sn_api-0.54.1/sn_cli-0.47.1 ([`86975f2`](https://github.com/maidsafe/safe_network/commit/86975f228f31303597a707e158005e44c86de1cc))
     - Merge #993 ([`303e856`](https://github.com/maidsafe/safe_network/commit/303e856346dd1d4e5544c9ceae6d571c54cfb84e))
-    - remove get_target_url function ([`9af70e7`](https://github.com/maidsafe/safe_network/commit/9af70e7785c9329d8262de99bda68c4ad79d5154))
-    - remove url sanitisation from api ([`a58f6c5`](https://github.com/maidsafe/safe_network/commit/a58f6c5019e73ffbfa0f29965aa0fa62b026ece7))
-    - Merge #985 ([`ba572d5`](https://github.com/maidsafe/safe_network/commit/ba572d5f909f5c1dc389b9affadffec39a4e0369))
 </details>
 
 ## v0.47.0 (2022-02-01)
@@ -36,6 +60,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
    Previously a command error would simply error out and fail.
    Now we use an exponential backoff to retry incase errors
    can be overcome
+ - <csr-id-3d73dd03a7a6913a248e5cca7d714f8b8e4c0d01/> retrieve immutable content via nrs
+   Changes the resolver to enable retrieval of NRS links to immutable content. Previously, the
+   NRS `target_url` was incorrectly being checked to see if it contained a version. We now validate
+   this URL using the same process used by NRS, which won't assert that a file link has a version. To
+   reduce duplication, the `validate_nrs_url` function in the NRS module was changed to public.
+   
+   Tests were added to both the API and CLI to cover the scenario.
+   
+   The NrsMap struct was extended to include a subname_version field. This is going to be used to
+   request the map with a particular version of a subname. If no version was specified when the
+   container was retrieved, then the field won't be set. This is why it's an Option. Since we're
+   storing this field on the NrsMap, the `version` field on the `NrsMapContainer` was removed.
+   
+   A couple of CLI NRS tests were also re-enabled, one of which happened to be related to immutable
+   content.
 
 ### Bug Fixes (BREAKING)
 
@@ -46,9 +85,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 3 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits contributed to the release.
+ - 10 days passed between releases.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -59,6 +98,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - safe_network-0.55.1/sn_api-0.54.0/sn_cli-0.47.0 ([`2ec86e2`](https://github.com/maidsafe/safe_network/commit/2ec86e28246031084d603768ffa1fddf320a10a2))
+    - Merge branch 'main' into nrs_resolve_immutable_content ([`099bf22`](https://github.com/maidsafe/safe_network/commit/099bf224714e667bf998de80099eeeabfd869d8b))
+    - retrieve immutable content via nrs ([`3d73dd0`](https://github.com/maidsafe/safe_network/commit/3d73dd03a7a6913a248e5cca7d714f8b8e4c0d01))
     - enable cmd retries ([`b2b0520`](https://github.com/maidsafe/safe_network/commit/b2b0520630774d935aca1f2b602a1de9479ba6f9))
     - dry-runner was making a connection to the network ([`e088598`](https://github.com/maidsafe/safe_network/commit/e0885987742226f72ed761e7b78b86e2fa72e256))
 </details>
@@ -87,9 +128,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release over the course of 2 calendar days.
- - 6 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -100,8 +140,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  * **Uncategorized**
     - safe_network-0.55.0/sn_api-0.53.0/sn_cli-0.46.0 ([`366eee2`](https://github.com/maidsafe/safe_network/commit/366eee25f4b982d5a20d90168368a1aa14aa3181))
-    - Merge branch 'main' into nrs_resolve_immutable_content ([`099bf22`](https://github.com/maidsafe/safe_network/commit/099bf224714e667bf998de80099eeeabfd869d8b))
-    - retrieve immutable content via nrs ([`3d73dd0`](https://github.com/maidsafe/safe_network/commit/3d73dd03a7a6913a248e5cca7d714f8b8e4c0d01))
+    - remove get_target_url function ([`9af70e7`](https://github.com/maidsafe/safe_network/commit/9af70e7785c9329d8262de99bda68c4ad79d5154))
+    - remove url sanitisation from api ([`a58f6c5`](https://github.com/maidsafe/safe_network/commit/a58f6c5019e73ffbfa0f29965aa0fa62b026ece7))
+    - Merge #985 ([`ba572d5`](https://github.com/maidsafe/safe_network/commit/ba572d5f909f5c1dc389b9affadffec39a4e0369))
 </details>
 
 ## v0.45.0 (2022-01-22)

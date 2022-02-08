@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.56.0 (2022-02-08)
+
+### New Features (BREAKING)
+
+ - <csr-id-0b5ebece1240deb56360b238b96e2aece4a6d314/> fix typo
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - fix typo ([`0b5ebec`](https://github.com/maidsafe/safe_network/commit/0b5ebece1240deb56360b238b96e2aece4a6d314))
+</details>
+
 ## v0.55.5 (2022-02-07)
 
 ### New Features
@@ -16,9 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
+ - 2 commits contributed to the release.
  - 2 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -28,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.55.5 ([`d56f3c7`](https://github.com/maidsafe/safe_network/commit/d56f3c7c0bfc7bd6d045eb80a68a885615e73115))
     - add `flame` arg to use cargo flamegraph ([`0c04071`](https://github.com/maidsafe/safe_network/commit/0c04071e2184c4e74fa8c9f264a380585e84369e))
 </details>
 
@@ -125,10 +151,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-fa6014e581f52615971701572a1635dfde922fb6/> remove the relocation promise step for Elders
    - Both Adults and Elders now receive the `Relocate` message with all the relocation details
    without any previous or additional steps required to proceed with their relocation.
-- The relocation details are now embedded in the `NodeState`, which is
-     sent to the relocated peer (with section authority) within the Relocate message.
-- `JoinAsRelocatedRequest` always carries the signed relocate details (`relocate_proof`).
-- `JoinAsRelocatedRequest` now contains the signature of the node's new name with its previous key (`signature_over_new_name`)
 
 ### New Features
 
@@ -169,6 +191,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - make log files rotate properly ([`6aae745`](https://github.com/maidsafe/safe_network/commit/6aae745a4ffd7302fc74d5d548ca464066d5203f))
     - Merge #968 ([`f54ed86`](https://github.com/maidsafe/safe_network/commit/f54ed86b405c8463cd2a79ae9df33f992bd06cec))
 </details>
+
+<csr-unknown>
+The relocation details are now embedded in the NodeState, which issent to the relocated peer (with section authority) within the Relocate message.JoinAsRelocatedRequest always carries the signed relocate details (relocate_proof).JoinAsRelocatedRequest now contains the signature of the node’s new name with its previous key (signature_over_new_name)<csr-unknown/>
 
 ## v0.55.0 (2022-01-28)
 

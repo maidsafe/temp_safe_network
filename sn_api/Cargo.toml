@@ -1,6 +1,6 @@
 [package]
 name = "sn_api"
-version = "0.54.1"
+version = "0.55.0"
 description = "Safe API"
 authors = [
   "bochaco <gabrielviganotti@gmail.com>",
@@ -31,7 +31,7 @@ rmp-serde = "~0.15"
 serde = "1.0.123"
 serde_json = "1.0.62"
 sha3 = "~0.9"
-safe_network = { path = "../sn", version = "^0.55.3" }
+safe_network = { path = "../sn", version = "^0.56.0" }
 thiserror = "1.0.23"
 time = { version = "0.3.4", features = ["formatting"] }
 tracing = "~0.1.26"
