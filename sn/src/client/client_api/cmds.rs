@@ -81,6 +81,11 @@ impl Client {
                 break Ok(cmd_result);
             }
 
+            trace!(
+                "Failed response on {debug_cmd} attempt #{attempt}: {:?}",
+                res
+            );
+
             attempt += 1.0;
 
             if let Some(delay) = backoff.next_backoff() {
