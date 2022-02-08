@@ -89,6 +89,17 @@ impl<'a> Join<'a> {
         recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
         prefix_map: NetworkPrefixMap,
     ) -> Self {
+
+        let backoff = ExponentialBackoff {
+            initial_interval: Duration::from_millis(50),
+            max_interval: Duration::from_millis(750),
+            max_elapsed_time: Some(Duration::from_secs(60)),
+            ..Default::default()
+        };
+
+        // this seems needed for custom settings to take effect
+        backoff.reset();
+
         Self {
             send_tx,
             recv_rx,
@@ -97,12 +108,7 @@ impl<'a> Join<'a> {
             prefix_map,
             signature_aggregators: BTreeMap::default(),
             node_state_serialized: None,
-            backoff: ExponentialBackoff {
-                initial_interval: Duration::from_millis(50),
-                max_interval: Duration::from_millis(750),
-                max_elapsed_time: Some(Duration::from_secs(60)),
-                ..Default::default()
-            },
+            backoff,
             aggregated: false,
         }
     }

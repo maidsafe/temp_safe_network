@@ -470,6 +470,9 @@ impl Session {
             ..Default::default()
         };
 
+        // this seems needed for custom settings to take effect
+        backoff.reset();
+
         // wait here to give a chance for AE responses to come in and be parsed
         tokio::time::sleep(Duration::from_secs(INITIAL_WAIT)).await;
 

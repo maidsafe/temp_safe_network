@@ -56,7 +56,7 @@ impl Client {
             ..Default::default()
         };
 
-        //needed to take effect
+        // this seems needed for custom settings to take effect
         backoff.reset();
 
         let span = info_span!("Attempting a cmd");
