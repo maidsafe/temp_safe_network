@@ -8,7 +8,6 @@
 
 use super::{QueryResult, Session};
 
-use super::AeCache;
 use crate::client::connections::CmdResponse;
 use crate::client::Error;
 use crate::elder_count;
@@ -68,8 +67,6 @@ impl Session {
             pending_cmds: Arc::new(DashMap::default()),
             endpoint,
             network: Arc::new(prefix_map),
-            ae_redirect_cache: Arc::new(RwLock::new(AeCache::default())),
-            ae_retry_cache: Arc::new(RwLock::new(AeCache::default())),
             genesis_key,
             initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
             standard_wait,
@@ -183,11 +180,7 @@ impl Session {
                     received_err += 1;
                     error!(
                         "received error response {:?} of cmd {:?} from {:?}, so far {:?} vs. {:?}",
-                        error,
-                        msg_id,
-                        src,
-                        received_ack,
-                        received_err
+                        error, msg_id, src, received_ack, received_err
                     );
                     if received_err >= expected_acks {
                         error!("Received majority of error response for cmd {:?}", msg_id);
@@ -567,7 +560,6 @@ impl Session {
                     insufficient_sap_peers = false;
                     if let Some(sap) = known_sap.clone() {
                         if sap.elders_vec().len() < elder_count() {
-
                             debug!("Known elders: {:?}", sap.elders_vec().len());
                             insufficient_sap_peers = true;
                         }

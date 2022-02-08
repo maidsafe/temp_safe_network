@@ -89,8 +89,7 @@ impl<'a> Join<'a> {
         recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
         prefix_map: NetworkPrefixMap,
     ) -> Self {
-
-        let backoff = ExponentialBackoff {
+        let mut backoff = ExponentialBackoff {
             initial_interval: Duration::from_millis(50),
             max_interval: Duration::from_millis(750),
             max_elapsed_time: Some(Duration::from_secs(60)),

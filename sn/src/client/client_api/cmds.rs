@@ -19,7 +19,7 @@ use bytes::Bytes;
 use tokio::time::Duration;
 use xor_name::XorName;
 
-const MAX_RETRY_COUNT : f32 = 25.0;
+const MAX_RETRY_COUNT: f32 = 25.0;
 
 impl Client {
     /// Send a Cmd to the network and await a response.
@@ -49,7 +49,7 @@ impl Client {
         let op_limit = self.cmd_timeout;
 
         let mut backoff = ExponentialBackoff {
-            initial_interval: Duration::from_secs(15),
+            initial_interval: Duration::from_secs(3),
             max_interval: Duration::from_secs(60),
             max_elapsed_time: Some(op_limit),
             // randomization_factor: 0.5,

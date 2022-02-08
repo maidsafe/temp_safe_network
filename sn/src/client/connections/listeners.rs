@@ -8,6 +8,7 @@
 
 use super::Session;
 
+use crate::at_least_one_correct_elder;
 use crate::client::{
     connections::{
         messaging::{mark_connection_id_as_failed, send_msg, NUM_OF_ELDERS_SUBSET_FOR_QUERIES},
@@ -16,18 +17,19 @@ use crate::client::{
     Error, Result,
 };
 use crate::messaging::{
-    data::{CmdError, DataCmd, ServiceMsg},
+    data::{CmdError, ServiceMsg},
     system::{KeyedSig, SectionAuth, SystemMsg},
     AuthorityProof, DstLocation, MsgId, MsgKind, MsgType, ServiceAuth, WireMsg,
 };
 use crate::node::SectionAuthorityProvider;
 use crate::peer::Peer;
 use crate::types::{log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk};
-use crate::{at_least_one_correct_elder, elder_count};
 
 use bytes::Bytes;
 use itertools::Itertools;
 use qp2p::{Close, ConnectionError, ConnectionIncoming, SendError};
+use rand::rngs::OsRng;
+use rand::seq::SliceRandom;
 use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
 use tracing::Instrument;
@@ -55,7 +57,7 @@ impl Session {
             loop {
                 match Self::listen_for_incoming_msg(src, &mut incoming_msgs).await {
                     Ok(Some(msg)) => {
-                        if let Err(err) = Self::handle_msg(msg, src, session.clone()).await {
+                        if let Err(err) = Self::handle_msg(msg, connected_peer.clone(), session.clone()).await {
                             error!("Error while handling incoming msg: {:?}. Listening for next msg...", err);
                         }
                     },
@@ -110,12 +112,12 @@ impl Session {
     #[instrument(skip_all, level = "debug")]
     pub(crate) async fn handle_msg(
         msg: MsgType,
-        src: SocketAddr,
+        src_peer: Peer,
         session: Session,
     ) -> Result<(), Error> {
         match msg {
             MsgType::Service { msg_id, msg, .. } => {
-                Self::handle_client_msg(session, msg_id, msg, src)
+                Self::handle_client_msg(session, msg_id, msg, src_peer)
             }
             MsgType::System {
                 msg:
@@ -127,13 +129,14 @@ impl Session {
                     },
                 ..
             } => {
-                let result = Self::handle_ae_redirect_msg(
+                debug!("AE-Redirect msg received");
+                let result = Self::handle_ae_msg(
                     session,
                     section_auth.into_state(),
                     section_signed,
                     section_chain,
                     bounced_msg,
-                    src,
+                    src_peer,
                 )
                 .await;
                 if result.is_err() {
@@ -151,17 +154,18 @@ impl Session {
                     },
                 ..
             } => {
-                let result = Self::handle_ae_retry_msg(
+                debug!("AE-Retry msg received");
+                let result = Self::handle_ae_msg(
                     session,
                     section_auth.into_state(),
                     section_signed,
-                    bounced_msg,
                     proof_chain,
-                    src,
+                    bounced_msg,
+                    src_peer.clone(),
                 )
                 .await;
                 if result.is_err() {
-                    warn!("Failed to handle AE-Retry msg from {:?}", src);
+                    warn!("Failed to handle AE-Retry msg from {:?}", src_peer.addr());
                 }
                 result
             }
@@ -201,9 +205,13 @@ impl Session {
         session: Session,
         msg_id: MsgId,
         msg: ServiceMsg,
-        src: SocketAddr,
+        src_peer: Peer,
     ) -> Result<(), Error> {
-        debug!("ServiceMsg with id {:?} received from {:?}", msg_id, src);
+        debug!(
+            "ServiceMsg with id {:?} received from {:?}",
+            msg_id,
+            src_peer.addr()
+        );
         let queries = session.pending_queries.clone();
         let cmds = session.pending_cmds;
 
@@ -246,14 +254,16 @@ impl Session {
                 } => {
                     debug!("CmdError was received for msg w/ID: {:?}", correlation_id);
                     warn!("CmdError received is: {:?}", error);
-                    Self::send_cmd_response(cmds, correlation_id, src, Some(error));
+                    Self::send_cmd_response(cmds, correlation_id, src_peer.addr(), Some(error));
                 }
                 ServiceMsg::CmdAck { correlation_id } => {
                     debug!(
-                        "CmdAck was received for msg {:?} w/ID: {:?} from {:?}",
-                        msg_id, correlation_id, src
+                        "CmdAck was received for Message{:?} w/ID: {:?} from {:?}",
+                        msg_id,
+                        correlation_id,
+                        src_peer.addr()
                     );
-                    Self::send_cmd_response(cmds, correlation_id, src, None);
+                    Self::send_cmd_response(cmds, correlation_id, src_peer.addr(), None);
                 }
                 _ => {
                     warn!("Ignoring unexpected msg type received: {:?}", msg);
@@ -266,17 +276,18 @@ impl Session {
 
     // Handle Anti-Entropy Redirect msgs
     #[instrument(skip_all, level = "debug")]
-    async fn handle_ae_redirect_msg(
+    async fn handle_ae_msg(
         session: Session,
         target_sap: SectionAuthorityProvider,
         section_signed: KeyedSig,
         section_chain: SecuredLinkedList,
         bounced_msg: Bytes,
-        sender: SocketAddr,
+        src_peer: Peer,
     ) -> Result<(), Error> {
         debug!(
             "Received AE-Redirect for from {}, with SAP: {:?}",
-            sender, target_sap
+            src_peer.addr(),
+            target_sap
         );
 
         // Try to update our network knowledge first
@@ -285,83 +296,40 @@ impl Session {
             target_sap.clone(),
             section_signed,
             section_chain,
-            sender,
+            src_peer.clone(),
         )
         .await;
 
         if let Some((msg_id, elders, service_msg, dst_location, auth)) =
-            Self::new_elder_targets_if_any(session.clone(), bounced_msg.clone(), Some(&target_sap))
-                .await?
+            Self::new_target_elders(bounced_msg.clone(), &target_sap).await?
         {
-            if elders.is_empty() {
-                debug!("We have already resent this msg on an AE-Redirect response. Dropping this instance");
-                return Ok(());
+            let ae_msg_src_name = src_peer.clone().name();
+            // here we send this to only one elder for each AE message we get in. We _should_ have one per elder we sent to.
+            // deterministically send to most elder based upon sender
+            let target_elder = elders
+                .iter()
+                .sorted_by(|lhs, rhs| ae_msg_src_name.cmp_distance(&lhs.name(), &rhs.name()))
+                .cloned()
+                .collect_vec()
+                .pop();
+
+            // there should always be one
+            if let Some(elder) = target_elder {
+                let payload = WireMsg::serialize_msg_payload(&service_msg)?;
+                let wire_msg = WireMsg::new_msg(
+                    msg_id,
+                    payload,
+                    MsgKind::ServiceMsg(auth.into_inner()),
+                    dst_location,
+                )?;
+
+                debug!("Resending original message on AE-Redirect with updated details. Expecting an AE-Retry next");
+
+                let endpoint = session.endpoint.clone();
+                send_msg(session, vec![elder], wire_msg, endpoint, msg_id).await?;
+            } else {
+                error!("No elder determined for resending AE message");
             }
-
-            let payload = WireMsg::serialize_msg_payload(&service_msg)?;
-            let wire_msg = WireMsg::new_msg(
-                msg_id,
-                payload,
-                MsgKind::ServiceMsg(auth.into_inner()),
-                dst_location,
-            )?;
-
-            debug!("Resending original msg on AE-Redirect with updated details. Expecting an AE-Retry next");
-
-            let endpoint = session.endpoint.clone();
-            send_msg(session, elders.clone(), wire_msg, endpoint, msg_id).await?;
-        }
-
-        Ok(())
-    }
-
-    // Handle Anti-Entropy Retry msgs
-    #[instrument(skip_all, level = "debug")]
-    async fn handle_ae_retry_msg(
-        session: Session,
-        sap: SectionAuthorityProvider,
-        section_signed: KeyedSig,
-        bounced_msg: Bytes,
-        proof_chain: SecuredLinkedList,
-        sender: SocketAddr,
-    ) -> Result<(), Error> {
-        // Try to update our network knowledge first
-        Self::update_network_knowledge(&session, sap.clone(), section_signed, proof_chain, sender)
-            .await;
-
-        // Extract necessary information for resending
-        if let Some((msg_id, elders, service_msg, dst_location, auth)) =
-            Self::new_elder_targets_if_any(session.clone(), bounced_msg.clone(), None).await?
-        {
-            if let Some(id) = *session.clone().initial_connection_check_msg_id.read().await {
-                if id == msg_id {
-                    trace!(
-                        "Retry msg recevied from intial client contact probe ({:?}). No need to retry this",
-                        msg_id
-                    );
-                    return Ok(());
-                }
-            }
-
-            debug!("Received AE-Retry with new SAP: {:?}", sap);
-
-            if elders.is_empty() {
-                debug!("We have already responded to this msg on an AE-Retry response. Dropping this instance");
-                return Ok(());
-            }
-
-            let payload = WireMsg::serialize_msg_payload(&service_msg)?;
-            let wire_msg = WireMsg::new_msg(
-                msg_id,
-                payload,
-                MsgKind::ServiceMsg(auth.into_inner()),
-                dst_location,
-            )?;
-
-            debug!("Resending original msg via AE-Retry");
-
-            let endpoint = session.endpoint.clone();
-            send_msg(session, elders.clone(), wire_msg, endpoint, msg_id).await?;
         }
 
         Ok(())
@@ -374,7 +342,7 @@ impl Session {
         sap: SectionAuthorityProvider,
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
-        sender: SocketAddr,
+        sender: Peer,
     ) {
         match session.network.update(
             SectionAuth {
@@ -419,10 +387,9 @@ impl Session {
     /// Checks AE cache to see if we should be forwarding this msg (and to whom)
     /// or if it has already been dealt with
     #[instrument(skip_all, level = "debug")]
-    async fn new_elder_targets_if_any(
-        session: Session,
+    async fn new_target_elders(
         bounced_msg: Bytes,
-        received_auth: Option<&SectionAuthorityProvider>,
+        received_auth: &SectionAuthorityProvider,
     ) -> Result<
         Option<(
             MsgId,
@@ -433,7 +400,6 @@ impl Session {
         )>,
         Error,
     > {
-        let is_retry = received_auth.is_none();
         let (msg_id, service_msg, mut dst_location, auth) =
             match WireMsg::deserialize(bounced_msg.clone())? {
                 MsgType::Service {
@@ -458,9 +424,7 @@ impl Session {
         );
 
         let (target_count, dst_address_of_bounced_msg) = match service_msg.clone() {
-            ServiceMsg::Cmd(cmd) => {
-                (at_least_one_correct_elder(), cmd.dst_name())
-            }
+            ServiceMsg::Cmd(cmd) => (at_least_one_correct_elder(), cmd.dst_name()),
             ServiceMsg::Query(query) => (NUM_OF_ELDERS_SUBSET_FOR_QUERIES, query.dst_name()),
             _ => {
                 warn!(
@@ -475,57 +439,21 @@ impl Session {
 
         let target_public_key;
 
-        // We normally have received auth when we're in AE-Redirect (where we could not trust enough to update our prefixmap)
-        let mut target_elders: Vec<_> = if let Some(auth) = received_auth {
-            target_public_key = auth.section_key();
-            auth.elders_vec()
+        // We normally have received auth when we're in AE-Redirect
+        let mut target_elders: Vec<_> = {
+            target_public_key = received_auth.section_key();
+
+            received_auth
+                .elders_vec()
                 .into_iter()
                 .sorted_by(|lhs, rhs| {
                     dst_address_of_bounced_msg.cmp_distance(&lhs.name(), &rhs.name())
                 })
                 .take(target_count)
                 .collect()
-        } else {
-            // we use whatever is our latest knowledge at this point
-
-            if let Some(sap) = session
-                .network
-                .closest_or_opposite(&dst_address_of_bounced_msg, None)
-            {
-                target_public_key = sap.section_key();
-
-                sap.elders_vec().into_iter().take(target_count).collect()
-            } else {
-                error!("Cannot resend {:?}, no 'received auth' provided, and nothing relevant in session network prefixmap", msg_id);
-                return Ok(None);
-            }
         };
-
-        let mut the_cache_guard = if is_retry {
-            session.ae_retry_cache.write().await
-        } else {
-            session.ae_redirect_cache.write().await
-        };
-
-        let cache_entry =
-            the_cache_guard.find(|(candidate_elders, candidate_public_key, candidate_msg)| {
-                candidate_elders == &target_elders
-                    && candidate_public_key == &target_public_key
-                    && candidate_msg == &bounced_msg
-            });
-
-        if cache_entry.is_some() {
-            // an elder group corresponds to a PK, so as we've sent to this PK, we've sent to these elders...
-            debug!("Cache hit! we've sent {:?} before", msg_id);
-
-            target_elders = vec![];
-        } else {
-            let _old_entry_that_does_not_exist = the_cache_guard.insert((
-                target_elders.clone(),
-                target_public_key,
-                bounced_msg.clone(),
-            ));
-        }
+        // shuffle so elders sent to is random for better availability
+        target_elders.shuffle(&mut OsRng);
 
         // Let's rebuild the msg with the updated destination details
         dst_location.set_section_pk(target_public_key);
@@ -537,7 +465,7 @@ impl Session {
             );
         }
 
-        drop(the_cache_guard);
+        // drop(the_cache_guard);
 
         Ok(Some((
             msg_id,
