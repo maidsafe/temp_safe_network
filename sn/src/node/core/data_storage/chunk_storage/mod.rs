@@ -8,7 +8,7 @@
 
 mod chunk_disk_store;
 
-use crate::dbs::{convert_to_error_message, Error, Result};
+use crate::dbs::{convert_to_error_msg, Error, Result};
 use crate::messaging::system::NodeQueryResponse;
 use crate::types::{log_markers::LogMarker, Chunk, ChunkAddress};
 use crate::UsedSpace;
@@ -60,11 +60,7 @@ impl ChunkStorage {
     // Read chunk from local store and return NodeQueryResponse
     pub(crate) async fn get(&self, address: &ChunkAddress) -> NodeQueryResponse {
         trace!("{:?}", LogMarker::ChunkQueryReceviedAtAdult);
-        NodeQueryResponse::GetChunk(
-            self.get_chunk(address)
-                .await
-                .map_err(convert_to_error_message),
-        )
+        NodeQueryResponse::GetChunk(self.get_chunk(address).await.map_err(convert_to_error_msg))
     }
 
     /// Store a chunk in the local disk store

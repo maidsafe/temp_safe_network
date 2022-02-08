@@ -12,8 +12,8 @@ use crate::messaging::{
     DstLocation, WireMsg,
 };
 use crate::node::{
-    api::command::Command, ed25519, messages::WireMsgUtils,
-    network_knowledge::SectionAuthorityProvider, node_info::Node, Error, Result,
+    api::cmds::Cmd, ed25519, messages::WireMsgUtils, network_knowledge::SectionAuthorityProvider,
+    node_info::Node, Error, Result,
 };
 use crate::peer::Peer;
 use crate::types::PublicKey;
@@ -37,7 +37,7 @@ pub(crate) struct JoiningAsRelocated {
 }
 
 impl JoiningAsRelocated {
-    // Generates the first command to send a `JoinAsRelocatedRequest`, responses
+    // Generates the first cmd to send a `JoinAsRelocatedRequest`, responses
     // shall be fed back with `handle_join_response` function.
     pub(crate) fn start(
         node: Node,
@@ -47,7 +47,7 @@ impl JoiningAsRelocated {
         dst_xorname: XorName,
         dst_section_key: BlsPublicKey,
         new_age: u8,
-    ) -> Result<(Self, Command)> {
+    ) -> Result<(Self, Cmd)> {
         let recipients: Vec<_> = bootstrap_addrs
             .iter()
             .map(|addr| Peer::new(dst_xorname, *addr))
@@ -89,7 +89,7 @@ impl JoiningAsRelocated {
         &mut self,
         join_response: JoinAsRelocatedResponse,
         sender: SocketAddr,
-    ) -> Result<Option<Command>> {
+    ) -> Result<Option<Cmd>> {
         trace!("Hanlde JoinResponse {:?}", join_response);
         match join_response {
             JoinAsRelocatedResponse::Retry(section_auth) => {
@@ -215,7 +215,7 @@ impl JoiningAsRelocated {
         recipients: &[Peer],
         dst_name: XorName,
         new_name_sig: Signature,
-    ) -> Result<Command> {
+    ) -> Result<Cmd> {
         let join_request = JoinAsRelocatedRequest {
             section_key: self.dst_section_key,
             relocate_proof: self.relocate_proof.clone(),
@@ -235,7 +235,7 @@ impl JoiningAsRelocated {
             self.genesis_key,
         )?;
 
-        let cmd = Command::SendMessage {
+        let cmd = Cmd::SendMsg {
             recipients: recipients.to_vec(),
             wire_msg,
         };

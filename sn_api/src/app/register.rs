@@ -166,7 +166,7 @@ impl Safe {
             .get_register_entry(address, hash)
             .await
             .map_err(|err| {
-                if let ClientError::ErrorMessage {
+                if let ClientError::ErrorMsg {
                     source: safe_network::messaging::data::Error::NoSuchEntry,
                     ..
                 } = err

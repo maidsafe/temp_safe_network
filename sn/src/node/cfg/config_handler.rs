@@ -146,7 +146,7 @@ pub struct Config {
 
 impl Config {
     /// Returns a new `Config` instance.  Tries to read from the default node config file location,
-    /// and overrides values with any equivalent command line args.
+    /// and overrides values with any equivalent cmd line args.
     pub async fn new() -> Result<Self, Error> {
         // FIXME: Re-enable when we have rejoins working
         // let mut config = match Self::read_from_file() {
@@ -156,24 +156,24 @@ impl Config {
 
         let mut config = Config::default();
 
-        let mut command_line_args = Config::from_args();
-        command_line_args.validate().map_err(Error::Configuration)?;
+        let mut cmd_line_args = Config::from_args();
+        cmd_line_args.validate().map_err(Error::Configuration)?;
 
-        if command_line_args.hard_coded_contacts.is_empty() {
+        if cmd_line_args.hard_coded_contacts.is_empty() {
             debug!("Using node connection config file as no hard coded contacts were passed in");
             if let Ok((_, info)) = read_conn_info_from_file().await {
-                command_line_args.hard_coded_contacts = info;
+                cmd_line_args.hard_coded_contacts = info;
             }
         }
 
-        if command_line_args.genesis_key.is_none() {
+        if cmd_line_args.genesis_key.is_none() {
             debug!("Using node connection config file as no genesis key was passed in");
             if let Ok((genesis_key, _)) = read_conn_info_from_file().await {
-                command_line_args.genesis_key = Some(genesis_key);
+                cmd_line_args.genesis_key = Some(genesis_key);
             }
         }
 
-        config.merge(command_line_args);
+        config.merge(cmd_line_args);
 
         config.clear_data_from_disk().await.unwrap_or_else(|_| {
             tracing::error!("Error deleting data file from disk");
@@ -183,7 +183,7 @@ impl Config {
         Ok(config)
     }
 
-    /// Validate configuration that came from the command line.
+    /// Validate configuration that came from the cmd line.
     ///
     /// `StructOpt` doesn't support validation that crosses multiple field values.
     fn validate(&self) -> Result<(), String> {

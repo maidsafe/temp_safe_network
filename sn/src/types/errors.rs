@@ -8,7 +8,7 @@
 
 use super::{register::User, RegisterAddress};
 
-use crate::messaging::data::Error as ErrorMessage;
+use crate::messaging::data::Error as ErrorMsg;
 
 use std::{
     collections::BTreeMap,
@@ -125,13 +125,13 @@ pub(crate) fn convert_bincode_error(err: bincode::Error) -> Error {
 }
 
 /// Convert type errors to messaging::Errors for sending scross the network
-pub fn convert_dt_error_to_error_message(error: Error) -> ErrorMessage {
+pub fn convert_dt_error_to_error_msg(error: Error) -> ErrorMsg {
     match error {
         Error::InvalidOperation => {
-            ErrorMessage::InvalidOperation("DtError::InvalidOperation".to_string())
+            ErrorMsg::InvalidOperation("DtError::InvalidOperation".to_string())
         }
-        Error::NoSuchEntry => ErrorMessage::NoSuchEntry,
-        Error::AccessDenied(pk) => ErrorMessage::AccessDenied(pk),
-        other => ErrorMessage::InvalidOperation(format!("DtError: {:?}", other)),
+        Error::NoSuchEntry => ErrorMsg::NoSuchEntry,
+        Error::AccessDenied(pk) => ErrorMsg::AccessDenied(pk),
+        other => ErrorMsg::InvalidOperation(format!("DtError: {:?}", other)),
     }
 }

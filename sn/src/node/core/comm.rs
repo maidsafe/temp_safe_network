@@ -8,7 +8,7 @@
 
 use super::{msg_count::MsgCount, BackPressure};
 
-use crate::messaging::{system::LoadReport, MessageId, WireMsg};
+use crate::messaging::{system::LoadReport, MsgId, WireMsg};
 use crate::node::error::{Error, Result};
 use crate::peer::{Peer, UnnamedPeer};
 use crate::types::log_markers::LogMarker;
@@ -135,7 +135,7 @@ impl Comm {
 
             let bytes = wire_msg.serialize()?;
             // TODO: rework priority so this we dont need to deserialise payload to determine priority.
-            let priority = wire_msg.into_message()?.priority();
+            let priority = wire_msg.into_msg()?.priority();
             let retries = self.back_pressure.get(&addr).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 
             let connection = if let Some(connection) = recipient.connection().await {
@@ -244,7 +244,7 @@ impl Comm {
         }
 
         let msg_bytes = wire_msg.serialize().map_err(Error::Messaging)?;
-        let priority = wire_msg.clone().into_message()?.priority();
+        let priority = wire_msg.clone().into_msg()?.priority();
 
         // Run all the sends concurrently (using `FuturesUnordered`). If any of them fails, pick
         // the next recipient and try to send to them. Proceed until the needed number of sends
@@ -329,7 +329,7 @@ impl Comm {
     async fn send_to_one<'r>(
         &self,
         recipient: &'r Peer,
-        msg_id: MessageId,
+        msg_id: MsgId,
         msg_priority: i32,
         msg_bytes: Bytes,
         failed_connection_id: Option<usize>,
@@ -513,7 +513,7 @@ pub(crate) enum SendStatus {
 mod tests {
     use super::*;
     use crate::messaging::data::{DataQuery, ServiceMsg};
-    use crate::messaging::{DstLocation, MessageId, MsgKind, ServiceAuth};
+    use crate::messaging::{DstLocation, MsgId, MsgKind, ServiceAuth};
     use crate::node::Peer;
     use crate::types::{ChunkAddress, Keypair};
     use assert_matches::assert_matches;
@@ -535,7 +535,7 @@ mod tests {
         let (peer0, mut rx0) = new_peer().await?;
         let (peer1, mut rx1) = new_peer().await?;
 
-        let original_message = new_test_message()?;
+        let original_message = new_test_msg()?;
 
         let status = comm
             .send(&[peer0, peer1], 2, original_message.clone())
@@ -562,7 +562,7 @@ mod tests {
         let (peer0, mut rx0) = new_peer().await?;
         let (peer1, mut rx1) = new_peer().await?;
 
-        let original_message = new_test_message()?;
+        let original_message = new_test_msg()?;
         let status = comm
             .send(&[peer0, peer1], 1, original_message.clone())
             .await?;
@@ -597,7 +597,7 @@ mod tests {
         let invalid_peer = get_invalid_peer().await?;
         let invalid_addr = invalid_peer.addr();
 
-        let status = comm.send(&[invalid_peer], 1, new_test_message()?).await?;
+        let status = comm.send(&[invalid_peer], 1, new_test_msg()?).await?;
 
         assert_matches!(
             &status,
@@ -622,7 +622,7 @@ mod tests {
         let (peer, mut rx) = new_peer().await?;
         let invalid_peer = get_invalid_peer().await?;
 
-        let message = new_test_message()?;
+        let message = new_test_msg()?;
         let status = comm
             .send(&[invalid_peer.clone(), peer], 1, message.clone())
             .await?;
@@ -651,7 +651,7 @@ mod tests {
         let (peer, mut rx) = new_peer().await?;
         let invalid_peer = get_invalid_peer().await?;
 
-        let message = new_test_message()?;
+        let message = new_test_msg()?;
         let status = comm
             .send(&[invalid_peer.clone(), peer], 2, message.clone())
             .await?;
@@ -677,7 +677,7 @@ mod tests {
         let recv_addr = recv_endpoint.public_addr();
         let name = XorName::random();
 
-        let msg0 = new_test_message()?;
+        let msg0 = new_test_msg()?;
         let status = send_comm
             .send(&[Peer::new(name, recv_addr)], 1, msg0.clone())
             .await?;
@@ -698,7 +698,7 @@ mod tests {
             assert!(msg0_received);
         }
 
-        let msg1 = new_test_message()?;
+        let msg1 = new_test_msg()?;
         let status = send_comm
             .send(&[Peer::new(name, recv_addr)], 1, msg1.clone())
             .await?;
@@ -729,11 +729,7 @@ mod tests {
 
         // Send a message to establish the connection
         let status = comm1
-            .send(
-                &[Peer::new(XorName::random(), addr0)],
-                1,
-                new_test_message()?,
-            )
+            .send(&[Peer::new(XorName::random(), addr0)], 1, new_test_msg()?)
             .await?;
         assert_matches!(status, SendStatus::AllRecipients);
 
@@ -746,7 +742,7 @@ mod tests {
         Ok(())
     }
 
-    fn new_test_message() -> Result<WireMsg> {
+    fn new_test_msg() -> Result<WireMsg> {
         let dst_location = DstLocation::Node {
             name: XorName::random(),
             section_pk: bls::SecretKey::random().public_key(),
@@ -764,7 +760,7 @@ mod tests {
         };
 
         let wire_msg = WireMsg::new_msg(
-            MessageId::new(),
+            MsgId::new(),
             payload,
             MsgKind::ServiceMsg(auth),
             dst_location,

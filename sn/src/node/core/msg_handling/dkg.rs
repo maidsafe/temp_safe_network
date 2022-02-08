@@ -11,7 +11,7 @@ use crate::messaging::{
     DstLocation,
 };
 use crate::node::{
-    api::command::Command,
+    api::cmds::Cmd,
     core::{msg_handling::WireMsg, Core, Proposal},
     dkg::DkgFailureSigSetUtils,
     messages::WireMsgUtils,
@@ -35,7 +35,7 @@ impl Core {
         session_id: DkgSessionId,
         prefix: Prefix,
         elders: BTreeMap<XorName, SocketAddr>,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let current_generation = self.network_knowledge.chain_len().await;
         if session_id.generation < current_generation {
             trace!("Skipping DkgStart for older generation: {:?}", &session_id);
@@ -73,7 +73,7 @@ impl Core {
             .retain(|existing_session_id, _| {
                 existing_session_id.generation >= session_id.generation
             });
-        let commands = self
+        let cmds = self
             .dkg_voter
             .start(
                 &self.node.read().await.clone(),
@@ -82,15 +82,15 @@ impl Core {
                 self.network_knowledge().section_key().await,
             )
             .await?;
-        Ok(commands)
+        Ok(cmds)
     }
 
-    pub(crate) async fn handle_dkg_message(
+    pub(crate) async fn handle_dkg_msg(
         &self,
         session_id: DkgSessionId,
         message: DkgMessage,
         sender: Peer,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         trace!(
             "{} {:?} from {}",
             LogMarker::DkgMessageHandling,
@@ -99,7 +99,7 @@ impl Core {
         );
 
         self.dkg_voter
-            .process_message(
+            .process_msg(
                 sender,
                 &self.node.read().await.clone(),
                 &session_id,
@@ -115,8 +115,8 @@ impl Core {
         message: DkgMessage,
         session_id: DkgSessionId,
         section_pk: BlsPublicKey,
-    ) -> Result<Vec<Command>> {
-        let message_history = self.dkg_voter.get_cached_messages(&session_id);
+    ) -> Result<Vec<Cmd>> {
+        let message_history = self.dkg_voter.get_cached_msgs(&session_id);
         let node_msg = SystemMsg::DkgRetry {
             message_history,
             message,
@@ -132,7 +132,7 @@ impl Core {
             section_pk,
         )?;
 
-        Ok(vec![Command::SendMessage {
+        Ok(vec![Cmd::SendMsg {
             recipients: vec![sender],
             wire_msg,
         }])
@@ -144,7 +144,7 @@ impl Core {
         message_history: Vec<DkgMessage>,
         message: DkgMessage,
         sender: Peer,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let section_key = self.network_knowledge().section_key().await;
         let current_generation = self.network_knowledge.chain_len().await;
         if session_id.generation < current_generation {
@@ -154,7 +154,7 @@ impl Core {
             );
             return Ok(vec![]);
         }
-        let mut commands = self
+        let mut cmds = self
             .dkg_voter
             .handle_dkg_history(
                 &self.node.read().await.clone(),
@@ -165,9 +165,9 @@ impl Core {
             )
             .await?;
 
-        commands.extend(
+        cmds.extend(
             self.dkg_voter
-                .process_message(
+                .process_msg(
                     sender,
                     &self.node.read().await.clone(),
                     &session_id,
@@ -176,7 +176,7 @@ impl Core {
                 )
                 .await?,
         );
-        Ok(commands)
+        Ok(cmds)
     }
 
     pub(crate) fn handle_dkg_failure_observation(
@@ -184,7 +184,7 @@ impl Core {
         session_id: DkgSessionId,
         failed_participants: &BTreeSet<XorName>,
         signed: DkgFailureSig,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         match self
             .dkg_voter
             .process_failure(&session_id, failed_participants, signed)
@@ -198,7 +198,7 @@ impl Core {
         &self,
         sender: &XorName,
         failure_set: &DkgFailureSigSet,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         if !self.network_knowledge.is_section_member(sender).await {
             return Err(Error::InvalidSrcLocation);
         }
@@ -218,7 +218,7 @@ impl Core {
             return Ok(vec![]);
         };
 
-        let mut commands = vec![];
+        let mut cmds = vec![];
 
         if !failure_set.failed_participants.is_empty() {
             // The DKG failure is regarding failed_participants, i.e. potential unresponsive node.
@@ -227,7 +227,7 @@ impl Core {
                 failure_set.failed_participants,
                 generation, elder_candidates
             );
-            commands.extend(
+            cmds.extend(
                 self.cast_offline_proposals(&failure_set.failed_participants)
                     .await?,
             );
@@ -238,18 +238,18 @@ impl Core {
             elder_candidates, failure_set.failed_participants
         );
 
-        commands.extend(
+        cmds.extend(
             self.promote_and_demote_elders_except(&failure_set.failed_participants)
                 .await?,
         );
-        Ok(commands)
+        Ok(cmds)
     }
 
     pub(crate) async fn handle_dkg_outcome(
         &self,
         sap: SectionAuthorityProvider,
         key_share: SectionKeyShare,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let key_share_pk = key_share.public_key_set.public_key();
         trace!(
             "{} public_key={:?}",
@@ -286,11 +286,8 @@ impl Core {
         }
     }
 
-    pub(crate) async fn handle_dkg_failure(
-        &self,
-        failure_set: DkgFailureSigSet,
-    ) -> Result<Command> {
+    pub(crate) async fn handle_dkg_failure(&self, failure_set: DkgFailureSigSet) -> Result<Cmd> {
         let node_msg = SystemMsg::DkgFailureAgreement(failure_set);
-        self.send_message_to_our_elders(node_msg).await
+        self.send_msg_to_our_elders(node_msg).await
     }
 }

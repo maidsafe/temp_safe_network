@@ -11,7 +11,7 @@ use crate::messaging::{
     DstLocation, WireMsg,
 };
 use crate::node::{
-    api::command::Command,
+    api::cmds::Cmd,
     dkg::session::Session,
     ed25519,
     messages::WireMsgUtils,
@@ -64,7 +64,7 @@ impl DkgVoter {
         session_id: DkgSessionId,
         elder_candidates: ElderCandidates,
         section_pk: BlsPublicKey,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         if self.sessions.contains_key(&session_id) {
             trace!(
                 "DKG already in progress for {:?} - {:?}",
@@ -93,7 +93,7 @@ impl DkgVoter {
                 elder_candidates,
                 secret_key_set.public_keys(),
             );
-            return Ok(vec![Command::HandleDkgOutcome {
+            return Ok(vec![Cmd::HandleDkgOutcome {
                 section_auth,
                 outcome: SectionKeyShare {
                     public_key_set: secret_key_set.public_keys(),
@@ -119,8 +119,8 @@ impl DkgVoter {
                     complete: false,
                 };
 
-                let mut commands = vec![];
-                commands.extend(session.broadcast(node, &session_id, messages, section_pk)?);
+                let mut cmds = vec![];
+                cmds.extend(session.broadcast(node, &session_id, messages, section_pk)?);
 
                 // This is to avoid the case that between the above existence check
                 // and the insertion, there is another thread created and updated the session.
@@ -136,7 +136,7 @@ impl DkgVoter {
                     existing_session_id.generation >= session_id.generation
                 });
 
-                Ok(commands)
+                Ok(cmds)
             }
             Err(error) => {
                 // TODO: return a separate error here.
@@ -152,7 +152,7 @@ impl DkgVoter {
         node: &Node,
         timer_token: u64,
         section_pk: BlsPublicKey,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         if let Some(mut ref_mut_multi) = self.sessions.iter_mut().find(|ref_mut_multi| {
             let session = ref_mut_multi.value();
             session.timer_token() == timer_token
@@ -165,18 +165,18 @@ impl DkgVoter {
     }
 
     // Handle a received DkgMessage.
-    pub(crate) async fn process_message(
+    pub(crate) async fn process_msg(
         &self,
         sender: Peer,
         node: &Node,
         session_id: &DkgSessionId,
         message: DkgMessage,
         section_pk: BlsPublicKey,
-    ) -> Result<Vec<Command>> {
-        let mut commands = Vec::new();
+    ) -> Result<Vec<Cmd>> {
+        let mut cmds = Vec::new();
 
         if let Some(mut session) = self.sessions.get_mut(session_id) {
-            commands.extend(session.process_message(
+            cmds.extend(session.process_msg(
                 node,
                 sender.name(),
                 session_id,
@@ -204,12 +204,12 @@ impl DkgVoter {
                 section_pk,
             )?;
 
-            commands.push(Command::SendMessage {
+            cmds.push(Cmd::SendMsg {
                 recipients: vec![sender],
                 wire_msg,
             });
         }
-        Ok(commands)
+        Ok(cmds)
     }
 
     pub(crate) fn process_failure(
@@ -217,15 +217,15 @@ impl DkgVoter {
         session_id: &DkgSessionId,
         failed_participants: &BTreeSet<XorName>,
         signed: DkgFailureSig,
-    ) -> Option<Command> {
+    ) -> Option<Cmd> {
         self.sessions
             .get_mut(session_id)?
             .process_failure(session_id, failed_participants, signed)
     }
 
-    pub(crate) fn get_cached_messages(&self, session_id: &DkgSessionId) -> Vec<DkgMessage> {
+    pub(crate) fn get_cached_msgs(&self, session_id: &DkgSessionId) -> Vec<DkgMessage> {
         if let Some(session) = self.sessions.get_mut(session_id) {
-            session.get_cached_messages()
+            session.get_cached_msgs()
         } else {
             Vec::new()
         }
@@ -238,7 +238,7 @@ impl DkgVoter {
         message_history: Vec<DkgMessage>,
         sender: XorName,
         section_pk: BlsPublicKey,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         if let Some(mut session) = self.sessions.get_mut(&session_id) {
             session.handle_dkg_history(node, session_id, message_history, section_pk)
         } else {

@@ -16,7 +16,7 @@ use crate::messaging::client::ServiceMsg;
 use crate::messaging::{
     client::{ServiceMsg, ClientSig, Query, TransferQuery},
     location::{Aggregation, Itinerary},
-    DstLocation, MessageId, SrcLocation,
+    DstLocation, MsgId, SrcLocation,
 };
 use crate::node::routing_api::{Config, Error, Event, NodeElderChange};
 use std::net::{IpAddr, Ipv4Addr};
@@ -40,7 +40,7 @@ async fn test_messages_client_node() -> Result<()> {
         public_key: pk,
         signature: keypair.sign(b"the msg"),
     };
-    let id = MessageId::new();
+    let id = MsgId::new();
 
     // create a client which sends a message to the node
     let mut config = routing::TransportConfig {
@@ -70,7 +70,7 @@ async fn test_messages_client_node() -> Result<()> {
             match event {
                 Event::ServiceMsgReceived { msg, user } => {
                     assert_eq!(*msg, query_clone.clone());
-                    node.send_message(
+                    node.send_msg(
                         Itinerary {
                             src: SrcLocation::Node(node.name().await),
                             dst: DstLocation::EndUser(user),
@@ -92,7 +92,7 @@ async fn test_messages_client_node() -> Result<()> {
 
     let query_bytes = query.serialize(XorName::from(pk), section_key)?;
     client_endpoint
-        .send_message(query_bytes.clone(), &node_addr)
+        .send_msg(query_bytes.clone(), &node_addr)
         .await?;
 
     // just await for node to respond to client
@@ -171,7 +171,7 @@ async fn test_messages_between_nodes() -> Result<()> {
     };
 
     node2
-        .send_message(itinerary, Bytes::from_static(msg), None)
+        .send_msg(itinerary, Bytes::from_static(msg), None)
         .await?;
 
     println!("msg sent");
@@ -189,7 +189,7 @@ async fn test_messages_between_nodes() -> Result<()> {
 
     // send response from node1 to node2
     node1
-        .send_message(itinerary, Bytes::from_static(response), None)
+        .send_msg(itinerary, Bytes::from_static(response), None)
         .await?;
 
     println!("checking response received..");

@@ -11,7 +11,7 @@ use crate::messaging::{
     DstLocation, MsgKind, WireMsg,
 };
 use crate::node::{
-    api::command::Command,
+    api::cmds::Cmd,
     core::{Core, Proposal, StateSnapshot},
     dkg::DkgSessionIdUtils,
     messages::WireMsgUtils,
@@ -26,7 +26,7 @@ use xor_name::{Prefix, XorName};
 
 impl Core {
     // Send proposal to all our elders.
-    pub(crate) async fn propose(&self, proposal: Proposal) -> Result<Vec<Command>> {
+    pub(crate) async fn propose(&self, proposal: Proposal) -> Result<Vec<Cmd>> {
         let elders = self
             .network_knowledge
             .authority_provider()
@@ -40,7 +40,7 @@ impl Core {
         &self,
         recipients: Vec<Peer>,
         proposal: Proposal,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let section_key = self.network_knowledge.section_key().await;
 
         let key_share = self
@@ -61,7 +61,7 @@ impl Core {
         recipients: Vec<Peer>,
         proposal: Proposal,
         key_share: &SectionKeyShare,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         trace!(
             "Propose {:?}, key_share: {:?}, aggregators: {:?}",
             proposal,
@@ -95,12 +95,12 @@ impl Core {
 
         let msg_id = wire_msg.msg_id();
 
-        let mut commands = vec![];
+        let mut cmds = vec![];
         let our_name = self.node.read().await.name();
         // handle ourselves if we should
         for peer in recipients.clone() {
             if peer.name() == our_name {
-                commands.extend(
+                cmds.extend(
                     self.handle_proposal(msg_id, proposal.clone(), sig_share.clone(), peer)
                         .await?,
                 )
@@ -113,14 +113,14 @@ impl Core {
             .filter(|peer| peer.name() != our_name)
             .collect();
 
-        commands.extend(
+        cmds.extend(
             self.send_messages_to_all_nodes_or_directly_handle_for_accumulation(
                 wire_msg, recipients,
             )
             .await?,
         );
 
-        Ok(commands)
+        Ok(cmds)
     }
 
     // ------------------------------------------------------------------------------------------------------------
@@ -165,10 +165,7 @@ impl Core {
     }
 
     // Send NodeApproval to a joining node which makes them a section member
-    pub(crate) async fn send_node_approval(
-        &self,
-        node_state: SectionAuth<NodeState>,
-    ) -> Vec<Command> {
+    pub(crate) async fn send_node_approval(&self, node_state: SectionAuth<NodeState>) -> Vec<Cmd> {
         let peer = node_state.peer().clone();
         let prefix = self.network_knowledge.prefix().await;
         info!("Our section with {:?} has approved peer {}.", prefix, peer,);
@@ -187,7 +184,7 @@ impl Core {
         let dst_section_pk = self.network_knowledge.section_key().await;
         trace!("{}", LogMarker::SendNodeApproval);
         match self
-            .send_direct_message(peer.clone(), node_msg, dst_section_pk)
+            .send_direct_msg(peer.clone(), node_msg, dst_section_pk)
             .await
         {
             Ok(cmd) => vec![cmd],
@@ -198,7 +195,7 @@ impl Core {
         }
     }
 
-    pub(crate) async fn send_ae_update_to_our_section(&self) -> Vec<Command> {
+    pub(crate) async fn send_ae_update_to_our_section(&self) -> Vec<Cmd> {
         let our_name = self.node.read().await.name();
         let nodes: Vec<_> = self
             .network_knowledge
@@ -230,7 +227,7 @@ impl Core {
         };
 
         match self
-            .send_direct_message_to_nodes_in_section(
+            .send_direct_msg_to_nodes_in_section(
                 nodes,
                 node_msg,
                 self.network_knowledge.prefix().await.name(),
@@ -250,7 +247,7 @@ impl Core {
     pub(crate) async fn send_updates_to_sibling_section(
         &self,
         old: &StateSnapshot,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         debug!("{}", LogMarker::AeSendUpdateToSiblings);
         if let Some(sibling_sap) = self
             .network_knowledge
@@ -290,13 +287,13 @@ impl Core {
         prefix: Prefix,
         recipients: Vec<Peer>,
         target_pk: BlsPublicKey,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let metadata = self.get_metadata_of(&prefix).await;
 
         let data_update_msg = SystemMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata });
 
         match self
-            .send_direct_message_to_nodes_in_section(
+            .send_direct_msg_to_nodes_in_section(
                 recipients.clone(),
                 data_update_msg,
                 prefix.name(),
@@ -315,7 +312,7 @@ impl Core {
         }
     }
 
-    pub(crate) async fn send_ae_update_to_adults(&self) -> Vec<Command> {
+    pub(crate) async fn send_ae_update_to_adults(&self) -> Vec<Cmd> {
         let adults = self.network_knowledge.adults().await;
         let dst_section_pk = self.network_knowledge.section_key().await;
 
@@ -331,7 +328,7 @@ impl Core {
         };
 
         match self
-            .send_direct_message_to_nodes_in_section(
+            .send_direct_msg_to_nodes_in_section(
                 adults,
                 node_msg,
                 self.network_knowledge.prefix().await.name(),
@@ -351,7 +348,7 @@ impl Core {
         &self,
         recipient: Peer,
         node_state: SectionAuth<NodeState>,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let section_pk = self.network_knowledge.section_key().await;
         let dst = DstLocation::Node {
             name: recipient.name(),
@@ -362,7 +359,7 @@ impl Core {
         let wire_msg =
             WireMsg::single_src(&self.node.read().await.clone(), dst, node_msg, section_pk)?;
 
-        Ok(vec![Command::SendMessage {
+        Ok(vec![Cmd::SendMsg {
             recipients: vec![recipient],
             wire_msg,
         }])
@@ -371,7 +368,7 @@ impl Core {
     pub(crate) async fn send_dkg_start(
         &self,
         elder_candidates: ElderCandidates,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let src_prefix = elder_candidates.prefix();
         let generation = self.network_knowledge.chain_len().await;
         let session_id = DkgSessionId::new(&elder_candidates, generation);
@@ -395,7 +392,7 @@ impl Core {
                 .collect(),
         };
         let section_pk = self.network_knowledge.section_key().await;
-        self.send_message_for_dst_accumulation(
+        self.send_msg_for_dst_accumulation(
             src_prefix.name(),
             DstLocation::Section {
                 name: src_prefix.name(),
@@ -407,13 +404,13 @@ impl Core {
         .await
     }
 
-    pub(crate) async fn send_message_for_dst_accumulation(
+    pub(crate) async fn send_msg_for_dst_accumulation(
         &self,
         src: XorName,
         dst: DstLocation,
         node_msg: SystemMsg,
         recipients: Vec<Peer>,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let section_key = self.network_knowledge.section_key().await;
 
         let key_share = self
@@ -449,8 +446,8 @@ impl Core {
         &self,
         mut wire_msg: WireMsg,
         recipients: Vec<Peer>,
-    ) -> Result<Vec<Command>> {
-        let mut commands = vec![];
+    ) -> Result<Vec<Cmd>> {
+        let mut cmds = vec![];
         let mut others = Vec::new();
         let mut handle = false;
 
@@ -475,7 +472,7 @@ impl Core {
             wire_msg.set_dst_section_pk(dst_section_pk);
 
             trace!("{}", LogMarker::SendOrHandle);
-            commands.push(Command::SendMessage {
+            cmds.push(Cmd::SendMsg {
                 recipients: others,
                 wire_msg: wire_msg.clone(),
             });
@@ -485,22 +482,22 @@ impl Core {
             wire_msg.set_dst_section_pk(self.network_knowledge.section_key().await);
             wire_msg.set_dst_xorname(self.node.read().await.name());
 
-            commands.push(Command::HandleMessage {
+            cmds.push(Cmd::HandleMsg {
                 sender: UnnamedPeer::addressed(self.our_connection_info()),
                 wire_msg,
                 original_bytes: None,
             });
         }
 
-        Ok(commands)
+        Ok(cmds)
     }
 
-    pub(crate) async fn send_direct_message(
+    pub(crate) async fn send_direct_msg(
         &self,
         recipient: Peer,
         node_msg: SystemMsg,
         dst_section_pk: BlsPublicKey,
-    ) -> Result<Command> {
+    ) -> Result<Cmd> {
         let wire_msg = WireMsg::single_src(
             &self.node.read().await.clone(),
             DstLocation::Section {
@@ -516,19 +513,19 @@ impl Core {
 
         trace!("{}", LogMarker::SendDirect);
 
-        Ok(Command::SendMessage {
+        Ok(Cmd::SendMsg {
             recipients: vec![recipient],
             wire_msg,
         })
     }
 
-    pub(crate) async fn send_direct_message_to_nodes_in_section(
+    pub(crate) async fn send_direct_msg_to_nodes_in_section(
         &self,
         recipients: Vec<Peer>,
         node_msg: SystemMsg,
         section_name: XorName,
         dst_section_pk: BlsPublicKey,
-    ) -> Result<Command> {
+    ) -> Result<Cmd> {
         let wire_msg = WireMsg::single_src(
             &self.node.read().await.clone(),
             DstLocation::Section {
@@ -544,7 +541,7 @@ impl Core {
 
         trace!("{}", LogMarker::SendDirectToNodes);
 
-        Ok(Command::SendMessage {
+        Ok(Cmd::SendMsg {
             recipients,
             wire_msg,
         })
@@ -552,7 +549,7 @@ impl Core {
 
     // TODO: consider changing this so it sends only to a subset of the elders
     // (say 1/3 of the ones closest to our name or so)
-    pub(crate) async fn send_message_to_our_elders(&self, node_msg: SystemMsg) -> Result<Command> {
+    pub(crate) async fn send_msg_to_our_elders(&self, node_msg: SystemMsg) -> Result<Cmd> {
         let targets = self
             .network_knowledge
             .authority_provider()
@@ -561,7 +558,7 @@ impl Core {
 
         let dst_section_pk = self.network_knowledge.section_key().await;
         let cmd = self
-            .send_direct_message_to_nodes_in_section(
+            .send_direct_msg_to_nodes_in_section(
                 targets,
                 node_msg,
                 self.network_knowledge

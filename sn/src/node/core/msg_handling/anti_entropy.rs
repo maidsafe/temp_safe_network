@@ -8,10 +8,10 @@
 
 use crate::messaging::{
     system::{KeyedSig, SectionAuth, SectionPeers, SystemMsg},
-    MessageId, MessageType, SrcLocation, WireMsg,
+    MsgId, MsgType, SrcLocation, WireMsg,
 };
 use crate::node::{
-    api::command::Command, core::Core, messages::WireMsgUtils,
+    api::cmds::Cmd, core::Core, messages::WireMsgUtils,
     network_knowledge::SectionAuthorityProvider, Error, Result,
 };
 use crate::peer::Peer;
@@ -34,7 +34,7 @@ impl Core {
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
         members: SectionPeers,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let snapshot = self.state_snapshot().await;
         let old_adults: BTreeSet<_> = self
             .network_knowledge
@@ -61,12 +61,12 @@ impl Core {
             )
             .await?;
 
-        let mut commands = self.try_reorganize_data(old_adults).await?;
+        let mut cmds = self.try_reorganize_data(old_adults).await?;
 
         // always run this, only changes will trigger events
-        commands.extend(self.update_self_for_new_node_state(snapshot).await?);
+        cmds.extend(self.update_self_for_new_node_state(snapshot).await?);
 
-        Ok(commands)
+        Ok(cmds)
     }
 
     pub(crate) async fn handle_anti_entropy_retry_msg(
@@ -76,7 +76,7 @@ impl Core {
         proof_chain: SecuredLinkedList,
         bounced_msg: Bytes,
         sender: Peer,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let dst_section_key = section_auth.section_key();
         let snapshot = self.state_snapshot().await;
 
@@ -110,7 +110,7 @@ impl Core {
                 }
 
                 result.push(
-                    self.send_direct_message(sender, msg_to_resend, dst_section_key)
+                    self.send_direct_msg(sender, msg_to_resend, dst_section_key)
                         .await?,
                 );
 
@@ -126,7 +126,7 @@ impl Core {
         section_chain: SecuredLinkedList,
         bounced_msg: Bytes,
         sender: Peer,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let dst_section_key = section_auth.section_key();
 
         // We choose the Elder closest to the dst section key,
@@ -172,7 +172,7 @@ impl Core {
                     self.create_or_wait_for_backoff(&elder).await;
 
                     let cmd = self
-                        .send_direct_message(elder, msg_to_redirect, dst_section_key)
+                        .send_direct_msg(elder, msg_to_redirect, dst_section_key)
                         .await?;
 
                     Ok(vec![cmd])
@@ -189,16 +189,16 @@ impl Core {
         proof_chain: SecuredLinkedList,
         bounced_msg: Bytes,
         sender: Peer,
-    ) -> Result<Option<(SystemMsg, MessageId)>> {
+    ) -> Result<Option<(SystemMsg, MsgId)>> {
         let (bounced_msg, msg_id, dst_location) = match WireMsg::deserialize(bounced_msg)? {
-            MessageType::System {
+            MsgType::System {
                 msg,
                 msg_id,
                 dst_location,
                 ..
             } => (msg, msg_id, dst_location),
             _ => {
-                warn!("Non System MessageType received in AE response. We do not handle any other type in AE msgs yet.");
+                warn!("Non System MsgType received in AE response. We do not handle any other type in AE msgs yet.");
                 return Ok(None);
             }
         };
@@ -285,7 +285,7 @@ impl Core {
         dst_section_key: &BlsPublicKey,
         dst_name: XorName,
         sender: &Peer,
-    ) -> Result<Option<Command>> {
+    ) -> Result<Option<Cmd>> {
         // Check if the message has reached the correct section,
         // if not, we'll need to respond with AE
         trace!("Checking for entropy");
@@ -321,7 +321,7 @@ impl Core {
                     )?;
                     trace!("{}", LogMarker::AeSendRedirect);
 
-                    return Ok(Some(Command::SendMessage {
+                    return Ok(Some(Cmd::SendMsg {
                         recipients: vec![sender.clone()],
                         wire_msg,
                     }));
@@ -414,19 +414,19 @@ impl Core {
             self.network_knowledge.section_key().await,
         )?;
 
-        Ok(Some(Command::SendMessage {
+        Ok(Some(Cmd::SendMsg {
             recipients: vec![sender.clone()],
             wire_msg,
         }))
     }
 
-    // Generate an AE redirect command for the given message
+    // Generate an AE redirect cmd for the given message
     pub(crate) async fn ae_redirect_to_our_elders(
         &self,
         sender: Peer,
         src_location: &SrcLocation,
         original_wire_msg: &WireMsg,
-    ) -> Result<Command> {
+    ) -> Result<Cmd> {
         let signed_sap = self
             .network_knowledge
             .section_signed_authority_provider()
@@ -448,7 +448,7 @@ impl Core {
 
         trace!("{} in ae_redirect", LogMarker::AeSendRedirect);
 
-        Ok(Command::SendMessage {
+        Ok(Cmd::SendMsg {
             recipients: vec![sender],
             wire_msg,
         })
@@ -459,7 +459,7 @@ impl Core {
 mod tests {
     use super::*;
     use crate::elder_count;
-    use crate::messaging::{DstLocation, MessageId, MessageType, MsgKind, NodeAuth};
+    use crate::messaging::{DstLocation, MsgId, MsgKind, MsgType, NodeAuth};
     use crate::node::{
         api::tests::create_comm,
         create_test_max_capacity_and_root_storage,
@@ -487,7 +487,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         let env = Env::new().await?;
         let our_prefix = env.core.network_knowledge().prefix().await;
-        let (msg, src_location) = env.create_message(
+        let (msg, src_location) = env.create_msg(
             &our_prefix,
             env.core.network_knowledge().section_key().await,
         )?;
@@ -495,7 +495,7 @@ mod tests {
         let dst_name = our_prefix.substituted_in(rng.gen());
         let dst_section_key = env.core.network_knowledge().section_key().await;
 
-        let command = env
+        let cmd = env
             .core
             .check_for_entropy(
                 msg.serialize()?,
@@ -506,7 +506,7 @@ mod tests {
             )
             .await?;
 
-        assert!(command.is_none());
+        assert!(cmd.is_none());
 
         Ok(())
     }
@@ -518,13 +518,13 @@ mod tests {
         let other_sk = bls::SecretKey::random();
         let other_pk = other_sk.public_key();
 
-        let (msg, src_location) = env.create_message(&env.other_sap.prefix(), other_pk)?;
+        let (msg, src_location) = env.create_msg(&env.other_sap.prefix(), other_pk)?;
         let sender = env.core.node.read().await.peer();
 
         // since it's not aware of the other prefix, it shall redirect us to genesis section/SAP
         let dst_section_key = other_pk;
         let dst_name = env.other_sap.prefix().name();
-        let command = env
+        let cmd = env
             .core
             .check_for_entropy(
                 msg.serialize()?,
@@ -535,13 +535,13 @@ mod tests {
             )
             .await;
 
-        let msg_type = assert_matches!(command, Ok(Some(Command::SendMessage { wire_msg, .. })) => {
+        let msg_type = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { wire_msg, .. })) => {
             wire_msg
-                .into_message()
+                .into_msg()
                 .context("failed to deserialised anti-entropy message")?
         });
 
-        assert_matches!(msg_type, MessageType::System{ msg, .. } => {
+        assert_matches!(msg_type, MsgType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
                 assert_eq!(section_auth, env.genesis_sap.to_msg());
             });
@@ -563,7 +563,7 @@ mod tests {
 
         // and it now shall give us an AE redirect msg
         // with the SAP we inserted for other prefix
-        let command = env
+        let cmd = env
             .core
             .check_for_entropy(
                 msg.serialize()?,
@@ -574,13 +574,13 @@ mod tests {
             )
             .await;
 
-        let msg_type = assert_matches!(command, Ok(Some(Command::SendMessage { wire_msg, .. })) => {
+        let msg_type = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { wire_msg, .. })) => {
             wire_msg
-                .into_message()
+                .into_msg()
                 .context("failed to deserialised anti-entropy message")?
         });
 
-        assert_matches!(msg_type, MessageType::System{ msg, .. } => {
+        assert_matches!(msg_type, MsgType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
                 assert_eq!(section_auth, env.other_sap.value.to_msg());
             });
@@ -595,7 +595,7 @@ mod tests {
         let env = Env::new().await?;
         let our_prefix = env.core.network_knowledge().prefix().await;
 
-        let (msg, src_location) = env.create_message(
+        let (msg, src_location) = env.create_msg(
             &our_prefix,
             env.core.network_knowledge().section_key().await,
         )?;
@@ -603,7 +603,7 @@ mod tests {
         let dst_name = our_prefix.substituted_in(rng.gen());
         let dst_section_key = env.core.network_knowledge().genesis_key();
 
-        let command = env
+        let cmd = env
             .core
             .check_for_entropy(
                 msg.serialize()?,
@@ -614,13 +614,13 @@ mod tests {
             )
             .await?;
 
-        let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
+        let msg_type = assert_matches!(cmd, Some(Cmd::SendMsg { wire_msg, .. }) => {
             wire_msg
-                .into_message()
+                .into_msg()
                 .context("failed to deserialised anti-entropy message")?
         });
 
-        assert_matches!(msg_type, MessageType::System{ msg, .. } => {
+        assert_matches!(msg_type, MsgType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
                 assert_eq!(section_auth, &env.core.network_knowledge().authority_provider().await.to_msg());
                 assert_eq!(proof_chain, &env.core.section_chain().await);
@@ -636,7 +636,7 @@ mod tests {
         let env = Env::new().await?;
         let our_prefix = env.core.network_knowledge().prefix().await;
 
-        let (msg, src_location) = env.create_message(
+        let (msg, src_location) = env.create_msg(
             &our_prefix,
             env.core.network_knowledge().section_key().await,
         )?;
@@ -646,7 +646,7 @@ mod tests {
         let bogus_env = Env::new().await?;
         let dst_section_key = bogus_env.core.network_knowledge().genesis_key();
 
-        let command = env
+        let cmd = env
             .core
             .check_for_entropy(
                 msg.serialize()?,
@@ -657,13 +657,13 @@ mod tests {
             )
             .await?;
 
-        let msg_type = assert_matches!(command, Some(Command::SendMessage { wire_msg, .. }) => {
+        let msg_type = assert_matches!(cmd, Some(Cmd::SendMsg { wire_msg, .. }) => {
             wire_msg
-                .into_message()
+                .into_msg()
                 .context("failed to deserialised anti-entropy message")?
         });
 
-        assert_matches!(msg_type, MessageType::System{ msg, .. } => {
+        assert_matches!(msg_type, MsgType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
                 assert_eq!(*section_auth, env.core.network_knowledge().authority_provider().await.to_msg());
                 assert_eq!(*proof_chain, env.core.section_chain().await);
@@ -748,7 +748,7 @@ mod tests {
             })
         }
 
-        fn create_message(
+        fn create_msg(
             &self,
             src_section_prefix: &Prefix,
             src_section_pk: BlsPublicKey,
@@ -771,7 +771,7 @@ mod tests {
                 section_pk: dst_section_key,
             };
 
-            let msg_id = MessageId::new();
+            let msg_id = MsgId::new();
 
             let node_auth = NodeAuth::authorize(src_section_pk, &src_node_keypair, &payload);
 

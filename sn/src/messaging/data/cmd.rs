@@ -11,7 +11,7 @@ use crate::types::Chunk;
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
-/// Data commands - creating, updating, or removing data.
+/// Data cmds - creating, updating, or removing data.
 ///
 /// See the [`types`] module documentation for more details of the types supported by the Safe
 /// Network, and their semantics.
@@ -32,7 +32,7 @@ pub enum DataCmd {
 
 impl DataCmd {
     /// Creates a Response containing an error, with the Response variant corresponding to the
-    /// command variant.
+    /// cmd variant.
     pub fn error(&self, error: Error) -> CmdError {
         use DataCmd::*;
         match self {
@@ -41,7 +41,7 @@ impl DataCmd {
         }
     }
 
-    /// Returns the xorname of the data for this command.
+    /// Returns the xorname of the data for this cmd.
     pub fn dst_name(&self) -> XorName {
         use DataCmd::*;
         match self {

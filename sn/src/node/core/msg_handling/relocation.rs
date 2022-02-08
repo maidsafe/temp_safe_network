@@ -11,7 +11,7 @@ use crate::messaging::system::{
     MembershipState, NodeState as NodeStateMsg, RelocateDetails, SectionAuth,
 };
 use crate::node::{
-    api::command::Command,
+    api::cmds::Cmd,
     core::{
         bootstrap::JoiningAsRelocated,
         relocation::{find_nodes_to_relocate, ChurnId, RelocateDetailsUtils},
@@ -31,7 +31,7 @@ impl Core {
         &self,
         churn_id: ChurnId,
         excluded: BTreeSet<XorName>,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         // Do not carry out relocations in the first section
         // TODO: consider avoiding relocations in first 16 sections instead.
         if self.network_knowledge.prefix().await.is_empty() {
@@ -49,7 +49,7 @@ impl Core {
             return Ok(vec![]);
         }
 
-        let mut commands = vec![];
+        let mut cmds = vec![];
         for (node_state, relocate_details) in
             find_nodes_to_relocate(&self.network_knowledge, &churn_id, excluded).await
         {
@@ -60,20 +60,20 @@ impl Core {
                 churn_id
             );
 
-            commands.extend(
+            cmds.extend(
                 self.propose(Proposal::Offline(node_state.relocate(relocate_details)))
                     .await?,
             );
         }
 
-        Ok(commands)
+        Ok(cmds)
     }
 
     pub(crate) async fn relocate_rejoining_peer(
         &self,
         node_state: NodeState,
         age: u8,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let peer = node_state.peer();
         let relocate_details =
             RelocateDetails::with_age(&self.network_knowledge, peer, peer.name(), age);
@@ -93,7 +93,7 @@ impl Core {
     pub(crate) async fn handle_relocate(
         &self,
         relocate_proof: SectionAuth<NodeStateMsg>,
-    ) -> Result<Option<Command>> {
+    ) -> Result<Option<Cmd>> {
         let (dst_xorname, dst_section_key, new_age) =
             if let MembershipState::Relocated(ref relocate_details) = relocate_proof.value.state {
                 (

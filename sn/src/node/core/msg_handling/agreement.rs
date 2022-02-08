@@ -8,7 +8,7 @@
 
 use crate::messaging::system::{KeyedSig, MembershipState, SectionAuth};
 use crate::node::{
-    api::command::Command,
+    api::cmds::Cmd,
     core::{relocation::ChurnId, Core, Proposal},
     dkg::SectionAuthUtils,
     network_knowledge::{NodeState, SectionAuthorityProvider},
@@ -25,7 +25,7 @@ impl Core {
         &self,
         proposal: Proposal,
         sig: KeyedSig,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         debug!("handle agreement on {:?}", proposal);
         match proposal {
             Proposal::Offline(node_state) => self.handle_offline_agreement(node_state, sig).await,
@@ -47,9 +47,9 @@ impl Core {
         &self,
         new_info: NodeState,
         sig: KeyedSig,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         debug!("{}", LogMarker::AgreementOfOnline);
-        let mut commands = vec![];
+        let mut cmds = vec![];
         if let Some(old_info) = self
             .network_knowledge
             .is_either_member_or_archived(&new_info.name())
@@ -63,7 +63,7 @@ impl Core {
                     old_info.state(),
                 );
 
-                return Ok(commands);
+                return Ok(cmds);
             }
 
             // We would approve and relocate it only if half its age is at least MIN_ADULT_AGE
@@ -71,14 +71,14 @@ impl Core {
             if new_age >= MIN_ADULT_AGE {
                 // TODO: consider handling the relocation inside the bootstrap phase, to avoid
                 // having to send this `NodeApproval`.
-                commands.extend(self.send_node_approval(old_info.clone()).await);
+                cmds.extend(self.send_node_approval(old_info.clone()).await);
 
-                commands.extend(
+                cmds.extend(
                     self.relocate_rejoining_peer(old_info.value, new_age)
                         .await?,
                 );
 
-                return Ok(commands);
+                return Ok(cmds);
             }
         }
 
@@ -115,24 +115,24 @@ impl Core {
 
         let churn_id = ChurnId(new_info.sig.signature.to_bytes().to_vec());
         let excluded_from_relocation = vec![new_info.name()].into_iter().collect();
-        commands.extend(
+        cmds.extend(
             self.relocate_peers(churn_id, excluded_from_relocation)
                 .await?,
         );
 
         let result = self.promote_and_demote_elders().await?;
         if result.is_empty() {
-            commands.extend(self.send_ae_update_to_adults().await);
+            cmds.extend(self.send_ae_update_to_adults().await);
         }
 
-        commands.extend(result);
-        commands.extend(self.send_node_approval(new_info).await);
+        cmds.extend(result);
+        cmds.extend(self.send_node_approval(new_info).await);
 
-        info!("Commands in queue for Accepting node {:?}", commands);
+        info!("cmds in queue for Accepting node {:?}", cmds);
 
         self.print_network_stats().await;
 
-        Ok(commands)
+        Ok(cmds)
     }
 
     #[instrument(skip(self))]
@@ -140,8 +140,8 @@ impl Core {
         &self,
         node_state: NodeState,
         sig: KeyedSig,
-    ) -> Result<Vec<Command>> {
-        let mut commands = vec![];
+    ) -> Result<Vec<Cmd>> {
+        let mut cmds = vec![];
         let signature = sig.signature.clone();
 
         let signed_node_state = SectionAuth {
@@ -159,7 +159,7 @@ impl Core {
                 node_state.name(),
                 node_state.addr()
             );
-            return Ok(commands);
+            return Ok(cmds);
         }
 
         info!(
@@ -172,21 +172,21 @@ impl Core {
         // we then need to send the Relocate msg to the peer attaching the signed NodeState
         // containing the relocation details.
         if node_state.is_relocated() {
-            commands.extend(
+            cmds.extend(
                 self.send_relocate(node_state.peer().clone(), signed_node_state)
                     .await?,
             );
         }
 
         let churn_id = ChurnId(signature.to_bytes().to_vec());
-        commands.extend(self.relocate_peers(churn_id, BTreeSet::default()).await?);
+        cmds.extend(self.relocate_peers(churn_id, BTreeSet::default()).await?);
 
         let result = self.promote_and_demote_elders().await?;
         if result.is_empty() {
-            commands.extend(self.send_ae_update_to_adults().await);
+            cmds.extend(self.send_ae_update_to_adults().await);
         }
 
-        commands.extend(result);
+        cmds.extend(result);
 
         self.liveness_retain_only(
             self.network_knowledge
@@ -199,7 +199,7 @@ impl Core {
         .await?;
         *self.joins_allowed.write().await = true;
 
-        Ok(commands)
+        Ok(cmds)
     }
 
     #[instrument(skip(self), level = "trace")]
@@ -207,7 +207,7 @@ impl Core {
         &self,
         section_auth: SectionAuthorityProvider,
         sig: KeyedSig,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let equal_or_extension = section_auth.prefix() == self.network_knowledge.prefix().await
             || section_auth
                 .prefix()
@@ -259,7 +259,7 @@ impl Core {
         &self,
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         key_sig: KeyedSig,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         trace!("{}", LogMarker::HandlingNewEldersAgreement);
         let updates = self.split_barrier.write().await.process(
             &self.network_knowledge.prefix().await,

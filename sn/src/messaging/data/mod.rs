@@ -30,7 +30,7 @@ use crate::types::{
     Chunk, ChunkAddress, DataAddress,
 };
 use crate::{
-    messaging::{data::Error as ErrorMessage, MessageId},
+    messaging::{data::Error as ErrorMsg, MsgId},
     types::utils,
 };
 use bytes::Bytes;
@@ -90,7 +90,7 @@ pub enum ServiceMsg {
         /// The result of the query.
         response: QueryResponse,
         /// ID of the query message.
-        correlation_id: MessageId,
+        correlation_id: MsgId,
     },
     /// An error response to a [`Cmd`].
     ///
@@ -101,7 +101,7 @@ pub enum ServiceMsg {
         /// ID of causing [`Cmd`] message.
         ///
         /// [`Cmd`]: Self::Cmd
-        correlation_id: MessageId,
+        correlation_id: MsgId,
     },
     /// A message indicating that an error occurred as a node was handling a client's message.
     ServiceError(ServiceError),
@@ -111,12 +111,12 @@ pub enum ServiceMsg {
         /// ID of causing [`Cmd`] message.
         ///
         /// [`Cmd`]: Self::Cmd
-        correlation_id: MessageId,
+        correlation_id: MsgId,
     },
 }
 
 impl ServiceMsg {
-    /// Returns the destination address for Commands and Queries only.
+    /// Returns the destination address for cmds and Queries only.
     pub fn dst_address(&self) -> Option<XorName> {
         match self {
             Self::Cmd(cmd) => Some(cmd.dst_name()),
@@ -191,31 +191,31 @@ impl QueryResponse {
         match self {
             GetChunk(result) => match result {
                 Ok(_) => false,
-                Err(error) => matches!(*error, ErrorMessage::ChunkNotFound(_)),
+                Err(error) => matches!(*error, ErrorMsg::ChunkNotFound(_)),
             },
             GetRegister((result, _op_id)) => match result {
                 Ok(_) => false,
-                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
+                Err(error) => matches!(*error, ErrorMsg::DataNotFound(_)),
             },
             GetRegisterEntry((result, _op_id)) => match result {
                 Ok(_) => false,
-                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
+                Err(error) => matches!(*error, ErrorMsg::DataNotFound(_)),
             },
             GetRegisterOwner((result, _op_id)) => match result {
                 Ok(_) => false,
-                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
+                Err(error) => matches!(*error, ErrorMsg::DataNotFound(_)),
             },
             ReadRegister((result, _op_id)) => match result {
                 Ok(_) => false,
-                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
+                Err(error) => matches!(*error, ErrorMsg::DataNotFound(_)),
             },
             GetRegisterPolicy((result, _op_id)) => match result {
                 Ok(_) => false,
-                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
+                Err(error) => matches!(*error, ErrorMsg::DataNotFound(_)),
             },
             GetRegisterUserPermissions((result, _op_id)) => match result {
                 Ok(_) => false,
-                Err(error) => matches!(*error, ErrorMessage::DataNotFound(_)),
+                Err(error) => matches!(*error, ErrorMsg::DataNotFound(_)),
             },
             FailedToCreateOperationId => false,
         }
@@ -230,11 +230,11 @@ impl QueryResponse {
         match self {
             GetChunk(result) => match result {
                 Ok(chunk) => chunk_operation_id(chunk.address()),
-                Err(ErrorMessage::ChunkNotFound(name)) => chunk_operation_id(&ChunkAddress(*name)),
-                Err(ErrorMessage::DataNotFound(DataAddress::Bytes(address))) => {
+                Err(ErrorMsg::ChunkNotFound(name)) => chunk_operation_id(&ChunkAddress(*name)),
+                Err(ErrorMsg::DataNotFound(DataAddress::Bytes(address))) => {
                     chunk_operation_id(&ChunkAddress(*address.name()))
                 }
-                Err(ErrorMessage::DataNotFound(another_address)) => {
+                Err(ErrorMsg::DataNotFound(another_address)) => {
                     error!(
                         "{:?} address returned when we were expecting a ChunkAddress",
                         another_address

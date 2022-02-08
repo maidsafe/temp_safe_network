@@ -117,7 +117,7 @@ pub async fn create_test_client_with(
     let (genesis_key, bootstrap_nodes) = read_network_conn_info()?;
 
     let standard_wait = if read_prefix_map {
-        // there should be No AE needed and commands should work first time
+        // there should be No AE needed and cmds should work first time
         Some(Duration::from_secs(0))
     } else {
         // AE may be needed, so lets go with defaults

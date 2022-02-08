@@ -359,10 +359,10 @@ impl NetworkKnowledge {
                 .collect();
 
             if self.merge_members(peers).await? {
+                let prefix = self.prefix().await;
                 info!(
                     "Updated our section's members ({:?}): {:?}",
-                    self.prefix().await,
-                    self.section_peers
+                    prefix, self.section_peers
                 );
             }
         }

@@ -13,7 +13,7 @@ mod lru_cache;
 mod used_space;
 
 pub(crate) use encoding::{deserialise, serialise};
-pub(crate) use errors::{convert_to_error_message, Error, Result};
+pub(crate) use errors::{convert_to_error_msg, Error, Result};
 pub(crate) use event_store::EventStore;
 pub(crate) use lru_cache::LruCache;
 use std::path::Path;

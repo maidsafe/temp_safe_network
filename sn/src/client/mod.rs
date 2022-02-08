@@ -33,7 +33,7 @@ mod errors;
 
 pub use client_api::{Client, RegisterWriteAheadLog};
 pub use config_handler::{ClientConfig, DEFAULT_AE_WAIT, DEFAULT_OPERATION_TIMEOUT};
-pub use errors::ErrorMessage;
+pub use errors::ErrorMsg;
 pub use errors::{Error, Result};
 pub use qp2p::Config as QuicP2pConfig;
 
