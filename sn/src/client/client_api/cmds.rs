@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Client, MAX_RETRY_COUNT};
+use super::Client;
 use crate::at_least_one_correct_elder;
 use crate::client::Error;
 use crate::messaging::{
@@ -18,6 +18,8 @@ use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
 use tokio::time::Duration;
 use xor_name::XorName;
+
+const MAX_RETRY_COUNT : f32 = 25.0;
 
 impl Client {
     /// Send a Cmd to the network and await a response.
@@ -36,7 +38,7 @@ impl Client {
         let dst_name = cmd.dst_name(); // let msg = ServiceMsg::Cmd(cmd.clone());
 
         let debug_cmd = format!("{:?}", cmd);
-        let targets = at_least_one_correct_elder(); // stored at Adults, so only 1 correctly functioning Elder need to relay
+        let target_count = at_least_one_correct_elder(); // stored at Adults, so only 1 correctly functioning Elder need to relay
 
         let serialised_cmd = {
             let msg = ServiceMsg::Cmd(cmd);
@@ -54,6 +56,9 @@ impl Client {
             ..Default::default()
         };
 
+        //needed to take effect
+        backoff.reset();
+
         let span = info_span!("Attempting a cmd");
         let _ = span.enter();
 
@@ -67,7 +72,7 @@ impl Client {
                     client_pk,
                     serialised_cmd.clone(),
                     signature.clone(),
-                    targets,
+                    target_count,
                 )
                 .await;
 
