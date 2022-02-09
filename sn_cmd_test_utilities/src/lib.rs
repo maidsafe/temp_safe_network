@@ -110,7 +110,7 @@ pub mod util {
 
     pub fn create_nrs_link(name: &str, link: &str) -> Result<SafeUrl> {
         let nrs_creation = safe_cmd_stdout(["nrs", "create", name, "-l", link, "--json"], Some(0))?;
-        let (nrs_map_xorurl, _change_map) = parse_nrs_register_output(&nrs_creation)?;
+        let (_, nrs_map_xorurl, _change_map) = parse_nrs_register_output(&nrs_creation)?;
         Ok(nrs_map_xorurl)
     }
 
@@ -313,7 +313,9 @@ pub mod util {
         })
     }
 
-    pub fn parse_nrs_register_output(output: &str) -> Result<(SafeUrl, (String, String, String))> {
+    pub fn parse_nrs_register_output(
+        output: &str,
+    ) -> Result<(String, SafeUrl, (String, String, String))> {
         serde_json::from_str(output)
             .map_err(|_| eyre!("Failed to parse output of `safe nrs register`: {}", output))
     }

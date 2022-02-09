@@ -48,14 +48,20 @@ pub enum SafeData {
         resolved_from: String,
     },
     NrsMapContainer {
-        public_name: Option<String>,
         xorurl: String,
         xorname: XorName,
         type_tag: u64,
         nrs_map: NrsMap,
         data_type: DataType,
-        resolves_into: Option<SafeUrl>,
+    },
+    /// The xorurl and data_type are those the target entry points to.
+    NrsEntry {
+        xorurl: String,
+        public_name: String,
+        data_type: DataType,
+        resolves_into: SafeUrl,
         resolved_from: String,
+        version: Option<EntryHash>,
     },
     Multimap {
         xorurl: String,
@@ -88,22 +94,24 @@ impl SafeData {
             | FilesContainer { xorurl, .. }
             | PublicFile { xorurl, .. }
             | NrsMapContainer { xorurl, .. }
+            | NrsEntry { xorurl, .. }
             | Multimap { xorurl, .. }
             | PublicRegister { xorurl, .. }
             | PrivateRegister { xorurl, .. } => xorurl.clone(),
         }
     }
 
-    pub fn resolved_from(&self) -> String {
+    pub fn resolved_from(&self) -> Option<String> {
         use SafeData::*;
         match self {
             SafeKey { resolved_from, .. }
             | FilesContainer { resolved_from, .. }
             | PublicFile { resolved_from, .. }
-            | NrsMapContainer { resolved_from, .. }
+            | NrsEntry { resolved_from, .. }
             | Multimap { resolved_from, .. }
             | PublicRegister { resolved_from, .. }
-            | PrivateRegister { resolved_from, .. } => resolved_from.clone(),
+            | PrivateRegister { resolved_from, .. } => Some(resolved_from.clone()),
+            NrsMapContainer { .. } => None,
         }
     }
 
@@ -111,13 +119,13 @@ impl SafeData {
         use SafeData::*;
         match self {
             SafeKey { .. }
-            | PublicFile { .. }
             | Multimap { .. }
+            | NrsMapContainer { .. }
+            | PublicFile { .. }
             | PublicRegister { .. }
             | PrivateRegister { .. } => None,
-            FilesContainer { resolves_into, .. } | NrsMapContainer { resolves_into, .. } => {
-                resolves_into.clone()
-            }
+            FilesContainer { resolves_into, .. } => resolves_into.clone(),
+            NrsEntry { resolves_into, .. } => Some(resolves_into.clone()),
         }
     }
 
@@ -128,7 +136,8 @@ impl SafeData {
             | Multimap { .. }
             | PublicRegister { .. }
             | PrivateRegister { .. }
-            | NrsMapContainer { .. } => None,
+            | NrsMapContainer { .. }
+            | NrsEntry { .. } => None,
             FilesContainer { metadata, .. } | PublicFile { metadata, .. } => metadata.clone(),
         }
     }

@@ -484,7 +484,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
         ],
         Some(0),
     )?;
-    let (nrs_xorurl, _) = parse_nrs_register_output(&output)?;
+    let (_, nrs_xorurl, _) = parse_nrs_register_output(&output)?;
     let nrs_version = nrs_xorurl
         .content_version()
         .ok_or_else(|| eyre!("failed to get content version from xorurl"))?;

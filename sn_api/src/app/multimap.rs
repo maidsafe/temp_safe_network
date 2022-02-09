@@ -156,7 +156,7 @@ impl Safe {
     pub(crate) async fn fetch_multimap(&self, safeurl: &SafeUrl) -> Result<Multimap> {
         let entries = match self.register_fetch_entries(safeurl).await {
             Ok(data) => {
-                debug!("Multimap retrieved...");
+                debug!("Multimap retrieved with {} entries...", data.len());
                 Ok(data)
             }
             Err(Error::EmptyContent(_)) => Err(Error::EmptyContent(format!(

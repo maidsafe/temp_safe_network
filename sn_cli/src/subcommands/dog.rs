@@ -43,35 +43,41 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe)
             println!("== URL resolution step {} ==", i + 1);
             match content {
                 SafeData::NrsMapContainer {
-                    public_name,
                     xorurl,
                     xorname,
                     type_tag,
                     nrs_map,
                     data_type,
-                    resolved_from,
                     ..
                 } => {
-                    println!("Resolved from: {}", resolved_from);
                     println!("= NRS Map Container =");
-                    match public_name {
-                        Some(name) => println!("PublicName: \"{}\"", name),
-                        None => {}
-                    }
                     println!("XOR-URL: {}", xorurl);
-                    println!(
-                        "Version: {}",
-                        nrs_map
-                            .subname_version
-                            .map_or("none".to_string(), |v| v.to_string())
-                    );
                     println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: {}", data_type);
                     let mut safeurl = SafeUrl::from_url(xorurl)?;
                     safeurl.set_content_type(ContentType::Raw)?;
                     println!("Native data XOR-URL: {}", safeurl);
-                    print_nrs_map(nrs_map, public_name);
+                    print_nrs_map(nrs_map);
+                }
+                SafeData::NrsEntry {
+                    xorurl,
+                    public_name,
+                    data_type,
+                    resolves_into,
+                    resolved_from,
+                    version,
+                } => {
+                    println!("Resolved from: {}", resolved_from);
+                    println!("= NrsEntry =");
+                    println!("Public name: {}", public_name);
+                    println!("Target XOR-URL: {}", xorurl);
+                    println!("Target native data type: {}", data_type);
+                    println!("Resolves into: {}", resolves_into);
+                    println!(
+                        "Version: {}",
+                        version.map_or("none".to_string(), |v| v.to_string())
+                    );
                 }
                 SafeData::FilesContainer {
                     xorurl,
