@@ -7,9 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Cmd;
-use crate::messaging::{system::SystemMsg, DstLocation, EndUser, MsgKind, WireMsg};
+use crate::messaging::{system::SystemMsg, MsgKind, WireMsg};
 use crate::node::{
     core::{Core, Proposal, SendStatus},
+    messages::WireMsgUtils,
     Error, Result,
 };
 use crate::peer::Peer;
@@ -229,7 +230,16 @@ impl Dispatcher {
                     )
                     .await
             }
-            Cmd::SignOutgoingSystemMsg { msg, dst } => self.core.sign_system_msg(msg, dst).await,
+            Cmd::SignOutgoingSystemMsg { msg, dst } => {
+                let src_section_pk = self.core.network_knowledge().section_key().await;
+                let wire_msg =
+                    WireMsg::single_src(&*self.core.node.read().await, dst, msg, src_section_pk)?;
+
+                let mut cmds = vec![];
+                cmds.extend(self.core.send_msg_to_nodes(wire_msg).await?);
+
+                Ok(cmds)
+            }
             Cmd::HandleMsg {
                 sender,
                 wire_msg,
@@ -276,15 +286,6 @@ impl Dispatcher {
             } => {
                 self.send_msg(&recipients, delivery_group_size, wire_msg)
                     .await
-            }
-            Cmd::SendWireMsgToNodes(wire_msg) => {
-                if let DstLocation::EndUser(EndUser(_)) = wire_msg.dst_location() {
-                    error!("End user msg dropped at send. This API is for sending to a node's peers only",);
-                    Ok(vec![])
-                } else {
-                    // This message is not for an end user, then send it to peer/s over the network
-                    self.core.send_msg_to_nodes(wire_msg).await
-                }
             }
             Cmd::ScheduleTimeout { duration, token } => Ok(self
                 .handle_schedule_timeout(duration, token)

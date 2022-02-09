@@ -118,12 +118,6 @@ impl Core {
         self.network_knowledge.section_by_name(name)
     }
 
-    /// Returns our index in the current BLS group if this node is a member of one, or
-    /// `Error::MissingSecretKeyShare` otherwise.
-    pub(crate) async fn our_index(&self) -> Result<usize> {
-        Ok(self.key_share().await?.index)
-    }
-
     /// Returns our key share in the current BLS group if this node is a member of one, or
     /// `Error::MissingSecretKeyShare` otherwise.
     pub(crate) async fn key_share(&self) -> Result<SectionKeyShare> {
@@ -151,7 +145,7 @@ impl Core {
     }
 
     // Send message to peers on the network.
-    pub(crate) async fn send_msg_to_nodes(&self, mut wire_msg: WireMsg) -> Result<Vec<Cmd>> {
+    pub(crate) async fn send_msg_to_nodes(&self, mut wire_msg: WireMsg) -> Result<Option<Cmd>> {
         let dst_location = wire_msg.dst_location();
         let (targets, dg_size) = delivery_group::delivery_targets(
             dst_location,
@@ -180,7 +174,7 @@ impl Core {
             // This actually means being an elder, but we don't know the member yet. Which most likely
             // happens during the join process that a node's name is changed.
             // we just drop the message
-            return Ok(vec![]);
+            return Ok(None);
         }
 
         let dst_pk = self.section_key_by_name(&target_name).await;
@@ -192,7 +186,7 @@ impl Core {
             wire_msg,
         };
 
-        Ok(vec![cmd])
+        Ok(Some(cmd))
     }
 
     // Generate a new section info based on the current set of members and if it differs from the

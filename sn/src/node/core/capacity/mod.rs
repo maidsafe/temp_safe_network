@@ -23,23 +23,12 @@ pub(crate) const MIN_LEVEL_WHEN_FULL: u8 = 9; // considered full when >= 90 %.
 /// A util for sharing the
 /// info on data capacity among the
 /// chunk storing nodes in the section.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub(crate) struct Capacity {
     adult_levels: Arc<RwLock<BTreeMap<XorName, Arc<RwLock<StorageLevel>>>>>,
 }
 
 impl Capacity {
-    /// Pass in adult_levels with info on used adult storage capacity.
-    pub(super) fn new(adult_levels: BTreeMap<XorName, StorageLevel>) -> Self {
-        let adult_levels = adult_levels
-            .into_iter()
-            .map(|(adult, level)| (adult, Arc::new(RwLock::new(level))))
-            .collect();
-        Self {
-            adult_levels: Arc::new(RwLock::new(adult_levels)),
-        }
-    }
-
     pub(super) async fn add_new_adult(&self, adult: XorName) {
         info!("Adding new adult:{adult} to Capacity tracker");
 

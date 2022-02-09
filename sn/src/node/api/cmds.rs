@@ -75,9 +75,6 @@ pub(crate) enum Cmd {
         recipients: Vec<Peer>,
         wire_msg: WireMsg,
     },
-    /// Parses WireMsg to send to the correct location. These must be network nodes, in the NetworkKnowledge.
-    /// EndUser messages can not be sent through this api
-    SendWireMsgToNodes(WireMsg),
     /// Performs serialisation and signing for sending of NodeMsg.
     /// This cmd only send this to other nodes
     SignOutgoingSystemMsg { msg: SystemMsg, dst: DstLocation },
@@ -134,9 +131,6 @@ impl fmt::Display for Cmd {
                     wire_msg.msg_id(),
                     wire_msg.payload_debug
                 )
-            }
-            Cmd::SendWireMsgToNodes(wire_msg) => {
-                write!(f, "SendWireMsgToNodes {:?}", wire_msg.msg_id())
             }
             Cmd::SignOutgoingSystemMsg { .. } => write!(f, "SignOutgoingSystemMsg"),
             Cmd::SendMsgDeliveryGroup { wire_msg, .. } => {
