@@ -13,15 +13,18 @@ use crate::{
     messaging::{
         data::{CmdError, DataQuery, MetadataExchange, StorageLevel},
         system::{NodeCmd, NodeQuery, SystemMsg},
-        AuthorityProof, EndUser, MsgId, ServiceAuth,
+        AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
     },
-    node::{core::MAX_WAITING_PEERS_PER_QUERY, error::convert_to_error_msg, Error, Result},
+    node::{
+        core::MAX_WAITING_PEERS_PER_QUERY, error::convert_to_error_msg, messages::WireMsgUtils,
+        Error, Result,
+    },
     peer::Peer,
     types::{log_markers::LogMarker, PublicKey, ReplicatedData, ReplicatedDataAddress},
 };
 
 use itertools::Itertools;
-use std::collections::BTreeSet;
+use std::{cmp::Ordering, collections::BTreeSet};
 use tracing::info;
 use xor_name::XorName;
 
@@ -39,7 +42,7 @@ impl Core {
             );
 
             let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(data));
-            self.send_node_msg_to_nodes(msg, targets, false).await
+            self.send_node_msg_to_nodes(msg, targets).await
         } else {
             Err(Error::InvalidState)
         }
@@ -64,21 +67,18 @@ impl Core {
         let targets = self.get_adults_holding_data(address.name()).await;
 
         if targets.is_empty() {
+            let error =
+                convert_to_error_msg(Error::NoAdults(self.network_knowledge().prefix().await));
+
             return self
-                .send_error(
-                    Error::NoAdults(self.network_knowledge().prefix().await),
-                    msg_id,
-                    origin,
-                )
+                .send_cmd_error_response(CmdError::Data(error), origin, msg_id)
                 .await;
         }
 
-        let mut fresh_targets = BTreeSet::new();
-        for target in targets {
+        for target in &targets {
             self.liveness
-                .add_a_pending_request_operation(target, operation_id)
+                .add_a_pending_request_operation(*target, operation_id)
                 .await;
-            let _existed = fresh_targets.insert(target);
         }
 
         let mut already_waiting_on_response = false;
@@ -119,10 +119,8 @@ impl Core {
             origin: EndUser(origin.name()),
             correlation_id: MsgId::from_xor_name(*address.name()),
         });
-        let aggregation = false;
 
-        self.send_node_msg_to_nodes(msg, fresh_targets, aggregation)
-            .await
+        self.send_node_msg_to_nodes(msg, targets).await
     }
 
     pub(crate) async fn get_metadata_of(&self, prefix: &Prefix) -> MetadataExchange {
@@ -177,18 +175,6 @@ impl Core {
         self.capacity.full_adults().await
     }
 
-    pub(crate) async fn send_error(
-        &self,
-        error: Error,
-        msg_id: MsgId,
-        origin: Peer,
-    ) -> Result<Vec<Cmd>> {
-        let error = convert_to_error_msg(error);
-        let error = CmdError::Data(error);
-
-        self.send_cmd_error_response(error, origin, msg_id).await
-    }
-
     pub(crate) fn compute_holders(
         &self,
         addr: &ReplicatedDataAddress,
@@ -200,5 +186,113 @@ impl Core {
             .take(data_copy_count())
             .cloned()
             .collect()
+    }
+
+    // Used to fetch the list of holders for given data name.
+    async fn get_adults_holding_data(&self, target: &XorName) -> BTreeSet<XorName> {
+        let full_adults = self.full_adults().await;
+        // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
+        let adults = self.network_knowledge().adults().await;
+
+        let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
+
+        let mut candidates = adults_names
+            .into_iter()
+            .sorted_by(|lhs, rhs| target.cmp_distance(lhs, rhs))
+            .filter(|peer| !full_adults.contains(peer))
+            .take(data_copy_count())
+            .collect::<BTreeSet<_>>();
+
+        trace!(
+            "Chunk holders of {:?} are empty adults: {:?} and full adults: {:?}",
+            target,
+            candidates,
+            full_adults
+        );
+
+        // Full adults that are close to the chunk, shall still be considered as candidates
+        // to allow chunks stored to empty adults can be queried when nodes become full.
+        let close_full_adults = if let Some(closest_empty) = candidates.iter().next() {
+            full_adults
+                .iter()
+                .filter_map(|name| {
+                    if target.cmp_distance(name, closest_empty) == Ordering::Less {
+                        Some(*name)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<BTreeSet<_>>()
+        } else {
+            // In case there is no empty candidates, query all full_adults
+            full_adults
+        };
+
+        candidates.extend(close_full_adults);
+        candidates
+    }
+
+    // Used to fetch the list of holders for given name of data.
+    async fn get_adults_who_should_store_data(&self, target: XorName) -> BTreeSet<XorName> {
+        let full_adults = self.full_adults().await;
+        // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
+        let adults = self.network_knowledge().adults().await;
+
+        let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
+
+        let candidates = adults_names
+            .into_iter()
+            .sorted_by(|lhs, rhs| target.cmp_distance(lhs, rhs))
+            .filter(|peer| !full_adults.contains(peer))
+            .take(data_copy_count())
+            .collect::<BTreeSet<_>>();
+
+        trace!(
+               "Target chunk holders of {:?} are empty adults: {:?} and full adults that were ignored: {:?}",
+               target,
+               candidates,
+               full_adults
+           );
+
+        candidates
+    }
+
+    // Takes a message and forms cmds to send to specified targets
+    // Targets are XorName specified so must be within the section
+    async fn send_node_msg_to_nodes(
+        &self,
+        msg: SystemMsg,
+        targets: BTreeSet<XorName>,
+    ) -> Result<Vec<Cmd>> {
+        // we create a dummy/random dst location,
+        // we will set it correctly for each msg and target
+        let section_pk = self.network_knowledge().section_key().await;
+        let our_name = self.node.read().await.name();
+        let dummy_dst_location = DstLocation::Node {
+            name: our_name,
+            section_pk,
+        };
+
+        // separate this into form_wire_msg based on agg
+        let wire_msg = WireMsg::single_src(
+            &self.node.read().await.clone(),
+            dummy_dst_location,
+            msg,
+            section_pk,
+        )?;
+
+        let mut cmds = vec![];
+
+        for target in targets {
+            debug!("Sending {:?} to {:?}", wire_msg, target);
+            let mut wire_msg = wire_msg.clone();
+            let dst_section_pk = self.section_key_by_name(&target).await;
+            wire_msg.set_dst_section_pk(dst_section_pk);
+            wire_msg.set_dst_xorname(target);
+
+            cmds.extend(self.send_msg_to_nodes(wire_msg).await?);
+        }
+
+        Ok(cmds)
     }
 }

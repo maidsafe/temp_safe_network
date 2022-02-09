@@ -24,8 +24,7 @@ use crate::messaging::{
         JoinRequest, JoinResponse, NodeCmd, NodeEvent, NodeQuery, SectionAuth as SystemSectionAuth,
         SystemMsg,
     },
-    AuthorityProof, DstLocation, MsgId, MsgKind, MsgType, NodeMsgAuthority, SectionAuth,
-    ServiceAuth, WireMsg,
+    AuthorityProof, DstLocation, MsgId, MsgType, NodeMsgAuthority, SectionAuth, WireMsg,
 };
 use crate::node::{
     api::cmds::Cmd,
@@ -35,12 +34,10 @@ use crate::node::{
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
 };
 use crate::peer::{Peer, UnnamedPeer};
-use crate::types::{log_markers::LogMarker, PublicKey, Signature};
+use crate::types::{log_markers::LogMarker, PublicKey};
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
-use ed25519_dalek::Signer;
-use std::collections::BTreeSet;
 use xor_name::XorName;
 
 // Message handling
@@ -916,65 +913,6 @@ impl Core {
         cmds
     }
 
-    /// Takes a message and forms cmds to send to specified targets
-    /// Targets are XorName specified so must be within the section
-    pub(super) async fn send_node_msg_to_nodes(
-        &self,
-        msg: SystemMsg,
-        targets: BTreeSet<XorName>,
-        aggregation: bool,
-    ) -> Result<Vec<Cmd>> {
-        let msg_id = MsgId::new();
-
-        let our_name = self.node.read().await.name();
-
-        // we create a dummy/random dst location,
-        // we will set it correctly for each msg and target
-        // let name = network.our_name().await;
-        let section_pk = self.network_knowledge().section_key().await;
-
-        let dummy_dst_location = DstLocation::Node {
-            name: our_name,
-            section_pk,
-        };
-
-        // separate this into form_wire_msg based on agg
-        let mut wire_msg = if aggregation {
-            let src = our_name;
-
-            WireMsg::for_dst_accumulation(
-                &self.key_share().await.map_err(|err| err)?,
-                src,
-                dummy_dst_location,
-                msg,
-                section_pk,
-            )
-        } else {
-            WireMsg::single_src(
-                &self.node.read().await.clone(),
-                dummy_dst_location,
-                msg,
-                section_pk,
-            )
-        }?;
-
-        wire_msg.set_msg_id(msg_id);
-
-        let mut cmds = vec![];
-
-        for target in targets {
-            debug!("sending {:?} to {:?}", wire_msg, target);
-            let mut wire_msg = wire_msg.clone();
-            let dst_section_pk = self.section_key_by_name(&target).await;
-            wire_msg.set_dst_section_pk(dst_section_pk);
-            wire_msg.set_dst_xorname(target);
-
-            cmds.push(Cmd::SendWireMsgToNodes(wire_msg));
-        }
-
-        Ok(cmds)
-    }
-
     // Convert the provided NodeMsgAuthority to be a `Section` message
     // authority on successful accumulation. Also return 'true' if
     // current message shall not be processed any further.
@@ -1010,19 +948,5 @@ impl Core {
                 Err(Error::InvalidSignatureShare)
             }
         }
-    }
-
-    // Currently using node's Ed key. May need to use bls key share for concensus purpose.
-    async fn ed_sign_client_msg(&self, client_msg: &ServiceMsg) -> Result<(MsgKind, Bytes)> {
-        let keypair = self.node.read().await.keypair.clone();
-        let payload = WireMsg::serialize_msg_payload(client_msg)?;
-        let signature = keypair.sign(&payload);
-
-        let msg = MsgKind::ServiceMsg(ServiceAuth {
-            public_key: PublicKey::Ed25519(keypair.public),
-            signature: Signature::Ed25519(signature),
-        });
-
-        Ok((msg, payload))
     }
 }

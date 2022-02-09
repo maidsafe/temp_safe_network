@@ -107,7 +107,8 @@ impl Core {
         self.log_section_stats().await;
 
         // Do not disable node joins in first section.
-        if !self.network_knowledge.prefix().await.is_empty() {
+        let our_prefix = self.network_knowledge.prefix().await;
+        if !our_prefix.is_empty() {
             // ..otherwise, switch off joins_allowed on a node joining.
             // TODO: fix racing issues here? https://github.com/maidsafe/safe_network/issues/890
             *self.joins_allowed.write().await = false;
@@ -122,7 +123,13 @@ impl Core {
 
         let result = self.promote_and_demote_elders().await?;
         if result.is_empty() {
-            cmds.extend(self.send_ae_update_to_adults().await);
+            // Send AE-Update to Adults of our section
+            let our_adults = self.network_knowledge.adults().await;
+            let our_section_pk = self.network_knowledge.section_key().await;
+            cmds.extend(
+                self.send_ae_update_to_nodes(our_adults, &our_prefix, our_section_pk)
+                    .await,
+            );
         }
 
         cmds.extend(result);
@@ -172,7 +179,7 @@ impl Core {
         // we then need to send the Relocate msg to the peer attaching the signed NodeState
         // containing the relocation details.
         if node_state.is_relocated() {
-            cmds.extend(
+            cmds.push(
                 self.send_relocate(node_state.peer().clone(), signed_node_state)
                     .await?,
             );
@@ -183,7 +190,14 @@ impl Core {
 
         let result = self.promote_and_demote_elders().await?;
         if result.is_empty() {
-            cmds.extend(self.send_ae_update_to_adults().await);
+            // Send AE-Update to Adults of our section
+            let our_adults = self.network_knowledge.adults().await;
+            let our_prefix = self.network_knowledge.prefix().await;
+            let our_section_pk = self.network_knowledge.section_key().await;
+            cmds.extend(
+                self.send_ae_update_to_nodes(our_adults, &our_prefix, our_section_pk)
+                    .await,
+            );
         }
 
         cmds.extend(result);

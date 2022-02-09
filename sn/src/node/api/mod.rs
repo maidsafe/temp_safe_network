@@ -37,7 +37,7 @@ use crate::node::{
 use crate::types::{log_markers::LogMarker, PublicKey as TypesPublicKey};
 use crate::UsedSpace;
 
-use ed25519_dalek::{PublicKey, Signature, Signer, KEYPAIR_LENGTH};
+use ed25519_dalek::PublicKey;
 use itertools::Itertools;
 use rand::rngs::OsRng;
 use secured_linked_list::SecuredLinkedList;
@@ -107,7 +107,8 @@ impl NodeApi {
         .map_err(|_| Error::JoinTimeout)??;
 
         // Network keypair may have to be changed due to naming criteria or network requirements.
-        store_network_keypair(root_dir, node.keypair_as_bytes().await).await?;
+        let keypair_as_bytes = node.dispatcher.core.node.read().await.keypair.to_bytes();
+        store_network_keypair(root_dir, keypair_as_bytes).await?;
 
         let our_pid = std::process::id();
         let node_prefix = node.our_prefix().await;
@@ -130,7 +131,7 @@ impl NodeApi {
         Ok((node, network_events))
     }
 
-    // Creates new node using the given config and bootstraps it to the network.
+    // Private helper to create a new node using the given config and bootstraps it to the network.
     //
     // NOTE: It's not guaranteed this function ever returns. This can happen due to messages being
     // lost in transit during bootstrapping, or other reasons. It's the responsibility of the
@@ -283,15 +284,6 @@ impl NodeApi {
         Ok((node, event_stream))
     }
 
-    /// Signals the Elders of our section to test connectivity to a node.
-    pub async fn start_connectivity_test(&self, name: XorName) -> Result<()> {
-        let cmd = Cmd::StartConnectivityTest(name);
-        self.dispatcher
-            .clone()
-            .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
-            .await
-    }
-
     /// Returns the current age of this node.
     pub async fn age(&self) -> u8 {
         self.dispatcher.core.node.read().await.age()
@@ -300,41 +292,6 @@ impl NodeApi {
     /// Returns the ed25519 public key of this node.
     pub async fn public_key(&self) -> PublicKey {
         self.dispatcher.core.node.read().await.keypair.public
-    }
-
-    /// Returns the ed25519 keypair of this node, as bytes.
-    pub async fn keypair_as_bytes(&self) -> [u8; KEYPAIR_LENGTH] {
-        self.dispatcher.core.node.read().await.keypair.to_bytes()
-    }
-
-    /// Signs `data` with the ed25519 key of this node.
-    pub async fn sign_as_node(&self, data: &[u8]) -> Signature {
-        self.dispatcher.core.node.read().await.keypair.sign(data)
-    }
-
-    /// Signs `data` with the BLS secret key share of this node, if it has any. Returns
-    /// `Error::MissingSecretKeyShare` otherwise.
-    pub async fn sign_as_elder(
-        &self,
-        data: &[u8],
-        public_key: &bls::PublicKey,
-    ) -> Result<(usize, bls::SignatureShare)> {
-        self.dispatcher
-            .core
-            .sign_with_section_key_share(data, public_key)
-            .await
-    }
-
-    /// Verifies `signature` on `data` with the ed25519 public key of this node.
-    pub async fn verify(&self, data: &[u8], signature: &Signature) -> bool {
-        self.dispatcher
-            .core
-            .node
-            .read()
-            .await
-            .keypair
-            .verify(data, signature)
-            .is_ok()
     }
 
     /// The name of this node.
@@ -362,11 +319,6 @@ impl NodeApi {
         self.dispatcher.core.network_knowledge().prefix().await
     }
 
-    /// Finds out if the given XorName matches our prefix.
-    pub async fn matches_our_prefix(&self, name: &XorName) -> bool {
-        self.our_prefix().await.matches(name)
-    }
-
     /// Returns whether the node is Elder.
     pub async fn is_elder(&self) -> bool {
         self.dispatcher.core.is_elder().await
@@ -374,36 +326,12 @@ impl NodeApi {
 
     /// Returns the information of all the current section elders.
     pub async fn our_elders(&self) -> Vec<Peer> {
-        self.dispatcher
-            .core
-            .network_knowledge()
-            .authority_provider()
-            .await
-            .elders_vec()
-    }
-
-    /// Returns the elders of our section sorted by their distance to `name` (closest first).
-    pub async fn our_elders_sorted_by_distance_to(&self, name: &XorName) -> Vec<Peer> {
-        self.our_elders()
-            .await
-            .into_iter()
-            .sorted_by(|lhs, rhs| name.cmp_distance(&lhs.name(), &rhs.name()))
-            .collect()
+        self.dispatcher.core.network_knowledge().elders().await
     }
 
     /// Returns the information of all the current section adults.
     pub async fn our_adults(&self) -> Vec<Peer> {
         self.dispatcher.core.network_knowledge().adults().await
-    }
-
-    /// Returns the adults of our section sorted by their distance to `name` (closest first).
-    /// If we are not elder or if there are no adults in the section, returns empty vec.
-    pub async fn our_adults_sorted_by_distance_to(&self, name: &XorName) -> Vec<Peer> {
-        self.our_adults()
-            .await
-            .into_iter()
-            .sorted_by(|lhs, rhs| name.cmp_distance(&lhs.name(), &rhs.name()))
-            .collect()
     }
 
     /// Returns the info about the section matching the name.
@@ -426,24 +354,6 @@ impl NodeApi {
         )
     }
 
-    /// Builds a WireMsg signed for accumulateion at destination
-    pub async fn sign_msg_for_dst_accumulation(
-        &self,
-        node_msg: SystemMsg,
-        dst: DstLocation,
-    ) -> Result<WireMsg> {
-        let src = self.name().await;
-        let src_section_pk = *self.section_chain().await.last_key();
-
-        WireMsg::for_dst_accumulation(
-            &self.dispatcher.core.key_share().await.map_err(|err| err)?,
-            src,
-            dst,
-            node_msg,
-            src_section_pk,
-        )
-    }
-
     /// Send a message.
     /// Messages sent here, either section to section or node to node.
     pub async fn send_msg_to_nodes(&self, wire_msg: WireMsg) -> Result<()> {
@@ -452,22 +362,21 @@ impl NodeApi {
             LogMarker::DispatchSendMsgCmd,
             wire_msg.msg_id()
         );
-        self.dispatcher
-            .clone()
-            .enqueue_and_handle_next_cmd_and_offshoots(Cmd::SendWireMsgToNodes(wire_msg), None)
-            .await
+
+        if let Some(cmd) = self.dispatcher.core.send_msg_to_nodes(wire_msg).await? {
+            self.dispatcher
+                .clone()
+                .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
+                .await?;
+        }
+
+        Ok(())
     }
 
     /// Returns the current BLS public key set if this node has one, or
     /// `Error::MissingSecretKeyShare` otherwise.
     pub async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
         self.dispatcher.core.public_key_set().await
-    }
-
-    /// Returns our index in the current BLS group if this node is a member of one, or
-    /// `Error::MissingSecretKeyShare` otherwise.
-    pub async fn our_index(&self) -> Result<usize> {
-        self.dispatcher.core.our_index().await
     }
 }
 

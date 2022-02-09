@@ -142,7 +142,6 @@ impl Core {
 
         let data_storage = DataStorage::new(&root_storage_dir, used_space.clone())?;
 
-        let capacity = Capacity::new(BTreeMap::new());
         info!("Creating Liveness checks");
         let adult_liveness = Liveness::new(
             network_knowledge
@@ -170,7 +169,7 @@ impl Core {
             current_joins_semaphore: Arc::new(Semaphore::new(CONCURRENT_JOINS)),
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             data_storage,
-            capacity,
+            capacity: Capacity::default(),
             liveness: adult_liveness,
             pending_data_queries: Arc::new(Cache::with_expiry_duration(DATA_QUERY_TIMEOUT)),
             ae_backoff_cache: AeBackoffCache::default(),
@@ -212,7 +211,7 @@ impl Core {
             section_key
         );
 
-        self.send_direct_msg_to_nodes_in_section(recipients, message, dst_name, section_key)
+        self.send_direct_msg_to_nodes(recipients, message, dst_name, section_key)
             .await
     }
 
@@ -318,12 +317,12 @@ impl Core {
                 }
             } else {
                 cmds.extend(
-                    self.send_metadata_updates_to(
-                        self.network_knowledge.prefix().await,
+                    self.send_metadata_updates_to_nodes(
                         self.network_knowledge
                             .authority_provider()
                             .await
                             .elders_vec(),
+                        &self.network_knowledge.prefix().await,
                         new.section_key,
                     )
                     .await?,
@@ -336,8 +335,7 @@ impl Core {
             };
 
             cmds.extend(
-                self.send_metadata_updates_to(
-                    self.network_knowledge.prefix().await,
+                self.send_metadata_updates_to_nodes(
                     self.network_knowledge
                         .authority_provider()
                         .await
@@ -345,6 +343,7 @@ impl Core {
                         .filter(|peer| !old.elders.contains(&peer.name()))
                         .cloned()
                         .collect(),
+                    &self.network_knowledge.prefix().await,
                     new.section_key,
                 )
                 .await?,

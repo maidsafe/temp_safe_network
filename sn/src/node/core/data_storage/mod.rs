@@ -16,6 +16,7 @@ use crate::{
     messaging::{
         data::{DataQuery, RegisterStoreExport, StorageLevel},
         system::{NodeCmd, NodeQueryResponse, SystemMsg},
+        DstLocation,
     },
     types::{register::User, ReplicatedData, ReplicatedDataAddress as DataAddress},
     UsedSpace,
@@ -156,7 +157,7 @@ impl Core {
             for name in targets {
                 cmds.push(Cmd::SignOutgoingSystemMsg {
                     msg: SystemMsg::NodeCmd(NodeCmd::ReplicateData(data.clone())),
-                    dst: crate::messaging::DstLocation::Node { name, section_pk },
+                    dst: DstLocation::Node { name, section_pk },
                 })
             }
         }

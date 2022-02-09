@@ -10,73 +10,16 @@ use crate::data_copy_count;
 use crate::messaging::{
     data::{CmdError, DataCmd, DataQuery, Error as ErrorMsg, ServiceMsg},
     system::{NodeQueryResponse, SystemMsg},
-    DstLocation, EndUser, MsgId, MsgKind, NodeAuth, WireMsg,
+    DstLocation, EndUser, MsgId, WireMsg,
 };
 use crate::messaging::{AuthorityProof, ServiceAuth};
 use crate::node::{api::cmds::Cmd, core::Core, Result};
 use crate::peer::Peer;
 use crate::types::{log_markers::LogMarker, register::User, PublicKey, ReplicatedData};
 
-use itertools::Itertools;
-use std::{cmp::Ordering, collections::BTreeSet};
 use xor_name::XorName;
 
 impl Core {
-    /// Forms a CmdError msg to send back to the client
-    pub(crate) async fn send_cmd_error_response(
-        &self,
-        error: CmdError,
-        target: Peer,
-        msg_id: MsgId,
-    ) -> Result<Vec<Cmd>> {
-        let the_error_msg = ServiceMsg::CmdError {
-            error,
-            correlation_id: msg_id,
-        };
-        self.send_cmd_response(target, the_error_msg).await
-    }
-
-    /// Forms a CmdAck msg to send back to the client
-    pub(crate) async fn send_cmd_ack(&self, target: Peer, msg_id: MsgId) -> Result<Vec<Cmd>> {
-        let the_ack_msg = ServiceMsg::CmdAck {
-            correlation_id: msg_id,
-        };
-        self.send_cmd_response(target, the_ack_msg).await
-    }
-
-    /// Forms a cmd to send a cmd response error/ack to the client
-    async fn send_cmd_response(&self, target: Peer, msg: ServiceMsg) -> Result<Vec<Cmd>> {
-        let dst = DstLocation::EndUser(EndUser(target.name()));
-
-        let (msg_kind, payload) = self.ed_sign_client_msg(&msg).await?;
-        let wire_msg = WireMsg::new_msg(MsgId::new(), payload, msg_kind, dst)?;
-
-        let cmd = Cmd::SendMsg {
-            recipients: vec![target],
-            wire_msg,
-        };
-
-        Ok(vec![cmd])
-    }
-
-    /// Sign and serialize system message to be sent
-    pub(crate) async fn sign_system_msg(
-        &self,
-        msg: SystemMsg,
-        dst: DstLocation,
-    ) -> Result<Vec<Cmd>> {
-        let msg_id = MsgId::new();
-        let section_pk = self.network_knowledge().section_key().await;
-        let payload = WireMsg::serialize_msg_payload(&msg)?;
-
-        let auth = NodeAuth::authorize(section_pk, &self.node.read().await.keypair, &payload);
-        let msg_kind = MsgKind::NodeAuthMsg(auth.into_inner());
-
-        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
-
-        Ok(vec![Cmd::SendWireMsgToNodes(wire_msg)])
-    }
-
     /// Handle data query
     pub(crate) async fn handle_data_query_at_adult(
         &self,
@@ -256,78 +199,6 @@ impl Core {
         }
         cmds.extend(self.send_cmd_ack(origin, msg_id).await?);
         Ok(cmds)
-    }
-
-    // Used to fetch the list of holders for given data name.
-    pub(crate) async fn get_adults_holding_data(&self, target: &XorName) -> BTreeSet<XorName> {
-        let full_adults = self.full_adults().await;
-        // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
-        let adults = self.network_knowledge().adults().await;
-
-        let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
-
-        let mut candidates = adults_names
-            .into_iter()
-            .sorted_by(|lhs, rhs| target.cmp_distance(lhs, rhs))
-            .filter(|peer| !full_adults.contains(peer))
-            .take(data_copy_count())
-            .collect::<BTreeSet<_>>();
-
-        trace!(
-            "Chunk holders of {:?} are empty adults: {:?} and full adults: {:?}",
-            target,
-            candidates,
-            full_adults
-        );
-
-        // Full adults that are close to the chunk, shall still be considered as candidates
-        // to allow chunks stored to empty adults can be queried when nodes become full.
-        let close_full_adults = if let Some(closest_empty) = candidates.iter().next() {
-            full_adults
-                .iter()
-                .filter_map(|name| {
-                    if target.cmp_distance(name, closest_empty) == Ordering::Less {
-                        Some(*name)
-                    } else {
-                        None
-                    }
-                })
-                .collect::<BTreeSet<_>>()
-        } else {
-            // In case there is no empty candidates, query all full_adults
-            full_adults
-        };
-
-        candidates.extend(close_full_adults);
-        candidates
-    }
-
-    // Used to fetch the list of holders for given name of data.
-    pub(crate) async fn get_adults_who_should_store_data(
-        &self,
-        target: XorName,
-    ) -> BTreeSet<XorName> {
-        let full_adults = self.full_adults().await;
-        // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
-        let adults = self.network_knowledge().adults().await;
-
-        let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
-
-        let candidates = adults_names
-            .into_iter()
-            .sorted_by(|lhs, rhs| target.cmp_distance(lhs, rhs))
-            .filter(|peer| !full_adults.contains(peer))
-            .take(data_copy_count())
-            .collect::<BTreeSet<_>>();
-
-        trace!(
-            "Target chunk holders of {:?} are empty adults: {:?} and full adults that were ignored: {:?}",
-            target,
-            candidates,
-            full_adults
-        );
-
-        candidates
     }
 
     /// Handle incoming data msgs.
