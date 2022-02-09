@@ -14,6 +14,7 @@ export RUST_BACKTRACE=full
 
 cargo run --package sn_cli --release -- keys create --for-cli || ((exit++))
 cargo test --release --test cli_node || ((exit++))
+cargo test --release --test cli_xorurl || ((exit++))
 cargo test --release --test cli_cat -- --test-threads=1 || ((exit++))
 cargo test --release --test cli_dog -- --test-threads=1 || ((exit++))
 cargo test --release --test cli_files -- --test-threads=1 || ((exit++))
