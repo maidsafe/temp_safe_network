@@ -154,7 +154,7 @@ impl Client {
             config.qp2p,
             err_sender,
             config.local_addr,
-            config.standard_wait,
+            config.cmd_ack_wait,
             prefix_map.clone(),
         )
         .await?;

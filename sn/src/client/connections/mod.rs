@@ -51,7 +51,7 @@ pub(super) struct Session {
     /// Initial network comms MsgId
     initial_connection_check_msg_id: Arc<RwLock<Option<MsgId>>>,
     /// Standard time to await potential AE messages:
-    standard_wait: Duration,
+    cmd_ack_wait: Duration,
     /// Closed connection tracking, used to validate if a new connection is needed or not. Xorname to ConnectionId
     elder_last_closed_connections: Arc<DashMap<XorName, Vec<usize>>>,
 }

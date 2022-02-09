@@ -54,7 +54,7 @@ impl Session {
         qp2p_config: QuicP2pConfig,
         err_sender: Sender<CmdError>,
         local_addr: SocketAddr,
-        standard_wait: Duration,
+        cmd_ack_wait: Duration,
         prefix_map: NetworkPrefixMap,
     ) -> Result<Session, Error> {
         trace!("Trying to bootstrap to the network");
@@ -69,7 +69,7 @@ impl Session {
             network: Arc::new(prefix_map),
             genesis_key,
             initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
-            standard_wait,
+            cmd_ack_wait,
             elder_last_closed_connections: Arc::new(DashMap::default()),
         };
 
@@ -158,8 +158,8 @@ impl Session {
         let mut received_err = 0;
         let mut attempts = 0;
         let interval = Duration::from_millis(100);
-        let expected_ack_wait_attempts =
-            std::cmp::max(10, self.standard_wait.as_millis() / interval.as_millis());
+        let expected_cmd_ack_wait_attempts =
+            std::cmp::max(10, self.cmd_ack_wait.as_millis() / interval.as_millis());
         loop {
             match receiver.try_recv() {
                 Ok((src, None)) => {
@@ -193,7 +193,7 @@ impl Session {
                 }
             }
             attempts += 1;
-            if attempts >= expected_ack_wait_attempts {
+            if attempts >= expected_cmd_ack_wait_attempts {
                 warn!(
                     "Terminated with insufficient CmdAcks for {:?}, {:?} / {:?} acks received",
                     msg_id, received_ack, expected_acks
@@ -203,7 +203,7 @@ impl Session {
             trace!(
                 "current attempt {:?}/{:?}",
                 attempts,
-                expected_ack_wait_attempts
+                expected_cmd_ack_wait_attempts
             );
             tokio::time::sleep(interval).await;
         }

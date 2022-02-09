@@ -252,8 +252,10 @@ impl Session {
                     correlation_id,
                     ..
                 } => {
-                    debug!("CmdError was received for msg w/ID: {:?}", correlation_id);
-                    warn!("CmdError received is: {:?}", error);
+                    warn!(
+                        "CmdError was received for {correlation_id:?} received is: {:?}",
+                        error
+                    );
                     Self::send_cmd_response(cmds, correlation_id, src_peer.addr(), Some(error));
                 }
                 ServiceMsg::CmdAck { correlation_id } => {
