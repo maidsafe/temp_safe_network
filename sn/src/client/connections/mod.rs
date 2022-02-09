@@ -12,10 +12,7 @@ use crate::messaging::{
     data::{CmdError, OperationId, QueryResponse},
     MsgId,
 };
-use crate::peer::Peer;
 use crate::prefix_map::NetworkPrefixMap;
-use bls::PublicKey as BlsPublicKey;
-use bytes::Bytes;
 use dashmap::DashMap;
 use qp2p::Endpoint;
 use std::sync::Arc;
@@ -25,7 +22,6 @@ use xor_name::XorName;
 
 // Here we dont track the msg_id across the network, but just use it as a local identifier to remove the correct listener
 type PendingQueryResponses = Arc<DashMap<OperationId, Vec<(MsgId, QueryResponseSender)>>>;
-use uluru::LRUCache;
 type QueryResponseSender = Sender<QueryResponse>;
 
 type CmdResponse = (std::net::SocketAddr, Option<CmdError>);
@@ -36,8 +32,6 @@ pub struct QueryResult {
     pub response: QueryResponse,
     pub operation_id: OperationId,
 }
-
-pub(crate) type AeCache = LRUCache<(Vec<Peer>, BlsPublicKey, Bytes), 100>;
 
 #[derive(Clone, Debug)]
 pub(super) struct Session {
@@ -52,16 +46,12 @@ pub(super) struct Session {
     pending_cmds: PendingCmdAcks,
     /// All elders we know about from AE messages
     network: Arc<NetworkPrefixMap>,
-    /// AE redirect cache
-    ae_redirect_cache: Arc<RwLock<AeCache>>,
-    // AE retry cache
-    ae_retry_cache: Arc<RwLock<AeCache>>,
     /// Network's genesis key
     genesis_key: bls::PublicKey,
     /// Initial network comms MsgId
     initial_connection_check_msg_id: Arc<RwLock<Option<MsgId>>>,
     /// Standard time to await potential AE messages:
-    standard_wait: Duration,
+    cmd_ack_wait: Duration,
     /// Closed connection tracking, used to validate if a new connection is needed or not. Xorname to ConnectionId
     elder_last_closed_connections: Arc<DashMap<XorName, Vec<usize>>>,
 }

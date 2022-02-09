@@ -26,7 +26,7 @@ const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::UNSPECIFIED, 0);
 pub const DEFAULT_OPERATION_TIMEOUT: Duration = Duration::from_secs(120);
 /// Default amount of time to wait (to keep the client alive) after sending a cmd. This allows AE messages to be parsed/resent.
 /// Larger PUT operations may need larger ae wait time
-pub const DEFAULT_AE_WAIT: Duration = Duration::from_secs(0);
+pub const DEFAULT_ACK_WAIT: Duration = Duration::from_secs(5);
 
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const SN_QUERY_TIMEOUT: &str = "SN_QUERY_TIMEOUT";
@@ -49,7 +49,7 @@ pub struct ClientConfig {
     /// The amount of time to wait for cmds to not error before giving up and returning an error.
     pub cmd_timeout: Duration,
     /// The amount of time to wait after a cmd is sent for AE flows to complete.
-    pub standard_wait: Duration,
+    pub cmd_ack_wait: Duration,
 }
 
 impl ClientConfig {
@@ -70,7 +70,7 @@ impl ClientConfig {
         config_file_path: Option<&Path>,
         query_timeout: Option<Duration>,
         cmd_timeout: Option<Duration>,
-        standard_wait: Option<Duration>,
+        cmd_ack_wait: Option<Duration>,
     ) -> Self {
         let root_dir = root_dir
             .map(|p| p.to_path_buf())
@@ -84,7 +84,7 @@ impl ClientConfig {
 
         let query_timeout = query_timeout.unwrap_or(DEFAULT_OPERATION_TIMEOUT);
         let cmd_timeout = cmd_timeout.unwrap_or(DEFAULT_OPERATION_TIMEOUT);
-        let standard_wait = standard_wait.unwrap_or(DEFAULT_AE_WAIT);
+        let cmd_ack_wait = cmd_ack_wait.unwrap_or(DEFAULT_ACK_WAIT);
 
         // if we have an env var for this, let's override
         let query_timeout = match std::env::var(SN_QUERY_TIMEOUT) {
@@ -123,7 +123,7 @@ impl ClientConfig {
         };
 
         // if we have an env var for this, let's override
-        let standard_wait = match std::env::var(SN_AE_WAIT) {
+        let cmd_ack_wait = match std::env::var(SN_AE_WAIT) {
             Ok(timeout) => match timeout.parse() {
                 Ok(time) => {
                     warn!(
@@ -134,15 +134,15 @@ impl ClientConfig {
                 }
                 Err(error) => {
                     warn!("There was an error parsing {} env var value: '{}'. Default or client configured query timeout will be used: {:?}", SN_AE_WAIT, timeout, error);
-                    standard_wait
+                    cmd_ack_wait
                 }
             },
-            Err(_) => standard_wait,
+            Err(_) => cmd_ack_wait,
         };
 
         info!(
             "Client set to use a query timeout of {:?}, and AE await post-put for {:?}",
-            query_timeout, standard_wait
+            query_timeout, cmd_ack_wait
         );
         Self {
             local_addr: local_addr.unwrap_or_else(|| SocketAddr::from(DEFAULT_LOCAL_ADDR)),
@@ -151,7 +151,7 @@ impl ClientConfig {
             qp2p,
             query_timeout,
             cmd_timeout,
-            standard_wait,
+            cmd_ack_wait,
         }
     }
 }
@@ -257,13 +257,13 @@ mod tests {
             })
             .unwrap_or(DEFAULT_OPERATION_TIMEOUT);
 
-        let expected_standard_wait = std::env::var(SN_AE_WAIT)
+        let expected_cmd_ack_wait = std::env::var(SN_AE_WAIT)
             .map(|v| {
                 v.parse()
                     .map(Duration::from_secs)
-                    .unwrap_or(DEFAULT_AE_WAIT)
+                    .unwrap_or(DEFAULT_ACK_WAIT)
             })
-            .unwrap_or(DEFAULT_AE_WAIT);
+            .unwrap_or(DEFAULT_ACK_WAIT);
 
         let expected_config = ClientConfig {
             local_addr: (Ipv4Addr::UNSPECIFIED, 0).into(),
@@ -274,7 +274,7 @@ mod tests {
             },
             query_timeout: expected_query_timeout,
             cmd_timeout: expected_cmd_timeout,
-            standard_wait: expected_standard_wait,
+            cmd_ack_wait: expected_cmd_ack_wait,
         };
         assert_eq!(format!("{:?}", config), format!("{:?}", expected_config));
         assert_eq!(serialize(&config)?, serialize(&expected_config)?);

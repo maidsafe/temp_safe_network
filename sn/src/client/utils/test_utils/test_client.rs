@@ -116,13 +116,8 @@ pub async fn create_test_client_with(
     let timeout = timeout.map(Duration::from_secs);
     let (genesis_key, bootstrap_nodes) = read_network_conn_info()?;
 
-    let standard_wait = if read_prefix_map {
-        // there should be No AE needed and cmds should work first time
-        Some(Duration::from_secs(0))
-    } else {
-        // AE may be needed, so lets go with defaults
-        None
-    };
+    // use standard wait
+    let cmd_ack_wait = None;
 
     let config = ClientConfig::new(
         Some(root_dir.path()),
@@ -131,7 +126,7 @@ pub async fn create_test_client_with(
         None,
         timeout,
         timeout,
-        standard_wait,
+        cmd_ack_wait,
     )
     .await;
     let client = Client::create_with(

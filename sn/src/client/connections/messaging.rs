@@ -8,7 +8,6 @@
 
 use super::{QueryResult, Session};
 
-use super::AeCache;
 use crate::client::connections::CmdResponse;
 use crate::client::Error;
 use crate::elder_count;
@@ -55,7 +54,7 @@ impl Session {
         qp2p_config: QuicP2pConfig,
         err_sender: Sender<CmdError>,
         local_addr: SocketAddr,
-        standard_wait: Duration,
+        cmd_ack_wait: Duration,
         prefix_map: NetworkPrefixMap,
     ) -> Result<Session, Error> {
         trace!("Trying to bootstrap to the network");
@@ -68,11 +67,9 @@ impl Session {
             pending_cmds: Arc::new(DashMap::default()),
             endpoint,
             network: Arc::new(prefix_map),
-            ae_redirect_cache: Arc::new(RwLock::new(AeCache::default())),
-            ae_retry_cache: Arc::new(RwLock::new(AeCache::default())),
             genesis_key,
             initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
-            standard_wait,
+            cmd_ack_wait,
             elder_last_closed_connections: Arc::new(DashMap::default()),
         };
 
@@ -91,15 +88,12 @@ impl Session {
         // TODO: Consider other approach: Keep a session per section!
 
         // Get DataSection elders details.
-        let (elders, section_pk) =
+        let (mut elders, section_pk) =
             if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
-                let mut sap_elders = sap.elders_vec();
+                let sap_elders = sap.elders_vec();
 
-                sap_elders.shuffle(&mut OsRng);
+                trace!("SAP elders found {:?}", sap_elders);
 
-                let sap_elders: Vec<_> = sap_elders.into_iter().take(targets_count).collect();
-
-                trace!("{:?} SAP elders found", sap_elders);
                 (sap_elders, sap.section_key())
             } else {
                 return Err(Error::NoNetworkKnowledge);
@@ -107,13 +101,19 @@ impl Session {
 
         let msg_id = MsgId::new();
 
-        if elders.len() < targets_count {
+        // any SAP that does not hold elders_count() is indicative of a broken network (after genesis)
+        if elders.len() < elder_count() {
+            error!("Insufficient knowledge to send to {:?}", dst_address);
             return Err(Error::InsufficientElderKnowledge {
                 connections: elders.len(),
                 required: targets_count,
                 section_pk,
             });
         }
+
+        elders.shuffle(&mut OsRng);
+        // now we use only the required count
+        let elders: Vec<_> = elders.into_iter().take(targets_count).collect();
 
         debug!(
             "Sending cmd w/id {:?}, from {}, to {} Elders w/ dst: {:?}",
@@ -127,6 +127,7 @@ impl Session {
             name: dst_address,
             section_pk,
         };
+
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
@@ -157,8 +158,8 @@ impl Session {
         let mut received_err = 0;
         let mut attempts = 0;
         let interval = Duration::from_millis(100);
-        let expected_ack_wait_attempts =
-            std::cmp::max(10, self.standard_wait.as_millis() / interval.as_millis());
+        let expected_cmd_ack_wait_attempts =
+            std::cmp::max(10, self.cmd_ack_wait.as_millis() / interval.as_millis());
         loop {
             match receiver.try_recv() {
                 Ok((src, None)) => {
@@ -177,13 +178,9 @@ impl Session {
                 }
                 Ok((src, Some(error))) => {
                     received_err += 1;
-                    trace!(
+                    error!(
                         "received error response {:?} of cmd {:?} from {:?}, so far {:?} vs. {:?}",
-                        error,
-                        msg_id,
-                        src,
-                        received_ack,
-                        received_err
+                        error, msg_id, src, received_ack, received_err
                     );
                     if received_err >= expected_acks {
                         error!("Received majority of error response for cmd {:?}", msg_id);
@@ -196,7 +193,7 @@ impl Session {
                 }
             }
             attempts += 1;
-            if attempts >= expected_ack_wait_attempts {
+            if attempts >= expected_cmd_ack_wait_attempts {
                 warn!(
                     "Terminated with insufficient CmdAcks for {:?}, {:?} / {:?} acks received",
                     msg_id, received_ack, expected_acks
@@ -206,7 +203,7 @@ impl Session {
             trace!(
                 "current attempt {:?}/{:?}",
                 attempts,
-                expected_ack_wait_attempts
+                expected_cmd_ack_wait_attempts
             );
             tokio::time::sleep(interval).await;
         }
@@ -466,6 +463,9 @@ impl Session {
             ..Default::default()
         };
 
+        // this seems needed for custom settings to take effect
+        backoff.reset();
+
         // wait here to give a chance for AE responses to come in and be parsed
         tokio::time::sleep(Duration::from_secs(INITIAL_WAIT)).await;
 
@@ -555,9 +555,12 @@ impl Session {
                     }
 
                     known_sap = self.network.closest_or_opposite(&dst_address, None);
+
+                    debug!("Known sap: {known_sap:?}");
                     insufficient_sap_peers = false;
                     if let Some(sap) = known_sap.clone() {
                         if sap.elders_vec().len() < elder_count() {
+                            debug!("Known elders: {:?}", sap.elders_vec().len());
                             insufficient_sap_peers = true;
                         }
                     }

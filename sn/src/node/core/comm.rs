@@ -141,6 +141,7 @@ impl Comm {
             let connection = if let Some(connection) = recipient.connection().await {
                 Ok(connection)
             } else {
+                error!("No connection available to client");
                 Err(None)
             };
 

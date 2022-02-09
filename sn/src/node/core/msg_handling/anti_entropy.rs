@@ -203,7 +203,10 @@ impl Core {
             }
         };
 
-        info!("Anti-Entropy: message received from peer: {}", sender);
+        info!(
+            "Anti-Entropy: message received from peer: {}",
+            sender.addr()
+        );
 
         let prefix = section_auth.prefix();
         let dst_section_key = section_auth.section_key();

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Client, MAX_RETRY_COUNT};
+use super::Client;
 use crate::at_least_one_correct_elder;
 use crate::client::Error;
 use crate::messaging::{
@@ -18,6 +18,8 @@ use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
 use tokio::time::Duration;
 use xor_name::XorName;
+
+const MAX_RETRY_COUNT: f32 = 25.0;
 
 impl Client {
     /// Send a Cmd to the network and await a response.
@@ -36,7 +38,7 @@ impl Client {
         let dst_name = cmd.dst_name(); // let msg = ServiceMsg::Cmd(cmd.clone());
 
         let debug_cmd = format!("{:?}", cmd);
-        let targets = at_least_one_correct_elder(); // stored at Adults, so only 1 correctly functioning Elder need to relay
+        let target_count = at_least_one_correct_elder(); // stored at Adults, so only 1 correctly functioning Elder need to relay
 
         let serialised_cmd = {
             let msg = ServiceMsg::Cmd(cmd);
@@ -47,12 +49,15 @@ impl Client {
         let op_limit = self.cmd_timeout;
 
         let mut backoff = ExponentialBackoff {
-            initial_interval: Duration::from_secs(15),
+            initial_interval: Duration::from_secs(3),
             max_interval: Duration::from_secs(60),
             max_elapsed_time: Some(op_limit),
             // randomization_factor: 0.5,
             ..Default::default()
         };
+
+        // this seems needed for custom settings to take effect
+        backoff.reset();
 
         let span = info_span!("Attempting a cmd");
         let _ = span.enter();
@@ -67,7 +72,7 @@ impl Client {
                     client_pk,
                     serialised_cmd.clone(),
                     signature.clone(),
-                    targets,
+                    target_count,
                 )
                 .await;
 
@@ -75,6 +80,11 @@ impl Client {
                 debug!("{debug_cmd} sent okay");
                 break Ok(cmd_result);
             }
+
+            trace!(
+                "Failed response on {debug_cmd} attempt #{attempt}: {:?}",
+                res
+            );
 
             attempt += 1.0;
 
