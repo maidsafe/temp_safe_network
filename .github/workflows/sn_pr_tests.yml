@@ -7,7 +7,7 @@ env:
   # RUST_BACKTRACE: 1
   # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
-  # RUST_LOG: "safe_network,sn_api,sn_node=trace"
+  RUST_LOG: "safe_network,sn_api,sn_node=trace"
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
   NODE_COUNT: 11

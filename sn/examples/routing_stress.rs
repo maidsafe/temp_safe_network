@@ -39,7 +39,7 @@ use xor_name::{Prefix, XorName};
 use yansi::{Color, Style};
 
 use safe_network::messaging::{
-    data::Error::FailedToWriteFile, system::SystemMsg, DstLocation, MessageId,
+    data::Error::FailedToWriteFile, system::SystemMsg, DstLocation, MsgId,
 };
 use safe_network::node::{
     create_test_max_capacity_and_root_storage, Config, Event as RoutingEvent, NodeApi,
@@ -464,7 +464,7 @@ impl Network {
         // just some valid message
         let node_msg = SystemMsg::NodeMsgError {
             error: FailedToWriteFile,
-            correlation_id: MessageId::new(),
+            correlation_id: MsgId::new(),
         };
 
         let dst_location = DstLocation::Section {
@@ -474,7 +474,7 @@ impl Network {
 
         let wire_msg = node.sign_single_src_msg(node_msg, dst_location).await?;
 
-        match node.parse_and_send_message_to_nodes(wire_msg).await {
+        match node.send_msg_to_nodes(wire_msg).await {
             Ok(()) => Ok(true),
             Err(error) => {
                 Err(error).context(format!("failed to send probe by {}", node.name().await))

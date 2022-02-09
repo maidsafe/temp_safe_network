@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{signature_aggregator::Error as AggregatorError, MessageId};
+use crate::messaging::{signature_aggregator::Error as AggregatorError, MsgId};
 use crate::node::{
-    api::command::Command,
+    api::cmds::Cmd,
     core::{Core, Proposal},
     dkg::SigShare,
     Result,
@@ -20,11 +20,11 @@ impl Core {
     // Insert the proposal into the proposal aggregator and handle it if aggregated.
     pub(crate) async fn handle_proposal(
         &self,
-        msg_id: MessageId,
+        msg_id: MsgId,
         proposal: Proposal,
         sig_share: SigShare,
         sender: Peer,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let sig_share_pk = &sig_share.public_key_set.public_key();
 
         // Any other proposal than SectionInfo needs to be signed by a known section key.
@@ -75,7 +75,7 @@ impl Core {
             }
         }
 
-        let mut commands = vec![];
+        let mut cmds = vec![];
 
         match proposal.as_signable_bytes() {
             Err(error) => error!(
@@ -90,9 +90,9 @@ impl Core {
                 {
                     Ok(sig) => match proposal {
                         Proposal::NewElders(_) => {
-                            commands.push(Command::HandleNewEldersAgreement { proposal, sig })
+                            cmds.push(Cmd::HandleNewEldersAgreement { proposal, sig })
                         }
-                        _ => commands.push(Command::HandleAgreement { proposal, sig }),
+                        _ => cmds.push(Cmd::HandleAgreement { proposal, sig }),
                     },
                     Err(AggregatorError::NotEnoughShares) => {
                         trace!(
@@ -111,6 +111,6 @@ impl Core {
             }
         }
 
-        Ok(commands)
+        Ok(cmds)
     }
 }

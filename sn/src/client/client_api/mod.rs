@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod commands;
+mod cmds;
 mod data;
 mod file_apis;
 mod queries;
@@ -33,10 +33,6 @@ use uluru::LRUCache;
 use xor_name::XorName;
 
 pub use register_apis::RegisterWriteAheadLog;
-
-/// We divide the total operation timeout by this number.
-/// This also represents the max retries possible, while still staying within the max_timeout.
-pub(crate) const MAX_RETRY_COUNT: f32 = 5.0;
 
 // Maximum amount of Chunks to keep in our cal Chunks cache.
 // Each Chunk is maximum types::MAX_CHUNK_SIZE_IN_BYTES, i.e. ~1MB
@@ -158,7 +154,7 @@ impl Client {
             config.qp2p,
             err_sender,
             config.local_addr,
-            config.standard_wait,
+            config.cmd_ack_wait,
             prefix_map.clone(),
         )
         .await?;

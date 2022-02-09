@@ -8,7 +8,7 @@
 
 use crate::messaging::system::{JoinResponse, ResourceProofResponse, SystemMsg};
 use crate::node::{
-    api::command::Command,
+    api::cmds::Cmd,
     core::{Core, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
     ed25519, Error, Result,
 };
@@ -47,7 +47,7 @@ impl Core {
             .validate_all(&response.nonce, &response.data, response.solution)
     }
 
-    pub(crate) async fn send_resource_proof_challenge(&self, peer: Peer) -> Result<Command> {
+    pub(crate) async fn send_resource_proof_challenge(&self, peer: Peer) -> Result<Cmd> {
         let nonce: [u8; 32] = rand::random();
         let serialized =
             bincode::serialize(&(peer.name(), &nonce)).map_err(|_| Error::InvalidMessage)?;
@@ -59,7 +59,7 @@ impl Core {
         }));
 
         trace!("{}", LogMarker::SendResourceProofChallenge);
-        self.send_direct_message(peer, response, self.network_knowledge.section_key().await)
+        self.send_direct_msg(peer, response, self.network_knowledge.section_key().await)
             .await
     }
 }

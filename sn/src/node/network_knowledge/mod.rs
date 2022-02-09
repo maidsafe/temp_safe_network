@@ -295,16 +295,44 @@ impl NetworkKnowledge {
                     .await
                     .join(proof_chain.clone())?;
 
-                let switch_to_new_sap = (!self.is_elder(our_name).await
-                    && !provided_sap.contains_elder(our_name))
-                    || section_keys_provider
+                // lets find out if we should be an elder after the change
+                let mut we_are_an_adult;
+                // and if we are... do we have the key share needed to perform elder duties
+                let mut we_have_a_share_of_this_key = false;
+
+                we_are_an_adult = !self.is_elder(our_name).await;
+
+                // check we should not be _becoming_ an elder
+                if we_are_an_adult {
+                    let we_should_become_an_elder = provided_sap.contains_elder(our_name);
+                    we_are_an_adult = we_should_become_an_elder
+                }
+
+                if !we_are_an_adult {
+                    we_have_a_share_of_this_key = section_keys_provider
                         .key_share(&signed_sap.section_key())
                         .await
                         .is_ok();
+                }
+
                 trace!(
-                    "update_knowledge_if_valid switch_to_new_sap {:?}",
+                    "we_are_an_adult: {we_are_an_adult},we_have_a_share_of_this_key{we_have_a_share_of_this_key}"
+                );
+
+                // if we're an adult, we accept the validated sap
+                // if we have a keyshare, we're an eder and we shoud continue with this validated sap
+                let switch_to_new_sap = we_are_an_adult || we_have_a_share_of_this_key;
+
+                trace!(
+                    "update_knowledge_if_valid: will switch_to_new_sap {:?}",
                     switch_to_new_sap
                 );
+
+                // if we're not an adult, but we don't have a key share...
+                // something is wrong
+                if !we_are_an_adult && !we_have_a_share_of_this_key {
+                    error!("We should be an elder, but we're missing the keyshare!");
+                }
 
                 // We try to update our SAP and own chain only if we were flagged to,
                 // otherwise this update could be due to an AE message and we still don't have
@@ -359,10 +387,10 @@ impl NetworkKnowledge {
                 .collect();
 
             if self.merge_members(peers).await? {
+                let prefix = self.prefix().await;
                 info!(
                     "Updated our section's members ({:?}): {:?}",
-                    self.prefix().await,
-                    self.section_peers
+                    prefix, self.section_peers
                 );
             }
         }

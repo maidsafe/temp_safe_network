@@ -11,7 +11,7 @@ use crate::messaging::{
     DstLocation, WireMsg,
 };
 use crate::node::{
-    api::command::{next_timer_token, Command},
+    api::cmds::{next_timer_token, Cmd},
     dkg::dkg_msgs_utils::{DkgFailureSigSetUtils, DkgFailureSigUtils},
     ed25519,
     messages::WireMsgUtils,
@@ -71,8 +71,8 @@ impl Session {
         session_id: &DkgSessionId,
         sender: XorName,
         section_pk: BlsPublicKey,
-    ) -> Result<Vec<Command>> {
-        let mut commands = vec![];
+    ) -> Result<Vec<Cmd>> {
+        let mut cmds = vec![];
         // When the message in trouble is an Acknowledgement,
         // we shall query the ack.proposer .
         let target = match message {
@@ -107,7 +107,7 @@ impl Session {
                 section_pk,
             )?;
 
-            commands.push(Command::SendMessage {
+            cmds.push(Cmd::SendMsg {
                 recipients: vec![peer.clone()],
                 wire_msg,
             });
@@ -117,19 +117,19 @@ impl Session {
                 target, self.elder_candidates
             );
         }
-        Ok(commands)
+        Ok(cmds)
     }
 
-    pub(crate) fn process_message(
+    pub(crate) fn process_msg(
         &mut self,
         node: &Node,
         sender: XorName,
         session_id: &DkgSessionId,
         message: DkgMessage,
         section_pk: BlsPublicKey,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         trace!("process DKG message {:?}", message);
-        let mut commands = vec![];
+        let mut cmds = vec![];
         match self
             .key_gen
             .handle_message(&mut rand::thread_rng(), message.clone())
@@ -138,22 +138,22 @@ impl Session {
                 // Only a valid DkgMessage, which results in some responses, shall reset the ticker.
                 let add_reset_timer = !responses.is_empty();
 
-                commands.extend(self.broadcast(node, session_id, responses, section_pk)?);
+                cmds.extend(self.broadcast(node, session_id, responses, section_pk)?);
 
                 if add_reset_timer {
-                    commands.push(self.reset_timer());
+                    cmds.push(self.reset_timer());
                 }
-                commands.extend(self.check(node, session_id, section_pk)?);
+                cmds.extend(self.check(node, session_id, section_pk)?);
             }
             Err(DkgError::UnexpectedPhase { expected, actual })
                 if is_dkg_behind(expected, actual) =>
             {
-                commands.extend(
+                cmds.extend(
                     self.send_dkg_not_ready(node, message, session_id, sender, section_pk)?,
                 );
             }
             Err(DkgError::MissingPart) => {
-                commands.extend(
+                cmds.extend(
                     self.send_dkg_not_ready(node, message, session_id, sender, section_pk)?,
                 );
             }
@@ -162,7 +162,7 @@ impl Session {
             }
         }
 
-        Ok(commands)
+        Ok(cmds)
     }
 
     fn recipients(&self) -> Vec<Peer> {
@@ -186,8 +186,8 @@ impl Session {
         session_id: &DkgSessionId,
         messages: Vec<MessageAndTarget>,
         section_pk: BlsPublicKey,
-    ) -> Result<Vec<Command>> {
-        let mut commands = vec![];
+    ) -> Result<Vec<Cmd>> {
+        let mut cmds = vec![];
 
         trace!(
             "{} to {:?} targets",
@@ -198,14 +198,8 @@ impl Session {
         let peers = self.peers();
         for (target, message) in messages {
             if target == node.name() {
-                match self.process_message(
-                    node,
-                    node.name(),
-                    session_id,
-                    message.clone(),
-                    section_pk,
-                ) {
-                    Ok(result) => commands.extend(result),
+                match self.process_msg(node, node.name(), session_id, message.clone(), section_pk) {
+                    Ok(result) => cmds.extend(result),
                     Err(err) => error!(
                         "Within session {:?}, failed to process DkgMessage {:?} with error {:?}",
                         session_id, message, err
@@ -238,7 +232,7 @@ impl Session {
                     wire_msg.msg_id()
                 );
 
-                commands.push(Command::SendMessage {
+                cmds.push(Cmd::SendMsg {
                     recipients: vec![peer.clone()],
                     wire_msg,
                 });
@@ -247,7 +241,7 @@ impl Session {
             }
         }
 
-        Ok(commands)
+        Ok(cmds)
     }
 
     pub(crate) fn handle_timeout(
@@ -255,7 +249,7 @@ impl Session {
         node: &Node,
         session_id: &DkgSessionId,
         section_pk: BlsPublicKey,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         if self.complete {
             return Ok(vec![]);
         }
@@ -264,11 +258,11 @@ impl Session {
 
         match self.key_gen.timed_phase_transition(&mut rand::thread_rng()) {
             Ok(messages) => {
-                let mut commands = vec![];
-                commands.extend(self.broadcast(node, session_id, messages, section_pk)?);
-                commands.push(self.reset_timer());
-                commands.extend(self.check(node, session_id, section_pk)?);
-                Ok(commands)
+                let mut cmds = vec![];
+                cmds.extend(self.broadcast(node, session_id, messages, section_pk)?);
+                cmds.push(self.reset_timer());
+                cmds.extend(self.check(node, session_id, section_pk)?);
+                Ok(cmds)
             }
             Err(error) => {
                 trace!("DKG failed for {:?}: {}", self.elder_candidates, error);
@@ -285,7 +279,7 @@ impl Session {
         node: &Node,
         session_id: &DkgSessionId,
         section_pk: BlsPublicKey,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         if self.complete {
             trace!("{} {:?}", LogMarker::DkgSessionAlreadyCompleted, session_id);
             return Ok(vec![]);
@@ -358,7 +352,7 @@ impl Session {
             secret_key_share: outcome.secret_key_share,
         };
 
-        Ok(vec![Command::HandleDkgOutcome {
+        Ok(vec![Cmd::HandleDkgOutcome {
             section_auth,
             outcome,
         }])
@@ -370,7 +364,7 @@ impl Session {
         session_id: &DkgSessionId,
         failed_participants: BTreeSet<XorName>,
         section_pk: BlsPublicKey,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let sig = DkgFailureSig::new(&node.keypair, &failed_participants, session_id);
 
         if !self.failures.insert(sig, &failed_participants) {
@@ -396,7 +390,7 @@ impl Session {
                     section_pk,
                 )?;
                 trace!("{}", LogMarker::DkgSendFailureObservation);
-                Command::SendMessage {
+                Cmd::SendMsg {
                     recipients: self.recipients(),
                     wire_msg,
                 }
@@ -411,7 +405,7 @@ impl Session {
         session_id: &DkgSessionId,
         failed_participants: &BTreeSet<XorName>,
         signed: DkgFailureSig,
-    ) -> Option<Command> {
+    ) -> Option<Cmd> {
         if !self
             .elder_candidates
             .contains(&ed25519::name(&signed.public_key))
@@ -430,7 +424,7 @@ impl Session {
         self.check_failure_agreement()
     }
 
-    pub(crate) fn get_cached_messages(&self) -> Vec<DkgMessage> {
+    pub(crate) fn get_cached_msgs(&self) -> Vec<DkgMessage> {
         self.key_gen.get_cached_message()
     }
 
@@ -438,45 +432,45 @@ impl Session {
         &mut self,
         node: &Node,
         session_id: DkgSessionId,
-        message_history: Vec<DkgMessage>,
+        msg_history: Vec<DkgMessage>,
         section_pk: BlsPublicKey,
-    ) -> Result<Vec<Command>> {
-        let mut commands = vec![];
+    ) -> Result<Vec<Cmd>> {
+        let mut cmds = vec![];
         let (responses, unhandleable) = self
             .key_gen
-            .handle_pre_session_messages(&mut rand::thread_rng(), message_history);
+            .handle_pre_session_messages(&mut rand::thread_rng(), msg_history);
         let add_reset_timer = !responses.is_empty();
 
-        commands.extend(self.broadcast(node, &session_id, responses, section_pk)?);
+        cmds.extend(self.broadcast(node, &session_id, responses, section_pk)?);
 
         if add_reset_timer {
-            commands.push(self.reset_timer());
+            cmds.push(self.reset_timer());
         }
-        commands.extend(self.check(node, &session_id, section_pk)?);
+        cmds.extend(self.check(node, &session_id, section_pk)?);
 
         if !unhandleable.is_empty() {
             trace!(
-                "Having unhandleables among the message_history. {:?}",
+                "Having unhandleables among the msg_history. {:?}",
                 unhandleable
             );
         }
 
-        Ok(commands)
+        Ok(cmds)
     }
 
-    fn check_failure_agreement(&mut self) -> Option<Command> {
+    fn check_failure_agreement(&mut self) -> Option<Cmd> {
         if self.failures.has_agreement(&self.elder_candidates) {
             self.complete = true;
 
-            Some(Command::HandleDkgFailure(mem::take(&mut self.failures)))
+            Some(Cmd::HandleDkgFailure(mem::take(&mut self.failures)))
         } else {
             None
         }
     }
 
-    fn reset_timer(&mut self) -> Command {
+    fn reset_timer(&mut self) -> Cmd {
         self.timer_token = next_timer_token();
-        Command::ScheduleTimeout {
+        Cmd::ScheduleTimeout {
             duration: DKG_PROGRESS_INTERVAL,
             token: self.timer_token,
         }
@@ -487,7 +481,7 @@ impl Session {
 mod tests {
     use super::*;
     use crate::elder_count;
-    use crate::messaging::MessageType;
+    use crate::messaging::MsgType;
     use crate::node::{
         dkg::voter::DkgVoter, dkg::DkgSessionIdUtils, ed25519,
         network_knowledge::test_utils::gen_addr, node_info::test_utils::arbitrary_unique_nodes,
@@ -515,10 +509,10 @@ mod tests {
         let elder_candidates = ElderCandidates::new(Prefix::default(), iter::once(node.peer()));
         let session_id = DkgSessionId::new(&elder_candidates, 0);
 
-        let commands = voter
+        let cmds = voter
             .start(&node, session_id, elder_candidates, section_pk)
             .await?;
-        assert_matches!(&commands[..], &[Command::HandleDkgOutcome { .. }]);
+        assert_matches!(&cmds[..], &[Cmd::HandleDkgOutcome { .. }]);
 
         Ok(())
     }
@@ -551,15 +545,15 @@ mod tests {
             .collect();
 
         for actor in actors.values_mut() {
-            let commands = futures::executor::block_on(actor.voter.start(
+            let cmds = futures::executor::block_on(actor.voter.start(
                 &actor.node,
                 session_id,
                 elder_candidates.clone(),
                 section_pk,
             ))?;
 
-            for command in commands {
-                messages.extend(actor.handle(command, &session_id)?)
+            for cmd in cmds {
+                messages.extend(actor.handle(cmd, &session_id)?)
             }
         }
 
@@ -582,7 +576,7 @@ mod tests {
 
             let actor = actors.get_mut(&addr).context("Unknown message recipient")?;
 
-            let commands = futures::executor::block_on(actor.voter.process_message(
+            let cmds = futures::executor::block_on(actor.voter.process_msg(
                 actor.peer(),
                 &actor.node,
                 &session_id,
@@ -590,8 +584,8 @@ mod tests {
                 section_pk,
             ))?;
 
-            for command in commands {
-                messages.extend(actor.handle(command, &session_id)?)
+            for cmd in cmds {
+                messages.extend(actor.handle(cmd, &session_id)?)
             }
         }
     }
@@ -617,15 +611,15 @@ mod tests {
 
         fn handle(
             &mut self,
-            command: Command,
+            cmd: Cmd,
             expected_dkg_key: &DkgSessionId,
         ) -> Result<Vec<(SocketAddr, DkgMessage)>> {
-            match command {
-                Command::SendMessage {
+            match cmd {
+                Cmd::SendMsg {
                     recipients,
                     wire_msg,
-                } => match wire_msg.into_message()? {
-                    MessageType::System {
+                } => match wire_msg.into_msg()? {
+                    MsgType::System {
                         msg:
                             SystemMsg::DkgMessage {
                                 session_id,
@@ -639,19 +633,19 @@ mod tests {
                             .map(|peer| (peer.addr(), message.clone()))
                             .collect())
                     }
-                    MessageType::System {
+                    MsgType::System {
                         msg: SystemMsg::DkgNotReady { message, .. },
                         ..
                     } => Ok(vec![(self.node.addr, message)]),
-                    other_message => bail!("Unexpected message: {:?}", other_message),
+                    other_msg => bail!("Unexpected msg: {:?}", other_msg),
                 },
-                Command::HandleDkgOutcome { outcome, .. } => {
+                Cmd::HandleDkgOutcome { outcome, .. } => {
                     self.outcome = Some(outcome.public_key_set.public_key());
                     Ok(vec![])
                 }
-                Command::ScheduleTimeout { .. } => Ok(vec![]),
-                other_command => {
-                    bail!("Unexpected command: {:?}", other_command)
+                Cmd::ScheduleTimeout { .. } => Ok(vec![]),
+                other_cmd => {
+                    bail!("Unexpected cmd: {:?}", other_cmd)
                 }
             }
         }

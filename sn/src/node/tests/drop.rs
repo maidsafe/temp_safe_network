@@ -59,7 +59,7 @@ async fn test_node_drop() -> Result<()> {
             dst: DstLocation::Node(dropped_name),
             aggregation: Aggregation::None,
         };
-        node.send_message(itinerary, Bytes::from(b"hello".to_vec()), None)
+        node.send_msg(itinerary, Bytes::from(b"hello".to_vec()), None)
             .await?
     }
 

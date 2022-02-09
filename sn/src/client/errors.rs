@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub use crate::messaging::data::Error as ErrorMessage;
+pub use crate::messaging::data::Error as ErrorMsg;
 use crate::messaging::{
     data::{CmdError, OperationId, QueryResponse},
-    Error as MessagingError, MessageId,
+    Error as MessagingError, MsgId,
 };
 use crate::types::Error as DtError;
 use bls::PublicKey;
@@ -109,21 +109,21 @@ pub enum Error {
         source,
         op_id
     )]
-    ErrorMessage {
-        /// The source of an error message
-        source: ErrorMessage,
+    ErrorMsg {
+        /// The source of an error msg
+        source: ErrorMsg,
         /// operation ID that was used to send the query
         op_id: OperationId,
     },
     /// Error response received for a client cmd sent to the network
     #[error("Error received from the network: {:?} for cmd: {:?}", source, msg_id)]
     ErrorCmd {
-        /// The source of an error message
-        source: ErrorMessage,
-        /// message ID that was used to send the cmd
-        msg_id: MessageId,
+        /// The source of an error msg
+        source: ErrorMsg,
+        /// MsgId of the cmd
+        msg_id: MsgId,
     },
-    /// Errors occurred when serialising or deserialising messages
+    /// Errors occurred when serialising or deserialising msgs
     #[error(transparent)]
     MessagingProtocol(#[from] MessagingError),
     /// self_enryption errors
@@ -168,16 +168,16 @@ pub enum Error {
     },
 }
 
-impl From<(CmdError, MessageId)> for Error {
-    fn from((error, msg_id): (CmdError, MessageId)) -> Self {
+impl From<(CmdError, MsgId)> for Error {
+    fn from((error, msg_id): (CmdError, MsgId)) -> Self {
         let CmdError::Data(source) = error;
         Error::ErrorCmd { source, msg_id }
     }
 }
 
-impl From<(ErrorMessage, OperationId)> for Error {
-    fn from((source, op_id): (ErrorMessage, OperationId)) -> Self {
-        Self::ErrorMessage { source, op_id }
+impl From<(ErrorMsg, OperationId)> for Error {
+    fn from((source, op_id): (ErrorMsg, OperationId)) -> Self {
+        Self::ErrorMsg { source, op_id }
     }
 }
 

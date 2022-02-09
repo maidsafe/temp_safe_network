@@ -12,7 +12,7 @@ pub(super) use self::msg_authority::NodeMsgAuthorityUtils;
 
 use crate::messaging::{
     system::{SigShare, SystemMsg},
-    AuthorityProof, BlsShareAuth, DstLocation, MessageId, MsgKind, NodeAuth, WireMsg,
+    AuthorityProof, BlsShareAuth, DstLocation, MsgId, MsgKind, NodeAuth, WireMsg,
 };
 use crate::node::{network_knowledge::SectionKeyShare, node_info::Node, Error, Result};
 
@@ -55,7 +55,7 @@ impl WireMsgUtils for WireMsg {
             bls_share_authorize(src_section_pk, src_name, key_share, &msg_payload).into_inner(),
         );
 
-        let wire_msg = WireMsg::new_msg(MessageId::new(), msg_payload, msg_kind, dst)?;
+        let wire_msg = WireMsg::new_msg(MsgId::new(), msg_payload, msg_kind, dst)?;
 
         #[cfg(feature = "unstable-wiremsg-debuginfo")]
         let wire_msg = wire_msg.set_payload_debug(node_msg);
@@ -77,7 +77,7 @@ impl WireMsgUtils for WireMsg {
             NodeAuth::authorize(src_section_pk, &node.keypair, &msg_payload).into_inner(),
         );
 
-        let wire_msg = WireMsg::new_msg(MessageId::new(), msg_payload, msg_kind, dst)?;
+        let wire_msg = WireMsg::new_msg(MsgId::new(), msg_payload, msg_kind, dst)?;
 
         #[cfg(feature = "unstable-wiremsg-debuginfo")]
         let wire_msg = wire_msg.set_payload_debug(node_msg);

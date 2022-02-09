@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{api::command::Command, core::Core, Result};
+use crate::node::{api::cmds::Cmd, core::Core, Result};
 use crate::types::log_markers::LogMarker;
 use std::collections::BTreeSet;
 use xor_name::XorName;
@@ -17,7 +17,7 @@ impl Core {
     pub(crate) async fn try_reorganize_data(
         &self,
         old_adults: BTreeSet<XorName>,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         if self.is_elder().await {
             // only adults carry out the ops in this method
             return Ok(vec![]);

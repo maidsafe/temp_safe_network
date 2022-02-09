@@ -11,23 +11,23 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use xor_name::XorName;
 
-/// Constant byte length of `MessageId`.
+/// Constant byte length of `MsgId`.
 pub const MESSAGE_ID_LEN: usize = 32;
 
 /// Unique ID for messages.
 #[derive(
     Ord, PartialOrd, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Hash, custom_debug::Debug,
 )]
-pub struct MessageId(#[debug(with = "Self::fmt_bytes")] [u8; MESSAGE_ID_LEN]);
+pub struct MsgId(#[debug(with = "Self::fmt_bytes")] [u8; MESSAGE_ID_LEN]);
 
-impl MessageId {
-    /// Generates a new `MessageId` with random content.
+impl MsgId {
+    /// Generates a new `MsgId` with random content.
     pub fn new() -> Self {
         // Here we use XorName just as helper to generate a random id
         Self(XorName::random().0)
     }
 
-    /// Convert an XorName into a MessageId
+    /// Convert an XorName into a MsgId
     pub fn from_xor_name(xor_name: XorName) -> Self {
         Self(xor_name.0)
     }
@@ -37,13 +37,13 @@ impl MessageId {
     }
 }
 
-impl Default for MessageId {
+impl Default for MsgId {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl AsRef<[u8; MESSAGE_ID_LEN]> for MessageId {
+impl AsRef<[u8; MESSAGE_ID_LEN]> for MsgId {
     fn as_ref(&self) -> &[u8; MESSAGE_ID_LEN] {
         &self.0
     }

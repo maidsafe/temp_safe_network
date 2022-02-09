@@ -10,7 +10,7 @@ use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
     data::{ServiceError, ServiceMsg},
     system::SystemMsg,
-    AuthorityProof, DstLocation, Error, MessageId, MessageType, MsgKind, NodeMsgAuthority, Result,
+    AuthorityProof, DstLocation, Error, MsgId, MsgKind, MsgType, NodeMsgAuthority, Result,
     ServiceAuth,
 };
 use bls::PublicKey as BlsPublicKey;
@@ -63,7 +63,7 @@ impl WireMsg {
 
     /// Creates a new `WireMsg` with the provided serialized payload and `MsgKind`.
     pub fn new_msg(
-        msg_id: MessageId,
+        msg_id: MsgId,
         payload: Bytes,
         msg_kind: MsgKind,
         dst_location: DstLocation,
@@ -116,8 +116,8 @@ impl WireMsg {
         Ok(Bytes::from(buffer))
     }
 
-    /// Deserialize the payload from this WireMsg returning a MessageType instance.
-    pub fn into_message(&self) -> Result<MessageType> {
+    /// Deserialize the payload from this WireMsg returning a MsgType instance.
+    pub fn into_msg(&self) -> Result<MsgType> {
         match self.header.msg_envelope.msg_kind.clone() {
             MsgKind::ServiceMsg(auth) => {
                 let msg: ServiceMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
@@ -134,7 +134,7 @@ impl WireMsg {
                     AuthorityProof::verify(auth, &self.payload)?
                 };
 
-                Ok(MessageType::Service {
+                Ok(MsgType::Service {
                     msg_id: self.header.msg_envelope.msg_id,
                     auth,
                     dst_location: self.header.msg_envelope.dst_location,
@@ -146,7 +146,7 @@ impl WireMsg {
                     Error::FailedToParse(format!("Node signed message payload as Msgpack: {}", err))
                 })?;
 
-                Ok(MessageType::System {
+                Ok(MsgType::System {
                     msg_id: self.header.msg_envelope.msg_id,
                     msg_authority: NodeMsgAuthority::Node(AuthorityProof::verify(
                         node_signed,
@@ -164,7 +164,7 @@ impl WireMsg {
                     ))
                 })?;
 
-                Ok(MessageType::System {
+                Ok(MsgType::System {
                     msg_id: self.header.msg_envelope.msg_id,
                     msg_authority: NodeMsgAuthority::BlsShare(AuthorityProof::verify(
                         bls_share_signed,
@@ -178,12 +178,12 @@ impl WireMsg {
     }
 
     /// Return the message id of this message
-    pub fn msg_id(&self) -> MessageId {
+    pub fn msg_id(&self) -> MsgId {
         self.header.msg_envelope.msg_id
     }
 
     /// Update the message ID
-    pub fn set_msg_id(&mut self, msg_id: MessageId) {
+    pub fn set_msg_id(&mut self, msg_id: MsgId) {
         self.header.msg_envelope.msg_id = msg_id;
     }
 
@@ -224,8 +224,8 @@ impl WireMsg {
 
     /// Convenience function which creates a temporary WireMsg from the provided
     /// bytes, returning the deserialized message.
-    pub fn deserialize(bytes: Bytes) -> Result<MessageType> {
-        Self::from(bytes)?.into_message()
+    pub fn deserialize(bytes: Bytes) -> Result<MsgType> {
+        Self::from(bytes)?.into_msg()
     }
 
     /// Convenience function which validates the signature on a ServiceMsg.
@@ -251,7 +251,7 @@ mod tests {
         messaging::{
             data::{DataQuery, ServiceMsg, StorageLevel},
             system::{NodeCmd, SystemMsg},
-            AuthorityProof, MessageId, NodeAuth, ServiceAuth,
+            AuthorityProof, MsgId, NodeAuth, ServiceAuth,
         },
         types::{ChunkAddress, Keypair},
     };
@@ -273,7 +273,7 @@ mod tests {
             section_pk: dst_section_pk,
         };
 
-        let msg_id = MessageId::new();
+        let msg_id = MsgId::new();
         let pk = crate::types::PublicKey::Bls(dst_section_pk);
 
         let node_msg = SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel {
@@ -300,8 +300,8 @@ mod tests {
 
         // test deserialisation of payload
         assert_eq!(
-            deserialized.into_message()?,
-            MessageType::System {
+            deserialized.into_msg()?,
+            MsgType::System {
                 msg_id: wire_msg.msg_id(),
                 msg_authority: NodeMsgAuthority::Node(node_auth),
                 dst_location,
@@ -324,7 +324,7 @@ mod tests {
             section_pk: dst_section_pk,
         };
 
-        let msg_id = MessageId::new();
+        let msg_id = MsgId::new();
 
         let client_msg = ServiceMsg::Query(DataQuery::GetChunk(ChunkAddress(XorName::random())));
 
@@ -350,8 +350,8 @@ mod tests {
 
         // test deserialisation of payload
         assert_eq!(
-            deserialized.into_message()?,
-            MessageType::Service {
+            deserialized.into_msg()?,
+            MsgType::Service {
                 msg_id: wire_msg.msg_id(),
                 auth: auth_proof,
                 dst_location,

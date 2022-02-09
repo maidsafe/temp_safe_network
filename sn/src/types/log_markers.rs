@@ -40,13 +40,13 @@ pub enum LogMarker {
     RegisterWrite,
     RegisterQueryReceivedAtElder,
     RegisterQueryReceivedAtAdult,
-    // Routing commands
+    // Routing cmds
     DispatchHandleMsgCmd,
     DispatchSendMsgCmd,
-    CommandHandleSpawned,
-    CommandHandleStart,
-    CommandHandleEnd,
-    CommandHandleError,
+    CmdHandlingSpawned,
+    CmdProcessStart,
+    CmdProcessEnd,
+    CmdProcessingError,
     // DKG + Promotion
     PromotedToElder,
     DemotedFromElder,

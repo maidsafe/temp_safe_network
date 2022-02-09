@@ -9,14 +9,14 @@
 #[cfg(test)]
 pub(crate) mod tests;
 
-pub(crate) mod command;
+pub(crate) mod cmds;
 
 pub(super) mod dispatcher;
 pub(super) mod event;
 pub(super) mod event_stream;
 
 use self::{
-    command::Command,
+    cmds::Cmd,
     dispatcher::Dispatcher,
     event::{Elders, Event, NodeElderChange},
     event_stream::EventStream,
@@ -285,10 +285,10 @@ impl NodeApi {
 
     /// Signals the Elders of our section to test connectivity to a node.
     pub async fn start_connectivity_test(&self, name: XorName) -> Result<()> {
-        let command = Command::StartConnectivityTest(name);
+        let cmd = Cmd::StartConnectivityTest(name);
         self.dispatcher
             .clone()
-            .enqueue_and_handle_next_command_and_any_offshoots(command, None)
+            .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
             .await
     }
 
@@ -446,7 +446,7 @@ impl NodeApi {
 
     /// Send a message.
     /// Messages sent here, either section to section or node to node.
-    pub async fn parse_and_send_message_to_nodes(&self, wire_msg: WireMsg) -> Result<()> {
+    pub async fn send_msg_to_nodes(&self, wire_msg: WireMsg) -> Result<()> {
         trace!(
             "{:?} {:?}",
             LogMarker::DispatchSendMsgCmd,
@@ -454,10 +454,7 @@ impl NodeApi {
         );
         self.dispatcher
             .clone()
-            .enqueue_and_handle_next_command_and_any_offshoots(
-                Command::ParseAndSendWireMsgToNodes(wire_msg),
-                None,
-            )
+            .enqueue_and_handle_next_cmd_and_offshoots(Cmd::SendWireMsgToNodes(wire_msg), None)
             .await
     }
 
@@ -509,7 +506,7 @@ async fn handle_connection_events(
                     sender,
                     bytes.len(),
                 );
-                let command = Command::HandleMessage {
+                let cmd = Cmd::HandleMsg {
                     sender,
                     wire_msg,
                     original_bytes: Some(bytes),
@@ -517,7 +514,7 @@ async fn handle_connection_events(
 
                 let _handle = dispatcher
                     .clone()
-                    .enqueue_and_handle_next_command_and_any_offshoots(command, None)
+                    .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
                     .await;
             }
         }

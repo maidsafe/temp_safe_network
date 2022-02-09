@@ -10,7 +10,7 @@ use crate::messaging::{
     data::{
         DataCmd, DataQuery, MetadataExchange, OperationId, QueryResponse, Result, StorageLevel,
     },
-    EndUser, MessageId, ServiceAuth,
+    EndUser, MsgId, ServiceAuth,
 };
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
@@ -21,13 +21,13 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
-/// Command message sent among nodes
+/// cmd message sent among nodes
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeCmd {
     /// Metadata is handled by Elders
     Metadata {
-        /// The contained command
+        /// The contained cmd
         cmd: DataCmd,
         /// Requester pk and signature
         auth: ServiceAuth,
@@ -90,7 +90,7 @@ pub enum NodeQuery {
         /// The user that has initiated this query
         origin: EndUser,
         /// The correlation id that recorded in Elders for this query
-        correlation_id: MessageId,
+        correlation_id: MsgId,
     },
 }
 

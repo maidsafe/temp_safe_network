@@ -46,8 +46,8 @@ pub use self::{
     },
     errors::{Error, Result},
     location::{DstLocation, EndUser, SrcLocation},
-    msg_id::{MessageId, MESSAGE_ID_LEN},
+    msg_id::{MsgId, MESSAGE_ID_LEN},
     msg_kind::MsgKind,
     sap::SectionAuthorityProvider,
-    serialisation::{MessageType, NodeMsgAuthority, WireMsg},
+    serialisation::{MsgType, NodeMsgAuthority, WireMsg},
 };

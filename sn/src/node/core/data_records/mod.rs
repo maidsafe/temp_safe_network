@@ -6,16 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Command, Core, Prefix};
+use super::{Cmd, Core, Prefix};
 
 use crate::{
     data_copy_count,
     messaging::{
         data::{CmdError, DataQuery, MetadataExchange, StorageLevel},
         system::{NodeCmd, NodeQuery, SystemMsg},
-        AuthorityProof, EndUser, MessageId, ServiceAuth,
+        AuthorityProof, EndUser, MsgId, ServiceAuth,
     },
-    node::{error::convert_to_error_message, Error, Result},
+    node::{error::convert_to_error_msg, Error, Result},
     peer::Peer,
     types::{log_markers::LogMarker, PublicKey, ReplicatedData, ReplicatedDataAddress},
 };
@@ -27,7 +27,7 @@ use xor_name::XorName;
 
 impl Core {
     // Locate ideal holders for this data, line up wiremsgs for those to instruct them to store the data
-    pub(crate) async fn replicate_data(&self, data: ReplicatedData) -> Result<Vec<Command>> {
+    pub(crate) async fn replicate_data(&self, data: ReplicatedData) -> Result<Vec<Cmd>> {
         trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
         if self.is_elder().await {
             let targets = self.get_adults_who_should_store_data(data.name()).await;
@@ -48,10 +48,10 @@ impl Core {
     pub(crate) async fn read_data_from_adults(
         &self,
         query: DataQuery,
-        msg_id: MessageId,
+        msg_id: MsgId,
         auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
-    ) -> Result<Vec<Command>> {
+    ) -> Result<Vec<Cmd>> {
         let address = query.address();
         let operation_id = query.operation_id()?;
         trace!(
@@ -98,7 +98,7 @@ impl Core {
             query,
             auth: auth.into_inner(),
             origin: EndUser(origin.name()),
-            correlation_id: MessageId::from_xor_name(*address.name()),
+            correlation_id: MsgId::from_xor_name(*address.name()),
         });
         let aggregation = false;
 
@@ -161,10 +161,10 @@ impl Core {
     pub(crate) async fn send_error(
         &self,
         error: Error,
-        msg_id: MessageId,
+        msg_id: MsgId,
         origin: Peer,
-    ) -> Result<Vec<Command>> {
-        let error = convert_to_error_message(error);
+    ) -> Result<Vec<Cmd>> {
+        let error = convert_to_error_msg(error);
         let error = CmdError::Data(error);
 
         self.send_cmd_error_response(error, origin, msg_id).await
