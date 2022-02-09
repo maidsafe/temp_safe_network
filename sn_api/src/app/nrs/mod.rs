@@ -21,33 +21,6 @@ use std::str;
 // Type tag to use for the NrsMapContainer stored on Register
 pub(crate) const NRS_MAP_TYPE_TAG: u64 = 1_500;
 
-/// Helper to check if an NRS SafeUrl:
-/// - is valid
-/// - has a version (if its data is versionable)
-///
-/// It's public because we perform the same check in the resolver.
-pub fn validate_nrs_url(link: &SafeUrl) -> Result<()> {
-    if link.content_version().is_none() {
-        let content_type = link.content_type();
-        let data_type = link.data_type();
-        if content_type == ContentType::FilesContainer
-            || content_type == ContentType::NrsMapContainer
-        {
-            return Err(Error::UnversionedContentError(format!(
-                "{} content is versionable. NRS requires the supplied link to specify a version hash.",
-                content_type
-            )));
-        } else if data_type == DataType::Register {
-            return Err(Error::UnversionedContentError(format!(
-                "{} content is versionable. NRS requires the supplied link to specify a version hash.",
-                data_type
-            )));
-        }
-    }
-
-    Ok(())
-}
-
 impl Safe {
     /// # Creates a nrs_map_container for a chosen top name
     /// ```
@@ -360,6 +333,31 @@ fn validate_nrs_public_name(public_name: &str) -> Result<SafeUrl> {
         )));
     }
     Ok(url)
+}
+
+/// Helper to check if an NRS SafeUrl:
+/// - is valid
+/// - has a version (if its data is versionable)
+fn validate_nrs_url(link: &SafeUrl) -> Result<()> {
+    if link.content_version().is_none() {
+        let content_type = link.content_type();
+        let data_type = link.data_type();
+        if content_type == ContentType::FilesContainer
+            || content_type == ContentType::NrsMapContainer
+        {
+            return Err(Error::UnversionedContentError(format!(
+                "{} content is versionable. NRS requires the supplied link to specify a version hash.",
+                content_type
+            )));
+        } else if data_type == DataType::Register {
+            return Err(Error::UnversionedContentError(format!(
+                "{} content is versionable. NRS requires the supplied link to specify a version hash.",
+                data_type
+            )));
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

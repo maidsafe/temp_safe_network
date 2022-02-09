@@ -88,7 +88,7 @@ impl NrsMap {
         let mut v = self
             .map
             .iter()
-            .map(|x| (x.0.clone(), x.1.to_string().clone()))
+            .map(|x| (x.0.clone(), x.1.to_string()))
             .collect::<Vec<(String, String)>>();
         v.sort_by(|a, b| a.0.len().cmp(&b.0.len()));
         v

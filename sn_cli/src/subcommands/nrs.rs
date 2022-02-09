@@ -85,7 +85,7 @@ async fn run_register_subcommand(
             summary.push_str("The container for the map is located at ");
             summary.push_str(&topname_url.to_xorurl_string());
             if let Some(ref link) = link {
-                let url = get_target_url(&link)?;
+                let url = get_target_url(link)?;
                 let _ = associate_url_with_public_name(&name, safe, &url).await?;
                 summary.push_str(&format!("\nThe entry points to {link}"));
             }

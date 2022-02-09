@@ -171,7 +171,7 @@ fn calling_safe_dog_with_nrs_map_container_link() -> Result<()> {
             "add",
             &format!("test.{site_name}"),
             "--link",
-            &test_file_link,
+            test_file_link,
         ],
         Some(0),
     )?;
@@ -181,7 +181,7 @@ fn calling_safe_dog_with_nrs_map_container_link() -> Result<()> {
             "add",
             &format!("another.{site_name}"),
             "--link",
-            &another_file_link,
+            another_file_link,
         ],
         Some(0),
     )?;

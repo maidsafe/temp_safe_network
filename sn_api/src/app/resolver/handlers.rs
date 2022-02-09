@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Range, SafeData};
-use crate::app::nrs::validate_nrs_url;
 use crate::app::{
     files::{self, FileInfo, FilesMap},
     multimap::Multimap,
@@ -33,8 +32,6 @@ impl Safe {
             let url_path = input_url.path_decoded()?;
             let target_path = target_url.path_decoded()?;
             target_url.set_path(&format!("{}{}", target_path, url_path));
-            validate_nrs_url(&target_url)?;
-
             let version = input_url.content_version().map(|v| v.entry_hash());
             let safe_data = SafeData::NrsEntry {
                 xorurl: target_url.to_xorurl_string(),
