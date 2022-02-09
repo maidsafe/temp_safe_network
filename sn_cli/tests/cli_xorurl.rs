@@ -16,8 +16,8 @@ use sn_api::SafeUrl;
 use sn_cmd_test_utilities::util::{parse_xorurl_output, safeurl_from, CLI, SAFE_PROTOCOL};
 use std::process::Command;
 
-const TEST_FILE: &str = "./testdata/test.md";
-const TEST_FOLDER: &str = "./testdata/";
+const TEST_FILE: &str = "../resources/testdata/test.md";
+const TEST_FOLDER: &str = "../resources/testdata/";
 
 #[test]
 fn calling_safe_xorurl() -> Result<()> {
@@ -36,9 +36,9 @@ fn calling_safe_xorurl_recursive() -> Result<()> {
     let mut cmd = Command::cargo_bin(CLI).map_err(|e| eyre!(e.to_string()))?;
     cmd.args(&vec!["xorurl", TEST_FOLDER, "--recursive"])
         .assert()
-        .stdout(predicate::str::contains("11 file/s processed"))
-        .stdout(predicate::str::contains(SAFE_PROTOCOL).count(8))
-        .stdout(predicate::str::contains(TEST_FOLDER).count(11))
+        .stdout(predicate::str::contains("12 file/s processed"))
+        .stdout(predicate::str::contains(SAFE_PROTOCOL).count(9))
+        .stdout(predicate::str::contains(TEST_FOLDER).count(12))
         .success();
     Ok(())
 }
