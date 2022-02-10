@@ -35,7 +35,9 @@ use crate::node::{
     network_knowledge::NetworkKnowledge,
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
 };
-use crate::types::{log_markers::LogMarker, Peer, PublicKey, UnnamedPeer};
+use crate::types::{log_markers::LogMarker, PublicKey};
+use crate::types::{Peer, UnnamedPeer};
+use std::collections::BTreeSet;
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -943,7 +945,7 @@ impl Node {
             .collect::<BTreeSet<XorName>>();
 
         self.reorganize_data(
-            self.node.read().await.name(),
+            self.info.read().await.name(),
             BTreeSet::new(),
             deviants,
             our_adults,
