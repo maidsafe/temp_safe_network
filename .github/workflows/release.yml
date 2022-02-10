@@ -164,7 +164,7 @@ jobs:
           make prepare-deploy
           make safe_network-package-version-artifacts-for-release \
             SN_NODE_VERSION=latest DEPLOY_PATH=deploy
-          make sn_cli-package-version-artifacts-for-release SN_NODE_VERSION=latest DEPLOY_PATH=deploy
+          make sn_cli-package-version-artifacts-for-release SN_CLI_VERSION=latest DEPLOY_PATH=deploy
 
       - uses: shallwefootball/s3-upload-action@master
         name: upload sn_node artifacts to s3
