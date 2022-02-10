@@ -157,6 +157,33 @@ jobs:
           source_dir: deploy/prod/safe
           destination_dir: ''
 
+      # Now repackage and upload the artifacts using 'latest' for the version.
+      - shell: bash
+        name: package artifacts for release
+        run: |
+          make prepare-deploy
+          make safe_network-package-version-artifacts-for-release \
+            SN_NODE_VERSION=latest DEPLOY_PATH=deploy
+          make sn_cli-package-version-artifacts-for-release SN_NODE_VERSION=latest DEPLOY_PATH=deploy
+
+      - uses: shallwefootball/s3-upload-action@master
+        name: upload sn_node artifacts to s3
+        with:
+          aws_key_id: AKIAVVODCRMSJ5MV63VB
+          aws_secret_access_key: ${{ secrets.DEPLOY_USER_SECRET_ACCESS_KEY }}
+          aws_bucket: sn-node
+          source_dir: deploy/prod/sn_node
+          destination_dir: ''
+
+      - uses: shallwefootball/s3-upload-action@master
+        name: upload safe artifacts to s3
+        with:
+          aws_key_id: AKIAVVODCRMSJ5MV63VB
+          aws_secret_access_key: ${{ secrets.DEPLOY_USER_SECRET_ACCESS_KEY }}
+          aws_bucket: sn-cli
+          source_dir: deploy/prod/safe
+          destination_dir: ''
+
   # At first glance, it seems like it would be possible to check the commit message in the `if` condition
   # for the presence of the crate name, by using `contains`. However, this doesn't work, so the commit
   # message needs to be checked at the point of publishing. The reason is because of the dependencies
