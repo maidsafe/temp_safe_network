@@ -10,7 +10,7 @@ use crate::node::XorName;
 
 use crate::messaging::data::{chunk_operation_id, OperationId};
 use crate::types::ChunkAddress;
-use crate::DEFAULT_DATA_COPY_COUNT;
+use crate::DEFAULT_ELDER_COUNT;
 use dashmap::DashMap;
 use itertools::Itertools;
 use std::collections::BTreeSet;
@@ -18,7 +18,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 /// Count of neighbours to every node that we keep track of.
-const NEIGHBOUR_COUNT: usize = DEFAULT_DATA_COPY_COUNT - 1; // '- 1' because we exclude the original node
+// NOTE: To be set relevant to section size when tweaked
+const NEIGHBOUR_COUNT: usize = DEFAULT_ELDER_COUNT;
 
 // If the pending ops count of a node is 5 times higher than it's neighbours, it will be kicked.
 const EXCESSIVE_OPS_TOLERANCE: f64 = 5.0; // increasing this number increases tolerance
@@ -254,7 +255,7 @@ impl Liveness {
 
 #[cfg(test)]
 mod tests {
-    use super::{Liveness, MIN_PENDING_OPS};
+    use super::{Liveness, EXCESSIVE_OPS_TOLERANCE};
 
     use crate::messaging::data::chunk_operation_id;
     use crate::node::Error;
@@ -298,8 +299,8 @@ mod tests {
         // Assert total adult count
         assert_eq!(liveness_tracker.closest_nodes_to.len(), 11);
 
-        // Write data 3 x 50 times to the new adult to check for preemptive replication
-        for _ in 0..50 * 3 {
+        // Write data (EXCESSIVE_OPS_TOLERANCE/2) + 1 x 50 times to the new adult to check for preemptive replication
+        for _ in 0..50 * ((EXCESSIVE_OPS_TOLERANCE as usize / 2) + 1) {
             let random_addr = ChunkAddress(XorName::random());
             let op_id = chunk_operation_id(&random_addr)?;
             liveness_tracker
@@ -315,8 +316,8 @@ mod tests {
             .iter()
             .contains(&new_adult));
 
-        // Write data another 3 x 50 times to the new adult to check for unresponsiveness.
-        for _ in 0..50 * 3 {
+        // Write data another EXCESSIVE_OPS_TOLERANCE x 50 times to the new adult to check for unresponsiveness.
+        for _ in 0..50 * EXCESSIVE_OPS_TOLERANCE as usize {
             let random_addr = ChunkAddress(XorName::random());
             let op_id = chunk_operation_id(&random_addr)?;
             liveness_tracker
@@ -357,12 +358,12 @@ mod tests {
     #[tokio::test]
     async fn liveness_compute_closest() -> Result<(), Error> {
         // Adults with prefix 0
-        let mut adults0 = (0..5)
+        let mut adults0 = (0..10)
             .map(|_| XorName::random().with_bit(0, false))
             .collect::<Vec<XorName>>();
 
         // Adults with prefix 1
-        let mut adults1 = (0..5)
+        let mut adults1 = (0..10)
             .map(|_| XorName::random().with_bit(0, true))
             .collect::<Vec<XorName>>();
 

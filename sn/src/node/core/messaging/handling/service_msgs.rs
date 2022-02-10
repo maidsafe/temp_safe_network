@@ -16,7 +16,6 @@ use crate::node::{api::cmds::Cmd, core::Node, Result};
 use crate::types::{log_markers::LogMarker, register::User, Peer, PublicKey, ReplicatedData};
 
 use crate::messaging::system::NodeEvent;
-use itertools::Itertools;
 use xor_name::XorName;
 
 impl Node {
