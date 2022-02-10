@@ -134,12 +134,12 @@ impl Core {
 
         let node_id = XorName::from(sending_node_pk);
         let op_id = response.operation_id()?;
-        let origin = if let Some(origin) = self.pending_data_queries.remove(&op_id).await {
-            origin
+
+        let waiting_peers = if let Some(peers) = self.pending_data_queries.remove(&op_id).await {
+            peers
         } else {
             warn!(
-                "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client or \
-                have not registered the client: {}",
+                "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client orthe client connection cache has expired: {}",
                 sending_node_pk, user.0
             );
             return Ok(cmds);
@@ -197,18 +197,21 @@ impl Core {
         };
         let (msg_kind, payload) = self.ed_sign_client_msg(&msg).await?;
 
-        let dst = DstLocation::EndUser(EndUser(origin.name()));
-        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst)?;
+        for origin in waiting_peers {
+            let dst = DstLocation::EndUser(EndUser(origin.name()));
+            let wire_msg = WireMsg::new_msg(msg_id, payload.clone(), msg_kind.clone(), dst)?;
 
-        trace!(
-            "Responding with the first chunk query response to {:?}",
-            dst
-        );
+            trace!(
+                "Responding with the first chunk query response to {:?}",
+                dst
+            );
 
-        cmds.push(Cmd::SendMsg {
-            recipients: vec![origin],
-            wire_msg,
-        });
+            let command = Cmd::SendMsg {
+                recipients: vec![origin],
+                wire_msg,
+            };
+            cmds.push(command);
+        }
 
         Ok(cmds)
     }

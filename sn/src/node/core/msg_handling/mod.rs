@@ -29,7 +29,7 @@ use crate::messaging::{
 };
 use crate::node::{
     api::cmds::Cmd,
-    core::{Core, DkgSessionInfo},
+    core::{Core, DkgSessionInfo, DATA_QUERY_LIMIT},
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::NetworkKnowledge,
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
@@ -53,7 +53,6 @@ impl Core {
         original_bytes: Option<Bytes>,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
-        trace!("handling msg");
 
         // Apply backpressure if needed.
         if let Some(load_report) = self.comm.check_strain(sender.addr()).await {
@@ -67,8 +66,9 @@ impl Core {
         }
 
         // Deserialize the payload of the incoming message
-        let payload = wire_msg.payload.clone();
         let msg_id = wire_msg.msg_id();
+        // payload needed for aggregation
+        let payload = wire_msg.payload.clone();
 
         let message_type = match wire_msg.into_msg() {
             Ok(message_type) => message_type,
@@ -206,7 +206,19 @@ impl Core {
                     return Ok(cmds);
                 }
 
-                // First we perform AE checks
+                // First we check if it's query and we have too many on the go at the moment...
+                if let ServiceMsg::Query(_) = msg {
+                    // we have a query, check if we have too many on the go....
+                    let pending_query_length = self.pending_data_queries.len().await;
+
+                    if pending_query_length > DATA_QUERY_LIMIT {
+                        // TODO: check if query is pending for this already.. add to that if that makes sense.
+                        warn!("Pending queries length exceeded, dropping query {msg:?}");
+                        return Ok(vec![]);
+                    }
+                }
+
+                // Then we perform AE checks
                 let received_section_pk = match dst_location.section_pk() {
                     Some(section_pk) => section_pk,
                     None => {
