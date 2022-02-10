@@ -13,10 +13,10 @@ use xor_name::XorName;
 
 // highest prio as we can't do anything until we've joined
 pub(crate) const DKG_MSG_PRIORITY: i32 = 3;
-pub(crate) const AE_MSG_PRIORITY: i32 = 2;
 pub(crate) const INFRASTRUCTURE_MSG_PRIORITY: i32 = 1;
 pub(crate) const NODE_DATA_MSG_PRIORITY: i32 = 0;
-pub(crate) const SERVICE_MSG_PRIORITY: i32 = -2;
+pub(crate) const SERVICE_CMD_PRIORITY: i32 = -1;
+pub(crate) const SERVICE_QUERY_PRIORITY: i32 = -2;
 pub(crate) const JOIN_RESPONSE_PRIORITY: i32 = -5;
 
 use crate::types::PublicKey;
@@ -107,7 +107,11 @@ impl MsgType {
             } => NODE_DATA_MSG_PRIORITY,
 
             // Client<->node service comms
-            MsgType::Service { .. } => SERVICE_MSG_PRIORITY,
+            MsgType::Service {
+                msg: ServiceMsg::Cmd(_),
+                ..
+            } => SERVICE_CMD_PRIORITY,
+            MsgType::Service { .. } => SERVICE_QUERY_PRIORITY,
         }
     }
 }

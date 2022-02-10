@@ -74,7 +74,7 @@ pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 10;
 const BACKOFF_CACHE_LIMIT: usize = 100;
 pub(crate) const CONCURRENT_JOINS: usize = 7;
 
-// How long to hold on to correlated `Peer`s for chunk queries. Since chunk queries are forwarded
+// How long to hold on to correlated `Peer`s for data queries. Since data queries are forwarded
 // from elders (with whom the client is connected) to adults (who hold the data), the elder handling
 // the query cannot reply immediately. For now, they stash a reference to the client `Peer` in
 // `Core::pending_data_queries`, which is a cache with duration-based expiry.
@@ -82,7 +82,12 @@ pub(crate) const CONCURRENT_JOINS: usize = 7;
 // `crate::client::SN_CLIENT_QUERY_TIMEOUT`), but the timeout is configurable. Ideally this would be
 // based on liveness properties (e.g. the timeout should be dynamic based on the responsiveness of
 // the section).
-const CHUNK_QUERY_TIMEOUT: Duration = Duration::from_secs(60 * 5 /* 5 mins */);
+const DATA_QUERY_TIMEOUT: Duration = Duration::from_secs(60 * 5 /* 5 mins */);
+
+// This prevents pending query limit unbound growth
+pub(crate) const DATA_QUERY_LIMIT: usize = 100;
+// per query we can have this many peers, so the total peers waiting can be QUERY_LIMIT * MAX_WAITING_PEERS_PER_QUERY
+pub(crate) const MAX_WAITING_PEERS_PER_QUERY: usize = 25;
 
 // Store up to 100 in use backoffs
 pub(crate) type AeBackoffCache =
@@ -114,7 +119,7 @@ pub(crate) struct Core {
     pub(super) data_storage: DataStorage,
     capacity: Capacity,
     liveness: Liveness,
-    pending_data_queries: Arc<Cache<OperationId, Peer>>,
+    pending_data_queries: Arc<Cache<OperationId, Vec<Peer>>>,
     ae_backoff_cache: AeBackoffCache,
 }
 
@@ -167,7 +172,7 @@ impl Core {
             data_storage,
             capacity,
             liveness: adult_liveness,
-            pending_data_queries: Arc::new(Cache::with_expiry_duration(CHUNK_QUERY_TIMEOUT)),
+            pending_data_queries: Arc::new(Cache::with_expiry_duration(DATA_QUERY_TIMEOUT)),
             ae_backoff_cache: AeBackoffCache::default(),
         })
     }
