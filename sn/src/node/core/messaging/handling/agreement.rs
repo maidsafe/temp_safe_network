@@ -292,7 +292,7 @@ impl Node {
             let prefix = signed_sap.prefix();
             trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);
 
-            info!("New SAP agreed for {:?}: {:?}", prefix, signed_sap);
+            info!("New SAP agreed for:{}", *signed_sap);
 
             let our_name = self.info.read().await.name();
 
