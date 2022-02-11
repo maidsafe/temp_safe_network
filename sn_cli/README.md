@@ -56,19 +56,30 @@ The Safe CLI provides all the tools necessary to interact with the Safe Network,
 
 ## Quick Start
 
-If you're a Linux or macOS user and you have root access, you can run the following in your terminal:
+### Linux/macOS
+
+If you have root access, you can run the following in your terminal:
 ```
-$ curl -so- https://raw.githubusercontent.com/maidsafe/safe_network/master/resources/scripts/install.sh | sudo bash
+$ curl -so- https://raw.githubusercontent.com/maidsafe/safe_network/main/resources/scripts/install.sh | sudo bash
 ```
 
-If you don't have root or prefer an install under your home directory:
+If you don't or prefer an install under your home directory:
 ```
-$ curl -so- https://raw.githubusercontent.com/maidsafe/safe_network/master/resources/scripts/install.sh | bash
+$ curl -so- https://raw.githubusercontent.com/maidsafe/safe_network/main/resources/scripts/install.sh | bash
 ```
 
-In either case, if you can successfully run `safe --version`, you can now skip to [Using the CLI](#using-the-cli).
+The non-root option may require a new shell session; using root, `safe` should be available immediately.
 
-At the moment we don't have a quick start mechanism for Windows, but this will be coming soon.
+### Windows
+
+Start a Powershell session and run the following:
+```
+Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/maidsafe/safe_network/main/resources/scripts/install.ps1'))
+```
+
+If you don't have the Visual C++ Redistributable installed, the script will install it for you, but that requires admin access; otherwise, admin is not required. On the first install run, the location of `safe` will be added to your user `PATH` variable. Powershell requires a new session to pick this up. If VC++ was installed, this requires a machine restart. If later you use the install script to get a newer version of `safe`, neither will be necessary again.
+
+Now, if you can successfully run `safe --version`, you can skip to [Using the CLI](#using-the-cli).
 
 If you want more detail or alternative setup options, read the next section.
 
@@ -110,11 +121,7 @@ $ curl -so- https://raw.githubusercontent.com/maidsafe/sn_cli/master/resources/i
 
 #### Windows
 
-On Windows you can run the Bash install script using Bash emulation like [Git Bash](https://gitforwindows.org). You'll need to run it as an administrative user. The script can be run using the same commands as per the above section. The install script detects that it's running in emulation and will install a native Windows binary.
-
-You can also run the install script from [WSL](https://docs.microsoft.com/en-us/windows/wsl/about), though this will install a Linux-based binary inside the Linux emulation.
-
-We hope to make things much easier for Windows users by having a Powershell script that does something similar to the Bash script.
+The quickstart section has all the details for the Windows install script. No further elaboration is required.
 
 ### Binaries
 

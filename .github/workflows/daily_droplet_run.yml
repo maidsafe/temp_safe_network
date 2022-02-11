@@ -15,7 +15,8 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_DEFAULT_REGION: 'eu-west-2'
-  INSTALL_SCRIPT_URL: https://raw.githubusercontent.com/maidsafe/safe_network/master/resources/scripts/install.sh
+  INSTALL_SCRIPT_URL: https://raw.githubusercontent.com/maidsafe/safe_network/main/resources/scripts/install.sh
+  POWERSHELL_INSTALL_SCRIPT_URL: https://raw.githubusercontent.com/maidsafe/safe_network/main/resources/scripts/install.ps1
 
 jobs:
   cli-install-tests:
@@ -39,7 +40,7 @@ jobs:
              | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           actual_version=$(safe --version | awk '{ print $2 }')
           echo "Expected version: $expected_version"
-          echo "Actual version: $expected_version"
+          echo "Actual version: $actual_version"
           if [[ $actual_version != $expected_version ]]; then exit 1; fi
       - shell: bash
         name: test install as non-root user
@@ -53,7 +54,7 @@ jobs:
              | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
           actual_version=$($HOME/.safe/cli/safe --version | awk '{ print $2 }')
           echo "Expected version: $expected_version"
-          echo "Actual version: $expected_version"
+          echo "Actual version: $actual_version"
           if [[ $actual_version != $expected_version ]]; then exit 1; fi
           # Since the installer attempts to update more than just the bashrc,
           # this isn't a comprehensive test, but I think it should do as a
@@ -62,6 +63,54 @@ jobs:
             echo "Installer has not updated the bashrc correctly"
             exit 1
           fi
+  windows-cli-install-test:
+    name: windows cli install test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - shell: powershell
+        name: run install
+        run: |
+          Set-ExecutionPolicy Bypass -Scope Process -Force; `
+            iex ((New-Object System.Net.WebClient).DownloadString($env:POWERSHELL_INSTALL_SCRIPT_URL))
+      - shell: powershell
+        name: test install
+        run: |
+          # Use a new session to test the result of the install.
+          # This is because of things like the PATH modification, which requires a new session.
+          $installPath = Join-Path -Path $env:USERPROFILE -ChildPath ".safe\cli"
+          $safeBinPath = Join-Path -Path $installPath -ChildPath "safe.exe"
+          $failed = $false
+
+          $list = Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* `
+            | Where-Object { $_.DisplayName -like "Microsoft Visual C++*" } | Select-Object DisplayName
+          if ($list) {
+            echo "Visual C++ Redistributable was installed"
+          } else {
+            echo "Visual C++ Redistributable was not installed"
+            $failed = $true
+          }
+
+          $local:currentPaths = [Environment]::GetEnvironmentVariable(
+            'Path', [EnvironmentVariableTarget]::User) -split ';'
+          if ($currentPaths -contains $installPath) {
+            echo "CLI install path was added to user PATH variable"
+          } else {
+            echo "CLI install path was not added to user PATH variable"
+            $failed = $true
+          }
+
+          if (Test-Path $safeBinPath) {
+            echo "Detected safe binary at $safeBinPath"
+          } else {
+            echo "Expected safe binary at $safeBinPath"
+            $failed = $true
+          }
+
+          if ($failed) {
+            echo "Test run failed. Please see output to determine failure."
+            exit 1
+          }
 
   build-node:
     name: build node
