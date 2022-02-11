@@ -15,8 +15,54 @@ env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_DEFAULT_REGION: 'eu-west-2'
+  INSTALL_SCRIPT_URL: https://raw.githubusercontent.com/maidsafe/safe_network/master/resources/scripts/install.sh
 
 jobs:
+  cli-install-tests:
+    name: cli install tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v2
+      - shell: bash
+        name: test install as root user
+        run: |
+          curl -so- $INSTALL_SCRIPT_URL | sudo bash
+          if [[ ! -f /usr/local/bin/safe ]]; then
+            echo "Failed to unpack safe to /usr/local/bin"
+            exit 1
+          fi
+          expected_version=$(grep "^version" < sn_cli/Cargo.toml \
+             | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+          actual_version=$(safe --version | awk '{ print $2 }')
+          echo "Expected version: $expected_version"
+          echo "Actual version: $expected_version"
+          if [[ $actual_version != $expected_version ]]; then exit 1; fi
+      - shell: bash
+        name: test install as non-root user
+        run: |
+          curl -so- $INSTALL_SCRIPT_URL | bash
+          if [[ ! -f "$HOME/.safe/cli/safe" ]]; then
+            echo "Failed to unpack safe to $HOME/.safe/cli/safe"
+            exit 1
+          fi
+          expected_version=$(grep "^version" < sn_cli/Cargo.toml \
+             | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+          actual_version=$($HOME/.safe/cli/safe --version | awk '{ print $2 }')
+          echo "Expected version: $expected_version"
+          echo "Actual version: $expected_version"
+          if [[ $actual_version != $expected_version ]]; then exit 1; fi
+          # Since the installer attempts to update more than just the bashrc,
+          # this isn't a comprehensive test, but I think it should do as a
+          # starting point. Or until the other conditions could be reproduced.
+          if ! $(cat "$HOME/.bashrc" | grep "^export PATH=\$PATH:$HOME/.safe/cli"); then
+            echo "Installer has not updated the bashrc correctly"
+            exit 1
+          fi
+
   build-node:
     name: build node
     runs-on: ubuntu-latest

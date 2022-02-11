@@ -56,18 +56,23 @@ The Safe CLI provides all the tools necessary to interact with the Safe Network,
 
 ## Quick Start
 
-If you're a Linux or macOS user, you can simply run the following in your terminal:
+If you're a Linux or macOS user and you have root access, you can run the following in your terminal:
 ```
-$ curl -so- https://raw.githubusercontent.com/maidsafe/sn_cli/master/resources/install.sh | bash
+$ curl -so- https://raw.githubusercontent.com/maidsafe/safe_network/master/resources/scripts/install.sh | sudo bash
 ```
 
-This will make the latest version of `safe` available. If you can successfully run `safe --version`, you can now skip to [Using the CLI](#using-the-cli).
+If you don't have root or prefer an install under your home directory:
+```
+$ curl -so- https://raw.githubusercontent.com/maidsafe/safe_network/master/resources/scripts/install.sh | bash
+```
+
+In either case, if you can successfully run `safe --version`, you can now skip to [Using the CLI](#using-the-cli).
 
 At the moment we don't have a quick start mechanism for Windows, but this will be coming soon.
 
-## Installation and Setup
+If you want more detail or alternative setup options, read the next section.
 
-If you want more detail or alternative setup options, continue reading this section.
+## Installation and Setup
 
 ### Prerequisites
 
@@ -84,15 +89,19 @@ If you use Visual Studio, you may already have these libraries installed.
 
 #### Linux and macOS
 
-The [install script](https://raw.githubusercontent.com/maidsafe/sn_cli/master/resources/install.sh) will download the latest Safe CLI binary, unpack it to `~/.safe/cli/`, and extend your `PATH` variable with that location. When using a terminal, you can then refer to the `safe` binary from any location.
+The [install script](https://raw.githubusercontent.com/maidsafe/safe_network/master/resources/scripts/install.sh) can get you running quickly. If you have root access to your machine, in your terminal, you can run:
+```
+$ curl -so- https://raw.githubusercontent.com/maidsafe/safe_network/master/resources/scripts/install.sh | sudo bash
+```
 
-Run either of the following commands from a terminal:
+This downloads and unpacks the latest `safe` binary to `/usr/local/bin`; this location is almost always on the `PATH` variable, so `safe` will be immediately available.
+
+If you don't have root access or prefer an install under your home directory:
 ```
-$ curl -so- https://raw.githubusercontent.com/maidsafe/sn_cli/master/resources/install.sh | bash
+$ curl -so- https://raw.githubusercontent.com/maidsafe/safe_network/master/resources/scripts/install.sh | bash
 ```
-```
-$ wget -qO- https://raw.githubusercontent.com/maidsafe/sn_cli/master/resources/install.sh | bash
-```
+
+In this case, `safe` is unpacked to `~/.safe/cli/`, and your `PATH` variable is extended with that location. To do so, the install script modifies your shell configuration, such as your `~/.bashrc` file. If you'd prefer the install not modify your configuration, use the sudo option above.
 
 The install script also has a `--version` argument to enable retrieval of a specific version:
 ```
