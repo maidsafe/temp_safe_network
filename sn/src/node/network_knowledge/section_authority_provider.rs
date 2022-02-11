@@ -17,6 +17,7 @@ use crate::types::Peer;
 use bls::{PublicKey, PublicKeySet};
 use std::{
     collections::{BTreeMap, BTreeSet},
+    fmt::{self, Display, Formatter},
     net::SocketAddr,
 };
 
@@ -29,6 +30,23 @@ pub struct SectionAuthorityProvider {
     prefix: Prefix,
     public_key_set: PublicKeySet,
     elders: BTreeSet<Peer>,
+}
+
+impl Display for SectionAuthorityProvider {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let elders_info: Vec<_> = self
+            .elders
+            .iter()
+            .map(|peer| (peer.addr(), peer.name()))
+            .collect();
+        write!(
+            f,
+            "Sap {:?}  elder len:{} contains: {{{:?}}})",
+            self.prefix,
+            self.elders.len(),
+            elders_info,
+        )
+    }
 }
 
 impl serde::Serialize for SectionAuthorityProvider {
