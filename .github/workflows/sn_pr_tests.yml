@@ -185,7 +185,7 @@ jobs:
         timeout-minutes: 60
 
       - name: Start the network
-        run: ./target/release/testnet --interval 15000
+        run: ./target/release/testnet
         id: section-startup
         env:
           RUST_LOG: "safe_network,sn_api,sn_node=trace"
@@ -381,7 +381,7 @@ jobs:
         timeout-minutes: 60
 
       - name: Start the network
-        run: ./target/release/testnet --interval 15000
+        run: ./target/release/testnet
         id: section-startup
 
       - name: Print Network Log Stats at start
@@ -543,7 +543,7 @@ jobs:
         run: cargo test --no-run -p sn_api --release --lib
 
       - name: Start the network
-        run: ./target/release/testnet --interval 15000
+        run: ./target/release/testnet
         id: section-startup
         env:
           RUST_LOG: "safe_network,sn_api,sn_node=trace"
@@ -659,7 +659,7 @@ jobs:
         run: cargo test --no-run -p sn_cli --release
 
       - name: Start the network
-        run: ./target/release/testnet --interval 15000
+        run: ./target/release/testnet
         id: section-startup
         env:
           RUST_LOG: "safe_network,sn_api,sn_node=trace"
