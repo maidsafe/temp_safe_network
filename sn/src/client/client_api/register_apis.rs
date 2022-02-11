@@ -129,6 +129,7 @@ impl Client {
     ) -> Result<(EntryHash, RegisterWriteAheadLog), Error> {
         // First we fetch it so we can get the causality info,
         // either from local CRDT replica or from the network if not found
+        debug!("Writing to register at {:?}", address);
         let mut register = self.get_register(address).await?;
 
         // We can now write the entry to the Register

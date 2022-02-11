@@ -81,8 +81,14 @@ async fn run_register_subcommand(
 ) -> Result<()> {
     match safe.nrs_create(&name).await {
         Ok(topname_url) => {
-            let (nrs_url, summary) =
-                get_new_nrs_url_for_topname(&name, safe, topname_url, link).await?;
+            let mut summary = String::new();
+            summary.push_str("The container for the map is located at ");
+            summary.push_str(&topname_url.to_xorurl_string());
+            if let Some(ref link) = link {
+                let url = get_target_url(link)?;
+                let _ = associate_url_with_public_name(&name, safe, &url).await?;
+                summary.push_str(&format!("\nThe entry points to {link}"));
+            }
             print_summary(
                 output_fmt,
                 &format!(
@@ -90,8 +96,9 @@ async fn run_register_subcommand(
                     name.replace("safe://", "")
                 ),
                 summary,
-                &nrs_url,
-                ("+", &name, &nrs_url.to_string()),
+                &topname_url.to_xorurl_string(),
+                &topname_url,
+                ("+", &name, &topname_url.to_string()),
             );
             Ok(())
         }
@@ -140,7 +147,11 @@ async fn run_add_subcommand(
 
     let mut summary_header = String::new();
     if topname_was_registered {
-        summary_header.push_str("New NRS Map created. ");
+        summary_header.push_str("New NRS Map created.\n");
+        summary_header.push_str("The container for the map is located at ");
+        summary_header.push_str(
+            &SafeUrl::from_url(&format!("safe://{}", url.top_name()))?.to_xorurl_string(),
+        );
     } else {
         summary_header.push_str("Existing NRS Map updated. ");
     }
@@ -148,7 +159,7 @@ async fn run_add_subcommand(
         .content_version()
         .ok_or_else(|| eyre!("Content version not set for returned NRS SafeUrl"))?
         .to_string();
-    summary_header.push_str(&format!("Now at version {}. ", version));
+    summary_header.push_str(&format!("\nNow at version {}. ", version));
 
     if default {
         let topname = get_topname_from_public_name(&name)?;
@@ -162,6 +173,7 @@ async fn run_add_subcommand(
         output_fmt,
         &summary_header,
         "".to_string(),
+        &SafeUrl::from_url(&format!("safe://{}", url.top_name()))?.to_xorurl_string(),
         &url,
         ("+", &name, &link),
     );
@@ -179,6 +191,7 @@ async fn run_remove_subcommand(name: String, safe: &Safe, output_fmt: OutputFmt)
                 output_fmt,
                 &format!("NRS Map updated (version {})", version),
                 "".to_string(),
+                &SafeUrl::from_url(&format!("safe://{}", url.top_name()))?.to_xorurl_string(),
                 &url,
                 ("-", &name, ""),
             );
@@ -203,25 +216,6 @@ async fn run_remove_subcommand(name: String, safe: &Safe, output_fmt: OutputFmt)
             _ => Err(eyre!(error)),
         },
     }
-}
-
-/// Get the new NRS URL that's going to be displayed to the user.
-///
-/// If no target link has been supplied, the URL is just going to be the one returned from the
-/// topname creation; otherwise, associate the link with the newly registered topname, and return the
-/// URL generated from the association.
-async fn get_new_nrs_url_for_topname(
-    name: &str,
-    safe: &Safe,
-    topname_url: SafeUrl,
-    link: Option<String>,
-) -> Result<(SafeUrl, String)> {
-    if let Some(link) = link {
-        let url = get_target_url(&link)?;
-        let new_url = associate_url_with_public_name(name, safe, &url).await?;
-        return Ok((new_url, format!("The entry points to {}", link)));
-    }
-    Ok((topname_url, "".to_string()))
 }
 
 async fn associate_url_with_public_name(
@@ -274,6 +268,7 @@ fn print_summary(
     output_fmt: OutputFmt,
     header: &str,
     summary: String,
+    container_xorurl: &str,
     nrs_url: &SafeUrl,
     processed_entry: (&str, &str, &str),
 ) {
@@ -295,7 +290,7 @@ fn print_summary(
     } else {
         println!(
             "{}",
-            serialise_output(&(nrs_url, processed_entry), output_fmt)
+            serialise_output(&(container_xorurl, nrs_url, processed_entry), output_fmt)
         );
     }
 }

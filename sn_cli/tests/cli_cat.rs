@@ -17,7 +17,7 @@ use sn_cmd_test_utilities::util::{
     safe_cmd_stdout, safeurl_from, test_symlinks_are_valid, upload_path,
     upload_test_symlinks_folder, CLI,
 };
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const TEST_DATA: &str = "../resources/testdata/";
@@ -219,7 +219,7 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
         Some(0),
     )?;
 
-    let (nrs_url, _) = parse_nrs_register_output(&output)?;
+    let (_, nrs_url, _) = parse_nrs_register_output(&output)?;
     let version = nrs_url.content_version();
 
     let mut nrs_url = SafeUrl::from_url(&format!("safe://{}", public_name))?;
@@ -419,5 +419,74 @@ fn calling_cat_symlinks_resolve_dir_outside() -> Result<()> {
     let output = safe_cmd_stderr(["cat", &safeurl.to_string()], Some(1))?;
     assert!(output.contains("ContentNotFound: Cannot ascend beyond root directory"));
 
+    Ok(())
+}
+
+#[test]
+fn calling_safe_cat_nrs_map_container() -> Result<()> {
+    let with_trailing_slash = true;
+    let tmp_data_path = assert_fs::TempDir::new()?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
+    let (files_container_xor, processed_files, _) =
+        upload_path(&tmp_data_path, with_trailing_slash)?;
+
+    let test_file_link = processed_files
+        .get(&PathBuf::from(tmp_data_path.path()).join("test.md"))
+        .ok_or_else(|| eyre!("test.md should be in files container"))?
+        .link()
+        .ok_or_else(|| eyre!("should have link"))?;
+    let another_file_link = processed_files
+        .get(&PathBuf::from(tmp_data_path.path()).join("another.md"))
+        .ok_or_else(|| eyre!("another.md should be in files container"))?
+        .link()
+        .ok_or_else(|| eyre!("should have link"))?;
+
+    let site_name = get_random_nrs_string();
+    let container_xorurl = SafeUrl::from_url(&format!("safe://{}", site_name))?.to_xorurl_string();
+    safe_cmd(
+        [
+            "nrs",
+            "register",
+            &site_name,
+            "--link",
+            &files_container_xor,
+        ],
+        Some(0),
+    )?;
+    safe_cmd(
+        [
+            "nrs",
+            "add",
+            &format!("test.{site_name}"),
+            "--link",
+            test_file_link,
+        ],
+        Some(0),
+    )?;
+    safe_cmd(
+        [
+            "nrs",
+            "add",
+            &format!("another.{site_name}"),
+            "--link",
+            another_file_link,
+        ],
+        Some(0),
+    )?;
+
+    safe_cmd(["cat", &container_xorurl], Some(0))?
+        .assert()
+        .stdout(predicate::str::contains(&format!(
+            "{site_name}: {}",
+            files_container_xor
+        )))
+        .stdout(predicate::str::contains(&format!(
+            "test.{site_name}: {}",
+            test_file_link
+        )))
+        .stdout(predicate::str::contains(&format!(
+            "another.{site_name}: {}",
+            another_file_link
+        )));
     Ok(())
 }

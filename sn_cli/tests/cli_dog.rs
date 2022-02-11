@@ -6,12 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use assert_cmd::prelude::*;
+use assert_fs::prelude::*;
 use color_eyre::{eyre::eyre, Result};
-use sn_api::resolver::SafeData;
+use predicates::prelude::*;
+use sn_api::resolver::{SafeData, SafeUrl};
 use sn_cmd_test_utilities::util::{
-    create_and_get_keys, get_random_nrs_string, parse_dog_output, parse_files_put_or_sync_output,
-    safe_cmd, safe_cmd_stdout, safeurl_from,
+    create_and_get_keys, get_random_nrs_string, parse_files_put_or_sync_output, safe_cmd,
+    safe_cmd_stdout, upload_path,
 };
+use std::path::PathBuf;
 
 const TEST_FILE: &str = "../resources/testdata/test.md";
 
@@ -131,53 +135,70 @@ fn calling_safe_dog_safekey_nrsurl() -> Result<()> {
 }
 
 #[test]
-#[ignore = "still broken"]
-fn calling_safe_dog_nrs_url_with_subnames() -> Result<()> {
-    let (safekey_xorurl, _sk) = create_and_get_keys()?;
+fn calling_safe_dog_with_nrs_map_container_link() -> Result<()> {
+    let with_trailing_slash = true;
+    let tmp_data_path = assert_fs::TempDir::new()?;
+    tmp_data_path.copy_from("../resources/testdata", &["**"])?;
+    let (files_container_xor, processed_files, _) =
+        upload_path(&tmp_data_path, with_trailing_slash)?;
 
-    let pub_name = get_random_nrs_string();
-    let nrsurl = format!("subname.{}", pub_name);
-    safe_cmd(["nrs", "register", &nrsurl, "-l", &safekey_xorurl], Some(0))?;
+    let test_file_link = processed_files
+        .get(&PathBuf::from(tmp_data_path.path()).join("test.md"))
+        .ok_or_else(|| eyre!("test.md should be in files container"))?
+        .link()
+        .ok_or_else(|| eyre!("should have link"))?;
+    let another_file_link = processed_files
+        .get(&PathBuf::from(tmp_data_path.path()).join("another.md"))
+        .ok_or_else(|| eyre!("another.md should be in files container"))?
+        .link()
+        .ok_or_else(|| eyre!("should have link"))?;
 
-    // let's check the output with NRS-URL first
-    let dog_output = safe_cmd_stdout(["dog", &nrsurl, "--json"], Some(0))?;
-    let (url, safe_data_vec) = parse_dog_output(&dog_output)?;
-    assert_eq!(url, format!("safe://{}", nrsurl));
-    let mut safeurl = safeurl_from(&nrsurl)?;
-    safeurl.set_sub_names("").map_err(|e| eyre!(e))?;
-    let nrs_map_xorurl = safeurl.to_xorurl_string();
+    let site_name = get_random_nrs_string();
+    let container_xorurl = SafeUrl::from_url(&format!("safe://{}", site_name))?.to_xorurl_string();
+    safe_cmd(
+        [
+            "nrs",
+            "register",
+            &site_name,
+            "--link",
+            &files_container_xor,
+        ],
+        Some(0),
+    )?;
+    safe_cmd(
+        [
+            "nrs",
+            "add",
+            &format!("test.{site_name}"),
+            "--link",
+            test_file_link,
+        ],
+        Some(0),
+    )?;
+    safe_cmd(
+        [
+            "nrs",
+            "add",
+            &format!("another.{site_name}"),
+            "--link",
+            another_file_link,
+        ],
+        Some(0),
+    )?;
 
-    if let sn_api::resolver::SafeData::NrsMapContainer {
-        resolved_from,
-        xorurl,
-        public_name,
-        ..
-    } = &safe_data_vec[0]
-    {
-        assert_eq!(*resolved_from, nrsurl);
-        assert_eq!(*xorurl, nrs_map_xorurl);
-        assert_eq!(*public_name, Some(pub_name));
-    } else {
-        panic!("Content retrieved was unexpected: {:?}", safe_data_vec);
-    }
-
-    // let's now check the output with its XOR-URL
-    let dog_output = safe_cmd_stdout(["dog", &nrs_map_xorurl, "--json"], Some(0))?;
-    let (url, safe_data_vec) = parse_dog_output(&dog_output)?;
-    assert_eq!(url, *nrs_map_xorurl);
-    if let sn_api::resolver::SafeData::NrsMapContainer {
-        resolved_from,
-        xorurl,
-        public_name,
-        ..
-    } = &safe_data_vec[0]
-    {
-        assert_eq!(*resolved_from, nrs_map_xorurl);
-        assert_eq!(*xorurl, nrs_map_xorurl);
-        // it doesn't know the public name as it was resolved from a XOR-URL
-        assert_eq!(*public_name, None);
-        Ok(())
-    } else {
-        panic!("Content retrieved was unexpected: {:?}", safe_data_vec);
-    }
+    safe_cmd(["dog", &container_xorurl], Some(0))?
+        .assert()
+        .stdout(predicate::str::contains(&format!(
+            "{site_name}: {}",
+            files_container_xor
+        )))
+        .stdout(predicate::str::contains(&format!(
+            "test.{site_name}: {}",
+            test_file_link
+        )))
+        .stdout(predicate::str::contains(&format!(
+            "another.{site_name}: {}",
+            another_file_link
+        )));
+    Ok(())
 }

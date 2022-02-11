@@ -92,19 +92,10 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
                     .context("Failed to print out the content of the file")?;
             }
         }
-        SafeData::NrsMapContainer {
-            public_name,
-            nrs_map,
-            ..
-        } => {
+        SafeData::NrsMapContainer { nrs_map, .. } => {
             if OutputFmt::Pretty == output_fmt {
-                let mut msg = String::from("NRS Map Container ");
-                if let Some(version) = nrs_map.subname_version {
-                    msg.push_str(&format!("(version {}) ", version));
-                }
-                msg.push_str(&format!("at \"{}\"", url));
-                println!("{}", msg);
-                print_nrs_map(nrs_map, public_name);
+                println!("NRS Map Container at {}", url);
+                print_nrs_map(nrs_map);
             } else {
                 println!(
                     "{}",
@@ -116,6 +107,7 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
             println!("No content to show since the URL targets a SafeKey. Use the 'dog' command to obtain additional information about the targeted SafeKey.");
         }
         SafeData::Multimap { .. }
+        | SafeData::NrsEntry { .. }
         | SafeData::PrivateRegister { .. }
         | SafeData::PublicRegister { .. } => unimplemented!(),
     }

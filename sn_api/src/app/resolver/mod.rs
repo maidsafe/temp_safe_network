@@ -242,7 +242,11 @@ impl Safe {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{app::files, app::test_helpers::new_safe_instance, retry_loop, SafeUrl, Scope};
+    use crate::{
+        app::files,
+        app::test_helpers::{new_safe_instance, random_nrs_name, TestDataFilesContainer},
+        retry_loop, SafeUrl, Scope,
+    };
     use anyhow::{anyhow, bail, Context, Result};
     use bytes::Bytes;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -407,20 +411,23 @@ mod tests {
 
         // check NRS map container step
         match &inspected_content[0] {
-            SafeData::NrsMapContainer {
+            SafeData::NrsEntry {
                 xorurl,
-                resolved_from,
+                public_name,
+                data_type,
                 resolves_into,
-                ..
+                resolved_from,
+                version,
             } => {
-                let mut unversionned_nrs_res_url = nrs_resolution_url.clone();
-                unversionned_nrs_res_url.set_content_version(None);
-                assert_eq!(*xorurl, unversionned_nrs_res_url.to_xorurl_string());
-                assert_eq!(*resolved_from, unversionned_nrs_res_url.to_string());
-                assert_eq!(*resolves_into, Some(files_container_url));
+                assert_eq!(*xorurl, files_container_url.to_xorurl_string());
+                assert_eq!(*public_name, nrs_resolution_url.public_name());
+                assert_eq!(*data_type, nrs_resolution_url.data_type());
+                assert_eq!(*resolves_into, files_container_url);
+                assert_eq!(*resolved_from, nrs_url.to_string());
+                assert_eq!(*version, None);
             }
             _ => {
-                bail!("Nrs map container was not returned".to_string());
+                bail!("NrsEntry was not returned".to_string());
             }
         }
 
@@ -680,5 +687,354 @@ mod tests {
                 other
             )),
         }
+    }
+
+    /// Given:
+    /// * Files container is created
+    /// * The topname `example` is registered
+    /// * The topname is linked to a files container
+    ///
+    /// When: `safe://<nrs map container xorurl>` is fetched
+    ///
+    /// Then: `safe://<nrs map container xorurl>` resolves to the NRS map container
+    #[tokio::test]
+    async fn test_fetch_should_resolve_nrs_map_container_when_xorurl_is_used_and_topname_has_link(
+    ) -> Result<()> {
+        let site_name = random_nrs_name();
+        let safe = new_safe_instance().await?;
+
+        let files_container = TestDataFilesContainer::get_container([]).await?;
+
+        let nrs_url = safe.nrs_create(&site_name).await?;
+        let nrs_container_url = SafeUrl::from_url(&nrs_url.to_xorurl_string())?;
+        safe.nrs_associate(&site_name, &files_container.url).await?;
+
+        let content = safe.fetch(&nrs_container_url.to_string(), None).await?;
+        match &content {
+            SafeData::NrsMapContainer {
+                data_type,
+                nrs_map,
+                type_tag,
+                xorurl,
+                xorname,
+            } => {
+                assert_eq!(*data_type, nrs_container_url.data_type());
+                assert_eq!(nrs_map.map.len(), 1);
+                assert_eq!(*type_tag, nrs_container_url.type_tag());
+                assert_eq!(*xorurl, nrs_container_url.to_xorurl_string());
+                assert_eq!(*xorname, nrs_container_url.xorname());
+            }
+            _ => {
+                bail!("NrsMapContainer was not returned".to_string());
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Given:
+    /// * Files container is created
+    /// * The topname `example` is registered
+    /// * The topname is *not* linked to any content
+    /// * A subname links to a file in the container
+    ///
+    /// When: `safe://<nrs map container xorurl>` is fetched
+    ///
+    /// Then: `safe://<nrs map container xorurl>` resolves to the NRS map container
+    #[tokio::test]
+    async fn test_fetch_should_resolve_nrs_map_container_when_xorurl_is_used_and_topname_has_no_link(
+    ) -> Result<()> {
+        let site_name = random_nrs_name();
+        let safe = new_safe_instance().await?;
+
+        let files_container = TestDataFilesContainer::get_container(["/testdata/test.md"]).await?;
+
+        let nrs_url = safe.nrs_create(&site_name).await?;
+        let nrs_container_url = SafeUrl::from_url(&nrs_url.to_xorurl_string())?;
+        safe.nrs_associate(
+            &format!("a.{site_name}"),
+            &files_container["/testdata/test.md"],
+        )
+        .await?;
+
+        let content = safe.fetch(&nrs_container_url.to_string(), None).await?;
+        match &content {
+            SafeData::NrsMapContainer {
+                data_type,
+                nrs_map,
+                type_tag,
+                xorurl,
+                xorname,
+            } => {
+                assert_eq!(*data_type, nrs_container_url.data_type());
+                assert_eq!(nrs_map.map.len(), 1);
+                assert_eq!(*type_tag, nrs_container_url.type_tag());
+                assert_eq!(*xorurl, nrs_container_url.to_xorurl_string());
+                assert_eq!(*xorname, nrs_container_url.xorname());
+            }
+            _ => {
+                bail!("NrsMapContainer was not returned".to_string());
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Given:
+    /// * Files container is created
+    /// * The topname `example` is registered
+    /// * The topname is *not* linked to any content
+    /// * A subname links to a file in the container
+    ///
+    /// When: `safe://example` is fetched
+    ///
+    /// Then: `safe://example` resolves to the NRS map container
+    #[tokio::test]
+    async fn test_fetch_should_resolve_nrs_map_container_when_nrsurl_is_used_and_topname_has_no_link(
+    ) -> Result<()> {
+        let site_name = random_nrs_name();
+        let safe = new_safe_instance().await?;
+
+        let files_container = TestDataFilesContainer::get_container(["/testdata/test.md"]).await?;
+
+        let nrs_url = safe.nrs_create(&site_name).await?;
+        let nrs_container_url = SafeUrl::from_url(&nrs_url.to_xorurl_string())?;
+        safe.nrs_associate(
+            &format!("a.{site_name}"),
+            &files_container["/testdata/test.md"],
+        )
+        .await?;
+
+        let content = safe.fetch(&nrs_url.to_string(), None).await?;
+        match &content {
+            SafeData::NrsMapContainer {
+                data_type,
+                nrs_map,
+                type_tag,
+                xorurl,
+                xorname,
+            } => {
+                assert_eq!(*data_type, nrs_container_url.data_type());
+                assert_eq!(nrs_map.map.len(), 1);
+                assert_eq!(*type_tag, nrs_container_url.type_tag());
+                assert_eq!(*xorurl, nrs_container_url.to_xorurl_string());
+                assert_eq!(*xorname, nrs_container_url.xorname());
+            }
+            _ => {
+                bail!("NrsMapContainer was not returned".to_string());
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Given:
+    /// * Files container is created
+    /// * The topname `example` is registered
+    /// * The topname is linked to a files container
+    /// * A subname links to a file in the container
+    ///
+    /// When: `safe://example` is fetched
+    ///
+    /// Then: `safe://example` resolves to the files container
+    #[tokio::test]
+    async fn test_fetch_should_resolve_linked_content_when_nrsurl_is_used_and_topname_has_a_link(
+    ) -> Result<()> {
+        let site_name = random_nrs_name();
+        let safe = new_safe_instance().await?;
+
+        let files_container = TestDataFilesContainer::get_container(["/testdata/test.md"]).await?;
+
+        let nrs_url = safe.nrs_create(&site_name).await?;
+        safe.nrs_associate(&site_name, &files_container.url).await?;
+        safe.nrs_associate(
+            &format!("a.{site_name}"),
+            &files_container["/testdata/test.md"],
+        )
+        .await?;
+
+        let content = safe.fetch(&nrs_url.to_string(), None).await?;
+        match &content {
+            SafeData::FilesContainer {
+                xorurl,
+                resolved_from,
+                resolves_into,
+                ..
+            } => {
+                assert_eq!(*xorurl, files_container.url.to_string());
+                assert_eq!(*resolved_from, files_container.url.to_string());
+                assert!(resolves_into.is_none());
+            }
+            _ => {
+                bail!("FilesContainer was not returned".to_string());
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Given:
+    /// * Files container is created
+    /// * The topname `example` is registered
+    /// * A subname "a" is linked to three different files in the container
+    /// * Another subname links to a file in the container
+    ///
+    /// When: `safe://a.example?v=<first version>` is fetched
+    ///
+    /// Then: `safe://a.example` resolves to the first file it was linked to
+    #[tokio::test]
+    async fn test_fetch_should_resolve_subname_to_specific_version() -> Result<()> {
+        let site_name = random_nrs_name();
+        let safe = new_safe_instance().await?;
+
+        let files_container = TestDataFilesContainer::get_container([
+            "/testdata/test.md",
+            "/testdata/another.md",
+            "/testdata/noextension",
+        ])
+        .await?;
+
+        safe.nrs_create(&site_name).await?;
+        let nrs_url = safe
+            .nrs_associate(
+                &format!("a.{site_name}"),
+                &files_container["/testdata/test.md"],
+            )
+            .await?;
+        safe.nrs_associate(
+            &format!("b.{site_name}"),
+            &files_container["/testdata/test.md"],
+        )
+        .await?;
+        safe.nrs_associate(
+            &format!("a.{site_name}"),
+            &files_container["/testdata/another.md"],
+        )
+        .await?;
+        safe.nrs_associate(
+            &format!("a.{site_name}"),
+            &files_container["/testdata/noextension"],
+        )
+        .await?;
+
+        // This URL has a version on it.
+        let content = safe.fetch(&nrs_url.to_string(), None).await?;
+        match &content {
+            SafeData::PublicFile { xorurl, .. } => {
+                assert_eq!(
+                    *xorurl,
+                    files_container["/testdata/test.md"].to_xorurl_string()
+                );
+            }
+            _ => {
+                bail!("PublicFile was not returned".to_string());
+            }
+        }
+
+        // This is mainly to verify that the correct version was assigned to the NRS entry.
+        let inspected_content = safe.inspect(&nrs_url.to_string()).await?;
+        match &inspected_content[0] {
+            SafeData::NrsEntry {
+                xorurl,
+                public_name,
+                data_type,
+                resolves_into,
+                resolved_from,
+                version,
+            } => {
+                assert_eq!(
+                    *xorurl,
+                    files_container["/testdata/test.md"].to_xorurl_string()
+                );
+                assert_eq!(*public_name, nrs_url.public_name());
+                assert_eq!(*data_type, files_container["/testdata/test.md"].data_type());
+                assert_eq!(*resolves_into, files_container["/testdata/test.md"]);
+                assert_eq!(*resolved_from, nrs_url.to_string());
+
+                let left = VersionHash::from(
+                    &version.ok_or_else(|| anyhow!("version should not be None"))?,
+                );
+                let right = nrs_url
+                    .content_version()
+                    .ok_or_else(|| anyhow!("version should not be None"))?;
+                assert_eq!(left, right);
+            }
+            _ => {
+                bail!("NrsEntry was not returned".to_string());
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Given:
+    /// * Files container is created
+    /// * The topname `example` is registered
+    /// * The topname is linked to a files container
+    ///
+    /// When: `safe://example/testdata/test.md` is fetched
+    ///
+    /// Then: `safe://example/testdata/test.md` resolves to the file in the container
+    #[tokio::test]
+    async fn test_fetch_should_resolve_nrs_url_when_input_url_has_path() -> Result<()> {
+        let site_name = random_nrs_name();
+        let safe = new_safe_instance().await?;
+
+        let files_container = TestDataFilesContainer::get_container(["/testdata/test.md"]).await?;
+
+        let mut nrs_url = safe.nrs_create(&site_name).await?;
+        safe.nrs_associate(&site_name, &files_container.url).await?;
+
+        nrs_url.set_path("testdata/test.md");
+        let content = safe.fetch(&nrs_url.to_string(), None).await?;
+        match &content {
+            SafeData::PublicFile { xorurl, .. } => {
+                assert_eq!(
+                    *xorurl,
+                    files_container["/testdata/test.md"].to_xorurl_string()
+                );
+            }
+            _ => {
+                bail!("PublicFile was not returned".to_string());
+            }
+        }
+        Ok(())
+    }
+
+    /// Given:
+    /// * Files container is created
+    /// * The topname `example` is registered
+    /// * The topname is linked to a directory in the files container
+    ///
+    /// When: `safe://example/test.md` is fetched
+    ///
+    /// Then: `safe://example/test.md` resolves to the file in the container
+    #[tokio::test]
+    async fn test_fetch_should_resolve_nrs_url_when_input_url_and_target_url_have_paths(
+    ) -> Result<()> {
+        let site_name = random_nrs_name();
+        let safe = new_safe_instance().await?;
+
+        let files_container = TestDataFilesContainer::get_container(["/testdata/test.md"]).await?;
+
+        let mut target_url = files_container.url.clone();
+        target_url.set_path("testdata");
+        let mut nrs_url = safe.nrs_create(&site_name).await?;
+        safe.nrs_associate(&site_name, &target_url).await?;
+
+        nrs_url.set_path("test.md");
+        let content = safe.fetch(&nrs_url.to_string(), None).await?;
+        match &content {
+            SafeData::PublicFile { xorurl, .. } => {
+                assert_eq!(
+                    *xorurl,
+                    files_container["/testdata/test.md"].to_xorurl_string()
+                );
+            }
+            _ => {
+                bail!("PublicFile was not returned".to_string());
+            }
+        }
+        Ok(())
     }
 }

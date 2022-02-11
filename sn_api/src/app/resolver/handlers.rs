@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Range, SafeData};
-use crate::app::nrs::validate_nrs_url;
 use crate::app::{
     files::{self, FileInfo, FilesMap},
     multimap::Multimap,
@@ -21,38 +20,38 @@ use std::collections::BTreeSet;
 
 impl Safe {
     pub(crate) async fn resolve_nrs_map_container(&self, input_url: SafeUrl) -> Result<SafeData> {
-        let (mut target_url, nrs_map) = self
+        let (target_url, nrs_map) = self
             .nrs_get(input_url.public_name(), input_url.content_version())
             .await
             .map_err(|e| {
                 warn!("NRS failed to resolve {}: {}", input_url, e);
                 Error::ContentNotFound(format!("Content not found at {}", input_url))
             })?;
-        debug!("NRS Resolved {} => {}", input_url, target_url);
-
-        let url_path = input_url.path_decoded()?;
-        let target_path = target_url.path_decoded()?;
-        target_url.set_path(&format!("{}{}", target_path, url_path));
-
-        validate_nrs_url(&target_url)?;
-        let mut nrs_url = input_url.clone();
-        nrs_url.set_path("");
-        nrs_url.set_sub_names("")?;
+        if let Some(mut target_url) = target_url {
+            debug!("NRS Resolved {} => {}", input_url, target_url);
+            let url_path = input_url.path_decoded()?;
+            let target_path = target_url.path_decoded()?;
+            target_url.set_path(&format!("{}{}", target_path, url_path));
+            let version = input_url.content_version().map(|v| v.entry_hash());
+            let safe_data = SafeData::NrsEntry {
+                xorurl: target_url.to_xorurl_string(),
+                public_name: input_url.public_name().to_string(),
+                data_type: target_url.data_type(),
+                resolves_into: target_url,
+                resolved_from: input_url.to_string(),
+                version,
+            };
+            return Ok(safe_data);
+        }
+        debug!("No target associated with input {}", input_url);
+        debug!("Returning NrsMapContainer with NRS Map.");
         let safe_data = SafeData::NrsMapContainer {
-            public_name: if nrs_url.is_xorurl() {
-                None
-            } else {
-                Some(nrs_url.top_name().to_string())
-            },
-            xorurl: nrs_url.to_xorurl_string(),
-            xorname: nrs_url.xorname(),
-            type_tag: nrs_url.type_tag(),
+            xorurl: input_url.to_xorurl_string(),
+            xorname: input_url.xorname(),
+            type_tag: input_url.type_tag(),
             nrs_map,
-            data_type: nrs_url.data_type(),
-            resolves_into: Some(target_url),
-            resolved_from: nrs_url.to_string(),
+            data_type: input_url.data_type(),
         };
-
         Ok(safe_data)
     }
 
