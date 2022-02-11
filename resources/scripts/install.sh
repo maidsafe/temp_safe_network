@@ -7,10 +7,13 @@ cmd_has() {
 }
 
 sn_cli_install_dir() {
-  if [ -n "$SN_CLI_DIR" ]; then
-    printf %s "${SN_CLI_DIR}"
+  user_id=$(id -u)
+  if [ $user_id -eq 0 ]; then
+    # If we're running as sudo, install to /usr/local/bin. It's almost always
+    # on PATH, even in a minimal setup.
+    echo "/usr/local/bin"
   else
-    printf %s "${HOME}/.safe/cli"
+    echo "${HOME}/.safe/cli"
   fi
 }
 
@@ -145,14 +148,21 @@ sn_cli_install() {
   mkdir -p "$install_dir"
   tar -xzf $tmp_archive_path -C $install_dir
 
+  # Set this *just in case* the release process has been modified and the binary in the archive
+  # hasn't been set to executable (though ideally it should be and that bug should be fixed).
+  chmod +x "$install_dir/safe"
+
+  user_id=$(id -u)
+  if [ $user_id -eq 0 ]; then
+    # If we're running as sudo we're installing to a system-wide location,
+    # so we don't need to modify the ~/.bashrc or whatever.
+    return
+  fi
+
   case $uname_output in
     Linux* | Darwin*)
       sn_cli_profile="$(sn_cli_detect_profile)"
       sn_cli_in_path_str="\\nexport PATH=\$PATH:$install_dir"
-
-      # Set this *just incase* the release process has been modified and the binary in the archive
-      # hasn't been set to executable (though ideally it should be and that bug should be fixed).
-      chmod +x "$install_dir/safe"
 
       if [ -z "${sn_cli_profile-}" ] ; then
         local tried_profile
@@ -202,12 +212,12 @@ sn_cli_reset() {
 }
 
 usage() {
-    printf "Usage: $0 [-v=<version> or --version=<version>]\n\n"
-    printf "To install a specific version of safe, you can optionally supply a version number.\n"
-    printf "You should supply it without the 'v' prefix.\n\n"
-    printf "Example: ./install.sh --version=0.33.0\n\n"
-    printf "If no version number is supplied, the latest version will be installed.\n"
-    exit 1
+  printf "Usage: $0 [-v=<version> or --version=<version>]\n\n"
+  printf "To install a specific version of safe, you can optionally supply a version number.\n"
+  printf "You should supply it without the 'v' prefix.\n\n"
+  printf "Example: ./install.sh --version=0.33.0\n\n"
+  printf "If no version number is supplied, the latest version will be installed.\n"
+  exit 1
 }
 
 # It would have been nice to wrap the argument parsing in a little function, but
@@ -220,16 +230,16 @@ usage() {
 # Linux. For that reason, we just parse them 'manually'.
 safe_version=""
 for arg in "$@"; do
-    case $arg in
-        -v=*|--version=*)
-            safe_version="${arg#*=}"
-            shift
-            ;;
-        *)
-            printf "The %s argument is not supported\n\n" "$arg"
-            usage
-            ;;
-    esac
+  case $arg in
+    -v=*|--version=*)
+      safe_version="${arg#*=}"
+      shift
+      ;;
+    *)
+      printf "The %s argument is not supported\n\n" "$arg"
+      usage
+      ;;
+  esac
 done
 
 sn_cli_install
