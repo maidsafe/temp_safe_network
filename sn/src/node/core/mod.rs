@@ -8,12 +8,10 @@
 
 mod api;
 mod bootstrap;
-mod capacity;
 mod comm;
 mod connectivity;
 mod data;
 mod delivery_group;
-mod liveness_tracking;
 mod messaging;
 
 mod msg_handling;
@@ -22,8 +20,8 @@ mod relocation;
 mod split_barrier;
 
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
-pub(crate) use capacity::MIN_LEVEL_WHEN_FULL;
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
+pub(crate) use data::MIN_LEVEL_WHEN_FULL;
 pub(crate) use proposal::Proposal;
 #[cfg(test)]
 pub(crate) use relocation::{check as relocation_check, ChurnId};
@@ -50,9 +48,8 @@ use crate::types::{
 use crate::UsedSpace;
 
 use backoff::ExponentialBackoff;
-use capacity::Capacity;
+use data::{Capacity, Liveness};
 use itertools::Itertools;
-use liveness_tracking::Liveness;
 use resource_proof::ResourceProof;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},

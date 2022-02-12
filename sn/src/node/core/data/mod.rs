@@ -9,4 +9,5 @@
 mod records;
 mod storage;
 
+pub(crate) use self::records::{Capacity, Liveness, MIN_LEVEL_WHEN_FULL};
 pub(crate) use self::storage::DataStorage;

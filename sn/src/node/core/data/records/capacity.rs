@@ -29,6 +29,14 @@ pub(crate) struct Capacity {
 }
 
 impl Capacity {
+    /// Whether the adult is considered full.
+    /// This happens when it has reported at least `MIN_LEVEL_WHEN_FULL`.
+    pub(crate) async fn is_full(&self, adult: &XorName) -> Option<bool> {
+        let adult_levels = self.adult_levels.read().await;
+        let level = adult_levels.get(adult)?.read().await.value();
+        Some(level >= MIN_LEVEL_WHEN_FULL)
+    }
+
     pub(super) async fn add_new_adult(&self, adult: XorName) {
         info!("Adding new adult:{adult} to Capacity tracker");
 
@@ -41,14 +49,6 @@ impl Capacity {
             let _level = old_entry.read().await.value();
             warn!("Throwing old storage level for Adult {adult}:{_level}");
         }
-    }
-
-    /// Whether the adult is considered full.
-    /// This happens when it has reported at least `MIN_LEVEL_WHEN_FULL`.
-    pub(super) async fn is_full(&self, adult: &XorName) -> Option<bool> {
-        let adult_levels = self.adult_levels.read().await;
-        let level = adult_levels.get(adult)?.read().await.value();
-        Some(level >= MIN_LEVEL_WHEN_FULL)
     }
 
     /// Avg usage by nodes in the section, a value between 0 and 10.
