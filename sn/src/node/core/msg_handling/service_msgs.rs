@@ -12,12 +12,12 @@ use crate::messaging::{
     system::{NodeQueryResponse, SystemMsg},
     AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
 };
-use crate::node::{api::cmds::Cmd, core::Core, Result};
+use crate::node::{api::cmds::Cmd, core::Node, Result};
 use crate::types::{log_markers::LogMarker, register::User, Peer, PublicKey, ReplicatedData};
 
 use xor_name::XorName;
 
-impl Core {
+impl Node {
     /// Handle data query
     pub(crate) async fn handle_data_query_at_adult(
         &self,

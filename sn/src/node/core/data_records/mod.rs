@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Cmd, Core, Prefix};
+use super::{Cmd, Node, Prefix};
 
 use crate::{
     data_copy_count,
@@ -27,7 +27,7 @@ use std::{cmp::Ordering, collections::BTreeSet};
 use tracing::info;
 use xor_name::XorName;
 
-impl Core {
+impl Node {
     // Locate ideal holders for this data, line up wiremsgs for those to instruct them to store the data
     pub(crate) async fn replicate_data(&self, data: ReplicatedData) -> Result<Vec<Cmd>> {
         trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
@@ -266,7 +266,7 @@ impl Core {
         // we create a dummy/random dst location,
         // we will set it correctly for each msg and target
         let section_pk = self.network_knowledge().section_key().await;
-        let our_name = self.node.read().await.name();
+        let our_name = self.info.read().await.name();
         let dummy_dst_location = DstLocation::Node {
             name: our_name,
             section_pk,
@@ -274,7 +274,7 @@ impl Core {
 
         // separate this into form_wire_msg based on agg
         let wire_msg = WireMsg::single_src(
-            &self.node.read().await.clone(),
+            &self.info.read().await.clone(),
             dummy_dst_location,
             msg,
             section_pk,

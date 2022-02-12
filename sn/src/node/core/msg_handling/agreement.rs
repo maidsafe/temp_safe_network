@@ -9,7 +9,7 @@
 use crate::messaging::system::{KeyedSig, MembershipState, SectionAuth};
 use crate::node::{
     api::cmds::Cmd,
-    core::{relocation::ChurnId, Core, Proposal},
+    core::{relocation::ChurnId, Node, Proposal},
     dkg::SectionAuthUtils,
     network_knowledge::{NodeState, SectionAuthorityProvider},
     Event, Result, MIN_ADULT_AGE,
@@ -19,7 +19,7 @@ use crate::types::log_markers::LogMarker;
 use std::{cmp, collections::BTreeSet};
 
 // Agreement
-impl Core {
+impl Node {
     #[instrument(skip(self), level = "trace")]
     pub(crate) async fn handle_general_agreements(
         &self,
@@ -237,7 +237,7 @@ impl Core {
             let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
             let saps_candidates = self
                 .network_knowledge
-                .promote_and_demote_elders(&self.node.read().await.name(), &BTreeSet::new())
+                .promote_and_demote_elders(&self.info.read().await.name(), &BTreeSet::new())
                 .await;
 
             if !saps_candidates.contains(&signed_section_auth.elder_candidates()) {
@@ -294,7 +294,7 @@ impl Core {
 
             info!("New SAP agreed for {:?}: {:?}", prefix, signed_sap);
 
-            let our_name = self.node.read().await.name();
+            let our_name = self.info.read().await.name();
 
             // Let's update our network knowledge, including our
             // section SAP and chain if the new SAP's prefix matches our name

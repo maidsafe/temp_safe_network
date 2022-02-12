@@ -28,7 +28,7 @@ use crate::messaging::{
 };
 use crate::node::{
     api::cmds::Cmd,
-    core::{Core, DkgSessionInfo, DATA_QUERY_LIMIT},
+    core::{DkgSessionInfo, Node, DATA_QUERY_LIMIT},
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::NetworkKnowledge,
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
@@ -40,7 +40,7 @@ use bytes::Bytes;
 use xor_name::XorName;
 
 // Message handling
-impl Core {
+impl Node {
     #[instrument(skip(self, original_bytes))]
     pub(crate) async fn handle_msg(
         &self,
@@ -442,7 +442,7 @@ impl Core {
                                 {
                                     let new_node = joining_as_relocated.node.clone();
                                     let new_name = new_node.name();
-                                    let previous_name = self.node.read().await.name();
+                                    let previous_name = self.info.read().await.name();
                                     let new_keypair = new_node.keypair.clone();
 
                                     info!(
@@ -511,7 +511,7 @@ impl Core {
                                     // we have collected enough ApprovalShares from the Elders
                                     let node_msg = SystemMsg::JoinRequest(Box::new(join_req));
                                     let wire_msg = WireMsg::single_src(
-                                        &self.node.read().await.clone(),
+                                        &self.info.read().await.clone(),
                                         DstLocation::Section {
                                             name: new_name,
                                             section_pk: section_key,
@@ -594,7 +594,7 @@ impl Core {
                 elders,
             } => {
                 trace!("Handling msg: Dkg-Start {:?} from {}", session_id, sender);
-                if !elders.contains_key(&self.node.read().await.name()) {
+                if !elders.contains_key(&self.info.read().await.name()) {
                     return Ok(vec![]);
                 }
                 if let NodeMsgAuthority::Section(authority) = msg_authority {
@@ -715,7 +715,7 @@ impl Core {
                                 error!("Not enough space to store more data");
                             }
 
-                            let node_id = PublicKey::from(self.node.read().await.keypair.public);
+                            let node_id = PublicKey::from(self.info.read().await.keypair.public);
                             let msg = SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                                 node_id,
                                 data,
@@ -819,7 +819,7 @@ impl Core {
                     };
                     let section_pk = self.network_knowledge.section_key().await;
                     let wire_msg = WireMsg::single_src(
-                        &self.node.read().await.clone(),
+                        &self.info.read().await.clone(),
                         DstLocation::Node {
                             name: sender.name(),
                             section_pk,
@@ -892,7 +892,7 @@ impl Core {
         let mut cmds = vec![];
         if let Some(level) = level {
             info!("Storage has now passed {} % used.", 10 * level.value());
-            let node_id = PublicKey::from(self.node.read().await.keypair.public);
+            let node_id = PublicKey::from(self.info.read().await.keypair.public);
             let node_xorname = XorName::from(node_id);
 
             // we ask the section to record the new level reached

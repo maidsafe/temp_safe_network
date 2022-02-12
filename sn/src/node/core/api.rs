@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{delivery_group, Comm, Core};
+use super::{delivery_group, Comm, Node};
 
 use crate::messaging::{
     system::{JoinResponse, MembershipState, NodeState, SigShare, SystemMsg},
@@ -26,7 +26,7 @@ use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf};
 use tokio::sync::mpsc;
 use xor_name::XorName;
 
-impl Core {
+impl Node {
     // Creates `Core` for the first node in the network
     pub(crate) async fn first_node(
         comm: Comm,
@@ -64,7 +64,7 @@ impl Core {
         // make sure the new Node has the correct local addr as Comm
         new_node.addr = self.comm.our_connection_info();
 
-        let mut our_node = self.node.write().await;
+        let mut our_node = self.info.write().await;
         *our_node = new_node;
 
         Ok(())
@@ -81,7 +81,7 @@ impl Core {
     /// Is this node an elder?
     pub(crate) async fn is_elder(&self) -> bool {
         self.network_knowledge
-            .is_elder(&self.node.read().await.name())
+            .is_elder(&self.info.read().await.name())
             .await
     }
 
@@ -136,7 +136,7 @@ impl Core {
 
     pub(crate) async fn handle_timeout(&self, token: u64) -> Result<Vec<Cmd>> {
         self.dkg_voter.handle_timeout(
-            &self.node.read().await.clone(),
+            &self.info.read().await.clone(),
             token,
             self.network_knowledge().section_key().await,
         )
@@ -147,7 +147,7 @@ impl Core {
         let dst_location = wire_msg.dst_location();
         let (targets, dg_size) = delivery_group::delivery_targets(
             dst_location,
-            &self.node.read().await.name(),
+            &self.info.read().await.name(),
             &self.network_knowledge,
         )
         .await?;
@@ -202,7 +202,7 @@ impl Core {
         excluded_names: &BTreeSet<XorName>,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
-        let our_name = self.node.read().await.name();
+        let our_name = self.info.read().await.name();
 
         debug!("{}", LogMarker::TriggeringPromotionAndDemotion);
         for elder_candidates in self

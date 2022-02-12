@@ -101,9 +101,9 @@ pub(crate) struct DkgSessionInfo {
 }
 
 // Core state + logic of a node.
-pub(crate) struct Core {
+pub(crate) struct Node {
     pub(crate) comm: Comm,
-    pub(crate) node: Arc<RwLock<NodeInfo>>,
+    pub(crate) info: Arc<RwLock<NodeInfo>>,
     network_knowledge: NetworkKnowledge,
     pub(crate) section_keys_provider: SectionKeysProvider,
     message_aggregator: SignatureAggregator,
@@ -123,12 +123,12 @@ pub(crate) struct Core {
     ae_backoff_cache: AeBackoffCache,
 }
 
-impl Core {
+impl Node {
     // Creates `Core` for a regular node.
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn new(
         comm: Comm,
-        mut node: NodeInfo,
+        mut info: NodeInfo,
         network_knowledge: NetworkKnowledge,
         section_key_share: Option<SectionKeyShare>,
         event_tx: mpsc::Sender<Event>,
@@ -138,7 +138,7 @@ impl Core {
         let section_keys_provider = SectionKeysProvider::new(section_key_share).await;
 
         // make sure the Node has the correct local addr as Comm
-        node.addr = comm.our_connection_info();
+        info.addr = comm.our_connection_info();
 
         let data_storage = DataStorage::new(&root_storage_dir, used_space.clone())?;
 
@@ -155,7 +155,7 @@ impl Core {
 
         Ok(Self {
             comm,
-            node: Arc::new(RwLock::new(node)),
+            info: Arc::new(RwLock::new(info)),
             network_knowledge,
             section_keys_provider,
             dkg_sessions: Arc::new(RwLock::new(HashMap::default())),

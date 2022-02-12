@@ -12,7 +12,7 @@ use crate::messaging::{
 };
 use crate::node::{
     api::cmds::Cmd,
-    core::{msg_handling::WireMsg, Core, Proposal},
+    core::{msg_handling::WireMsg, Node, Proposal},
     dkg::DkgFailureSigSetUtils,
     messages::WireMsgUtils,
     network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
@@ -28,7 +28,7 @@ use std::{
 };
 use xor_name::{Prefix, XorName};
 
-impl Core {
+impl Node {
     pub(crate) async fn handle_dkg_start(
         &self,
         session_id: DkgSessionId,
@@ -75,7 +75,7 @@ impl Core {
         let cmds = self
             .dkg_voter
             .start(
-                &self.node.read().await.clone(),
+                &self.info.read().await.clone(),
                 session_id,
                 elder_candidates,
                 self.network_knowledge().section_key().await,
@@ -100,7 +100,7 @@ impl Core {
         self.dkg_voter
             .process_msg(
                 sender,
-                &self.node.read().await.clone(),
+                &self.info.read().await.clone(),
                 &session_id,
                 message,
                 self.network_knowledge().section_key().await,
@@ -122,7 +122,7 @@ impl Core {
             session_id,
         };
         let wire_msg = WireMsg::single_src(
-            &self.node.read().await.clone(),
+            &self.info.read().await.clone(),
             DstLocation::Node {
                 name: sender.name(),
                 section_pk,
@@ -156,7 +156,7 @@ impl Core {
         let mut cmds = self
             .dkg_voter
             .handle_dkg_history(
-                &self.node.read().await.clone(),
+                &self.info.read().await.clone(),
                 session_id,
                 message_history,
                 sender.name(),
@@ -168,7 +168,7 @@ impl Core {
             self.dkg_voter
                 .process_msg(
                     sender,
-                    &self.node.read().await.clone(),
+                    &self.info.read().await.clone(),
                     &session_id,
                     message,
                     section_key,
@@ -206,7 +206,7 @@ impl Core {
 
         let elder_candidates = if let Some(elder_candidates) = self
             .network_knowledge
-            .promote_and_demote_elders(&self.node.read().await.name(), &BTreeSet::new())
+            .promote_and_demote_elders(&self.info.read().await.name(), &BTreeSet::new())
             .await
             .into_iter()
             .find(|elder_candidates| failure_set.verify(elder_candidates, generation))

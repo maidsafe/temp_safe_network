@@ -10,7 +10,7 @@ use super::Cmd;
 
 use crate::messaging::{system::SystemMsg, MsgKind, WireMsg};
 use crate::node::{
-    core::{Core, Proposal, SendStatus},
+    core::{Node, Proposal, SendStatus},
     messages::WireMsgUtils,
     Error, Result,
 };
@@ -28,8 +28,7 @@ type CmdId = String;
 
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
-    pub(crate) core: Core,
-
+    pub(crate) node: Node,
     cancel_timer_tx: watch::Sender<bool>,
     cancel_timer_rx: watch::Receiver<bool>,
 }
@@ -42,10 +41,10 @@ impl Drop for Dispatcher {
 }
 
 impl Dispatcher {
-    pub(super) fn new(core: Core) -> Self {
+    pub(super) fn new(node: Node) -> Self {
         let (cancel_timer_tx, cancel_timer_rx) = watch::channel(false);
         Self {
-            core,
+            node,
             cancel_timer_tx,
             cancel_timer_rx,
         }
@@ -119,9 +118,9 @@ impl Dispatcher {
                 let _instant = interval.tick().await;
 
                 // Send a probe message if we are an elder
-                let core = &dispatcher.core;
-                if core.is_elder().await && !core.network_knowledge().prefix().await.is_empty() {
-                    match core.generate_probe_msg().await {
+                let node = &dispatcher.node;
+                if node.is_elder().await && !node.network_knowledge().prefix().await.is_empty() {
+                    match node.generate_probe_msg().await {
                         Ok(cmd) => {
                             info!("Sending probe msg");
                             if let Err(e) = dispatcher
@@ -141,7 +140,7 @@ impl Dispatcher {
 
     pub(super) async fn write_prefixmap_to_disk(self: Arc<Self>) {
         info!("Writing our PrefixMap to disk");
-        self.clone().core.write_prefix_map().await
+        self.clone().node.write_prefix_map().await
     }
 
     /// Handles a single cmd.
@@ -150,15 +149,15 @@ impl Dispatcher {
         // analyzing logs produced by running multiple nodes within the same process, for example
         // from integration tests.
         let span = {
-            let core = &self.core;
+            let node = &self.node;
 
-            let prefix = core.network_knowledge().prefix().await;
-            let is_elder = core.is_elder().await;
-            let section_key = core.network_knowledge().section_key().await;
-            let age = core.node.read().await.age();
+            let prefix = node.network_knowledge().prefix().await;
+            let is_elder = node.is_elder().await;
+            let section_key = node.network_knowledge().section_key().await;
+            let age = node.info.read().await.age();
             trace_span!(
                 "process_cmd",
-                name = %core.node.read().await.name(),
+                name = %node.info.read().await.name(),
                 prefix = format_args!("({:b})", prefix),
                 age,
                 elder = is_elder,
@@ -219,7 +218,7 @@ impl Dispatcher {
                 payload,
                 known_keys,
             } => {
-                self.core
+                self.node
                     .handle_system_msg(
                         sender,
                         msg_id,
@@ -232,12 +231,12 @@ impl Dispatcher {
                     .await
             }
             Cmd::SignOutgoingSystemMsg { msg, dst } => {
-                let src_section_pk = self.core.network_knowledge().section_key().await;
+                let src_section_pk = self.node.network_knowledge().section_key().await;
                 let wire_msg =
-                    WireMsg::single_src(&*self.core.node.read().await, dst, msg, src_section_pk)?;
+                    WireMsg::single_src(&*self.node.info.read().await, dst, msg, src_section_pk)?;
 
                 let mut cmds = vec![];
-                cmds.extend(self.core.send_msg_to_nodes(wire_msg).await?);
+                cmds.extend(self.node.send_msg_to_nodes(wire_msg).await?);
 
                 Ok(cmds)
             }
@@ -245,19 +244,19 @@ impl Dispatcher {
                 sender,
                 wire_msg,
                 original_bytes,
-            } => self.core.handle_msg(sender, wire_msg, original_bytes).await,
-            Cmd::HandleTimeout(token) => self.core.handle_timeout(token).await,
+            } => self.node.handle_msg(sender, wire_msg, original_bytes).await,
+            Cmd::HandleTimeout(token) => self.node.handle_timeout(token).await,
             Cmd::HandleAgreement { proposal, sig } => {
-                self.core.handle_general_agreements(proposal, sig).await
+                self.node.handle_general_agreements(proposal, sig).await
             }
             Cmd::HandleNewNodeOnline(auth) => {
-                self.core
+                self.node
                     .handle_online_agreement(auth.value.into_state(), auth.sig)
                     .await
             }
             Cmd::HandleNewEldersAgreement { proposal, sig } => match proposal {
                 Proposal::NewElders(section_auth) => {
-                    self.core
+                    self.node
                         .handle_new_elders_agreement(section_auth, sig)
                         .await
                 }
@@ -266,13 +265,13 @@ impl Dispatcher {
                     Ok(vec![])
                 }
             },
-            Cmd::HandlePeerLost(peer) => self.core.handle_peer_lost(&peer.addr()).await,
+            Cmd::HandlePeerLost(peer) => self.node.handle_peer_lost(&peer.addr()).await,
             Cmd::HandleDkgOutcome {
                 section_auth,
                 outcome,
-            } => self.core.handle_dkg_outcome(section_auth, outcome).await,
+            } => self.node.handle_dkg_outcome(section_auth, outcome).await,
             Cmd::HandleDkgFailure(signeds) => self
-                .core
+                .node
                 .handle_dkg_failure(signeds)
                 .await
                 .map(|cmd| vec![cmd]),
@@ -297,26 +296,26 @@ impl Dispatcher {
                 peer,
                 previous_name,
             } => {
-                self.core
+                self.node
                     .send_accepted_online_share(peer, previous_name)
                     .await
             }
-            Cmd::ProposeOffline(name) => self.core.propose_offline(name).await,
+            Cmd::ProposeOffline(name) => self.node.propose_offline(name).await,
             Cmd::StartConnectivityTest(name) => Ok(vec![
-                self.core
+                self.node
                     .send_msg_to_our_elders(SystemMsg::StartConnectivityTest(name))
                     .await?,
             ]),
             Cmd::TestConnectivity(name) => {
                 let mut cmds = vec![];
                 if let Some(member_info) = self
-                    .core
+                    .node
                     .network_knowledge()
                     .get_section_member(&name)
                     .await
                 {
                     if self
-                        .core
+                        .node
                         .comm
                         .is_reachable(&member_info.addr())
                         .await
@@ -343,7 +342,7 @@ impl Dispatcher {
             }
             MsgKind::ServiceMsg(_) => {
                 if let Err(err) = self
-                    .core
+                    .node
                     .comm
                     .send_on_existing_connection_to_client(recipients, wire_msg.clone())
                     .await
@@ -366,7 +365,7 @@ impl Dispatcher {
         wire_msg: WireMsg,
     ) -> Result<Vec<Cmd>> {
         let status = self
-            .core
+            .node
             .comm
             .send(recipients, delivery_group_size, wire_msg)
             .await?;

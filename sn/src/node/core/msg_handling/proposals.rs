@@ -9,14 +9,14 @@
 use crate::messaging::{signature_aggregator::Error as AggregatorError, MsgId};
 use crate::node::{
     api::cmds::Cmd,
-    core::{Core, Proposal},
+    core::{Node, Proposal},
     dkg::SigShare,
     Result,
 };
 use crate::types::Peer;
 
 // Decisions
-impl Core {
+impl Node {
     // Insert the proposal into the proposal aggregator and handle it if aggregated.
     pub(crate) async fn handle_proposal(
         &self,

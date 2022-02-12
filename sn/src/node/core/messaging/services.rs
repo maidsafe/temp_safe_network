@@ -10,13 +10,13 @@ use crate::messaging::{
     data::{CmdError, ServiceMsg},
     DstLocation, EndUser, MsgId, MsgKind, ServiceAuth, WireMsg,
 };
-use crate::node::{api::cmds::Cmd, core::Core, Result};
+use crate::node::{api::cmds::Cmd, core::Node, Result};
 use crate::types::{Peer, PublicKey, Signature};
 
 use bytes::Bytes;
 use ed25519_dalek::Signer;
 
-impl Core {
+impl Node {
     /// Forms a CmdError msg to send back to the client
     pub(crate) async fn send_cmd_error_response(
         &self,
@@ -59,7 +59,7 @@ impl Core {
         &self,
         client_msg: &ServiceMsg,
     ) -> Result<(MsgKind, Bytes)> {
-        let keypair = self.node.read().await.keypair.clone();
+        let keypair = self.info.read().await.keypair.clone();
         let payload = WireMsg::serialize_msg_payload(client_msg)?;
         let signature = keypair.sign(&payload);
 

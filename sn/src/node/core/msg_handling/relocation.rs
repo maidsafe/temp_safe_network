@@ -15,7 +15,7 @@ use crate::node::{
     core::{
         bootstrap::JoiningAsRelocated,
         relocation::{find_nodes_to_relocate, ChurnId, RelocateDetailsUtils},
-        Core, Proposal,
+        Node, Proposal,
     },
     network_knowledge::NodeState,
     Event, Result,
@@ -26,7 +26,7 @@ use std::collections::BTreeSet;
 use xor_name::XorName;
 
 // Relocation
-impl Core {
+impl Node {
     pub(crate) async fn relocate_peers(
         &self,
         churn_id: ChurnId,
@@ -109,7 +109,7 @@ impl Core {
                 return Ok(None);
             };
 
-        let node = self.node.read().await.clone();
+        let node = self.info.read().await.clone();
         if dst_xorname != node.name() {
             // This `Relocate` message is not for us - it's most likely a duplicate of a previous
             // message that we already handled.

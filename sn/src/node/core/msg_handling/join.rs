@@ -13,7 +13,7 @@ use crate::messaging::system::{
 };
 use crate::node::{
     api::cmds::Cmd,
-    core::{relocation::RelocateDetailsUtils, Core},
+    core::{relocation::RelocateDetailsUtils, Node},
     Error, Result, SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE,
 };
 use crate::types::{log_markers::LogMarker, Peer};
@@ -24,7 +24,7 @@ use std::vec;
 const FIRST_SECTION_MIN_ELDER_AGE: u8 = 90;
 
 // Message handling
-impl Core {
+impl Node {
     pub(crate) async fn handle_join_request(
         &self,
         peer: Peer,

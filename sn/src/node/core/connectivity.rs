@@ -8,13 +8,13 @@
 
 use crate::node::{
     api::cmds::Cmd,
-    core::{Core, Proposal},
+    core::{Node, Proposal},
     Result,
 };
 use std::{collections::BTreeSet, iter, net::SocketAddr};
 use xor_name::XorName;
 
-impl Core {
+impl Node {
     pub(crate) async fn handle_peer_lost(&self, addr: &SocketAddr) -> Result<Vec<Cmd>> {
         let name = if let Some(peer) = self.network_knowledge.find_member_by_addr(addr).await {
             debug!("Lost known peer {}", peer);
