@@ -21,8 +21,7 @@ use crate::node::{
     ed25519,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::NetworkKnowledge,
-    node_info::Node,
-    Error, Result, MIN_ADULT_AGE,
+    Error, NodeInfo, Result, MIN_ADULT_AGE,
 };
 use crate::types::{log_markers::LogMarker, prefix_map::NetworkPrefixMap, Peer, UnnamedPeer};
 
@@ -45,12 +44,12 @@ const JOIN_SHARE_EXPIRATION_DURATION: Duration = Duration::from_secs(900);
 /// lost in transit or other reasons. It's the responsibility of the caller to handle this case,
 /// for example by using a timeout.
 pub(crate) async fn join_network(
-    node: Node,
+    node: NodeInfo,
     comm: &Comm,
     incoming_conns: &mut mpsc::Receiver<ConnectionEvent>,
     bootstrap_peer: UnnamedPeer,
     genesis_key: BlsPublicKey,
-) -> Result<(Node, NetworkKnowledge)> {
+) -> Result<(NodeInfo, NetworkKnowledge)> {
     let (send_tx, send_rx) = mpsc::channel(1);
 
     let span = trace_span!("bootstrap");
@@ -71,7 +70,7 @@ struct Join<'a> {
     send_tx: mpsc::Sender<(WireMsg, Vec<Peer>)>,
     // Receiver for incoming messages.
     recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
-    node: Node,
+    node: NodeInfo,
     prefix: Prefix,
     prefix_map: NetworkPrefixMap,
     signature_aggregators: BTreeMap<BlsPublicKey, SignatureAggregator>,
@@ -82,7 +81,7 @@ struct Join<'a> {
 
 impl<'a> Join<'a> {
     fn new(
-        node: Node,
+        node: NodeInfo,
         send_tx: mpsc::Sender<(WireMsg, Vec<Peer>)>,
         recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
         prefix_map: NetworkPrefixMap,
@@ -116,7 +115,7 @@ impl<'a> Join<'a> {
     // - `ResourceChallenge`: carry out resource proof calculation.
     // - `Approval`: returns the initial `Section` value to use by this node,
     //    completing the bootstrap.
-    async fn run(self, bootstrap_peer: UnnamedPeer) -> Result<(Node, NetworkKnowledge)> {
+    async fn run(self, bootstrap_peer: UnnamedPeer) -> Result<(NodeInfo, NetworkKnowledge)> {
         // Use our XorName as we do not know their name or section key yet.
         let bootstrap_peer = bootstrap_peer.named(self.node.name());
         let genesis_key = self.prefix_map.genesis_key();
@@ -138,7 +137,7 @@ impl<'a> Join<'a> {
         network_genesis_key: BlsPublicKey,
         target_section_key: BlsPublicKey,
         recipients: Vec<Peer>,
-    ) -> Result<(Node, NetworkKnowledge)> {
+    ) -> Result<(NodeInfo, NetworkKnowledge)> {
         // We first use genesis key as the target section key, we'll be getting
         // a response with the latest section key for us to retry with.
         // Once we are approved to join, we will make sure the SAP we receive can
@@ -395,7 +394,7 @@ impl<'a> Join<'a> {
                         let new_name = ed25519::name(&new_keypair.public);
 
                         info!("Setting Node name to {} (age {})", new_name, expected_age);
-                        self.node = Node::new(new_keypair, self.node.addr);
+                        self.node = NodeInfo::new(new_keypair, self.node.addr);
                     } else if !is_new_sap {
                         debug!("Ignoring JoinResponse::Retry with same SAP as we previously sent to: {:?}", section_auth);
                         continue;
@@ -668,7 +667,7 @@ mod tests {
         // Node in first section has to have a stepped age,
         // Otherwise during the bootstrap process, node will change its id and age.
         let node_age = MIN_ADULT_AGE;
-        let node = Node::new(
+        let node = NodeInfo::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), node_age),
             gen_addr(),
         );
@@ -778,7 +777,7 @@ mod tests {
         let bootstrap_node = nodes.remove(0);
         let genesis_key = sk_set.secret_key().public_key();
 
-        let node = Node::new(
+        let node = NodeInfo::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
@@ -880,7 +879,7 @@ mod tests {
             gen_section_authority_provider(Prefix::default(), elder_count());
         let bootstrap_node = nodes.remove(0);
 
-        let node = Node::new(
+        let node = NodeInfo::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
@@ -967,7 +966,7 @@ mod tests {
             gen_section_authority_provider(Prefix::default(), elder_count());
         let bootstrap_node = nodes.remove(0);
 
-        let node = Node::new(
+        let node = NodeInfo::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
@@ -1020,12 +1019,12 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
-        let bootstrap_node = Node::new(
+        let bootstrap_node = NodeInfo::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
 
-        let node = Node::new(
+        let node = NodeInfo::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
@@ -1124,7 +1123,7 @@ mod tests {
     fn send_response(
         recv_tx: &mpsc::Sender<ConnectionEvent>,
         node_msg: SystemMsg,
-        bootstrap_node: &Node,
+        bootstrap_node: &NodeInfo,
         section_pk: BlsPublicKey,
     ) -> Result<()> {
         let wire_msg = WireMsg::single_src(

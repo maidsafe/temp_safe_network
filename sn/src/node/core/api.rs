@@ -16,8 +16,7 @@ use crate::node::{
     api::cmds::Cmd,
     error::Result,
     network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionKeyShare},
-    node_info::Node,
-    Event,
+    Event, NodeInfo,
 };
 use crate::types::{log_markers::LogMarker, Peer};
 use crate::UsedSpace;
@@ -31,7 +30,7 @@ impl Core {
     // Creates `Core` for the first node in the network
     pub(crate) async fn first_node(
         comm: Comm,
-        mut node: Node,
+        mut node: NodeInfo,
         event_tx: mpsc::Sender<Event>,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
@@ -56,7 +55,7 @@ impl Core {
 
     pub(crate) async fn relocate(
         &self,
-        mut new_node: Node,
+        mut new_node: NodeInfo,
         new_section: NetworkKnowledge,
     ) -> Result<()> {
         // we first try to relocate section info.

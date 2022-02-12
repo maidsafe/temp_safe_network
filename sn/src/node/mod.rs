@@ -20,7 +20,15 @@ mod error;
 mod logging;
 mod messages;
 mod network_knowledge;
-mod node_info;
+
+use crate::types::{Peer, PublicKey};
+
+use ed25519_dalek::Keypair;
+use std::{
+    fmt::{self, Display, Formatter},
+    net::SocketAddr,
+    sync::Arc,
+};
 
 pub use self::{
     api::{
@@ -59,7 +67,43 @@ pub(crate) const fn supermajority(group_size: usize) -> usize {
     1 + group_size * 2 / 3
 }
 
-use crate::types::Peer;
+/// Information and state of our node
+#[derive(Clone, custom_debug::Debug)]
+pub(crate) struct NodeInfo {
+    // Keep the secret key in Arc to allow Clone while also preventing multiple copies to exist in
+    // memory which might be insecure.
+    #[debug(skip)]
+    pub(crate) keypair: Arc<Keypair>,
+    pub(crate) addr: SocketAddr,
+}
+
+impl NodeInfo {
+    pub(crate) fn new(keypair: Keypair, addr: SocketAddr) -> Self {
+        Self {
+            keypair: Arc::new(keypair),
+            addr,
+        }
+    }
+
+    pub(crate) fn peer(&self) -> Peer {
+        Peer::new(self.name(), self.addr)
+    }
+
+    pub(crate) fn name(&self) -> XorName {
+        XorName::from(PublicKey::from(self.keypair.public))
+    }
+
+    // Last byte of the name represents the age.
+    pub(crate) fn age(&self) -> u8 {
+        self.name()[XOR_NAME_LEN - 1]
+    }
+}
+
+impl Display for NodeInfo {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", self.name())
+    }
+}
 
 #[cfg(any(test, feature = "test-utils"))]
 mod test_utils {

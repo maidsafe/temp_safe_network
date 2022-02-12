@@ -14,7 +14,7 @@ use crate::messaging::{
     system::{SigShare, SystemMsg},
     AuthorityProof, BlsShareAuth, DstLocation, MsgId, MsgKind, NodeAuth, WireMsg,
 };
-use crate::node::{network_knowledge::SectionKeyShare, node_info::Node, Error, Result};
+use crate::node::{network_knowledge::SectionKeyShare, Error, NodeInfo, Result};
 
 use bls::PublicKey as BlsPublicKey;
 use xor_name::XorName;
@@ -32,7 +32,7 @@ pub(crate) trait WireMsgUtils {
 
     /// Creates a signed message from single node.
     fn single_src(
-        node: &Node,
+        node: &NodeInfo,
         dst: DstLocation,
         node_msg: SystemMsg,
         src_section_pk: BlsPublicKey,
@@ -65,7 +65,7 @@ impl WireMsgUtils for WireMsg {
 
     /// Creates a signed message from single node.
     fn single_src(
-        node: &Node,
+        node: &NodeInfo,
         dst: DstLocation,
         node_msg: SystemMsg,
         src_section_pk: BlsPublicKey,

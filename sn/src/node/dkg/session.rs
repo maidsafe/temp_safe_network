@@ -16,8 +16,7 @@ use crate::node::{
     ed25519,
     messages::WireMsgUtils,
     network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
-    node_info::Node,
-    Result,
+    NodeInfo, Result,
 };
 use crate::types::{log_markers::LogMarker, Peer, PublicKey};
 
@@ -65,7 +64,7 @@ impl Session {
 
     fn send_dkg_not_ready(
         &mut self,
-        node: &Node,
+        node: &NodeInfo,
         message: DkgMessage,
         session_id: &DkgSessionId,
         sender: XorName,
@@ -121,7 +120,7 @@ impl Session {
 
     pub(crate) fn process_msg(
         &mut self,
-        node: &Node,
+        node: &NodeInfo,
         sender: XorName,
         session_id: &DkgSessionId,
         message: DkgMessage,
@@ -181,7 +180,7 @@ impl Session {
 
     pub(crate) fn broadcast(
         &mut self,
-        node: &Node,
+        node: &NodeInfo,
         session_id: &DkgSessionId,
         messages: Vec<MessageAndTarget>,
         section_pk: BlsPublicKey,
@@ -245,7 +244,7 @@ impl Session {
 
     pub(crate) fn handle_timeout(
         &mut self,
-        node: &Node,
+        node: &NodeInfo,
         session_id: &DkgSessionId,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
@@ -275,7 +274,7 @@ impl Session {
     // Check whether a key generator is finalized to give a DKG outcome.
     fn check(
         &mut self,
-        node: &Node,
+        node: &NodeInfo,
         session_id: &DkgSessionId,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
@@ -359,7 +358,7 @@ impl Session {
 
     fn report_failure(
         &mut self,
-        node: &Node,
+        node: &NodeInfo,
         session_id: &DkgSessionId,
         failed_participants: BTreeSet<XorName>,
         section_pk: BlsPublicKey,
@@ -429,7 +428,7 @@ impl Session {
 
     pub(crate) fn handle_dkg_history(
         &mut self,
-        node: &Node,
+        node: &NodeInfo,
         session_id: DkgSessionId,
         msg_history: Vec<DkgMessage>,
         section_pk: BlsPublicKey,
@@ -479,17 +478,18 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::elder_count;
     use crate::messaging::MsgType;
     use crate::node::{
         dkg::voter::DkgVoter, dkg::DkgSessionIdUtils, ed25519,
-        network_knowledge::test_utils::gen_addr, node_info::test_utils::arbitrary_unique_nodes,
-        node_info::Node, MIN_ADULT_AGE,
+        network_knowledge::test_utils::gen_addr, NodeInfo, MIN_ADULT_AGE,
     };
 
     use assert_matches::assert_matches;
     use eyre::{bail, ContextCompat, Result};
-    use proptest::prelude::*;
+    use itertools::Itertools;
+    use proptest::{collection::SizeRange, prelude::*};
     use rand::{rngs::SmallRng, SeedableRng};
     use std::{collections::HashMap, iter, net::SocketAddr};
     use xor_name::Prefix;
@@ -501,7 +501,7 @@ mod tests {
         let voter = DkgVoter::default();
         let section_pk = bls::SecretKey::random().public_key();
 
-        let node = Node::new(
+        let node = NodeInfo::new(
             ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
@@ -528,14 +528,14 @@ mod tests {
         }
     }
 
-    fn proptest_full_participation_impl(nodes: Vec<Node>, seed: u64) -> Result<()> {
+    fn proptest_full_participation_impl(nodes: Vec<NodeInfo>, seed: u64) -> Result<()> {
         // Rng used to randomize the message order.
         let mut rng = SmallRng::seed_from_u64(seed);
         let section_pk = bls::SecretKey::random().public_key();
         let mut messages = Vec::new();
 
         let elder_candidates =
-            ElderCandidates::new(Prefix::default(), nodes.iter().map(Node::peer));
+            ElderCandidates::new(Prefix::default(), nodes.iter().map(NodeInfo::peer));
         let session_id = DkgSessionId::new(&elder_candidates, 0);
 
         let mut actors: HashMap<_, _> = nodes
@@ -590,13 +590,13 @@ mod tests {
     }
 
     struct Actor {
-        node: Node,
+        node: NodeInfo,
         voter: DkgVoter,
         outcome: Option<bls::PublicKey>,
     }
 
     impl Actor {
-        fn new(node: Node) -> Self {
+        fn new(node: NodeInfo) -> Self {
             Self {
                 node,
                 voter: DkgVoter::default(),
@@ -650,7 +650,29 @@ mod tests {
         }
     }
 
-    fn arbitrary_elder_nodes() -> impl Strategy<Value = Vec<Node>> {
+    fn arbitrary_elder_nodes() -> impl Strategy<Value = Vec<NodeInfo>> {
         arbitrary_unique_nodes(2..=elder_count())
+    }
+
+    // Generate Vec<Node> where no two nodes have the same name.
+    pub(crate) fn arbitrary_unique_nodes(
+        count: impl Into<SizeRange>,
+    ) -> impl Strategy<Value = Vec<NodeInfo>> {
+        proptest::collection::vec(arbitrary_node(), count).prop_filter("non-unique keys", |nodes| {
+            nodes
+                .iter()
+                .unique_by(|node| node.keypair.secret.as_bytes())
+                .unique_by(|node| node.addr)
+                .count()
+                == nodes.len()
+        })
+    }
+
+    fn arbitrary_node() -> impl Strategy<Value = NodeInfo> {
+        (
+            ed25519::test_utils::arbitrary_keypair(),
+            any::<SocketAddr>(),
+        )
+            .prop_map(|(keypair, addr)| NodeInfo::new(keypair, addr))
     }
 }

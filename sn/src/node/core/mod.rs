@@ -37,8 +37,7 @@ use super::{
     api::cmds::Cmd,
     dkg::DkgVoter,
     network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider},
-    node_info::Node,
-    Elders, Event, NodeElderChange,
+    Elders, Event, NodeElderChange, NodeInfo,
 };
 
 use crate::messaging::{
@@ -104,7 +103,7 @@ pub(crate) struct DkgSessionInfo {
 // Core state + logic of a node.
 pub(crate) struct Core {
     pub(crate) comm: Comm,
-    pub(crate) node: Arc<RwLock<Node>>,
+    pub(crate) node: Arc<RwLock<NodeInfo>>,
     network_knowledge: NetworkKnowledge,
     pub(crate) section_keys_provider: SectionKeysProvider,
     message_aggregator: SignatureAggregator,
@@ -129,7 +128,7 @@ impl Core {
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn new(
         comm: Comm,
-        mut node: Node,
+        mut node: NodeInfo,
         network_knowledge: NetworkKnowledge,
         section_key_share: Option<SectionKeyShare>,
         event_tx: mpsc::Sender<Event>,
