@@ -6,7 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{msg_count::MsgCount, BackPressure};
+mod back_pressure;
+mod msg_count;
+
+use back_pressure::BackPressure;
+use msg_count::MsgCount;
 
 use crate::messaging::{system::LoadReport, MsgId, WireMsg};
 use crate::node::error::{Error, Result};
