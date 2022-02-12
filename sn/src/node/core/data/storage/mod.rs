@@ -6,10 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod chunk_storage;
-mod register_storage;
-
-use super::{Cmd, Node};
+mod chunks;
+mod registers;
 
 use crate::{
     dbs::Result,
@@ -18,12 +16,13 @@ use crate::{
         system::{NodeCmd, NodeQueryResponse, SystemMsg},
         DstLocation,
     },
+    node::core::{Cmd, Node},
     types::{register::User, ReplicatedData, ReplicatedDataAddress as DataAddress},
     UsedSpace,
 };
 
-pub(crate) use chunk_storage::ChunkStorage;
-pub(crate) use register_storage::RegisterStorage;
+pub(crate) use chunks::ChunkStorage;
+pub(crate) use registers::RegisterStorage;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -55,7 +54,7 @@ impl DataStorage {
 
     /// Store data in the local store
     #[instrument(skip_all)]
-    pub(super) async fn store(&self, data: &ReplicatedData) -> Result<Option<StorageLevel>> {
+    pub(crate) async fn store(&self, data: &ReplicatedData) -> Result<Option<StorageLevel>> {
         match data.clone() {
             ReplicatedData::Chunk(chunk) => self.chunks.store(&chunk).await?,
             ReplicatedData::RegisterLog(data) => {

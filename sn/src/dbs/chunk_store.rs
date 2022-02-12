@@ -22,22 +22,22 @@ const CHUNK_DB_DIR: &str = "chunkdb";
 
 /// A disk store for chunks
 #[derive(Clone)]
-pub(crate) struct ChunkDiskStore {
+pub(crate) struct ChunkStore {
     bit_tree_depth: usize,
     chunk_store_path: PathBuf,
     used_space: UsedSpace,
 }
 
-impl ChunkDiskStore {
-    /// Creates a new `ChunkDiskStore` at location `root/CHUNK_DB_DIR`
+impl ChunkStore {
+    /// Creates a new `ChunkStore` at location `root/CHUNK_DB_DIR`
     ///
-    /// If the location specified already contains a ChunkDiskStore, it is simply used
+    /// If the location specified already contains a ChunkStore, it is simply used
     ///
     /// Used space of the dir is tracked
     pub(crate) fn new<P: AsRef<Path>>(root: P, used_space: UsedSpace) -> Result<Self> {
         let chunk_store_path = root.as_ref().join(CHUNK_DB_DIR);
 
-        Ok(ChunkDiskStore {
+        Ok(ChunkStore {
             bit_tree_depth: BIT_TREE_DEPTH,
             chunk_store_path,
             used_space,
@@ -165,7 +165,7 @@ fn list_files_in(path: &Path) -> Result<Vec<String>> {
         .filter_map(|e| match e {
             Ok(direntry) => Some(direntry),
             Err(err) => {
-                warn!("ChunkDiskStore: failed to process file entry: {}", err);
+                warn!("ChunkStore: failed to process file entry: {}", err);
                 None
             }
         })
@@ -184,9 +184,9 @@ mod tests {
     use rayon::prelude::*;
     use tempfile::tempdir;
 
-    fn init_chunk_disk_store() -> ChunkDiskStore {
+    fn init_chunk_disk_store() -> ChunkStore {
         let root = tempdir().expect("Failed to create temporary directory for chunk disk store");
-        ChunkDiskStore::new(root.path(), UsedSpace::new(usize::MAX))
+        ChunkStore::new(root.path(), UsedSpace::new(usize::MAX))
             .expect("Failed to create chunk disk store")
     }
 
@@ -231,7 +231,7 @@ mod tests {
         write_and_read_chunks(&chunks, store).await;
     }
 
-    async fn write_and_read_chunks(chunks: &[Chunk], store: ChunkDiskStore) {
+    async fn write_and_read_chunks(chunks: &[Chunk], store: ChunkStore) {
         // write all chunks
         let tasks = chunks.iter().map(|c| store.write_chunk(c));
         let results = join_all(tasks).await;

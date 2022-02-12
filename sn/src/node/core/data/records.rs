@@ -6,8 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{Cmd, Node, Prefix};
-
 use crate::{
     data_copy_count,
     messaging::{
@@ -16,7 +14,9 @@ use crate::{
         AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
     },
     node::{
-        core::MAX_WAITING_PEERS_PER_QUERY, error::convert_to_error_msg, messages::WireMsgUtils,
+        core::{Cmd, Node, Prefix, MAX_WAITING_PEERS_PER_QUERY},
+        error::convert_to_error_msg,
+        messages::WireMsgUtils,
         Error, Result,
     },
     types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData, ReplicatedDataAddress},
