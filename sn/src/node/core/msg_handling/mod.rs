@@ -162,15 +162,18 @@ impl Core {
                     }
                 }
 
-                cmds.push(Cmd::HandleSystemMsg {
-                    sender,
-                    msg_id,
-                    msg_authority,
-                    dst_location,
-                    msg,
-                    payload,
-                    known_keys,
-                });
+                cmds.extend(
+                    self.handle_system_msg(
+                        sender,
+                        msg_id,
+                        msg_authority,
+                        dst_location,
+                        msg,
+                        payload,
+                        known_keys,
+                    )
+                    .await?,
+                );
 
                 Ok(cmds)
             }
@@ -180,6 +183,14 @@ impl Core {
                 dst_location,
                 auth,
             } => {
+                if let DstLocation::EndUser(_) = dst_location {
+                    warn!(
+                        "Service msg has been dropped as its destination location ({:?}) is invalid: {:?}",
+                        dst_location, msg
+                    );
+                    return Ok(vec![]);
+                }
+
                 let dst_name = match msg.dst_address() {
                     Some(name) => name,
                     None => {
@@ -241,10 +252,7 @@ impl Core {
                     return Ok(cmds);
                 }
 
-                cmds.extend(
-                    self.handle_service_msg(msg_id, msg, dst_location, auth, sender)
-                        .await?,
-                );
+                cmds.extend(self.handle_service_msg(msg_id, msg, auth, sender).await?);
 
                 Ok(cmds)
             }

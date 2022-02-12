@@ -209,27 +209,6 @@ impl Dispatcher {
     /// Actually process the cmd
     async fn try_processing_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
         match cmd {
-            Cmd::HandleSystemMsg {
-                sender,
-                msg_id,
-                msg_authority,
-                dst_location,
-                msg,
-                payload,
-                known_keys,
-            } => {
-                self.core
-                    .handle_system_msg(
-                        sender,
-                        msg_id,
-                        msg_authority,
-                        dst_location,
-                        msg,
-                        payload,
-                        known_keys,
-                    )
-                    .await
-            }
             Cmd::SignOutgoingSystemMsg { msg, dst } => {
                 let src_section_pk = self.core.network_knowledge().section_key().await;
                 let wire_msg =

@@ -159,14 +159,16 @@ impl Core {
         Ok(cmds)
     }
 
-    /// Handle ServiceMsgs received from EndUser
-    pub(crate) async fn handle_service_msg_received(
+    /// Handle incoming service msgs.
+    pub(crate) async fn handle_service_msg(
         &self,
         msg_id: MsgId,
         msg: ServiceMsg,
         auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
     ) -> Result<Vec<Cmd>> {
+        trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
+
         if self.is_not_elder().await {
             error!("Received unexpected message while Adult");
             return Ok(vec![]);
@@ -197,29 +199,9 @@ impl Core {
             });
             return self.send_cmd_error_response(error, origin, msg_id).await;
         }
+
         cmds.extend(self.send_cmd_ack(origin, msg_id).await?);
+
         Ok(cmds)
-    }
-
-    /// Handle incoming data msgs.
-    pub(crate) async fn handle_service_msg(
-        &self,
-        msg_id: MsgId,
-        msg: ServiceMsg,
-        dst_location: DstLocation,
-        auth: AuthorityProof<ServiceAuth>,
-        user: Peer,
-    ) -> Result<Vec<Cmd>> {
-        trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
-        if let DstLocation::EndUser(_) = dst_location {
-            warn!(
-                "Service msg has been dropped as its destination location ({:?}) is invalid: {:?}",
-                dst_location, msg
-            );
-            return Ok(vec![]);
-        }
-
-        self.handle_service_msg_received(msg_id, msg, auth, user)
-            .await
     }
 }
