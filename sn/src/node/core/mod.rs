@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod api;
-mod back_pressure;
 mod bootstrap;
 mod capacity;
 mod comm;
@@ -17,13 +16,12 @@ mod data_storage;
 mod delivery_group;
 mod liveness_tracking;
 mod messaging;
-mod msg_count;
+
 mod msg_handling;
 mod proposal;
 mod relocation;
 mod split_barrier;
 
-pub(crate) use back_pressure::BackPressure;
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use capacity::MIN_LEVEL_WHEN_FULL;
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
@@ -102,24 +100,34 @@ pub(crate) struct DkgSessionInfo {
 
 // Core state + logic of a node.
 pub(crate) struct Node {
-    pub(crate) comm: Comm,
+    pub(super) event_tx: mpsc::Sender<Event>,
     pub(crate) info: Arc<RwLock<NodeInfo>>,
-    network_knowledge: NetworkKnowledge,
+
+    pub(crate) comm: Comm,
     pub(crate) section_keys_provider: SectionKeysProvider,
+
+    pub(super) data_storage: DataStorage, // Adult only before cache
+
+    resource_proof: ResourceProof,
+
+    network_knowledge: NetworkKnowledge,
+
     message_aggregator: SignatureAggregator,
+
     proposal_aggregator: SignatureAggregator,
     split_barrier: Arc<RwLock<SplitBarrier>>,
     dkg_sessions: Arc<RwLock<HashMap<DkgSessionId, DkgSessionInfo>>>,
     dkg_voter: DkgVoter,
+
     relocate_state: Arc<RwLock<Option<Box<JoiningAsRelocated>>>>,
-    pub(super) event_tx: mpsc::Sender<Event>,
-    joins_allowed: Arc<RwLock<bool>>,
-    current_joins_semaphore: Arc<Semaphore>,
-    resource_proof: ResourceProof,
-    pub(super) data_storage: DataStorage,
-    capacity: Capacity,
-    liveness: Liveness,
-    pending_data_queries: Arc<Cache<OperationId, Vec<Peer>>>,
+
+    joins_allowed: Arc<RwLock<bool>>,        // Elder only
+    current_joins_semaphore: Arc<Semaphore>, // Elder only
+
+    capacity: Capacity,                                       // Elder only
+    liveness: Liveness,                                       // Elder only
+    pending_data_queries: Arc<Cache<OperationId, Vec<Peer>>>, // Elder only
+
     ae_backoff_cache: AeBackoffCache,
 }
 
@@ -180,15 +188,6 @@ impl Node {
     // Miscellaneous
     ////////////////////////////////////////////////////////////////////////////
 
-    pub(crate) async fn state_snapshot(&self) -> StateSnapshot {
-        StateSnapshot {
-            is_elder: self.is_elder().await,
-            section_key: self.network_knowledge.section_key().await,
-            prefix: self.network_knowledge.prefix().await,
-            elders: self.network_knowledge().authority_provider().await.names(),
-        }
-    }
-
     pub(crate) async fn generate_probe_msg(&self) -> Result<Cmd> {
         // Generate a random address not belonging to our Prefix
         let mut dst = XorName::random();
@@ -229,8 +228,17 @@ impl Node {
         });
     }
 
+    pub(super) async fn state_snapshot(&self) -> StateSnapshot {
+        StateSnapshot {
+            is_elder: self.is_elder().await,
+            section_key: self.network_knowledge.section_key().await,
+            prefix: self.network_knowledge.prefix().await,
+            elders: self.network_knowledge().authority_provider().await.names(),
+        }
+    }
+
     /// Generate cmds and fire events based upon any node state changes.
-    pub(crate) async fn update_self_for_new_node_state(
+    pub(super) async fn update_self_for_new_node_state(
         &self,
         old: StateSnapshot,
     ) -> Result<Vec<Cmd>> {
@@ -355,7 +363,7 @@ impl Node {
         Ok(cmds)
     }
 
-    pub(crate) async fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
+    pub(super) async fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
         if self.network_knowledge.prefix().await.matches(name) {
             self.network_knowledge.section_key().await
         } else if let Ok(sap) = self.network_knowledge.section_by_name(name) {
@@ -378,7 +386,7 @@ impl Node {
         }
     }
 
-    pub(crate) async fn print_network_stats(&self) {
+    pub(super) async fn print_network_stats(&self) {
         self.network_knowledge
             .prefix_map()
             .network_stats(&self.network_knowledge.authority_provider().await)
