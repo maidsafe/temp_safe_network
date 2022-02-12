@@ -235,10 +235,12 @@ impl Liveness {
 
 #[cfg(test)]
 mod tests {
+    use super::{Liveness, MIN_PENDING_OPS};
+
     use crate::messaging::data::chunk_operation_id;
-    use crate::node::core::liveness_tracking::{Liveness, MIN_PENDING_OPS};
     use crate::node::Error;
     use crate::types::ChunkAddress;
+
     use itertools::Itertools;
     use std::collections::BTreeSet;
     use xor_name::XorName;
