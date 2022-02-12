@@ -8,11 +8,11 @@
 
 use crate::messaging::{
     system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
-    DstLocation,
+    DstLocation, WireMsg,
 };
 use crate::node::{
     api::cmds::Cmd,
-    core::{msg_handling::WireMsg, Node, Proposal},
+    core::{Node, Proposal},
     dkg::DkgFailureSigSetUtils,
     messages::WireMsgUtils,
     network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},

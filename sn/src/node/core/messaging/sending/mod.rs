@@ -6,7 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod handling;
-mod sending;
-
-pub(crate) use handling::handle_proposal;
+mod anti_entropy;
+mod approval;
+mod dkg_start;
+mod proposal;
+mod services;
+mod system;
