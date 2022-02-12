@@ -5,6 +5,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.56.0 (2022-02-12)
+
+### New Features
+
+ - <csr-id-0bc50ae33ccb934016ac425e7bb2eca90a4b06e3/> resolve nrs map container content
+   The resolver can now return `NrsMapContainer` content, which can then be displayed by the CLI with
+   the `cat` and `dog` commands. This functionality was unintentionally broken at some point.
+   
+   The first change introduced an `NrsEntry` field in `SafeData`, and modified the `NrsMapContainer` to
+   remove its `resolve_into` and `public_name` fields. The intention is for the resolver to return
+   `NrsMapContainer` data when a container XOR-URL is used, but when using an NRS URL, an `NrsEntry`
+   will be returned. The `NrsMapContainer` data will have the NRS map, whereas the `NrsEntry` will only
+   contain the target link and subname version. It's worth noting, the `NrsEntry` doesn't have an
+   XOR-URL because the entries are still stored in the map. An NRS URL still has an `NrsMapContainer`
+   content type and that content is retrieved during the resolution process.
+   
+   This brings us to the next change. The `nrs_get` API was modified to return an `Option<SafeUrl>`,
+   where `None` will now be returned if the container XOR-URL is used. In this case, the resolver will
+   know to return `NrsMapContainer` data, otherwise, it will return the `NrsEntry` with the target URL.
+   One exception is worth mentioning: if the NRS URL uses the registered topname and that topname
+   *doesn't* link to anything, `NrsMapContainer` data will also be returned. To make these extensions,
+   small unit tests were added to the `NrsMap` and several tests were added to the resolver to cover
+   these scenarios.
+   
+   With these changes in place, the CLI could then be updated. The `cat` and `dog` commands were
+   modified to print the NRS map when `NrsMapContainer` data was returned. Previously, the map was
+   printed as a table, but this isn't really suitable for presentation because the table crate doesn't
+   have the ability to use multi-line cells and the target links are too large, so I changed it to
+   print a list. Test cases were added for both commands, which should hopefully prevent us breaking
+   the feature again.
+   
+   Finally, some usability changes were also made to `nrs` commands to give the user the XOR-URL of the
+   container. This can be useful to them if they want to list all the entries in a map.
+ - <csr-id-ced0f6631ac5e8d24546841ba15b8cb7b43929c4/> retrieve subname version
+   The `nrs_get` function is changed to make use of the version argument to retrieve a subname at a
+   specific version.
+   
+   A helper struct was created to reduce test verbosity. It uploads a file container and stores file
+   path/URL pairs in a hash table.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release over the course of 1 calendar day.
+ - 3 days passed between releases.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge branch 'main' into resolve_nrs_map_container_content ([`1631737`](https://github.com/maidsafe/safe_network/commit/1631737769f0d1a3cd2740af6d835479daafe1a7))
+    - make nrs url validation private ([`f558b5c`](https://github.com/maidsafe/safe_network/commit/f558b5c60df64dd349158a327bec945321937cf3))
+    - resolve nrs map container content ([`0bc50ae`](https://github.com/maidsafe/safe_network/commit/0bc50ae33ccb934016ac425e7bb2eca90a4b06e3))
+    - update nrs tests to use helper ([`b9ceb22`](https://github.com/maidsafe/safe_network/commit/b9ceb229091ca29f5dcc675d66a0d9ff46a60427))
+    - Merge #995 ([`5176b3a`](https://github.com/maidsafe/safe_network/commit/5176b3a72e2f5f3f1dfc21116a6bf3ffa3893830))
+    - retrieve subname version ([`ced0f66`](https://github.com/maidsafe/safe_network/commit/ced0f6631ac5e8d24546841ba15b8cb7b43929c4))
+</details>
+
 ## v0.55.0 (2022-02-08)
 
 ### Bug Fixes
@@ -15,9 +79,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 3 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits contributed to the release.
+ - 4 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -27,6 +91,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.56.0/sn_api-0.55.0/sn_cli-0.48.0 ([`3f75bf8`](https://github.com/maidsafe/safe_network/commit/3f75bf8da770a6167c396080b3ad8b54cfeb27e2))
+    - improve acronym consistency ([`471d910`](https://github.com/maidsafe/safe_network/commit/471d910f2b6d8952569c3dc4b2dd31fe7aa30dfa))
     - Merge branch 'main' into fix-cli-shell-api-instances ([`5fe7e54`](https://github.com/maidsafe/safe_network/commit/5fe7e54874e5d665fd10906c4c973f24d613aeba))
     - CLI shell was creating a new Safe API instance, and connecting to the net, for every command ([`e867b1f`](https://github.com/maidsafe/safe_network/commit/e867b1f5aa290823e77eff95f0846f00d7c0416c))
 </details>
@@ -61,9 +127,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - safe_network-0.55.3/sn_api-0.54.1/sn_cli-0.47.1 ([`86975f2`](https://github.com/maidsafe/safe_network/commit/86975f228f31303597a707e158005e44c86de1cc))
     - Merge #993 ([`303e856`](https://github.com/maidsafe/safe_network/commit/303e856346dd1d4e5544c9ceae6d571c54cfb84e))
 </details>
-
-<csr-unknown>
-This is to facilitate resolving NrsMapContainer content using its XorUrl, which effectively printsthe NRS map. It was a feature we had that broke at some point. Right now, the XorUrl of thecontainer will resolve the content the topname is linked to, or will result in an error if thethere’s no topname link.<csr-unknown/>
 
 ## v0.54.0 (2022-02-01)
 
@@ -140,14 +203,9 @@ This is to facilitate resolving NrsMapContainer content using its XorUrl, which 
  - <csr-id-1115093a4cb4a0c7ed9f8d2b846aa435a7026b2e/> store full public name in nrs map
    Entries will now use the full public name reference, rather than the just subname. Like so:
    * example -> link
-   * a.example -> link
-   * b.example -> link
-   * a.b.example -> link
-   
-   This is to facilitate resolving NrsMapContainer content using its XorUrl, which effectively prints
-   the NRS map. It was a feature we had that broke at some point. Right now, the XorUrl of the
-   container will resolve the content the topname is linked to, or will result in an error if the
-   there's no topname link.
+* a.example -> link
+* b.example -> link
+* a.b.example -> link
 
 ### Commit Statistics
 
@@ -172,6 +230,9 @@ This is to facilitate resolving NrsMapContainer content using its XorUrl, which 
     - Merge #985 ([`ba572d5`](https://github.com/maidsafe/safe_network/commit/ba572d5f909f5c1dc389b9affadffec39a4e0369))
     - store full public name in nrs map ([`1115093`](https://github.com/maidsafe/safe_network/commit/1115093a4cb4a0c7ed9f8d2b846aa435a7026b2e))
 </details>
+
+<csr-unknown>
+This is to facilitate resolving NrsMapContainer content using its XorUrl, which effectively printsthe NRS map. It was a feature we had that broke at some point. Right now, the XorUrl of thecontainer will resolve the content the topname is linked to, or will result in an error if thethere’s no topname link.<csr-unknown/>
 
 ## v0.52.0 (2022-01-22)
 

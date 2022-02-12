@@ -4,6 +4,64 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.49.0 (2022-02-12)
+
+### New Features
+
+ - <csr-id-0bc50ae33ccb934016ac425e7bb2eca90a4b06e3/> resolve nrs map container content
+   The resolver can now return `NrsMapContainer` content, which can then be displayed by the CLI with
+   the `cat` and `dog` commands. This functionality was unintentionally broken at some point.
+   
+   The first change introduced an `NrsEntry` field in `SafeData`, and modified the `NrsMapContainer` to
+   remove its `resolve_into` and `public_name` fields. The intention is for the resolver to return
+   `NrsMapContainer` data when a container XOR-URL is used, but when using an NRS URL, an `NrsEntry`
+   will be returned. The `NrsMapContainer` data will have the NRS map, whereas the `NrsEntry` will only
+   contain the target link and subname version. It's worth noting, the `NrsEntry` doesn't have an
+   XOR-URL because the entries are still stored in the map. An NRS URL still has an `NrsMapContainer`
+   content type and that content is retrieved during the resolution process.
+   
+   This brings us to the next change. The `nrs_get` API was modified to return an `Option<SafeUrl>`,
+   where `None` will now be returned if the container XOR-URL is used. In this case, the resolver will
+   know to return `NrsMapContainer` data, otherwise, it will return the `NrsEntry` with the target URL.
+   One exception is worth mentioning: if the NRS URL uses the registered topname and that topname
+   *doesn't* link to anything, `NrsMapContainer` data will also be returned. To make these extensions,
+   small unit tests were added to the `NrsMap` and several tests were added to the resolver to cover
+   these scenarios.
+   
+   With these changes in place, the CLI could then be updated. The `cat` and `dog` commands were
+   modified to print the NRS map when `NrsMapContainer` data was returned. Previously, the map was
+   printed as a table, but this isn't really suitable for presentation because the table crate doesn't
+   have the ability to use multi-line cells and the target links are too large, so I changed it to
+   print a list. Test cases were added for both commands, which should hopefully prevent us breaking
+   the feature again.
+   
+   Finally, some usability changes were also made to `nrs` commands to give the user the XOR-URL of the
+   container. This can be useful to them if they want to list all the entries in a map.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release over the course of 3 calendar days.
+ - 3 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #1005 ([`bf07fa2`](https://github.com/maidsafe/safe_network/commit/bf07fa22ccc9e397fccac8fb7a589ccd760cff70))
+    - Merge branch 'main' into resolve_nrs_map_container_content ([`1631737`](https://github.com/maidsafe/safe_network/commit/1631737769f0d1a3cd2740af6d835479daafe1a7))
+    - fix xorurl cmds tests and enable them to run in CI ([`2fcbfc0`](https://github.com/maidsafe/safe_network/commit/2fcbfc0347769ea41e0b9243bfb32e7104899a11))
+    - make nrs url validation private ([`f558b5c`](https://github.com/maidsafe/safe_network/commit/f558b5c60df64dd349158a327bec945321937cf3))
+    - resolve nrs map container content ([`0bc50ae`](https://github.com/maidsafe/safe_network/commit/0bc50ae33ccb934016ac425e7bb2eca90a4b06e3))
+    - Merge #995 ([`5176b3a`](https://github.com/maidsafe/safe_network/commit/5176b3a72e2f5f3f1dfc21116a6bf3ffa3893830))
+</details>
+
 ## v0.48.0 (2022-02-08)
 
 ### Bug Fixes
@@ -14,9 +72,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 3 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release.
+ - 4 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -26,6 +84,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.56.0/sn_api-0.55.0/sn_cli-0.48.0 ([`3f75bf8`](https://github.com/maidsafe/safe_network/commit/3f75bf8da770a6167c396080b3ad8b54cfeb27e2))
     - Merge branch 'main' into fix-cli-shell-api-instances ([`5fe7e54`](https://github.com/maidsafe/safe_network/commit/5fe7e54874e5d665fd10906c4c973f24d613aeba))
     - CLI shell was creating a new Safe API instance, and connecting to the net, for every command ([`e867b1f`](https://github.com/maidsafe/safe_network/commit/e867b1f5aa290823e77eff95f0846f00d7c0416c))
 </details>

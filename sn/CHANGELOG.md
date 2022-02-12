@@ -5,19 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.56.0 (2022-02-08)
+## v0.57.0 (2022-02-12)
 
-### New Features (BREAKING)
+### New Features
 
- - <csr-id-0b5ebece1240deb56360b238b96e2aece4a6d314/> fix typo
+ - <csr-id-0bc50ae33ccb934016ac425e7bb2eca90a4b06e3/> resolve nrs map container content
+   The resolver can now return `NrsMapContainer` content, which can then be displayed by the CLI with
+   the `cat` and `dog` commands. This functionality was unintentionally broken at some point.
+   
+   The first change introduced an `NrsEntry` field in `SafeData`, and modified the `NrsMapContainer` to
+   remove its `resolve_into` and `public_name` fields. The intention is for the resolver to return
+   `NrsMapContainer` data when a container XOR-URL is used, but when using an NRS URL, an `NrsEntry`
+   will be returned. The `NrsMapContainer` data will have the NRS map, whereas the `NrsEntry` will only
+   contain the target link and subname version. It's worth noting, the `NrsEntry` doesn't have an
+   XOR-URL because the entries are still stored in the map. An NRS URL still has an `NrsMapContainer`
+   content type and that content is retrieved during the resolution process.
+   
+   This brings us to the next change. The `nrs_get` API was modified to return an `Option<SafeUrl>`,
+   where `None` will now be returned if the container XOR-URL is used. In this case, the resolver will
+   know to return `NrsMapContainer` data, otherwise, it will return the `NrsEntry` with the target URL.
+   One exception is worth mentioning: if the NRS URL uses the registered topname and that topname
+   *doesn't* link to anything, `NrsMapContainer` data will also be returned. To make these extensions,
+   small unit tests were added to the `NrsMap` and several tests were added to the resolver to cover
+   these scenarios.
+   
+   With these changes in place, the CLI could then be updated. The `cat` and `dog` commands were
+   modified to print the NRS map when `NrsMapContainer` data was returned. Previously, the map was
+   printed as a table, but this isn't really suitable for presentation because the table crate doesn't
+   have the ability to use multi-line cells and the target links are too large, so I changed it to
+   print a list. Test cases were added for both commands, which should hopefully prevent us breaking
+   the feature again.
+   
+   Finally, some usability changes were also made to `nrs` commands to give the user the XOR-URL of the
+   container. This can be useful to them if they want to list all the entries in a map.
 
+### refactor (BREAKING)
+
+ - <csr-id-74fc4ddf31af51e0036eb164e6b5c4f0864bd08c/> reorganise internal node messaging mod and remove redundant private APIs
+   - Fixing missing AE update to be sent to sibling new Elders upon split.
+   - Removing some node's public API which shouldn't be needed for any user of it (e.g. a UI).
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits contributed to the release over the course of 2 calendar days.
+ - 3 days passed between releases.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -27,7 +61,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - fix typo ([`0b5ebec`](https://github.com/maidsafe/safe_network/commit/0b5ebece1240deb56360b238b96e2aece4a6d314))
+    - Merge #1005 ([`bf07fa2`](https://github.com/maidsafe/safe_network/commit/bf07fa22ccc9e397fccac8fb7a589ccd760cff70))
+    - Merge branch 'main' into resolve_nrs_map_container_content ([`1631737`](https://github.com/maidsafe/safe_network/commit/1631737769f0d1a3cd2740af6d835479daafe1a7))
+    - reorganise internal node messaging mod and remove redundant private APIs ([`74fc4dd`](https://github.com/maidsafe/safe_network/commit/74fc4ddf31af51e0036eb164e6b5c4f0864bd08c))
+    - Merge branch 'main' into Feat-NoPermitsAnyMore ([`bf4597f`](https://github.com/maidsafe/safe_network/commit/bf4597f7366a7bfc7babc5ac627e9e7a5628bd54))
+    - resolve nrs map container content ([`0bc50ae`](https://github.com/maidsafe/safe_network/commit/0bc50ae33ccb934016ac425e7bb2eca90a4b06e3))
+    - Batch pending requests together per name ([`8f58020`](https://github.com/maidsafe/safe_network/commit/8f580200ba5b8b67f36977fb59d6d48e7613e176))
+    - only prioritise service cmd/query with permits. ([`1f57e30`](https://github.com/maidsafe/safe_network/commit/1f57e30a206998a03b2201f4b57b372ebe9ae828))
+    - rename standard_wait to cmd_ack_wait, set default to 5s ([`1dfb651`](https://github.com/maidsafe/safe_network/commit/1dfb651e72f38743645afbbee62c7e6e7fbb0fb2))
+    - Merge #995 ([`5176b3a`](https://github.com/maidsafe/safe_network/commit/5176b3a72e2f5f3f1dfc21116a6bf3ffa3893830))
+    - simplify ae msg handling at clients ([`5869662`](https://github.com/maidsafe/safe_network/commit/5869662a29c4bd8dfe0d7bf07a30f10d89b450ad))
+</details>
+
+## v0.56.0 (2022-02-08)
+
+### New Features (BREAKING)
+
+ - <csr-id-0b5ebece1240deb56360b238b96e2aece4a6d314/> fix typo
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.56.0/sn_api-0.55.0/sn_cli-0.48.0 ([`3f75bf8`](https://github.com/maidsafe/safe_network/commit/3f75bf8da770a6167c396080b3ad8b54cfeb27e2))
+    - improve acronym consistency ([`471d910`](https://github.com/maidsafe/safe_network/commit/471d910f2b6d8952569c3dc4b2dd31fe7aa30dfa))
+    - ensure to use backoff.reset() before use ([`f1e0e45`](https://github.com/maidsafe/safe_network/commit/f1e0e4564c2b581352f6dc6a0ba32259452494c5))
 </details>
 
 ## v0.55.5 (2022-02-07)
@@ -41,9 +111,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 2 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits contributed to the release over the course of 2 calendar days.
+ - 3 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -54,18 +124,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - safe_network-0.55.5 ([`d56f3c7`](https://github.com/maidsafe/safe_network/commit/d56f3c7c0bfc7bd6d045eb80a68a885615e73115))
-    - add `flame` arg to use cargo flamegraph ([`0c04071`](https://github.com/maidsafe/safe_network/commit/0c04071e2184c4e74fa8c9f264a380585e84369e))
+    - Merge branch 'main' into Feat-UpdateQp2p ([`7acc85b`](https://github.com/maidsafe/safe_network/commit/7acc85b8dd11e36abfcab3d2f9f901d25b681ab2))
+    - tweak client commend retries and backoff ([`473e4b0`](https://github.com/maidsafe/safe_network/commit/473e4b0ca27767f4e1326629670f43ff5de5bc86))
+    - Merge branch 'main' into Feat-UpdateQp2p ([`dbf89b5`](https://github.com/maidsafe/safe_network/commit/dbf89b5023766ab34193663a2367ff2eccb6b7e0))
+    - adding a trace log when updating a section member state ([`dab972d`](https://github.com/maidsafe/safe_network/commit/dab972dccdf968e706f0c7599154e188dc74bf48))
 </details>
 
 ## v0.55.4 (2022-02-05)
+
+### New Features (BREAKING)
+
+ - <csr-id-0b5ebece1240deb56360b238b96e2aece4a6d314/> fix typo
+
+
+### Bug Fixes
+
+ - <csr-id-e0e085273524f8e457887548cd68238060590a7b/> only send reg commands to a subset of elders
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 4 commits contributed to the release.
- - 1 day passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -76,12 +157,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - safe_network-0.55.4 ([`a0e9c52`](https://github.com/maidsafe/safe_network/commit/a0e9c52951e81018249a3bcf3b6300b3ad592136))
-    - Merge branch 'main' into Feat-UpdateQp2p ([`7acc85b`](https://github.com/maidsafe/safe_network/commit/7acc85b8dd11e36abfcab3d2f9f901d25b681ab2))
-    - Merge branch 'main' into Feat-UpdateQp2p ([`dbf89b5`](https://github.com/maidsafe/safe_network/commit/dbf89b5023766ab34193663a2367ff2eccb6b7e0))
-    - adding a trace log when updating a section member state ([`dab972d`](https://github.com/maidsafe/safe_network/commit/dab972dccdf968e706f0c7599154e188dc74bf48))
+    - client errors when a SAP has less than expected elders ([`1c78a27`](https://github.com/maidsafe/safe_network/commit/1c78a27d31bb6530274d4ac5cecbce817fad5313))
+    - fix typo ([`0b5ebec`](https://github.com/maidsafe/safe_network/commit/0b5ebece1240deb56360b238b96e2aece4a6d314))
+    - only send reg commands to a subset of elders ([`e0e0852`](https://github.com/maidsafe/safe_network/commit/e0e085273524f8e457887548cd68238060590a7b))
 </details>
 
 ## v0.55.3 (2022-02-04)
+
+### New Features
+
+ - <csr-id-0c04071e2184c4e74fa8c9f264a380585e84369e/> add `flame` arg to use cargo flamegraph
+   uses the launcher option to enable flamegraph generation per node
 
 ### New Features (BREAKING)
 
@@ -97,9 +183,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release.
+ - 6 commits contributed to the release.
  - 6 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -110,9 +196,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - safe_network-0.55.3/sn_api-0.54.1/sn_cli-0.47.1 ([`86975f2`](https://github.com/maidsafe/safe_network/commit/86975f228f31303597a707e158005e44c86de1cc))
+    - one more error msg on client send ([`064a7ed`](https://github.com/maidsafe/safe_network/commit/064a7ed00ca84edd5b5f86640ae868c1cb202590))
     - move to q2p 0.28 / quinn 0.8 ([`208e73c`](https://github.com/maidsafe/safe_network/commit/208e73c732ae5bac184bf5848c0490b98c9a0364))
     - section_peers refactored to avoid dashmap deadlock. ([`df808e1`](https://github.com/maidsafe/safe_network/commit/df808e1d3c559408f5704590493d0aa97d9c2a19))
     - Merge #993 ([`303e856`](https://github.com/maidsafe/safe_network/commit/303e856346dd1d4e5544c9ceae6d571c54cfb84e))
+    - add `flame` arg to use cargo flamegraph ([`0c04071`](https://github.com/maidsafe/safe_network/commit/0c04071e2184c4e74fa8c9f264a380585e84369e))
 </details>
 
 ## v0.55.2 (2022-02-02)
@@ -121,9 +209,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 9 commits contributed to the release.
+ - 10 commits contributed to the release.
  - 1 day passed between releases.
- - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 8 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -134,6 +222,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - safe_network-0.55.2 ([`637ec03`](https://github.com/maidsafe/safe_network/commit/637ec03f9922e5d3dd0c8703eba5019256f4ec06))
+    - log chain update logic ([`d42b34d`](https://github.com/maidsafe/safe_network/commit/d42b34d54adfc16b7947fa5728fcde80ad4f49c7))
     - use the churn signature for deciding both the destination and members to relocate ([`b1d35af`](https://github.com/maidsafe/safe_network/commit/b1d35af9c2ae6cb386c6726a432c02b9d44973c2))
     - all env var to override cmd_timeout ([`7cd6337`](https://github.com/maidsafe/safe_network/commit/7cd63377de16dd2962961f2dd936df3276fe8d6d))
     - session records all failed connection ids ([`f73e00c`](https://github.com/maidsafe/safe_network/commit/f73e00cc67fae6090b9c991ac4e06999ea28f22e))
@@ -192,9 +281,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Merge #968 ([`f54ed86`](https://github.com/maidsafe/safe_network/commit/f54ed86b405c8463cd2a79ae9df33f992bd06cec))
 </details>
 
-<csr-unknown>
-The relocation details are now embedded in the NodeState, which issent to the relocated peer (with section authority) within the Relocate message.JoinAsRelocatedRequest always carries the signed relocate details (relocate_proof).JoinAsRelocatedRequest now contains the signature of the node’s new name with its previous key (signature_over_new_name)<csr-unknown/>
-
 ## v0.55.0 (2022-01-28)
 
 ### Bug Fixes
@@ -211,8 +297,8 @@ The relocation details are now embedded in the NodeState, which issent to the re
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits contributed to the release.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -225,6 +311,7 @@ The relocation details are now embedded in the NodeState, which issent to the re
     - safe_network-0.55.0/sn_api-0.53.0/sn_cli-0.46.0 ([`366eee2`](https://github.com/maidsafe/safe_network/commit/366eee25f4b982d5a20d90168368a1aa14aa3181))
     - keep section Left/Relocated members in a separate archive container ([`c52de7a`](https://github.com/maidsafe/safe_network/commit/c52de7a75ce4bbf872b215a14258b5e7778bfb34))
     - Merge #991 ([`a4f2c8a`](https://github.com/maidsafe/safe_network/commit/a4f2c8ac42d5d91764ca4e00a73a693f6a0221b5))
+    - clarify sap switch logic ([`2cc7323`](https://github.com/maidsafe/safe_network/commit/2cc7323ec8b62f89f2e4247c5d6ab56f78eda2ce))
     - renaming apis for clarity of purpose ([`2746cff`](https://github.com/maidsafe/safe_network/commit/2746cff087fd33aff523bc2df07a3462d05c6de1))
 </details>
 
