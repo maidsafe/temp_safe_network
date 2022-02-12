@@ -9,6 +9,7 @@
 #![allow(dead_code, unused_imports)]
 
 use super::{Cmd, Comm, Dispatcher};
+
 use crate::dbs::UsedSpace;
 use crate::messaging::{
     system::{
@@ -34,8 +35,7 @@ use crate::node::{
     recommended_section_size, supermajority, Error, Event, Peer, Result as RoutingResult,
     FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
-use crate::peer::UnnamedPeer;
-use crate::types::{Keypair, PublicKey};
+use crate::types::{Keypair, PublicKey, UnnamedPeer};
 use crate::{elder_count, init_test_logger};
 
 use assert_matches::assert_matches;

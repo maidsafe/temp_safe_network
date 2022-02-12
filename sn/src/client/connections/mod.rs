@@ -8,11 +8,13 @@
 
 mod listeners;
 mod messaging;
+
 use crate::messaging::{
     data::{CmdError, OperationId, QueryResponse},
     MsgId,
 };
-use crate::prefix_map::NetworkPrefixMap;
+use crate::types::prefix_map::NetworkPrefixMap;
+
 use dashmap::DashMap;
 use qp2p::Endpoint;
 use std::sync::Arc;

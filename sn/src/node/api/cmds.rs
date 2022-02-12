@@ -15,7 +15,7 @@ use crate::node::{
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     XorName,
 };
-use crate::peer::{Peer, UnnamedPeer};
+use crate::types::{Peer, UnnamedPeer};
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;

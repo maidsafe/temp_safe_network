@@ -12,8 +12,7 @@ use crate::node::{
     core::{Core, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
     ed25519, Error, Result,
 };
-use crate::peer::Peer;
-use crate::types::log_markers::LogMarker;
+use crate::types::{log_markers::LogMarker, Peer};
 
 use ed25519_dalek::Verifier;
 use xor_name::XorName;

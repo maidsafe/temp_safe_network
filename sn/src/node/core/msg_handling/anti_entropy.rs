@@ -14,8 +14,7 @@ use crate::node::{
     api::cmds::Cmd, core::Core, messages::WireMsgUtils,
     network_knowledge::SectionAuthorityProvider, Error, Result,
 };
-use crate::peer::Peer;
-use crate::types::{log_markers::LogMarker, PublicKey};
+use crate::types::{log_markers::LogMarker, Peer, PublicKey};
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;

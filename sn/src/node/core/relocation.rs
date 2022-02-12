@@ -166,18 +166,20 @@ fn trailing_zeros(bytes: &[u8]) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::elder_count;
     use crate::node::{
         api::tests::SecretKeySet, dkg::test_utils::section_signed,
         network_knowledge::SectionAuthorityProvider, MIN_ADULT_AGE,
     };
-    use crate::peer::test_utils::arbitrary_unique_peers;
+
     use eyre::Result;
     use itertools::Itertools;
-    use proptest::prelude::*;
+    use proptest::{collection::SizeRange, prelude::*};
     use rand::{rngs::SmallRng, Rng, SeedableRng};
     use secured_linked_list::SecuredLinkedList;
-    use xor_name::Prefix;
+    use std::net::SocketAddr;
+    use xor_name::{Prefix, XOR_NAME_LEN};
 
     #[test]
     fn byte_slice_trailing_zeros() {
@@ -320,5 +322,27 @@ mod tests {
                 return signature;
             }
         }
+    }
+
+    // Generate Vec<Peer> where no two peers have the same name.
+    fn arbitrary_unique_peers(
+        count: impl Into<SizeRange>,
+        age: impl Strategy<Value = u8>,
+    ) -> impl Strategy<Value = Vec<Peer>> {
+        proptest::collection::btree_map(arbitrary_bytes(), (any::<SocketAddr>(), age), count)
+            .prop_map(|peers| {
+                peers
+                    .into_iter()
+                    .map(|(mut bytes, (addr, age))| {
+                        bytes[XOR_NAME_LEN - 1] = age;
+                        let name = XorName(bytes);
+                        Peer::new(name, addr)
+                    })
+                    .collect()
+            })
+    }
+
+    fn arbitrary_bytes() -> impl Strategy<Value = [u8; XOR_NAME_LEN]> {
+        any::<[u8; XOR_NAME_LEN]>()
     }
 }

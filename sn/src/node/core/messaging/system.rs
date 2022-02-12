@@ -13,8 +13,7 @@ use crate::messaging::{
 use crate::node::{
     api::cmds::Cmd, core::Core, messages::WireMsgUtils, network_knowledge::NodeState, Error, Result,
 };
-use crate::peer::{Peer, UnnamedPeer};
-use crate::types::log_markers::LogMarker;
+use crate::types::{log_markers::LogMarker, Peer, UnnamedPeer};
 
 use bls::PublicKey as BlsPublicKey;
 use xor_name::XorName;

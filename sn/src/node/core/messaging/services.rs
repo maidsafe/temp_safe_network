@@ -11,8 +11,7 @@ use crate::messaging::{
     DstLocation, EndUser, MsgId, MsgKind, ServiceAuth, WireMsg,
 };
 use crate::node::{api::cmds::Cmd, core::Core, Result};
-use crate::peer::Peer;
-use crate::types::{PublicKey, Signature};
+use crate::types::{Peer, PublicKey, Signature};
 
 use bytes::Bytes;
 use ed25519_dalek::Signer;

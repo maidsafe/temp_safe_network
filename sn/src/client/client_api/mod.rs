@@ -12,12 +12,18 @@ mod file_apis;
 mod queries;
 mod register_apis;
 
+pub use register_apis::RegisterWriteAheadLog;
+
 use crate::client::{connections::Session, errors::Error, ClientConfig};
-use crate::messaging::data::{CmdError, DataQuery, RegisterQuery, ServiceMsg};
-use crate::messaging::{ServiceAuth, WireMsg};
-use crate::peer::Peer;
-use crate::prefix_map::NetworkPrefixMap;
-use crate::types::{utils::read_prefix_map_from_disk, Chunk, Keypair, PublicKey, RegisterAddress};
+use crate::messaging::{
+    data::{CmdError, DataQuery, RegisterQuery, ServiceMsg},
+    ServiceAuth, WireMsg,
+};
+use crate::types::{
+    prefix_map::NetworkPrefixMap, utils::read_prefix_map_from_disk, Chunk, Keypair, Peer,
+    PublicKey, RegisterAddress,
+};
+
 use bytes::Bytes;
 use itertools::Itertools;
 use rand::rngs::OsRng;
@@ -31,8 +37,6 @@ use tokio::{
 use tracing::{debug, info};
 use uluru::LRUCache;
 use xor_name::XorName;
-
-pub use register_apis::RegisterWriteAheadLog;
 
 // Maximum amount of Chunks to keep in our cal Chunks cache.
 // Each Chunk is maximum types::MAX_CHUNK_SIZE_IN_BYTES, i.e. ~1MB

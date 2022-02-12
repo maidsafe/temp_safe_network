@@ -13,7 +13,7 @@ use crate::node::{
     dkg::SigShare,
     Result,
 };
-use crate::peer::Peer;
+use crate::types::Peer;
 
 // Decisions
 impl Core {

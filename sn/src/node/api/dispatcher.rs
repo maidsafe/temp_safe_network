@@ -7,14 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Cmd;
+
 use crate::messaging::{system::SystemMsg, MsgKind, WireMsg};
 use crate::node::{
     core::{Core, Proposal, SendStatus},
     messages::WireMsgUtils,
     Error, Result,
 };
-use crate::peer::Peer;
-use crate::types::log_markers::LogMarker;
+use crate::types::{log_markers::LogMarker, Peer};
+
 use std::{sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
 use tokio::{sync::watch, time};

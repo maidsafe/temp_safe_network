@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -262,7 +262,7 @@ impl Peer {
 /// `Cmd`). One benefit of this is it also works with tests, where we also often don't have an
 /// actual connection.
 #[derive(Clone, Debug)]
-pub(crate) struct UnnamedPeer {
+pub struct UnnamedPeer {
     addr: SocketAddr,
     connection: Option<qp2p::Connection>,
 }
@@ -292,34 +292,5 @@ impl UnnamedPeer {
             addr: self.addr,
             connection: Arc::new(RwLock::new(self.connection)),
         }
-    }
-}
-
-#[cfg(test)]
-pub(crate) mod test_utils {
-    use super::*;
-    use proptest::{collection::SizeRange, prelude::*};
-    use xor_name::XOR_NAME_LEN;
-
-    pub(crate) fn arbitrary_bytes() -> impl Strategy<Value = [u8; XOR_NAME_LEN]> {
-        any::<[u8; XOR_NAME_LEN]>()
-    }
-
-    // Generate Vec<Peer> where no two peers have the same name.
-    pub(crate) fn arbitrary_unique_peers(
-        count: impl Into<SizeRange>,
-        age: impl Strategy<Value = u8>,
-    ) -> impl Strategy<Value = Vec<Peer>> {
-        proptest::collection::btree_map(arbitrary_bytes(), (any::<SocketAddr>(), age), count)
-            .prop_map(|peers| {
-                peers
-                    .into_iter()
-                    .map(|(mut bytes, (addr, age))| {
-                        bytes[XOR_NAME_LEN - 1] = age;
-                        let name = XorName(bytes);
-                        Peer::new(name, addr)
-                    })
-                    .collect()
-            })
     }
 }

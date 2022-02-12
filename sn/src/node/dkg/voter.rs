@@ -19,7 +19,7 @@ use crate::node::{
     node_info::Node,
     supermajority, Result,
 };
-use crate::peer::Peer;
+use crate::types::Peer;
 
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};

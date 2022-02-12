@@ -10,8 +10,7 @@ use super::{msg_count::MsgCount, BackPressure};
 
 use crate::messaging::{system::LoadReport, MsgId, WireMsg};
 use crate::node::error::{Error, Result};
-use crate::peer::{Peer, UnnamedPeer};
-use crate::types::log_markers::LogMarker;
+use crate::types::{log_markers::LogMarker, Peer, UnnamedPeer};
 
 use bytes::Bytes;
 use futures::{

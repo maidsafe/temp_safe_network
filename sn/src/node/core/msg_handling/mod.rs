@@ -33,8 +33,7 @@ use crate::node::{
     network_knowledge::NetworkKnowledge,
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
 };
-use crate::peer::{Peer, UnnamedPeer};
-use crate::types::{log_markers::LogMarker, PublicKey};
+use crate::types::{log_markers::LogMarker, Peer, PublicKey, UnnamedPeer};
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;

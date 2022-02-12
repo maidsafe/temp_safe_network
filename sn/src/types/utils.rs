@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::errors::convert_bincode_error;
+use super::prefix_map::NetworkPrefixMap;
 use super::{Error, Result};
-use crate::prefix_map::NetworkPrefixMap;
 use bytes::Bytes;
 use multibase::{self, Base};
 use rand::rngs::OsRng;
