@@ -11,7 +11,7 @@ use crate::messaging::{
     MsgId, MsgType, SrcLocation, WireMsg,
 };
 use crate::node::{
-    api::cmds::Cmd, core::Core, messages::WireMsgUtils,
+    api::cmds::Cmd, core::Node, messages::WireMsgUtils,
     network_knowledge::SectionAuthorityProvider, Error, Result,
 };
 use crate::types::{log_markers::LogMarker, Peer, PublicKey};
@@ -25,7 +25,7 @@ use std::collections::BTreeSet;
 use std::time::Duration;
 use xor_name::XorName;
 
-impl Core {
+impl Node {
     #[instrument(skip_all)]
     pub(crate) async fn handle_anti_entropy_update_msg(
         &self,
@@ -43,7 +43,7 @@ impl Core {
             .map(|p| p.name())
             .collect();
 
-        let our_name = self.node.read().await.name();
+        let our_name = self.info.read().await.name();
         let signed_sap = SectionAuth {
             value: section_auth.clone(),
             sig: section_signed.clone(),
@@ -213,7 +213,7 @@ impl Core {
             value: section_auth.clone(),
             sig: section_signed.clone(),
         };
-        let our_name = self.node.read().await.name();
+        let our_name = self.info.read().await.name();
 
         // Update our network knowledge.
         if self
@@ -316,7 +316,7 @@ impl Core {
                         bounced_msg,
                     };
                     let wire_msg = WireMsg::single_src(
-                        &self.node.read().await.clone(),
+                        &self.info.read().await.clone(),
                         src_location.to_dst(),
                         ae_msg,
                         self.network_knowledge.section_key().await,
@@ -410,7 +410,7 @@ impl Core {
         };
 
         let wire_msg = WireMsg::single_src(
-            &self.node.read().await.clone(),
+            &self.info.read().await.clone(),
             src_location.to_dst(),
             ae_msg,
             self.network_knowledge.section_key().await,
@@ -442,7 +442,7 @@ impl Core {
         };
 
         let wire_msg = WireMsg::single_src(
-            &self.node.read().await.clone(),
+            &self.info.read().await.clone(),
             src_location.to_dst(),
             ae_msg,
             self.network_knowledge.section_key().await,
@@ -487,17 +487,17 @@ mod tests {
     async fn ae_everything_up_to_date() -> Result<()> {
         let mut rng = rand::thread_rng();
         let env = Env::new().await?;
-        let our_prefix = env.core.network_knowledge().prefix().await;
+        let our_prefix = env.node.network_knowledge().prefix().await;
         let (msg, src_location) = env.create_msg(
             &our_prefix,
-            env.core.network_knowledge().section_key().await,
+            env.node.network_knowledge().section_key().await,
         )?;
-        let sender = env.core.node.read().await.peer();
+        let sender = env.node.info.read().await.peer();
         let dst_name = our_prefix.substituted_in(rng.gen());
-        let dst_section_key = env.core.network_knowledge().section_key().await;
+        let dst_section_key = env.node.network_knowledge().section_key().await;
 
         let cmd = env
-            .core
+            .node
             .check_for_entropy(
                 msg.serialize()?,
                 &src_location,
@@ -520,13 +520,13 @@ mod tests {
         let other_pk = other_sk.public_key();
 
         let (msg, src_location) = env.create_msg(&env.other_sap.prefix(), other_pk)?;
-        let sender = env.core.node.read().await.peer();
+        let sender = env.node.info.read().await.peer();
 
         // since it's not aware of the other prefix, it shall redirect us to genesis section/SAP
         let dst_section_key = other_pk;
         let dst_name = env.other_sap.prefix().name();
         let cmd = env
-            .core
+            .node
             .check_for_entropy(
                 msg.serialize()?,
                 &src_location,
@@ -550,14 +550,14 @@ mod tests {
 
         // now let's insert the other SAP to make it aware of the other prefix
         assert!(
-            env.core
+            env.node
                 .network_knowledge()
                 .update_knowledge_if_valid(
                     env.other_sap.clone(),
                     &env.proof_chain,
                     None,
-                    &env.core.node.read().await.name(),
-                    &env.core.section_keys_provider
+                    &env.node.info.read().await.name(),
+                    &env.node.section_keys_provider
                 )
                 .await?
         );
@@ -565,7 +565,7 @@ mod tests {
         // and it now shall give us an AE redirect msg
         // with the SAP we inserted for other prefix
         let cmd = env
-            .core
+            .node
             .check_for_entropy(
                 msg.serialize()?,
                 &src_location,
@@ -594,18 +594,18 @@ mod tests {
     async fn ae_outdated_dst_key_of_our_section() -> Result<()> {
         let mut rng = rand::thread_rng();
         let env = Env::new().await?;
-        let our_prefix = env.core.network_knowledge().prefix().await;
+        let our_prefix = env.node.network_knowledge().prefix().await;
 
         let (msg, src_location) = env.create_msg(
             &our_prefix,
-            env.core.network_knowledge().section_key().await,
+            env.node.network_knowledge().section_key().await,
         )?;
-        let sender = env.core.node.read().await.peer();
+        let sender = env.node.info.read().await.peer();
         let dst_name = our_prefix.substituted_in(rng.gen());
-        let dst_section_key = env.core.network_knowledge().genesis_key();
+        let dst_section_key = env.node.network_knowledge().genesis_key();
 
         let cmd = env
-            .core
+            .node
             .check_for_entropy(
                 msg.serialize()?,
                 &src_location,
@@ -623,8 +623,8 @@ mod tests {
 
         assert_matches!(msg_type, MsgType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
-                assert_eq!(section_auth, &env.core.network_knowledge().authority_provider().await.to_msg());
-                assert_eq!(proof_chain, &env.core.section_chain().await);
+                assert_eq!(section_auth, &env.node.network_knowledge().authority_provider().await.to_msg());
+                assert_eq!(proof_chain, &env.node.section_chain().await);
             });
         });
 
@@ -635,20 +635,20 @@ mod tests {
     async fn ae_wrong_dst_key_of_our_section_returns_retry() -> Result<()> {
         let mut rng = rand::thread_rng();
         let env = Env::new().await?;
-        let our_prefix = env.core.network_knowledge().prefix().await;
+        let our_prefix = env.node.network_knowledge().prefix().await;
 
         let (msg, src_location) = env.create_msg(
             &our_prefix,
-            env.core.network_knowledge().section_key().await,
+            env.node.network_knowledge().section_key().await,
         )?;
-        let sender = env.core.node.read().await.peer();
+        let sender = env.node.info.read().await.peer();
         let dst_name = our_prefix.substituted_in(rng.gen());
 
         let bogus_env = Env::new().await?;
-        let dst_section_key = bogus_env.core.network_knowledge().genesis_key();
+        let dst_section_key = bogus_env.node.network_knowledge().genesis_key();
 
         let cmd = env
-            .core
+            .node
             .check_for_entropy(
                 msg.serialize()?,
                 &src_location,
@@ -666,8 +666,8 @@ mod tests {
 
         assert_matches!(msg_type, MsgType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
-                assert_eq!(*section_auth, env.core.network_knowledge().authority_provider().await.to_msg());
-                assert_eq!(*proof_chain, env.core.section_chain().await);
+                assert_eq!(*section_auth, env.node.network_knowledge().authority_provider().await.to_msg());
+                assert_eq!(*proof_chain, env.node.section_chain().await);
             });
         });
 
@@ -675,7 +675,7 @@ mod tests {
     }
 
     struct Env {
-        core: Core,
+        node: Node,
         other_sap: SectionAuth<SectionAuthorityProvider>,
         proof_chain: SecuredLinkedList,
         genesis_sap: SectionAuthorityProvider,
@@ -689,7 +689,7 @@ mod tests {
             // generate a SAP for prefix0
             let (section_auth, mut nodes, secret_key_set) =
                 gen_section_authority_provider(prefix0, elder_count());
-            let node = nodes.remove(0);
+            let info = nodes.remove(0);
             let sap_sk = secret_key_set.secret_key();
             let signed_sap = section_signed(sap_sk, section_auth)?;
 
@@ -699,9 +699,9 @@ mod tests {
             assert_eq!(genesis_pk, *chain.root_key());
 
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-            let mut core = Core::first_node(
+            let mut node = Node::first_node(
                 create_comm().await?,
-                node.clone(),
+                info.clone(),
                 mpsc::channel(1).0,
                 UsedSpace::new(max_capacity),
                 root_storage_dir,
@@ -709,24 +709,24 @@ mod tests {
             )
             .await?;
 
-            let genesis_sap = core.network_knowledge().authority_provider().await;
+            let genesis_sap = node.network_knowledge().authority_provider().await;
             let section_key_share = SectionKeyShare {
                 public_key_set: secret_key_set.public_keys(),
                 index: 0,
                 secret_key_share: secret_key_set.secret_key_share(0),
             };
 
-            core.section_keys_provider = SectionKeysProvider::new(Some(section_key_share)).await;
+            node.section_keys_provider = SectionKeysProvider::new(Some(section_key_share)).await;
 
-            // get our Core to now be in prefix(0)
-            let _ = core
+            // get our Node to now be in prefix(0)
+            let _ = node
                 .network_knowledge()
                 .update_knowledge_if_valid(
                     signed_sap.clone(),
                     &chain,
                     None,
-                    &node.name(),
-                    &core.section_keys_provider,
+                    &info.name(),
+                    &node.section_keys_provider,
                 )
                 .await;
 
@@ -742,7 +742,7 @@ mod tests {
             proof_chain.insert(&genesis_pk, other_sap_sk.public_key(), signature)?;
 
             Ok(Self {
-                core,
+                node,
                 other_sap,
                 proof_chain,
                 genesis_sap,

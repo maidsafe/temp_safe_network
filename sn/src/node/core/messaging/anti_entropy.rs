@@ -9,7 +9,7 @@
 use crate::messaging::system::{NodeCmd, SystemMsg};
 use crate::node::{
     api::cmds::Cmd,
-    core::{Core, StateSnapshot},
+    core::{Node, StateSnapshot},
     Result,
 };
 use crate::types::{log_markers::LogMarker, Peer};
@@ -17,10 +17,10 @@ use crate::types::{log_markers::LogMarker, Peer};
 use bls::PublicKey as BlsPublicKey;
 use xor_name::Prefix;
 
-impl Core {
+impl Node {
     /// Send `AntiEntropyUpdate` message to all nodes in our own section.
     pub(crate) async fn send_ae_update_to_our_section(&self) -> Vec<Cmd> {
-        let our_name = self.node.read().await.name();
+        let our_name = self.info.read().await.name();
         let nodes: Vec<_> = self
             .network_knowledge
             .section_members()

@@ -9,7 +9,7 @@
 use crate::messaging::system::{JoinResponse, ResourceProofResponse, SystemMsg};
 use crate::node::{
     api::cmds::Cmd,
-    core::{Core, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
+    core::{Node, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
     ed25519, Error, Result,
 };
 use crate::types::{log_markers::LogMarker, Peer};
@@ -18,7 +18,7 @@ use ed25519_dalek::Verifier;
 use xor_name::XorName;
 
 // Resource signed
-impl Core {
+impl Node {
     pub(crate) async fn validate_resource_proof_response(
         &self,
         peer_name: &XorName,
@@ -31,7 +31,7 @@ impl Core {
         };
 
         if self
-            .node
+            .info
             .read()
             .await
             .keypair
@@ -54,7 +54,7 @@ impl Core {
             data_size: RESOURCE_PROOF_DATA_SIZE,
             difficulty: RESOURCE_PROOF_DIFFICULTY,
             nonce,
-            nonce_signature: ed25519::sign(&serialized, &self.node.read().await.keypair),
+            nonce_signature: ed25519::sign(&serialized, &self.info.read().await.keypair),
         }));
 
         trace!("{}", LogMarker::SendResourceProofChallenge);

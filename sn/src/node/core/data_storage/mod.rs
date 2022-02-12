@@ -9,7 +9,7 @@
 mod chunk_storage;
 mod register_storage;
 
-use super::{Cmd, Core};
+use super::{Cmd, Node};
 
 use crate::{
     dbs::Result,
@@ -130,7 +130,7 @@ impl DataStorage {
     }
 }
 
-impl Core {
+impl Node {
     #[allow(clippy::mutable_key_type)]
     pub(crate) async fn reorganize_data(
         &self,

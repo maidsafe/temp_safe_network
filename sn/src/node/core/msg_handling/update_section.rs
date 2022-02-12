@@ -6,12 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{api::cmds::Cmd, core::Core, Result};
+use crate::node::{api::cmds::Cmd, core::Node, Result};
 use crate::types::log_markers::LogMarker;
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
-impl Core {
+impl Node {
     /// Will reorganize data if we are an adult,
     /// and there were changes to adults (any added or removed).
     pub(crate) async fn try_reorganize_data(
@@ -41,7 +41,7 @@ impl Core {
         trace!("{:?}", LogMarker::DataReorganisationUnderway);
         // we are an adult, and there were changes to adults
         // so we reorganise the data stored in this section..:
-        let our_name = self.node.read().await.name();
+        let our_name = self.info.read().await.name();
         let remaining = old_adults.intersection(&current_adults).copied().collect();
         self.reorganize_data(our_name, added, removed, remaining)
             .await

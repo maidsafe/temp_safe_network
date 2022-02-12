@@ -25,7 +25,7 @@ use self::{
 use crate::messaging::{system::SystemMsg, DstLocation, WireMsg};
 use crate::node::{
     cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
-    core::{join_network, Comm, ConnectionEvent, Core},
+    core::{join_network, Comm, ConnectionEvent, Node},
     ed25519,
     error::{Error, Result},
     logging::{log_ctx::LogCtx, run_system_logger},
@@ -98,7 +98,7 @@ impl NodeApi {
 
         let used_space = UsedSpace::new(config.max_capacity());
 
-        let (node, network_events) = tokio::time::timeout(
+        let (api, network_events) = tokio::time::timeout(
             joining_timeout,
             Self::start_node(config, used_space, root_dir),
         )
@@ -106,14 +106,14 @@ impl NodeApi {
         .map_err(|_| Error::JoinTimeout)??;
 
         // Network keypair may have to be changed due to naming criteria or network requirements.
-        let keypair_as_bytes = node.dispatcher.core.node.read().await.keypair.to_bytes();
+        let keypair_as_bytes = api.dispatcher.node.info.read().await.keypair.to_bytes();
         store_network_keypair(root_dir, keypair_as_bytes).await?;
 
         let our_pid = std::process::id();
-        let node_prefix = node.our_prefix().await;
-        let node_name = node.name().await;
-        let node_age = node.age().await;
-        let our_conn_info = node.our_connection_info().await;
+        let node_prefix = api.our_prefix().await;
+        let node_name = api.name().await;
+        let node_age = api.age().await;
+        let our_conn_info = api.our_connection_info().await;
         let our_conn_info_json = serde_json::to_string(&our_conn_info)
             .unwrap_or_else(|_| "Failed to serialize connection info".into());
         println!(
@@ -125,9 +125,9 @@ impl NodeApi {
             our_pid, node_prefix, node_name, node_age, our_conn_info_json,
         );
 
-        run_system_logger(LogCtx::new(node.dispatcher.clone()), config.resource_logs).await;
+        run_system_logger(LogCtx::new(api.dispatcher.clone()), config.resource_logs).await;
 
-        Ok((node, network_events))
+        Ok((api, network_events))
     }
 
     // Private helper to create a new node using the given config and bootstraps it to the network.
@@ -147,7 +147,7 @@ impl NodeApi {
             .local_addr
             .unwrap_or_else(|| SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)));
 
-        let core = if config.is_first() {
+        let node = if config.is_first() {
             // Genesis node having a fix age of 255.
             let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), 255);
             let node_name = ed25519::name(&keypair.public);
@@ -164,12 +164,12 @@ impl NodeApi {
                 connection_event_tx,
             )
             .await?;
-            let node = NodeInfo::new(keypair, comm.our_connection_info());
+            let info = NodeInfo::new(keypair, comm.our_connection_info());
 
             let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
-            let core = Core::first_node(
+            let node = Node::first_node(
                 comm,
-                node,
+                info,
                 event_tx,
                 used_space.clone(),
                 root_storage_dir.to_path_buf(),
@@ -177,7 +177,7 @@ impl NodeApi {
             )
             .await?;
 
-            let network_knowledge = core.network_knowledge();
+            let network_knowledge = node.network_knowledge();
 
             let elders = Elders {
                 prefix: network_knowledge.prefix().await,
@@ -188,7 +188,7 @@ impl NodeApi {
             };
 
             trace!("{}", LogMarker::PromotedToElder);
-            core.send_event(Event::EldersChanged {
+            node.send_event(Event::EldersChanged {
                 elders,
                 self_status_change: NodeElderChange::Promoted,
             })
@@ -202,7 +202,7 @@ impl NodeApi {
                 hex::encode(genesis_key.to_bytes())
             );
 
-            core
+            node
         } else {
             let genesis_key_str = config.genesis_key.as_ref().ok_or_else(|| {
                 Error::Configuration("Network's genesis key was not provided.".to_string())
@@ -241,7 +241,7 @@ impl NodeApi {
             );
 
             let joining_node = NodeInfo::new(keypair, comm.our_connection_info());
-            let (node, network_knowledge) = join_network(
+            let (info, network_knowledge) = join_network(
                 joining_node,
                 &comm,
                 &mut connection_event_rx,
@@ -250,9 +250,9 @@ impl NodeApi {
             )
             .await?;
 
-            let core = Core::new(
+            let node = Node::new(
                 comm,
-                node,
+                info,
                 network_knowledge,
                 None,
                 event_tx,
@@ -260,13 +260,13 @@ impl NodeApi {
                 root_storage_dir.to_path_buf(),
             )
             .await?;
-            info!("{} Joined the network!", core.node.read().await.name());
-            info!("Our AGE: {}", core.node.read().await.age());
+            info!("{} Joined the network!", node.info.read().await.name());
+            info!("Our AGE: {}", node.info.read().await.age());
 
-            core
+            node
         };
 
-        let dispatcher = Arc::new(Dispatcher::new(core));
+        let dispatcher = Arc::new(Dispatcher::new(node));
         let event_stream = EventStream::new(event_rx);
 
         // Start listening to incoming connections.
@@ -278,64 +278,64 @@ impl NodeApi {
         dispatcher.clone().start_network_probing().await;
         dispatcher.clone().write_prefixmap_to_disk().await;
 
-        let node = Self { dispatcher };
+        let api = Self { dispatcher };
 
-        Ok((node, event_stream))
+        Ok((api, event_stream))
     }
 
     /// Returns the current age of this node.
     pub async fn age(&self) -> u8 {
-        self.dispatcher.core.node.read().await.age()
+        self.dispatcher.node.info.read().await.age()
     }
 
     /// Returns the ed25519 public key of this node.
     pub async fn public_key(&self) -> PublicKey {
-        self.dispatcher.core.node.read().await.keypair.public
+        self.dispatcher.node.info.read().await.keypair.public
     }
 
     /// The name of this node.
     pub async fn name(&self) -> XorName {
-        self.dispatcher.core.node.read().await.name()
+        self.dispatcher.node.info.read().await.name()
     }
 
     /// Returns connection info of this node.
     pub async fn our_connection_info(&self) -> SocketAddr {
-        self.dispatcher.core.our_connection_info()
+        self.dispatcher.node.our_connection_info()
     }
 
     /// Returns the Section Signed Chain
     pub async fn section_chain(&self) -> SecuredLinkedList {
-        self.dispatcher.core.section_chain().await
+        self.dispatcher.node.section_chain().await
     }
 
     /// Returns the Section Chain's genesis key
     pub async fn genesis_key(&self) -> bls::PublicKey {
-        *self.dispatcher.core.network_knowledge().genesis_key()
+        *self.dispatcher.node.network_knowledge().genesis_key()
     }
 
     /// Prefix of our section
     pub async fn our_prefix(&self) -> Prefix {
-        self.dispatcher.core.network_knowledge().prefix().await
+        self.dispatcher.node.network_knowledge().prefix().await
     }
 
     /// Returns whether the node is Elder.
     pub async fn is_elder(&self) -> bool {
-        self.dispatcher.core.is_elder().await
+        self.dispatcher.node.is_elder().await
     }
 
     /// Returns the information of all the current section elders.
     pub async fn our_elders(&self) -> Vec<Peer> {
-        self.dispatcher.core.network_knowledge().elders().await
+        self.dispatcher.node.network_knowledge().elders().await
     }
 
     /// Returns the information of all the current section adults.
     pub async fn our_adults(&self) -> Vec<Peer> {
-        self.dispatcher.core.network_knowledge().adults().await
+        self.dispatcher.node.network_knowledge().adults().await
     }
 
     /// Returns the info about the section matching the name.
     pub async fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        self.dispatcher.core.matching_section(name).await
+        self.dispatcher.node.matching_section(name).await
     }
 
     /// Builds a WireMsg signed by this Node
@@ -346,7 +346,7 @@ impl NodeApi {
     ) -> Result<WireMsg> {
         let src_section_pk = *self.section_chain().await.last_key();
         WireMsg::single_src(
-            &self.dispatcher.core.node.read().await.clone(),
+            &self.dispatcher.node.info.read().await.clone(),
             dst,
             node_msg,
             src_section_pk,
@@ -362,7 +362,7 @@ impl NodeApi {
             wire_msg.msg_id()
         );
 
-        if let Some(cmd) = self.dispatcher.core.send_msg_to_nodes(wire_msg).await? {
+        if let Some(cmd) = self.dispatcher.node.send_msg_to_nodes(wire_msg).await? {
             self.dispatcher
                 .clone()
                 .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
@@ -375,7 +375,7 @@ impl NodeApi {
     /// Returns the current BLS public key set if this node has one, or
     /// `Error::MissingSecretKeyShare` otherwise.
     pub async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        self.dispatcher.core.public_key_set().await
+        self.dispatcher.node.public_key_set().await
     }
 }
 
@@ -403,8 +403,8 @@ async fn handle_connection_events(
                 };
 
                 let span = {
-                    let core = &dispatcher.core;
-                    trace_span!("handle_message", name = %core.node.read().await.name(), ?sender, msg_id = ?wire_msg.msg_id())
+                    let node = &dispatcher.node;
+                    trace_span!("handle_message", name = %node.info.read().await.name(), ?sender, msg_id = ?wire_msg.msg_id())
                 };
                 let _span_guard = span.enter();
 

@@ -11,14 +11,14 @@ use crate::messaging::{
     DstLocation, MsgKind, WireMsg,
 };
 use crate::node::{
-    api::cmds::Cmd, core::Core, messages::WireMsgUtils, network_knowledge::NodeState, Error, Result,
+    api::cmds::Cmd, core::Node, messages::WireMsgUtils, network_knowledge::NodeState, Error, Result,
 };
 use crate::types::{log_markers::LogMarker, Peer, UnnamedPeer};
 
 use bls::PublicKey as BlsPublicKey;
 use xor_name::XorName;
 
-impl Core {
+impl Node {
     /// Send a direct (`SystemMsg`) message to a node in the specified section
     pub(crate) async fn send_direct_msg(
         &self,
@@ -40,7 +40,7 @@ impl Core {
         section_pk: BlsPublicKey,
     ) -> Result<Cmd> {
         trace!("{}", LogMarker::SendDirectToNodes);
-        let our_node = self.node.read().await.clone();
+        let our_node = self.info.read().await.clone();
         let our_section_key = self.network_knowledge.section_key().await;
 
         let wire_msg = WireMsg::single_src(
@@ -93,7 +93,7 @@ impl Core {
 
         trace!("Send {:?} to {:?}", wire_msg, recipients);
 
-        let our_name = self.node.read().await.name();
+        let our_name = self.info.read().await.name();
         for recipient in recipients.into_iter() {
             if recipient.name() == our_name {
                 match wire_msg.msg_kind() {

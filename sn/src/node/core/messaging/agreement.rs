@@ -12,7 +12,7 @@ use crate::messaging::{
 };
 use crate::node::{
     api::cmds::Cmd,
-    core::{Core, Proposal},
+    core::{Node, Proposal},
     dkg::DkgSessionIdUtils,
     messages::WireMsgUtils,
     network_knowledge::{ElderCandidates, NodeState, SectionKeyShare},
@@ -22,7 +22,7 @@ use crate::types::{log_markers::LogMarker, Peer};
 
 use xor_name::XorName;
 
-impl Core {
+impl Node {
     /// Send proposal to all our elders.
     pub(crate) async fn propose(&self, proposal: Proposal) -> Result<Vec<Cmd>> {
         let elders = self
@@ -83,7 +83,7 @@ impl Core {
         // Carry out a substitution to prevent the dst_location becomes other section.
         let section_key = self.network_knowledge.section_key().await;
         let wire_msg = WireMsg::single_src(
-            &self.node.read().await.clone(),
+            &self.info.read().await.clone(),
             DstLocation::Section {
                 name: self.network_knowledge.prefix().await.name(),
                 section_pk: section_key,
@@ -95,7 +95,7 @@ impl Core {
         let msg_id = wire_msg.msg_id();
 
         let mut cmds = vec![];
-        let our_name = self.node.read().await.name();
+        let our_name = self.info.read().await.name();
         // handle ourselves if we should
         for peer in recipients.clone() {
             if peer.name() == our_name {

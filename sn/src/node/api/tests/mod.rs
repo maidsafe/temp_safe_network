@@ -21,7 +21,7 @@ use crate::messaging::{
 };
 use crate::node::{
     core::{
-        relocation_check, ChurnId, ConnectionEvent, Core, Proposal, RESOURCE_PROOF_DATA_SIZE,
+        relocation_check, ChurnId, ConnectionEvent, Node, Proposal, RESOURCE_PROOF_DATA_SIZE,
         RESOURCE_PROOF_DIFFICULTY,
     },
     create_test_max_capacity_and_root_storage,
@@ -72,7 +72,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
     let node = nodes.remove(0);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-    let core = Core::new(
+    let node = Node::new(
         create_comm().await?,
         node,
         section,
@@ -82,7 +82,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
         root_storage_dir,
     )
     .await?;
-    let dispatcher = Dispatcher::new(core);
+    let dispatcher = Dispatcher::new(node);
 
     let new_node_comm = create_comm().await?;
     let new_node = NodeInfo::new(
@@ -152,7 +152,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
     let node = nodes.remove(0);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-    let core = Core::new(
+    let node = Node::new(
         create_comm().await?,
         node,
         section,
@@ -162,7 +162,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
         root_storage_dir,
     )
     .await?;
-    let dispatcher = Dispatcher::new(core);
+    let dispatcher = Dispatcher::new(node);
 
     let new_node = NodeInfo::new(
         ed25519::gen_keypair(&prefix1.range_inclusive(), MIN_ADULT_AGE),
@@ -171,7 +171,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
 
     let nonce: [u8; 32] = rand::random();
     let serialized = bincode::serialize(&(new_node.name(), nonce))?;
-    let nonce_signature = ed25519::sign(&serialized, &dispatcher.core.node.read().await.keypair);
+    let nonce_signature = ed25519::sign(&serialized, &dispatcher.node.info.read().await.keypair);
 
     let rp = ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY);
     let data = rp.create_proof_data(&nonce);
@@ -241,7 +241,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
     let relocated_node_old_name = node.name();
     let relocated_node_old_keypair = node.keypair.clone();
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-    let core = Core::new(
+    let node = Node::new(
         create_comm().await?,
         node,
         section,
@@ -251,7 +251,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         root_storage_dir,
     )
     .await?;
-    let dispatcher = Dispatcher::new(core);
+    let dispatcher = Dispatcher::new(node);
 
     let relocated_node = NodeInfo::new(
         ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
@@ -330,7 +330,7 @@ async fn handle_agreement_on_online() -> Result<()> {
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
     let node = nodes.remove(0);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-    let core = Core::new(
+    let node = Node::new(
         create_comm().await?,
         node,
         section,
@@ -340,7 +340,7 @@ async fn handle_agreement_on_online() -> Result<()> {
         root_storage_dir,
     )
     .await?;
-    let dispatcher = Dispatcher::new(core);
+    let dispatcher = Dispatcher::new(node);
 
     let new_peer = create_peer(MIN_ADULT_AGE);
 
@@ -391,7 +391,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let node_name = node.name();
     let section_key_share = create_section_key_share(&sk_set, 0);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-    let core = Core::new(
+    let node = Node::new(
         create_comm().await?,
         node,
         section,
@@ -401,7 +401,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         root_storage_dir,
     )
     .await?;
-    let dispatcher = Dispatcher::new(core);
+    let dispatcher = Dispatcher::new(node);
 
     // Handle agreement on Online of a peer that is older than the youngest
     // current elder - that means this peer is going to be promoted.
@@ -533,7 +533,8 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
         NetworkPhase::Startup => Prefix::default(),
         NetworkPhase::Regular => "0".parse().unwrap(),
     };
-    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, elder_count());
+    let (section_auth, mut node_infos, sk_set) =
+        gen_section_authority_provider(prefix, elder_count());
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
 
     // Make a left peer.
@@ -544,11 +545,11 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
 
     // Make a Node
     let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-    let node = nodes.remove(0);
+    let info = node_infos.remove(0);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-    let state = Core::new(
+    let node = Node::new(
         create_comm().await?,
-        node,
+        info,
         section,
         Some(section_key_share),
         event_tx,
@@ -556,7 +557,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
         root_storage_dir,
     )
     .await?;
-    let dispatcher = Dispatcher::new(state);
+    let dispatcher = Dispatcher::new(node);
 
     // Simulate peer with the same name is rejoin and verify resulted behaviours.
     let status = handle_online_cmd(&peer, &sk_set, &dispatcher, &section_auth).await?;
@@ -615,7 +616,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let (event_tx, _event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let node = nodes.remove(0);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-    let core = Core::new(
+    let node = Node::new(
         create_comm().await?,
         node,
         section,
@@ -625,7 +626,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
         root_storage_dir,
     )
     .await?;
-    let dispatcher = Dispatcher::new(core);
+    let dispatcher = Dispatcher::new(node);
 
     let node_state = NodeState::left(existing_peer.clone(), None);
     let proposal = Proposal::Offline(node_state.clone());
@@ -636,7 +637,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
         .await?;
 
     assert!(!dispatcher
-        .core
+        .node
         .network_knowledge()
         .section_members()
         .await
@@ -671,7 +672,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = nodes.remove(0);
     let node_name = node.name();
-    let core = Core::new(
+    let node = Node::new(
         create_comm().await?,
         node,
         section,
@@ -681,7 +682,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         root_storage_dir,
     )
     .await?;
-    let dispatcher = Dispatcher::new(core);
+    let dispatcher = Dispatcher::new(node);
 
     // Handle agreement on the Offline proposal
     let proposal = Proposal::Offline(remove_node_state.clone());
@@ -733,7 +734,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     assert!(dkg_start_sent);
 
     assert!(!dispatcher
-        .core
+        .node
         .network_knowledge()
         .section_members()
         .await
@@ -741,7 +742,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
     // The removed peer is still our elder because we haven't yet processed the section update.
     assert!(dispatcher
-        .core
+        .node
         .network_knowledge()
         .authority_provider()
         .await
@@ -781,7 +782,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let section_key_share = create_section_key_share(&sk_set1, 0);
     let node = nodes.remove(0);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-    let core = Core::new(
+    let node = Node::new(
         create_comm().await?,
         node,
         network_knowledge,
@@ -833,11 +834,11 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
     // Simulate DKG round finished succesfully by adding
     // the new section key share to our cache
-    core.section_keys_provider
+    node.section_keys_provider
         .insert(create_section_key_share(&sk_set2, 0))
         .await;
 
-    let dispatcher = Dispatcher::new(core);
+    let dispatcher = Dispatcher::new(node);
 
     let _cmds = get_internal_cmds(
         Cmd::HandleMsg {
@@ -891,11 +892,11 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
     };
 
     let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-    let node = create_node(MIN_ADULT_AGE, None);
+    let info = gen_info(MIN_ADULT_AGE, None);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-    let core = Core::new(
+    let node = Node::new(
         create_comm().await?,
-        node,
+        info,
         our_section.clone(),
         None,
         event_tx,
@@ -904,9 +905,9 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
     )
     .await?;
 
-    let dispatcher = Dispatcher::new(core);
+    let dispatcher = Dispatcher::new(node);
 
-    let sender = create_node(MIN_ADULT_AGE, None);
+    let sender = gen_info(MIN_ADULT_AGE, None);
     let wire_msg = WireMsg::single_src(
         &sender,
         DstLocation::Section {
@@ -928,9 +929,9 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
     )
     .await?;
 
-    assert_eq!(dispatcher.core.network_knowledge().genesis_key(), &pk0);
+    assert_eq!(dispatcher.node.network_knowledge().genesis_key(), &pk0);
     assert_eq!(
-        dispatcher.core.network_knowledge().prefix_map().all(),
+        dispatcher.node.network_knowledge().prefix_map().all(),
         vec![section_signed_our_section_auth.value]
     );
 
@@ -997,7 +998,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     assert!(section.update_member(node_state).await);
     let node = nodes.remove(0);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-    let core = Core::new(
+    let node = Node::new(
         create_comm().await?,
         node,
         section,
@@ -1007,7 +1008,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         root_storage_dir,
     )
     .await?;
-    let dispatcher = Dispatcher::new(core);
+    let dispatcher = Dispatcher::new(node);
 
     let relocated_peer = match relocated_peer_role {
         RelocatedPeerRole::Elder => section_auth
@@ -1069,33 +1070,33 @@ enum MessageDst {
 }
 
 async fn message_to_self(dst: MessageDst) -> Result<()> {
-    let node = create_node(MIN_ADULT_AGE, None);
+    let info = gen_info(MIN_ADULT_AGE, None);
     let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let (comm_tx, mut comm_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let comm = Comm::new((Ipv4Addr::LOCALHOST, 0).into(), Default::default(), comm_tx).await?;
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
 
     let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
-    let core = Core::first_node(
+    let node = Node::first_node(
         comm,
-        node,
+        info,
         event_tx,
         UsedSpace::new(max_capacity),
         root_storage_dir,
         genesis_sk_set,
     )
     .await?;
-    let node = core.node.read().await.clone();
-    let section_pk = core.network_knowledge().section_key().await;
-    let dispatcher = Dispatcher::new(core);
+    let info = node.info.read().await.clone();
+    let section_pk = node.network_knowledge().section_key().await;
+    let dispatcher = Dispatcher::new(node);
 
     let dst_location = match dst {
         MessageDst::Node => DstLocation::Node {
-            name: node.name(),
+            name: info.name(),
             section_pk,
         },
         MessageDst::Section => DstLocation::Section {
-            name: node.name(),
+            name: info.name(),
             section_pk,
         },
     };
@@ -1104,12 +1105,12 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
         error: crate::messaging::data::Error::FailedToWriteFile,
         correlation_id: MsgId::new(),
     };
-    let wire_msg = WireMsg::single_src(&node, dst_location, node_msg.clone(), section_pk)?;
+    let wire_msg = WireMsg::single_src(&info, dst_location, node_msg.clone(), section_pk)?;
 
     let cmds = dispatcher
         .process_cmd(
             Cmd::SendMsg {
-                recipients: vec![node.peer()],
+                recipients: vec![info.peer()],
                 wire_msg,
             },
             "cmd-id",
@@ -1119,7 +1120,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     assert!(cmds.is_empty());
 
     let msg_type = assert_matches!(comm_rx.recv().await, Some(ConnectionEvent::Received((sender, bytes))) => {
-        assert_eq!(sender.addr(), node.addr);
+        assert_eq!(sender.addr(), info.addr);
         assert_matches!(WireMsg::deserialize(bytes), Ok(msg_type) => msg_type)
     });
 
@@ -1140,7 +1141,7 @@ async fn handle_elders_update() -> Result<()> {
     let _span = tracing::info_span!("handle_elders_update").entered();
     // Start with section that has `elder_count()` elders with age 6, 1 non-elder with age 5 and one
     // to-be-elder with age 7:
-    let node = create_node(MIN_ADULT_AGE + 1, None);
+    let info = gen_info(MIN_ADULT_AGE + 1, None);
     let mut other_elder_peers: Vec<_> = iter::repeat_with(|| create_peer(MIN_ADULT_AGE + 1))
         .take(elder_count() - 1)
         .collect();
@@ -1151,7 +1152,7 @@ async fn handle_elders_update() -> Result<()> {
     let pk0 = sk_set0.secret_key().public_key();
 
     let sap0 = SectionAuthorityProvider::new(
-        iter::once(node.peer()).chain(other_elder_peers.clone()),
+        iter::once(info.peer()).chain(other_elder_peers.clone()),
         Prefix::default(),
         sk_set0.public_keys(),
     );
@@ -1172,7 +1173,7 @@ async fn handle_elders_update() -> Result<()> {
     // Create `HandleAgreement` cmd for an `NewElders` proposal. This will demote one of the
     // current elders and promote the oldest peer.
     let sap1 = SectionAuthorityProvider::new(
-        iter::once(node.peer())
+        iter::once(info.peer())
             .chain(other_elder_peers.clone())
             .chain(iter::once(promoted_peer.clone())),
         Prefix::default(),
@@ -1190,9 +1191,9 @@ async fn handle_elders_update() -> Result<()> {
 
     let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-    let core = Core::new(
+    let node = Node::new(
         create_comm().await?,
-        node,
+        info,
         section0.clone(),
         Some(section_key_share),
         event_tx,
@@ -1203,11 +1204,11 @@ async fn handle_elders_update() -> Result<()> {
 
     // Simulate DKG round finished succesfully by adding
     // the new section key share to our cache
-    core.section_keys_provider
+    node.section_keys_provider
         .insert(create_section_key_share(&sk_set1, 0))
         .await;
 
-    let dispatcher = Dispatcher::new(core);
+    let dispatcher = Dispatcher::new(node);
 
     let cmds = dispatcher
         .process_cmd(Cmd::HandleNewEldersAgreement { proposal, sig }, "cmd-id")
@@ -1273,8 +1274,8 @@ async fn handle_demote_during_split() -> Result<()> {
     init_test_logger();
     let _span = tracing::info_span!("handle_demote_during_split").entered();
 
-    let node = create_node(MIN_ADULT_AGE, None);
-    let node_name = node.name();
+    let info = gen_info(MIN_ADULT_AGE, None);
+    let node_name = info.name();
     let prefix0 = Prefix::default().pushed(false);
     let prefix1 = Prefix::default().pushed(true);
     // These peers together with `node` are pre-split elders.
@@ -1292,7 +1293,7 @@ async fn handle_demote_during_split() -> Result<()> {
     // Create the pre-split section
     let sk_set_v0 = SecretKeySet::random();
     let section_auth_v0 = SectionAuthorityProvider::new(
-        iter::once(node.peer()).chain(peers_a.iter().cloned()),
+        iter::once(info.peer()).chain(peers_a.iter().cloned()),
         Prefix::default(),
         sk_set_v0.public_keys(),
     );
@@ -1306,9 +1307,9 @@ async fn handle_demote_during_split() -> Result<()> {
 
     let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-    let core = Core::new(
+    let node = Node::new(
         create_comm().await?,
-        node,
+        info,
         section,
         Some(section_key_share),
         event_tx,
@@ -1323,16 +1324,16 @@ async fn handle_demote_during_split() -> Result<()> {
     // Simulate DKG round finished succesfully by adding the new section
     // key share to our cache (according to which split section we'll belong to).
     if prefix0.matches(&node_name) {
-        core.section_keys_provider
+        node.section_keys_provider
             .insert(create_section_key_share(&sk_set_v1_p0, 0))
             .await;
     } else {
-        core.section_keys_provider
+        node.section_keys_provider
             .insert(create_section_key_share(&sk_set_v1_p1, 0))
             .await;
     }
 
-    let dispatcher = Dispatcher::new(core);
+    let dispatcher = Dispatcher::new(node);
 
     // Create agreement on `OurElder` for both sub-sections
     let create_our_elders_cmd = |signed_sap| -> Result<_> {
@@ -1409,7 +1410,7 @@ fn create_peer_in_prefix(prefix: &Prefix, age: u8) -> Peer {
     Peer::new(prefix.substituted_in(name), gen_addr())
 }
 
-fn create_node(age: u8, prefix: Option<Prefix>) -> NodeInfo {
+fn gen_info(age: u8, prefix: Option<Prefix>) -> NodeInfo {
     NodeInfo::new(
         ed25519::gen_keypair(&prefix.unwrap_or_default().range_inclusive(), age),
         gen_addr(),
