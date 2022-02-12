@@ -31,8 +31,7 @@ use crate::node::{
     network_knowledge::{
         test_utils::*, NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare,
     },
-    node_info::Node,
-    recommended_section_size, supermajority, Error, Event, Peer, Result as RoutingResult,
+    recommended_section_size, supermajority, Error, Event, NodeInfo, Peer, Result as RoutingResult,
     FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
 use crate::types::{Keypair, PublicKey, UnnamedPeer};
@@ -86,7 +85,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     let dispatcher = Dispatcher::new(core);
 
     let new_node_comm = create_comm().await?;
-    let new_node = Node::new(
+    let new_node = NodeInfo::new(
         ed25519::gen_keypair(&prefix1.range_inclusive(), MIN_ADULT_AGE),
         new_node_comm.our_connection_info(),
     );
@@ -165,7 +164,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
     .await?;
     let dispatcher = Dispatcher::new(core);
 
-    let new_node = Node::new(
+    let new_node = NodeInfo::new(
         ed25519::gen_keypair(&prefix1.range_inclusive(), MIN_ADULT_AGE),
         gen_addr(),
     );
@@ -254,7 +253,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
     .await?;
     let dispatcher = Dispatcher::new(core);
 
-    let relocated_node = Node::new(
+    let relocated_node = NodeInfo::new(
         ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
         gen_addr(),
     );
@@ -365,7 +364,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let mut nodes: Vec<_> = gen_sorted_nodes(&Prefix::default(), elder_count(), true);
 
     let section_auth = SectionAuthorityProvider::new(
-        nodes.iter().map(Node::peer),
+        nodes.iter().map(NodeInfo::peer),
         Prefix::default(),
         sk_set.public_keys(),
     );
@@ -1410,8 +1409,8 @@ fn create_peer_in_prefix(prefix: &Prefix, age: u8) -> Peer {
     Peer::new(prefix.substituted_in(name), gen_addr())
 }
 
-fn create_node(age: u8, prefix: Option<Prefix>) -> Node {
-    Node::new(
+fn create_node(age: u8, prefix: Option<Prefix>) -> NodeInfo {
+    NodeInfo::new(
         ed25519::gen_keypair(&prefix.unwrap_or_default().range_inclusive(), age),
         gen_addr(),
     )
@@ -1423,7 +1422,7 @@ pub(crate) async fn create_comm() -> Result<Comm> {
 }
 
 // Generate random SectionAuthorityProvider and the corresponding Nodes.
-fn create_section_auth() -> (SectionAuthorityProvider, Vec<Node>, SecretKeySet) {
+fn create_section_auth() -> (SectionAuthorityProvider, Vec<NodeInfo>, SecretKeySet) {
     let (section_auth, elders, secret_key_set) =
         gen_section_authority_provider(Prefix::default(), elder_count());
     (section_auth, elders, secret_key_set)

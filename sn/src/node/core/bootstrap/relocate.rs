@@ -14,7 +14,7 @@ use crate::messaging::{
 };
 use crate::node::{
     api::cmds::Cmd, ed25519, messages::WireMsgUtils, network_knowledge::SectionAuthorityProvider,
-    node_info::Node, Error, Result,
+    Error, NodeInfo, Result,
 };
 use crate::types::{Peer, PublicKey};
 
@@ -25,7 +25,7 @@ use xor_name::{Prefix, XorName};
 
 /// Re-join as a relocated node.
 pub(crate) struct JoiningAsRelocated {
-    pub(crate) node: Node,
+    pub(crate) node: NodeInfo,
     genesis_key: BlsPublicKey,
     relocate_proof: SectionAuth<NodeState>,
     // Avoid sending more than one duplicated request (with same SectionKey) to the same peer.
@@ -40,7 +40,7 @@ impl JoiningAsRelocated {
     // Generates the first cmd to send a `JoinAsRelocatedRequest`, responses
     // shall be fed back with `handle_join_response` function.
     pub(crate) fn start(
-        node: Node,
+        node: NodeInfo,
         genesis_key: BlsPublicKey,
         relocate_proof: SectionAuth<NodeState>,
         bootstrap_addrs: Vec<SocketAddr>,
@@ -205,7 +205,7 @@ impl JoiningAsRelocated {
         let signature_over_new_name = ed25519::sign(&new_name.0, &self.old_keypair);
 
         info!("Changing name to {}", new_name);
-        self.node = Node::new(new_keypair, self.node.addr);
+        self.node = NodeInfo::new(new_keypair, self.node.addr);
 
         signature_over_new_name
     }

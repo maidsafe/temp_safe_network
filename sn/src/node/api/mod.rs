@@ -31,8 +31,7 @@ use crate::node::{
     logging::{log_ctx::LogCtx, run_system_logger},
     messages::WireMsgUtils,
     network_knowledge::SectionAuthorityProvider,
-    node_info::Node,
-    Config, Peer, MIN_ADULT_AGE,
+    Config, NodeInfo, Peer, MIN_ADULT_AGE,
 };
 use crate::types::{log_markers::LogMarker, PublicKey as TypesPublicKey};
 use crate::UsedSpace;
@@ -165,7 +164,7 @@ impl NodeApi {
                 connection_event_tx,
             )
             .await?;
-            let node = Node::new(keypair, comm.our_connection_info());
+            let node = NodeInfo::new(keypair, comm.our_connection_info());
 
             let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
             let core = Core::first_node(
@@ -241,7 +240,7 @@ impl NodeApi {
                 genesis_key
             );
 
-            let joining_node = Node::new(keypair, comm.our_connection_info());
+            let joining_node = NodeInfo::new(keypair, comm.our_connection_info());
             let (node, network_knowledge) = join_network(
                 joining_node,
                 &comm,

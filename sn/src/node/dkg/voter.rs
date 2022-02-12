@@ -16,8 +16,7 @@ use crate::node::{
     ed25519,
     messages::WireMsgUtils,
     network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
-    node_info::Node,
-    supermajority, Result,
+    supermajority, NodeInfo, Result,
 };
 use crate::types::Peer;
 
@@ -60,7 +59,7 @@ impl DkgVoter {
     // Starts a new DKG session.
     pub(crate) async fn start(
         &self,
-        node: &Node,
+        node: &NodeInfo,
         session_id: DkgSessionId,
         elder_candidates: ElderCandidates,
         section_pk: BlsPublicKey,
@@ -149,7 +148,7 @@ impl DkgVoter {
     // Make key generator progress with timed phase.
     pub(crate) fn handle_timeout(
         &self,
-        node: &Node,
+        node: &NodeInfo,
         timer_token: u64,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
@@ -168,7 +167,7 @@ impl DkgVoter {
     pub(crate) async fn process_msg(
         &self,
         sender: Peer,
-        node: &Node,
+        node: &NodeInfo,
         session_id: &DkgSessionId,
         message: DkgMessage,
         section_pk: BlsPublicKey,
@@ -233,7 +232,7 @@ impl DkgVoter {
 
     pub(crate) async fn handle_dkg_history(
         &self,
-        node: &Node,
+        node: &NodeInfo,
         session_id: DkgSessionId,
         message_history: Vec<DkgMessage>,
         sender: XorName,

@@ -190,7 +190,7 @@ impl SectionAuth<SectionAuthorityProviderMsg> {
 pub(crate) mod test_utils {
     use super::*;
     use crate::node::api::tests::SecretKeySet;
-    use crate::node::{ed25519, node_info::Node, MIN_ADULT_AGE};
+    use crate::node::{ed25519, NodeInfo, MIN_ADULT_AGE};
     use itertools::Itertools;
     use std::{cell::Cell, net::SocketAddr};
     use xor_name::Prefix;
@@ -210,7 +210,7 @@ pub(crate) mod test_utils {
     // The `age_diff` flag is used to trigger nodes being generated with different age pattern.
     // The test of `handle_agreement_on_online_of_elder_candidate` requires most nodes to be with
     // age of MIN_AGE + 2 and one node with age of MIN_ADULT_AGE.
-    pub(crate) fn gen_sorted_nodes(prefix: &Prefix, count: usize, age_diff: bool) -> Vec<Node> {
+    pub(crate) fn gen_sorted_nodes(prefix: &Prefix, count: usize, age_diff: bool) -> Vec<NodeInfo> {
         (0..count)
             .map(|index| {
                 let age = if age_diff && index < count - 1 {
@@ -218,7 +218,7 @@ pub(crate) mod test_utils {
                 } else {
                     MIN_ADULT_AGE
                 };
-                Node::new(
+                NodeInfo::new(
                     ed25519::gen_keypair(&prefix.range_inclusive(), age),
                     gen_addr(),
                 )
@@ -231,9 +231,9 @@ pub(crate) mod test_utils {
     pub(crate) fn gen_section_authority_provider(
         prefix: Prefix,
         count: usize,
-    ) -> (SectionAuthorityProvider, Vec<Node>, SecretKeySet) {
+    ) -> (SectionAuthorityProvider, Vec<NodeInfo>, SecretKeySet) {
         let nodes = gen_sorted_nodes(&prefix, count, false);
-        let elders = nodes.iter().map(Node::peer);
+        let elders = nodes.iter().map(NodeInfo::peer);
 
         let secret_key_set = SecretKeySet::random();
         let section_auth = SectionAuthorityProvider::from_elder_candidates(

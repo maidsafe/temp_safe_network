@@ -471,8 +471,7 @@ mod tests {
             test_utils::{gen_addr, gen_section_authority_provider},
             SectionKeyShare, SectionKeysProvider,
         },
-        node_info::Node,
-        XorName, MIN_ADULT_AGE,
+        NodeInfo, XorName, MIN_ADULT_AGE,
     };
     use crate::UsedSpace;
 
@@ -755,7 +754,7 @@ mod tests {
             src_section_prefix: &Prefix,
             src_section_pk: BlsPublicKey,
         ) -> Result<(WireMsg, SrcLocation)> {
-            let sender = Node::new(
+            let sender = NodeInfo::new(
                 ed25519::gen_keypair(&src_section_prefix.range_inclusive(), MIN_ADULT_AGE),
                 gen_addr(),
             );
