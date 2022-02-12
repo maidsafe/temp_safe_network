@@ -10,6 +10,8 @@
 
 /// Standardised log markers for various events
 pub mod log_markers;
+/// PrefixMap used in client and node.
+pub mod prefix_map;
 /// Register data type
 pub mod register;
 /// Encoding utils
@@ -20,6 +22,7 @@ mod cache;
 mod chunk;
 mod errors;
 mod keys;
+mod peer;
 mod token;
 
 pub use address::{
@@ -36,6 +39,7 @@ pub use keys::{
     secret_key::SecretKey,
     signature::{Signature, SignatureShare},
 };
+pub use peer::{Peer, UnnamedPeer};
 pub use token::Token;
 
 use crate::messaging::data::{RegisterCmd, ReplicatedRegisterLog};

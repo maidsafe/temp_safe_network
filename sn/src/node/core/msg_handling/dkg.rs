@@ -18,8 +18,7 @@ use crate::node::{
     network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
     Error, Result,
 };
-use crate::peer::Peer;
-use crate::types::log_markers::LogMarker;
+use crate::types::{log_markers::LogMarker, Peer};
 
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;

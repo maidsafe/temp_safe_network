@@ -8,7 +8,8 @@
 
 use crate::messaging::system::{MembershipState, SectionAuth};
 use crate::node::network_knowledge::{NodeState, SectionAuthorityProvider};
-use crate::peer::Peer;
+use crate::types::Peer;
+
 use dashmap::{mapref::entry::Entry, DashMap};
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;

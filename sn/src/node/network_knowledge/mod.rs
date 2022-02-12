@@ -7,10 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod elder_candidates;
+mod section_peers;
+
 pub(super) mod node_state;
 pub(crate) mod section_authority_provider;
 pub(super) mod section_keys;
-mod section_peers;
 
 #[cfg(test)]
 pub(crate) use self::section_authority_provider::test_utils;
@@ -24,12 +25,10 @@ pub(crate) use section_authority_provider::SectionAuthorityProvider;
 use crate::elder_count;
 use crate::messaging::system::{KeyedSig, SectionAuth, SectionPeers as SectionPeersMsg};
 use crate::node::{dkg::SectionAuthUtils, recommended_section_size, Error, Result};
-use crate::peer::Peer;
-use crate::prefix_map::NetworkPrefixMap;
-use crate::types::log_markers::LogMarker;
-use section_peers::SectionPeers;
+use crate::types::{log_markers::LogMarker, prefix_map::NetworkPrefixMap, Peer};
 
 use bls::PublicKey as BlsPublicKey;
+use section_peers::SectionPeers;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
 use std::{

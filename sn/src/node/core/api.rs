@@ -19,8 +19,7 @@ use crate::node::{
     node_info::Node,
     Event,
 };
-use crate::peer::Peer;
-use crate::types::log_markers::LogMarker;
+use crate::types::{log_markers::LogMarker, Peer};
 use crate::UsedSpace;
 
 use secured_linked_list::SecuredLinkedList;

@@ -19,8 +19,7 @@ use crate::node::{
     node_info::Node,
     Result,
 };
-use crate::peer::Peer;
-use crate::types::{log_markers::LogMarker, PublicKey};
+use crate::types::{log_markers::LogMarker, Peer, PublicKey};
 
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{

@@ -7,11 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::ElderCandidates;
+
 use crate::messaging::{
     system::SectionAuth, SectionAuthorityProvider as SectionAuthorityProviderMsg,
 };
 use crate::node::{Prefix, XorName};
-use crate::peer::Peer;
+use crate::types::Peer;
+
 use bls::{PublicKey, PublicKeySet};
 use std::{
     collections::{BTreeMap, BTreeSet},

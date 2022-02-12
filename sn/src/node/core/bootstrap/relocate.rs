@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::UsedRecipientSaps;
+
 use crate::messaging::{
     system::{JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeState, SectionAuth, SystemMsg},
     DstLocation, WireMsg,
@@ -15,8 +16,7 @@ use crate::node::{
     api::cmds::Cmd, ed25519, messages::WireMsgUtils, network_knowledge::SectionAuthorityProvider,
     node_info::Node, Error, Result,
 };
-use crate::peer::Peer;
-use crate::types::PublicKey;
+use crate::types::{Peer, PublicKey};
 
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{Keypair, Signature};

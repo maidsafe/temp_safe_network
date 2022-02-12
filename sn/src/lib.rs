@@ -43,7 +43,6 @@ extern crate tracing;
 
 pub mod client;
 mod dbs;
-mod peer;
 
 #[cfg(test)]
 /// Helpers for analysis of testnet logs
@@ -53,7 +52,6 @@ pub use dbs::UsedSpace;
 
 pub mod messaging;
 pub mod node;
-pub mod prefix_map;
 pub mod types;
 
 use tracing_core::{Event, Subscriber};

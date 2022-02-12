@@ -12,8 +12,7 @@ use crate::node::{
     core::{Core, StateSnapshot},
     Result,
 };
-use crate::peer::Peer;
-use crate::types::log_markers::LogMarker;
+use crate::types::{log_markers::LogMarker, Peer};
 
 use bls::PublicKey as BlsPublicKey;
 use xor_name::Prefix;

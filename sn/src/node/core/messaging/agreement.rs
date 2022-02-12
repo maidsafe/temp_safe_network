@@ -18,8 +18,7 @@ use crate::node::{
     network_knowledge::{ElderCandidates, NodeState, SectionKeyShare},
     Result,
 };
-use crate::peer::Peer;
-use crate::types::log_markers::LogMarker;
+use crate::types::{log_markers::LogMarker, Peer};
 
 use xor_name::XorName;
 

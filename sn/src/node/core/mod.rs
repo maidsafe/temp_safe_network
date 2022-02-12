@@ -48,8 +48,9 @@ use crate::messaging::{
     AuthorityProof, SectionAuth,
 };
 use crate::node::error::Result;
-use crate::peer::Peer;
-use crate::types::{log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk, Cache};
+use crate::types::{
+    log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk, Cache, Peer,
+};
 use crate::UsedSpace;
 
 use backoff::ExponentialBackoff;

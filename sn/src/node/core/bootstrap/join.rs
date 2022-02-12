@@ -24,9 +24,7 @@ use crate::node::{
     node_info::Node,
     Error, Result, MIN_ADULT_AGE,
 };
-use crate::peer::{Peer, UnnamedPeer};
-use crate::prefix_map::NetworkPrefixMap;
-use crate::types::log_markers::LogMarker;
+use crate::types::{log_markers::LogMarker, prefix_map::NetworkPrefixMap, Peer, UnnamedPeer};
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -633,6 +631,7 @@ async fn send_messages(mut rx: mpsc::Receiver<(WireMsg, Vec<Peer>)>, comm: &Comm
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::messaging::SectionAuthorityProvider as SectionAuthorityProviderMsg;
     use crate::node::{
         dkg::test_utils::*,
@@ -640,10 +639,9 @@ mod tests {
         network_knowledge::{test_utils::*, NodeState},
         Error as RoutingError, MIN_ADULT_AGE,
     };
-    use crate::peer::UnnamedPeer;
+    use crate::types::PublicKey;
     use crate::{elder_count, init_test_logger};
 
-    use crate::types::PublicKey;
     use assert_matches::assert_matches;
     use eyre::{eyre, Error, Result};
     use futures::{

@@ -19,8 +19,7 @@ use crate::{
         core::MAX_WAITING_PEERS_PER_QUERY, error::convert_to_error_msg, messages::WireMsgUtils,
         Error, Result,
     },
-    peer::Peer,
-    types::{log_markers::LogMarker, PublicKey, ReplicatedData, ReplicatedDataAddress},
+    types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData, ReplicatedDataAddress},
 };
 
 use itertools::Itertools;

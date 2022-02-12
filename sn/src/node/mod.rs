@@ -59,7 +59,7 @@ pub(crate) const fn supermajority(group_size: usize) -> usize {
     1 + group_size * 2 / 3
 }
 
-use crate::peer::Peer;
+use crate::types::Peer;
 
 #[cfg(any(test, feature = "test-utils"))]
 mod test_utils {

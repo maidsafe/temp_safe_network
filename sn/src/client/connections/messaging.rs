@@ -8,16 +8,14 @@
 
 use super::{QueryResult, Session};
 
-use crate::client::connections::CmdResponse;
-use crate::client::Error;
+use crate::client::{connections::CmdResponse, Error};
 use crate::elder_count;
 use crate::messaging::{
     data::{CmdError, DataQuery, QueryResponse},
     DstLocation, MsgId, MsgKind, ServiceAuth, WireMsg,
 };
-use crate::peer::Peer;
-use crate::prefix_map::NetworkPrefixMap;
-use crate::types::PublicKey;
+use crate::types::{prefix_map::NetworkPrefixMap, Peer, PublicKey};
+
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
 use dashmap::DashMap;

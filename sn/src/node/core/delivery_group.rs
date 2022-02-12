@@ -9,7 +9,7 @@
 use crate::elder_count;
 use crate::messaging::DstLocation;
 use crate::node::{network_knowledge::NetworkKnowledge, supermajority, Error, Result};
-use crate::peer::Peer;
+use crate::types::Peer;
 
 use itertools::Itertools;
 use std::{cmp, iter};

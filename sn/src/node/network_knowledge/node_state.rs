@@ -10,7 +10,7 @@ use crate::messaging::system::{
     MembershipState, NodeState as NodeStateMsg, RelocateDetails, SectionAuth,
 };
 use crate::node::error::Error;
-use crate::peer::Peer;
+use crate::types::Peer;
 
 use std::net::SocketAddr;
 use xor_name::XorName;

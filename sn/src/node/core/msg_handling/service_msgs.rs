@@ -10,12 +10,10 @@ use crate::data_copy_count;
 use crate::messaging::{
     data::{CmdError, DataCmd, DataQuery, Error as ErrorMsg, ServiceMsg},
     system::{NodeQueryResponse, SystemMsg},
-    DstLocation, EndUser, MsgId, WireMsg,
+    AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
 };
-use crate::messaging::{AuthorityProof, ServiceAuth};
 use crate::node::{api::cmds::Cmd, core::Core, Result};
-use crate::peer::Peer;
-use crate::types::{log_markers::LogMarker, register::User, PublicKey, ReplicatedData};
+use crate::types::{log_markers::LogMarker, register::User, Peer, PublicKey, ReplicatedData};
 
 use xor_name::XorName;
 
