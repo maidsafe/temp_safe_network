@@ -11,8 +11,7 @@ mod bootstrap;
 mod capacity;
 mod comm;
 mod connectivity;
-mod data_records;
-mod data_storage;
+mod data;
 mod delivery_group;
 mod liveness_tracking;
 mod messaging;
@@ -29,7 +28,7 @@ pub(crate) use proposal::Proposal;
 #[cfg(test)]
 pub(crate) use relocation::{check as relocation_check, ChurnId};
 
-use self::{data_storage::DataStorage, split_barrier::SplitBarrier};
+use self::{data::DataStorage, split_barrier::SplitBarrier};
 
 use super::{
     api::cmds::Cmd,
