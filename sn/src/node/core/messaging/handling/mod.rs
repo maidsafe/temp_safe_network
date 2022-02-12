@@ -16,6 +16,8 @@ mod resource_proof;
 mod service_msgs;
 mod update_section;
 
+pub(crate) use proposals::handle_proposal;
+
 use crate::dbs::Error as DbError;
 use crate::messaging::{
     data::{ServiceMsg, StorageLevel},
@@ -585,8 +587,16 @@ impl Node {
                 }
 
                 trace!("Handling msg: Propose from {}: {:?}", sender, msg_id);
-                self.handle_proposal(msg_id, proposal.into_state(), sig_share, sender)
-                    .await
+
+                handle_proposal(
+                    msg_id,
+                    proposal.into_state(),
+                    sig_share,
+                    sender,
+                    &self.network_knowledge,
+                    &self.proposal_aggregator,
+                )
+                .await
             }
             SystemMsg::DkgStart {
                 session_id,

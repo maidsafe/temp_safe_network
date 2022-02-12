@@ -13,8 +13,6 @@ mod connectivity;
 mod data;
 mod delivery_group;
 mod messaging;
-
-mod msg_handling;
 mod proposal;
 mod relocation;
 mod split_barrier;
