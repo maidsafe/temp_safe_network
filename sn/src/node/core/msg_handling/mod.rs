@@ -265,6 +265,8 @@ impl Core {
     ) -> Result<Vec<Cmd>> {
         trace!("{:?}", LogMarker::SystemMsgToBeHandled);
 
+        trace!("Aggregating {:?} / {:?} / {:?}", msg_id, msg_authority, msg);
+
         // We assume to be aggregated if it contains a BLS Share sig as authority.
         match self
             .aggregate_msg_and_stop(&mut msg_authority, payload)
@@ -300,6 +302,7 @@ impl Core {
         sender: Peer,
         known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Cmd>> {
+        trace!("Handling valid message {:?} - {:?}", msg_id, node_msg);
         self.network_knowledge().merge_connections([&sender]).await;
 
         let src_name = msg_authority.name();

@@ -570,10 +570,14 @@ impl Session {
                     if let Some(sap) = known_sap.clone() {
                         eprintln!(
                             "known_sap after {:?} rounds: {:?}",
-                            knowledge_checks, sap.names()
+                            knowledge_checks,
+                            sap.names()
                         );
                     } else {
-                        eprintln!("don't have a known sap yet after {:?} rounds", knowledge_checks);
+                        eprintln!(
+                            "don't have a known sap yet after {:?} rounds",
+                            knowledge_checks
+                        );
                     }
 
                     insufficient_sap_peers = false;
@@ -594,9 +598,11 @@ impl Session {
                     stats, sap.names()
                 );
             } else {
-                eprintln!("don't have a known sap yet , and know section is {:?}", stats);
+                eprintln!(
+                    "don't have a known sap yet , and know section is {:?}",
+                    stats
+                );
             }
-
         }
 
         Ok(())
