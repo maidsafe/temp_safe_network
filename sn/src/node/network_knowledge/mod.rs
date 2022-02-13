@@ -677,7 +677,7 @@ impl NetworkKnowledge {
             .map(|peer| (peer.addr(), peer))
             .collect();
 
-        for elder in self.signed_sap.read().await.elders() {
+        for elder in self.signed_sap.write().await.elders() {
             if let Some(source) = sources.get(&elder.addr()) {
                 elder.merge_connection(source).await;
             }
