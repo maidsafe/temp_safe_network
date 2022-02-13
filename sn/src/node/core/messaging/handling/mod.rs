@@ -30,7 +30,7 @@ use crate::messaging::{
 };
 use crate::node::{
     api::cmds::Cmd,
-    core::{DkgSessionInfo, Node, DATA_QUERY_LIMIT},
+    core::{DkgSessionInfo, Node},
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::NetworkKnowledge,
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
@@ -198,9 +198,7 @@ impl Node {
                 // First we check if it's query and we have too many on the go at the moment...
                 if let ServiceMsg::Query(_) = msg {
                     // we have a query, check if we have too many on the go....
-                    let pending_query_length = self.pending_data_queries.len().await;
-
-                    if pending_query_length > DATA_QUERY_LIMIT {
+                    if self.data.pending_queries_exceeded().await {
                         // TODO: check if query is pending for this already.. add to that if that makes sense.
                         warn!("Pending queries length exceeded, dropping query {msg:?}");
                         return Ok(vec![]);
@@ -648,7 +646,7 @@ impl Node {
                     .await
             }
             SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {
-                let changed = self.set_storage_level(&node_id, level).await;
+                let changed = self.data.set_storage_level(&node_id, level).await;
                 if changed && level.value() == MIN_LEVEL_WHEN_FULL {
                     // ..then we accept a new node in place of the full node
                     *self.joins_allowed.write().await = true;
@@ -657,7 +655,7 @@ impl Node {
             }
             SystemMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }) => {
                 info!("Processing received MetadataExchange packet: {:?}", msg_id);
-                self.set_adult_levels(metadata).await;
+                self.data.set_adult_levels(metadata).await;
                 Ok(vec![])
             }
             SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
@@ -672,6 +670,7 @@ impl Node {
                 return if self.is_elder().await {
                     if full {
                         let changed = self
+                            .data
                             .set_storage_level(&node_id, StorageLevel::from(StorageLevel::MAX)?)
                             .await;
                         if changed {
@@ -679,7 +678,7 @@ impl Node {
                             *self.joins_allowed.write().await = true;
                         }
                     }
-                    self.replicate_data(data).await
+                    self.data.replicate(data).await
                 } else {
                     error!("Received unexpected message while Adult");
                     Ok(vec![])
@@ -702,7 +701,7 @@ impl Node {
                     // We are an adult here, so just store away!
                     // This may return a DatabaseFull error... but we should have reported storage increase
                     // well before this
-                    match self.data_storage.store(&data).await {
+                    match self.data.store(&data).await {
                         Ok(level_report) => {
                             info!("Storage level report: {:?}", level_report);
                             return Ok(self.record_storage_level_if_any(level_report).await);

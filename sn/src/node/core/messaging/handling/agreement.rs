@@ -92,7 +92,7 @@ impl Node {
             return Ok(vec![]);
         }
 
-        self.add_new_adult_to_trackers(new_info.name()).await;
+        self.data.track_adult(new_info.name()).await;
 
         info!("handle Online: {} at {}", new_info.name(), new_info.addr());
 
@@ -202,15 +202,7 @@ impl Node {
 
         cmds.extend(result);
 
-        self.liveness_retain_only(
-            self.network_knowledge
-                .adults()
-                .await
-                .iter()
-                .map(|peer| peer.name())
-                .collect(),
-        )
-        .await?;
+        self.data.update_member_tracking().await?;
         *self.joins_allowed.write().await = true;
 
         Ok(cmds)

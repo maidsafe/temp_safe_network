@@ -9,7 +9,11 @@
 mod chunks;
 mod registers;
 
+pub(crate) use chunks::ChunkStorage;
+pub(crate) use registers::RegisterStorage;
+
 use crate::{
+    data_copy_count,
     dbs::Result,
     messaging::{
         data::{DataQuery, RegisterStoreExport, StorageLevel},
@@ -21,9 +25,7 @@ use crate::{
     UsedSpace,
 };
 
-pub(crate) use chunks::ChunkStorage;
-pub(crate) use registers::RegisterStorage;
-
+use itertools::Itertools;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
@@ -118,7 +120,7 @@ impl DataStorage {
         }
     }
 
-    async fn keys(&self) -> Result<Vec<DataAddress>> {
+    pub(crate) async fn keys(&self) -> Result<Vec<DataAddress>> {
         let chunk_keys = self.chunks.keys()?.into_iter().map(DataAddress::Chunk);
         let reg_keys = self
             .registers
@@ -137,9 +139,8 @@ impl Node {
         new_adults: BTreeSet<XorName>,
         lost_adults: BTreeSet<XorName>,
         remaining: BTreeSet<XorName>,
-    ) -> Result<Vec<Cmd>, crate::node::Error> {
-        let data = self.data_storage.clone();
-        let keys = data.keys().await?;
+    ) -> Result<Vec<Cmd>> {
+        let keys = self.data.keys().await?;
         let mut data_for_replication = BTreeMap::new();
         for addr in keys.iter() {
             if let Some((data, holders)) = self
@@ -172,8 +173,6 @@ impl Node {
         lost_adults: &BTreeSet<XorName>,
         remaining: &BTreeSet<XorName>,
     ) -> Option<(ReplicatedData, BTreeSet<XorName>)> {
-        let storage = self.data_storage.clone();
-
         let old_adult_list = remaining.union(lost_adults).copied().collect();
         let new_adult_list = remaining.union(new_adults).copied().collect();
         let new_holders = self.compute_holders(address, &new_adult_list);
@@ -185,19 +184,19 @@ impl Node {
         let lost_old_holder = !old_holders.is_disjoint(lost_adults);
 
         if new_adult_is_holder || lost_old_holder {
-            info!("Republishing data at {:?}", address);
+            info!("Replicating data at {:?}", address);
             trace!(
                 "New Adult is Holder? {}, Lost Adult was holder? {}",
                 new_adult_is_holder,
                 lost_old_holder
             );
-            let data = match storage.get_for_replication(address).await {
+            let data = match self.data.get_for_replication(address).await {
                 Ok(data) => {
-                    info!("Data found and republishing: {address:?}");
+                    info!("Data found and replicating: {address:?}");
                     Ok(data)
                 }
                 Err(error) => {
-                    warn!("Error finding {address:?} for republishing: {error:?}");
+                    warn!("Error finding {address:?} for replication: {error:?}");
                     Err(error)
                 }
             }
@@ -207,5 +206,18 @@ impl Node {
         } else {
             None
         }
+    }
+
+    fn compute_holders(
+        &self,
+        addr: &DataAddress,
+        adult_list: &BTreeSet<XorName>,
+    ) -> BTreeSet<XorName> {
+        adult_list
+            .iter()
+            .sorted_by(|lhs, rhs| addr.name().cmp_distance(lhs, rhs))
+            .take(data_copy_count())
+            .cloned()
+            .collect()
     }
 }

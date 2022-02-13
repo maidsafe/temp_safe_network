@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{delivery_group, Comm, Node};
+use super::{Comm, Node};
 
 use crate::messaging::{
     system::{JoinResponse, MembershipState, NodeState, SigShare, SystemMsg},
@@ -143,48 +143,8 @@ impl Node {
     }
 
     // Send message to peers on the network.
-    pub(crate) async fn send_msg_to_nodes(&self, mut wire_msg: WireMsg) -> Result<Option<Cmd>> {
-        let dst_location = wire_msg.dst_location();
-        let (targets, dg_size) = delivery_group::delivery_targets(
-            dst_location,
-            &self.info.read().await.name(),
-            &self.network_knowledge,
-        )
-        .await?;
-
-        trace!(
-            "relay {:?} to first {:?} of {:?} (Section PK: {:?})",
-            wire_msg,
-            dg_size,
-            targets,
-            wire_msg.src_section_pk(),
-        );
-
-        let target_name = dst_location.name();
-
-        // To avoid loop: if destination is to Node, targets are multiple, self is an elder,
-        //     self section prefix matches the destination name, then don't carry out a relay.
-        if self.is_elder().await
-            && targets.len() > 1
-            && dst_location.is_to_node()
-            && self.network_knowledge.prefix().await.matches(&target_name)
-        {
-            // This actually means being an elder, but we don't know the member yet. Which most likely
-            // happens during the join process that a node's name is changed.
-            // we just drop the message
-            return Ok(None);
-        }
-
-        let dst_pk = self.section_key_by_name(&target_name).await;
-        wire_msg.set_dst_section_pk(dst_pk);
-
-        let cmd = Cmd::SendMsgDeliveryGroup {
-            recipients: targets.into_iter().collect(),
-            delivery_group_size: dg_size,
-            wire_msg,
-        };
-
-        Ok(Some(cmd))
+    pub(crate) async fn send_msg_to_nodes(&self, wire_msg: WireMsg) -> Result<Option<Cmd>> {
+        self.msg_sender.send_msg_to_nodes(wire_msg).await
     }
 
     // Generate a new section info based on the current set of members and if it differs from the

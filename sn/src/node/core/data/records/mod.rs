@@ -12,30 +12,100 @@ mod liveness_tracking;
 pub(crate) use self::capacity::{Capacity, MIN_LEVEL_WHEN_FULL};
 pub(crate) use self::liveness_tracking::Liveness;
 
-use crate::{
-    data_copy_count,
-    messaging::{
-        data::{CmdError, DataQuery, MetadataExchange, StorageLevel},
-        system::{NodeCmd, NodeQuery, SystemMsg},
-        AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
-    },
-    node::{
-        core::{Cmd, Node, Prefix, MAX_WAITING_PEERS_PER_QUERY},
-        error::convert_to_error_msg,
-        messages::WireMsgUtils,
-        Error, Result,
-    },
-    types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData, ReplicatedDataAddress},
+use crate::data_copy_count;
+use crate::messaging::{
+    data::{CmdError, DataQuery, MetadataExchange, OperationId, ServiceMsg, StorageLevel},
+    system::{NodeCmd, NodeQuery, SystemMsg},
+    AuthorityProof, DstLocation, EndUser, MsgId, MsgKind, ServiceAuth, WireMsg,
 };
+use crate::node::{
+    core::{
+        messaging::MsgSender, Cmd, Prefix, DATA_QUERY_LIMIT, DATA_QUERY_TIMEOUT,
+        MAX_WAITING_PEERS_PER_QUERY,
+    },
+    error::convert_to_error_msg,
+    messages::WireMsgUtils,
+    network_knowledge::NetworkKnowledge,
+    Error, NodeInfo, Result,
+};
+use crate::types::{log_markers::LogMarker, Cache, Peer, PublicKey, ReplicatedData};
 
+use bytes::Bytes;
 use itertools::Itertools;
+use std::sync::Arc;
 use std::{cmp::Ordering, collections::BTreeSet};
+use tokio::sync::RwLock;
 use tracing::info;
 use xor_name::XorName;
 
-impl Node {
+/// Elders only
+pub(crate) struct DataRecords {
+    liveness: Liveness,
+    capacity: Capacity,
+    pending_data_queries: Arc<Cache<OperationId, Vec<Peer>>>,
+    network_knowledge: NetworkKnowledge,
+    our_info: Arc<RwLock<NodeInfo>>,
+    sender: MsgSender,
+}
+
+impl DataRecords {
+    pub(crate) async fn new(
+        network_knowledge: NetworkKnowledge,
+        our_info: Arc<RwLock<NodeInfo>>,
+    ) -> Self {
+        let liveness = Liveness::new(
+            network_knowledge
+                .adults()
+                .await
+                .iter()
+                .map(|peer| peer.name())
+                .collect::<Vec<XorName>>(),
+        );
+
+        let sender = MsgSender::new(network_knowledge.clone(), our_info.clone()).await;
+
+        Self {
+            liveness,
+            capacity: Capacity::default(),
+            pending_data_queries: Arc::new(Cache::with_expiry_duration(DATA_QUERY_TIMEOUT)),
+            network_knowledge,
+            our_info,
+            sender,
+        }
+    }
+
+    /// see if a client is waiting in the pending queries for a response
+    /// If not, we could remove its link eg.
+    pub(crate) async fn pending_data_queries_contains_client(&self, peer: &Peer) -> bool {
+        // now we check if our peer is still waiting...
+        for (_op_id, peer_vec) in self.pending_data_queries.get_items().await {
+            if peer_vec.object.contains(peer) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub(crate) async fn remove_pending_query(&self, op_id: &OperationId) -> Option<Vec<Peer>> {
+        self.pending_data_queries.remove(op_id).await
+    }
+
+    pub(crate) async fn remove_expired_queries(&self) {
+        self.pending_data_queries.remove_expired().await
+    }
+
+    pub(crate) async fn pending_queries_exceeded(&self) -> bool {
+        let pending_query_length = self.pending_data_queries.len().await;
+        pending_query_length > DATA_QUERY_LIMIT
+    }
+
+    pub(crate) async fn remove_op_id(&self, node_id: &XorName, op_id: &OperationId) -> bool {
+        self.liveness.remove_op_id(node_id, op_id).await
+    }
+
     // Locate ideal holders for this data, line up wiremsgs for those to instruct them to store the data
-    pub(crate) async fn replicate_data(&self, data: ReplicatedData) -> Result<Vec<Cmd>> {
+    pub(crate) async fn replicate(&self, data: ReplicatedData) -> Result<Vec<Cmd>> {
         trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
         if self.is_elder().await {
             let targets = self.get_adults_who_should_store_data(data.name()).await;
@@ -47,7 +117,7 @@ impl Node {
             );
 
             let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(data));
-            self.send_node_msg_to_nodes(msg, targets).await
+            self.send_to_nodes(msg, targets).await
         } else {
             Err(Error::InvalidState)
         }
@@ -73,9 +143,10 @@ impl Node {
 
         if targets.is_empty() {
             let error =
-                convert_to_error_msg(Error::NoAdults(self.network_knowledge().prefix().await));
+                convert_to_error_msg(Error::NoAdults(self.network_knowledge.prefix().await));
 
             return self
+                .sender
                 .send_cmd_error_response(CmdError::Data(error), origin, msg_id)
                 .await;
         }
@@ -126,7 +197,7 @@ impl Node {
             correlation_id: MsgId::from_xor_name(*address.name()),
         });
 
-        self.send_node_msg_to_nodes(msg, targets).await
+        self.send_to_nodes(msg, targets).await
     }
 
     pub(crate) async fn get_metadata_of(&self, prefix: &Prefix) -> MetadataExchange {
@@ -140,9 +211,18 @@ impl Node {
         self.capacity.set_adult_levels(adult_levels).await
     }
 
-    /// Registered holders not present in provided list of members
-    /// will be removed from adult_storage_info and no longer tracked for liveness.
-    pub(crate) async fn liveness_retain_only(&self, members: BTreeSet<XorName>) -> Result<()> {
+    /// Registered holders not present in current list of adults,
+    /// will be removed from capacity and liveness tracking.
+    pub(crate) async fn update_member_tracking(&self) -> Result<()> {
+        // current list of adults
+        let members = self
+            .network_knowledge
+            .adults()
+            .await
+            .iter()
+            .map(|peer| peer.name())
+            .collect();
+
         // full adults
         self.capacity.retain_members_only(&members).await;
 
@@ -152,11 +232,10 @@ impl Node {
         Ok(())
     }
 
-    /// Adds the new adult to the Capacity and Liveness trackers.
-    pub(crate) async fn add_new_adult_to_trackers(&self, adult: XorName) {
+    /// Adds an adult to the Capacity and Liveness trackers.
+    pub(crate) async fn track_adult(&self, adult: XorName) {
         info!("Adding new Adult: {adult} to trackers");
         self.capacity.add_new_adult(adult).await;
-
         self.liveness.add_new_adult(adult);
     }
 
@@ -177,28 +256,31 @@ impl Node {
         changed
     }
 
-    pub(crate) async fn full_adults(&self) -> BTreeSet<XorName> {
-        self.capacity.full_adults().await
+    pub(crate) async fn find_unresponsive_and_deviant_nodes(
+        &self,
+    ) -> (Vec<(XorName, usize)>, BTreeSet<XorName>) {
+        self.liveness.find_unresponsive_and_deviant_nodes().await
     }
 
-    pub(crate) fn compute_holders(
-        &self,
-        addr: &ReplicatedDataAddress,
-        adult_list: &BTreeSet<XorName>,
-    ) -> BTreeSet<XorName> {
-        adult_list
-            .iter()
-            .sorted_by(|lhs, rhs| addr.name().cmp_distance(lhs, rhs))
-            .take(data_copy_count())
-            .cloned()
-            .collect()
+    pub(crate) async fn is_full(&self, adult: &XorName) -> Option<bool> {
+        self.capacity.is_full(adult).await
+    }
+
+    async fn is_elder(&self) -> bool {
+        self.network_knowledge
+            .is_elder(&self.our_info.read().await.name())
+            .await
+    }
+
+    async fn full_adults(&self) -> BTreeSet<XorName> {
+        self.capacity.full_adults().await
     }
 
     // Used to fetch the list of holders for given data name.
     async fn get_adults_holding_data(&self, target: &XorName) -> BTreeSet<XorName> {
         let full_adults = self.full_adults().await;
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
-        let adults = self.network_knowledge().adults().await;
+        let adults = self.network_knowledge.adults().await;
 
         let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
 
@@ -242,7 +324,7 @@ impl Node {
     async fn get_adults_who_should_store_data(&self, target: XorName) -> BTreeSet<XorName> {
         let full_adults = self.full_adults().await;
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
-        let adults = self.network_knowledge().adults().await;
+        let adults = self.network_knowledge.adults().await;
 
         trace!("Total adults known about: {:?}", adults.len());
 
@@ -268,15 +350,11 @@ impl Node {
     // Takes a message for specified targets, and builds internal send cmds
     // for sending to each of the targets.
     // Targets are XorName specified so must be within the section
-    async fn send_node_msg_to_nodes(
-        &self,
-        msg: SystemMsg,
-        targets: BTreeSet<XorName>,
-    ) -> Result<Vec<Cmd>> {
+    async fn send_to_nodes(&self, msg: SystemMsg, targets: BTreeSet<XorName>) -> Result<Vec<Cmd>> {
         // we create a dummy/random dst location,
         // we will set it correctly for each msg and target
-        let section_pk = self.network_knowledge().section_key().await;
-        let our_name = self.info.read().await.name();
+        let section_pk = self.network_knowledge.section_key().await;
+        let our_name = self.our_info.read().await.name();
         let dummy_dst_location = DstLocation::Node {
             name: our_name,
             section_pk,
@@ -284,7 +362,7 @@ impl Node {
 
         // separate this into form_wire_msg based on agg
         let wire_msg = WireMsg::single_src(
-            &self.info.read().await.clone(),
+            &self.our_info.read().await.clone(),
             dummy_dst_location,
             msg,
             section_pk,
@@ -295,13 +373,17 @@ impl Node {
         for target in targets {
             debug!("Sending {:?} to {:?}", wire_msg, target);
             let mut wire_msg = wire_msg.clone();
-            let dst_section_pk = self.section_key_by_name(&target).await;
+            let dst_section_pk = self.network_knowledge.section_key_by_name(&target).await;
             wire_msg.set_dst_section_pk(dst_section_pk);
             wire_msg.set_dst_xorname(target);
 
-            cmds.extend(self.send_msg_to_nodes(wire_msg).await?);
+            cmds.extend(self.sender.send_msg_to_nodes(wire_msg).await?);
         }
 
         Ok(cmds)
+    }
+
+    pub(crate) async fn ed_sign_service_msg(&self, msg: &ServiceMsg) -> Result<(MsgKind, Bytes)> {
+        self.sender.ed_sign_service_msg(msg).await
     }
 }

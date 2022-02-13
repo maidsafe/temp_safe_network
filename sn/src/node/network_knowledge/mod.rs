@@ -390,9 +390,27 @@ impl NetworkKnowledge {
         Ok(there_was_an_update)
     }
 
-    // Returns reference to network prefix map
+    /// Returns reference to network prefix map
     pub(crate) fn prefix_map(&self) -> &NetworkPrefixMap {
         &self.prefix_map
+    }
+
+    /// Returns section key
+    pub(crate) async fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
+        if self.prefix().await.matches(name) {
+            self.section_key().await
+        } else if let Ok(sap) = self.section_by_name(name) {
+            sap.section_key()
+        } else if self.prefix().await.sibling().matches(name) {
+            // For sibling with unknown key, use the previous key in our chain under the assumption
+            // that it's the last key before the split and therefore the last key of theirs we know.
+            // In case this assumption is not correct (because we already progressed more than one
+            // key since the split) then this key would be unknown to them and they would send
+            // us back their whole section chain. However, this situation should be rare.
+            *self.section_chain().await.prev_key()
+        } else {
+            *self.genesis_key()
+        }
     }
 
     // Returns the section authority provider for the prefix that matches name.

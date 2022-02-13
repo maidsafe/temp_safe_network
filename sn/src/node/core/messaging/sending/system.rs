@@ -109,7 +109,10 @@ impl Node {
         }
 
         if !others.is_empty() {
-            let dst_section_pk = self.section_key_by_name(&others[0].name()).await;
+            let dst_section_pk = self
+                .network_knowledge
+                .section_key_by_name(&others[0].name())
+                .await;
             wire_msg.set_dst_section_pk(dst_section_pk);
 
             trace!("{}", LogMarker::SendOrHandle);

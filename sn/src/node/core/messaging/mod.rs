@@ -7,6 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod handling;
+mod sender;
 mod sending;
 
 pub(crate) use handling::handle_proposal;
+pub(crate) use sender::MsgSender;

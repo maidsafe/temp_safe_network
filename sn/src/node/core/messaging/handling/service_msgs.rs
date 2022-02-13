@@ -30,10 +30,7 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
 
-        let response = self
-            .data_storage
-            .query(query, User::Key(auth.public_key))
-            .await;
+        let response = self.data.query(query, User::Key(auth.public_key)).await;
 
         trace!("data query response at adult is:  {:?}", response);
 
@@ -58,15 +55,7 @@ impl Node {
     /// see if a client is waiting in the pending queries for a response
     /// If not, we could remove its link eg.
     pub(crate) async fn pending_data_queries_contains_client(&self, peer: &Peer) -> bool {
-        // now we check if our peer is still waiting...
-        for (_op_id, peer_vec) in self.pending_data_queries.get_items().await {
-            let vec = peer_vec.object;
-            if vec.contains(peer) {
-                return true;
-            }
-        }
-
-        false
+        self.data.pending_data_queries_contains_client(peer).await
     }
 
     /// Handle data read
@@ -90,9 +79,7 @@ impl Node {
         let node_id = XorName::from(sending_node_pk);
         let op_id = response.operation_id()?;
 
-        let querys_peers = self.pending_data_queries.remove(&op_id).await;
-
-        let waiting_peers = if let Some(peers) = querys_peers {
+        let waiting_peers = if let Some(peers) = self.data.remove_pending_query(&op_id).await {
             peers
         } else {
             warn!(
@@ -104,15 +91,14 @@ impl Node {
         };
 
         // Clear expired queries from the cache.
-        self.pending_data_queries.remove_expired().await;
+        self.data.remove_expired_queries().await;
 
         let query_response = response.convert();
 
         let pending_removed = match query_response.operation_id() {
             Ok(op_id) => {
-                self.liveness
-                    .request_operation_fulfilled(&node_id, op_id)
-                    .await
+                // request is fulfilled, so we can remove the op id
+                self.data.remove_op_id(&node_id, &op_id).await
             }
             Err(error) => {
                 warn!("Node problems noted when retrieving data: {:?}", error);
@@ -120,7 +106,7 @@ impl Node {
             }
         };
 
-        let (unresponsives, deviants) = self.liveness.find_unresponsive_and_deviant_nodes().await;
+        let (unresponsives, deviants) = self.data.find_unresponsive_and_deviant_nodes().await;
 
         // Check for unresponsive adults here.
         for (name, count) in unresponsives {
@@ -162,7 +148,7 @@ impl Node {
         if query_response.failed_with_data_not_found()
             || (!query_response.is_success()
                 && self
-                    .capacity
+                    .data
                     .is_full(&XorName::from(sending_node_pk))
                     .await
                     .unwrap_or(false))
@@ -177,7 +163,7 @@ impl Node {
             response: query_response,
             correlation_id,
         };
-        let (msg_kind, payload) = self.ed_sign_client_msg(&msg).await?;
+        let (msg_kind, payload) = self.msg_sender.ed_sign_service_msg(&msg).await?;
 
         for origin in waiting_peers {
             let dst = DstLocation::EndUser(EndUser(origin.name()));
@@ -217,6 +203,7 @@ impl Node {
             ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => ReplicatedData::Chunk(chunk),
             ServiceMsg::Query(query) => {
                 return self
+                    .data
                     .read_data_from_adults(query, msg_id, auth, origin)
                     .await
             }
@@ -226,7 +213,7 @@ impl Node {
             }
         };
         // build the replication cmds
-        let mut cmds = self.replicate_data(data).await?;
+        let mut cmds = self.data.replicate(data).await?;
         // make sure the expected replication factor is achieved
         if data_copy_count() > cmds.len() {
             error!("InsufficientAdults for storing data reliably");
@@ -235,9 +222,14 @@ impl Node {
                 expected: data_copy_count() as u8,
                 found: cmds.len() as u8,
             });
-            return self.send_cmd_error_response(error, origin, msg_id).await;
+            return self
+                .msg_sender
+                .send_cmd_error_response(error, origin, msg_id)
+                .await;
         }
-        cmds.extend(self.send_cmd_ack(origin.clone(), msg_id).await?);
+
+        cmds.extend(self.msg_sender.send_cmd_ack(origin, msg_id).await?);
+
         Ok(cmds)
     }
 

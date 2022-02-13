@@ -140,15 +140,11 @@ impl Liveness {
     }
 
     /// Removes a pending_operation from the node liveness records
-    pub(crate) async fn request_operation_fulfilled(
-        &self,
-        node_id: &NodeIdentifier,
-        operation_id: OperationId,
-    ) -> bool {
+    pub(crate) async fn remove_op_id(&self, node_id: &NodeIdentifier, op_id: &OperationId) -> bool {
         trace!(
             "Attempting to remove pending_operation {:?} op: {:?}",
             node_id,
-            operation_id
+            op_id
         );
         let mut has_removed = false;
 
@@ -157,7 +153,7 @@ impl Liveness {
 
             // only remove the first instance from the vec
             v.write().await.retain(|x| {
-                if has_removed || x != &operation_id {
+                if has_removed || x != op_id {
                     true
                 } else {
                     has_removed = true;
@@ -168,13 +164,13 @@ impl Liveness {
                 trace!(
                     "Pending operation removed for node: {:?} op: {:?}",
                     node_id,
-                    operation_id
+                    op_id
                 );
             } else {
                 trace!(
                     "No Pending operation found for node: {:?} op: {:?}",
                     node_id,
-                    operation_id
+                    op_id
                 );
             }
         }

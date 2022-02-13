@@ -24,31 +24,28 @@ pub(crate) use proposal::Proposal;
 #[cfg(test)]
 pub(crate) use relocation::{check as relocation_check, ChurnId};
 
-use self::{data::DataStorage, split_barrier::SplitBarrier};
-
 use super::{
     api::cmds::Cmd,
     dkg::DkgVoter,
+    error::Result,
     network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider},
     Elders, Event, NodeElderChange, NodeInfo,
 };
 
 use crate::messaging::{
-    data::OperationId,
     signature_aggregator::SignatureAggregator,
     system::{DkgSessionId, SystemMsg},
     AuthorityProof, SectionAuth,
 };
-use crate::node::error::Result;
-use crate::types::{
-    log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk, Cache, Peer,
-};
+use crate::types::{log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk, Peer};
 use crate::UsedSpace;
 
 use backoff::ExponentialBackoff;
-use data::{Capacity, Liveness};
+use data::Data;
 use itertools::Itertools;
+use messaging::MsgSender;
 use resource_proof::ResourceProof;
+use split_barrier::SplitBarrier;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     net::SocketAddr,
@@ -63,8 +60,13 @@ use xor_name::{Prefix, XorName};
 pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 128;
 pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 10;
 
-const BACKOFF_CACHE_LIMIT: usize = 100;
 pub(crate) const CONCURRENT_JOINS: usize = 7;
+// This prevents pending query limit unbound growth
+pub(crate) const DATA_QUERY_LIMIT: usize = 100;
+// per query we can have this many peers, so the total peers waiting can be QUERY_LIMIT * MAX_WAITING_PEERS_PER_QUERY
+pub(crate) const MAX_WAITING_PEERS_PER_QUERY: usize = 100;
+
+const BACKOFF_CACHE_LIMIT: usize = 100;
 
 // How long to hold on to correlated `Peer`s for data queries. Since data queries are forwarded
 // from elders (with whom the client is connected) to adults (who hold the data), the elder handling
@@ -75,11 +77,6 @@ pub(crate) const CONCURRENT_JOINS: usize = 7;
 // based on liveness properties (e.g. the timeout should be dynamic based on the responsiveness of
 // the section).
 const DATA_QUERY_TIMEOUT: Duration = Duration::from_secs(60 * 5 /* 5 mins */);
-
-// This prevents pending query limit unbound growth
-pub(crate) const DATA_QUERY_LIMIT: usize = 100;
-// per query we can have this many peers, so the total peers waiting can be QUERY_LIMIT * MAX_WAITING_PEERS_PER_QUERY
-pub(crate) const MAX_WAITING_PEERS_PER_QUERY: usize = 100;
 
 // Store up to 100 in use backoffs
 pub(crate) type AeBackoffCache =
@@ -100,12 +97,9 @@ pub(crate) struct Node {
     pub(crate) comm: Comm,
     pub(crate) section_keys_provider: SectionKeysProvider,
 
-    pub(super) data_storage: DataStorage, // Adult only before cache
-
+    data: Data,
     resource_proof: ResourceProof,
-
     network_knowledge: NetworkKnowledge,
-
     message_aggregator: SignatureAggregator,
 
     proposal_aggregator: SignatureAggregator,
@@ -118,11 +112,9 @@ pub(crate) struct Node {
     joins_allowed: Arc<RwLock<bool>>,        // Elder only
     current_joins_semaphore: Arc<Semaphore>, // Elder only
 
-    capacity: Capacity,                                       // Elder only
-    liveness: Liveness,                                       // Elder only
-    pending_data_queries: Arc<Cache<OperationId, Vec<Peer>>>, // Elder only
-
     ae_backoff_cache: AeBackoffCache,
+
+    msg_sender: MsgSender,
 }
 
 impl Node {
@@ -142,39 +134,36 @@ impl Node {
         // make sure the Node has the correct local addr as Comm
         info.addr = comm.our_connection_info();
 
-        let data_storage = DataStorage::new(&root_storage_dir, used_space.clone())?;
+        let info = Arc::new(RwLock::new(info));
 
-        info!("Creating Liveness checks");
-        let adult_liveness = Liveness::new(
-            network_knowledge
-                .adults()
-                .await
-                .iter()
-                .map(|peer| peer.name())
-                .collect::<Vec<XorName>>(),
-        );
-        info!("Liveness check: {:?}", adult_liveness);
+        let data = Data::new(
+            &root_storage_dir,
+            used_space.clone(),
+            network_knowledge.clone(),
+            info.clone(),
+        )
+        .await?;
+
+        let msg_sender = MsgSender::new(network_knowledge.clone(), info.clone()).await;
 
         Ok(Self {
+            event_tx,
+            info,
             comm,
-            info: Arc::new(RwLock::new(info)),
-            network_knowledge,
             section_keys_provider,
+            data,
+            network_knowledge,
             dkg_sessions: Arc::new(RwLock::new(HashMap::default())),
             proposal_aggregator: SignatureAggregator::default(),
             split_barrier: Arc::new(RwLock::new(SplitBarrier::new())),
             message_aggregator: SignatureAggregator::default(),
             dkg_voter: DkgVoter::default(),
             relocate_state: Arc::new(RwLock::new(None)),
-            event_tx,
             joins_allowed: Arc::new(RwLock::new(true)),
             current_joins_semaphore: Arc::new(Semaphore::new(CONCURRENT_JOINS)),
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
-            data_storage,
-            capacity: Capacity::default(),
-            liveness: adult_liveness,
-            pending_data_queries: Arc::new(Cache::with_expiry_duration(DATA_QUERY_TIMEOUT)),
             ae_backoff_cache: AeBackoffCache::default(),
+            msg_sender,
         })
     }
 
@@ -303,15 +292,7 @@ impl Node {
                 }
 
                 cmds.extend(self.send_updates_to_sibling_section(&old).await?);
-                self.liveness_retain_only(
-                    self.network_knowledge
-                        .adults()
-                        .await
-                        .iter()
-                        .map(|peer| peer.name())
-                        .collect(),
-                )
-                .await?;
+                self.data.update_member_tracking().await?;
 
                 Event::SectionSplit {
                     elders,
@@ -355,29 +336,6 @@ impl Node {
         }
 
         Ok(cmds)
-    }
-
-    pub(super) async fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
-        if self.network_knowledge.prefix().await.matches(name) {
-            self.network_knowledge.section_key().await
-        } else if let Ok(sap) = self.network_knowledge.section_by_name(name) {
-            sap.section_key()
-        } else if self
-            .network_knowledge
-            .prefix()
-            .await
-            .sibling()
-            .matches(name)
-        {
-            // For sibling with unknown key, use the previous key in our chain under the assumption
-            // that it's the last key before the split and therefore the last key of theirs we know.
-            // In case this assumption is not correct (because we already progressed more than one
-            // key since the split) then this key would be unknown to them and they would send
-            // us back their whole section chain. However, this situation should be rare.
-            *self.network_knowledge.section_chain().await.prev_key()
-        } else {
-            *self.network_knowledge.genesis_key()
-        }
     }
 
     pub(super) async fn print_network_stats(&self) {
