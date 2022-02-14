@@ -10,7 +10,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
 };
-use tracing::info;
+// use tracing::info;
 
 #[derive(Clone, Debug)]
 /// Tracking used space
@@ -45,10 +45,9 @@ impl UsedSpace {
     pub(crate) fn ratio(&self) -> f64 {
         let used = self.used_space.load(Ordering::Relaxed);
         let max_capacity = self.max_capacity;
-        let used_space_ratio = used as f64 / max_capacity as f64;
-        info!("Used space: {:?}", used);
-        info!("Max capacity: {:?}", max_capacity);
-        info!("Used space ratio: {:?}", used_space_ratio);
-        used_space_ratio
+        used as f64 / max_capacity as f64
+        // info!("Used space: {:?}", used);
+        // info!("Max capacity: {:?}", max_capacity);
+        // info!("Used space ratio: {:?}", used_space_ratio);
     }
 }

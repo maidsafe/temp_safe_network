@@ -37,7 +37,7 @@ use crate::NodeConfig;
 use rand::rngs::OsRng;
 use safe_network::client::{Client, ClientConfig, DEFAULT_OPERATION_TIMEOUT};
 use safe_network::types::Keypair;
-use tracing::debug;
+// use tracing::debug;
 
 use std::path::Path;
 use std::time::Duration;
@@ -89,12 +89,12 @@ impl Safe {
         config_path: Option<&Path>,
         timeout: Option<Duration>,
     ) -> Result<()> {
-        debug!("Connecting to SAFE Network...");
+        // debug!("Connecting to SAFE Network...");
 
         let config_path = config_path.map(|p| p.to_path_buf());
 
-        debug!("Client to be instantiated with specific pk?: {:?}", keypair);
-        debug!("Bootstrap contacts list set to: {:?}", bootstrap_config);
+        // debug!("Client to be instantiated with specific pk?: {:?}", keypair);
+        // debug!("Bootstrap contacts list set to: {:?}", bootstrap_config);
 
         let config = ClientConfig::new(
             None,
@@ -118,7 +118,7 @@ impl Safe {
                 })?,
         );
 
-        debug!("Successfully connected to the Network!!!");
+        // debug!("Successfully connected to the Network!!!");
 
         Ok(())
     }

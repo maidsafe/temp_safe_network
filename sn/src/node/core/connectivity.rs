@@ -17,10 +17,10 @@ use xor_name::XorName;
 impl Core {
     pub(crate) async fn handle_peer_lost(&self, addr: &SocketAddr) -> Result<Vec<Cmd>> {
         let name = if let Some(peer) = self.network_knowledge.find_member_by_addr(addr).await {
-            debug!("Lost known peer {}", peer);
+            // debug!("Lost known peer {}", peer);
             peer.name()
         } else {
-            trace!("Lost unknown peer {}", addr);
+            // trace!("Lost unknown peer {}", addr);
             return Ok(vec![]);
         };
 

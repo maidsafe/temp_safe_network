@@ -12,7 +12,7 @@ use sn_api::PublicKey;
 use std::collections::BTreeSet;
 use std::net::SocketAddr;
 use structopt::StructOpt;
-use tracing::debug;
+// use tracing::debug;
 
 #[derive(StructOpt, Debug)]
 pub enum NetworksSubCommands {
@@ -60,7 +60,7 @@ pub async fn networks_commander(
     match cmd {
         Some(NetworksSubCommands::Switch { network_name }) => {
             let msg = format!("Switching to '{}' network...", network_name);
-            debug!("{}", msg);
+            // debug!("{}", msg);
             println!("{}", msg);
             config.switch_to_network(&network_name).await?;
             println!(

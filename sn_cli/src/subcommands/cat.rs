@@ -16,7 +16,7 @@ use sn_api::{resolver::SafeData, Safe};
 use std::io::{self, Write};
 use structopt::StructOpt;
 use tokio::time::{sleep, Duration};
-use tracing::{debug, trace};
+// use tracing::{debug, trace};
 
 const MAX_RETRY_ATTEMPTS: usize = 5;
 
@@ -32,14 +32,14 @@ pub struct CatCommands {
 pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe) -> Result<()> {
     let link = get_from_arg_or_stdin(cmd.location, None)?;
     let url = get_target_url(&link)?;
-    debug!("Running cat for: {}", &url.to_string());
+    // debug!("Running cat for: {}", &url.to_string());
 
     let mut attempts = 0;
 
     let mut content = safe.fetch(&url.to_string(), None).await;
 
     while content.is_err() && attempts < MAX_RETRY_ATTEMPTS {
-        trace!("cat attempt #{:?}", attempts);
+        // trace!("cat attempt #{:?}", attempts);
         sleep(Duration::from_secs(1)).await;
         content = safe.fetch(&url.to_string(), None).await;
 

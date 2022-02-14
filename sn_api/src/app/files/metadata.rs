@@ -14,7 +14,7 @@ use crate::{
     },
     Error, Result,
 };
-use log::debug;
+// use log::debug;
 use std::{fs, path::Path};
 
 #[cfg(unix)]
@@ -208,7 +208,7 @@ pub(crate) fn get_metadata(path: &Path, follow_links: bool) -> Result<(fs::Metad
             err
         ))
     })?;
-    debug!("Metadata for location: {:?}", metadata);
+    // debug!("Metadata for location: {:?}", metadata);
 
     let media_type = get_media_type(path, &metadata);
     Ok((metadata, media_type))

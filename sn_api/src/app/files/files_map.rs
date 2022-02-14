@@ -12,7 +12,7 @@ use super::{
     ProcessedFiles, RealPath,
 };
 use crate::{app::consts::*, Error, Result, Safe, XorUrl};
-use log::{debug, info};
+// use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, path::Path};
 
@@ -113,8 +113,8 @@ pub(crate) async fn add_or_update_file_item(
                 FilesMapChange::Added(xorurl)
             };
 
-            debug!("New FileInfo item: {:?}", new_file_item);
-            debug!("New FileInfo item inserted as {:?}", file_name);
+            // debug!("New FileInfo item: {:?}", new_file_item);
+            // debug!("New FileInfo item inserted as {:?}", file_name);
             files_map.insert(file_name_for_map.to_string(), new_file_item);
 
             processed_files.insert(file_name.to_path_buf(), file_item_change);
@@ -122,7 +122,7 @@ pub(crate) async fn add_or_update_file_item(
             true
         }
         Err(err) => {
-            info!("Skipping file \"{}\": {:?}", file_link.unwrap_or(""), err);
+            // info!("Skipping file \"{}\": {:?}", file_link.unwrap_or(""), err);
             processed_files.insert(
                 file_name.to_path_buf(),
                 FilesMapChange::Failed(format!("{}", err)),

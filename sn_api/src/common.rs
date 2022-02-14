@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{constants::SN_AUTHD_CONNECTION_IDLE_TIMEOUT, Error, Result};
-use log::info;
+// use log::info;
 use qjsonrpc::ClientEndpoint;
 use serde::de::DeserializeOwned;
 use tokio::runtime;
@@ -79,10 +79,10 @@ pub async fn send_authd_request<T>(
 where
     T: DeserializeOwned,
 {
-    info!(
-        "Sending '{}' request to SAFE Authenticator on {} ...",
-        method, dst_endpoint
-    );
+    // info!(
+    //     "Sending '{}' request to SAFE Authenticator on {} ...",
+    //     method, dst_endpoint
+    // );
 
     match dirs_next::home_dir() {
         None => Err(Error::AuthdClientError(

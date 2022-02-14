@@ -18,7 +18,7 @@ use multibase::{decode as base_decode, encode as base_encode, Base};
 use safe_network::types::{BytesAddress, DataAddress, RegisterAddress, SafeKeyAddress, Scope};
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use tracing::{info, trace, warn};
+// use tracing::{info, trace, warn};
 use url::Url;
 use url_parts::UrlParts;
 pub use version_hash::VersionHash;
@@ -382,11 +382,11 @@ impl SafeUrl {
     pub fn from_url(url: &str) -> Result<Self> {
         match Self::from_xorurl(url) {
             Ok(enc) => Ok(enc),
-            Err(err) => {
-                info!(
-                    "Falling back to NRS. XorUrl decoding failed with: {:?}",
-                    err
-                );
+            Err(_err) => {
+                // info!(
+                //     "Falling back to NRS. XorUrl decoding failed with: {:?}",
+                //     err
+                // );
                 Self::from_nrsurl(url)
             }
         }
@@ -477,11 +477,11 @@ impl SafeUrl {
             },
         };
 
-        trace!(
-            "Attempting to match content type of URL: {}, {:?}",
-            &xorurl,
-            content_type
-        );
+        // trace!(
+        //     "Attempting to match content type of URL: {}, {:?}",
+        //     &xorurl,
+        //     content_type
+        // );
 
         let scope = match xorurl_bytes[3] {
             0 => Scope::Public,
@@ -687,8 +687,8 @@ impl SafeUrl {
         // set_query_string().  Thus, it should never be invalid, else
         // we have a serious bug in SafeUrl impl.
         self.set_query_key(URL_VERSION_QUERY_NAME, v_option)
-            .unwrap_or_else(|e| {
-                warn!("{}", e);
+            .unwrap_or_else(|_e| {
+                // warn!("{}", e);
             });
     }
 
@@ -731,7 +731,7 @@ impl SafeUrl {
         }
 
         self.query_string = pairs.finish();
-        trace!("Set query_string: {}", self.query_string);
+        // trace!("Set query_string: {}", self.query_string);
 
         if key == URL_VERSION_QUERY_NAME {
             self.set_content_version_internal(val)?;
@@ -1094,7 +1094,7 @@ impl SafeUrl {
         } else {
             self.content_version = None;
         }
-        trace!("Set version: {:#?}", self.content_version);
+        // trace!("Set version: {:#?}", self.content_version);
         Ok(())
     }
 
@@ -1191,7 +1191,7 @@ impl fmt::Display for SafeUrl {
             match self.to_nrsurl_string() {
                 Some(s) => s,
                 None => {
-                    warn!("to_nrsurl_string() return None when is_nrsurl() == true. '{}'.  This should never happen. Please investigate.", self.public_name);
+                    // warn!("to_nrsurl_string() return None when is_nrsurl() == true. '{}'.  This should never happen. Please investigate.", self.public_name);
                     return Err(fmt::Error);
                 }
             }

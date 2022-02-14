@@ -31,7 +31,7 @@ use std::{
     sync::Arc,
 };
 use tokio::sync::RwLock;
-use tracing::info;
+// // use tracing::info;
 use xor_name::XorName;
 
 /// Operations on data.
@@ -75,7 +75,7 @@ impl DataStorage {
             let used_space_level = 10.0 * used_space_ratio;
             // every level represents 10 percentage points
             if used_space_level as u8 >= next_level.value() {
-                debug!("Next level for storage has been reached");
+                // debug!("Next level for storage has been reached");
                 *self.last_recorded_level.write().await = next_level;
                 return Ok(Some(next_level));
             }
@@ -186,12 +186,12 @@ impl Core {
         let lost_old_holder = !old_holders.is_disjoint(lost_adults);
 
         if we_are_not_holder_anymore || new_adult_is_holder || lost_old_holder {
-            info!("Republishing data at {:?}", address);
-            trace!("We are not a holder anymore? {}, New Adult is Holder? {}, Lost Adult was holder? {}", we_are_not_holder_anymore, new_adult_is_holder, lost_old_holder);
+            // info!("Republishing data at {:?}", address);
+            // trace!("We are not a holder anymore? {}, New Adult is Holder? {}, Lost Adult was holder? {}", we_are_not_holder_anymore, new_adult_is_holder, lost_old_holder);
             let data = storage.get_for_replication(address).await.ok()?;
             if we_are_not_holder_anymore {
-                if let Err(err) = storage.remove(address).await {
-                    warn!("Error deleting data during republish: {:?}", err);
+                if let Err(_err) = storage.remove(address).await {
+                    // warn!("Error deleting data during republish: {:?}", err);
                 }
             }
             Some((data, new_holders))

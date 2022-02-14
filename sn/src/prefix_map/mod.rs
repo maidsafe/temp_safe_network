@@ -149,27 +149,27 @@ impl NetworkPrefixMap {
         proof_chain: &SecuredLinkedList,
     ) -> Result<bool> {
         let prefix = signed_sap.prefix();
-        trace!("Attempting to update prefixmap for {:?}", prefix);
+        // trace!("Attempting to update prefixmap for {:?}", prefix);
         let section_key = match self.section_by_prefix(&prefix) {
             Ok(sap) => sap.section_key(),
             Err(_) => {
-                trace!("No key found for prefix: {:?}", prefix);
+                // trace!("No key found for prefix: {:?}", prefix);
                 self.genesis_pk
             }
         };
 
-        let res = self.verify_with_chain_and_update(
+        self.verify_with_chain_and_update(
             signed_sap,
             proof_chain,
             &SecuredLinkedList::new(section_key),
-        );
+        )
 
-        for section in self.sections.iter() {
-            let prefix = section.key();
-            trace!("Known prefix after update: {:?}", prefix);
-        }
+        // for section in self.sections.iter() {
+        //     let prefix = section.key();
+        //     trace!("Known prefix after update: {:?}", prefix);
+        // }
 
-        res
+        // res
     }
 
     /// Update our knowledge of a remote section's SAP only
@@ -261,10 +261,10 @@ impl NetworkPrefixMap {
         // for the prefix since we've already checked that above.
         let changed = self.insert(signed_sap);
 
-        for section in self.sections.iter() {
-            let prefix = section.key();
-            trace!("Known prefix: {:?}", prefix);
-        }
+        // for section in self.sections.iter() {
+        //     let prefix = section.key();
+        //     trace!("Known prefix: {:?}", prefix);
+        // }
 
         Ok(changed)
     }
@@ -299,6 +299,7 @@ impl NetworkPrefixMap {
     }
 
     /// Get total number of known sections
+    #[allow(unused)]
     pub(crate) fn known_sections_count(&self) -> usize {
         self.sections.len()
     }
@@ -310,7 +311,7 @@ impl NetworkPrefixMap {
         let section_prefixes = self.sections.iter().map(|e| *e.key());
         let known_prefixes: Vec<_> = section_prefixes.chain(iter::once(our.prefix())).collect();
 
-        let total_elders_exact = Prefix::default().is_covered_by(&known_prefixes);
+        // let total_elders_exact = Prefix::default().is_covered_by(&known_prefixes);
 
         // Estimated fraction of the network that we have in our RT.
         // Computed as the sum of 1 / 2^(prefix.bit_count) for all known section prefixes.
@@ -321,14 +322,14 @@ impl NetworkPrefixMap {
 
         let network_elders_count: usize =
             self.sections.iter().map(|e| e.value().elder_count()).sum();
-        let total = network_elders_count as f64 / network_fraction;
+        let _total = network_elders_count as f64 / network_fraction;
 
         // `total_elders_exact` indicates whether `total_elders` is
         // an exact number or an estimate.
         NetworkStats {
-            known_elders: network_elders_count as u64,
-            total_elders: total.ceil() as u64,
-            total_elders_exact,
+            // known_elders: network_elders_count as u64,
+            // total_elders: total.ceil() as u64,
+            // total_elders_exact,
         }
     }
 

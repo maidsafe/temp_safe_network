@@ -88,19 +88,19 @@ impl JoiningAsRelocated {
     pub(crate) async fn handle_join_response(
         &mut self,
         join_response: JoinAsRelocatedResponse,
-        sender: SocketAddr,
+        _sender: SocketAddr,
     ) -> Result<Option<Cmd>> {
-        trace!("Hanlde JoinResponse {:?}", join_response);
+        // trace!("Hanlde JoinResponse {:?}", join_response);
         match join_response {
             JoinAsRelocatedResponse::Retry(section_auth) => {
                 let section_auth = section_auth.into_state();
                 if !self.check_autority_provider(&section_auth, &self.dst_xorname) {
-                    trace!("failed to check authority");
+                    // trace!("failed to check authority");
                     return Ok(None);
                 }
 
                 if section_auth.section_key() == self.dst_section_key {
-                    trace!("equal destination section key");
+                    // trace!("equal destination section key");
                     return Ok(None);
                 }
 
@@ -115,17 +115,17 @@ impl JoiningAsRelocated {
                     .collect();
 
                 if new_recipients.is_empty() {
-                    debug!(
-                        "Ignore JoinAsRelocatedResponse::Retry with old SAP that has been sent to: {:?}",
-                        section_auth
-                    );
+                    // debug!(
+                    //     "Ignore JoinAsRelocatedResponse::Retry with old SAP that has been sent to: {:?}",
+                    //     section_auth
+                    // );
                     return Ok(None);
                 }
 
-                info!(
-                    "Newer Join response for our prefix {:?} from {:?}",
-                    section_auth, sender
-                );
+                // info!(
+                //     "Newer Join response for our prefix {:?} from {:?}",
+                //     section_auth, sender
+                // );
                 self.dst_section_key = section_auth.section_key();
 
                 let new_name_sig = self.build_relocation_name(&section_auth.prefix());
@@ -159,17 +159,17 @@ impl JoiningAsRelocated {
                     .collect();
 
                 if new_recipients.is_empty() {
-                    debug!(
-                        "Ignore JoinAsRelocatedResponse::Redirect with old SAP that has been sent to: {:?}",
-                        section_auth
-                    );
+                    // debug!(
+                    //     "Ignore JoinAsRelocatedResponse::Redirect with old SAP that has been sent to: {:?}",
+                    //     section_auth
+                    // );
                     return Ok(None);
                 }
 
-                info!(
-                    "Newer Join response for our prefix {:?} from {:?}",
-                    section_auth, sender
-                );
+                // info!(
+                //     "Newer Join response for our prefix {:?} from {:?}",
+                //     section_auth, sender
+                // );
                 self.dst_section_key = section_auth.section_key();
 
                 let new_name_sig = self.build_relocation_name(&section_auth.prefix());
@@ -182,10 +182,10 @@ impl JoiningAsRelocated {
                 Ok(Some(cmd))
             }
             JoinAsRelocatedResponse::NodeNotReachable(addr) => {
-                error!(
-                    "Node cannot join as relocated since it is not externally reachable: {}",
-                    addr
-                );
+                // error!(
+                //     "Node cannot join as relocated since it is not externally reachable: {}",
+                //     addr
+                // );
                 Err(Error::NodeNotReachable(addr))
             }
         }
@@ -204,7 +204,7 @@ impl JoiningAsRelocated {
         // Sign new_name with our old keypair
         let signature_over_new_name = ed25519::sign(&new_name.0, &self.old_keypair);
 
-        info!("Changing name to {}", new_name);
+        // info!("Changing name to {}", new_name);
         self.node = Node::new(new_keypair, self.node.addr);
 
         signature_over_new_name
@@ -222,7 +222,7 @@ impl JoiningAsRelocated {
             signature_over_new_name: new_name_sig,
         };
 
-        info!("Sending {:?} to {:?}", join_request, recipients);
+        // info!("Sending {:?} to {:?}", join_request, recipients);
 
         let node_msg = SystemMsg::JoinAsRelocatedRequest(Box::new(join_request));
         let wire_msg = WireMsg::single_src(
@@ -248,17 +248,6 @@ impl JoiningAsRelocated {
         section_auth: &SectionAuthorityProvider,
         dst: &XorName,
     ) -> bool {
-        if !section_auth.prefix().matches(dst) {
-            error!("Invalid JoinResponse bad prefix: {:?}", section_auth);
-            false
-        } else if section_auth.elder_count() == 0 {
-            error!(
-                "Invalid JoinResponse, empty list of Elders: {:?}",
-                section_auth
-            );
-            false
-        } else {
-            true
-        }
+        section_auth.prefix().matches(dst) && section_auth.elder_count() != 0
     }
 }

@@ -49,11 +49,11 @@ async fn read_prefix_map_from_disk(genesis_key: BlsPublicKey) -> Result<NetworkP
     };
 
     match read_prefix_map {
-        Some((prefix_map, dir)) => {
-            info!(
-                "Read PrefixMap from disk successfully from {}",
-                dir.display()
-            );
+        Some((prefix_map, _dir)) => {
+            // info!(
+            //     "Read PrefixMap from disk successfully from {}",
+            //     dir.display()
+            // );
             if prefix_map.genesis_key() != genesis_key {
                 Err(Error::InvalidGenesisKey(prefix_map.genesis_key()))
             } else {

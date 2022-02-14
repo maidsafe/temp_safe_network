@@ -14,7 +14,7 @@ use crate::node::{
     api::cmds::Cmd, core::Core, messages::WireMsgUtils, network_knowledge::NodeState, Error, Result,
 };
 use crate::peer::{Peer, UnnamedPeer};
-use crate::types::log_markers::LogMarker;
+// use crate::types::log_markers::LogMarker;
 
 use bls::PublicKey as BlsPublicKey;
 use xor_name::XorName;
@@ -40,7 +40,7 @@ impl Core {
         section_name: XorName,
         section_pk: BlsPublicKey,
     ) -> Result<Cmd> {
-        trace!("{}", LogMarker::SendDirectToNodes);
+        // trace!("{}", LogMarker::SendDirectToNodes);
         let our_node = self.node.read().await.clone();
         let our_section_key = self.network_knowledge.section_key().await;
 
@@ -92,7 +92,7 @@ impl Core {
         let mut others = Vec::new();
         let mut handle = false;
 
-        trace!("Send {:?} to {:?}", wire_msg, recipients);
+        // trace!("Send {:?} to {:?}", wire_msg, recipients);
 
         let our_name = self.node.read().await.name();
         for recipient in recipients.into_iter() {
@@ -113,7 +113,7 @@ impl Core {
             let dst_section_pk = self.section_key_by_name(&others[0].name()).await;
             wire_msg.set_dst_section_pk(dst_section_pk);
 
-            trace!("{}", LogMarker::SendOrHandle);
+            // trace!("{}", LogMarker::SendOrHandle);
             cmds.push(Cmd::SendMsg {
                 recipients: others,
                 wire_msg: wire_msg.clone(),

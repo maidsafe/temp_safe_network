@@ -20,7 +20,7 @@ impl Core {
     // Insert the proposal into the proposal aggregator and handle it if aggregated.
     pub(crate) async fn handle_proposal(
         &self,
-        msg_id: MsgId,
+        _msg_id: MsgId,
         proposal: Proposal,
         sig_share: SigShare,
         sender: Peer,
@@ -39,10 +39,10 @@ impl Core {
                 // know it yet. We only require the src_name of the
                 // proposal to be one of the DKG participants.
                 if !section_auth.contains_elder(&sender.name()) {
-                    trace!(
-                        "Ignoring proposal from src not being a DKG participant: {:?}",
-                        proposal
-                    );
+                    // trace!(
+                    //     "Ignoring proposal from src not being a DKG participant: {:?}",
+                    //     proposal
+                    // );
                     return Ok(vec![]);
                 }
             }
@@ -55,22 +55,22 @@ impl Core {
                 .await
                 .matches(&sender.name())
             {
-                trace!(
-                    "Ignore proposal {:?} from other section, src {}: {:?}",
-                    proposal,
-                    sender,
-                    msg_id
-                );
+                // trace!(
+                //     "Ignore proposal {:?} from other section, src {}: {:?}",
+                //     proposal,
+                //     sender,
+                //     msg_id
+                // );
                 return Ok(vec![]);
             }
 
             // Let's now verify the section key in the msg authority is trusted
             // based on our current knowledge of the network and sections chains.
             if !self.network_knowledge.has_chain_key(sig_share_pk).await {
-                warn!(
-                    "Dropped Propose msg ({:?}) with untrusted sig share from {}: {:?}",
-                    msg_id, sender, proposal
-                );
+                // warn!(
+                //     "Dropped Propose msg ({:?}) with untrusted sig share from {}: {:?}",
+                //     msg_id, sender, proposal
+                // );
                 return Ok(vec![]);
             }
         }
@@ -78,10 +78,10 @@ impl Core {
         let mut cmds = vec![];
 
         match proposal.as_signable_bytes() {
-            Err(error) => error!(
-                "Failed to serialise proposal from {}, {:?}: {:?}",
-                sender, msg_id, error
-            ),
+            Err(_error) => (), // error!(
+            //     "Failed to serialise proposal from {}, {:?}: {:?}",
+            //     sender, msg_id, error
+            // ),
             Ok(serialised_proposal) => {
                 match self
                     .proposal_aggregator
@@ -95,17 +95,17 @@ impl Core {
                         _ => cmds.push(Cmd::HandleAgreement { proposal, sig }),
                     },
                     Err(AggregatorError::NotEnoughShares) => {
-                        trace!(
-                            "Proposal from {} inserted in aggregator, not enough sig shares yet: {:?}",
-                            sender,
-                            msg_id
-                        );
+                        // trace!(
+                        //     "Proposal from {} inserted in aggregator, not enough sig shares yet: {:?}",
+                        //     sender,
+                        //     msg_id
+                        // );
                     }
-                    Err(error) => {
-                        error!(
-                            "Failed to add proposal from {}, {:?}: {:?}",
-                            sender, msg_id, error
-                        );
+                    Err(_error) => {
+                        // error!(
+                        //     "Failed to add proposal from {}, {:?}: {:?}",
+                        //     sender, msg_id, error
+                        // );
                     }
                 }
             }

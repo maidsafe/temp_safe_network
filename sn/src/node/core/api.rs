@@ -20,7 +20,7 @@ use crate::node::{
     Event,
 };
 use crate::peer::Peer;
-use crate::types::log_markers::LogMarker;
+// use crate::types::log_markers::LogMarker;
 use crate::UsedSpace;
 
 use secured_linked_list::SecuredLinkedList;
@@ -128,7 +128,7 @@ impl Core {
     pub(crate) async fn send_event(&self, event: Event) {
         // Note: cloning the sender to avoid mutable access. Should have negligible cost.
         if self.event_tx.clone().send(event).await.is_err() {
-            error!("Event receiver has been closed");
+            // error!("Event receiver has been closed");
         }
     }
 
@@ -154,13 +154,13 @@ impl Core {
         )
         .await?;
 
-        trace!(
-            "relay {:?} to first {:?} of {:?} (Section PK: {:?})",
-            wire_msg,
-            dg_size,
-            targets,
-            wire_msg.src_section_pk(),
-        );
+        // trace!(
+        //     "relay {:?} to first {:?} of {:?} (Section PK: {:?})",
+        //     wire_msg,
+        //     dg_size,
+        //     targets,
+        //     wire_msg.src_section_pk(),
+        // );
 
         let target_name = dst_location.name();
 
@@ -206,7 +206,7 @@ impl Core {
         let mut cmds = vec![];
         let our_name = self.node.read().await.name();
 
-        debug!("{}", LogMarker::TriggeringPromotionAndDemotion);
+        // debug!("{}", LogMarker::TriggeringPromotionAndDemotion);
         for elder_candidates in self
             .network_knowledge
             .promote_and_demote_elders(&our_name, excluded_names)

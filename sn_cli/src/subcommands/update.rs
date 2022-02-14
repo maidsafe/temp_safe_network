@@ -8,8 +8,7 @@
 
 use std::error::Error;
 #[cfg(feature = "self-update")]
-use tracing::debug;
-
+// use tracing::debug;
 #[cfg(feature = "self-update")]
 const REPO_NAME: &str = "sn_cli";
 
@@ -33,7 +32,7 @@ pub fn update_commander(no_confirm: bool) -> Result<(), Box<dyn Error>> {
         println!("Current version is {}", env!("CARGO_PKG_VERSION"));
         println!("No releases are available on GitHub to perform an update");
     } else {
-        debug!("Found releases: {:#?}\n", releases);
+        // debug!("Found releases: {:#?}\n", releases);
         let bin_name = if target.contains("pc-windows") {
             "safe.exe"
         } else {

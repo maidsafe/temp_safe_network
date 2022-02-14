@@ -46,7 +46,7 @@ use std::{
 };
 use structopt::StructOpt;
 use tokio::task::JoinHandle;
-use tracing::info;
+// use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 /// Minimal example node.
@@ -181,7 +181,7 @@ async fn start_node(
         })
         .unwrap_or_else(rand::random);
 
-    info!("Node #{} starting...", index);
+    // info!("Node #{} starting...", index);
 
     let (max_capacity, root) = create_test_max_capacity_and_root_storage()?;
 
@@ -202,12 +202,12 @@ async fn start_node(
 
     let contact_info = node.our_connection_info().await;
 
-    info!(
-        "Node #{} connected - name: {}, contact: {}",
-        index,
-        node.name().await,
-        contact_info
-    );
+    // info!(
+    //     "Node #{} connected - name: {}, contact: {}",
+    //     index,
+    //     node.name().await,
+    //     contact_info
+    // );
 
     let handle = run_node(index, node, event_stream);
 
@@ -226,66 +226,52 @@ fn run_node(index: usize, mut node: NodeApi, mut event_stream: EventStream) -> J
 }
 
 // Handles the event emitted by the node.
-async fn handle_event(index: usize, node: &mut NodeApi, event: Event) -> bool {
+async fn handle_event(_index: usize, _node: &mut NodeApi, event: Event) -> bool {
     match event {
-        Event::MemberJoined {
-            name,
-            previous_name,
-            age,
-        } => {
-            info!(
-                "Node #{} member joined - name: {}, previous_name: {:?}, age: {}",
-                index, name, previous_name, age
-            );
+        Event::MemberJoined { .. } => {
+            // info!(
+            //     "Node #{} member joined - name: {}, previous_name: {:?}, age: {}",
+            //     index, name, previous_name, age
+            // );
         }
-        Event::MemberLeft { name, age } => {
-            info!("Node #{} member left - name: {}, age: {}", index, name, age);
+        Event::MemberLeft { .. } => {
+            // info!("Node #{} member left - name: {}, age: {}", index, name, age);
         }
-        Event::SectionSplit {
-            elders,
-            self_status_change,
-        } => {
-            info!(
-                "Node #{} section split - elders: {:?}, node elder status change: {:?}",
-                index, elders, self_status_change
-            );
+        Event::SectionSplit { .. } => {
+            // info!(
+            //     "Node #{} section split - elders: {:?}, node elder status change: {:?}",
+            //     index, elders, self_status_change
+            // );
         }
-        Event::EldersChanged {
-            elders,
-            self_status_change,
-        } => {
-            info!(
-                "Node #{} elders changed - elders: {:?}, node elder status change: {:?}",
-                index, elders, self_status_change
-            );
+        Event::EldersChanged { .. } => {
+            // info!(
+            //     "Node #{} elders changed - elders: {:?}, node elder status change: {:?}",
+            //     index, elders, self_status_change
+            // );
         }
-        Event::MessageReceived { msg, src, dst, .. } => info!(
-            "Node #{} received message - src: {:?}, dst: {:?}, content: {:?}",
-            index, src, dst, msg
-        ),
-        Event::RelocationStarted { previous_name } => info!(
-            "Node #{} relocation started - previous_name: {}",
-            index, previous_name
-        ),
-        Event::Relocated { previous_name, .. } => {
-            let new_name = node.name().await;
-            info!(
-                "Node #{} relocated - old name: {}, new name: {}",
-                index, previous_name, new_name,
-            );
+        Event::MessageReceived { .. } => (), // info!(
+        //     "Node #{} received message - src: {:?}, dst: {:?}, content: {:?}",
+        //     index, src, dst, msg
+        // ),
+        Event::RelocationStarted { .. } => (), // info!(
+        //     "Node #{} relocation started - previous_name: {}",
+        //     index, previous_name
+        // ),
+        Event::Relocated { .. } => {
+            // let new_name = node.name().await;
+            // info!(
+            //     "Node #{} relocated - old name: {}, new name: {}",
+            //     index, previous_name, new_name,
+            // );
         }
-        Event::ServiceMsgReceived { msg, user, .. } => info!(
-            "Node #{} received message from user: {:?}, msg: {:?}",
-            index, user, msg
-        ),
-        Event::AdultsChanged {
-            remaining,
-            added,
-            removed,
-        } => info!(
-            "Node #{} adults changed - remaining: {:?}, added: {:?}, removed: {:?}",
-            index, remaining, added, removed
-        ),
+        Event::ServiceMsgReceived { .. } => (), // info!(
+        //     "Node #{} received message from user: {:?}, msg: {:?}",
+        //     index, user, msg
+        // ),
+        Event::AdultsChanged { .. } => (), // info!(
+                                           //     "Node #{} adults changed - remaining: {:?}, added: {:?}, removed: {:?}",
+                                           //     index, remaining, added, removed
+                                           // ),
     }
 
     true

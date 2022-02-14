@@ -66,11 +66,11 @@ impl DkgVoter {
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
         if self.sessions.contains_key(&session_id) {
-            trace!(
-                "DKG already in progress for {:?} - {:?}",
-                session_id,
-                elder_candidates
-            );
+            // trace!(
+            //     "DKG already in progress for {:?} - {:?}",
+            //     session_id,
+            //     elder_candidates
+            // );
             return Ok(vec![]);
         }
 
@@ -79,10 +79,10 @@ impl DkgVoter {
             if let Some(index) = elder_candidates.names().position(|n| n == name) {
                 index
             } else {
-                error!(
-                    "DKG failed to start for {:?}: {} is not a participant",
-                    elder_candidates, name
-                );
+                // error!(
+                //     "DKG failed to start for {:?}: {} is not a participant",
+                //     elder_candidates, name
+                // );
                 return Ok(vec![]);
             };
 
@@ -108,7 +108,7 @@ impl DkgVoter {
 
         match KeyGen::initialize(name, threshold, participants) {
             Ok((key_gen, messages)) => {
-                trace!("DKG starting for {:?}", elder_candidates);
+                // trace!("DKG starting for {:?}", elder_candidates);
 
                 let mut session = Session {
                     key_gen,
@@ -125,7 +125,7 @@ impl DkgVoter {
                 // This is to avoid the case that between the above existence check
                 // and the insertion, there is another thread created and updated the session.
                 if self.sessions.contains_key(&session_id) {
-                    warn!("DKG already in progress for {:?}", session_id);
+                    // warn!("DKG already in progress for {:?}", session_id);
                     return Ok(vec![]);
                 } else {
                     let _prev = self.sessions.insert(session_id, session);
@@ -138,9 +138,9 @@ impl DkgVoter {
 
                 Ok(cmds)
             }
-            Err(error) => {
+            Err(_error) => {
                 // TODO: return a separate error here.
-                error!("DKG failed to start for {:?}: {}", elder_candidates, error);
+                // error!("DKG failed to start for {:?}: {}", elder_candidates, error);
                 Ok(vec![])
             }
         }
@@ -184,11 +184,11 @@ impl DkgVoter {
                 section_pk,
             )?)
         } else {
-            trace!(
-                "Sending DkgSessionUnknown {{ {:?} }} to {}",
-                &session_id,
-                &sender
-            );
+            // trace!(
+            //     "Sending DkgSessionUnknown {{ {:?} }} to {}",
+            //     &session_id,
+            //     &sender
+            // );
 
             let node_msg = SystemMsg::DkgSessionUnknown {
                 session_id: *session_id,
@@ -236,16 +236,16 @@ impl DkgVoter {
         node: &Node,
         session_id: DkgSessionId,
         message_history: Vec<DkgMessage>,
-        sender: XorName,
+        _sender: XorName,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
         if let Some(mut session) = self.sessions.get_mut(&session_id) {
             session.handle_dkg_history(node, session_id, message_history, section_pk)
         } else {
-            warn!(
-                "Recieved DKG message cache from {} without an active DKG session: {:?}",
-                &sender, &session_id,
-            );
+            // warn!(
+            //     "Recieved DKG message cache from {} without an active DKG session: {:?}",
+            //     &sender, &session_id,
+            // );
             Ok(vec![])
         }
     }

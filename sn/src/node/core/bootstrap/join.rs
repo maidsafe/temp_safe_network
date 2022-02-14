@@ -26,7 +26,7 @@ use crate::node::{
 };
 use crate::peer::{Peer, UnnamedPeer};
 use crate::prefix_map::NetworkPrefixMap;
-use crate::types::log_markers::LogMarker;
+// use crate::types::log_markers::LogMarker;
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -166,14 +166,14 @@ impl<'a> Join<'a> {
             let (response, sender) = self.receive_join_response().await?;
             match response {
                 JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(addr)) => {
-                    error!(
-                        "Node cannot join the network since it is not externally reachable: {}",
-                        addr
-                    );
+                    // error!(
+                    //     "Node cannot join the network since it is not externally reachable: {}",
+                    //     addr
+                    // );
                     return Err(Error::NodeNotReachable(addr));
                 }
                 JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed) => {
-                    error!("Network is set to not taking any new joining node, try join later.");
+                    // error!("Network is set to not taking any new joining node, try join later.");
                     return Err(Error::TryJoinLater);
                 }
                 JoinResponse::Approval {
@@ -182,24 +182,24 @@ impl<'a> Join<'a> {
                     section_chain,
                     node_state,
                 } => {
-                    info!("{}", LogMarker::ReceivedJoinApproval);
+                    // info!("{}", LogMarker::ReceivedJoinApproval);
                     if node_state.name != self.node.name() {
-                        trace!("Ignore NodeApproval not for us: {:?}", node_state);
+                        // trace!("Ignore NodeApproval not for us: {:?}", node_state);
                         continue;
                     }
 
                     if !node_state.verify(&section_chain) {
-                        error!(
-                            "Verification of node state in JoinResponse failed: {:?}",
-                            node_state
-                        );
+                        // error!(
+                        //     "Verification of node state in JoinResponse failed: {:?}",
+                        //     node_state
+                        // );
                         continue;
                     }
 
-                    trace!(
-                        "This node has been approved to join the network at {:?}!",
-                        section_auth.prefix,
-                    );
+                    // trace!(
+                    //     "This node has been approved to join the network at {:?}!",
+                    //     section_auth.prefix,
+                    // );
 
                     // Building our network knowledge instance will validate SAP and section chain.
                     let section_auth = section_auth.into_authed_state();
@@ -234,17 +234,17 @@ impl<'a> Join<'a> {
                         sig: section_signed,
                     };
                     match self.prefix_map.update(signed_sap, &section_chain) {
-                        Ok(updated) => {
-                            debug!(
-                                "Update prefix_map via JoinResponse::ApprovalShare: {:?}",
-                                updated
-                            );
+                        Ok(_updated) => {
+                            // debug!(
+                            //     "Update prefix_map via JoinResponse::ApprovalShare: {:?}",
+                            //     updated
+                            // );
                         }
-                        Err(err) => {
-                            debug!(
-                                "Failed to update prefix_map via JoinResponse::ApprovalShare: {:?}",
-                                err
-                            );
+                        Err(_err) => {
+                            // debug!(
+                            //     "Failed to update prefix_map via JoinResponse::ApprovalShare: {:?}",
+                            //     err
+                            // );
                         }
                     }
 
@@ -265,10 +265,10 @@ impl<'a> Join<'a> {
                             SignatureAggregator::with_expiration(JOIN_SHARE_EXPIRATION_DURATION)
                         });
 
-                    info!("Aggregating received ApprovalShare from {:?}", sender);
+                    // info!("Aggregating received ApprovalShare from {:?}", sender);
                     match aggregator.add(&serialized_details, sig_share.clone()).await {
                         Ok(sig) => {
-                            info!("Successfully aggregated ApprovalShares for joining the network");
+                            // info!("Successfully aggregated ApprovalShares for joining the network");
                             self.aggregated = true;
 
                             let section_key = sig_share.public_key_set.public_key();
@@ -287,21 +287,21 @@ impl<'a> Join<'a> {
                             {
                                 signed_sap.value.elders().cloned().collect()
                             } else {
-                                warn!("cannot find recipients to send aggregated JoinApproval");
+                                // warn!("cannot find recipients to send aggregated JoinApproval");
                                 continue;
                             };
-                            trace!("Sending aggregated JoinRequest to {:?}", recipients);
+                            // trace!("Sending aggregated JoinRequest to {:?}", recipients);
                             // Resend the JoinRequest now that we have collected enough ApprovalShares from the Elders
                             self.send_join_requests(join_req, &recipients, section_key, false)
                                 .await?;
                             continue;
                         }
                         Err(AggregatorError::NotEnoughShares) => continue,
-                        error => {
-                            warn!(
-                                "Error received as part of signature aggregation during join: {:?}",
-                                error
-                            );
+                        _error => {
+                            // warn!(
+                            //     "Error received as part of signature aggregation during join: {:?}",
+                            //     error
+                            // );
 
                             if sig_pk != section_key {
                                 // if we've have aggregation errors, we attempt a fresh join as there's likely been a key change
@@ -332,24 +332,24 @@ impl<'a> Join<'a> {
                 } => {
                     let section_auth = section_auth.into_state();
 
-                    trace!(
-                        "Joining node {:?} - {:?}/{:?} received a Retry from {} with SAP {:?}, expected_age: {}, our age: {}",
-                        self.prefix,
-                        self.node.name(),
-                        self.node.age(),sender,
-                        section_auth,
-                        expected_age,
-                        self.node.age()
-                    );
+                    // trace!(
+                    //     "Joining node {:?} - {:?}/{:?} received a Retry from {} with SAP {:?}, expected_age: {}, our age: {}",
+                    //     self.prefix,
+                    //     self.node.name(),
+                    //     self.node.age(),sender,
+                    //     section_auth,
+                    //     expected_age,
+                    //     self.node.age()
+                    // );
 
                     let prefix = section_auth.prefix();
                     if !prefix.matches(&self.node.name()) {
-                        warn!(
-                            "Ignoring newer JoinResponse::Retry response not for us {:?}, SAP {:?} from {:?}",
-                            self.node.name(),
-                            section_auth,
-                            sender,
-                        );
+                        // warn!(
+                        //     "Ignoring newer JoinResponse::Retry response not for us {:?}, SAP {:?} from {:?}",
+                        //     self.node.name(),
+                        //     section_auth,
+                        //     sender,
+                        // );
                         continue;
                     }
 
@@ -361,11 +361,11 @@ impl<'a> Join<'a> {
                     // make sure we received a valid and trusted new SAP
                     let is_new_sap = match self.prefix_map.update(signed_sap, &proof_chain) {
                         Ok(updated) => updated,
-                        Err(err) => {
-                            debug!(
-                                "Ignoring JoinResponse::Retry with an invalid SAP: {:?}",
-                                err
-                            );
+                        Err(_err) => {
+                            // debug!(
+                            //     "Ignoring JoinResponse::Retry with an invalid SAP: {:?}",
+                            //     err
+                            // );
                             continue;
                         }
                     };
@@ -376,11 +376,11 @@ impl<'a> Join<'a> {
                         && !self.aggregated
                     {
                         // adjust our joining age to the expected by the network
-                        trace!(
-                            "Re-generating name due to mis-matched age, current {} vs. expected {}",
-                            self.node.age(),
-                            expected_age
-                        );
+                        // trace!(
+                        //     "Re-generating name due to mis-matched age, current {} vs. expected {}",
+                        //     self.node.age(),
+                        //     expected_age
+                        // );
                         // The expected_age is a sequence of 98, 96, 94, 92, ...
                         // The prefix is deduced from the age's bits.
                         let mut cur_age = expected_age / 2;
@@ -390,25 +390,25 @@ impl<'a> Join<'a> {
                             new_prefix = new_prefix.pushed(push_prefix_0);
                             cur_age /= 2;
                         }
-                        trace!("Name shall have the prefix of {:?}", new_prefix);
+                        // trace!("Name shall have the prefix of {:?}", new_prefix);
 
                         let new_keypair =
                             ed25519::gen_keypair(&new_prefix.range_inclusive(), expected_age);
-                        let new_name = ed25519::name(&new_keypair.public);
+                        // let new_name = ed25519::name(&new_keypair.public);
 
-                        info!("Setting Node name to {} (age {})", new_name, expected_age);
+                        // info!("Setting Node name to {} (age {})", new_name, expected_age);
                         self.node = Node::new(new_keypair, self.node.addr);
                     } else if !is_new_sap {
-                        debug!("Ignoring JoinResponse::Retry with same SAP as we previously sent to: {:?}", section_auth);
+                        // debug!("Ignoring JoinResponse::Retry with same SAP as we previously sent to: {:?}", section_auth);
                         continue;
                     }
 
-                    info!(
-                        "Newer Join response for us {:?}, SAP {:?} from {:?}",
-                        self.node.name(),
-                        section_auth,
-                        sender
-                    );
+                    // info!(
+                    //     "Newer Join response for us {:?}, SAP {:?} from {:?}",
+                    //     self.node.name(),
+                    //     section_auth,
+                    //     sender
+                    // );
 
                     section_key = section_auth.section_key();
                     let join_request = JoinRequest {
@@ -425,23 +425,23 @@ impl<'a> Join<'a> {
                         .await?;
                 }
                 JoinResponse::Redirect(section_auth) => {
-                    trace!("Received a redirect/retry JoinResponse from {}. Sending request to the latest contacts", sender);
+                    // trace!("Received a redirect/retry JoinResponse from {}. Sending request to the latest contacts", sender);
                     if section_auth.elders.is_empty() {
-                        error!(
-                            "Invalid JoinResponse::Redirect, empty list of Elders: {:?}",
-                            section_auth
-                        );
+                        // error!(
+                        //     "Invalid JoinResponse::Redirect, empty list of Elders: {:?}",
+                        //     section_auth
+                        // );
                         continue;
                     }
 
                     let section_auth = section_auth.into_state();
                     if !section_auth.prefix().matches(&self.node.name()) {
-                        warn!(
-                            "Ignoring newer JoinResponse::Redirect response not for us {:?}, SAP {:?} from {:?}",
-                            self.node.name(),
-                            section_auth,
-                            sender,
-                        );
+                        // warn!(
+                        //     "Ignoring newer JoinResponse::Redirect response not for us {:?}, SAP {:?} from {:?}",
+                        //     self.node.name(),
+                        //     section_auth,
+                        //     sender,
+                        // );
                         continue;
                     }
 
@@ -453,19 +453,19 @@ impl<'a> Join<'a> {
                         .collect();
 
                     if new_recipients.is_empty() {
-                        debug!(
-                            "Ignoring JoinResponse::Redirect with old SAP that has been sent to: {:?}",
-                            section_auth
-                        );
+                        // debug!(
+                        //     "Ignoring JoinResponse::Redirect with old SAP that has been sent to: {:?}",
+                        //     section_auth
+                        // );
                         continue;
                     }
 
-                    info!(
-                        "Newer JoinResponse::Redirect for us {:?}, SAP {:?} from {:?}",
-                        self.node.name(),
-                        section_auth,
-                        sender
-                    );
+                    // info!(
+                    //     "Newer JoinResponse::Redirect for us {:?}, SAP {:?} from {:?}",
+                    //     self.node.name(),
+                    //     section_auth,
+                    //     sender
+                    // );
 
                     section_key = new_section_key;
                     self.prefix = section_auth.prefix();
@@ -488,7 +488,7 @@ impl<'a> Join<'a> {
                     nonce,
                     nonce_signature,
                 } => {
-                    trace!("Received a ResourceChallenge from {}", sender);
+                    // trace!("Received a ResourceChallenge from {}", sender);
                     let rp = ResourceProof::new(data_size, difficulty);
                     let data = rp.create_proof_data(&nonce);
                     let mut prover = rp.create_prover(data.clone());
@@ -527,14 +527,14 @@ impl<'a> Join<'a> {
             if let Some(wait) = next_wait {
                 sleep(wait).await;
             } else {
-                error!("Waiting before attempting to join again");
+                // error!("Waiting before attempting to join again");
 
                 sleep(self.backoff.max_interval).await;
                 self.backoff.reset();
             }
         }
 
-        info!("Sending {:?} to {:?}", join_request, recipients);
+        // info!("Sending {:?} to {:?}", join_request, recipients);
 
         let node_msg = SystemMsg::JoinRequest(Box::new(join_request));
         let wire_msg = WireMsg::single_src(
@@ -563,11 +563,11 @@ impl<'a> Join<'a> {
                     Ok(wire_msg) => match wire_msg.msg_kind() {
                         MsgKind::ServiceMsg(_) => continue,
                         MsgKind::NodeBlsShareAuthMsg(_) => {
-                            trace!(
-                                "Bootstrap message discarded: sender: {:?} wire_msg: {:?}",
-                                sender,
-                                wire_msg
-                            );
+                            // trace!(
+                            //     "Bootstrap message discarded: sender: {:?} wire_msg: {:?}",
+                            //     sender,
+                            //     wire_msg
+                            // );
                             continue;
                         }
                         MsgKind::NodeAuthMsg(NodeAuth { .. }) => match wire_msg.into_msg() {
@@ -576,24 +576,22 @@ impl<'a> Join<'a> {
                                 msg_authority,
                                 ..
                             }) => (*resp, sender.named(msg_authority.src_location().name())),
-                            Ok(
-                                MsgType::Service { msg_id, .. } | MsgType::System { msg_id, .. },
-                            ) => {
-                                trace!(
-                                    "Bootstrap message discarded: sender: {:?} msg_id: {:?}",
-                                    sender,
-                                    msg_id
-                                );
+                            Ok(MsgType::Service { .. } | MsgType::System { .. }) => {
+                                // trace!(
+                                //     "Bootstrap message discarded: sender: {:?} msg_id: {:?}",
+                                //     sender,
+                                //     msg_id
+                                // );
                                 continue;
                             }
-                            Err(err) => {
-                                debug!("Failed to deserialize message payload: {:?}", err);
+                            Err(_err) => {
+                                // debug!("Failed to deserialize message payload: {:?}", err);
                                 continue;
                             }
                         },
                     },
-                    Err(err) => {
-                        debug!("Failed to deserialize message: {:?}", err);
+                    Err(_err) => {
+                        // debug!("Failed to deserialize message: {:?}", err);
                         continue;
                     }
                 },
@@ -602,7 +600,7 @@ impl<'a> Join<'a> {
             return Ok((join_response, sender));
         }
 
-        error!("NodeMsg sender unexpectedly closed");
+        // error!("NodeMsg sender unexpectedly closed");
         // TODO: consider more specific error here (e.g. `BootstrapInterrupted`)
         Err(Error::InvalidState)
     }
@@ -616,14 +614,14 @@ async fn send_messages(mut rx: mpsc::Receiver<(WireMsg, Vec<Peer>)>, comm: &Comm
             .await
         {
             Ok(SendStatus::AllRecipients) | Ok(SendStatus::MinDeliveryGroupSizeReached(_)) => {}
-            Ok(SendStatus::MinDeliveryGroupSizeFailed(recipients)) => {
-                error!("Failed to send message {:?} to {:?}", wire_msg, recipients)
+            Ok(SendStatus::MinDeliveryGroupSizeFailed(_recipients)) => {
+                // error!("Failed to send message {:?} to {:?}", wire_msg, recipients)
             }
-            Err(err) => {
-                error!(
-                    "Failed to send message {:?} to {:?}: {:?}",
-                    wire_msg, recipients, err
-                )
+            Err(_err) => {
+                // error!(
+                //     "Failed to send message {:?} to {:?}: {:?}",
+                //     wire_msg, recipients, err
+                // )
             }
         }
     }
@@ -1139,7 +1137,7 @@ mod tests {
             section_pk,
         )?;
 
-        debug!("wire msg built");
+        // debug!("wire msg built");
 
         recv_tx.try_send(ConnectionEvent::Received((
             UnnamedPeer::addressed(bootstrap_node.addr),

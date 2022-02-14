@@ -21,7 +21,7 @@ use std::{
 };
 use structopt::StructOpt;
 use tokio::fs;
-use tracing::debug;
+// use tracing::debug;
 
 const CONFIG_NETWORKS_DIRNAME: &str = "networks";
 
@@ -44,7 +44,7 @@ pub trait NetworkLauncher {
 pub struct SnLaunchToolNetworkLauncher {}
 impl NetworkLauncher for SnLaunchToolNetworkLauncher {
     fn launch(&mut self, args: Vec<String>, interval: u64) -> Result<(), Report> {
-        debug!("Running network launch tool with args: {:?}", args);
+        // debug!("Running network launch tool with args: {:?}", args);
         println!("Starting a node to join a Safe network...");
         sn_launch_tool::Launch::from_iter_safe(&args)
             .map_err(|e| eyre!(e))
@@ -58,7 +58,7 @@ impl NetworkLauncher for SnLaunchToolNetworkLauncher {
     }
 
     fn join(&mut self, args: Vec<String>) -> Result<(), Report> {
-        debug!("Running network launch tool with args: {:?}", args);
+        // debug!("Running network launch tool with args: {:?}", args);
         println!("Starting a node to join a Safe network...");
         sn_launch_tool::Join::from_iter_safe(&args)
             .map_err(|e| eyre!(e))
@@ -132,17 +132,17 @@ impl Config {
                     cli_config_path.display()
                 )
             })?;
-            debug!(
-                "Config settings retrieved from '{}': {:?}",
-                cli_config_path.display(),
-                settings
-            );
+            // debug!(
+            //     "Config settings retrieved from '{}': {:?}",
+            //     cli_config_path.display(),
+            //     settings
+            // );
         } else {
             settings = Settings::default();
-            debug!(
-                "Empty config file created at '{}'",
-                cli_config_path.display()
-            );
+            // debug!(
+            //     "Empty config file created at '{}'",
+            //     cli_config_path.display()
+            // );
         }
 
         let config = Config {
@@ -248,7 +248,7 @@ impl Config {
 
         self.write_settings_to_file().await?;
 
-        debug!("Network '{}' added to settings: {}", name, net_info);
+        // debug!("Network '{}' added to settings: {}", name, net_info);
         Ok(net_info)
     }
 
@@ -256,7 +256,7 @@ impl Config {
         match self.settings.networks.remove(name) {
             Some(NetworkInfo::ConnInfoLocation(location)) => {
                 self.write_settings_to_file().await?;
-                debug!("Network '{}' removed from config", name);
+                // debug!("Network '{}' removed from config", name);
                 println!("Network '{}' was removed from the config", name);
                 let mut config_local_path = self.cli_config_path.clone();
                 config_local_path.pop();
@@ -277,7 +277,7 @@ impl Config {
             }
             Some(NetworkInfo::NodeConfig(_)) => {
                 self.write_settings_to_file().await?;
-                debug!("Network '{}' removed from config", name);
+                // debug!("Network '{}' removed from config", name);
                 println!("Network '{}' was removed from the config", name);
             }
             None => println!("No network with name '{}' was found in config", name),
@@ -377,11 +377,11 @@ impl Config {
                     self.cli_config_path.display()
                 )
             })?;
-        debug!(
-            "Config settings at '{}' updated with: {:?}",
-            self.cli_config_path.display(),
-            self.settings
-        );
+        // debug!(
+        //     "Config settings at '{}' updated with: {:?}",
+        //     self.cli_config_path.display(),
+        //     self.settings
+        // );
         Ok(())
     }
 }

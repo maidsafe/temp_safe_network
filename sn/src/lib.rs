@@ -93,14 +93,14 @@ pub(crate) fn elder_count() -> usize {
     match std::env::var(SN_ELDER_COUNT) {
         Ok(count) => match count.parse() {
             Ok(count) => {
-                warn!(
-                    "ELDER_COUNT count set from env var SN_ELDER_COUNT: {:?}",
-                    SN_ELDER_COUNT
-                );
+                // warn!(
+                //     "ELDER_COUNT count set from env var SN_ELDER_COUNT: {:?}",
+                //     SN_ELDER_COUNT
+                // );
                 count
             }
-            Err(error) => {
-                warn!("There was an error parsing {:?} env var. DEFAULT_ELDER_COUNT will be used: {:?}", SN_ELDER_COUNT, error);
+            Err(_error) => {
+                // warn!("There was an error parsing {:?} env var. DEFAULT_ELDER_COUNT will be used: {:?}", SN_ELDER_COUNT, error);
                 DEFAULT_ELDER_COUNT
             }
         },
@@ -115,14 +115,14 @@ pub(crate) fn data_copy_count() -> usize {
     match std::env::var(SN_DATA_COPY_COUNT) {
         Ok(count) => match count.parse() {
             Ok(count) => {
-                warn!(
-                    "data_copy_count countout set from env var SN_DATA_COPY_COUNT: {:?}",
-                    SN_DATA_COPY_COUNT
-                );
+                // warn!(
+                //     "data_copy_count countout set from env var SN_DATA_COPY_COUNT: {:?}",
+                //     SN_DATA_COPY_COUNT
+                // );
                 count
             }
-            Err(error) => {
-                warn!("There was an error parsing {:?} env var. DEFAULT_DATA_COPY_COUNT will be used: {:?}", SN_DATA_COPY_COUNT, error);
+            Err(_error) => {
+                // warn!("There was an error parsing {:?} env var. DEFAULT_DATA_COPY_COUNT will be used: {:?}", SN_DATA_COPY_COUNT, error);
                 DEFAULT_DATA_COPY_COUNT
             }
         },

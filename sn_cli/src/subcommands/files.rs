@@ -30,7 +30,7 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 use structopt::StructOpt;
-use tracing::debug;
+// use tracing::debug;
 
 type FileDetails = BTreeMap<String, String>;
 
@@ -356,7 +356,7 @@ pub async fn files_commander(
             let target_url =
                 get_from_arg_or_stdin(target, Some("...awaiting target URl from STDIN"))?;
 
-            debug!("Getting files in container {:?}", target_url);
+            // debug!("Getting files in container {:?}", target_url);
             let mut resolution_chain = safe.inspect(&target_url).await?;
             let resolved_content = resolution_chain
                 .pop()
@@ -423,7 +423,7 @@ async fn process_tree_command(
 ) -> Result<()> {
     let target_url = get_from_arg_or_stdin(target, Some("...awaiting target URl from STDIN"))?;
 
-    debug!("Getting files in container {:?}", target_url);
+    // debug!("Getting files in container {:?}", target_url);
     let files_map = match safe.fetch(&target_url, None).await? {
         SafeData::FilesContainer { files_map, .. } => files_map,
         _other_type => bail!("Make sure the URL targets a FilesContainer"),

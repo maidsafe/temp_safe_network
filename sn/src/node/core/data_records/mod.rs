@@ -20,26 +20,26 @@ use crate::{
         Error, Result,
     },
     peer::Peer,
-    types::{log_markers::LogMarker, PublicKey, ReplicatedData, ReplicatedDataAddress},
+    types::{PublicKey, ReplicatedData, ReplicatedDataAddress},
 };
 
 use itertools::Itertools;
 use std::{cmp::Ordering, collections::BTreeSet};
-use tracing::info;
+// use tracing::info;
 use xor_name::XorName;
 
 impl Core {
     // Locate ideal holders for this data, line up wiremsgs for those to instruct them to store the data
     pub(crate) async fn replicate_data(&self, data: ReplicatedData) -> Result<Vec<Cmd>> {
-        trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
+        // trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
         if self.is_elder().await {
             let targets = self.get_adults_who_should_store_data(data.name()).await;
 
-            info!(
-                "Replicating data {:?} to holders {:?}",
-                data.name(),
-                &targets,
-            );
+            // info!(
+            //     "Replicating data {:?} to holders {:?}",
+            //     data.name(),
+            //     &targets,
+            // );
 
             let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(data));
             self.send_node_msg_to_nodes(msg, targets).await
@@ -57,12 +57,12 @@ impl Core {
     ) -> Result<Vec<Cmd>> {
         let address = query.address();
         let operation_id = query.operation_id()?;
-        trace!(
-            "{:?} preparing to query adults for data at {:?} with op_id: {:?}",
-            LogMarker::DataQueryReceviedAtElder,
-            address,
-            operation_id
-        );
+        // trace!(
+        //     "{:?} preparing to query adults for data at {:?} with op_id: {:?}",
+        //     LogMarker::DataQueryReceviedAtElder,
+        //     address,
+        //     operation_id
+        // );
 
         let targets = self.get_adults_holding_data(address.name()).await;
 
@@ -99,7 +99,7 @@ impl Core {
 
         // drop if we exceed
         if waiting_peers.len() > MAX_WAITING_PEERS_PER_QUERY {
-            warn!("Dropping query from {origin:?}, there are more than {MAX_WAITING_PEERS_PER_QUERY} waiting already");
+            // warn!("Dropping query from {origin:?}, there are more than {MAX_WAITING_PEERS_PER_QUERY} waiting already");
             return Ok(vec![]);
         }
 
@@ -148,7 +148,7 @@ impl Core {
 
     /// Adds the new adult to the Capacity and Liveness trackers.
     pub(crate) async fn add_new_adult_to_trackers(&self, adult: XorName) {
-        info!("Adding new Adult: {adult} to trackers");
+        // info!("Adding new Adult: {adult} to trackers");
         self.capacity.add_new_adult(adult).await;
 
         self.liveness.add_new_adult(adult);
@@ -157,17 +157,17 @@ impl Core {
     /// Set storage level of a given node.
     /// Returns whether the level changed or not.
     pub(crate) async fn set_storage_level(&self, node_id: &PublicKey, level: StorageLevel) -> bool {
-        info!("Setting new storage level..");
+        // info!("Setting new storage level..");
         let changed = self
             .capacity
             .set_adult_level(XorName::from(*node_id), level)
             .await;
-        let avg_usage = self.capacity.avg_usage().await;
-        info!(
-            "Avg storage usage among Adults is between {}-{} %",
-            avg_usage * 10,
-            (avg_usage + 1) * 10
-        );
+        // let avg_usage = self.capacity.avg_usage().await;
+        // info!(
+        //     "Avg storage usage among Adults is between {}-{} %",
+        //     avg_usage * 10,
+        //     (avg_usage + 1) * 10
+        // );
         changed
     }
 
@@ -203,12 +203,12 @@ impl Core {
             .take(data_copy_count())
             .collect::<BTreeSet<_>>();
 
-        trace!(
-            "Chunk holders of {:?} are empty adults: {:?} and full adults: {:?}",
-            target,
-            candidates,
-            full_adults
-        );
+        // trace!(
+        //     "Chunk holders of {:?} are empty adults: {:?} and full adults: {:?}",
+        //     target,
+        //     candidates,
+        //     full_adults
+        // );
 
         // Full adults that are close to the chunk, shall still be considered as candidates
         // to allow chunks stored to empty adults can be queried when nodes become full.
@@ -240,21 +240,21 @@ impl Core {
 
         let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
 
-        let candidates = adults_names
+        adults_names
             .into_iter()
             .sorted_by(|lhs, rhs| target.cmp_distance(lhs, rhs))
             .filter(|peer| !full_adults.contains(peer))
             .take(data_copy_count())
-            .collect::<BTreeSet<_>>();
+            .collect::<BTreeSet<_>>()
 
-        trace!(
-               "Target chunk holders of {:?} are empty adults: {:?} and full adults that were ignored: {:?}",
-               target,
-               candidates,
-               full_adults
-           );
+        // trace!(
+        //        "Target chunk holders of {:?} are empty adults: {:?} and full adults that were ignored: {:?}",
+        //        target,
+        //        candidates,
+        //        full_adults
+        //    );
 
-        candidates
+        // candidates
     }
 
     // Takes a message and forms cmds to send to specified targets
@@ -284,7 +284,7 @@ impl Core {
         let mut cmds = vec![];
 
         for target in targets {
-            debug!("Sending {:?} to {:?}", wire_msg, target);
+            // debug!("Sending {:?} to {:?}", wire_msg, target);
             let mut wire_msg = wire_msg.clone();
             let dst_section_pk = self.section_key_by_name(&target).await;
             wire_msg.set_dst_section_pk(dst_section_pk);

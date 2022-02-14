@@ -28,7 +28,7 @@ use tokio::{
     sync::{mpsc::Receiver, RwLock},
     time::Duration,
 };
-use tracing::{debug, info};
+// use tracing::{debug, info};
 use uluru::LRUCache;
 use xor_name::XorName;
 
@@ -91,16 +91,15 @@ impl Client {
 
         let keypair = match optional_keypair {
             Some(id) => {
-                info!("Client started for specific pk: {:?}", id.public_key());
+                // info!("Client started for specific pk: {:?}", id.public_key());
                 id
             }
             None => {
-                let keypair = Keypair::new_ed25519(&mut rng);
-                info!(
-                    "Client started for new randomly created pk: {:?}",
-                    keypair.public_key()
-                );
-                keypair
+                Keypair::new_ed25519(&mut rng)
+                // info!(
+                //     "Client started for new randomly created pk: {:?}",
+                //     keypair.public_key()
+                // );
             }
         };
 
@@ -114,12 +113,12 @@ impl Client {
             .await
             {
                 Ok(prefix_map) => prefix_map,
-                Err(e) => {
-                    warn!("Could not read PrefixMap at '.safe/prefix_maps': {:?}", e);
-                    info!(
-                        "Creating a fresh PrefixMap with GenesisKey {:?}",
-                        config.genesis_key
-                    );
+                Err(_e) => {
+                    // warn!("Could not read PrefixMap at '.safe/prefix_maps': {:?}", e);
+                    // info!(
+                    //     "Creating a fresh PrefixMap with GenesisKey {:?}",
+                    //     config.genesis_key
+                    // );
                     NetworkPrefixMap::new(config.genesis_key)
                 }
             }
@@ -138,14 +137,14 @@ impl Client {
 
         // Bootstrap to the network, connecting to a section based
         // on a public key of our choice.
-        debug!(
-            "Creating new session with genesis key: {:?} ",
-            config.genesis_key
-        );
-        debug!(
-            "Creating new session with genesis key (in hex format): {} ",
-            hex::encode(config.genesis_key.to_bytes())
-        );
+        // debug!(
+        //     "Creating new session with genesis key: {:?} ",
+        //     config.genesis_key
+        // );
+        // debug!(
+        //     "Creating new session with genesis key (in hex format): {} ",
+        //     hex::encode(config.genesis_key.to_bytes())
+        // );
 
         // Create a session with the network
         let session = Session::new(
@@ -224,10 +223,10 @@ impl Client {
             .await;
         // Send the dummy message to probe the network for it's infrastructure details.
         while attempts < NETWORK_PROBE_RETRY_COUNT && initial_probe.is_err() {
-            error!(
-                "Initial probe msg to network failed. Trying again (attempt {}): {:?}",
-                attempts, initial_probe
-            );
+            // error!(
+            //     "Initial probe msg to network failed. Trying again (attempt {}): {:?}",
+            //     attempts, initial_probe
+            // );
 
             if attempts == NETWORK_PROBE_RETRY_COUNT {
                 // we've failed

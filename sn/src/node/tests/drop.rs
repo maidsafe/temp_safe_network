@@ -48,7 +48,7 @@ async fn test_node_drop() -> Result<()> {
     let dropped_addr = dropped_node.our_connection_info();
     drop(dropped_node);
 
-    tracing::info!("Dropped {} at {}", dropped_name, dropped_addr);
+    // tracing::info!("Dropped {} at {}", dropped_name, dropped_addr);
 
     //  A failed send_message from any node should
     // trigger voting by all nodes

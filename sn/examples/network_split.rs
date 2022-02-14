@@ -18,7 +18,7 @@ use std::{
 use structopt::StructOpt;
 use tokio::fs::create_dir_all;
 use tokio::time::{sleep, Duration};
-use tracing::{debug, info};
+// use tracing::{debug, info};
 
 use tiny_keccak::{Hasher, Sha3};
 
@@ -85,17 +85,17 @@ fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf> {
 
 /// Uses SNLT to create a local network of nodes
 pub async fn run_split() -> Result<()> {
-    info!("Starting local network");
+    // info!("Starting local network");
     let node_path = Some(PathBuf::from("./target/release"));
     let node_path = get_node_bin_path(node_path)?;
 
     let arg_node_path = node_path.join(SAFE_NODE_EXECUTABLE).display().to_string();
-    debug!("Running node from {}", arg_node_path);
+    // debug!("Running node from {}", arg_node_path);
 
     let base_log_dir = get_node_bin_path(None)?;
     let node_log_dir = base_log_dir.join(NODES_DIR);
     if !node_log_dir.exists() {
-        debug!("Creating '{}' folder", node_log_dir.display());
+        // debug!("Creating '{}' folder", node_log_dir.display());
         create_dir_all(node_log_dir.clone()).await.map_err(|err| {
             eyre!(
                 "Couldn't create target path to store nodes' generated data: {}",
@@ -104,7 +104,7 @@ pub async fn run_split() -> Result<()> {
         })?;
     }
     let arg_node_log_dir = node_log_dir.display().to_string();
-    info!("Storing nodes' generated data at {}", arg_node_log_dir);
+    // info!("Storing nodes' generated data at {}", arg_node_log_dir);
 
     // Let's create an args array to pass to the network launcher tool
     let mut sn_launch_tool_args = vec![
@@ -133,10 +133,10 @@ pub async fn run_split() -> Result<()> {
     // start with 11 nodes
     let start_node_count = 11;
 
-    debug!("Running testnet with args: {:?}", sn_launch_tool_args);
+    // debug!("Running testnet with args: {:?}", sn_launch_tool_args);
 
     // We can now call the tool with the args
-    info!("Launching local Safe network...");
+    // info!("Launching local Safe network...");
     Launch::from_iter_safe(&sn_launch_tool_args)
         .map_err(|error| eyre!(error))
         .and_then(|launch| launch.run())
@@ -162,10 +162,10 @@ pub async fn run_split() -> Result<()> {
     sn_launch_tool_args.push("--add");
     sn_launch_tool_args.push("-n");
     sn_launch_tool_args.push(additional_node_count_str);
-    debug!("Adding testnet nodes with args: {:?}", sn_launch_tool_args);
+    // debug!("Adding testnet nodes with args: {:?}", sn_launch_tool_args);
 
     // We can now call the tool with the args
-    info!("Adding nodes to the local Safe network...");
+    // info!("Adding nodes to the local Safe network...");
     Launch::from_iter_safe(&sn_launch_tool_args)
         .map_err(|error| eyre!(error))
         .and_then(|launch| launch.run())

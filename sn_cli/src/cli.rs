@@ -31,7 +31,7 @@ use std::env;
 use std::path::PathBuf;
 use std::time::Duration;
 use structopt::{clap::AppSettings::ColoredHelp, StructOpt};
-use tracing::debug;
+// use tracing::debug;
 
 const DEFAULT_OPERATION_TIMEOUT_SECS: u64 = 120; // 2mins
 
@@ -90,7 +90,7 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
     // Set dry run mode in Safe instance as per arg provide
     safe.dry_run_mode = args.dry;
 
-    debug!("Processing command: {:?}", args);
+    // debug!("Processing command: {:?}", args);
 
     let result = match args.cmd {
         Some(SubCommands::Config { cmd }) => config_commander(cmd, &mut get_config().await?).await,

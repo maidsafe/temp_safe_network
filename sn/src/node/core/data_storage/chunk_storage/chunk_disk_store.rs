@@ -164,8 +164,8 @@ fn list_files_in(path: &Path) -> Result<Vec<String>> {
         .into_iter()
         .filter_map(|e| match e {
             Ok(direntry) => Some(direntry),
-            Err(err) => {
-                warn!("ChunkDiskStore: failed to process file entry: {}", err);
+            Err(_err) => {
+                // warn!("ChunkDiskStore: failed to process file entry: {}", err);
                 None
             }
         })

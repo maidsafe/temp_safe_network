@@ -14,7 +14,7 @@ use crate::app::{
 };
 use crate::{Error, Result};
 use bytes::Bytes;
-use log::{debug, warn};
+// use log::{debug, warn};
 use safe_network::types::BytesAddress;
 use std::collections::BTreeSet;
 
@@ -23,12 +23,12 @@ impl Safe {
         let (target_url, nrs_map) = self
             .nrs_get(input_url.public_name(), input_url.content_version())
             .await
-            .map_err(|e| {
-                warn!("NRS failed to resolve {}: {}", input_url, e);
+            .map_err(|_e| {
+                // warn!("NRS failed to resolve {}: {}", input_url, e);
                 Error::ContentNotFound(format!("Content not found at {}", input_url))
             })?;
         if let Some(mut target_url) = target_url {
-            debug!("NRS Resolved {} => {}", input_url, target_url);
+            // debug!("NRS Resolved {} => {}", input_url, target_url);
             let url_path = input_url.path_decoded()?;
             let target_path = target_url.path_decoded()?;
             target_url.set_path(&format!("{}{}", target_path, url_path));
@@ -43,8 +43,8 @@ impl Safe {
             };
             return Ok(safe_data);
         }
-        debug!("No target associated with input {}", input_url);
-        debug!("Returning NrsMapContainer with NRS Map.");
+        // debug!("No target associated with input {}", input_url);
+        // debug!("Returning NrsMapContainer with NRS Map.");
         let safe_data = SafeData::NrsMapContainer {
             xorurl: input_url.to_xorurl_string(),
             xorname: input_url.xorname(),
@@ -177,13 +177,13 @@ impl Safe {
             None => (None, FilesMap::default()),
         };
 
-        debug!(
-            "Files container at {}, with version: {:?}, of data type: {}, containing: {:?}",
-            input_url,
-            version,
-            input_url.data_type(),
-            files_map
-        );
+        // debug!(
+        //     "Files container at {}, with version: {:?}, of data type: {}, containing: {:?}",
+        //     input_url,
+        //     version,
+        //     input_url.data_type(),
+        //     files_map
+        // );
 
         // cd there if it is a dir
         let path = input_url.path_decoded()?;
@@ -191,10 +191,10 @@ impl Safe {
             || path == "/"
             || path.is_empty()
         {
-            debug!(
-                "Skipping path resolution for FilesContainer resolved with {}",
-                input_url
-            );
+            // debug!(
+            //     "Skipping path resolution for FilesContainer resolved with {}",
+            //     input_url
+            // );
             (files_map, None, None)
         } else {
             let files_map_for_path = files::file_map_for_path(files_map, &path).map_err(|e| Error::ContentError(
@@ -280,7 +280,7 @@ fn ensure_no_subnames(url: &SafeUrl, data_type: &str) -> Result<()> {
             "Cannot resolve URL targetting {} as it contains subnames: {}",
             data_type, url
         );
-        debug!("{}", msg);
+        // debug!("{}", msg);
         return Err(Error::InvalidXorUrl(msg));
     }
     Ok(())

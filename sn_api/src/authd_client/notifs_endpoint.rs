@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::AuthReq;
-use log::{debug, info};
+// use log::{debug, info};
 use qjsonrpc::{
     Endpoint, IncomingJsonRpcRequest, JsonRpcRequest, JsonRpcResponse, JsonRpcResponseStream,
 };
@@ -27,7 +27,7 @@ pub async fn jsonrpc_listen(
     cert_base_path: &str,
     notif_channel: mpsc::UnboundedSender<(AuthReq, oneshot::Sender<Option<bool>>)>,
 ) -> Result<(), String> {
-    debug!("Launching new QUIC endpoint on '{}'", listen);
+    // debug!("Launching new QUIC endpoint on '{}'", listen);
 
     let listen_socket_addr = Url::parse(listen)
         .map_err(|_| "Invalid endpoint address".to_string())?
@@ -92,7 +92,7 @@ async fn handle_request(
         .await
         .map_err(|e| format!("Failed to shutdown stream: {}", e))?;
 
-    info!("Request complete");
+    // info!("Request complete");
     Ok(())
 }
 
@@ -112,17 +112,17 @@ async fn process_jsonrpc_request(
     };
 
     // New notification for auth req to be sent to user
-    let app_id = auth_req.app_id.clone();
+    // let app_id = auth_req.app_id.clone();
     let (decision_tx, decision_rx) = oneshot::channel::<Option<bool>>();
     match notif_channel.send((auth_req, decision_tx)) {
-        Ok(_) => debug!(
-            "Auth req notification from app id '{}' sent to user",
-            app_id
-        ),
-        Err(err) => debug!(
-            "Auth req notification for app id '{}' couldn't be sent to user: {}",
-            app_id, err
-        ),
+        Ok(_) => (), // debug!(
+        //     "Auth req notification from app id '{}' sent to user",
+        //     app_id
+        // ),
+        Err(_err) => (), // debug!(
+                         //     "Auth req notification for app id '{}' couldn't be sent to user: {}",
+                         //     app_id, err
+                         // ),
     }
 
     // Send the decision made by the user back to authd

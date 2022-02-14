@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::error::{Error, Result};
-use crate::types::log_markers::LogMarker;
+// use crate::types::log_markers::LogMarker;
 
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -86,16 +86,16 @@ impl SectionKeysProvider {
     /// Adds a new key to the cache, and removes the oldest
     /// key if cache size is exceeded.
     pub(crate) async fn insert(&self, share: SectionKeyShare) {
-        let public_key = share.public_key_set.public_key();
-        if let Some(evicted) = self.cache.write().await.insert(share) {
-            trace!("evicted old key share from cache: {:?}", evicted);
+        // let public_key = share.public_key_set.public_key();
+        if let Some(_evicted) = self.cache.write().await.insert(share) {
+            // trace!("evicted old key share from cache: {:?}", evicted);
         }
-        let cache_len = self.cache.read().await.len();
-        trace!(
-            "{} in cache (total {}): {:?}",
-            LogMarker::NewKeyShareStored,
-            cache_len,
-            public_key
-        );
+        // let cache_len = self.cache.read().await.len();
+        // trace!(
+        //     "{} in cache (total {}): {:?}",
+        //     LogMarker::NewKeyShareStored,
+        //     cache_len,
+        //     public_key
+        // );
     }
 }

@@ -19,7 +19,7 @@ use crate::node::{
     Error, Result,
 };
 use crate::peer::Peer;
-use crate::types::log_markers::LogMarker;
+// use crate::types::log_markers::LogMarker;
 
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
@@ -38,7 +38,7 @@ impl Core {
     ) -> Result<Vec<Cmd>> {
         let current_generation = self.network_knowledge.chain_len().await;
         if session_id.generation < current_generation {
-            trace!("Skipping DkgStart for older generation: {:?}", &session_id);
+            // trace!("Skipping DkgStart for older generation: {:?}", &session_id);
             return Ok(vec![]);
         }
         let section_auth = self.network_knowledge().authority_provider().await;
@@ -62,11 +62,11 @@ impl Core {
 
         let elder_candidates = ElderCandidates::new(prefix, peers);
 
-        trace!(
-            "Received DkgStart for {:?} - {:?}",
-            session_id,
-            elder_candidates
-        );
+        // trace!(
+        //     "Received DkgStart for {:?} - {:?}",
+        //     session_id,
+        //     elder_candidates
+        // );
         self.dkg_sessions
             .write()
             .await
@@ -91,12 +91,12 @@ impl Core {
         message: DkgMessage,
         sender: Peer,
     ) -> Result<Vec<Cmd>> {
-        trace!(
-            "{} {:?} from {}",
-            LogMarker::DkgMessageHandling,
-            message,
-            sender
-        );
+        // trace!(
+        //     "{} {:?} from {}",
+        //     LogMarker::DkgMessageHandling,
+        //     message,
+        //     sender
+        // );
 
         self.dkg_voter
             .process_msg(
@@ -148,10 +148,10 @@ impl Core {
         let section_key = self.network_knowledge().section_key().await;
         let current_generation = self.network_knowledge.chain_len().await;
         if session_id.generation < current_generation {
-            trace!(
-                "Ignoring DkgRetry for expired DKG session: {:?}",
-                &session_id
-            );
+            // trace!(
+            //     "Ignoring DkgRetry for expired DKG session: {:?}",
+            //     &session_id
+            // );
             return Ok(vec![]);
         }
         let mut cmds = self
@@ -205,7 +205,7 @@ impl Core {
 
         let generation = self.network_knowledge.chain_len().await;
 
-        let elder_candidates = if let Some(elder_candidates) = self
+        let _elder_candidates = if let Some(elder_candidates) = self
             .network_knowledge
             .promote_and_demote_elders(&self.node.read().await.name(), &BTreeSet::new())
             .await
@@ -214,7 +214,7 @@ impl Core {
         {
             elder_candidates
         } else {
-            trace!("Ignore DKG failure agreement with invalid signeds or outdated participants",);
+            // trace!("Ignore DKG failure agreement with invalid signeds or outdated participants",);
             return Ok(vec![]);
         };
 
@@ -222,21 +222,21 @@ impl Core {
 
         if !failure_set.failed_participants.is_empty() {
             // The DKG failure is regarding failed_participants, i.e. potential unresponsive node.
-            trace!(
-                "Received DKG failure agreement, propose offline for failed participants: {:?} , DKG generation({}), candidates: {:?}",
-                failure_set.failed_participants,
-                generation, elder_candidates
-            );
+            // trace!(
+            //     "Received DKG failure agreement, propose offline for failed participants: {:?} , DKG generation({}), candidates: {:?}",
+            //     failure_set.failed_participants,
+            //     generation, elder_candidates
+            // );
             cmds.extend(
                 self.cast_offline_proposals(&failure_set.failed_participants)
                     .await?,
             );
         }
 
-        trace!(
-            "Received DKG failure agreement, we will restart with candidates: {:?} except failed participants: {:?}",
-            elder_candidates, failure_set.failed_participants
-        );
+        // trace!(
+        //     "Received DKG failure agreement, we will restart with candidates: {:?} except failed participants: {:?}",
+        //     elder_candidates, failure_set.failed_participants
+        // );
 
         cmds.extend(
             self.promote_and_demote_elders_except(&failure_set.failed_participants)
@@ -251,11 +251,11 @@ impl Core {
         key_share: SectionKeyShare,
     ) -> Result<Vec<Cmd>> {
         let key_share_pk = key_share.public_key_set.public_key();
-        trace!(
-            "{} public_key={:?}",
-            LogMarker::HandlingDkgSuccessfulOutcome,
-            key_share_pk
-        );
+        // trace!(
+        //     "{} public_key={:?}",
+        //     LogMarker::HandlingDkgSuccessfulOutcome,
+        //     key_share_pk
+        // );
 
         // Add our new keyshare to our cache, we will then use
         // it to sign any msg that needs section agreement.

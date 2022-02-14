@@ -12,7 +12,7 @@ mod safe_data;
 use super::{files::FileInfo, Safe};
 pub use super::{ContentType, DataType, SafeUrl, VersionHash, XorUrlBase};
 use crate::{Error, Result};
-use log::{debug, info};
+// use log::{debug, info};
 pub use safe_data::SafeData;
 
 pub type Range = Option<(Option<u64>, Option<u64>)>;
@@ -79,7 +79,7 @@ impl Safe {
     /// ```
     pub async fn fetch(&self, url: &str, range: Range) -> Result<SafeData> {
         let safe_url = SafeUrl::from_url(url)?;
-        info!("URL parsed successfully, fetching: {}", url);
+        // info!("URL parsed successfully, fetching: {}", url);
 
         let mut resolution_chain = self
             .fully_resolve_url(safe_url, None, true, range, true)
@@ -134,7 +134,7 @@ impl Safe {
     /// ```
     pub async fn inspect(&self, url: &str) -> Result<Vec<SafeData>> {
         let safe_url = SafeUrl::from_url(url)?;
-        info!("URL parsed successfully, inspecting: {}", url);
+        // info!("URL parsed successfully, inspecting: {}", url);
         self.fully_resolve_url(safe_url, None, false, None, true)
             .await
     }
@@ -163,12 +163,12 @@ impl Safe {
         range: Range,
         resolve_path: bool,
     ) -> Result<Vec<SafeData>> {
-        debug!(
-            "Fetching URL: {} with content of type: {:?}, data type: {:?}",
-            input_url,
-            input_url.content_type(),
-            input_url.data_type()
-        );
+        // debug!(
+        //     "Fetching URL: {} with content of type: {:?}, data type: {:?}",
+        //     input_url,
+        //     input_url.content_type(),
+        //     input_url.data_type()
+        // );
 
         let mut indirections_limit = INDIRECTION_LIMIT;
         let mut safe_data_vec = vec![];
@@ -204,13 +204,13 @@ impl Safe {
         range: Range,
         resolve_path: bool,
     ) -> Result<SafeData> {
-        debug!(
-            "Resolving URL: {}, of content type: {:?}, and data type: {:?}, address {:?}",
-            input_url.to_xorurl_string(),
-            input_url.content_type(),
-            input_url.data_type(),
-            input_url.address()
-        );
+        // debug!(
+        //     "Resolving URL: {}, of content type: {:?}, and data type: {:?}, address {:?}",
+        //     input_url.to_xorurl_string(),
+        //     input_url.content_type(),
+        //     input_url.data_type(),
+        //     input_url.address()
+        // );
 
         match input_url.content_type() {
             ContentType::FilesContainer => {

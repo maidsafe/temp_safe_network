@@ -37,7 +37,7 @@ impl Client {
         let client_pk = self.public_key();
         let dst_name = cmd.dst_name(); // let msg = ServiceMsg::Cmd(cmd.clone());
 
-        let debug_cmd = format!("{:?}", cmd);
+        // let debug_cmd = format!("{:?}", cmd);
         let target_count = at_least_one_correct_elder(); // stored at Adults, so only 1 correctly functioning Elder need to relay
 
         let serialised_cmd = {
@@ -62,9 +62,9 @@ impl Client {
         let span = info_span!("Attempting a cmd");
         let _ = span.enter();
 
-        let mut attempt = 1.0;
+        // let mut attempt = 1.0;
         loop {
-            debug!("Attempting {:?} (attempt #{})", debug_cmd, attempt);
+            // debug!("Attempting {:?} (attempt #{})", debug_cmd, attempt);
 
             let res = self
                 .send_signed_cmd(
@@ -77,19 +77,19 @@ impl Client {
                 .await;
 
             if let Ok(cmd_result) = res {
-                debug!("{debug_cmd} sent okay");
+                // debug!("{debug_cmd} sent okay");
                 break Ok(cmd_result);
             }
 
-            trace!(
-                "Failed response on {debug_cmd} attempt #{attempt}: {:?}",
-                res
-            );
+            // trace!(
+            //     "Failed response on {debug_cmd} attempt #{attempt}: {:?}",
+            //     res
+            // );
 
-            attempt += 1.0;
+            // attempt += 1.0;
 
             if let Some(delay) = backoff.next_backoff() {
-                debug!("Sleeping for {delay:?} before trying cmd {debug_cmd:?} again");
+                // debug!("Sleeping for {delay:?} before trying cmd {debug_cmd:?} again");
                 tokio::time::sleep(delay).await;
             } else {
                 // we're done trying

@@ -11,7 +11,7 @@ use super::helpers::download_from_s3_and_install_bin;
 use crate::APP_ID;
 use color_eyre::{eyre::eyre, eyre::bail, eyre::WithErr, Result};
 use envy::from_env;
-use tracing::info;
+// use tracing::info;
 use prettytable::Table;
 use serde::Deserialize;
 use sn_api::{
@@ -334,14 +334,14 @@ fn get_safe_seed(config_file: Option<String>) -> Result<SafeSeed> {
             .safe_auth_passphrase
             .unwrap_or_else(|| String::from(""));
         if !the_passphrase.is_empty() {
-            info!("Using passphrase from provided ENV var: SAFE_AUTH_PASSPHRASE")
+           // info!("Using passphrase from provided ENV var: SAFE_AUTH_PASSPHRASE")
         }
 
         let mut the_password = environment_details
             .safe_auth_password
             .unwrap_or_else(|| String::from(""));
         if !the_password.is_empty() {
-            info!("Using password from provided ENV var: SAFE_AUTH_PASSWORD")
+           // info!("Using password from provided ENV var: SAFE_AUTH_PASSWORD")
         }
 
         if the_passphrase.is_empty() ^ the_password.is_empty() {

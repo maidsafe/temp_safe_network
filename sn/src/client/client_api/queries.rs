@@ -15,7 +15,7 @@ use crate::messaging::{
 use crate::types::{PublicKey, Signature};
 use bytes::Bytes;
 use rand::Rng;
-use tracing::{debug, info_span};
+use tracing::info_span;
 
 // We divide the total query timeout by this number.
 // This also represents the max retries possible, while still staying within the max_timeout.
@@ -57,16 +57,16 @@ impl Client {
         // and should help prevent elders from being conseceutively overwhelmed
         let jitter = rng.gen_range(1.0, 1.5);
         let attempt_timeout = self.query_timeout.div_f32(retry_count + jitter);
-        trace!("Setting up query retry, interval is: {:?}", attempt_timeout);
+        // trace!("Setting up query retry, interval is: {:?}", attempt_timeout);
 
         let span = info_span!("Attempting a query");
         let _ = span.enter();
         let mut attempt = 1.0;
         loop {
-            debug!(
-                "Attempting {:?} (attempt #{}) with a query timeout of {:?}",
-                query, attempt, attempt_timeout
-            );
+            // debug!(
+            //     "Attempting {:?} (attempt #{}) with a query timeout of {:?}",
+            //     query, attempt, attempt_timeout
+            // );
 
             let res = tokio::time::timeout(
                 attempt_timeout,
@@ -82,10 +82,10 @@ impl Client {
             if let Ok(Ok(query_result)) = res {
                 break Ok(query_result);
             } else if attempt > MAX_RETRY_COUNT {
-                debug!(
-                    "Retries ({}) all failed returning no response for {:?}",
-                    MAX_RETRY_COUNT, query
-                );
+                // debug!(
+                //     "Retries ({}) all failed returning no response for {:?}",
+                //     MAX_RETRY_COUNT, query
+                // );
                 break Err(Error::NoResponse);
             }
 
@@ -103,7 +103,7 @@ impl Client {
         serialised_query: Bytes,
         signature: Signature,
     ) -> Result<QueryResult, Error> {
-        debug!("Sending Query: {:?}", query);
+        // debug!("Sending Query: {:?}", query);
         let auth = ServiceAuth {
             public_key: client_pk,
             signature,

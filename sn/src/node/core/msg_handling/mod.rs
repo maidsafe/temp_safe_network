@@ -34,7 +34,7 @@ use crate::node::{
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
 };
 use crate::peer::{Peer, UnnamedPeer};
-use crate::types::{log_markers::LogMarker, PublicKey};
+use crate::types::PublicKey;
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -63,17 +63,17 @@ impl Core {
         }
 
         // Deserialize the payload of the incoming message
-        let msg_id = wire_msg.msg_id();
+        // let msg_id = wire_msg.msg_id();
         // payload needed for aggregation
         let payload = wire_msg.payload.clone();
 
         let message_type = match wire_msg.into_msg() {
             Ok(message_type) => message_type,
-            Err(error) => {
-                error!(
-                    "Failed to deserialize message payload ({:?}): {:?}",
-                    msg_id, error
-                );
+            Err(_error) => {
+                // error!(
+                //     "Failed to deserialize message payload ({:?}): {:?}",
+                //     msg_id, error
+                // );
                 return Ok(cmds);
             }
         };
@@ -98,19 +98,19 @@ impl Core {
                 known_keys.push(*self.network_knowledge.genesis_key());
 
                 if !msg_authority.verify_src_section_key_is_known(&known_keys) {
-                    warn!(
-                        "Untrusted message ({:?}) dropped from {:?}: {:?} ",
-                        msg_id, sender, msg
-                    );
+                    // warn!(
+                    //     "Untrusted message ({:?}) dropped from {:?}: {:?} ",
+                    //     msg_id, sender, msg
+                    // );
                     return Ok(cmds);
                 }
 
-                trace!(
-                    "Trusted msg authority in message ({:?}) from {:?}: {:?}",
-                    msg_id,
-                    sender,
-                    msg
-                );
+                // trace!(
+                //     "Trusted msg authority in message ({:?}) from {:?}: {:?}",
+                //     msg_id,
+                //     sender,
+                //     msg
+                // );
 
                 let sender = sender.named(msg_authority.name());
 
@@ -130,10 +130,10 @@ impl Core {
                         | SystemMsg::AntiEntropyRedirect { .. }
                         | SystemMsg::JoinRequest(_)
                         | SystemMsg::JoinAsRelocatedRequest(_) => {
-                            trace!(
-                                "Entropy check skipped for {:?}, handling message directly",
-                                msg_id
-                            );
+                            // trace!(
+                            //     "Entropy check skipped for {:?}, handling message directly",
+                            //     msg_id
+                            // );
                         }
                         _ => match dst_location.section_pk() {
                             None => {}
@@ -156,7 +156,7 @@ impl Core {
                                     return Ok(cmds);
                                 }
 
-                                trace!("Entropy check passed. Handling verified msg {:?}", msg_id);
+                                // trace!("Entropy check passed. Handling verified msg {:?}", msg_id);
                             }
                         },
                     }
@@ -183,10 +183,10 @@ impl Core {
                 let dst_name = match msg.dst_address() {
                     Some(name) => name,
                     None => {
-                        error!(
-                            "Service msg has been dropped since {:?} is not a valid msg to send from a client {}.",
-                            msg, sender.addr()
-                        );
+                        // error!(
+                        //     "Service msg has been dropped since {:?} is not a valid msg to send from a client {}.",
+                        //     msg, sender.addr()
+                        // );
                         return Ok(vec![]);
                     }
                 };
@@ -195,7 +195,7 @@ impl Core {
                 let sender = sender.named(src_location.name());
 
                 if self.is_not_elder().await {
-                    trace!("Redirecting from adult to section elders");
+                    // trace!("Redirecting from adult to section elders");
                     cmds.push(
                         self.ae_redirect_to_our_elders(sender, &src_location, &wire_msg)
                             .await?,
@@ -210,7 +210,7 @@ impl Core {
 
                     if pending_query_length > DATA_QUERY_LIMIT {
                         // TODO: check if query is pending for this already.. add to that if that makes sense.
-                        warn!("Pending queries length exceeded, dropping query {msg:?}");
+                        // warn!("Pending queries length exceeded, dropping query {msg:?}");
                         return Ok(vec![]);
                     }
                 }
@@ -219,7 +219,7 @@ impl Core {
                 let received_section_pk = match dst_location.section_pk() {
                     Some(section_pk) => section_pk,
                     None => {
-                        warn!("Dropping service message as there is no valid dst section_pk.");
+                        // warn!("Dropping service message as there is no valid dst section_pk.");
                         return Ok(cmds);
                     }
                 };
@@ -263,7 +263,7 @@ impl Core {
         payload: Bytes,
         known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Cmd>> {
-        trace!("{:?}", LogMarker::SystemMsgToBeHandled);
+        // trace!("{:?}", LogMarker::SystemMsgToBeHandled);
 
         // We assume to be aggregated if it contains a BLS Share sig as authority.
         match self
@@ -275,15 +275,15 @@ impl Core {
                     .await
             }
             Err(Error::InvalidSignatureShare) => {
-                warn!(
-                    "Invalid signature on received system message, dropping the message: {:?}",
-                    msg_id
-                );
+                // warn!(
+                //     "Invalid signature on received system message, dropping the message: {:?}",
+                //     msg_id
+                // );
                 Ok(vec![])
             }
             Ok(true) => Ok(vec![]),
-            Err(err) => {
-                trace!("handle_system_msg got error {:?}", err);
+            Err(_err) => {
+                // trace!("handle_system_msg got error {:?}", err);
                 Ok(vec![])
             }
         }
@@ -303,7 +303,7 @@ impl Core {
         self.network_knowledge().merge_connections([&sender]).await;
 
         let src_name = msg_authority.name();
-        trace!("Handling non blocking message");
+        // trace!("Handling non blocking message");
         match node_msg {
             SystemMsg::AntiEntropyUpdate {
                 section_auth,
@@ -311,7 +311,7 @@ impl Core {
                 proof_chain,
                 members,
             } => {
-                trace!("Handling msg: AE-Update from {}: {:?}", sender, msg_id,);
+                // trace!("Handling msg: AE-Update from {}: {:?}", sender, msg_id,);
                 self.handle_anti_entropy_update_msg(
                     section_auth.into_state(),
                     section_signed,
@@ -321,7 +321,7 @@ impl Core {
                 .await
             }
             SystemMsg::Relocate(node_state) => {
-                trace!("Handling msg: Relocate from {}: {:?}", sender, msg_id);
+                // trace!("Handling msg: Relocate from {}: {:?}", sender, msg_id);
                 Ok(self
                     .handle_relocate(node_state)
                     .await?
@@ -329,11 +329,11 @@ impl Core {
                     .collect())
             }
             SystemMsg::StartConnectivityTest(name) => {
-                trace!(
-                    "Handling msg: StartConnectivityTest from {}: {:?}",
-                    sender,
-                    msg_id
-                );
+                // trace!(
+                //     "Handling msg: StartConnectivityTest from {}: {:?}",
+                //     sender,
+                //     msg_id
+                // );
                 if self.is_not_elder().await {
                     return Ok(vec![]);
                 }
@@ -341,7 +341,7 @@ impl Core {
                 Ok(vec![Cmd::TestConnectivity(name)])
             }
             SystemMsg::JoinAsRelocatedResponse(join_response) => {
-                trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
+                // trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
                 if let Some(ref mut joining_as_relocated) = *self.relocate_state.write().await {
                     if let Some(cmd) = joining_as_relocated
                         .handle_join_response(*join_response, sender.addr())
@@ -350,25 +350,22 @@ impl Core {
                         return Ok(vec![cmd]);
                     }
                 } else {
-                    error!(
-                        "No relocation in progress upon receiving {:?}",
-                        join_response
-                    );
+                    // error!(
+                    //     "No relocation in progress upon receiving {:?}",
+                    //     join_response
+                    // );
                 }
 
                 Ok(vec![])
             }
-            SystemMsg::NodeMsgError {
-                error,
-                correlation_id,
-            } => {
-                trace!(
-                    "From {:?}({:?}), received error {:?} correlated to {:?}",
-                    msg_authority.src_location(),
-                    msg_id,
-                    error,
-                    correlation_id
-                );
+            SystemMsg::NodeMsgError { .. } => {
+                // trace!(
+                //     "From {:?}({:?}), received error {:?} correlated to {:?}",
+                //     msg_authority.src_location(),
+                //     msg_id,
+                //     error,
+                //     correlation_id
+                // );
                 Ok(vec![])
             }
             SystemMsg::AntiEntropyRetry {
@@ -377,7 +374,7 @@ impl Core {
                 proof_chain,
                 bounced_msg,
             } => {
-                trace!("Handling msg: AE-Retry from {}: {:?}", sender, msg_id,);
+                // trace!("Handling msg: AE-Retry from {}: {:?}", sender, msg_id,);
                 self.handle_anti_entropy_retry_msg(
                     section_auth.into_state(),
                     section_signed,
@@ -393,7 +390,7 @@ impl Core {
                 section_chain,
                 bounced_msg,
             } => {
-                trace!("Handling msg: AE-Redirect from {}: {:?}", sender, msg_id);
+                // trace!("Handling msg: AE-Redirect from {}: {:?}", sender, msg_id);
                 self.handle_anti_entropy_redirect_msg(
                     section_auth.into_state(),
                     section_signed,
@@ -404,11 +401,11 @@ impl Core {
                 .await
             }
             SystemMsg::AntiEntropyProbe(_dst) => {
-                trace!("Received Probe message from {}: {:?}", sender, msg_id);
+                // trace!("Received Probe message from {}: {:?}", sender, msg_id);
                 Ok(vec![])
             }
             SystemMsg::BackPressure(load_report) => {
-                trace!("Handling msg: BackPressure from {}: {:?}", sender, msg_id);
+                // trace!("Handling msg: BackPressure from {}: {:?}", sender, msg_id);
                 // TODO: Factor in med/long term backpressure into general node liveness calculations
                 self.comm.regulate(sender.addr(), load_report).await;
                 Ok(vec![])
@@ -425,17 +422,17 @@ impl Core {
                     } => {
                         let serialized_details = bincode::serialize(&node_state)?;
 
-                        info!(
-                            "Relocation: Aggregating received ApprovalShare from {:?}",
-                            sender
-                        );
+                        // info!(
+                        //     "Relocation: Aggregating received ApprovalShare from {:?}",
+                        //     sender
+                        // );
                         match self
                             .proposal_aggregator
                             .add(&serialized_details, sig_share.clone())
                             .await
                         {
                             Ok(sig) => {
-                                info!("Relocation: Successfully aggregated ApprovalShares for joining the network");
+                                // info!("Relocation: Successfully aggregated ApprovalShares for joining the network");
                                 let mut cmds = vec![];
 
                                 if let Some(ref mut joining_as_relocated) =
@@ -446,10 +443,10 @@ impl Core {
                                     let previous_name = self.node.read().await.name();
                                     let new_keypair = new_node.keypair.clone();
 
-                                    info!(
-                                        "Relocation: switching from {:?} to {:?}",
-                                        previous_name, new_name
-                                    );
+                                    // info!(
+                                    //     "Relocation: switching from {:?} to {:?}",
+                                    //     previous_name, new_name
+                                    // );
 
                                     let genesis_key = *self.network_knowledge.genesis_key();
                                     let prefix_map = self.network_knowledge.prefix_map().clone();
@@ -462,14 +459,14 @@ impl Core {
                                         {
                                             (sap.elders().cloned().collect(), signed_sap)
                                         } else {
-                                            warn!(
-                                                "Relocation: cannot find signed_sap for {:?}",
-                                                sap.prefix()
-                                            );
+                                            // warn!(
+                                            //     "Relocation: cannot find signed_sap for {:?}",
+                                            //     sap.prefix()
+                                            // );
                                             return Ok(vec![]);
                                         }
                                     } else {
-                                        warn!("Relocation: cannot find recipients to send aggregated JoinApproval");
+                                        // warn!("Relocation: cannot find recipients to send aggregated JoinApproval");
                                         return Ok(vec![]);
                                     };
 
@@ -504,10 +501,10 @@ impl Core {
                                         aggregated: Some(auth),
                                     };
 
-                                    trace!(
-                                        "Relocation: Sending aggregated JoinRequest to {:?}",
-                                        recipients
-                                    );
+                                    // trace!(
+                                    //     "Relocation: Sending aggregated JoinRequest to {:?}",
+                                    //     recipients
+                                    // );
                                     // Resend the JoinRequest now that
                                     // we have collected enough ApprovalShares from the Elders
                                     let node_msg = SystemMsg::JoinRequest(Box::new(join_req));
@@ -531,43 +528,43 @@ impl Core {
                                     })
                                     .await;
 
-                                    trace!("{}", LogMarker::RelocateEnd);
+                                    // trace!("{}", LogMarker::RelocateEnd);
                                 } else {
-                                    warn!("Relocation:  self.relocate_state is not in Progress");
+                                    // warn!("Relocation:  self.relocate_state is not in Progress");
                                     return Ok(vec![]);
                                 }
 
                                 Ok(cmds)
                             }
                             Err(AggregatorError::NotEnoughShares) => Ok(vec![]),
-                            error => {
-                                warn!(
-                                    "Relocation: Error received as part of signature aggregation during join: {:?}",
-                                    error
-                                );
+                            _error => {
+                                // warn!(
+                                //     "Relocation: Error received as part of signature aggregation during join: {:?}",
+                                //     error
+                                // );
                                 Ok(vec![])
                             }
                         }
                     }
                     _ => {
-                        debug!(
-                            "Relocation: Ignoring unexpected join response message: {:?}",
-                            join_response
-                        );
+                        // debug!(
+                        //     "Relocation: Ignoring unexpected join response message: {:?}",
+                        //     join_response
+                        // );
                         Ok(vec![])
                     }
                 }
             }
             SystemMsg::DkgFailureAgreement(sig_set) => {
-                trace!("Handling msg: Dkg-FailureAgreement from {}", sender);
+                // trace!("Handling msg: Dkg-FailureAgreement from {}", sender);
                 self.handle_dkg_failure_agreement(&src_name, &sig_set).await
             }
             SystemMsg::JoinRequest(join_request) => {
-                trace!("Handling msg: JoinRequest from {}", sender);
+                // trace!("Handling msg: JoinRequest from {}", sender);
                 self.handle_join_request(sender, *join_request).await
             }
             SystemMsg::JoinAsRelocatedRequest(join_request) => {
-                trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
+                // trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
                 if self.is_not_elder().await
                     && join_request.section_key == self.network_knowledge.section_key().await
                 {
@@ -582,10 +579,10 @@ impl Core {
                 sig_share,
             } => {
                 if self.is_not_elder().await {
-                    trace!("Adult handling a Propose msg from {}: {:?}", sender, msg_id);
+                    // trace!("Adult handling a Propose msg from {}: {:?}", sender, msg_id);
                 }
 
-                trace!("Handling msg: Propose from {}: {:?}", sender, msg_id);
+                // trace!("Handling msg: Propose from {}: {:?}", sender, msg_id);
                 self.handle_proposal(msg_id, proposal.into_state(), sig_share, sender)
                     .await
             }
@@ -594,7 +591,7 @@ impl Core {
                 prefix,
                 elders,
             } => {
-                trace!("Handling msg: Dkg-Start {:?} from {}", session_id, sender);
+                // trace!("Handling msg: Dkg-Start {:?} from {}", session_id, sender);
                 if !elders.contains_key(&self.node.read().await.name()) {
                     return Ok(vec![]);
                 }
@@ -614,12 +611,12 @@ impl Core {
                 session_id,
                 message,
             } => {
-                trace!(
-                    "Handling msg: Dkg-Msg ({:?} - {:?}) from {}",
-                    session_id,
-                    message,
-                    sender
-                );
+                // trace!(
+                //     "Handling msg: Dkg-Msg ({:?} - {:?}) from {}",
+                //     session_id,
+                //     message,
+                //     sender
+                // );
                 self.handle_dkg_msg(session_id, message, sender).await
             }
             SystemMsg::DkgFailureObservation {
@@ -627,7 +624,7 @@ impl Core {
                 sig,
                 failed_participants,
             } => {
-                trace!("Handling msg: Dkg-FailureObservation from {}", sender);
+                // trace!("Handling msg: Dkg-FailureObservation from {}", sender);
                 self.handle_dkg_failure_observation(session_id, &failed_participants, sig)
             }
             SystemMsg::DkgNotReady {
@@ -659,7 +656,7 @@ impl Core {
                 Ok(vec![])
             }
             SystemMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }) => {
-                info!("Processing received MetadataExchange packet: {:?}", msg_id);
+                // info!("Processing received MetadataExchange packet: {:?}", msg_id);
                 self.set_adult_levels(metadata).await;
                 Ok(vec![])
             }
@@ -668,10 +665,10 @@ impl Core {
                 data,
                 full,
             }) => {
-                info!(
-                    "Processing CouldNotStoreData event with MsgId: {:?}",
-                    msg_id
-                );
+                // info!(
+                //     "Processing CouldNotStoreData event with MsgId: {:?}",
+                //     msg_id
+                // );
                 return if self.is_elder().await {
                     if full {
                         let changed = self
@@ -684,14 +681,14 @@ impl Core {
                     }
                     self.replicate_data(data).await
                 } else {
-                    error!("Received unexpected message while Adult");
+                    // error!("Received unexpected message while Adult");
                     Ok(vec![])
                 };
             }
             SystemMsg::NodeCmd(NodeCmd::ReplicateData(data)) => {
-                info!("ReplicateData MsgId: {:?}", msg_id);
+                // info!("ReplicateData MsgId: {:?}", msg_id);
                 return if self.is_elder().await {
-                    error!("Received unexpected message while Elder");
+                    // error!("Received unexpected message while Elder");
                     Ok(vec![])
                 } else {
                     // We are an adult here, so just store away!
@@ -699,7 +696,7 @@ impl Core {
                     // well before this
                     match self.data_storage.store(&data).await {
                         Ok(level_report) => {
-                            info!("Storage level report: {:?}", level_report);
+                            // info!("Storage level report: {:?}", level_report);
                             return Ok(self.record_storage_level_if_any(level_report).await);
                         }
                         Err(error) => {
@@ -707,13 +704,13 @@ impl Core {
                                 //DbError::Io(_) | DbError::Sled(_) => false, // potential transient errors
                                 DbError::NotEnoughSpace => true, // db full
                                 _ => {
-                                    error!("Problem storing data, but it was ignored: {error}");
+                                    // error!("Problem storing data, but it was ignored: {error}");
                                     return Ok(vec![]);
                                 } // the rest seem to be non-problematic errors.. (?)
                             };
 
                             if full {
-                                error!("Not enough space to store more data");
+                                // error!("Not enough space to store more data");
                             }
 
                             let node_id = PublicKey::from(self.node.read().await.keypair.public);
@@ -777,7 +774,7 @@ impl Core {
                 correlation_id,
                 user,
             } => {
-                debug!("{:?}", LogMarker::ChunkQueryResponseReceviedFromAdult);
+                // debug!("{:?}", LogMarker::ChunkQueryResponseReceviedFromAdult);
                 let sending_nodes_pk = match msg_authority {
                     NodeMsgAuthority::Node(auth) => PublicKey::from(auth.into_inner().public_key),
                     _ => return Err(Error::InvalidQueryResponseAuthority),
@@ -803,12 +800,12 @@ impl Core {
                         authority: section_auth,
                     } = session_info;
                     let message_cache = self.dkg_voter.get_cached_msgs(&session_id);
-                    trace!(
-                        "Sending DkgSessionInfo {{ {:?}, elders {:?}, ... }} to {}",
-                        &session_id,
-                        elders,
-                        &sender
-                    );
+                    // trace!(
+                    //     "Sending DkgSessionInfo {{ {:?}, elders {:?}, ... }} to {}",
+                    //     &session_id,
+                    //     elders,
+                    //     &sender
+                    // );
 
                     let node_msg = SystemMsg::DkgSessionInfo {
                         session_id,
@@ -834,7 +831,7 @@ impl Core {
                         wire_msg,
                     }])
                 } else {
-                    warn!("Unknown DkgSessionInfo: {:?} requested", &session_id);
+                    // warn!("Unknown DkgSessionInfo: {:?} requested", &session_id);
                     Ok(vec![])
                 }
             }
@@ -855,19 +852,19 @@ impl Core {
                 })?;
                 let auth = section_auth.clone().into_inner();
                 if self.network_knowledge.section_key().await == auth.sig.public_key {
-                    if let Err(err) = AuthorityProof::verify(auth, payload) {
-                        error!("Error verifying signature for DkgSessionInfo: {:?}", err);
+                    if let Err(_err) = AuthorityProof::verify(auth, payload) {
+                        // error!("Error verifying signature for DkgSessionInfo: {:?}", err);
                         return Ok(cmds);
                     } else {
-                        trace!("DkgSessionInfo signature verified");
+                        // trace!("DkgSessionInfo signature verified");
                     }
                 } else {
-                    warn!(
-                        "Cannot verify DkgSessionInfo: {:?}. Unknown key: {:?}!",
-                        &session_id, auth.sig.public_key
-                    );
-                    let chain = self.network_knowledge().section_chain().await;
-                    warn!("Chain: {:?}", chain);
+                    // warn!(
+                    //     "Cannot verify DkgSessionInfo: {:?}. Unknown key: {:?}!",
+                    //     &session_id, auth.sig.public_key
+                    // );
+                    let _chain = self.network_knowledge().section_chain().await;
+                    // warn!("Chain: {:?}", chain);
                     return Ok(cmds);
                 }
                 let _existing = self.dkg_sessions.write().await.insert(
@@ -878,7 +875,7 @@ impl Core {
                         authority: section_auth,
                     },
                 );
-                trace!("DkgSessionInfo handling {:?} - {:?}", session_id, elders);
+                // trace!("DkgSessionInfo handling {:?} - {:?}", session_id, elders);
                 cmds.extend(self.handle_dkg_start(session_id, prefix, elders).await?);
                 cmds.extend(
                     self.handle_dkg_retry(session_id, message_cache, message, sender)
@@ -892,7 +889,7 @@ impl Core {
     async fn record_storage_level_if_any(&self, level: Option<StorageLevel>) -> Vec<Cmd> {
         let mut cmds = vec![];
         if let Some(level) = level {
-            info!("Storage has now passed {} % used.", 10 * level.value());
+            // info!("Storage has now passed {} % used.", 10 * level.value());
             let node_id = PublicKey::from(self.node.read().await.keypair.public);
             let node_xorname = XorName::from(node_id);
 
@@ -935,16 +932,16 @@ impl Core {
         .await
         {
             Ok(section_auth) => {
-                info!("Successfully aggregated message");
+                // info!("Successfully aggregated message");
                 *msg_authority = NodeMsgAuthority::Section(section_auth);
                 Ok(false)
             }
             Err(AggregatorError::NotEnoughShares) => {
-                info!("Not enough shares to aggregate received message");
+                // info!("Not enough shares to aggregate received message");
                 Ok(true)
             }
-            Err(err) => {
-                error!("Error accumulating message at dst: {:?}", err);
+            Err(_err) => {
+                // error!("Error accumulating message at dst: {:?}", err);
                 Err(Error::InvalidSignatureShare)
             }
         }

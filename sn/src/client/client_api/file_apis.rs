@@ -22,7 +22,7 @@ use futures::future::join_all;
 use itertools::Itertools;
 use self_encryption::{self, ChunkInfo, DataMap, EncryptedChunk};
 use tokio::task;
-use tracing::trace;
+// use tracing::trace;
 use xor_name::XorName;
 
 struct HeadChunk {
@@ -74,12 +74,12 @@ impl Client {
     where
         Self: Sized,
     {
-        trace!(
-            "Reading {:?} bytes at: {:?}, starting from position: {:?}",
-            &length,
-            &address,
-            &position,
-        );
+        // trace!(
+        //     "Reading {:?} bytes at: {:?}, starting from position: {:?}",
+        //     &length,
+        //     &address,
+        //     &position,
+        // );
 
         let chunk = self.get_chunk(address.name()).await?;
 
@@ -115,7 +115,7 @@ impl Client {
             .await
             .find(|c| c.address().name() == name)
         {
-            trace!("Chunk retrieved from local cache: {:?}", name);
+            // trace!("Chunk retrieved from local cache: {:?}", name);
             return Ok(chunk.clone());
         }
 
@@ -308,10 +308,10 @@ impl Client {
                         content: chunk.value().clone(),
                     }),
                     Err(err) => {
-                        warn!(
-                            "Reading chunk {} from network, resulted in error {:?}.",
-                            chunk_info.dst_hash, err
-                        );
+                        // warn!(
+                        //     "Reading chunk {} from network, resulted in error {:?}.",
+                        //     chunk_info.dst_hash, err
+                        // );
                         Err(err)
                     }
                 }
@@ -553,19 +553,19 @@ mod tests {
 
         let mut tasks = vec![];
 
-        debug!("======> Data uploaded");
+        // debug!("======> Data uploaded");
 
-        for i in 1..50 {
-            debug!("starting client on thread #{:?}", i);
+        for _i in 1..50 {
+            // debug!("starting client on thread #{:?}", i);
             let handle: Instrumented<tokio::task::JoinHandle<Result<()>>> =
                 tokio::spawn(async move {
-                    debug!("started client #{:?}", i);
+                    // debug!("started client #{:?}", i);
                     // use a fresh client
                     let client = create_test_client().await?;
                     // to grab that data
                     let _read_data = client.read_bytes(address).await?;
 
-                    debug!("client #{:?} finished", i);
+                    // debug!("client #{:?} finished", i);
                     Ok(())
                 })
                 .in_current_span();
@@ -575,7 +575,7 @@ mod tests {
         let responses = join_all(tasks).await;
 
         for res in responses {
-            debug!("a response is done");
+            // debug!("a response is done");
             let _ok = res??;
         }
 
@@ -595,7 +595,7 @@ mod tests {
             .parse()?;
 
         let delay = tokio::time::Duration::from_secs(network_assert_delay);
-        debug!("Running network asserts with delay of {:?}", delay);
+        // debug!("Running network asserts with delay of {:?}", delay);
 
         let bytes = random_bytes(LARGE_FILE_SIZE_MIN / 3);
         let client = create_test_client().await?;

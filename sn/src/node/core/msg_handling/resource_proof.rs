@@ -13,7 +13,7 @@ use crate::node::{
     ed25519, Error, Result,
 };
 use crate::peer::Peer;
-use crate::types::log_markers::LogMarker;
+// use crate::types::log_markers::LogMarker;
 
 use ed25519_dalek::Verifier;
 use xor_name::XorName;
@@ -58,7 +58,7 @@ impl Core {
             nonce_signature: ed25519::sign(&serialized, &self.node.read().await.keypair),
         }));
 
-        trace!("{}", LogMarker::SendResourceProofChallenge);
+        // trace!("{}", LogMarker::SendResourceProofChallenge);
         self.send_direct_msg(peer, response, self.network_knowledge.section_key().await)
             .await
     }

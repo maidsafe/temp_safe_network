@@ -10,7 +10,7 @@ mod chunk_disk_store;
 
 use crate::dbs::{convert_to_error_msg, Error, Result};
 use crate::messaging::system::NodeQueryResponse;
-use crate::types::{log_markers::LogMarker, Chunk, ChunkAddress};
+use crate::types::{Chunk, ChunkAddress};
 use crate::UsedSpace;
 
 use chunk_disk_store::ChunkDiskStore;
@@ -19,7 +19,7 @@ use std::{
     io::ErrorKind,
     path::Path,
 };
-use tracing::info;
+// use tracing::info;
 
 /// Operations on data chunks.
 #[derive(Clone)]
@@ -39,12 +39,12 @@ impl ChunkStorage {
     }
 
     pub(crate) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
-        trace!("Removing chunk, {:?}", address);
+        // trace!("Removing chunk, {:?}", address);
         self.disk_store.delete_chunk(address).await
     }
 
     pub(crate) async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
-        debug!("Getting chunk {:?}", address);
+        // debug!("Getting chunk {:?}", address);
 
         match self.disk_store.read_chunk(address).await {
             Ok(res) => Ok(res),
@@ -59,7 +59,7 @@ impl ChunkStorage {
 
     // Read chunk from local store and return NodeQueryResponse
     pub(crate) async fn get(&self, address: &ChunkAddress) -> NodeQueryResponse {
-        trace!("{:?}", LogMarker::ChunkQueryReceviedAtAdult);
+        // trace!("{:?}", LogMarker::ChunkQueryReceviedAtAdult);
         NodeQueryResponse::GetChunk(self.get_chunk(address).await.map_err(convert_to_error_msg))
     }
 
@@ -68,11 +68,11 @@ impl ChunkStorage {
     #[instrument(skip_all)]
     pub(super) async fn store(&self, data: &Chunk) -> Result<()> {
         if self.disk_store.chunk_file_exists(data.address())? {
-            info!(
-                "{}: Chunk already exists, not storing: {:?}",
-                self,
-                data.address()
-            );
+            // info!(
+            //     "{}: Chunk already exists, not storing: {:?}",
+            //     self,
+            //     data.address()
+            // );
             // Nothing more to do here
             return Ok(());
         }
@@ -85,9 +85,9 @@ impl ChunkStorage {
         }
 
         // store the data
-        trace!("{:?}", LogMarker::StoringChunk);
+        // trace!("{:?}", LogMarker::StoringChunk);
         let _addr = self.disk_store.write_chunk(data).await?;
-        trace!("{:?}", LogMarker::StoredNewChunk);
+        // trace!("{:?}", LogMarker::StoredNewChunk);
 
         Ok(())
     }

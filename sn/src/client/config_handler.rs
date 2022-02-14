@@ -18,7 +18,7 @@ use tokio::{
     fs::File,
     io::{self, AsyncReadExt},
 };
-use tracing::{debug, warn};
+// use tracing::{debug, warn};
 
 const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::UNSPECIFIED, 0);
 
@@ -90,14 +90,14 @@ impl ClientConfig {
         let query_timeout = match std::env::var(SN_QUERY_TIMEOUT) {
             Ok(timeout) => match timeout.parse() {
                 Ok(time) => {
-                    warn!(
-                        "Query timeout set from env var {}: {}s",
-                        SN_QUERY_TIMEOUT, time
-                    );
+                    // warn!(
+                    //     "Query timeout set from env var {}: {}s",
+                    //     SN_QUERY_TIMEOUT, time
+                    // );
                     Duration::from_secs(time)
                 }
-                Err(error) => {
-                    warn!("There was an error parsing {} env var value: '{}'. Default or client configured query timeout will be used: {:?}", SN_QUERY_TIMEOUT, timeout, error);
+                Err(_error) => {
+                    // warn!("There was an error parsing {} env var value: '{}'. Default or client configured query timeout will be used: {:?}", SN_QUERY_TIMEOUT, timeout, error);
                     query_timeout
                 }
             },
@@ -108,14 +108,14 @@ impl ClientConfig {
         let cmd_timeout = match std::env::var(SN_CMD_TIMEOUT) {
             Ok(timeout) => match timeout.parse() {
                 Ok(time) => {
-                    warn!(
-                        "Query timeout set from env var {}: {}s",
-                        SN_CMD_TIMEOUT, time
-                    );
+                    // warn!(
+                    //     "Query timeout set from env var {}: {}s",
+                    //     SN_CMD_TIMEOUT, time
+                    // );
                     Duration::from_secs(time)
                 }
-                Err(error) => {
-                    warn!("There was an error parsing {} env var value: '{}'. Default or client configured cmd timeout will be used: {:?}", SN_CMD_TIMEOUT, timeout, error);
+                Err(_error) => {
+                    // warn!("There was an error parsing {} env var value: '{}'. Default or client configured cmd timeout will be used: {:?}", SN_CMD_TIMEOUT, timeout, error);
                     cmd_timeout
                 }
             },
@@ -126,24 +126,24 @@ impl ClientConfig {
         let cmd_ack_wait = match std::env::var(SN_AE_WAIT) {
             Ok(timeout) => match timeout.parse() {
                 Ok(time) => {
-                    warn!(
-                        "Client AE wait post-put set from env var {}: {}s",
-                        SN_AE_WAIT, time
-                    );
+                    // warn!(
+                    //     "Client AE wait post-put set from env var {}: {}s",
+                    //     SN_AE_WAIT, time
+                    // );
                     Duration::from_secs(time)
                 }
-                Err(error) => {
-                    warn!("There was an error parsing {} env var value: '{}'. Default or client configured query timeout will be used: {:?}", SN_AE_WAIT, timeout, error);
+                Err(_error) => {
+                    // warn!("There was an error parsing {} env var value: '{}'. Default or client configured query timeout will be used: {:?}", SN_AE_WAIT, timeout, error);
                     cmd_ack_wait
                 }
             },
             Err(_) => cmd_ack_wait,
         };
 
-        info!(
-            "Client set to use a query timeout of {:?}, and AE await post-put for {:?}",
-            query_timeout, cmd_ack_wait
-        );
+        // info!(
+        //     "Client set to use a query timeout of {:?}, and AE await post-put for {:?}",
+        //     query_timeout, cmd_ack_wait
+        // );
         Self {
             local_addr: local_addr.unwrap_or_else(|| SocketAddr::from(DEFAULT_LOCAL_ADDR)),
             root_dir: root_dir.clone(),
@@ -157,18 +157,18 @@ impl ClientConfig {
 }
 
 async fn read_config_file(filepath: &Path) -> Result<QuicP2pConfig, Error> {
-    debug!("Reading config file '{}' ...", filepath.display());
+    // debug!("Reading config file '{}' ...", filepath.display());
     let mut file = File::open(filepath).await?;
 
     let mut contents = vec![];
     let _size = file.read_to_end(&mut contents).await?;
 
     serde_json::from_slice(&contents).map_err(|err| {
-        warn!(
-            "Could not parse content of config file '{}': {}",
-            filepath.display(),
-            err
-        );
+        // warn!(
+        //     "Could not parse content of config file '{}': {}",
+        //     filepath.display(),
+        //     err
+        // );
         err.into()
     })
 }

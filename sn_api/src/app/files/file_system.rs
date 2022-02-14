@@ -9,7 +9,7 @@
 use super::{metadata::get_metadata, FilesMapChange, ProcessedFiles};
 use crate::{Error, Result, Safe, XorUrl};
 use bytes::Bytes;
-use log::info;
+// use log::info;
 use safe_network::client::Error as ClientError;
 use std::{
     fs,
@@ -71,7 +71,7 @@ pub(crate) async fn file_system_dir_walk(
     recursive: bool,
     follow_links: bool,
 ) -> Result<ProcessedFiles> {
-    info!("Reading files from {}", location.display());
+    // info!("Reading files from {}", location.display());
 
     let (metadata, _) = get_metadata(location, follow_links)?;
     if metadata.is_dir() || !recursive {
@@ -88,7 +88,7 @@ pub(crate) async fn file_system_dir_walk(
         for (idx, child) in children_to_process.enumerate() {
             let current_file_path = child.path();
             let current_path_str = current_file_path.to_str().unwrap_or("").to_string();
-            info!("Processing {}...", current_path_str);
+            // info!("Processing {}...", current_path_str);
             let normalised_path = PathBuf::from(normalise_path_separator(&current_path_str));
 
             let result = get_metadata(current_file_path, follow_links);
@@ -132,7 +132,7 @@ pub(crate) async fn file_system_dir_walk(
                                     .insert(normalised_path, FilesMapChange::Added(xorurl));
                             }
                             Err(err) => {
-                                info!("Skipping file \"{}\". {}", normalised_path.display(), err);
+                                // info!("Skipping file \"{}\". {}", normalised_path.display(), err);
                                 processed_files.insert(
                                     normalised_path,
                                     FilesMapChange::Failed(format!("{}", err)),
@@ -142,9 +142,9 @@ pub(crate) async fn file_system_dir_walk(
                     }
                 }
                 Err(err) => {
-                    info!(
-                        "Skipping file \"{}\" since no metadata could be read from local location: {:?}",
-                        normalised_path.display(), err);
+                    // info!(
+                    // "Skipping file \"{}\" since no metadata could be read from local location: {:?}",
+                    // normalised_path.display(), err);
                     processed_files
                         .insert(normalised_path, FilesMapChange::Failed(format!("{}", err)));
                 }
@@ -179,7 +179,7 @@ pub(crate) async fn file_system_single_file(
     safe: &Safe,
     location: &Path,
 ) -> Result<ProcessedFiles> {
-    info!("Reading file {}", location.display());
+    // info!("Reading file {}", location.display());
     let (metadata, _) = get_metadata(location, true)?; // follows symlinks.
 
     // We now compare both FilesMaps to upload the missing files
@@ -196,7 +196,7 @@ pub(crate) async fn file_system_single_file(
                 processed_files.insert(normalised_path, FilesMapChange::Added(xorurl));
             }
             Err(err) => {
-                info!("Skipping file \"{}\". {}", normalised_path.display(), err);
+                // info!("Skipping file \"{}\". {}", normalised_path.display(), err);
                 processed_files.insert(normalised_path, FilesMapChange::Failed(format!("{}", err)));
             }
         };

@@ -60,7 +60,7 @@ impl Liveness {
 
     /// Add a new adult to the tracker and recompute closest nodes.
     pub(crate) fn add_new_adult(&self, adult: XorName) {
-        info!("Adding new adult:{adult} to Liveness tracker");
+        // info!("Adding new adult:{adult} to Liveness tracker");
 
         let our_adults: Vec<_> = self
             .closest_nodes_to
@@ -76,10 +76,10 @@ impl Liveness {
             .cloned()
             .collect::<Vec<_>>();
 
-        info!("Closest nodes to {adult}:{closest_nodes:?}");
+        // info!("Closest nodes to {adult}:{closest_nodes:?}");
 
         if let Some(_old_entry) = self.closest_nodes_to.insert(adult, closest_nodes) {
-            warn!("Throwing old liveness tracker for Adult {adult}:{_old_entry:?}");
+            // warn!("Throwing old liveness tracker for Adult {adult}:{_old_entry:?}");
         }
 
         self.recompute_closest_nodes();
@@ -94,11 +94,11 @@ impl Liveness {
     ) {
         let entry = self.unfulfilled_requests.entry(node_id).or_default();
 
-        trace!(
-            "Adding pending operation against node: {:?}: for op: {:?}",
-            node_id,
-            &operation_id
-        );
+        // trace!(
+        //     "Adding pending operation against node: {:?}: for op: {:?}",
+        //     node_id,
+        //     &operation_id
+        // );
 
         let v = entry.value();
         v.write().await.push(operation_id);
@@ -124,7 +124,7 @@ impl Liveness {
             self.add_a_pending_request_operation(member, random_op_id)
                 .await
         } else {
-            error!("Error generating a random OperationID for penalising member")
+            // error!("Error generating a random OperationID for penalising member")
         }
     }
 
@@ -134,11 +134,11 @@ impl Liveness {
         node_id: &NodeIdentifier,
         operation_id: OperationId,
     ) -> bool {
-        trace!(
-            "Attempting to remove pending_operation {:?} op: {:?}",
-            node_id,
-            operation_id
-        );
+        // trace!(
+        //     "Attempting to remove pending_operation {:?} op: {:?}",
+        //     node_id,
+        //     operation_id
+        // );
         let mut has_removed = false;
 
         if let Some(entry) = self.unfulfilled_requests.get(node_id) {
@@ -153,19 +153,19 @@ impl Liveness {
                     false
                 }
             });
-            if has_removed {
-                trace!(
-                    "Pending operation removed for node: {:?} op: {:?}",
-                    node_id,
-                    operation_id
-                );
-            } else {
-                trace!(
-                    "No Pending operation find for node: {:?} op: {:?}",
-                    node_id,
-                    operation_id
-                );
-            }
+            // if has_removed {
+            //     // trace!(
+            //     //     "Pending operation removed for node: {:?} op: {:?}",
+            //     //     node_id,
+            //     //     operation_id
+            //     // );
+            // } else {
+            //     // trace!(
+            //     //     "No Pending operation find for node: {:?} op: {:?}",
+            //     //     node_id,
+            //     //     operation_id
+            //     // );
+            // }
         }
         has_removed
     }
@@ -186,12 +186,12 @@ impl Liveness {
 
     // this is not an exact definition, thus has tolerance for variance due to concurrency
     pub(crate) async fn find_unresponsive_nodes(&self) -> Vec<(XorName, usize)> {
-        info!("Checking unresponsive nodes");
+        // info!("Checking unresponsive nodes");
         let mut unresponsive_nodes = Vec::new();
 
         for entry in self.closest_nodes_to.iter() {
             let (node, neighbours) = entry.pair();
-            info!("Checking node/neighbours: {:?}/{:?}", node, neighbours);
+            // info!("Checking node/neighbours: {:?}/{:?}", node, neighbours);
 
             let node = *node;
             let mut max_pending_by_neighbours = 0;
@@ -220,12 +220,12 @@ impl Liveness {
                 && pending_operations_count as f64 * PENDING_OP_TOLERANCE_RATIO
                     > max_pending_by_neighbours as f64
             {
-                tracing::info!(
-                    "Pending ops for {}: {} Neighbour max: {}",
-                    node,
-                    pending_operations_count,
-                    max_pending_by_neighbours
-                );
+                // tracing::info!(
+                //     "Pending ops for {}: {} Neighbour max: {}",
+                //     node,
+                //     pending_operations_count,
+                //     max_pending_by_neighbours
+                // );
                 unresponsive_nodes.push((node, pending_operations_count));
             }
         }

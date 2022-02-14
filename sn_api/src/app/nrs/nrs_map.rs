@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{Error, Result, SafeUrl};
-use log::debug;
+// use log::debug;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -56,14 +56,14 @@ impl NrsMap {
     pub fn get(&self, public_name: &str) -> Result<Option<SafeUrl>> {
         match self.map.get(public_name) {
             Some(link) => {
-                debug!(
-                    "NRS: public name resolution is: {} => {}",
-                    public_name, link
-                );
+                // debug!(
+                //     "NRS: public name resolution is: {} => {}",
+                //     public_name, link
+                // );
                 Ok(Some(link.to_owned()))
             }
             None => {
-                debug!("NRS: No link found for public name: {}", public_name);
+                // debug!("NRS: No link found for public name: {}", public_name);
                 if self.public_name_contains_subname(public_name) {
                     return Err(Error::ContentError(format!(
                         "Link not found in NRS Map Container for public name: \"{}\"",

@@ -25,7 +25,7 @@ use std::{
     io::{BufWriter, Write},
     path::Path,
 };
-use tracing::{debug, info, trace, warn};
+// use tracing::{debug, info, trace, warn};
 
 /// # Retrieval/write status for current file and overall transfer.
 #[derive(Debug, Clone)]
@@ -167,7 +167,7 @@ pub async fn process_get_command(
                             status.path_local.display()
                         );
 
-                        warn!("Skipping file \"{}\". {}", status.path_local.display(), msg);
+                        // warn!("Skipping file \"{}\". {}", status.path_local.display(), msg);
                         if isatty::stderr_isatty() {
                             eprintln!("Warning: {}", msg);
                         }
@@ -325,7 +325,7 @@ async fn files_container_get_files(
     // generate a new one, since the version that's returned by this function is not used by the
     // caller. Previously we were returning 0 or a number, so it seems reasonable to return either
     // "0" or the VersionHash as a string (it implements the Display trait).
-    debug!("Getting files in container {:?}", url);
+    // debug!("Getting files in container {:?}", url);
     let (version, files_map) = match safe.fetch(url, None).await? {
         SafeData::FilesContainer {
             version, files_map, ..
@@ -449,7 +449,7 @@ async fn files_map_get_files(
     dirpath: &str,
     mut callback: impl FnMut(&FilesGetStatus) -> bool,
 ) -> Result<BTreeMap<String, (String, String)>> {
-    trace!("Fetching files from FilesMap");
+    // trace!("Fetching files from FilesMap");
 
     let dpath = Path::new(dirpath);
 
@@ -470,7 +470,7 @@ async fn files_map_get_files(
         } else {
             dpath.to_path_buf()
         };
-        trace!("target path: {}", abspath.display());
+        // trace!("target path: {}", abspath.display());
 
         // determine the file size from metadata.  string must be parsed.
         let size_str = details.getattr("size")?;
@@ -512,7 +512,7 @@ async fn files_map_get_files(
             None => {
                 let msg = "Could not get parent directory";
                 processed_files.insert(path.to_string(), ("E".to_string(), format!("<{}>", msg)));
-                warn!("Skipping file \"{}\". {}", path, msg);
+                // warn!("Skipping file \"{}\". {}", path, msg);
                 continue;
             }
         };
@@ -544,7 +544,7 @@ async fn files_map_get_files(
             }
             Err(err) => {
                 processed_files.insert(path.to_string(), processed_files_err_report(&err));
-                info!("Skipping file \"{}\". {}", path, err);
+                // info!("Skipping file \"{}\". {}", path, err);
             }
         };
     }
@@ -591,18 +591,18 @@ async fn create_symlink_worker(
 }
 
 async fn create_symlink(target: &Path, link: &Path, target_type: &str) -> ApiResult<()> {
-    info!(
-        "creating symlink: {} --> {}",
-        link.display(),
-        target.display()
-    );
+    // info!(
+    //     "creating symlink: {} --> {}",
+    //     link.display(),
+    //     target.display()
+    // );
 
     let result = create_symlink_worker(target, link, target_type).await;
     match result {
         Ok(_) => {}
-        Err((msg, os_err)) => {
-            warn!("{}", msg);
-            warn!("{}", os_err);
+        Err((msg, _os_err)) => {
+            // warn!("{}", msg);
+            // warn!("{}", os_err);
             println!("{}", msg);
         }
     }
@@ -617,14 +617,14 @@ fn denormalize_slashes(p: &str) -> String {
 // Downloads a file from the network to a given file path
 // xorurl must point to a file
 // size (in bytes) must be provided
-async fn download_file_from_net(safe: &Safe, xorurl: &str, path: &Path, size: u64) -> Result<u64> {
-    debug!("downloading file {} to {}", xorurl, path.display());
+async fn download_file_from_net(safe: &Safe, xorurl: &str, path: &Path, _size: u64) -> Result<u64> {
+    // debug!("downloading file {} to {}", xorurl, path.display());
 
     // TODO: download the file by concurrently (spawning tasks/threads) pulling chunks.
     // The chunk_size can be based on https://stackoverflow.com/questions/8803515/optimal-buffer-size-for-write2
     // which can be 4096 to match common disk block size, but that seems a bit small for the
     // network, so I multiplied by 16. Perhaps should make it a param so caller can decide.
-    let mut rcvd: u64 = 0;
+    // let mut rcvd: u64 = 0;
     let mut bytes_written: u64 = 0;
 
     let fh = file_create(path)?;
@@ -633,8 +633,8 @@ async fn download_file_from_net(safe: &Safe, xorurl: &str, path: &Path, size: u6
     // gets public or private, based on xorurl type
     let filedata = files_get(safe, xorurl, None).await?;
     bytes_written += stream_write(&mut stream, &filedata, path)? as u64;
-    rcvd += filedata.len() as u64;
-    trace!("received {} bytes of {}", rcvd, size,);
+    // rcvd += filedata.len() as u64;
+    // trace!("received {} bytes of {}", rcvd, size,);
 
     // Close may generate an error, so we do a flush/sync first to detect such.
     // see https://github.com/rust-lang/rust/pull/63410#issuecomment-519965351

@@ -20,7 +20,7 @@ use crate::node::{
     network_knowledge::NodeState,
     Event, Result,
 };
-use crate::types::log_markers::LogMarker;
+// use crate::types::log_markers::LogMarker;
 
 use std::collections::BTreeSet;
 use xor_name::XorName;
@@ -53,12 +53,12 @@ impl Core {
         for (node_state, relocate_details) in
             find_nodes_to_relocate(&self.network_knowledge, &churn_id, excluded).await
         {
-            debug!(
-                "Relocating {:?} to {} (on churn of {})",
-                node_state.peer(),
-                relocate_details.dst,
-                churn_id
-            );
+            // debug!(
+            //     "Relocating {:?} to {} (on churn of {})",
+            //     node_state.peer(),
+            //     relocate_details.dst,
+            //     churn_id
+            // );
 
             cmds.extend(
                 self.propose(Proposal::Offline(node_state.relocate(relocate_details)))
@@ -78,12 +78,12 @@ impl Core {
         let relocate_details =
             RelocateDetails::with_age(&self.network_knowledge, peer, peer.name(), age);
 
-        trace!(
-            "Relocating {:?} to {} with age {} due to rejoin",
-            peer,
-            relocate_details.dst,
-            relocate_details.age
-        );
+        // trace!(
+        //     "Relocating {:?} to {} with age {} due to rejoin",
+        //     peer,
+        //     relocate_details.dst,
+        //     relocate_details.age
+        // );
 
         Ok(self
             .propose(Proposal::Offline(node_state.relocate(relocate_details)))
@@ -102,10 +102,10 @@ impl Core {
                     relocate_details.age,
                 )
             } else {
-                debug!(
-                    "Ignoring Relocate msg containing invalid NodeState: {:?}",
-                    relocate_proof.state
-                );
+                // debug!(
+                //     "Ignoring Relocate msg containing invalid NodeState: {:?}",
+                //     relocate_proof.state
+                // );
                 return Ok(None);
             };
 
@@ -116,18 +116,18 @@ impl Core {
             return Ok(None);
         }
 
-        debug!(
-            "Received Relocate message to join the section at {}",
-            dst_xorname
-        );
+        // debug!(
+        //     "Received Relocate message to join the section at {}",
+        //     dst_xorname
+        // );
 
         match *self.relocate_state.read().await {
             Some(_) => {
-                trace!("Ignore Relocate - relocation already in progress");
+                // trace!("Ignore Relocate - relocation already in progress");
                 return Ok(None);
             }
             None => {
-                trace!("{}", LogMarker::RelocateStart);
+                // trace!("{}", LogMarker::RelocateStart);
                 self.send_event(Event::RelocationStarted {
                     previous_name: node.name(),
                 })

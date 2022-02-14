@@ -74,12 +74,12 @@ pub(crate) async fn compare_and_write_prefix_map_to_disk(
     if let Some(old_map) = disk_map {
         // Return early as the PrefixMap in disk is the equivalent/latest already
         if &old_map >= prefix_map {
-            info!("Equivalent/Latest PrefixMap already in disk");
+            // info!("Equivalent/Latest PrefixMap already in disk");
             return Ok(());
         }
     }
 
-    trace!("Writing prefix_map to disk at {:?}", prefix_map_file);
+    // trace!("Writing prefix_map to disk at {:?}", prefix_map_file);
     let serialized =
         rmp_serde::to_vec(prefix_map).map_err(|e| Error::Serialisation(e.to_string()))?;
 

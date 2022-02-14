@@ -18,7 +18,7 @@ use sn_api::{
     Safe, SafeUrl,
 };
 use structopt::StructOpt;
-use tracing::debug;
+// use tracing::debug;
 
 #[derive(StructOpt, Debug)]
 pub struct DogCommands {
@@ -29,7 +29,7 @@ pub struct DogCommands {
 pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe) -> Result<()> {
     let link = get_from_arg_or_stdin(cmd.location, None)?;
     let url = get_target_url(&link)?;
-    debug!("Running dog for: {:?}", &url);
+    // debug!("Running dog for: {:?}", &url);
 
     let resolved_content = safe.inspect(&url.to_string()).await?;
     if OutputFmt::Pretty != output_fmt {

@@ -23,7 +23,7 @@ use crate::messaging::{
 };
 use crate::node::SectionAuthorityProvider;
 use crate::peer::Peer;
-use crate::types::{log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk};
+use crate::types::utils::compare_and_write_prefix_map_to_disk;
 
 use bytes::Bytes;
 use itertools::Itertools;
@@ -44,63 +44,71 @@ impl Session {
         mut incoming_msgs: ConnectionIncoming,
     ) {
         let src = connected_peer.addr();
-        debug!("Listening for incoming msgs from {}", connected_peer);
+        // debug!("Listening for incoming msgs from {}", connected_peer);
 
-        trace!(
-            "{} to {} (id: {})",
-            LogMarker::ConnectionOpened,
-            src,
-            connection_id
-        );
+        // trace!(
+        //     "{} to {} (id: {})",
+        //     LogMarker::ConnectionOpened,
+        //     src,
+        //     connection_id
+        // );
 
-        let _handle = tokio::spawn(async move {
-            loop {
-                match Self::listen_for_incoming_msg(src, &mut incoming_msgs).await {
-                    Ok(Some(msg)) => {
-                        if let Err(err) = Self::handle_msg(msg, connected_peer.clone(), session.clone()).await {
-                            error!("Error while handling incoming msg: {:?}. Listening for next msg...", err);
+        let _handle = tokio::spawn(
+            async move {
+                loop {
+                    match Self::listen_for_incoming_msg(src, &mut incoming_msgs).await {
+                        Ok(Some(msg)) => {
+                            if let Err(_err) =
+                                Self::handle_msg(msg, connected_peer.clone(), session.clone()).await
+                            {
+                                // error!("Error while handling incoming msg: {:?}. Listening for next msg...", err);
+                            }
                         }
-                    },
-                    Ok(None) => {
-                        info!("Incoming msg listener has closed for connection {}.", connection_id);
-                        break;
-                    }
-                    Err( Error::QuicP2pSend(SendError::ConnectionLost(
-                        ConnectionError::Closed(Close::Application { reason, .. }),
-                    ))) => {
-                        warn!(
-                            "Connection was closed by the node: {:?}",
-                            String::from_utf8(reason.to_vec())
-                        );
+                        Ok(None) => {
+                            // info!("Incoming msg listener has closed for connection {}.", connection_id);
+                            break;
+                        }
+                        Err(Error::QuicP2pSend(SendError::ConnectionLost(
+                            ConnectionError::Closed(Close::Application { .. }),
+                        ))) => {
+                            // warn!(
+                            //     "Connection was closed by the node: {:?}",
+                            //     String::from_utf8(reason.to_vec())
+                            // );
 
-                        mark_connection_id_as_failed(session.clone(), connected_peer.name(), connection_id);
+                            mark_connection_id_as_failed(
+                                session.clone(),
+                                connected_peer.name(),
+                                connection_id,
+                            );
+                        }
+                        Err(Error::QuicP2p(_qp2p_err)) => {
+                            // TODO: Can we recover here?
+                            // info!("Error from Qp2p received, closing listener loop. {:?}", qp2p_err);
 
-                    },
-                    Err(Error::QuicP2p(qp2p_err)) => {
-                          // TODO: Can we recover here?
-                          info!("Error from Qp2p received, closing listener loop. {:?}", qp2p_err);
-
-
-                          break;
-                    },
-                    Err(error) => {
-                        error!("Error while processing incoming msg: {:?}. Listening for next msg...", error);
+                            break;
+                        }
+                        Err(_error) => {
+                            // error!("Error while processing incoming msg: {:?}. Listening for next msg...", error);
+                        }
                     }
                 }
-            }
 
-            // once the msg loop breaks, we know the connection is closed
-            trace!("{} to {} (id: {})", LogMarker::ConnectionClosed, src, connection_id);
-        }.instrument(info_span!("Listening for incoming msgs from {}", ?src))).in_current_span();
+                // once the msg loop breaks, we know the connection is closed
+                // trace!("{} to {} (id: {})", LogMarker::ConnectionClosed, src, connection_id);
+            }
+            .instrument(info_span!("Listening for incoming msgs from {}", ?src)),
+        )
+        .in_current_span();
     }
 
     #[instrument(skip_all, level = "debug")]
     pub(crate) async fn listen_for_incoming_msg(
-        src: SocketAddr,
+        _src: SocketAddr,
         incoming_msgs: &mut ConnectionIncoming,
     ) -> Result<Option<MsgType>, Error> {
         if let Some(msg) = incoming_msgs.next().await? {
-            trace!("Incoming msg from {:?}", src);
+            // trace!("Incoming msg from {:?}", src);
             let msg_type = WireMsg::deserialize(msg)?;
 
             Ok(Some(msg_type))
@@ -129,7 +137,7 @@ impl Session {
                     },
                 ..
             } => {
-                debug!("AE-Redirect msg received");
+                // debug!("AE-Redirect msg received");
                 let result = Self::handle_ae_msg(
                     session,
                     section_auth.into_state(),
@@ -140,7 +148,7 @@ impl Session {
                 )
                 .await;
                 if result.is_err() {
-                    warn!("Failed to handle AE-Redirect");
+                    // warn!("Failed to handle AE-Redirect");
                 }
                 result
             }
@@ -154,7 +162,7 @@ impl Session {
                     },
                 ..
             } => {
-                debug!("AE-Retry msg received");
+                // debug!("AE-Retry msg received");
                 let result = Self::handle_ae_msg(
                     session,
                     section_auth.into_state(),
@@ -165,12 +173,12 @@ impl Session {
                 )
                 .await;
                 if result.is_err() {
-                    warn!("Failed to handle AE-Retry msg from {:?}", src_peer.addr());
+                    // warn!("Failed to handle AE-Retry msg from {:?}", src_peer.addr());
                 }
                 result
             }
-            msg_type => {
-                warn!("Unexpected msg type received: {:?}", msg_type);
+            _msg_type => {
+                // warn!("Unexpected msg type received: {:?}", msg_type);
                 Ok(())
             }
         }
@@ -184,18 +192,18 @@ impl Session {
         error: Option<CmdError>,
     ) {
         if let Some(sender) = cmds.get(&correlation_id) {
-            trace!(
-                "Sending cmd response from {:?} for cmd w/{:?} via channel.",
-                src,
-                correlation_id
-            );
+            // trace!(
+            //     "Sending cmd response from {:?} for cmd w/{:?} via channel.",
+            //     src,
+            //     correlation_id
+            // );
             let result = sender.try_send((src, error));
             if result.is_err() {
-                trace!("Error sending cmd response on a channel for cmd_id {:?}: {:?}. (It has likely been removed)", correlation_id, result)
+                // trace!("Error sending cmd response on a channel for cmd_id {:?}: {:?}. (It has likely been removed)", correlation_id, result)
             }
         } else {
             // Likely the channel is removed when received majority of Acks
-            trace!("No channel found for cmd Ack of {:?}", correlation_id);
+            // trace!("No channel found for cmd Ack of {:?}", correlation_id);
         }
     }
 
@@ -207,11 +215,11 @@ impl Session {
         msg: ServiceMsg,
         src_peer: Peer,
     ) -> Result<(), Error> {
-        debug!(
-            "ServiceMsg with id {:?} received from {:?}",
-            msg_id,
-            src_peer.addr()
-        );
+        // debug!(
+        //     "ServiceMsg with id {:?} received from {:?}",
+        //     msg_id,
+        //     src_peer.addr()
+        // );
         let queries = session.pending_queries.clone();
         let cmds = session.pending_cmds;
 
@@ -227,10 +235,10 @@ impl Session {
                         if let Some(entry) = queries.get(&op_id) {
                             let all_senders = entry.value();
                             for (_msg_id, sender) in all_senders {
-                                trace!("Sending response for query w/{:?} via channel.", op_id);
+                                // trace!("Sending response for query w/{:?} via channel.", op_id);
                                 let result = sender.try_send(response.clone());
                                 if result.is_err() {
-                                    trace!("Error sending query response on a channel for {:?} op_id {:?}: {:?}. (It has likely been removed)", msg_id, op_id, result)
+                                    // trace!("Error sending query response on a channel for {:?} op_id {:?}: {:?}. (It has likely been removed)", msg_id, op_id, result)
                                 }
                             }
                         } else {
@@ -244,7 +252,7 @@ impl Session {
                             //trace!("No channel found for operation {}", op_id);
                         }
                     } else {
-                        warn!("Ignoring query response without operation id");
+                        // warn!("Ignoring query response without operation id");
                     }
                 }
                 ServiceMsg::CmdError {
@@ -252,23 +260,23 @@ impl Session {
                     correlation_id,
                     ..
                 } => {
-                    warn!(
-                        "CmdError was received for {correlation_id:?} received is: {:?}",
-                        error
-                    );
+                    // warn!(
+                    //     "CmdError was received for {correlation_id:?} received is: {:?}",
+                    //     error
+                    // );
                     Self::send_cmd_response(cmds, correlation_id, src_peer.addr(), Some(error));
                 }
                 ServiceMsg::CmdAck { correlation_id } => {
-                    debug!(
-                        "CmdAck was received for Message{:?} w/ID: {:?} from {:?}",
-                        msg_id,
-                        correlation_id,
-                        src_peer.addr()
-                    );
+                    // debug!(
+                    //     "CmdAck was received for Message{:?} w/ID: {:?} from {:?}",
+                    //     msg_id,
+                    //     correlation_id,
+                    //     src_peer.addr()
+                    // );
                     Self::send_cmd_response(cmds, correlation_id, src_peer.addr(), None);
                 }
                 _ => {
-                    warn!("Ignoring unexpected msg type received: {:?}", msg);
+                    // warn!("Ignoring unexpected msg type received: {:?}", msg);
                 }
             };
         });
@@ -286,11 +294,11 @@ impl Session {
         bounced_msg: Bytes,
         src_peer: Peer,
     ) -> Result<(), Error> {
-        debug!(
-            "Received AE-Redirect for from {}, with SAP: {:?}",
-            src_peer.addr(),
-            target_sap
-        );
+        // debug!(
+        //     "Received AE-Redirect for from {}, with SAP: {:?}",
+        //     src_peer.addr(),
+        //     target_sap
+        // );
 
         // Try to update our network knowledge first
         Self::update_network_knowledge(
@@ -325,12 +333,12 @@ impl Session {
                     dst_location,
                 )?;
 
-                debug!("Resending original message on AE-Redirect with updated details. Expecting an AE-Retry next");
+                // debug!("Resending original message on AE-Redirect with updated details. Expecting an AE-Retry next");
 
                 let endpoint = session.endpoint.clone();
                 send_msg(session, vec![elder], wire_msg, endpoint, msg_id).await?;
             } else {
-                error!("No elder determined for resending AE message");
+                // error!("No elder determined for resending AE message");
             }
         }
 
@@ -344,7 +352,7 @@ impl Session {
         sap: SectionAuthorityProvider,
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
-        sender: Peer,
+        _sender: Peer,
     ) {
         match session.network.update(
             SectionAuth {
@@ -354,34 +362,34 @@ impl Session {
             &proof_chain,
         ) {
             Ok(true) => {
-                debug!(
-                    "Anti-Entropy: updated remote section SAP updated for {:?}",
-                    sap.prefix()
-                );
+                // debug!(
+                //     "Anti-Entropy: updated remote section SAP updated for {:?}",
+                //     sap.prefix()
+                // );
                 // Update the PrefixMap on disk
-                if let Err(e) = compare_and_write_prefix_map_to_disk(&session.network).await {
-                    error!(
-                        "Error writing freshly updated PrefixMap to client dir: {:?}",
-                        e
-                    );
+                if let Err(_e) = compare_and_write_prefix_map_to_disk(&session.network).await {
+                    // error!(
+                    //     "Error writing freshly updated PrefixMap to client dir: {:?}",
+                    //     e
+                    // );
                 }
             }
             Ok(false) => {
-                debug!(
-                    "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
-                    sap.prefix(), sap
-                );
+                // debug!(
+                //     "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
+                //     sap.prefix(), sap
+                // );
             }
-            Err(err) => {
-                warn!(
-                    "Anti-Entropy: failed to update remote section SAP w/ err: {:?}",
-                    err
-                );
-                warn!(
-                    "Anti-Entropy: bounced msg dropped. Failed section auth was {:?} sent by: {:?}",
-                    sap.section_key(),
-                    sender
-                );
+            Err(_err) => {
+                // warn!(
+                //     "Anti-Entropy: failed to update remote section SAP w/ err: {:?}",
+                //     err
+                // );
+                // warn!(
+                //     "Anti-Entropy: bounced msg dropped. Failed section auth was {:?} sent by: {:?}",
+                //     sap.section_key(),
+                //     sender
+                // );
             }
         }
     }
@@ -410,30 +418,30 @@ impl Session {
                     auth,
                     dst_location,
                 } => (msg_id, msg, dst_location, auth),
-                other => {
-                    warn!(
-                        "Unexpected non-serviceMsg returned in AE-Redirect response: {:?}",
-                        other
-                    );
+                _other => {
+                    // warn!(
+                    //     "Unexpected non-serviceMsg returned in AE-Redirect response: {:?}",
+                    //     other
+                    // );
                     return Ok(None);
                 }
             };
 
-        trace!(
-            "Bounced msg ({:?}) received in an AE response: {:?}",
-            msg_id,
-            service_msg
-        );
+        // trace!(
+        //     "Bounced msg ({:?}) received in an AE response: {:?}",
+        //     msg_id,
+        //     service_msg
+        // );
 
         let (target_count, dst_address_of_bounced_msg) = match service_msg.clone() {
             ServiceMsg::Cmd(cmd) => (at_least_one_correct_elder(), cmd.dst_name()),
             ServiceMsg::Query(query) => (NUM_OF_ELDERS_SUBSET_FOR_QUERIES, query.dst_name()),
             _ => {
-                warn!(
-                    "Invalid bounced msg {:?} received in AE response: {:?}. Msg is of invalid type",
-                    msg_id,
-                    service_msg
-                );
+                // warn!(
+                //     "Invalid bounced msg {:?} received in AE response: {:?}. Msg is of invalid type",
+                //     msg_id,
+                //     service_msg
+                // );
                 // Early return with random name as we will discard the msg at the caller func
                 return Ok(None);
             }
@@ -461,10 +469,10 @@ impl Session {
         dst_location.set_section_pk(target_public_key);
 
         if !target_elders.is_empty() {
-            debug!(
-                "Final target elders for resending {:?} : {:?} msg are {:?}",
-                msg_id, service_msg, target_elders
-            );
+            // debug!(
+            //     "Final target elders for resending {:?} : {:?} msg are {:?}",
+            //     msg_id, service_msg, target_elders
+            // );
         }
 
         // drop(the_cache_guard);

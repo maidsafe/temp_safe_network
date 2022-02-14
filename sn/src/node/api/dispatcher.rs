@@ -14,7 +14,7 @@ use crate::node::{
     Error, Result,
 };
 use crate::peer::Peer;
-use crate::types::log_markers::LogMarker;
+// use crate::types::log_markers::LogMarker;
 use std::{sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
 use tokio::{sync::watch, time};
@@ -74,8 +74,8 @@ impl Dispatcher {
         cmd_id: Option<CmdId>,
     ) -> Result<()> {
         let cmd_id = cmd_id.unwrap_or_else(|| rand::random::<u32>().to_string());
-        let cmd_id_clone = cmd_id.clone();
-        let cmd_display = cmd.to_string();
+        // let cmd_id_clone = cmd_id.clone();
+        // let cmd_display = cmd.to_string();
         let _task = tokio::spawn(async move {
             match self.process_cmd(cmd, &cmd_id).await {
                 Ok(cmds) => {
@@ -85,18 +85,18 @@ impl Dispatcher {
                         let _result = self.clone().spawn_cmd_handling(cmd, sub_cmd_id);
                     }
                 }
-                Err(err) => {
-                    error!("Failed to handle cmd {:?} with error {:?}", cmd_id, err);
+                Err(_err) => {
+                    // error!("Failed to handle cmd {:?} with error {:?}", cmd_id, err);
                 }
             }
         });
 
-        trace!(
-            "{:?} {} cmd_id={}",
-            LogMarker::CmdHandlingSpawned,
-            cmd_display,
-            &cmd_id_clone
-        );
+        // trace!(
+        //     "{:?} {} cmd_id={}",
+        //     LogMarker::CmdHandlingSpawned,
+        //     cmd_display,
+        //     &cmd_id_clone
+        // );
         Ok(())
     }
 
@@ -108,7 +108,7 @@ impl Dispatcher {
     }
 
     pub(super) async fn start_network_probing(self: Arc<Self>) {
-        info!("Starting to probe network");
+        // info!("Starting to probe network");
         let _handle = tokio::spawn(async move {
             let dispatcher = self.clone();
             let mut interval = tokio::time::interval(PROBE_INTERVAL);
@@ -122,16 +122,16 @@ impl Dispatcher {
                 if core.is_elder().await && !core.network_knowledge().prefix().await.is_empty() {
                     match core.generate_probe_msg().await {
                         Ok(cmd) => {
-                            info!("Sending probe msg");
-                            if let Err(e) = dispatcher
+                            // info!("Sending probe msg");
+                            if let Err(_e) = dispatcher
                                 .clone()
                                 .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
                                 .await
                             {
-                                error!("Error sending a probe msg to the network: {:?}", e);
+                                // error!("Error sending a probe msg to the network: {:?}", e);
                             }
                         }
-                        Err(error) => error!("Problem generating probe msg: {:?}", error),
+                        Err(_error) => (), // error!("Problem generating probe msg: {:?}", error),
                     }
                 }
             }
@@ -139,7 +139,7 @@ impl Dispatcher {
     }
 
     pub(super) async fn write_prefixmap_to_disk(self: Arc<Self>) {
-        info!("Writing our PrefixMap to disk");
+        // info!("Writing our PrefixMap to disk");
         self.clone().core.write_prefix_map().await
     }
 
@@ -168,35 +168,35 @@ impl Dispatcher {
         };
 
         async {
-            let cmd_display = cmd.to_string();
-            trace!(
-                "{:?} {:?} - {}",
-                LogMarker::CmdProcessStart,
-                cmd_id,
-                cmd_display
-            );
+            // let cmd_display = cmd.to_string();
+            // trace!(
+            //     "{:?} {:?} - {}",
+            //     LogMarker::CmdProcessStart,
+            //     cmd_id,
+            //     cmd_display
+            // );
 
             let res = match self.try_processing_cmd(cmd).await {
                 Ok(outcome) => {
-                    trace!(
-                        "{:?} {:?} - {}",
-                        LogMarker::CmdProcessEnd,
-                        cmd_id,
-                        cmd_display
-                    );
+                    // trace!(
+                    //     "{:?} {:?} - {}",
+                    //     LogMarker::CmdProcessEnd,
+                    //     cmd_id,
+                    //     cmd_display
+                    // );
                     Ok(outcome)
                 }
                 Err(error) => {
-                    error!(
-                        "Error encountered when processing cmd (cmd_id {}): {:?}",
-                        cmd_id, error
-                    );
-                    trace!(
-                        "{:?} {}: {:?}",
-                        LogMarker::CmdProcessingError,
-                        cmd_display,
-                        error
-                    );
+                    // error!(
+                    //     "Error encountered when processing cmd (cmd_id {}): {:?}",
+                    //     cmd_id, error
+                    // );
+                    // trace!(
+                    //     "{:?} {}: {:?}",
+                    //     LogMarker::CmdProcessingError,
+                    //     cmd_display,
+                    //     error
+                    // );
                     Err(error)
                 }
             };
@@ -261,7 +261,7 @@ impl Dispatcher {
                         .await
                 }
                 _ => {
-                    error!("Other agreement messages should be handled in `HandleAgreement`, which is non-blocking ");
+                    // error!("Other agreement messages should be handled in `HandleAgreement`, which is non-blocking ");
                     Ok(vec![])
                 }
             },
@@ -341,14 +341,14 @@ impl Dispatcher {
                     .await?
             }
             MsgKind::ServiceMsg(_) => {
-                if let Err(err) = self
+                if let Err(_err) = self
                     .core
                     .comm
                     .send_on_existing_connection_to_client(recipients, wire_msg.clone())
                     .await
                 {
-                    error!("Failed sending message {:?} to recipients {:?} on existing connection with error {:?}",
-                            wire_msg, recipients, err);
+                    // error!("Failed sending message {:?} to recipients {:?} on existing connection with error {:?}",
+                    // wire_msg, recipients, err);
                 }
 
                 vec![]

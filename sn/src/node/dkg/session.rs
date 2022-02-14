@@ -20,13 +20,12 @@ use crate::node::{
     Result,
 };
 use crate::peer::Peer;
-use crate::types::{log_markers::LogMarker, PublicKey};
+use crate::types::PublicKey;
 
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{
     message::Message as DkgMessage, Error as DkgError, KeyGen, MessageAndTarget, Phase,
 };
-use itertools::Itertools;
 use std::{
     collections::{BTreeMap, BTreeSet},
     iter, mem,
@@ -51,12 +50,10 @@ pub(crate) struct Session {
 }
 
 fn is_dkg_behind(expected: Phase, actual: Phase) -> bool {
-    if let (Phase::Contribution, Phase::Initialization) = (expected, actual) {
-        true
-    } else {
-        trace!("Our DKG session is ahead. Skipping DkgAE");
-        false
-    }
+    matches!(
+        (expected, actual),
+        (Phase::Contribution, Phase::Initialization)
+    )
 }
 
 impl Session {
@@ -80,7 +77,7 @@ impl Session {
                 if let Some(name) = self.key_gen.node_id_from_index(ack.0) {
                     name
                 } else {
-                    warn!("Cannot get node_id for index {:?}", ack.0);
+                    // warn!("Cannot get node_id for index {:?}", ack.0);
                     return Ok(vec![]);
                 }
             }
@@ -88,11 +85,11 @@ impl Session {
         };
 
         if let Some(peer) = self.peers().get(&target) {
-            trace!(
-                "Targeting DkgNotReady to {:?} on unhandable message {:?}",
-                target,
-                message
-            );
+            // trace!(
+            //     "Targeting DkgNotReady to {:?} on unhandable message {:?}",
+            //     target,
+            //     message
+            // );
             let node_msg = SystemMsg::DkgNotReady {
                 session_id: *session_id,
                 message,
@@ -112,10 +109,10 @@ impl Session {
                 wire_msg,
             });
         } else {
-            warn!(
-                "Failed to fetch peer of {:?} among {:?}",
-                target, self.elder_candidates
-            );
+            // warn!(
+            //     "Failed to fetch peer of {:?} among {:?}",
+            //     target, self.elder_candidates
+            // );
         }
         Ok(cmds)
     }
@@ -128,7 +125,7 @@ impl Session {
         message: DkgMessage,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
-        trace!("process DKG message {:?}", message);
+        // trace!("process DKG message {:?}", message);
         let mut cmds = vec![];
         match self
             .key_gen
@@ -157,8 +154,8 @@ impl Session {
                     self.send_dkg_not_ready(node, message, session_id, sender, section_pk)?,
                 );
             }
-            Err(error) => {
-                error!("Error processing DKG message: {:?}", error);
+            Err(_error) => {
+                // error!("Error processing DKG message: {:?}", error);
             }
         }
 
@@ -189,29 +186,29 @@ impl Session {
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
 
-        trace!(
-            "{} to {:?} targets",
-            LogMarker::DkgBroadcastMsg,
-            messages.len()
-        );
+        // trace!(
+        //     "{} to {:?} targets",
+        //     LogMarker::DkgBroadcastMsg,
+        //     messages.len()
+        // );
 
         let peers = self.peers();
         for (target, message) in messages {
             if target == node.name() {
                 match self.process_msg(node, node.name(), session_id, message.clone(), section_pk) {
                     Ok(result) => cmds.extend(result),
-                    Err(err) => error!(
-                        "Within session {:?}, failed to process DkgMessage {:?} with error {:?}",
-                        session_id, message, err
-                    ),
+                    Err(_err) => (), // error!(
+                                     //     "Within session {:?}, failed to process DkgMessage {:?} with error {:?}",
+                                     //     session_id, message, err
+                                     // ),
                 }
             } else if let Some(peer) = peers.get(&target) {
-                trace!(
-                    "DKG sending {:?} - {:?} to {:?}",
-                    message,
-                    session_id,
-                    target
-                );
+                // trace!(
+                //     "DKG sending {:?} - {:?} to {:?}",
+                //     message,
+                //     session_id,
+                //     target
+                // );
                 let node_msg = SystemMsg::DkgMessage {
                     session_id: *session_id,
                     message: message.clone(),
@@ -226,18 +223,18 @@ impl Session {
                     section_pk,
                 )?;
 
-                trace!(
-                    "DKG sending {:?} with msg_id {:?}",
-                    message,
-                    wire_msg.msg_id()
-                );
+                // trace!(
+                //     "DKG sending {:?} with msg_id {:?}",
+                //     message,
+                //     wire_msg.msg_id()
+                // );
 
                 cmds.push(Cmd::SendMsg {
                     recipients: vec![peer.clone()],
                     wire_msg,
                 });
             } else {
-                error!("Failed to find target {:?} among peers {:?}", target, peers);
+                // error!("Failed to find target {:?} among peers {:?}", target, peers);
             }
         }
 
@@ -254,7 +251,7 @@ impl Session {
             return Ok(vec![]);
         }
 
-        trace!("DKG progressing for {:?}", self.elder_candidates);
+        // trace!("DKG progressing for {:?}", self.elder_candidates);
 
         match self.key_gen.timed_phase_transition(&mut rand::thread_rng()) {
             Ok(messages) => {
@@ -264,8 +261,8 @@ impl Session {
                 cmds.extend(self.check(node, session_id, section_pk)?);
                 Ok(cmds)
             }
-            Err(error) => {
-                trace!("DKG failed for {:?}: {}", self.elder_candidates, error);
+            Err(_error) => {
+                // trace!("DKG failed for {:?}: {}", self.elder_candidates, error);
                 let failed_participants = self.key_gen.possible_blockers();
 
                 self.report_failure(node, session_id, failed_participants, section_pk)
@@ -281,12 +278,12 @@ impl Session {
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
         if self.complete {
-            trace!("{} {:?}", LogMarker::DkgSessionAlreadyCompleted, session_id);
+            // trace!("{} {:?}", LogMarker::DkgSessionAlreadyCompleted, session_id);
             return Ok(vec![]);
         }
 
         if !self.key_gen.is_finalized() {
-            trace!("DKG check: not finalised");
+            // trace!("DKG check: not finalised");
             return Ok(vec![]);
         }
 
@@ -302,11 +299,11 @@ impl Session {
             .copied()
             .eq(self.elder_candidates.names())
         {
-            trace!(
-                "DKG failed due to unexpected participants for {:?}: {:?}",
-                self.elder_candidates,
-                participants.iter().format(", ")
-            );
+            // trace!(
+            //     "DKG failed due to unexpected participants for {:?}: {:?}",
+            //     self.elder_candidates,
+            //     participants.iter().format(", ")
+            // );
 
             let failed_participants: BTreeSet<_> = self
                 .elder_candidates
@@ -326,19 +323,19 @@ impl Session {
             .public_key_share(self.participant_index)
             != outcome.secret_key_share.public_key_share()
         {
-            trace!(
-                "DKG failed due to corrupted outcome for {:?}",
-                self.elder_candidates
-            );
+            // trace!(
+            //     "DKG failed due to corrupted outcome for {:?}",
+            //     self.elder_candidates
+            // );
             return self.report_failure(node, session_id, BTreeSet::new(), section_pk);
         }
 
-        trace!(
-            "{} {:?}: {:?}",
-            LogMarker::DkgSessionComplete,
-            self.elder_candidates,
-            outcome.public_key_set.public_key()
-        );
+        // trace!(
+        //     "{} {:?}: {:?}",
+        //     LogMarker::DkgSessionComplete,
+        //     self.elder_candidates,
+        //     outcome.public_key_set.public_key()
+        // );
 
         self.complete = true;
         let section_auth = SectionAuthorityProvider::from_elder_candidates(
@@ -389,7 +386,7 @@ impl Session {
                     node_msg,
                     section_pk,
                 )?;
-                trace!("{}", LogMarker::DkgSendFailureObservation);
+                // trace!("{}", LogMarker::DkgSendFailureObservation);
                 Cmd::SendMsg {
                     recipients: self.recipients(),
                     wire_msg,
@@ -449,10 +446,10 @@ impl Session {
         cmds.extend(self.check(node, &session_id, section_pk)?);
 
         if !unhandleable.is_empty() {
-            trace!(
-                "Having unhandleables among the msg_history. {:?}",
-                unhandleable
-            );
+            // trace!(
+            //     "Having unhandleables among the msg_history. {:?}",
+            //     unhandleable
+            // );
         }
 
         Ok(cmds)
@@ -490,6 +487,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use eyre::{bail, ContextCompat, Result};
+    use itertools::Itertools;
     use proptest::prelude::*;
     use rand::{rngs::SmallRng, SeedableRng};
     use std::{collections::HashMap, iter, net::SocketAddr};

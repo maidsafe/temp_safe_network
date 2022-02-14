@@ -26,7 +26,7 @@ use crate::messaging::system::{KeyedSig, SectionAuth, SectionPeers as SectionPee
 use crate::node::{dkg::SectionAuthUtils, recommended_section_size, Error, Result};
 use crate::peer::Peer;
 use crate::prefix_map::NetworkPrefixMap;
-use crate::types::log_markers::LogMarker;
+// use crate::types::log_markers::LogMarker;
 use section_peers::SectionPeers;
 
 use bls::PublicKey as BlsPublicKey;
@@ -80,7 +80,7 @@ impl NetworkKnowledge {
 
         // Check the SAP's key is the last key of the section chain
         if signed_sap.sig.public_key != *chain.last_key() {
-            error!("can't create section: SAP signed with incorrect key");
+            // error!("can't create section: SAP signed with incorrect key");
             return Err(Error::UntrustedSectionAuthProvider(format!(
                 "section key doesn't match last key in proof chain: {:?}",
                 signed_sap.value
@@ -127,8 +127,8 @@ impl NetworkKnowledge {
 
         // At this point we know the prefix map corresponds to the correct genesis key,
         // let's make sure the prefix map contains also our own prefix and SAP,
-        if let Err(err) = prefix_map.update(signed_sap.clone(), &chain) {
-            debug!("Failed to update NetworkPrefixMap with SAP {:?} and chain {:?} upon creating new NetworkKnowledge intance: {:?}", signed_sap, chain, err);
+        if let Err(_err) = prefix_map.update(signed_sap.clone(), &chain) {
+            // debug!("Failed to update NetworkPrefixMap with SAP {:?} and chain {:?} upon creating new NetworkKnowledge intance: {:?}", signed_sap, chain, err);
         }
 
         Ok(Self {
@@ -143,7 +143,7 @@ impl NetworkKnowledge {
 
     /// update all section info for our new section
     pub(super) async fn relocated_to(&self, new_network_nowledge: Self) -> Result<()> {
-        debug!("Node was relocated to {:?}", new_network_nowledge);
+        // debug!("Node was relocated to {:?}", new_network_nowledge);
 
         let mut chain = self.chain.write().await;
         *chain = new_network_nowledge.section_chain().await;
@@ -227,34 +227,34 @@ impl NetworkKnowledge {
                             .await;
 
                         // Let's then update our current SAP and section chain
-                        let our_prev_prefix = self.prefix().await;
+                        let _our_prev_prefix = self.prefix().await;
                         *self.signed_sap.write().await = signed_sap.clone();
                         *self.chain.write().await = section_chain;
 
-                        info!(
-                            "Switched our section's SAP ({:?} to {:?}) with new one: {:?}",
-                            our_prev_prefix, prefix, signed_sap
-                        );
+                        // info!(
+                        //     "Switched our section's SAP ({:?} to {:?}) with new one: {:?}",
+                        //     our_prev_prefix, prefix, signed_sap
+                        // );
 
                         true
                     }
-                    Err(err) => {
-                        trace!(
-                            "We couldn't find section chain for {:?} and section key {:?}: {:?}",
-                            prefix,
-                            section_key,
-                            err
-                        );
+                    Err(_err) => {
+                        // trace!(
+                        //     "We couldn't find section chain for {:?} and section key {:?}: {:?}",
+                        //     prefix,
+                        //     section_key,
+                        //     err
+                        // );
                         false
                     }
                 }
             }
             Some(_) | None => {
-                trace!(
-                    "We yet don't have the signed SAP for {:?} and section key {:?}",
-                    prefix,
-                    section_key
-                );
+                // trace!(
+                //     "We yet don't have the signed SAP for {:?} and section key {:?}",
+                //     prefix,
+                //     section_key
+                // );
                 false
             }
         }
@@ -283,10 +283,10 @@ impl NetworkKnowledge {
         ) {
             Ok(true) => {
                 there_was_an_update = true;
-                debug!(
-                    "Anti-Entropy: updated network prefix map with SAP for {:?}",
-                    provided_sap.prefix()
-                );
+                // debug!(
+                //     "Anti-Entropy: updated network prefix map with SAP for {:?}",
+                //     provided_sap.prefix()
+                // );
 
                 // Join the proof chain to our DAG since it's a new SAP
                 // thus it shall extend some branch/chain.
@@ -315,23 +315,23 @@ impl NetworkKnowledge {
                         .is_ok();
                 }
 
-                trace!(
-                    "we_are_an_adult: {we_are_an_adult},we_have_a_share_of_this_key{we_have_a_share_of_this_key}"
-                );
+                // trace!(
+                //     "we_are_an_adult: {we_are_an_adult},we_have_a_share_of_this_key{we_have_a_share_of_this_key}"
+                // );
 
                 // if we're an adult, we accept the validated sap
                 // if we have a keyshare, we're an eder and we shoud continue with this validated sap
                 let switch_to_new_sap = we_are_an_adult || we_have_a_share_of_this_key;
 
-                trace!(
-                    "update_knowledge_if_valid: will switch_to_new_sap {:?}",
-                    switch_to_new_sap
-                );
+                // trace!(
+                //     "update_knowledge_if_valid: will switch_to_new_sap {:?}",
+                //     switch_to_new_sap
+                // );
 
                 // if we're not an adult, but we don't have a key share...
                 // something is wrong
                 if !we_are_an_adult && !we_have_a_share_of_this_key {
-                    error!("We should be an elder, but we're missing the keyshare!");
+                    // error!("We should be an elder, but we're missing the keyshare!");
                 }
 
                 // We try to update our SAP and own chain only if we were flagged to,
@@ -339,15 +339,15 @@ impl NetworkKnowledge {
                 // the key share for the new SAP, making this node unable to sign section messages
                 // and possibly being kicked out of the group of Elders.
                 if switch_to_new_sap && provided_sap.prefix().matches(our_name) {
-                    let our_prev_prefix = self.prefix().await;
+                    let _our_prev_prefix = self.prefix().await;
                     // Remove any peer which doesn't belong to our new section's prefix
                     self.section_peers.retain(&provided_sap.prefix());
-                    info!(
-                        "Updated our section's SAP ({:?} to {:?}) with new one: {:?}",
-                        our_prev_prefix,
-                        provided_sap.prefix(),
-                        provided_sap
-                    );
+                    // info!(
+                    //     "Updated our section's SAP ({:?} to {:?}) with new one: {:?}",
+                    //     our_prev_prefix,
+                    //     provided_sap.prefix(),
+                    //     provided_sap
+                    // );
 
                     let section_chain = self
                         .all_sections_chains
@@ -366,16 +366,16 @@ impl NetworkKnowledge {
                 }
             }
             Ok(false) => {
-                debug!(
-                    "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
-                    provided_sap.prefix(), provided_sap
-                );
+                // debug!(
+                //     "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
+                //     provided_sap.prefix(), provided_sap
+                // );
             }
-            Err(err) => {
-                debug!(
-                    "Anti-Entropy: discarded SAP for {:?} since we failed to update prefix map with: {:?}",
-                    provided_sap.prefix(), err
-                );
+            Err(_err) => {
+                // debug!(
+                //     "Anti-Entropy: discarded SAP for {:?} since we failed to update prefix map with: {:?}",
+                //     provided_sap.prefix(), err
+                // );
             }
         }
 
@@ -387,11 +387,11 @@ impl NetworkKnowledge {
                 .collect();
 
             if self.merge_members(peers).await? {
-                let prefix = self.prefix().await;
-                info!(
-                    "Updated our section's members ({:?}): {:?}",
-                    prefix, self.section_peers
-                );
+                // let prefix = self.prefix().await;
+                // info!(
+                //     "Updated our section's members ({:?}): {:?}",
+                //     prefix, self.section_peers
+                // );
             }
         }
 
@@ -446,17 +446,17 @@ impl NetworkKnowledge {
         let chain = self.chain.read().await.clone();
 
         for node_state in peers.iter() {
-            trace!(
-                "Updating section members. Name: {:?}, new state: {:?}",
-                node_state.name(),
-                node_state.state()
-            );
+            // trace!(
+            //     "Updating section members. Name: {:?}, new state: {:?}",
+            //     node_state.name(),
+            //     node_state.state()
+            // );
             if !node_state.verify(&chain) {
-                error!(
-                    "Can't update section member, name: {:?}, new state: {:?}",
-                    node_state.name(),
-                    node_state.state()
-                );
+                // error!(
+                //     "Can't update section member, name: {:?}, new state: {:?}",
+                //     node_state.name(),
+                //     node_state.state()
+                // );
             } else if self.section_peers.update(node_state.clone()) {
                 there_was_an_update = true;
             }
@@ -469,30 +469,30 @@ impl NetworkKnowledge {
 
     /// Update the member. Returns whether it actually updated it.
     pub(super) async fn update_member(&self, node_state: SectionAuth<NodeState>) -> bool {
-        let node_name = node_state.name();
-        trace!(
-            "Updating section member state, name: {:?}, new state: {:?}",
-            node_name,
-            node_state.state()
-        );
+        // let node_name = node_state.name();
+        // trace!(
+        //     "Updating section member state, name: {:?}, new state: {:?}",
+        //     node_name,
+        //     node_state.state()
+        // );
         // let's check the node state is properly signed by one of the keys in our chain
         if !node_state.verify(&*self.chain.read().await) {
-            error!(
-                "Can't update section member, name: {:?}, new state: {:?}",
-                node_name,
-                node_state.state()
-            );
+            // error!(
+            //     "Can't update section member, name: {:?}, new state: {:?}",
+            //     node_name,
+            //     node_state.state()
+            // );
             return false;
         }
 
-        let updated = self.section_peers.update(node_state);
-        trace!(
-            "Section member state, name: {:?}, updated: {}",
-            node_name,
-            updated
-        );
+        self.section_peers.update(node_state)
+        // trace!(
+        //     "Section member state, name: {:?}, updated: {}",
+        //     node_name,
+        //     updated
+        // );
 
-        updated
+        // updated
     }
 
     /// Return a copy of our section chain
@@ -562,27 +562,25 @@ impl NetworkKnowledge {
         let expected_peers =
             self.section_peers
                 .elder_candidates(elder_count(), &sap, excluded_names, None);
-        info!(
-            ">>>> ELDER CANDIDATES {}: {:?}",
-            expected_peers.len(),
-            expected_peers
-        );
+        // info!(
+        //     ">>>> ELDER CANDIDATES {}: {:?}",
+        //     expected_peers.len(),
+        //     expected_peers
+        // );
         let expected_names: BTreeSet<_> = expected_peers.iter().map(Peer::name).collect();
         let current_names: BTreeSet<_> = sap.names();
 
-        if expected_names == current_names {
-            vec![]
-        } else if expected_names.len() < crate::node::supermajority(current_names.len()) {
-            warn!("ignore attempt to reduce the number of elders too much");
-            vec![]
-        } else if expected_names.len() < current_names.len() {
+        if expected_names == current_names
+            || expected_names.len() < crate::node::supermajority(current_names.len())
+            || expected_names.len() < current_names.len()
+        {
             // Could be due to the newly promoted elder doesn't have enough knowledge of
             // existing members.
-            warn!("Ignore attempt to shrink the elders");
-            trace!("current_names  {:?}", current_names);
-            trace!("expected_names {:?}", expected_names);
-            trace!("excluded_names {:?}", excluded_names);
-            trace!("section_peers {:?}", self.section_peers);
+            // warn!("Ignore attempt to shrink the elders");
+            // trace!("current_names  {:?}", current_names);
+            // trace!("expected_names {:?}", expected_names);
+            // trace!("excluded_names {:?}", excluded_names);
+            // trace!("section_peers {:?}", self.section_peers);
             vec![]
         } else {
             let elder_candidates = ElderCandidates::new(sap.prefix(), expected_peers);
@@ -694,19 +692,19 @@ impl NetworkKnowledge {
         our_name: &XorName,
         excluded_names: &BTreeSet<XorName>,
     ) -> Option<(ElderCandidates, ElderCandidates)> {
-        trace!("{}", LogMarker::SplitAttempt);
+        // trace!("{}", LogMarker::SplitAttempt);
         if self.authority_provider().await.elder_count() < elder_count() {
-            trace!("No attempt to split as our section does not have enough elders.");
+            // trace!("No attempt to split as our section does not have enough elders.");
             return None;
         }
 
-        let (prefix_next_bit, our_new_size, sibling_new_size) =
+        let (prefix_next_bit, _our_new_size, _sibling_new_size) =
             self.get_split_info(our_name, excluded_names).await?;
 
-        debug!(
-            "Upon section split attempt: our section size {:?}, theirs {:?}",
-            our_new_size, sibling_new_size
-        );
+        // debug!(
+        //     "Upon section split attempt: our section size {:?}, theirs {:?}",
+        //     our_new_size, sibling_new_size
+        // );
 
         let sap = self.authority_provider().await;
 
@@ -743,7 +741,7 @@ impl NetworkKnowledge {
                 (index, prefix_next_bit)
             } else {
                 // Already at the longest prefix, can't split further.
-                warn!("We cannot split as we are at longest prefix possible");
+                // warn!("We cannot split as we are at longest prefix possible");
                 return None;
             };
 

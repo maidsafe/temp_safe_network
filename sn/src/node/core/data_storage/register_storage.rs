@@ -32,7 +32,7 @@ use std::{
     sync::Arc,
 };
 use tokio::sync::RwLock;
-use tracing::info;
+// use tracing::info;
 #[cfg(test)]
 use xor_name::Prefix;
 use xor_name::{XorName, XOR_NAME_LEN};
@@ -85,7 +85,7 @@ impl RegisterStorage {
     /// These are node internal functions, not to be exposed to users.
 
     pub(crate) async fn remove_register(&self, address: &Address) -> Result<()> {
-        trace!("Removing register, {:?}", address);
+        // trace!("Removing register, {:?}", address);
         self.drop_register_key(address.id()?).await
     }
 
@@ -115,9 +115,9 @@ impl RegisterStorage {
             .partition(|r| r.is_ok());
 
         if !err.is_empty() {
-            for e in err {
-                error!("{:?}", e);
-            }
+            // for e in err {
+            //     error!("{:?}", e);
+            // }
             return Err(Error::CouldNotConvertDbKey);
         }
 
@@ -169,7 +169,7 @@ impl RegisterStorage {
                         // TODO 1: in higher layers we must verify that the section_auth is from a proper section..!
                         // TODO 2: Enable this check once we have section signature over the container key.
                         // if section_auth.verify_authority(key).is_err() {
-                        //     warn!("Invalid section auth on register container: {}", key);
+                        //    // warn!("Invalid section auth on register container: {}", key);
                         //     return None;
                         // }
                         address = Some(cmd.dst_address());
@@ -177,29 +177,26 @@ impl RegisterStorage {
                     RegisterCmd::Edit(SignedRegisterEdit { op, auth }) => {
                         let verification = auth.verify_authority(serialize(&op).ok()?);
                         if verification.is_err() {
-                            error!(
-                                "Invalid signature found for a cmd stored in db: {:?}",
-                                stored_cmd
-                            );
+                            // error!(
+                            //     "Invalid signature found for a cmd stored in db: {:?}",
+                            //     stored_cmd
+                            // );
                             return None;
                         }
                     }
                     RegisterCmd::Delete(SignedRegisterDelete { op, auth }) => {
                         let verification = auth.verify_authority(serialize(&op).ok()?);
                         if verification.is_err() {
-                            error!(
-                                "Invalid signature found for cmd stored in db: {:?}",
-                                stored_cmd
-                            );
+                            // error!(
+                            //     "Invalid signature found for cmd stored in db: {:?}",
+                            //     stored_cmd
+                            // );
                             return None;
                         }
                     }
                     RegisterCmd::Extend { section_auth, .. } => {
                         // TODO: in higher layers we must verify that the section_auth is from a proper section..!
-                        if section_auth.verify_authority(key).is_err() {
-                            warn!("Invalid section auth on register container: {}", key);
-                            return None;
-                        }
+                        let _ = section_auth.verify_authority(key).ok()?;
                     }
                 };
                 Some(stored_cmd)
@@ -240,9 +237,9 @@ impl RegisterStorage {
             .partition(|r| r.is_ok());
 
         if !err.is_empty() {
-            for e in err {
-                error!("{:?}", e);
-            }
+            // for e in err {
+            //     error!("{:?}", e);
+            // }
             return Err(Error::CouldNotConvertDbKey);
         }
 
@@ -267,19 +264,19 @@ impl RegisterStorage {
 
     /// On receiving data from Elders when promoted.
     pub(crate) async fn update(&self, store_data: RegisterStoreExport) -> Result<()> {
-        debug!("Updating Register store");
+        // debug!("Updating Register store");
 
         let RegisterStoreExport(registers) = store_data;
 
         // nested loops, slow..
         for data in registers {
-            let key = data.address.id()?;
+            // let key = data.address.id()?;
             for replicated_cmd in data.op_log {
                 if replicated_cmd.dst_address() != data.address {
-                    warn!(
-                        "Corrupt ReplicatedRegisterLog, op log contains foreign ops: {}",
-                        key
-                    );
+                    // warn!(
+                    //     "Corrupt ReplicatedRegisterLog, op log contains foreign ops: {}",
+                    //     key
+                    // );
                     continue;
                 }
                 let _ = self.apply(replicated_cmd).await?;
@@ -332,7 +329,7 @@ impl RegisterStorage {
 
                 // only inserts if no value existed - which is denoted by passing in `None` as old_value
                 match self.key_db.compare_and_swap(key, old_value, new_value)? {
-                    Ok(()) => trace!("Creating new register"),
+                    Ok(()) => (), // trace!("Creating new register"),
                     Err(sled::CompareAndSwapError { .. }) => return Err(Error::DataExists),
                 }
 
@@ -352,7 +349,7 @@ impl RegisterStorage {
 
                 let entry = self.try_load_cache_entry(&key).await?;
 
-                info!("Editing Register");
+                // info!("Editing Register");
                 entry
                     .state
                     .read()
@@ -368,9 +365,9 @@ impl RegisterStorage {
                 if result.is_ok() {
                     entry.store.append(cmd)?;
                     self.used_space.increase(required_space);
-                    trace!("Editing Register success!");
+                    // trace!("Editing Register success!");
                 } else {
-                    trace!("Editing Register failed!");
+                    // trace!("Editing Register failed!");
                 }
 
                 result
@@ -389,7 +386,7 @@ impl RegisterStorage {
 
                 match self.try_load_cache_entry(&key).await {
                     Err(Error::KeyNotFound(_)) => {
-                        trace!("Register was already deleted, or never existed..");
+                        // trace!("Register was already deleted, or never existed..");
                         Ok(())
                     }
                     Ok(entry) => {
@@ -399,7 +396,7 @@ impl RegisterStorage {
                         if User::Key(public_key) != read_only.owner() {
                             Err(Error::InvalidOwner(public_key))
                         } else {
-                            info!("Deleting Register");
+                            // info!("Deleting Register");
                             self.drop_register_key(key).await?;
                             Ok(())
                         }
@@ -427,14 +424,14 @@ impl RegisterStorage {
                 entry.store.append(cmd)?;
 
                 let mut write = entry.state.write().await;
-                let prev = write.cap();
+                // let prev = write.cap();
                 write.increment_cap(extend_with);
 
-                info!(
-                    "Extended Register size from {} to {}",
-                    prev,
-                    prev + extend_with,
-                );
+                // info!(
+                //     "Extended Register size from {} to {}",
+                //     prev,
+                //     prev + extend_with,
+                // );
 
                 self.used_space.increase(required_space);
                 Ok(())
@@ -445,14 +442,14 @@ impl RegisterStorage {
     /// --- Reading ---
 
     pub(crate) async fn read(&self, read: &RegisterQuery, requester: User) -> NodeQueryResponse {
-        trace!("Reading register {:?}", read.dst_address());
+        // trace!("Reading register {:?}", read.dst_address());
         let operation_id = match read.operation_id() {
             Ok(id) => id,
             Err(_e) => {
                 return NodeQueryResponse::FailedToCreateOperationId;
             }
         };
-        trace!("Operation of register read: {:?}", operation_id);
+        // trace!("Operation of register read: {:?}", operation_id);
         use RegisterQuery::*;
         match read {
             Get(address) => self.get(*address, requester, operation_id).await,
@@ -651,7 +648,7 @@ impl RegisterStorage {
                         CreateRegister::Populated(instance) => {
                             if instance.size() > (u16::MAX as u64) {
                                 // this would mean the instance has been modified on disk outside of the software
-                                warn!("Data corruption! Encountered stored register with {} entries, wich is larger than max size of {}", instance.size(), u16::MAX);
+                                // warn!("Data corruption! Encountered stored register with {} entries, wich is larger than max size of {}", instance.size(), u16::MAX);
                             }
                             Some((instance, section_auth))
                         }

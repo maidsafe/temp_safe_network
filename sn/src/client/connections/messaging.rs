@@ -33,7 +33,7 @@ use tokio::{
     sync::RwLock,
     task::JoinHandle,
 };
-use tracing::{debug, error, trace, warn};
+// use tracing::{debug, error, trace, warn};
 use xor_name::XorName;
 
 // Number of Elders subset to send queries to
@@ -57,7 +57,7 @@ impl Session {
         cmd_ack_wait: Duration,
         prefix_map: NetworkPrefixMap,
     ) -> Result<Session, Error> {
-        trace!("Trying to bootstrap to the network");
+        // trace!("Trying to bootstrap to the network");
 
         let endpoint = Endpoint::new_client(local_addr, qp2p_config)?;
 
@@ -84,7 +84,7 @@ impl Session {
         payload: Bytes,
         targets_count: usize,
     ) -> Result<(), Error> {
-        let endpoint = self.endpoint.clone();
+        // let endpoint = self.endpoint.clone();
         // TODO: Consider other approach: Keep a session per section!
 
         // Get DataSection elders details.
@@ -92,7 +92,7 @@ impl Session {
             if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
                 let sap_elders = sap.elders_vec();
 
-                trace!("SAP elders found {:?}", sap_elders);
+                // trace!("SAP elders found {:?}", sap_elders);
 
                 (sap_elders, sap.section_key())
             } else {
@@ -103,7 +103,7 @@ impl Session {
 
         // any SAP that does not hold elders_count() is indicative of a broken network (after genesis)
         if elders.len() < elder_count() {
-            error!("Insufficient knowledge to send to {:?}", dst_address);
+            // error!("Insufficient knowledge to send to {:?}", dst_address);
             return Err(Error::InsufficientElderKnowledge {
                 connections: elders.len(),
                 required: targets_count,
@@ -115,13 +115,13 @@ impl Session {
         // now we use only the required count
         let elders: Vec<_> = elders.into_iter().take(targets_count).collect();
 
-        debug!(
-            "Sending cmd w/id {:?}, from {}, to {} Elders w/ dst: {:?}",
-            msg_id,
-            endpoint.public_addr(),
-            elders.len(),
-            dst_address
-        );
+        // debug!(
+        //     "Sending cmd w/id {:?}, from {}, to {} Elders w/ dst: {:?}",
+        //     msg_id,
+        //     endpoint.public_addr(),
+        //     elders.len(),
+        //     dst_address
+        // );
 
         let dst_location = DstLocation::Section {
             name: dst_address,
@@ -134,7 +134,7 @@ impl Session {
         // The insertion of channel will be executed AFTER the completion of the `send_message`.
         let (sender, mut receiver) = channel::<CmdResponse>(targets_count);
         let _ = self.pending_cmds.insert(msg_id, sender);
-        trace!("Inserted channel for cmd {:?}", msg_id);
+        // trace!("Inserted channel for cmd {:?}", msg_id);
 
         let res = send_msg(
             self.clone(),
@@ -162,28 +162,28 @@ impl Session {
             std::cmp::max(10, self.cmd_ack_wait.as_millis() / interval.as_millis());
         loop {
             match receiver.try_recv() {
-                Ok((src, None)) => {
+                Ok((_src, None)) => {
                     received_ack += 1;
-                    trace!(
-                        "received CmdAck of {:?} from {:?}, so far {:?} / {:?}",
-                        msg_id,
-                        src,
-                        received_ack,
-                        expected_acks
-                    );
+                    // trace!(
+                    //     "received CmdAck of {:?} from {:?}, so far {:?} / {:?}",
+                    //     msg_id,
+                    //     src,
+                    //     received_ack,
+                    //     expected_acks
+                    // );
                     if received_ack >= expected_acks {
                         let _ = self.pending_cmds.remove(&msg_id);
                         break;
                     }
                 }
-                Ok((src, Some(error))) => {
+                Ok((_src, Some(error))) => {
                     received_err += 1;
-                    error!(
-                        "received error response {:?} of cmd {:?} from {:?}, so far {:?} vs. {:?}",
-                        error, msg_id, src, received_ack, received_err
-                    );
+                    // error!(
+                    //     "received error response {:?} of cmd {:?} from {:?}, so far {:?} vs. {:?}",
+                    //     error, msg_id, src, received_ack, received_err
+                    // );
                     if received_err >= expected_acks {
-                        error!("Received majority of error response for cmd {:?}", msg_id);
+                        // error!("Received majority of error response for cmd {:?}", msg_id);
                         let _ = self.pending_cmds.remove(&msg_id);
                         return Err(Error::from((error, msg_id)));
                     }
@@ -194,21 +194,21 @@ impl Session {
             }
             attempts += 1;
             if attempts >= expected_cmd_ack_wait_attempts {
-                warn!(
-                    "Terminated with insufficient CmdAcks for {:?}, {:?} / {:?} acks received",
-                    msg_id, received_ack, expected_acks
-                );
+                // warn!(
+                //     "Terminated with insufficient CmdAcks for {:?}, {:?} / {:?} acks received",
+                //     msg_id, received_ack, expected_acks
+                // );
                 break;
             }
-            trace!(
-                "current attempt {:?}/{:?}",
-                attempts,
-                expected_cmd_ack_wait_attempts
-            );
+            // trace!(
+            //     "current attempt {:?}/{:?}",
+            //     attempts,
+            //     expected_cmd_ack_wait_attempts
+            // );
             tokio::time::sleep(interval).await;
         }
 
-        trace!("Wait for any cmd response/reaction (AE msgs eg), is over)");
+        // trace!("Wait for any cmd response/reaction (AE msgs eg), is over)");
         res
     }
 
@@ -256,20 +256,20 @@ impl Session {
 
         let msg_id = MsgId::new();
 
-        debug!(
-            "Sending query message {:?}, msg_id: {:?}, from {}, to the {} Elders closest to data name: {:?}",
-            query,
-            msg_id,
-            endpoint.public_addr(),
-            elders_len,
-            chosen_elders
-        );
+        // debug!(
+        //     "Sending query message {:?}, msg_id: {:?}, from {}, to the {} Elders closest to data name: {:?}",
+        //     query,
+        //     msg_id,
+        //     endpoint.public_addr(),
+        //     elders_len,
+        //     chosen_elders
+        // );
 
         let (sender, mut receiver) = channel::<QueryResponse>(7);
 
         if let Ok(op_id) = query.operation_id() {
             // Insert the response sender
-            trace!("Inserting channel for op_id {:?}", (msg_id, op_id));
+            // trace!("Inserting channel for op_id {:?}", (msg_id, op_id));
             if let Some(mut entry) = self.pending_queries.get_mut(&op_id) {
                 let senders_vec = entry.value_mut();
                 senders_vec.push((msg_id, sender))
@@ -277,9 +277,9 @@ impl Session {
                 let _nonexistant_entry = self.pending_queries.insert(op_id, vec![(msg_id, sender)]);
             }
 
-            trace!("Inserted channel for {:?}", op_id);
+            // trace!("Inserted channel for {:?}", op_id);
         } else {
-            warn!("No op_id found for query");
+            // warn!("No op_id found for query");
         }
 
         let dst_location = DstLocation::Section {
@@ -316,15 +316,15 @@ impl Session {
                 (Some(QueryResponse::GetChunk(Ok(chunk))), Some(chunk_addr)) => {
                     // We are dealing with Chunk query responses, thus we validate its hash
                     // matches its xorname, if so, we don't need to await for more responses
-                    debug!("Chunk QueryResponse received is: {:#?}", chunk);
+                    // debug!("Chunk QueryResponse received is: {:#?}", chunk);
 
                     if chunk_addr.name() == chunk.name() {
-                        trace!("Valid Chunk received for {:?}", msg_id);
+                        // trace!("Valid Chunk received for {:?}", msg_id);
                         break Some(QueryResponse::GetChunk(Ok(chunk)));
                     } else {
                         // the Chunk content doesn't match its XorName,
                         // this is suspicious and it could be a byzantine node
-                        warn!("We received an invalid Chunk response from one of the nodes");
+                        // warn!("We received an invalid Chunk response from one of the nodes");
                         discarded_responses += 1;
                     }
                 }
@@ -337,16 +337,16 @@ impl Session {
                 | (response @ Some(QueryResponse::GetRegisterOwner((Err(_), _))), None)
                 | (response @ Some(QueryResponse::GetRegisterUserPermissions((Err(_), _))), None) =>
                 {
-                    debug!("QueryResponse error received (but may be overridden by a non-error response from another elder): {:#?}", &response);
+                    // debug!("QueryResponse error received (but may be overridden by a non-error response from another elder): {:#?}", &response);
                     error_response = response;
                     discarded_responses += 1;
                 }
                 (Some(response), _) => {
-                    debug!("QueryResponse received is: {:#?}", response);
+                    // debug!("QueryResponse received is: {:#?}", response);
                     break Some(response);
                 }
                 (None, _) => {
-                    debug!("QueryResponse channel closed.");
+                    // debug!("QueryResponse channel closed.");
                     break None;
                 }
             }
@@ -355,15 +355,15 @@ impl Session {
             }
         };
 
-        debug!(
-            "Response obtained for query w/id {:?}: {:?}",
-            msg_id, response
-        );
+        // debug!(
+        //     "Response obtained for query w/id {:?}: {:?}",
+        //     msg_id, response
+        // );
 
         if let Some(query) = &response {
             if let Ok(query_op_id) = query.operation_id() {
                 // Remove the response sender
-                trace!("Removing channel for {:?}", (msg_id, &query_op_id));
+                // trace!("Removing channel for {:?}", (msg_id, &query_op_id));
                 // let _old_channel =
                 if let Some(mut entry) = self.pending_queries.get_mut(&query_op_id) {
                     let listeners_for_op = entry.value_mut();
@@ -374,7 +374,7 @@ impl Session {
                         let _old_listener = listeners_for_op.swap_remove(index);
                     }
                 } else {
-                    warn!("No listeners found for our op_id: {:?}", query_op_id)
+                    // warn!("No listeners found for our op_id: {:?}", query_op_id)
                 }
             }
         }
@@ -401,7 +401,7 @@ impl Session {
         auth: ServiceAuth,
         payload: Bytes,
     ) -> Result<(), Error> {
-        let endpoint = self.endpoint.clone();
+        // let endpoint = self.endpoint.clone();
         // Get DataSection elders details.
         // TODO: we should be able to handle using an pre-existing prefixmap. This is here for when that's in place.
         let (elders_or_adults, section_pk) =
@@ -418,13 +418,13 @@ impl Session {
 
         let msg_id = MsgId::new();
 
-        debug!(
-            "Making initial contact with nodes. Our PublicAddr: {:?}. Using {:?} to {} nodes: {:?}",
-            endpoint.public_addr(),
-            msg_id,
-            elders_or_adults.len(),
-            elders_or_adults
-        );
+        // debug!(
+        //     "Making initial contact with nodes. Our PublicAddr: {:?}. Using {:?} to {} nodes: {:?}",
+        //     endpoint.public_addr(),
+        //     msg_id,
+        //     elders_or_adults.len(),
+        //     elders_or_adults
+        // );
 
         // TODO: Don't use genesis key if we have a full section
         let dst_location = DstLocation::Section {
@@ -471,7 +471,7 @@ impl Session {
 
         // If we start with genesis key here, we should wait until we have _at least_ one AE-Retry in
         if section_pk == self.genesis_key {
-            info!("On client startup, awaiting some network knowledge");
+            // info!("On client startup, awaiting some network knowledge");
 
             let mut known_sap = self.network.closest_or_opposite(&dst_address, None);
 
@@ -489,8 +489,8 @@ impl Session {
                     return Err(Error::NetworkContact);
                 }
 
-                let stats = self.network.known_sections_count();
-                debug!("Client still has not received a complete section's AE-Retry message... Current sections known: {:?}. Do we have insufficient peers: {:?}", stats, insufficient_sap_peers);
+                // let stats = self.network.known_sections_count();
+                // debug!("Client still has not received a complete section's AE-Retry message... Current sections known: {:?}. Do we have insufficient peers: {:?}", stats, insufficient_sap_peers);
                 knowledge_checks += 1;
 
                 // only after a couple of waits do we try contacting more nodes...
@@ -533,7 +533,7 @@ impl Session {
                             .to_vec()
                     };
 
-                    trace!("Sending out another batch of initial contact msgs to new nodes");
+                    // trace!("Sending out another batch of initial contact msgs to new nodes");
                     send_msg(
                         self.clone(),
                         next_contacts,
@@ -544,10 +544,10 @@ impl Session {
                     .await?;
 
                     let next_wait = backoff.next_backoff();
-                    trace!(
-                        "Awaiting a duration of {:?} before trying new nodes",
-                        next_wait
-                    );
+                    // trace!(
+                    //     "Awaiting a duration of {:?} before trying new nodes",
+                    //     next_wait
+                    // );
 
                     // wait here to give a chance for AE responses to come in and be parsed
                     if let Some(wait) = next_wait {
@@ -556,19 +556,19 @@ impl Session {
 
                     known_sap = self.network.closest_or_opposite(&dst_address, None);
 
-                    debug!("Known sap: {known_sap:?}");
+                    // debug!("Known sap: {known_sap:?}");
                     insufficient_sap_peers = false;
                     if let Some(sap) = known_sap.clone() {
                         if sap.elders_vec().len() < elder_count() {
-                            debug!("Known elders: {:?}", sap.elders_vec().len());
+                            // debug!("Known elders: {:?}", sap.elders_vec().len());
                             insufficient_sap_peers = true;
                         }
                     }
                 }
             }
 
-            let stats = self.network.known_sections_count();
-            debug!("Client has received updated network knowledge. Current sections known: {:?}. Sap for our startup-query: {:?}", stats, known_sap);
+            // let stats = self.network.known_sections_count();
+            // debug!("Client has received updated network knowledge. Current sections known: {:?}. Sap for our startup-query: {:?}", stats, known_sap);
         }
 
         Ok(())
@@ -582,7 +582,7 @@ pub(super) fn mark_connection_id_as_failed(
     peer_name: XorName,
     connection_id: usize,
 ) {
-    trace!("Marking connection id as failed: {:?}", connection_id);
+    // trace!("Marking connection id as failed: {:?}", connection_id);
     let prev = session.elder_last_closed_connections.remove(&peer_name);
 
     let new_failed_conns = if let Some((_name, mut conns)) = prev {
@@ -602,7 +602,7 @@ pub(super) async fn send_msg(
     elders: Vec<Peer>,
     wire_msg: WireMsg,
     endpoint: Endpoint,
-    msg_id: MsgId,
+    _msg_id: MsgId,
 ) -> Result<(), Error> {
     let priority = wire_msg.clone().into_msg()?.priority();
 
@@ -630,54 +630,54 @@ pub(super) async fn send_msg(
             .get(&peer_name)
             .map(|entry| entry.value().clone());
 
-        let task_handle: JoinHandle<(XorName, usize, Result<(), Error>)> = tokio::spawn(
-            async move {
+        let task_handle: JoinHandle<(XorName, usize, Result<(), Error>)> =
+            tokio::spawn(async move {
                 let connection = peer
-                        .ensure_connection(
-                            |connection| {
-                                // Some(connection.id()) !=
-                                if let Some(failed_connection_ids) = failed_connection_ids.clone() {
-                                    !failed_connection_ids.contains(&connection.id())
-                                }
-                                else {
-                                    true
-                                }
-                            },
-                            |addr| {
-                                reused_connection = false;
-                                async move {
-                                    trace!(
-                                        "Prior connection no longer valid, opening a new connection to: {:?} ",
-                                        addr
-                                    );
-                                    let (connection, connection_incoming) = endpoint.connect_to(&addr).await?;
-                                    let conn_id = connection.id();
-                                    Session::spawn_msg_listener_thread(
-                                        session.clone(),
-                                        conn_id,
-                                        cloned_peer,
-                                        connection_incoming,
-                                    );
-                                    Ok(connection)
-                                }
-                            },
-                        )
-                        .await;
+                    .ensure_connection(
+                        |connection| {
+                            // Some(connection.id()) !=
+                            if let Some(failed_connection_ids) = failed_connection_ids.clone() {
+                                !failed_connection_ids.contains(&connection.id())
+                            } else {
+                                true
+                            }
+                        },
+                        |addr| {
+                            reused_connection = false;
+                            async move {
+                                // trace!(
+                                //     "Prior connection no longer valid, opening a new connection to: {:?} ",
+                                //     addr
+                                // );
+                                let (connection, connection_incoming) =
+                                    endpoint.connect_to(&addr).await?;
+                                let conn_id = connection.id();
+                                Session::spawn_msg_listener_thread(
+                                    session.clone(),
+                                    conn_id,
+                                    cloned_peer,
+                                    connection_incoming,
+                                );
+                                Ok(connection)
+                            }
+                        },
+                    )
+                    .await;
 
                 let connection_id = match connection {
                     Ok(conn) => conn.id(),
                     Err(err) => {
-                        warn!("Failed to get connection_id of {:?} {:?}", peer_name, err);
+                        // warn!("Failed to get connection_id of {:?} {:?}", peer_name, err);
                         return (peer_name, 0, Err(Error::from(err)));
                     }
                 };
 
                 if reused_connection {
-                    trace!(
-                        connection_id,
-                        src = %peer.addr(),
-                        "Client::ConnectionReused",
-                    );
+                    // trace!(
+                    //     connection_id,
+                    //     src = %peer.addr(),
+                    //     "Client::ConnectionReused",
+                    // );
                 }
 
                 let connection = peer.connection().await;
@@ -691,15 +691,14 @@ pub(super) async fn send_msg(
                             .map_err(Error::from),
                     )
                 } else {
-                    warn!("Peer connection did not exist, even after using 'ensure_connection'. Message to {:?} was not sent.",peer);
+                    // warn!("Peer connection did not exist, even after using 'ensure_connection'. Message to {:?} was not sent.",peer);
                     (
                         peer_name,
                         connection_id,
                         Err(Error::PeerConnection(peer.addr())),
                     )
                 }
-            },
-        );
+            });
 
         tasks.push(task_handle);
     }
@@ -713,10 +712,10 @@ pub(super) async fn send_msg(
                 Err(Error::QuicP2pSend(SendError::ConnectionLost(ConnectionError::Closed(
                     Close::Application { reason, error_code },
                 )))) => {
-                    warn!(
-                        "Connection was closed by the node: {:?}",
-                        String::from_utf8(reason.to_vec())
-                    );
+                    // warn!(
+                    //     "Connection was closed by the node: {:?}",
+                    //     String::from_utf8(reason.to_vec())
+                    // );
 
                     mark_connection_id_as_failed(session.clone(), peer_name, connection_id);
                     last_error = Some(Error::QuicP2pSend(SendError::ConnectionLost(
@@ -724,19 +723,19 @@ pub(super) async fn send_msg(
                     )));
                 }
                 Err(Error::QuicP2pSend(SendError::ConnectionLost(error))) => {
-                    warn!("Connection was lost: {:?}", error);
+                    // warn!("Connection was lost: {:?}", error);
 
                     mark_connection_id_as_failed(session.clone(), peer_name, connection_id);
                     last_error = Some(Error::QuicP2pSend(SendError::ConnectionLost(error)));
                 }
                 Err(error) => {
-                    warn!("Issue during {:?} send: {:?}", msg_id, error);
+                    // warn!("Issue during {:?} send: {:?}", msg_id, error);
                     last_error = Some(error);
                 }
                 Ok(_) => *successes.write().await += 1,
             },
-            Err(join_error) => {
-                warn!("Tokio join error as we send: {:?}", join_error)
+            Err(_join_error) => {
+                // warn!("Tokio join error as we send: {:?}", join_error)
             }
         }
     }
@@ -744,21 +743,21 @@ pub(super) async fn send_msg(
     let failures = elders.len() - *successes.read().await;
 
     if failures > 0 {
-        trace!(
-            "Sending the message ({:?}) from {} to {}/{} of the elders failed: {:?}",
-            msg_id,
-            endpoint.public_addr(),
-            failures,
-            elders.len(),
-            elders,
-        );
+        // trace!(
+        //     "Sending the message ({:?}) from {} to {}/{} of the elders failed: {:?}",
+        //     msg_id,
+        //     endpoint.public_addr(),
+        //     failures,
+        //     elders.len(),
+        //     elders,
+        // );
     }
 
     let successful_sends = *successes.read().await;
     if failures > successful_sends {
-        warn!("More errors when sending a message than successes");
+        // warn!("More errors when sending a message than successes");
         if let Some(error) = last_error {
-            warn!("The relevant error is: {error}");
+            // warn!("The relevant error is: {error}");
             return Err(error);
         }
     }

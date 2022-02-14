@@ -178,7 +178,7 @@ pub async fn create_new_key(safe: &Safe) -> Result<(String, Keypair)> {
     //             .await?
     //     }
     //     None => {
-    //         debug!("Missing the '--pay-with' argument, using app's wallet for funds");
+    //        // debug!("Missing the '--pay-with' argument, using app's wallet for funds");
     //     }
     // };
 

@@ -128,10 +128,10 @@ async fn candidates(
             dg_size = cmp::min(*len, dg_size);
         }
         if len < &min_dg_size {
-            warn!(
-                "Delivery group only {:?} when it should be {:?}",
-                len, min_dg_size
-            )
+            // warn!(
+            //     "Delivery group only {:?} when it should be {:?}",
+            //     len, min_dg_size
+            // )
         }
 
         if *prefix == network_knowledge.prefix().await {

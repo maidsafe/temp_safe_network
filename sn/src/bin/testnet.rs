@@ -36,7 +36,7 @@ use std::{io, path::PathBuf};
 use structopt::StructOpt;
 use tokio::fs::{create_dir_all, remove_dir_all};
 use tokio::time::{sleep, Duration};
-use tracing::{debug, info};
+// use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 
 #[cfg(not(target_os = "windows"))]
@@ -122,8 +122,8 @@ async fn main() -> Result<()> {
             build_args.push("unstable-wiremsg-debuginfo");
         }
 
-        info!("Building current sn_node");
-        debug!("Building current sn_node with args: {:?}", build_args);
+        // info!("Building current sn_node");
+        // debug!("Building current sn_node with args: {:?}", build_args);
 
         if !cmd_args.flame {
             Command::new("cargo")
@@ -137,7 +137,7 @@ async fn main() -> Result<()> {
                 .map_err(Into::into)
                 .and_then(|result| result.status.success().then(|| ()).ok_or_else(|| eyre!("Command exited with error")))
                 .wrap_err_with(|| format!("Failed to run build command with args: {:?}", build_args))?;
-            info!("sn_node built successfully");
+            // info!("sn_node built successfully");
         }
     }
 
@@ -151,23 +151,23 @@ pub async fn run_network() -> Result<()> {
     let args = Cmd::from_args();
     let adding_nodes = args.add_nodes_to_existing_network;
 
-    info!("Starting local network");
+    // info!("Starting local network");
     let node_path = Some(PathBuf::from("./target/release"));
     let node_path = get_node_bin_path(node_path)?;
 
     let arg_node_path = node_path.join(SAFE_NODE_EXECUTABLE).display().to_string();
-    debug!("Running node from {}", arg_node_path);
+    // debug!("Running node from {}", arg_node_path);
 
     let base_log_dir = get_node_bin_path(None)?;
     let node_log_dir = base_log_dir.join(NODES_DIR);
     if !node_log_dir.exists() {
-        debug!("Creating '{}' folder", node_log_dir.display());
+        // debug!("Creating '{}' folder", node_log_dir.display());
         create_dir_all(node_log_dir.clone())
             .await
             .wrap_err("Couldn't create target path to store nodes' generated data")?;
     }
     let arg_node_log_dir = node_log_dir.display().to_string();
-    info!("Storing nodes' generated data at {}", arg_node_log_dir);
+    // info!("Storing nodes' generated data at {}", arg_node_log_dir);
 
     let node_count = std::env::var("NODE_COUNT")
         .map_or_else(
@@ -217,13 +217,13 @@ pub async fn run_network() -> Result<()> {
         sn_launch_tool_args.push(&rust_log);
     }
 
-    debug!(
-        "Running network launch tool with args: {:?}",
-        sn_launch_tool_args
-    );
+    // debug!(
+    //     "Running network launch tool with args: {:?}",
+    //     sn_launch_tool_args
+    // );
 
     // We can now call the tool with the args
-    info!("Launching local Safe network...");
+    // info!("Launching local Safe network...");
     Launch::from_iter_safe(&sn_launch_tool_args)?.run()?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts

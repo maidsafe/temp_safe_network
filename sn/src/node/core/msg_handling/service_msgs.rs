@@ -15,7 +15,7 @@ use crate::messaging::{
 use crate::messaging::{AuthorityProof, ServiceAuth};
 use crate::node::{api::cmds::Cmd, core::Core, Result};
 use crate::peer::Peer;
-use crate::types::{log_markers::LogMarker, register::User, PublicKey, ReplicatedData};
+use crate::types::{register::User, PublicKey, ReplicatedData};
 
 use xor_name::XorName;
 
@@ -29,7 +29,7 @@ impl Core {
         user: EndUser,
         requesting_elder: XorName,
     ) -> Result<Vec<Cmd>> {
-        trace!("Handling data query at adult");
+        // trace!("Handling data query at adult");
         let mut cmds = vec![];
 
         let response = self
@@ -37,7 +37,7 @@ impl Core {
             .query(query, User::Key(auth.public_key))
             .await;
 
-        trace!("data query response at adult is:  {:?}", response);
+        // trace!("data query response at adult is:  {:?}", response);
 
         let msg = SystemMsg::NodeQueryResponse {
             response,
@@ -65,15 +65,15 @@ impl Core {
         // msg_id: MsgId,
         correlation_id: MsgId,
         response: NodeQueryResponse,
-        user: EndUser,
+        _user: EndUser,
         sending_node_pk: PublicKey,
     ) -> Result<Vec<Cmd>> {
         let msg_id = MsgId::new();
         let mut cmds = vec![];
-        debug!(
-            "Handling data read @ elders, received from {:?} ",
-            sending_node_pk
-        );
+        // debug!(
+        //     "Handling data read @ elders, received from {:?} ",
+        //     sending_node_pk
+        // );
 
         let node_id = XorName::from(sending_node_pk);
         let op_id = response.operation_id()?;
@@ -81,10 +81,10 @@ impl Core {
         let waiting_peers = if let Some(peers) = self.pending_data_queries.remove(&op_id).await {
             peers
         } else {
-            warn!(
-                "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client orthe client connection cache has expired: {}",
-                sending_node_pk, user.0
-            );
+            // warn!(
+            //     "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client orthe client connection cache has expired: {}",
+            //     sending_node_pk, user.0
+            // );
             return Ok(cmds);
         };
 
@@ -99,23 +99,23 @@ impl Core {
                     .request_operation_fulfilled(&node_id, op_id)
                     .await
             }
-            Err(error) => {
-                warn!("Node problems noted when retrieving data: {:?}", error);
+            Err(_error) => {
+                // warn!("Node problems noted when retrieving data: {:?}", error);
                 false
             }
         };
 
         // Check for unresponsive adults here.
-        for (name, count) in self.liveness.find_unresponsive_nodes().await {
-            warn!(
-                "Node {} has {} pending ops. It might be unresponsive",
-                name, count
-            );
+        for (name, _count) in self.liveness.find_unresponsive_nodes().await {
+            // warn!(
+            //     "Node {} has {} pending ops. It might be unresponsive",
+            //     name, count
+            // );
             cmds.push(Cmd::ProposeOffline(name));
         }
 
         if !pending_removed {
-            trace!("Ignoring un-expected response");
+            // trace!("Ignoring un-expected response");
             return Ok(cmds);
         }
 
@@ -129,7 +129,7 @@ impl Core {
                     .unwrap_or(false))
         {
             // we don't return data not found errors.
-            trace!("Node {:?}, reported data not found", sending_node_pk);
+            // trace!("Node {:?}, reported data not found", sending_node_pk);
 
             return Ok(cmds);
         }
@@ -144,10 +144,10 @@ impl Core {
             let dst = DstLocation::EndUser(EndUser(origin.name()));
             let wire_msg = WireMsg::new_msg(msg_id, payload.clone(), msg_kind.clone(), dst)?;
 
-            trace!(
-                "Responding with the first chunk query response to {:?}",
-                dst
-            );
+            // trace!(
+            //     "Responding with the first chunk query response to {:?}",
+            //     dst
+            // );
 
             let command = Cmd::SendMsg {
                 recipients: vec![origin],
@@ -168,7 +168,7 @@ impl Core {
         origin: Peer,
     ) -> Result<Vec<Cmd>> {
         if self.is_not_elder().await {
-            error!("Received unexpected message while Adult");
+            // error!("Received unexpected message while Adult");
             return Ok(vec![]);
         }
         // extract the data from the request
@@ -182,7 +182,7 @@ impl Core {
                     .await
             }
             _ => {
-                warn!("!!!! Unexpected ServiceMsg received in routing. Was not sent to node layer: {:?}", msg);
+                // warn!("!!!! Unexpected ServiceMsg received in routing. Was not sent to node layer: {:?}", msg);
                 return Ok(vec![]);
             }
         };
@@ -210,12 +210,12 @@ impl Core {
         auth: AuthorityProof<ServiceAuth>,
         user: Peer,
     ) -> Result<Vec<Cmd>> {
-        trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
+        // trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
         if let DstLocation::EndUser(_) = dst_location {
-            warn!(
-                "Service msg has been dropped as its destination location ({:?}) is invalid: {:?}",
-                dst_location, msg
-            );
+            // warn!(
+            //     "Service msg has been dropped as its destination location ({:?}) is invalid: {:?}",
+            //     dst_location, msg
+            // );
             return Ok(vec![]);
         }
 

@@ -11,7 +11,7 @@ use super::register::EntryHash;
 use crate::safeurl::{ContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe};
 
-use log::debug;
+// use log::debug;
 use rand::Rng;
 use safe_network::types::DataAddress;
 use std::collections::BTreeSet;
@@ -32,14 +32,14 @@ impl Safe {
         type_tag: u64,
         private: bool,
     ) -> Result<XorUrl> {
-        debug!("Creating a Multimap");
+        // debug!("Creating a Multimap");
         self.register_create(name, type_tag, private, ContentType::Multimap)
             .await
     }
 
     /// Return the value of a Multimap on the network corresponding to the key provided
     pub async fn multimap_get_by_key(&self, url: &str, key: &[u8]) -> Result<Multimap> {
-        debug!("Getting value by key from Multimap at: {}", url);
+        // debug!("Getting value by key from Multimap at: {}", url);
         let safeurl = self.parse_and_resolve_url(url).await?;
 
         self.fetch_multimap_values_by_key(&safeurl, key).await
@@ -51,7 +51,7 @@ impl Safe {
         url: &str,
         hash: EntryHash,
     ) -> Result<MultimapKeyValue> {
-        debug!("Getting value by hash from Multimap at: {}", url);
+        // debug!("Getting value by hash from Multimap at: {}", url);
         let safeurl = self.parse_and_resolve_url(url).await?;
 
         self.fetch_multimap_value_by_hash(&safeurl, hash).await
@@ -79,7 +79,7 @@ impl Safe {
         entry: MultimapKeyValue,
         replace: BTreeSet<EntryHash>,
     ) -> Result<EntryHash> {
-        debug!("Inserting '{:?}' into Multimap at {}", entry, multimap_url);
+        // debug!("Inserting '{:?}' into Multimap at {}", entry, multimap_url);
         let serialised_entry = rmp_serde::to_vec_named(&entry).map_err(|err| {
             Error::Serialisation(format!(
                 "Couldn't serialise the Multimap entry '{:?}': {:?}",
@@ -122,7 +122,7 @@ impl Safe {
         url: &str,
         to_remove: BTreeSet<EntryHash>,
     ) -> Result<EntryHash> {
-        debug!("Removing from Multimap at {}: {:?}", url, to_remove);
+        // debug!("Removing from Multimap at {}: {:?}", url, to_remove);
         let safeurl = SafeUrl::from_url(url)?;
         let address = match safeurl.address() {
             DataAddress::Register(reg_address) => reg_address,
@@ -156,7 +156,7 @@ impl Safe {
     pub(crate) async fn fetch_multimap(&self, safeurl: &SafeUrl) -> Result<Multimap> {
         let entries = match self.register_fetch_entries(safeurl).await {
             Ok(data) => {
-                debug!("Multimap retrieved with {} entries...", data.len());
+                // debug!("Multimap retrieved with {} entries...", data.len());
                 Ok(data)
             }
             Err(Error::EmptyContent(_)) => Err(Error::EmptyContent(format!(
@@ -193,7 +193,7 @@ impl Safe {
     ) -> Result<MultimapKeyValue> {
         let entry = match self.register_fetch_entry(safeurl, hash).await {
             Ok(data) => {
-                debug!("Multimap retrieved...");
+                // debug!("Multimap retrieved...");
                 Ok(data)
             }
             Err(Error::EmptyContent(_)) => Err(Error::EmptyContent(format!(

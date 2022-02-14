@@ -40,7 +40,7 @@ use std::{io::Write, process::exit};
 use structopt::{clap, StructOpt};
 use tokio::sync::RwLockReadGuard;
 use tokio::time::{sleep, Duration};
-use tracing::{self, error, info, trace, warn};
+use tracing::{self, warn};
 
 use tracing_appender::non_blocking::WorkerGuard;
 #[cfg(not(feature = "tokio-console"))]
@@ -246,7 +246,7 @@ async fn run_node() -> Result<()> {
                     exit(0);
                 }
             }
-            Err(e) => error!("Updating node failed: {:?}", e),
+            Err(_e) => (), // error!("Updating node failed: {:?}", e),
         }
 
         if config.update_only() {
@@ -254,12 +254,12 @@ async fn run_node() -> Result<()> {
         }
     }
 
-    let message = format!(
-        "Running {} v{}",
-        Config::clap().get_name(),
-        env!("CARGO_PKG_VERSION")
-    );
-    info!("\n\n{}\n{}", message, "=".repeat(message.len()));
+    // let message = format!(
+    //     "Running {} v{}",
+    //     Config::clap().get_name(),
+    //     env!("CARGO_PKG_VERSION")
+    // );
+    // info!("\n\n{}\n{}", message, "=".repeat(message.len()));
 
     let log = format!(
         "The network is not accepting nodes right now. Retrying after {} minutes",
@@ -284,16 +284,16 @@ async fn run_node() -> Result<()> {
                 );
             }
             #[cfg(feature = "always-joinable")]
-            Err(Error::CannotConnectEndpoint(err)) => {
-                warn!(
-                    "In 'always-joinable' mode. Continuing to try and join after error: {:?}",
-                    err
-                );
+            Err(Error::CannotConnectEndpoint(_err)) => {
+                // warn!(
+                //     "In 'always-joinable' mode. Continuing to try and join after error: {:?}",
+                //     err
+                // );
                 continue;
             }
             Err(Error::TryJoinLater) => {
                 println!("{}", log);
-                info!("{}", log);
+                // info!("{}", log);
             }
             Err(Error::NodeNotReachable(addr)) => {
                 let err_msg = format!(
@@ -305,13 +305,13 @@ async fn run_node() -> Result<()> {
                     addr
                 );
                 println!("{}", err_msg);
-                error!("{}", err_msg);
+                // error!("{}", err_msg);
                 exit(1);
             }
             Err(Error::JoinTimeout) => {
                 let message = format!("Encountered a timeout while trying to join the network. Retrying after {} minutes.", BOOTSTRAP_RETRY_TIME);
                 println!("{}", &message);
-                error!("{}", &message);
+                // error!("{}", &message);
             }
             Err(e) => {
                 let log_path = if let Some(path) = config.log_dir() {
@@ -335,27 +335,27 @@ async fn run_node() -> Result<()> {
         let genesis_key = node.genesis_key().await;
         set_connection_info(genesis_key, our_conn_info)
             .await
-            .unwrap_or_else(|err| {
-                error!("Unable to write our connection info to disk: {:?}", err);
+            .unwrap_or_else(|_err| {
+                // error!("Unable to write our connection info to disk: {:?}", err);
             });
     } else {
         add_connection_info(our_conn_info)
             .await
-            .unwrap_or_else(|err| {
-                error!("Unable to add our connection info to disk: {:?}", err);
+            .unwrap_or_else(|_err| {
+                // error!("Unable to add our connection info to disk: {:?}", err);
             });
     }
 
     // This just keeps the node going as long as routing goes
-    while let Some(event) = event_stream.next().await {
-        trace!("Routing event! {:?}", event);
+    while let Some(_event) = event_stream.next().await {
+        // trace!("Routing event! {:?}", event);
     }
 
     Ok(())
 }
 
 fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
-    info!("Checking for updates...");
+    // info!("Checking for updates...");
     let target = self_update::get_target();
 
     let releases = self_update::backends::github::ReleaseList::configure()
@@ -366,8 +366,8 @@ fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
         .fetch()?;
 
     if !releases.is_empty() {
-        tracing::debug!("Target for update is {}", target);
-        tracing::debug!("Found releases: {:#?}\n", releases);
+        // tracing::debug!("Target for update is {}", target);
+        // tracing::debug!("Found releases: {:#?}\n", releases);
         let bin_name = if target.contains("pc-windows") {
             "sn_node.exe"
         } else {

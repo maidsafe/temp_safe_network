@@ -30,7 +30,7 @@ pub(crate) struct Capacity {
 
 impl Capacity {
     pub(super) async fn add_new_adult(&self, adult: XorName) {
-        info!("Adding new adult:{adult} to Capacity tracker");
+        // info!("Adding new adult:{adult} to Capacity tracker");
 
         if let Some(old_entry) = self
             .adult_levels
@@ -39,7 +39,7 @@ impl Capacity {
             .insert(adult, Arc::new(RwLock::new(StorageLevel::zero())))
         {
             let _level = old_entry.read().await.value();
-            warn!("Throwing old storage level for Adult {adult}:{_level}");
+            // warn!("Throwing old storage level for Adult {adult}:{_level}");
         }
     }
 
@@ -52,6 +52,7 @@ impl Capacity {
     }
 
     /// Avg usage by nodes in the section, a value between 0 and 10.
+    #[allow(unused)]
     pub(super) async fn avg_usage(&self) -> u8 {
         let mut total = 0_usize;
         let levels = self.adult_levels.read().await;
@@ -109,34 +110,34 @@ impl Capacity {
             let all_levels = self.adult_levels.read().await;
             if let Some(level) = all_levels.get(&adult) {
                 let current_level = { level.read().await.value() };
-                info!("Current level: {}", current_level);
+                // info!("Current level: {}", current_level);
                 if new_level.value() > current_level {
                     *level.write().await = new_level;
-                    info!("Old value overwritten.");
+                    // info!("Old value overwritten.");
                     return true; // value changed
                 }
                 return false; // no change
             }
         }
 
-        info!("No current level, aqcuiring top level write lock..");
+        // info!("No current level, aqcuiring top level write lock..");
         // locks to prevent racing
         let mut all_levels = self.adult_levels.write().await;
-        info!("Top level write lock acquired.");
+        // info!("Top level write lock acquired.");
         // checking the value again, if there was a concurrent insert..
         if let Some(level) = all_levels.get(&adult) {
-            info!("Oh wait, a value was just recorded..");
+            // info!("Oh wait, a value was just recorded..");
             let current_level = { level.read().await.value() };
-            info!("Current level: {}", current_level);
+            // info!("Current level: {}", current_level);
             if new_level.value() > current_level {
                 *level.write().await = new_level;
-                info!("Old value overwritten.");
+                // info!("Old value overwritten.");
                 return true; // value changed
             }
             false // no change
         } else {
             let _level = all_levels.insert(adult, Arc::new(RwLock::new(new_level)));
-            info!("New value inserted.");
+            // info!("New value inserted.");
             true // value changed
         }
     }

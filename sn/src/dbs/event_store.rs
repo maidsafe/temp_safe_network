@@ -80,7 +80,7 @@ mod test {
         let tmp_dir = tempdir()?;
         let db_dir = tmp_dir.path().join(Path::new(&"Token".to_string()));
         let db = sled::open(db_dir).map_err(|error| {
-            trace!("Sled Error: {:?}", error);
+            // trace!("Sled Error: {:?}", error);
             Error::Sled(error)
         })?;
         let store = EventStore::<Token>::new(&id, db)?;

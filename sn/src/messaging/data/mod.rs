@@ -234,15 +234,15 @@ impl QueryResponse {
                 Err(ErrorMsg::DataNotFound(DataAddress::Bytes(address))) => {
                     chunk_operation_id(&ChunkAddress(*address.name()))
                 }
-                Err(ErrorMsg::DataNotFound(another_address)) => {
-                    error!(
-                        "{:?} address returned when we were expecting a ChunkAddress",
-                        another_address
-                    );
+                Err(ErrorMsg::DataNotFound(_another_address)) => {
+                    // error!(
+                    //     "{:?} address returned when we were expecting a ChunkAddress",
+                    //     another_address
+                    // );
                     Err(Error::NoOperationId)
                 }
-                Err(another_error) => {
-                    error!("Could not form operation id: {:?}", another_error);
+                Err(_another_error) => {
+                    // error!("Could not form operation id: {:?}", another_error);
                     Err(Error::InvalidQueryResponseErrorForOperationId)
                 }
             },

@@ -14,7 +14,7 @@ use crate::node::{
     network_knowledge::{NodeState, SectionAuthorityProvider},
     Event, Result, MIN_ADULT_AGE,
 };
-use crate::types::log_markers::LogMarker;
+// use crate::types::log_markers::LogMarker;
 
 use std::{cmp, collections::BTreeSet};
 
@@ -26,14 +26,14 @@ impl Core {
         proposal: Proposal,
         sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
-        debug!("handle agreement on {:?}", proposal);
+        // debug!("handle agreement on {:?}", proposal);
         match proposal {
             Proposal::Offline(node_state) => self.handle_offline_agreement(node_state, sig).await,
             Proposal::SectionInfo(section_auth) => {
                 self.handle_section_info_agreement(section_auth, sig).await
             }
             Proposal::NewElders(_) => {
-                error!("Elders agreement should be handled in a separate blocking fashion");
+                // error!("Elders agreement should be handled in a separate blocking fashion");
                 Ok(vec![])
             }
             Proposal::JoinsAllowed(joins_allowed) => {
@@ -48,7 +48,7 @@ impl Core {
         new_info: NodeState,
         sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
-        debug!("{}", LogMarker::AgreementOfOnline);
+        // debug!("{}", LogMarker::AgreementOfOnline);
         let mut cmds = vec![];
         if let Some(old_info) = self
             .network_knowledge
@@ -57,11 +57,11 @@ impl Core {
         {
             // This node is rejoin with same name.
             if old_info.state() != MembershipState::Left {
-                debug!(
-                    "Ignoring Online node {} - {:?} not Left.",
-                    new_info.name(),
-                    old_info.state(),
-                );
+                // debug!(
+                //     "Ignoring Online node {} - {:?} not Left.",
+                //     new_info.name(),
+                //     old_info.state(),
+                // );
 
                 return Ok(cmds);
             }
@@ -88,13 +88,13 @@ impl Core {
         };
 
         if !self.network_knowledge.update_member(new_info.clone()).await {
-            info!("ignore Online: {} at {}", new_info.name(), new_info.addr());
+            // info!("ignore Online: {} at {}", new_info.name(), new_info.addr());
             return Ok(vec![]);
         }
 
         self.add_new_adult_to_trackers(new_info.name()).await;
 
-        info!("handle Online: {} at {}", new_info.name(), new_info.addr());
+        // info!("handle Online: {} at {}", new_info.name(), new_info.addr());
 
         // still used for testing
         self.send_event(Event::MemberJoined {
@@ -104,7 +104,7 @@ impl Core {
         })
         .await;
 
-        self.log_section_stats().await;
+        // self.log_section_stats().await;
 
         // Do not disable node joins in first section.
         let our_prefix = self.network_knowledge.prefix().await;
@@ -135,7 +135,7 @@ impl Core {
         cmds.extend(result);
         cmds.extend(self.send_node_approval(new_info).await);
 
-        info!("cmds in queue for Accepting node {:?}", cmds);
+        // info!("cmds in queue for Accepting node {:?}", cmds);
 
         self.print_network_stats().await;
 
@@ -161,19 +161,19 @@ impl Core {
             .update_member(signed_node_state.clone())
             .await
         {
-            info!(
-                "ignore Offline: {} at {}",
-                node_state.name(),
-                node_state.addr()
-            );
+            // info!(
+            //     "ignore Offline: {} at {}",
+            //     node_state.name(),
+            //     node_state.addr()
+            // );
             return Ok(cmds);
         }
 
-        info!(
-            "handle Offline: {} at {}",
-            node_state.name(),
-            node_state.addr()
-        );
+        // info!(
+        //     "handle Offline: {} at {}",
+        //     node_state.name(),
+        //     node_state.addr()
+        // );
 
         // If this is an Offline agreement where the new node state is Relocated,
         // we then need to send the Relocate msg to the peer attaching the signed NodeState
@@ -229,10 +229,10 @@ impl Core {
 
         if equal_or_extension {
             // Our section or sub-section
-            debug!(
-                "Updating section info for our prefix: {:?}",
-                section_auth.prefix()
-            );
+            // debug!(
+            //     "Updating section info for our prefix: {:?}",
+            //     section_auth.prefix()
+            // );
 
             let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
             let saps_candidates = self
@@ -260,10 +260,10 @@ impl Core {
         } else {
             // Other section. We shouln't be receiving or updating a SAP for
             // a remote section here, that is done with a AE msg response.
-            debug!(
-                "Ignoring Proposal::SectionInfo since prefix doesn't match ours: {:?}",
-                section_auth
-            );
+            // debug!(
+            //     "Ignoring Proposal::SectionInfo since prefix doesn't match ours: {:?}",
+            //     section_auth
+            // );
             Ok(vec![])
         }
     }
@@ -274,7 +274,7 @@ impl Core {
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         key_sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
-        trace!("{}", LogMarker::HandlingNewEldersAgreement);
+        // trace!("{}", LogMarker::HandlingNewEldersAgreement);
         let updates = self.split_barrier.write().await.process(
             &self.network_knowledge.prefix().await,
             signed_section_auth.clone(),
@@ -289,10 +289,10 @@ impl Core {
         let old_chain = self.section_chain().await.clone();
 
         for (signed_sap, key_sig) in updates {
-            let prefix = signed_sap.prefix();
-            trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);
+            // let prefix = signed_sap.prefix();
+            // trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);
 
-            info!("New SAP agreed for {:?}: {:?}", prefix, signed_sap);
+            // info!("New SAP agreed for {:?}: {:?}", prefix, signed_sap);
 
             let our_name = self.node.read().await.name();
 
@@ -305,7 +305,7 @@ impl Core {
                 signed_sap.section_key(),
                 key_sig.signature,
             ) {
-                Err(err) => error!("Failed to generate proof chain for new SAP: {:?}", err),
+                Err(_err) => (), // error!("Failed to generate proof chain for new SAP: {:?}", err),
                 Ok(()) => match self
                     .network_knowledge
                     .update_knowledge_if_valid(
@@ -317,13 +317,13 @@ impl Core {
                     )
                     .await
                 {
-                    Err(err) => error!(
-                        "Error updating our network knowledge for {:?}: {:?}",
-                        prefix, err
-                    ),
+                    Err(_err) => (), // error!(
+                    //     "Error updating our network knowledge for {:?}: {:?}",
+                    //     prefix, err
+                    // ),
                     Ok(true) => {
-                        info!("Updated our network knowledge for {:?}", prefix);
-                        info!("Writing updated knowledge to disk");
+                        // info!("Updated our network knowledge for {:?}", prefix);
+                        // info!("Writing updated knowledge to disk");
                         self.write_prefix_map().await
                     }
                     _ => {}
@@ -331,10 +331,10 @@ impl Core {
             }
         }
 
-        info!(
-            "Prefixes we know about: {:?}",
-            self.network_knowledge.prefix_map()
-        );
+        // info!(
+        //     "Prefixes we know about: {:?}",
+        //     self.network_knowledge.prefix_map()
+        // );
 
         self.update_self_for_new_node_state(snapshot).await
     }

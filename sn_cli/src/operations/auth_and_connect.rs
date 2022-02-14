@@ -16,7 +16,7 @@ use std::{
     path::PathBuf,
     time::Duration,
 };
-use tracing::{debug, info, warn};
+// use tracing::{debug, info, warn};
 
 const AUTH_CREDENTIALS_FILENAME: &str = "credentials";
 
@@ -46,7 +46,7 @@ pub async fn authorise_cli(endpoint: Option<String>, is_self_authing: bool) -> R
 // Attempt to connect with credentials if found and valid,
 // otherwise it creates a read only connection.
 pub async fn connect(safe: &mut Safe, config: Config, timeout: Duration) -> Result<()> {
-    debug!("Connecting...");
+    // debug!("Connecting...");
 
     let app_keypair = if let Ok((_, keypair)) = read_credentials() {
         keypair
@@ -56,7 +56,7 @@ pub async fn connect(safe: &mut Safe, config: Config, timeout: Duration) -> Resu
 
     let found_app_keypair = app_keypair.is_some();
     if !found_app_keypair {
-        info!("No credentials found for CLI, connecting with read-only access...");
+        // info!("No credentials found for CLI, connecting with read-only access...");
     }
 
     let (_, bootstrap_contacts) = config.read_current_node_config().await?;
@@ -73,7 +73,7 @@ pub async fn connect(safe: &mut Safe, config: Config, timeout: Duration) -> Resu
     {
         Ok(()) => Ok(()),
         Err(_) if found_app_keypair => {
-            warn!("Credentials found for CLI are invalid, connecting with read-only access...");
+            // warn!("Credentials found for CLI are invalid, connecting with read-only access...");
             safe.connect(bootstrap_contacts, None, None, Some(timeout))
                 .await
                 .wrap_err("Failed to connect with read-only access")
@@ -111,12 +111,12 @@ pub fn read_credentials() -> Result<(PathBuf, Option<Keypair>)> {
                 })?;
                 Some(keypair)
             }
-            Err(err) => {
-                debug!(
-                    "Unable to read credentials from {}: {}",
-                    file_path.display(),
-                    err
-                );
+            Err(_err) => {
+                // debug!(
+                //     "Unable to read credentials from {}: {}",
+                //     file_path.display(),
+                //     err
+                // );
                 None
             }
         }

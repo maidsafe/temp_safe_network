@@ -34,7 +34,7 @@ use crate::node::{
     node_info::Node,
     Config, Peer, MIN_ADULT_AGE,
 };
-use crate::types::{log_markers::LogMarker, PublicKey as TypesPublicKey};
+use crate::types::PublicKey as TypesPublicKey;
 use crate::UsedSpace;
 
 use ed25519_dalek::PublicKey;
@@ -87,10 +87,10 @@ impl NodeApi {
         };
 
         let joining_timeout = if cfg!(feature = "always-joinable") {
-            debug!(
-                "Feature \"always-joinable\" is set. Running with join timeout: {:?}",
-                joining_timeout * 10
-            );
+            // debug!(
+            //     "Feature \"always-joinable\" is set. Running with join timeout: {:?}",
+            //     joining_timeout * 10
+            // );
             // arbitrarily long time, the join process should just loop w/ backoff until then
             joining_timeout * 10
         } else {
@@ -121,10 +121,10 @@ impl NodeApi {
             "Node PID: {:?}, prefix: {:?}, name: {:?}, age: {}, connection info:\n{}",
             our_pid, node_prefix, node_name, node_age, our_conn_info_json,
         );
-        info!(
-            "Node PID: {:?}, prefix: {:?}, name: {:?}, age: {}, connection info: {}",
-            our_pid, node_prefix, node_name, node_age, our_conn_info_json,
-        );
+        // info!(
+        //     "Node PID: {:?}, prefix: {:?}, name: {:?}, age: {}, connection info: {}",
+        //     our_pid, node_prefix, node_name, node_age, our_conn_info_json,
+        // );
 
         run_system_logger(LogCtx::new(node.dispatcher.clone()), config.resource_logs).await;
 
@@ -151,13 +151,13 @@ impl NodeApi {
         let core = if config.is_first() {
             // Genesis node having a fix age of 255.
             let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), 255);
-            let node_name = ed25519::name(&keypair.public);
+            // let node_name = ed25519::name(&keypair.public);
 
-            info!(
-                "{} Starting a new network as the genesis node (PID: {}).",
-                node_name,
-                std::process::id()
-            );
+            // info!(
+            //     "{} Starting a new network as the genesis node (PID: {}).",
+            //     node_name,
+            //     std::process::id()
+            // );
 
             let comm = Comm::new(
                 local_addr,
@@ -188,20 +188,20 @@ impl NodeApi {
                 removed: BTreeSet::new(),
             };
 
-            trace!("{}", LogMarker::PromotedToElder);
+            // trace!("{}", LogMarker::PromotedToElder);
             core.send_event(Event::EldersChanged {
                 elders,
                 self_status_change: NodeElderChange::Promoted,
             })
             .await;
 
-            let genesis_key = network_knowledge.genesis_key();
-            info!(
-                "{} Genesis node started!. Genesis key {:?}, hex: {}",
-                node_name,
-                genesis_key,
-                hex::encode(genesis_key.to_bytes())
-            );
+            // let genesis_key = network_knowledge.genesis_key();
+            // info!(
+            //     "{} Genesis node started!. Genesis key {:?}, hex: {}",
+            //     node_name,
+            //     genesis_key,
+            //     hex::encode(genesis_key.to_bytes())
+            // );
 
             core
         } else {
@@ -217,8 +217,8 @@ impl NodeApi {
                 })?;
 
             let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE);
-            let node_name = ed25519::name(&keypair.public);
-            info!("{} Bootstrapping a new node.", node_name);
+            // let node_name = ed25519::name(&keypair.public);
+            // info!("{} Bootstrapping a new node.", node_name);
 
             let (comm, bootstrap_peer) = Comm::bootstrap(
                 local_addr,
@@ -232,14 +232,14 @@ impl NodeApi {
                 connection_event_tx,
             )
             .await?;
-            info!(
-                "{} Joining as a new node (PID: {}) our socket: {}, bootstrapper was: {}, network's genesis key: {:?}",
-                node_name,
-                std::process::id(),
-                comm.our_connection_info(),
-                bootstrap_peer.addr(),
-                genesis_key
-            );
+            // info!(
+            //     "{} Joining as a new node (PID: {}) our socket: {}, bootstrapper was: {}, network's genesis key: {:?}",
+            //     node_name,
+            //     std::process::id(),
+            //     comm.our_connection_info(),
+            //     bootstrap_peer.addr(),
+            //     genesis_key
+            // );
 
             let joining_node = Node::new(keypair, comm.our_connection_info());
             let (node, network_knowledge) = join_network(
@@ -261,8 +261,8 @@ impl NodeApi {
                 root_storage_dir.to_path_buf(),
             )
             .await?;
-            info!("{} Joined the network!", core.node.read().await.name());
-            info!("Our AGE: {}", core.node.read().await.age());
+            // info!("{} Joined the network!", core.node.read().await.name());
+            // info!("Our AGE: {}", core.node.read().await.age());
 
             core
         };
@@ -357,11 +357,11 @@ impl NodeApi {
     /// Send a message.
     /// Messages sent here, either section to section or node to node.
     pub async fn send_msg_to_nodes(&self, wire_msg: WireMsg) -> Result<()> {
-        trace!(
-            "{:?} {:?}",
-            LogMarker::DispatchSendMsgCmd,
-            wire_msg.msg_id()
-        );
+        // trace!(
+        //     "{:?} {:?}",
+        //     LogMarker::DispatchSendMsgCmd,
+        //     wire_msg.msg_id()
+        // );
 
         if let Some(cmd) = self.dispatcher.core.send_msg_to_nodes(wire_msg).await? {
             self.dispatcher
@@ -388,17 +388,17 @@ async fn handle_connection_events(
     while let Some(event) = incoming_conns.recv().await {
         match event {
             ConnectionEvent::Received((sender, bytes)) => {
-                trace!(
-                    "New message ({} bytes) received from: {:?}",
-                    bytes.len(),
-                    sender
-                );
+                // trace!(
+                //     "New message ({} bytes) received from: {:?}",
+                //     bytes.len(),
+                //     sender
+                // );
 
                 // bytes.clone is cheap
                 let wire_msg = match WireMsg::from(bytes.clone()) {
                     Ok(wire_msg) => wire_msg,
-                    Err(error) => {
-                        error!("Failed to deserialize message header: {:?}", error);
+                    Err(_error) => {
+                        // error!("Failed to deserialize message header: {:?}", error);
                         continue;
                     }
                 };
@@ -409,12 +409,12 @@ async fn handle_connection_events(
                 };
                 let _span_guard = span.enter();
 
-                trace!(
-                    "{:?} from {:?} length {}",
-                    LogMarker::DispatchHandleMsgCmd,
-                    sender,
-                    bytes.len(),
-                );
+                // trace!(
+                //     "{:?} from {:?} length {}",
+                //     LogMarker::DispatchHandleMsgCmd,
+                //     sender,
+                //     bytes.len(),
+                // );
                 let cmd = Cmd::HandleMsg {
                     sender,
                     wire_msg,
@@ -429,5 +429,5 @@ async fn handle_connection_events(
         }
     }
 
-    error!("Fatal error, the stream for incoming connections has been unexpectedly closed. No new connections or messages can be received from the network from here on.");
+    // error!("Fatal error, the stream for incoming connections has been unexpectedly closed. No new connections or messages can be received from the network from here on.");
 }

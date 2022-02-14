@@ -20,7 +20,7 @@ use file_system::{
     file_system_dir_walk, file_system_single_file, normalise_path_separator, upload_file_to_net,
 };
 use files_map::add_or_update_file_item;
-use log::{debug, info, warn};
+// use log::{debug, info, warn};
 use relative_path::RelativePath;
 use safe_network::{client::Client, types::BytesAddress};
 use std::{
@@ -153,7 +153,7 @@ impl Safe {
     /// # });
     /// ```
     pub async fn files_container_get(&self, url: &str) -> Result<Option<(VersionHash, FilesMap)>> {
-        debug!("Getting files container from: {:?}", url);
+        // debug!("Getting files container from: {:?}", url);
         let safe_url = self.parse_and_resolve_url(url).await?;
 
         self.fetch_files_container(&safe_url).await
@@ -165,11 +165,11 @@ impl Safe {
         safe_url: &SafeUrl,
     ) -> Result<Option<(VersionHash, FilesMap)>> {
         // fetch register entries and wrap errors
-        debug!(
-            "Fetching FilesContainer from {}, address type: {:?}",
-            safe_url,
-            safe_url.address()
-        );
+        // debug!(
+        //     "Fetching FilesContainer from {}, address type: {:?}",
+        //     safe_url,
+        //     safe_url.address()
+        // );
 
         let entries = self
             .register_fetch_entries(safe_url)
@@ -190,11 +190,11 @@ impl Safe {
             })?;
 
         // take the 1st entry (TODO Multiple entries)
-        debug!(
-            "Retrieved {} entries for register at {}",
-            entries.len(),
-            safe_url.to_string()
-        );
+        // debug!(
+        //     "Retrieved {} entries for register at {}",
+        //     entries.len(),
+        //     safe_url.to_string()
+        // );
         if entries.len() > 1 {
             return Err(Error::NotImplementedError("Multiple file container entries not managed, this happends when 2 clients write concurrently to a file container".to_string()));
         }
@@ -202,7 +202,7 @@ impl Safe {
         let (version, files_map_xorurl) = if let Some((v, m)) = first_entry {
             (v.into(), str::from_utf8(m)?)
         } else {
-            warn!("FilesContainer found at \"{:?}\" was empty", safe_url);
+            // warn!("FilesContainer found at \"{:?}\" was empty", safe_url);
             return Ok(None);
         };
 
@@ -215,7 +215,7 @@ impl Safe {
                 err
             ))
         })?;
-        debug!("Files map retrieved.... {:?}", &version);
+        // debug!("Files map retrieved.... {:?}", &version);
 
         Ok(Some((version, files_map)))
     }
@@ -333,7 +333,7 @@ impl Safe {
         update_nrs: bool,
         follow_links: bool,
     ) -> Result<(Option<(VersionHash, FilesMap)>, ProcessedFiles)> {
-        debug!("Adding file to FilesContainer at {}", url);
+        // debug!("Adding file to FilesContainer at {}", url);
         let (safe_url, current_version, current_files_map) =
             validate_files_add_params(self, source_file, url, update_nrs).await?;
 
@@ -623,13 +623,13 @@ impl Safe {
         )?;
 
         let address = if self.dry_run_mode {
-            debug!(
-                "Calculating network address for {} bytes of data",
-                bytes.len()
-            );
+            // debug!(
+            //     "Calculating network address for {} bytes of data",
+            //     bytes.len()
+            // );
             Client::calculate_address(bytes, Scope::Public)?
         } else {
-            debug!("Storing {} bytes of data", bytes.len());
+            // debug!("Storing {} bytes of data", bytes.len());
             let client = self.get_safe_client()?;
             client.upload_and_verify(bytes, Scope::Public).await?
         };
@@ -678,7 +678,7 @@ impl Safe {
     }
 
     pub async fn get_bytes(&self, address: BytesAddress, range: Range) -> Result<Bytes> {
-        debug!("Attempting to fetch data from {:?}", address.name());
+        // debug!("Attempting to fetch data from {:?}", address.name());
         let client = self.get_safe_client()?;
         let data = if let Some((start, end)) = range {
             let start = start.map(|start_index| start_index as usize).unwrap_or(0);
@@ -692,11 +692,11 @@ impl Safe {
         }
         .map_err(|e| Error::NetDataError(format!("Failed to GET file: {:?}", e)))?;
 
-        debug!(
-            "{} bytes of data successfully retrieved from: {:?}",
-            data.len(),
-            address.name()
-        );
+        // debug!(
+        //     "{} bytes of data successfully retrieved from: {:?}",
+        //     data.len(),
+        //     address.name()
+        // );
 
         Ok(data)
     }
@@ -914,7 +914,7 @@ async fn files_map_sync(
                     updated_files_map.insert(normalised_file_name.to_string(), file_item.clone());
 
                     if !force && !compare_file_content {
-                        let (err_type, comp_str) = if is_modified {
+                        let (err_type, _comp_str) = if is_modified {
                             (
                                 Error::FileNameConflict(normalised_file_name.clone()),
                                 "different",
@@ -930,7 +930,7 @@ async fn files_map_sync(
                             local_file_name.to_path_buf(),
                             FilesMapChange::Failed(format!("{}", err_type)),
                         );
-                        info!("Skipping file \"{}\" since a file named \"{}\" with {} content already exists on target. You can use the 'force' flag to replace the existing file with the new one", local_file_name.display(), normalised_file_name, comp_str);
+                        // info!("Skipping file \"{}\" since a file named \"{}\" with {} content already exists on target. You can use the 'force' flag to replace the existing file with the new one", local_file_name.display(), normalised_file_name, comp_str);
                     }
                 }
 
@@ -1010,7 +1010,7 @@ async fn files_map_add_link(
     let mut success_count = 0;
     let file_type = match SafeUrl::from_url(file_link) {
         Err(err) => {
-            info!("Skipping file \"{}\". {}", file_link, err);
+            // info!("Skipping file \"{}\". {}", file_link, err);
             processed_files.insert(
                 PathBuf::from(file_link),
                 FilesMapChange::Failed(format!("{}", err)),
@@ -1061,7 +1061,7 @@ async fn files_map_add_link(
                         success_count += 1;
                     }
                 } else {
-                    info!("Skipping file \"{}\" since a file with name \"{}\" already exists on target. You can use the 'force' flag to replace the existing file with the new one", file_link, file_name_str);
+                    // info!("Skipping file \"{}\" since a file with name \"{}\" already exists on target. You can use the 'force' flag to replace the existing file with the new one", file_link, file_name_str);
                     processed_files.insert(
                         file_name.to_path_buf(),
                         FilesMapChange::Failed(format!(
@@ -1071,7 +1071,7 @@ async fn files_map_add_link(
                     );
                 }
             } else {
-                info!("Skipping file \"{}\" since a file with name \"{}\" already exists on target with the same link", file_link, file_name_str);
+                // info!("Skipping file \"{}\" since a file with name \"{}\" already exists on target with the same link", file_link, file_name_str);
                 processed_files.insert(
                     PathBuf::from(file_link),
                     FilesMapChange::Failed(format!(
@@ -1198,7 +1198,7 @@ async fn files_map_create(
             .trim_end_matches('/')
             .to_string();
 
-        debug!("FileInfo item name: {:?}", &file_name);
+        // debug!("FileInfo item name: {:?}", &file_name);
 
         add_or_update_file_item(
             safe,

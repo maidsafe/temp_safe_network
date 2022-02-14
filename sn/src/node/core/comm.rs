@@ -8,10 +8,10 @@
 
 use super::{msg_count::MsgCount, BackPressure};
 
-use crate::messaging::{system::LoadReport, MsgId, WireMsg};
+use crate::messaging::{system::LoadReport, WireMsg};
 use crate::node::error::{Error, Result};
 use crate::peer::{Peer, UnnamedPeer};
-use crate::types::log_markers::LogMarker;
+// use crate::types::log_markers::LogMarker;
 
 use bytes::Bytes;
 use futures::{
@@ -123,10 +123,10 @@ impl Comm {
         recipients: &[Peer],
         mut wire_msg: WireMsg,
     ) -> Result<(), Error> {
-        trace!(
-            "Sending msg on existing connection to client {:?}",
-            recipients
-        );
+        // trace!(
+        //     "Sending msg on existing connection to client {:?}",
+        //     recipients
+        // );
         for recipient in recipients {
             let name = recipient.name();
             let addr = recipient.addr();
@@ -141,7 +141,7 @@ impl Comm {
             let connection = if let Some(connection) = recipient.connection().await {
                 Ok(connection)
             } else {
-                error!("No connection available to client");
+                // error!("No connection available to client");
                 Err(None)
             };
 
@@ -153,14 +153,14 @@ impl Comm {
                         .map_err(Some)
                 })
                 .await
-                .map_err(|err| {
-                    error!(
-                        "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed with {:?}",
-                        wire_msg.msg_id(),
-                        addr,
-                        name,
-                        err
-                    );
+                .map_err(|_err| {
+                    // error!(
+                    //     "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed with {:?}",
+                    //     wire_msg.msg_id(),
+                    //     addr,
+                    //     name,
+                    //     err
+                    // );
                     Error::FailedSend(addr, name)
                 })?;
 
@@ -192,11 +192,11 @@ impl Comm {
             .is_reachable(peer)
             .await
             .map_err(|err| {
-                info!("Peer {} is NOT externally reachable: {:?}", peer, err);
+                // info!("Peer {} is NOT externally reachable: {:?}", peer, err);
                 err.into()
             })
             .map(|()| {
-                info!("Peer {} is externally reachable.", peer);
+                // info!("Peer {} is externally reachable.", peer);
             });
         connectivity_endpoint.close();
         result
@@ -222,20 +222,20 @@ impl Comm {
         delivery_group_size: usize,
         wire_msg: WireMsg,
     ) -> Result<SendStatus> {
-        let msg_id = wire_msg.msg_id();
-        trace!(
-            "Sending message (msg_id: {:?}) to {} of {:?}",
-            msg_id,
-            delivery_group_size,
-            recipients
-        );
+        // let msg_id = wire_msg.msg_id();
+        // trace!(
+        //     "Sending message (msg_id: {:?}) to {} of {:?}",
+        //     msg_id,
+        //     delivery_group_size,
+        //     recipients
+        // );
 
         if recipients.len() < delivery_group_size {
-            warn!(
-                "Less than delivery_group_size valid recipients - delivery_group_size: {}, recipients: {:?}",
-                delivery_group_size,
-                recipients,
-            );
+            // warn!(
+            //     "Less than delivery_group_size valid recipients - delivery_group_size: {}, recipients: {:?}",
+            //     delivery_group_size,
+            //     recipients,
+            // );
         }
 
         let delivery_group_size = delivery_group_size.min(recipients.len());
@@ -252,7 +252,7 @@ impl Comm {
         // succeeds or if there are no more recipients to pick.
         let mut tasks: FuturesUnordered<_> = recipients[0..delivery_group_size]
             .iter()
-            .map(|recipient| self.send_to_one(recipient, msg_id, priority, msg_bytes.clone(), None))
+            .map(|recipient| self.send_to_one(recipient, priority, msg_bytes.clone(), None))
             .collect();
 
         let mut next = delivery_group_size;
@@ -282,20 +282,18 @@ impl Comm {
                     // instead push the same recipient again, but force a reconnection.
                     tasks.push(self.send_to_one(
                         recipient,
-                        msg_id,
                         priority,
                         msg_bytes.clone(),
                         Some(connection_id),
                     ));
                 }
-                Err(error) => {
-                    warn!("during sending, received error {:?}", error);
+                Err(_error) => {
+                    // warn!("during sending, received error {:?}", error);
                     failed_recipients.push(recipient.clone());
 
                     if next < recipients.len() {
                         tasks.push(self.send_to_one(
                             &recipients[next],
-                            msg_id,
                             priority,
                             msg_bytes.clone(),
                             None,
@@ -306,13 +304,13 @@ impl Comm {
             }
         }
 
-        trace!(
-            "Finished sending message {:?} to {}/{} recipients (failed: {:?})",
-            wire_msg,
-            successes,
-            delivery_group_size,
-            failed_recipients
-        );
+        // trace!(
+        //     "Finished sending message {:?} to {}/{} recipients (failed: {:?})",
+        //     wire_msg,
+        //     successes,
+        //     delivery_group_size,
+        //     failed_recipients
+        // );
 
         if successes == delivery_group_size {
             if failed_recipients.is_empty() {
@@ -330,17 +328,17 @@ impl Comm {
     async fn send_to_one<'r>(
         &self,
         recipient: &'r Peer,
-        msg_id: MsgId,
+        // msg_id: MsgId,
         msg_priority: i32,
         msg_bytes: Bytes,
         failed_connection_id: Option<usize>,
     ) -> (&'r Peer, Result<(), SendToOneError>) {
-        trace!(
-            "Sending message ({} bytes, msg_id: {:?}) to {}",
-            msg_bytes.len(),
-            msg_id,
-            recipient,
-        );
+        // trace!(
+        //     "Sending message ({} bytes, msg_id: {:?}) to {}",
+        //     msg_bytes.len(),
+        //     msg_id,
+        //     recipient,
+        // );
 
         // TODO: more laid back retries with lower priority, more aggressive with higher
         let retries = self.back_pressure.get(&recipient.addr()).await;
@@ -370,13 +368,13 @@ impl Comm {
             .await
             .map_err(SendToOneError::Connection);
 
-        if let (true, Ok(connection)) = (reused_connection, &connection) {
-            trace!(
-                connection_id = connection.id(),
-                src = %connection.remote_address(),
-                "{}",
-                LogMarker::ConnectionReused
-            );
+        if let (true, Ok(_connection)) = (reused_connection, &connection) {
+            // trace!(
+            //     connection_id = connection.id(),
+            //     src = %connection.remote_address(),
+            //     "{}",
+            //     LogMarker::ConnectionReused
+            // );
         }
 
         let result = future::ready(connection)
@@ -406,12 +404,12 @@ impl Comm {
         self.back_pressure.load_report(caller).await
     }
 
-    pub(crate) fn print_stats(&self) {
-        let incoming = self.msg_count.incoming();
-        let outgoing = self.msg_count.outgoing();
-        info!("*** Incoming msgs: {:?} ***", incoming);
-        info!("*** Outgoing msgs: {:?} ***", outgoing);
-    }
+    // pub(crate) fn print_stats(&self) {
+    //     let incoming = self.msg_count.incoming();
+    //     let outgoing = self.msg_count.outgoing();
+    //     info!("*** Incoming msgs: {:?} ***", incoming);
+    //     info!("*** Outgoing msgs: {:?} ***", outgoing);
+    // }
 }
 
 /// Errors that can be returned from `Comm::send_to_one`.
@@ -452,11 +450,11 @@ async fn handle_incoming_connections(
     msg_count: MsgCount,
 ) {
     while let Some((connection, connection_incoming)) = incoming_connections.next().await {
-        trace!(
-            "incoming_connection from {:?} with connection_id {:?}",
-            connection.remote_address(),
-            connection.id()
-        );
+        // trace!(
+        //     "incoming_connection from {:?} with connection_id {:?}",
+        //     connection.remote_address(),
+        //     connection.id()
+        // );
         let _ = task::spawn(
             handle_incoming_messages(
                 connection,
@@ -476,9 +474,9 @@ async fn handle_incoming_messages(
     event_tx: mpsc::Sender<ConnectionEvent>,
     msg_count: MsgCount,
 ) {
-    let connection_id = connection.id();
+    // let connection_id = connection.id();
     let src = connection.remote_address();
-    trace!(%connection_id, %src, "{}", LogMarker::ConnectionOpened);
+    // trace!(%connection_id, %src, "{}", LogMarker::ConnectionOpened);
 
     while let Some(result) = incoming_msgs.next().await.transpose() {
         match result {
@@ -492,14 +490,14 @@ async fn handle_incoming_messages(
                 // count incoming msgs..
                 msg_count.increase_incoming(src);
             }
-            Err(error) => {
+            Err(_error) => {
                 // TODO: should we propagate this?
-                warn!("error on connection with {}: {:?}", src, error);
+                // warn!("error on connection with {}: {:?}", src, error);
             }
         }
     }
 
-    trace!(%connection_id, %src, "{}", LogMarker::ConnectionClosed);
+    // trace!(%connection_id, %src, "{}", LogMarker::ConnectionClosed);
 }
 
 /// Returns the status of the send operation.
@@ -795,7 +793,7 @@ mod tests {
         // Keep the socket alive to keep the address bound, but don't read/write to it so any
         // attempt to connect to it will fail.
         let _handle = tokio::spawn(async move {
-            debug!("get invalid peer");
+            // debug!("get invalid peer");
             future::pending::<()>().await;
             let _ = socket;
         });

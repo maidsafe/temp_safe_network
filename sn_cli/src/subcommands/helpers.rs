@@ -18,7 +18,7 @@ use sn_api::{
     SafeUrl,
 };
 use std::io::{stdin, stdout, Read, Write};
-use tracing::debug;
+// use tracing::debug;
 use xor_name::XorName;
 
 // Warn the user about a dry-run being performed
@@ -76,8 +76,8 @@ pub fn get_from_stdin(message: Option<&str>) -> Result<Vec<u8>> {
     println!("{}", &the_message);
     let mut buffer = Vec::new();
     match std::io::stdin().read_to_end(&mut buffer) {
-        Ok(size) => {
-            debug!("Read ({} bytes) from STDIN", size);
+        Ok(_size) => {
+            // debug!("Read ({} bytes) from STDIN", size);
             Ok(buffer)
         }
         Err(_) => bail!("Failed to read from STDIN stream".to_string()),

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Error, Result};
-use tracing::debug;
+// use tracing::debug;
 use uhttp_uri::HttpUri;
 use url::Url;
 
@@ -175,17 +175,17 @@ impl UrlParts {
             return Err(Error::InvalidXorUrl(msg));
         }
 
-        debug!(
-            "Parsed url: scheme: {}, public_name: {}, top_name: {}, sub_names: {}, sub_names_vec: {:?}, path: {}, query_string: {}, fragment: {:?}",
-            scheme,
-            public_name,
-            top_name,
-            sub_names,
-            sub_names_vec,
-            path,
-            query_string,
-            fragment,
-        );
+        // debug!(
+        //     "Parsed url: scheme: {}, public_name: {}, top_name: {}, sub_names: {}, sub_names_vec: {:?}, path: {}, query_string: {}, fragment: {:?}",
+        //     scheme,
+        //     public_name,
+        //     top_name,
+        //     sub_names,
+        //     sub_names_vec,
+        //     path,
+        //     query_string,
+        //     fragment,
+        // );
 
         Ok(Self {
             scheme,

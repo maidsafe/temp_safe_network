@@ -20,7 +20,8 @@ use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
 };
-use tracing::{debug, warn, Level};
+// use tracing::{debug, warn, Level};
+use tracing::Level;
 
 const CONFIG_FILE: &str = "node.config";
 const CONNECTION_INFO_FILE: &str = "node_connection_info.config";
@@ -160,14 +161,14 @@ impl Config {
         cmd_line_args.validate().map_err(Error::Configuration)?;
 
         if cmd_line_args.hard_coded_contacts.is_empty() {
-            debug!("Using node connection config file as no hard coded contacts were passed in");
+            // debug!("Using node connection config file as no hard coded contacts were passed in");
             if let Ok((_, info)) = read_conn_info_from_file().await {
                 cmd_line_args.hard_coded_contacts = info;
             }
         }
 
         if cmd_line_args.genesis_key.is_none() {
-            debug!("Using node connection config file as no genesis key was passed in");
+            // debug!("Using node connection config file as no genesis key was passed in");
             if let Ok((genesis_key, _)) = read_conn_info_from_file().await {
                 cmd_line_args.genesis_key = Some(genesis_key);
             }
@@ -176,10 +177,10 @@ impl Config {
         config.merge(cmd_line_args);
 
         config.clear_data_from_disk().await.unwrap_or_else(|_| {
-            tracing::error!("Error deleting data file from disk");
+            // // tracing::error!("Error deleting data file from disk");
         });
 
-        info!("Node config to be used: {:?}", config);
+        // info!("Node config to be used: {:?}", config);
         Ok(config)
     }
 
@@ -405,19 +406,19 @@ impl Config {
 
         match fs::read(path.clone()).await {
             Ok(content) => {
-                debug!("Reading settings from {}", path.display());
+                // debug!("Reading settings from {}", path.display());
 
                 serde_json::from_slice(&content).map_err(|err| {
-                    warn!(
-                        "Could not parse content of config file '{:?}': {:?}",
-                        path, err
-                    );
+                    // warn!(
+                    //     "Could not parse content of config file '{:?}': {:?}",
+                    //     path, err
+                    // );
                     err.into()
                 })
             }
             Err(error) => {
                 if error.kind() == std::io::ErrorKind::NotFound {
-                    debug!("No config file available at {:?}", path);
+                    // debug!("No config file available at {:?}", path);
                     Ok(None)
                 } else {
                     Err(error.into())
@@ -477,13 +478,13 @@ async fn read_conn_info_from_file() -> Result<(String, BTreeSet<SocketAddr>)> {
 
     match fs::read(&path).await {
         Ok(content) => {
-            debug!("Reading connection info from {}", path.display());
+            // debug!("Reading connection info from {}", path.display());
             let config = serde_json::from_slice(&content)?;
             Ok(config)
         }
         Err(error) => {
             if error.kind() == std::io::ErrorKind::NotFound {
-                debug!("No connection info file available at {}", path.display());
+                // debug!("No connection info file available at {}", path.display());
             }
             Err(error.into())
         }

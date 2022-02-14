@@ -17,7 +17,7 @@ use std::{
     path::PathBuf,
     process::{Command, Stdio},
 };
-use tracing::debug;
+// use tracing::debug;
 
 #[cfg(not(target_os = "windows"))]
 pub(crate) const SN_NODE_EXECUTABLE: &str = "sn_node";
@@ -177,10 +177,10 @@ pub fn node_shutdown(node_path: Option<PathBuf>) -> Result<()> {
         None => SN_NODE_EXECUTABLE,
     };
 
-    debug!(
-        "Killing all running nodes launched with {}...",
-        node_exec_name
-    );
+    // debug!(
+    //     "Killing all running nodes launched with {}...",
+    //     node_exec_name
+    // );
     kill_nodes(node_exec_name)
 }
 
@@ -192,7 +192,7 @@ fn get_initial_sn_launch_args(
         .join(SN_NODE_EXECUTABLE)
         .display()
         .to_string();
-    debug!("Running node from {}", arg_node_path);
+    // debug!("Running node from {}", arg_node_path);
 
     let node_data_dir_path = node_directory_path.join(node_data_dir_name);
     if !node_data_dir_path.exists() {
@@ -288,7 +288,7 @@ pub fn node_update(node_path: Option<PathBuf>) -> Result<()> {
     let node_path = get_node_bin_path(node_path)?;
 
     let arg_node_path = node_path.join(SN_NODE_EXECUTABLE).display().to_string();
-    debug!("Updating node at {}", arg_node_path);
+    // debug!("Updating node at {}", arg_node_path);
 
     let child = Command::new(&arg_node_path)
         .args(vec!["--update-only"])

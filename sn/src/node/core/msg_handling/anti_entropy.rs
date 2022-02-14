@@ -15,7 +15,7 @@ use crate::node::{
     network_knowledge::SectionAuthorityProvider, Error, Result,
 };
 use crate::peer::Peer;
-use crate::types::{log_markers::LogMarker, PublicKey};
+use crate::types::PublicKey;
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -96,11 +96,11 @@ impl Core {
                 // TODO: we may need to check if 'bounced_msg' dst section pk is different
                 // from the received new SAP key, to prevent from endlessly resending a msg
                 // if a sybil/corrupt peer keeps sending us the same AE msg.
-                trace!(
-                    "{} resending {:?}",
-                    LogMarker::AeResendAfterRetry,
-                    msg_to_resend
-                );
+                // trace!(
+                //     "{} resending {:?}",
+                //     LogMarker::AeResendAfterRetry,
+                //     msg_to_resend
+                // );
 
                 self.create_or_wait_for_backoff(&sender).await;
 
@@ -151,23 +151,23 @@ impl Core {
 
         match to_resend {
             None => Ok(vec![]),
-            Some((msg_to_redirect, msg_id)) => match chosen_dst_elder {
+            Some((msg_to_redirect, _msg_id)) => match chosen_dst_elder {
                 None => {
-                    error!(
-                            "Failed to find closest Elder to resend msg ({:?}) upon AE-Redirect response.",
-                            msg_id
-                        );
+                    // error!(
+                    //     "Failed to find closest Elder to resend msg ({:?}) upon AE-Redirect response.",
+                    //     msg_id
+                    // );
                     Ok(vec![])
                 }
                 Some(elder) if elder.addr() == sender.addr() => {
-                    error!(
-                            "Failed to find an alternative Elder to resend msg ({:?}) upon AE-Redirect response.",
-                            msg_id
-                        );
+                    // error!(
+                    //     "Failed to find an alternative Elder to resend msg ({:?}) upon AE-Redirect response.",
+                    //     msg_id
+                    // );
                     Ok(vec![])
                 }
                 Some(elder) => {
-                    trace!("{}", LogMarker::AeResendAfterAeRedirect);
+                    // trace!("{}", LogMarker::AeResendAfterAeRedirect);
 
                     self.create_or_wait_for_backoff(&elder).await;
 
@@ -188,7 +188,7 @@ impl Core {
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
         bounced_msg: Bytes,
-        sender: Peer,
+        _sender: Peer,
     ) -> Result<Option<(SystemMsg, MsgId)>> {
         let (bounced_msg, msg_id, dst_location) = match WireMsg::deserialize(bounced_msg)? {
             MsgType::System {
@@ -198,17 +198,17 @@ impl Core {
                 ..
             } => (msg, msg_id, dst_location),
             _ => {
-                warn!("Non System MsgType received in AE response. We do not handle any other type in AE msgs yet.");
+                // warn!("Non System MsgType received in AE response. We do not handle any other type in AE msgs yet.");
                 return Ok(None);
             }
         };
 
-        info!(
-            "Anti-Entropy: message received from peer: {}",
-            sender.addr()
-        );
+        // info!(
+        //     "Anti-Entropy: message received from peer: {}",
+        //     sender.addr()
+        // );
 
-        let prefix = section_auth.prefix();
+        // let prefix = section_auth.prefix();
         let dst_section_key = section_auth.section_key();
         let signed_sap = SectionAuth {
             value: section_auth.clone(),
@@ -229,16 +229,16 @@ impl Core {
             .await?
         {
             self.write_prefix_map().await;
-            info!(
-                "PrefixMap written to disk with update for prefix {:?}",
-                prefix
-            );
+            // info!(
+            //     "PrefixMap written to disk with update for prefix {:?}",
+            //     prefix
+            // );
         }
 
         // If the new SAP's section key is the same as the section key set when the
         // bounced message was originally sent, we just drop it.
         if dst_location.section_pk() == Some(dst_section_key) {
-            error!("Dropping bounced msg ({:?}) received in AE-Retry from {} as suggested new dst section key is the same as previously sent: {:?}", msg_id, sender,dst_section_key);
+            // error!("Dropping bounced msg ({:?}) received in AE-Retry from {} as suggested new dst section key is the same as previously sent: {:?}", msg_id, sender,dst_section_key);
             Ok(None)
         } else {
             Ok(Some((bounced_msg, msg_id)))
@@ -291,23 +291,23 @@ impl Core {
     ) -> Result<Option<Cmd>> {
         // Check if the message has reached the correct section,
         // if not, we'll need to respond with AE
-        trace!("Checking for entropy");
+        // trace!("Checking for entropy");
 
-        let our_prefix = self.network_knowledge.prefix().await;
+        // let our_prefix = self.network_knowledge.prefix().await;
 
         // Let's try to find a section closer to the destination, if it's not for us.
         if !self.network_knowledge.prefix().await.matches(&dst_name) {
-            debug!(
-                "AE: prefix not matching. We are: {:?}, they sent to: {:?}",
-                our_prefix, dst_name
-            );
+            // debug!(
+            //     "AE: prefix not matching. We are: {:?}, they sent to: {:?}",
+            //     our_prefix, dst_name
+            // );
             match self
                 .network_knowledge
                 .get_closest_or_opposite_signed_sap(&dst_name)
                 .await
             {
                 Some((signed_sap, section_chain)) => {
-                    info!("Found a better matching prefix {:?}", signed_sap.prefix());
+                    // info!("Found a better matching prefix {:?}", signed_sap.prefix());
                     let bounced_msg = original_bytes;
                     // Redirect to the closest section
                     let ae_msg = SystemMsg::AntiEntropyRedirect {
@@ -322,7 +322,7 @@ impl Core {
                         ae_msg,
                         self.network_knowledge.section_key().await,
                     )?;
-                    trace!("{}", LogMarker::AeSendRedirect);
+                    // trace!("{}", LogMarker::AeSendRedirect);
 
                     return Ok(Some(Cmd::SendMsg {
                         recipients: vec![sender.clone()],
@@ -330,30 +330,30 @@ impl Core {
                     }));
                 }
                 None => {
-                    warn!("Our PrefixMap is empty");
+                    // warn!("Our PrefixMap is empty");
                     // TODO: instead of just dropping the message, don't we actually need
                     // to get up to date info from other Elders in our section as it may be
                     // a section key we are not aware of yet?
                     // ...and once we acquired new key/s we attempt AE check again?
-                    warn!(
-                        "Anti-Entropy: cannot reply with redirect msg for dst_name {:?} and key {:?} to a closest section.",
-                        dst_name, dst_section_key
-                    );
+                    // warn!(
+                    //     "Anti-Entropy: cannot reply with redirect msg for dst_name {:?} and key {:?} to a closest section.",
+                    //     dst_name, dst_section_key
+                    // );
 
                     return Err(Error::NoMatchingSection);
                 }
             }
         }
 
-        let section_key = self.network_knowledge.section_key().await;
-        trace!(
-            "Performing AE checks, provided pk was: {:?} ours is: {:?}",
-            dst_section_key,
-            section_key
-        );
+        // let section_key = self.network_knowledge.section_key().await;
+        // trace!(
+        //     "Performing AE checks, provided pk was: {:?} ours is: {:?}",
+        //     dst_section_key,
+        //     section_key
+        // );
 
         if dst_section_key == &self.network_knowledge.section_key().await {
-            trace!("Provided Section PK matching our latest. All AE checks passed!");
+            // trace!("Provided Section PK matching our latest. All AE checks passed!");
             // Destination section key matches our current section key
             return Ok(None);
         }
@@ -364,19 +364,19 @@ impl Core {
             .await
         {
             Ok(proof_chain) => {
-                info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg for AE-Retry with up to date SAP info.", sender);
+                // info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg for AE-Retry with up to date SAP info.", sender);
 
                 let signed_sap = self
                     .network_knowledge
                     .section_signed_authority_provider()
                     .await;
 
-                trace!(
-                    "Sending AE-Retry with: proofchain last key: {:?} and  section key: {:?}",
-                    proof_chain.last_key(),
-                    &signed_sap.value.section_key()
-                );
-                trace!("{}", LogMarker::AeSendRetryAsOutdated);
+                // trace!(
+                //     "Sending AE-Retry with: proofchain last key: {:?} and  section key: {:?}",
+                //     proof_chain.last_key(),
+                //     &signed_sap.value.section_key()
+                // );
+                // trace!("{}", LogMarker::AeSendRetryAsOutdated);
 
                 SystemMsg::AntiEntropyRetry {
                     section_auth: signed_sap.value.to_msg(),
@@ -386,11 +386,11 @@ impl Core {
                 }
             }
             Err(_) => {
-                trace!(
-                    "Anti-Entropy: cannot find dst_section_key {:?} sent by {} in our chain",
-                    dst_section_key,
-                    sender
-                );
+                // trace!(
+                //     "Anti-Entropy: cannot find dst_section_key {:?} sent by {} in our chain",
+                //     dst_section_key,
+                //     sender
+                // );
 
                 let proof_chain = self.network_knowledge.section_chain().await;
 
@@ -399,7 +399,7 @@ impl Core {
                     .section_signed_authority_provider()
                     .await;
 
-                trace!("{}", LogMarker::AeSendRetryDstPkFail);
+                // trace!("{}", LogMarker::AeSendRetryDstPkFail);
 
                 SystemMsg::AntiEntropyRetry {
                     section_auth: signed_sap.value.to_msg(),
@@ -449,7 +449,7 @@ impl Core {
             self.network_knowledge.section_key().await,
         )?;
 
-        trace!("{} in ae_redirect", LogMarker::AeSendRedirect);
+        // trace!("{} in ae_redirect", LogMarker::AeSendRedirect);
 
         Ok(Cmd::SendMsg {
             recipients: vec![sender],

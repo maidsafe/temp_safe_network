@@ -49,12 +49,12 @@ use crate::messaging::{
 };
 use crate::node::error::Result;
 use crate::peer::Peer;
-use crate::types::{log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk, Cache};
+use crate::types::{utils::compare_and_write_prefix_map_to_disk, Cache};
 use crate::UsedSpace;
 
 use backoff::ExponentialBackoff;
 use capacity::Capacity;
-use itertools::Itertools;
+// use itertools::Itertools;
 use liveness_tracking::Liveness;
 use resource_proof::ResourceProof;
 use std::{
@@ -142,7 +142,7 @@ impl Core {
 
         let data_storage = DataStorage::new(&root_storage_dir, used_space.clone())?;
 
-        info!("Creating Liveness checks");
+        // info!("Creating Liveness checks");
         let adult_liveness = Liveness::new(
             network_knowledge
                 .adults()
@@ -151,7 +151,7 @@ impl Core {
                 .map(|peer| peer.name())
                 .collect::<Vec<XorName>>(),
         );
-        info!("Liveness check: {:?}", adult_liveness);
+        // info!("Liveness check: {:?}", adult_liveness);
 
         Ok(Self {
             comm,
@@ -205,26 +205,26 @@ impl Core {
         let dst_name = matching_section.prefix().name();
         let recipients = matching_section.elders_vec();
 
-        info!(
-            "ProbeMsg target {:?} w/key {:?}",
-            matching_section.prefix(),
-            section_key
-        );
+        // info!(
+        //     "ProbeMsg target {:?} w/key {:?}",
+        //     matching_section.prefix(),
+        //     section_key
+        // );
 
         self.send_direct_msg_to_nodes(recipients, message, dst_name, section_key)
             .await
     }
 
     pub(crate) async fn write_prefix_map(&self) {
-        info!("Writing our latest PrefixMap to disk");
+        // info!("Writing our latest PrefixMap to disk");
         // TODO: Make this serialization human readable
 
         let prefix_map = self.network_knowledge.prefix_map().clone();
 
         let _ = tokio::spawn(async move {
             // Compare and write Prefix to `~/.safe/prefix_maps` dir
-            if let Err(e) = compare_and_write_prefix_map_to_disk(&prefix_map).await {
-                error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);
+            if let Err(_e) = compare_and_write_prefix_map_to_disk(&prefix_map).await {
+                // error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);
             }
         });
     }
@@ -239,13 +239,13 @@ impl Core {
 
         if new.section_key != old.section_key {
             if new.is_elder {
-                let sap = self.network_knowledge.authority_provider().await;
-                info!(
-                    "Section updated: prefix: ({:b}), key: {:?}, elders: {}",
-                    new.prefix,
-                    new.section_key,
-                    sap.elders().format(", ")
-                );
+                // let sap = self.network_knowledge.authority_provider().await;
+                // info!(
+                //     "Section updated: prefix: ({:b}), key: {:?}, elders: {}",
+                //     new.prefix,
+                //     new.section_key,
+                //     sap.elders().format(", ")
+                // );
 
                 if !self.section_keys_provider.is_empty().await {
                     cmds.extend(self.promote_and_demote_elders().await?);
@@ -279,11 +279,11 @@ impl Core {
             };
 
             let self_status_change = if !old.is_elder && new.is_elder {
-                trace!("{}: {:?}", LogMarker::PromotedToElder, new.prefix);
+                // trace!("{}: {:?}", LogMarker::PromotedToElder, new.prefix);
                 NodeElderChange::Promoted
             } else if old.is_elder && !new.is_elder {
-                trace!("{}", LogMarker::DemotedFromElder);
-                info!("Demoted");
+                // trace!("{}", LogMarker::DemotedFromElder);
+                // info!("Demoted");
                 self.section_keys_provider.wipe().await;
                 NodeElderChange::Demoted
             } else {
@@ -294,10 +294,10 @@ impl Core {
             // Hence, fire the SectionSplit event whenever detect a prefix change.
             // We also need to update other nodes w/ our known data.
             let event = if (new.prefix != old.prefix) && new.is_elder {
-                info!("{}: {:?}", LogMarker::SplitSuccess, new.prefix);
+                // info!("{}: {:?}", LogMarker::SplitSuccess, new.prefix);
 
                 if old.is_elder {
-                    info!("{}: {:?}", LogMarker::StillElderAfterSplit, new.prefix);
+                    // info!("{}: {:?}", LogMarker::StillElderAfterSplit, new.prefix);
                 }
 
                 cmds.extend(self.send_updates_to_sibling_section(&old).await?);
@@ -383,19 +383,19 @@ impl Core {
             .prefix_map()
             .network_stats(&self.network_knowledge.authority_provider().await)
             .print();
-        self.comm.print_stats();
+        // self.comm.print_stats();
     }
 
-    pub(super) async fn log_section_stats(&self) {
-        let adults = self.network_knowledge.adults().await.len();
-        let elders = self
-            .network_knowledge
-            .authority_provider()
-            .await
-            .elder_count();
-        let prefix = self.network_knowledge.prefix().await;
-        debug!("{:?}: {:?} Elders, {:?} Adults.", prefix, elders, adults);
-    }
+    // pub(super) async fn log_section_stats(&self) {
+    //     let adults = self.network_knowledge.adults().await.len();
+    //     let elders = self
+    //          .network_knowledge
+    //          .authority_provider()
+    //          .await
+    //          .elder_count();
+    //     let prefix = self.network_knowledge.prefix().await;
+    //     debug!("{:?}: {:?} Elders, {:?} Adults.", prefix, elders, adults);
+    // }
 }
 
 pub(crate) struct StateSnapshot {

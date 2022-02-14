@@ -19,7 +19,7 @@ use crate::node::{
     Result,
 };
 use crate::peer::Peer;
-use crate::types::log_markers::LogMarker;
+// use crate::types::log_markers::LogMarker;
 
 use xor_name::XorName;
 
@@ -47,7 +47,7 @@ impl Core {
             .key_share(&section_key)
             .await
             .map_err(|err| {
-                trace!("Can't propose {:?}: {:?}", proposal, err);
+                // trace!("Can't propose {:?}: {:?}", proposal, err);
                 err
             })?;
 
@@ -62,12 +62,12 @@ impl Core {
         proposal: Proposal,
         key_share: &SectionKeyShare,
     ) -> Result<Vec<Cmd>> {
-        trace!(
-            "Propose {:?}, key_share: {:?}, aggregators: {:?}",
-            proposal,
-            key_share,
-            recipients,
-        );
+        // trace!(
+        //     "Propose {:?}, key_share: {:?}, aggregators: {:?}",
+        //     proposal,
+        //     key_share,
+        //     recipients,
+        // );
 
         let sig_share = proposal.sign_with_key_share(
             key_share.public_key_set.clone(),
@@ -126,8 +126,8 @@ impl Core {
     // Send `NodeApproval` to a joining node which makes it a section member
     pub(crate) async fn send_node_approval(&self, node_state: SectionAuth<NodeState>) -> Vec<Cmd> {
         let peer = node_state.peer().clone();
-        let prefix = self.network_knowledge.prefix().await;
-        info!("Our section with {:?} has approved peer {}.", prefix, peer,);
+        // let prefix = self.network_knowledge.prefix().await;
+        // info!("Our section with {:?} has approved peer {}.", prefix, peer,);
 
         let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
             genesis_key: *self.network_knowledge.genesis_key(),
@@ -141,14 +141,14 @@ impl Core {
         }));
 
         let dst_section_pk = self.network_knowledge.section_key().await;
-        trace!("{}", LogMarker::SendNodeApproval);
+        // trace!("{}", LogMarker::SendNodeApproval);
         match self
             .send_direct_msg(peer.clone(), node_msg, dst_section_pk)
             .await
         {
             Ok(cmd) => vec![cmd],
-            Err(err) => {
-                error!("Failed to send join approval to node {}: {:?}", peer, err);
+            Err(_err) => {
+                // error!("Failed to send join approval to node {}: {:?}", peer, err);
                 vec![]
             }
         }
@@ -166,12 +166,12 @@ impl Core {
         // Send DKG start to all candidates
         let recipients: Vec<_> = elder_candidates.elders().cloned().collect();
 
-        trace!(
-            "Send DkgStart for {:?} with {:?} to {:?}",
-            elder_candidates,
-            session_id,
-            recipients
-        );
+        // trace!(
+        //     "Send DkgStart for {:?} with {:?} to {:?}",
+        //     elder_candidates,
+        //     session_id,
+        //     recipients
+        // );
 
         let node_msg = SystemMsg::DkgStart {
             session_id,
@@ -208,22 +208,22 @@ impl Core {
             .key_share(&section_key)
             .await
             .map_err(|err| {
-                trace!(
-                    "Can't create message {:?} for accumulation at dst {:?}: {:?}",
-                    node_msg,
-                    dst,
-                    err
-                );
+                // trace!(
+                //     "Can't create message {:?} for accumulation at dst {:?}: {:?}",
+                //     node_msg,
+                //     dst,
+                //     err
+                // );
                 err
             })?;
 
         let wire_msg = WireMsg::for_dst_accumulation(&key_share, src, dst, node_msg, section_key)?;
 
-        trace!(
-            "Send {:?} for accumulation at dst to {:?}",
-            wire_msg,
-            recipients
-        );
+        // trace!(
+        //     "Send {:?} for accumulation at dst to {:?}",
+        //     wire_msg,
+        //     recipients
+        // );
 
         Ok(self
             .send_messages_to_all_nodes_or_directly_handle_for_accumulation(recipients, wire_msg)

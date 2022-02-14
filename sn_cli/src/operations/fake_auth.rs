@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::APP_ID;
-use tracing::debug;
+// use tracing::debug;
 use sn_api::Safe;
 use color_eyre::Result;
 
@@ -16,17 +16,17 @@ pub async fn authorise_cli(
     _endpoint: Option<String>,
     _is_self_authing: bool,
 ) -> Result<()> {
-    debug!("Fake-auth is enabled so we don't try to read the credentials file or send authorisation request");
+   // debug!("Fake-auth is enabled so we don't try to read the credentials file or send authorisation request");
     Ok(())
 }
 
 pub fn clear_credentials() -> Result<()> {
-    debug!("Fake-auth is enabled so we don't try to clear the credentials file");
+   // debug!("Fake-auth is enabled so we don't try to clear the credentials file");
     Ok(())
 }
 
 pub async fn connect(mut safe: Safe) -> Result<()> {
-    debug!("Fake-auth is enabled so we don't try to read the credentials file");
+   // debug!("Fake-auth is enabled so we don't try to read the credentials file");
 
     safe.connect(APP_ID, Some("fake-auth-credentials"))
         .await

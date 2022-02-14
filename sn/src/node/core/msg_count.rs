@@ -35,15 +35,18 @@ impl MsgCount {
     }
 
     /// Numbers for incoming msgs
+    #[allow(unused)]
     pub(super) fn incoming(&self) -> MsgNumbers {
         Self::get(&self.incoming)
     }
 
     /// Numbers for outgoing msgs
+    #[allow(unused)]
     pub(super) fn outgoing(&self) -> MsgNumbers {
         Self::get(&self.outgoing)
     }
 
+    #[allow(unused)]
     fn get(registry: &MsgRegistry) -> MsgNumbers {
         let mut total = 0_usize;
         let mut max = 0_usize;

@@ -172,12 +172,12 @@ impl SafeAuthenticator {
     ///```
     pub async fn create(&mut self, _passphrase: &str, _password: &str) -> Result<()> {
         unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
-        // debug!("Attempting to create a Safe from provided passphrase and password.");
+        //// debug!("Attempting to create a Safe from provided passphrase and password.");
 
         // let (location, keypair) = derive_location_and_keypair(passphrase, password)?;
         // let data_owner = keypair.public_key();
 
-        // debug!("Creating Safe to be owned by PublicKey: {:?}", data_owner);
+        //// debug!("Creating Safe to be owned by PublicKey: {:?}", data_owner);
 
         // let client = Client::new(
         //     Some(keypair),
@@ -186,7 +186,7 @@ impl SafeAuthenticator {
         //     DEFAULT_OPERATION_TIMEOUT,
         // )
         // .await?;
-        // trace!("Client instantiated properly!");
+        //// trace!("Client instantiated properly!");
 
         // // Create Map data to store the list of keypairs generated for
         // // each of the user's applications.
@@ -213,7 +213,7 @@ impl SafeAuthenticator {
         //     .map_err(|err| {
         //         Error::AuthenticatorError(format!("Failed to store Safe on a Map: {}", err))
         //     })?;
-        // debug!("Map stored successfully for new Safe!");
+        //// debug!("Map stored successfully for new Safe!");
 
         // self.safe = Some((client, map_address));
         // Ok(())
@@ -263,11 +263,11 @@ impl SafeAuthenticator {
     pub async fn unlock(&mut self, _passphrase: &str, _password: &str) -> Result<()> {
         unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
 
-        // debug!("Attempting to unlock a Safe...");
+        //// debug!("Attempting to unlock a Safe...");
 
         // let (location, keypair) = derive_location_and_keypair(passphrase, password)?;
 
-        // debug!(
+        //// debug!(
         //     "Unlocking Safe owned by PublicKey: {:?}",
         //     keypair.public_key()
         // );
@@ -279,7 +279,7 @@ impl SafeAuthenticator {
         //     DEFAULT_OPERATION_TIMEOUT,
         // )
         // .await?;
-        // trace!("Client instantiated properly!");
+        //// trace!("Client instantiated properly!");
 
         // let map_address = MapAddress::Seq {
         //     name: location,
@@ -288,7 +288,7 @@ impl SafeAuthenticator {
 
         // // Attempt to retrieve Map to make sure it actually exists
         // let _ = client.get_map(map_address).await?;
-        // debug!("Safe unlocked successfully!");
+        //// debug!("Safe unlocked successfully!");
 
         // self.safe = Some((client, map_address));
         // Ok(())
@@ -297,7 +297,7 @@ impl SafeAuthenticator {
     pub fn lock(&mut self) -> Result<()> {
         unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
 
-        // debug!("Locking Safe...");
+        //// debug!("Locking Safe...");
         // self.safe = None;
         // Ok(())
     }
@@ -306,7 +306,7 @@ impl SafeAuthenticator {
         unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
 
         // let is_a_safe_unlocked = self.safe.is_some();
-        // debug!(
+        //// debug!(
         //     "Is there a Safe currently unlocked?: {}",
         //     is_a_safe_unlocked
         // );
@@ -318,7 +318,7 @@ impl SafeAuthenticator {
 
         // match IpcMsg::from_string(req) {
         //     Ok(IpcMsg::Req(IpcReq::Auth(app_auth_req))) => {
-        //         debug!("Auth request string decoded: {:?}", app_auth_req);
+        //        // debug!("Auth request string decoded: {:?}", app_auth_req);
         //         Ok(SafeAuthReq::Auth(app_auth_req))
         //     }
         //     Ok(other) => Err(Error::AuthError(format!(
@@ -345,17 +345,17 @@ impl SafeAuthenticator {
         //     Error::AuthenticatorError(format!("Failed to decode authorisation request: {:?}", err))
         // })?;
 
-        // debug!("Auth request string decoded: {:?}", ipc_req);
+        //// debug!("Auth request string decoded: {:?}", ipc_req);
 
         // match ipc_req {
         //     IpcMsg::Req(IpcReq::Auth(app_auth_req)) => {
-        //         info!("Request was recognised as an application auth request");
-        //         debug!("Decoded request: {:?}", app_auth_req);
+        //        // info!("Request was recognised as an application auth request");
+        //        // debug!("Decoded request: {:?}", app_auth_req);
         //         self.gen_auth_response(app_auth_req).await
         //     }
         //     IpcMsg::Req(IpcReq::Unregistered(user_data)) => {
-        //         info!("Request was recognised as an unregistered auth request");
-        //         debug!("Decoded request: {:?}", user_data);
+        //        // info!("Request was recognised as an unregistered auth request");
+        //        // debug!("Decoded request: {:?}", user_data);
 
         //         self.gen_unreg_auth_response()
         //     }
@@ -373,7 +373,7 @@ impl SafeAuthenticator {
     pub async fn authenticate(&self, _auth_req: AuthReq) -> Result<AuthGranted> {
         unimplemented!("Authenticator hasn't yet been updated to work with the new Safe Network");
 
-        // debug!(
+        //// debug!(
         //     "Retrieving/generating keypair for an application: {:?}",
         //     auth_req
         // );
@@ -382,7 +382,7 @@ impl SafeAuthenticator {
         //     let keypair = match client.get_map_value(*map_address, app_id.clone()).await {
         //         Ok(value) => {
         //             // This app already has its own keypair
-        //             trace!(
+        //            // trace!(
         //                 "The app ('{}') already has a Keypair in the Safe",
         //                 auth_req.app_id
         //             );
@@ -407,7 +407,7 @@ impl SafeAuthenticator {
         //                 )
         //             })?;
 
-        //             debug!(
+        //            // debug!(
         //                 "Keypair for the app being authorised ('{}') retrieved from the Safe: {}",
         //                 auth_req.app_id,
         //                 keypair.public_key()
@@ -421,7 +421,7 @@ impl SafeAuthenticator {
         //         }) => {
         //             // This is the first time this app is being authorised,
         //             // thus let's generate a keypair for it
-        //             trace!(
+        //            // trace!(
         //                 "The app ('{}') was not assigned a Keypair yet in the Safe. Generating one for it...",
         //                 auth_req.app_id
         //             );
@@ -435,7 +435,7 @@ impl SafeAuthenticator {
         //                 ))
         //             })?;
 
-        //             debug!(
+        //            // debug!(
         //                 "New keypair generated for app ('{}') being authorised: {}",
         //                 auth_req.app_id,
         //                 keypair.public_key()
@@ -479,12 +479,12 @@ impl SafeAuthenticator {
     //         ))
     //     })?;
 
-    //     debug!("Encoding response with auth credentials auth granted...");
+    //    // debug!("Encoding response with auth credentials auth granted...");
     //     let resp = serde_json::to_string(&IpcMsg::Resp(IpcResp::Auth(Ok(auth_granted)))).map_err(
     //         |err| Error::AuthenticatorError(format!("Failed to encode response: {:?}", err)),
     //     )?;
 
-    //     debug!("Returning auth response generated");
+    //    // debug!("Returning auth response generated");
 
     //     Ok(resp)
     // }
@@ -495,14 +495,14 @@ impl SafeAuthenticator {
     //         Error::AuthenticatorError("Bootstrap contacts information not available".to_string())
     //     })?;
 
-    //     debug!("Encoding response... {:?}", bootstrap_contacts);
+    //    // debug!("Encoding response... {:?}", bootstrap_contacts);
     //     let resp =
     //         serde_json::to_string(&IpcMsg::Resp(IpcResp::Unregistered(Ok(bootstrap_contacts))))
     //             .map_err(|err| {
     //                 Error::AuthenticatorError(format!("Failed to encode response: {:?}", err))
     //             })?;
 
-    //     debug!("Returning unregistered auth response generated: {:?}", resp);
+    //    // debug!("Returning unregistered auth response generated: {:?}", resp);
     //     Ok(resp)
     // }
 }

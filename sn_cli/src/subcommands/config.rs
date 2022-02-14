@@ -9,7 +9,7 @@
 use crate::operations::config::{Config, NetworkInfo};
 use color_eyre::Result;
 use structopt::StructOpt;
-use tracing::debug;
+// use tracing::debug;
 
 #[derive(StructOpt, Debug)]
 pub enum ConfigSubCommands {
@@ -76,7 +76,7 @@ pub async fn config_commander(cmd: Option<ConfigSubCommands>, config: &mut Confi
         // Some(ConfigSubCommands::Remove(SettingRemoveCmd::Contact { name })) => {}
         Some(ConfigSubCommands::Clear) => {
             config.clear().await?;
-            debug!("Config settings cleared out");
+            // debug!("Config settings cleared out");
         }
         None => config.print_networks().await,
     }

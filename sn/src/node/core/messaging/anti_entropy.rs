@@ -13,7 +13,7 @@ use crate::node::{
     Result,
 };
 use crate::peer::Peer;
-use crate::types::log_markers::LogMarker;
+// use crate::types::log_markers::LogMarker;
 
 use bls::PublicKey as BlsPublicKey;
 use xor_name::Prefix;
@@ -32,7 +32,7 @@ impl Core {
             .collect();
 
         if nodes.is_empty() {
-            warn!("No peers of our section found in our network knowledge to send AE-Update");
+            // warn!("No peers of our section found in our network knowledge to send AE-Update");
             return vec![];
         }
 
@@ -54,8 +54,8 @@ impl Core {
     ) -> Vec<Cmd> {
         let node_msg = match self.generate_ae_update_msg(section_pk).await {
             Ok(node_msg) => node_msg,
-            Err(err) => {
-                warn!("Failed to generate AE-Update msg to send: {:?}", err);
+            Err(_err) => {
+                // warn!("Failed to generate AE-Update msg to send: {:?}", err);
                 return vec![];
             }
         };
@@ -66,11 +66,11 @@ impl Core {
             .await
         {
             Ok(cmd) => vec![cmd],
-            Err(err) => {
-                error!(
-                    "Failed to send AE update to ({:?}) {:?}: {:?}",
-                    prefix, recipients, err
-                );
+            Err(_err) => {
+                // error!(
+                //     "Failed to send AE update to ({:?}) {:?}: {:?}",
+                //     prefix, recipients, err
+                // );
                 vec![]
             }
         }
@@ -96,11 +96,11 @@ impl Core {
             .await
         {
             Ok(cmd) => Ok(vec![cmd]),
-            Err(err) => {
-                error!(
-                    "Failed to send data updates to: {:?} with {:?}",
-                    recipients, err
-                );
+            Err(_err) => {
+                // error!(
+                //     "Failed to send data updates to: {:?} with {:?}",
+                //     recipients, err
+                // );
                 Ok(vec![])
             }
         }
@@ -112,7 +112,7 @@ impl Core {
         &self,
         our_prev_state: &StateSnapshot,
     ) -> Result<Vec<Cmd>> {
-        debug!("{}", LogMarker::AeSendUpdateToSiblings);
+        // debug!("{}", LogMarker::AeSendUpdateToSiblings);
         let sibling_prefix = self.network_knowledge.prefix().await.sibling();
         if let Some(sibling_sap) = self
             .network_knowledge
@@ -126,7 +126,7 @@ impl Core {
                 .collect();
 
             if promoted_sibling_elders.is_empty() {
-                debug!("No promoted siblings found in our network knowledge to send AE-Update");
+                // debug!("No promoted siblings found in our network knowledge to send AE-Update");
                 return Ok(vec![]);
             }
 
@@ -155,7 +155,7 @@ impl Core {
 
             Ok(cmds)
         } else {
-            error!("Failed to get sibling SAP during split.");
+            // error!("Failed to get sibling SAP during split.");
             Ok(vec![])
         }
     }

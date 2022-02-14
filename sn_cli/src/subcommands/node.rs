@@ -11,7 +11,7 @@ use color_eyre::{eyre::eyre, Help, Result};
 use sn_api::PublicKey;
 use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf};
 use structopt::StructOpt;
-use tracing::debug;
+// use tracing::debug;
 
 const NODES_DATA_DIR_NAME: &str = "baby-fleming-nodes";
 const LOCAL_NODE_DIR_NAME: &str = "local-node";
@@ -194,7 +194,7 @@ pub async fn node_commander(
                 }
             } else if let Some(name) = network_name {
                 let msg = format!("Joining the '{}' network...", name);
-                debug!("{}", msg);
+                // debug!("{}", msg);
                 println!("{}", msg);
                 config.get_network_info(&name).await?
             } else {
@@ -203,7 +203,7 @@ pub async fn node_commander(
             };
 
             let msg = format!("Joining network with contacts {:?} ...", node_config);
-            debug!("{}", msg);
+            // debug!("{}", msg);
             println!("{}", msg);
 
             let node_directory_path = node_dir_path.unwrap_or_else(|| {

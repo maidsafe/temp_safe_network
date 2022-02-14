@@ -11,7 +11,7 @@ pub use safe_network::types::register::{Entry, EntryHash};
 use crate::safeurl::{ContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe};
 
-use log::debug;
+// use log::debug;
 use rand::Rng;
 use safe_network::{
     client::Error as ClientError,
@@ -23,7 +23,7 @@ use safe_network::{
     },
 };
 use std::collections::{BTreeMap, BTreeSet};
-use tracing::info;
+// use tracing::info;
 use xor_name::XorName;
 
 impl Safe {
@@ -36,16 +36,16 @@ impl Safe {
         private: bool,
         content_type: ContentType,
     ) -> Result<XorUrl> {
-        debug!(
-            "Storing {} Register data with tag type: {}, xorname: {:?}, dry_run: {}",
-            if private { "Private" } else { "Public" },
-            tag,
-            name,
-            self.dry_run_mode
-        );
+        // debug!(
+        //     "Storing {} Register data with tag type: {}, xorname: {:?}, dry_run: {}",
+        //     if private { "Private" } else { "Public" },
+        //     tag,
+        //     name,
+        //     self.dry_run_mode
+        // );
 
         let xorname = name.unwrap_or_else(rand::random);
-        info!("Xorname for new Register storage: {:?}", &xorname);
+        // info!("Xorname for new Register storage: {:?}", &xorname);
 
         let scope = if private {
             Scope::Private
@@ -88,7 +88,7 @@ impl Safe {
 
     /// Read value from a Register on the network
     pub async fn register_read(&self, url: &str) -> Result<BTreeSet<(EntryHash, Entry)>> {
-        debug!("Getting Public Register data from: {:?}", url);
+        // debug!("Getting Public Register data from: {:?}", url);
         let safeurl = self.parse_and_resolve_url(url).await?;
 
         self.register_fetch_entries(&safeurl).await
@@ -96,7 +96,7 @@ impl Safe {
 
     /// Read value from a Register on the network by its hash
     pub async fn register_read_entry(&self, url: &str, hash: EntryHash) -> Result<Entry> {
-        debug!("Getting Public Register data from: {:?}", url);
+        // debug!("Getting Public Register data from: {:?}", url);
         let safeurl = self.parse_and_resolve_url(url).await?;
 
         self.register_fetch_entry(&safeurl, hash).await
@@ -109,17 +109,17 @@ impl Safe {
         &self,
         url: &SafeUrl,
     ) -> Result<BTreeSet<(EntryHash, Entry)>> {
-        debug!("Fetching Register entries from {}", url);
+        // debug!("Fetching Register entries from {}", url);
         let result = match url.content_version() {
             Some(v) => {
                 let hash = v.entry_hash();
-                debug!("Take entry with version hash: {:?}", hash);
+                // debug!("Take entry with version hash: {:?}", hash);
                 self.register_fetch_entry(url, hash)
                     .await
                     .map(|entry| vec![(hash, entry)].into_iter().collect())
             }
             None => {
-                debug!("No version so take latest entry from Register at: {}", url);
+                // debug!("No version so take latest entry from Register at: {}", url);
                 let address = self.get_register_address(url)?;
                 let client = self.get_safe_client()?;
                 client.read_register(address).await.map_err(|err| {
@@ -137,7 +137,7 @@ impl Safe {
 
         match result {
             Ok(data) => {
-                debug!("Register retrieved from {}...", url);
+                // debug!("Register retrieved from {}...", url);
                 Ok(data)
             }
             Err(Error::EmptyContent(_)) => Err(Error::EmptyContent(format!(
