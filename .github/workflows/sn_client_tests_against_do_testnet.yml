@@ -78,19 +78,19 @@ jobs:
       - name: Initital client tests...
         shell: bash
         # always joinable not actually needed here, but should speed up compilation as we've just built with it
-        run: cargo test --release --features=always-joinable,test-utils -- client_api --skip client_api::reg --skip client_api::file --skip client_api::transfer && sleep 5
+        run: cargo test --release --features=test-utils -- client_api --skip client_api::reg --skip client_api::file --skip client_api::transfer && sleep 5
 
       - name: Client reg tests
         shell: bash
-        run: cargo test --release --features=always-joinable,test-utils -- client_api::reg && sleep 5
+        run: cargo test --release --features=test-utils -- client_api::reg && sleep 5
 
       - name: Client file tests
         shell: bash
-        run: cargo test --release --features=always-joinable,test-utils -- client_api::file --test-threads=1 && sleep 5
-      
+        run: cargo test --release --features=test-utils -- client_api::file --test-threads=1 && sleep 5
+
       - name: Run example app for file API
         shell: bash
-        run: cargo run --release  --features=always-joinable,test-utils --example client_files
+        run: cargo run --release  --features=test-utils --example client_files
 
   kill-testnet:
     name: Destroy Digital Ocean testnet
