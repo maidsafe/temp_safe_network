@@ -67,7 +67,6 @@ jobs:
               - 'sn/src/types/**'
             node:
               - 'sn/src/node/**'
-              - 'sn/src/routing/**'
               - 'sn/src/messaging/**'
               - 'sn/src/types/**'
               - 'sn/src/dbs/**'
@@ -80,11 +79,6 @@ jobs:
               - 'sn/src/dbs/**'
               - 'sn/src/prefix_map/**'
               - 'sn/src/url/**'
-            routing:
-              - 'sn/src/routing/**'
-              - 'sn/src/messaging/**'
-              - 'sn/src/types/**'
-              - 'sn/src/prefix_map/**'
             types:
               - 'sn/src/types/**'
             dbs:
@@ -136,11 +130,6 @@ jobs:
         run: cd sn && cargo test --release --features=test-utils -- node
         timeout-minutes: 5
 
-      - name: Run Routing tests
-        if: steps.changes.outputs.routing == 'true'
-        run: cd sn && cargo test --release --features=test-utils -- routing
-        timeout-minutes: 10
-
   e2e:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: E2E tests
@@ -185,25 +174,25 @@ jobs:
         timeout-minutes: 60
 
       - name: Start the network
-        run: ./target/release/testnet --interval 15000
+        run: ./target/release/testnet --interval 15000 && sleep 50
         id: section-startup
         env:
           RUST_LOG: "safe_network,sn_api,sn_node=trace"
 
-      - name: Print Network Log Stats at start
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+      # - name: Print Network Log Stats at start
+      #   shell: bash
+      #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+      #   if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
-      - name: Wait for all nodes to join
-        shell: bash
-        run: ./resources/scripts/wait_for_nodes_to_join.sh
-        timeout-minutes: 5
+      # - name: Wait for all nodes to join
+      #   shell: bash
+      #   run: ./resources/scripts/wait_for_nodes_to_join.sh
+      #   timeout-minutes: 5
 
-      - name: Print Network Log Stats after nodes joined
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+      # - name: Print Network Log Stats after nodes joined
+      #   shell: bash
+      #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+      #   if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
       - name: ubuntu install zsh
         if: matrix.os == 'ubuntu-latest'
@@ -298,20 +287,20 @@ jobs:
       #   env:
       #     SN_QUERY_TIMEOUT: 240 # 240 secs
 
-      - name: Are nodes still running...?
-        shell: bash
-        timeout-minutes: 1
-        if: failure() && matrix.os != 'windows-latest'
-        continue-on-error: true
-        run: |
-          echo "$(pgrep sn_node | wc -l) nodes still running"
-          ls $HOME/.safe/node/local-test-network
+      # - name: Are nodes still running...?
+      #   shell: bash
+      #   timeout-minutes: 1
+      #   if: failure() && matrix.os != 'windows-latest'
+      #   continue-on-error: true
+      #   run: |
+      #     echo "$(pgrep sn_node | wc -l) nodes still running"
+      #     ls $HOME/.safe/node/local-test-network
 
-      - name: Print Network Log Stats
-        shell: bash
-        continue-on-error: true
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' &&  matrix.os != 'windows-latest'
+      # - name: Print Network Log Stats
+      #   shell: bash
+      #   continue-on-error: true
+      #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+      #   if: steps.section-startup.outcome == 'success' &&  matrix.os != 'windows-latest'
 
       - name: Upload Node Logs to AWS for Windowns
           # Upload artifacts.
@@ -381,28 +370,28 @@ jobs:
         timeout-minutes: 60
 
       - name: Start the network
-        run: ./target/release/testnet --interval 15000
+        run: ./target/release/testnet --interval 15000 && sleep 50
         id: section-startup
 
-      - name: Print Network Log Stats at start
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome
+      # - name: Print Network Log Stats at start
+      #   shell: bash
+      #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+      #   if: steps.section-startup.outcome
 
-      - name: Wait for all nodes to join
-        shell: bash
-        # we are not running with 'always-joinable' set, so we should not have the full 33 nodes as yet.
-        run: NODE_COUNT=28 ./resources/scripts/wait_for_nodes_to_join.sh
-        timeout-minutes: 5
+      # - name: Wait for all nodes to join
+      #   shell: bash
+      #   # we are not running with 'always-joinable' set, so we should not have the full 33 nodes as yet.
+      #   run: NODE_COUNT=28 ./resources/scripts/wait_for_nodes_to_join.sh
+      #   timeout-minutes: 5
 
-      - name: Is the network split and ready?
-        shell: bash
-        run: ./resources/scripts/network_is_ready.sh
-        timeout-minutes: 5
+      # - name: Is the network split and ready?
+      #   shell: bash
+      #   run: ./resources/scripts/network_is_ready.sh
+      #   timeout-minutes: 5
 
-      - name: Print Network Log Stats after nodes joined
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+      # - name: Print Network Log Stats after nodes joined
+      #   shell: bash
+      #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
       - name: ubuntu install zsh
         run: |
@@ -469,19 +458,19 @@ jobs:
       #   env:
       #     SN_QUERY_TIMEOUT: 240 # 240 secs
 
-      - name: Are nodes still running...?
-        shell: bash
-        timeout-minutes: 1
-        if: failure()
-        continue-on-error: true
-        run: |
-          echo "$(pgrep sn_node | wc -l) nodes still running"
-          ls $HOME/.safe/node/local-test-network
+      # - name: Are nodes still running...?
+      #   shell: bash
+      #   timeout-minutes: 1
+      #   if: failure()
+      #   continue-on-error: true
+      #   run: |
+      #     echo "$(pgrep sn_node | wc -l) nodes still running"
+      #     ls $HOME/.safe/node/local-test-network
 
-      - name: Print Network Log Stats
-        shell: bash
-        continue-on-error: true
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+      # - name: Print Network Log Stats
+      #   shell: bash
+      #   continue-on-error: true
+      #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
       - name: Upload Node Logs
           # Upload artifacts.
@@ -543,25 +532,25 @@ jobs:
         run: cargo test --no-run -p sn_api --release --lib
 
       - name: Start the network
-        run: ./target/release/testnet --interval 15000
+        run: ./target/release/testnet --interval 15000 && sleep 50
         id: section-startup
         env:
           RUST_LOG: "safe_network,sn_api,sn_node=trace"
 
-      - name: Print Network Log Stats at start
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+      # - name: Print Network Log Stats at start
+      #   shell: bash
+      #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+      #   if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
-      - name: Wait for all nodes to join
-        shell: bash
-        run: ./resources/scripts/wait_for_nodes_to_join.sh
-        timeout-minutes: 5
+      # - name: Wait for all nodes to join
+      #   shell: bash
+      #   run: ./resources/scripts/wait_for_nodes_to_join.sh
+      #   timeout-minutes: 5
 
-      - name: Print Network Log Stats after nodes joined
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+      # - name: Print Network Log Stats after nodes joined
+      #   shell: bash
+      #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+      #   if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
       - name: Run sn_api tests
         shell: bash
@@ -572,19 +561,19 @@ jobs:
           # TODO: Remove that dependency
           SN_QUERY_TIMEOUT: 20 # 20 secs
 
-      - name: Are nodes still running...?
-        shell: bash
-        timeout-minutes: 1
-        if: failure() && matrix.os
-        run: |
-          echo "$(pgrep sn_node | wc -l) nodes still running"
-          ls $HOME/.safe/node/local-test-network
+      # - name: Are nodes still running...?
+      #   shell: bash
+      #   timeout-minutes: 1
+      #   if: failure() && matrix.os
+      #   run: |
+      #     echo "$(pgrep sn_node | wc -l) nodes still running"
+      #     ls $HOME/.safe/node/local-test-network
 
-      - name: Print Network Log Stats
-        shell: bash
-        continue-on-error: true
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success'
+      # - name: Print Network Log Stats
+      #   shell: bash
+      #   continue-on-error: true
+      #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+      #   if: steps.section-startup.outcome == 'success'
 
       - name: Upload Node Logs to AWS for Windowns
           # Upload artifacts.
@@ -606,7 +595,6 @@ jobs:
           path: ~/.safe/node/local-test-network/**/*.log*
         if: failure()
         continue-on-error: true
-
 
       # if we don't clean up, the .safe folder might persist between runs
       - name: Cleanup self-hosted runner
@@ -659,44 +647,44 @@ jobs:
         run: cargo test --no-run -p sn_cli --release
 
       - name: Start the network
-        run: ./target/release/testnet --interval 15000
+        run: ./target/release/testnet --interval 15000 && sleep 50
         id: section-startup
         env:
           RUST_LOG: "safe_network,sn_api,sn_node=trace"
 
-      - name: Print Network Log Stats at start
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+      # - name: Print Network Log Stats at start
+      #   shell: bash
+      #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+      #   if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
-      - name: Wait for all nodes to join
-        shell: bash
-        run: ./resources/scripts/wait_for_nodes_to_join.sh
-        timeout-minutes: 5
+      # - name: Wait for all nodes to join
+      #   shell: bash
+      #   run: ./resources/scripts/wait_for_nodes_to_join.sh
+      #   timeout-minutes: 5
 
-      - name: Print Network Log Stats after nodes joined
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+      # - name: Print Network Log Stats after nodes joined
+      #   shell: bash
+      #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+      #   if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
       - name: Run CLI tests
         shell: bash
         run: ./resources/scripts/cli_tests.sh
         timeout-minutes: 90
 
-      - name: Are nodes still running...?
-        shell: bash
-        timeout-minutes: 1
-        if: failure() && matrix.os
-        run: |
-          echo "$(pgrep sn_node | wc -l) nodes still running"
-          ls $HOME/.safe/node/local-test-network
+      # - name: Are nodes still running...?
+      #   shell: bash
+      #   timeout-minutes: 1
+      #   if: failure() && matrix.os
+      #   run: |
+      #     echo "$(pgrep sn_node | wc -l) nodes still running"
+      #     ls $HOME/.safe/node/local-test-network
 
-      - name: Print Network Log Stats
-        shell: bash
-        continue-on-error: true
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success'
+      # - name: Print Network Log Stats
+      #   shell: bash
+      #   continue-on-error: true
+      #   run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+      #   if: steps.section-startup.outcome == 'success'
 
       - name: Upload Node Logs to AWS
           # Upload artifacts.
