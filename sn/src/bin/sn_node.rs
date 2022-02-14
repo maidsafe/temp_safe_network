@@ -283,14 +283,6 @@ async fn run_node() -> Result<()> {
                         .header("Disable port forwarding or change your router settings"),
                 );
             }
-            #[cfg(feature = "always-joinable")]
-            Err(Error::CannotConnectEndpoint(err)) => {
-                warn!(
-                    "In 'always-joinable' mode. Continuing to try and join after error: {:?}",
-                    err
-                );
-                continue;
-            }
             Err(Error::TryJoinLater) => {
                 println!("{}", log);
                 info!("{}", log);

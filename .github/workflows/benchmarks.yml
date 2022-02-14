@@ -32,7 +32,7 @@ jobs:
           cache-on-failure: true
 
       - name: Build launch local network
-        run: cargo build --release --features=always-joinable
+        run: cargo build --release
 
       - name: Run testnet
         run: ./target/release/testnet

@@ -33,7 +33,6 @@ required-features = ["test-utils"]
 
 [features]
 default = []
-always-joinable = []
 chaos = []
 unstable-wiremsg-debuginfo = []
 test-utils = []
