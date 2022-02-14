@@ -188,6 +188,7 @@ impl Node {
         let mut cmds = self.replicate_data(data).await?;
         // make sure the expected replication factor is achieved
         if data_copy_count() > cmds.len() {
+            error!("InsufficientAdults for storing data reliably");
             let error = CmdError::Data(ErrorMsg::InsufficientAdults {
                 prefix: self.network_knowledge().prefix().await,
                 expected: data_copy_count() as u8,
