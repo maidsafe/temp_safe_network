@@ -123,8 +123,12 @@ async fn main() -> Result<()> {
     let (event_tx, mut event_rx) = mpsc::channel(20);
     let mut network = Network::new();
 
+    println!("creating genesis node");
+
     // Create the genesis node
     network.create_node(event_tx.clone()).await;
+
+    println!("genesis node created");
 
     let mut churn_events = schedule.events();
 
@@ -132,8 +136,10 @@ async fn main() -> Result<()> {
     let mut probes = time::interval(probe_interval);
 
     loop {
+        println!("looping");
         tokio::select! {
             event = event_rx.recv() => {
+                println!("received a network event");
                 if let Some(event) = event {
                     network.handle_event(event).await?
                 } else {
@@ -141,6 +147,7 @@ async fn main() -> Result<()> {
                 }
             }
             event = churn_events.next() => {
+                println!("received a churning event");
                 match event {
                     Some(ChurnEvent::Join) => {
                         network.create_node(event_tx.clone()).await
@@ -151,7 +158,10 @@ async fn main() -> Result<()> {
                     None => unreachable!()
                 }
             }
-            _ = probes.tick() => network.send_probes().await?,
+            _ = probes.tick() => {
+                println!("sending probe");
+                network.send_probes().await?
+            }
         }
     }
 
@@ -228,9 +238,9 @@ impl Network {
         };
 
         // TODO: Fix this: future returned by `add_node` is not `Send`
-        //let _handle = task::spawn(add_node(id, config, event_tx));
-        let _ = add_node(id, config, event_tx).await;
-
+        let _handle = tokio::task::spawn(async move { let _ = add_node(id, config, event_tx).await; });
+        // let _ = add_node(id, config, event_tx).await;
+        println!("try printing status");
         self.try_print_status();
     }
 
