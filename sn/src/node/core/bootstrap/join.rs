@@ -414,9 +414,7 @@ impl<'a> Join<'a> {
                         aggregated: None,
                     };
 
-                    section_auth
-                        .merge_connections(recipients.iter().chain([&sender]))
-                        .await;
+                    section_auth.merge_connections([&sender]).await;
                     let new_recipients = section_auth.elders_vec();
                     self.send_join_requests(join_request, &new_recipients, section_key, true)
                         .await?;
@@ -473,9 +471,7 @@ impl<'a> Join<'a> {
                         aggregated: None,
                     };
 
-                    section_auth
-                        .merge_connections(recipients.iter().chain([&sender]))
-                        .await;
+                    section_auth.merge_connections([&sender]).await;
                     self.send_join_requests(join_request, &new_recipients, section_key, true)
                         .await?;
                 }
