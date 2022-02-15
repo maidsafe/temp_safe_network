@@ -159,13 +159,16 @@ impl Peer {
             return;
         }
 
-        let other_connection = if let Ok(connection) =
-            RwLockReadGuard::try_map(other.connection.read().await, Option::as_ref)
-        {
+        let other_connection = if let Ok(connection) = other.connection.try_read() {
             // eager clone to drop the read lock, clones should be quite cheap
-            connection.clone()
+            if let Some(connection) = connection.as_ref() {
+                connection.clone()
+            } else {
+                // There's nothing to do if `other` has no connection
+                return;
+            }
         } else {
-            // There's nothing to do if `other` has no connection
+            // There's nothing to do if `other` connection not set yet
             return;
         };
 

@@ -238,7 +238,9 @@ impl Network {
         };
 
         // TODO: Fix this: future returned by `add_node` is not `Send`
-        let _handle = tokio::task::spawn(async move { let _ = add_node(id, config, event_tx).await; });
+        let _handle = tokio::task::spawn(async move {
+            let _ = add_node(id, config, event_tx).await;
+        });
         // let _ = add_node(id, config, event_tx).await;
         println!("try printing status");
         self.try_print_status();
