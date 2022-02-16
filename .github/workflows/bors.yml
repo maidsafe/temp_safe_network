@@ -28,6 +28,7 @@ jobs:
     # github jobs that need to have passed for bors to give the all clear
     needs:
       - e2e
+      - e2e-split
       - unit
       - checks
       - test-publish
@@ -267,6 +268,8 @@ jobs:
       - name: Start the network
         run: ./target/release/testnet
         id: section-startup
+        env:
+          RUST_LOG: "safe_network,sn_api,sn_node=trace"
 
       - name: Print Network Log Stats at start
         shell: bash
@@ -381,17 +384,6 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success' &&  matrix.os != 'windows-latest'
 
-      - name: Upload Node Logs to AWS for Windowns
-          # Upload artifacts.
-        run: aws s3 sync C:\Users\runneradmin\.safe\node\local-test-network\ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure() &&  matrix.os == 'windows-latest'
-        continue-on-error: true
-
-      - name: Upload Node Logs to AWS for Non-Windows
-          # Upload artifacts.
-        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure() &&  matrix.os != 'windows-latest'
-        continue-on-error: true
 
       - name: Upload Node Logs
           # Upload artifacts.
@@ -444,6 +436,8 @@ jobs:
       - name: Start the network
         run: ./target/release/testnet
         id: section-startup
+        env:
+          RUST_LOG: "safe_network,sn_api,sn_node=trace"
 
       - name: Print Network Log Stats at start
         shell: bash
