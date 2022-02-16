@@ -41,11 +41,7 @@ const ADDITIONAL_NODES_TO_SPLIT: u64 = 30;
 #[tokio::main]
 async fn main() -> Result<()> {
     // First lets build the network and testnet launcher, to ensure we're on the latest version
-    let args: Vec<&str> = vec![
-        "build",
-        "--release",
-        "--features=always-joinable,test-utils",
-    ];
+    let args: Vec<&str> = vec!["build", "--release", "--features=test-utils"];
 
     println!("Building current sn_node");
     let _child = Command::new("cargo")

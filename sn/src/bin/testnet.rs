@@ -94,7 +94,7 @@ async fn main() -> Result<()> {
     // got resoved within the new version of Rust.
     #[cfg(not(target_os = "windows"))]
     // For Windows guys, rember to use
-    // `cargo build --release --features=always-joinable,test-utils --bins`
+    // `cargo build --release --features=test-utils --bins`
     // before executing the testnet.exe.
     {
         let cmd_args = Cmd::from_args();
@@ -104,10 +104,6 @@ async fn main() -> Result<()> {
         if cfg!(feature = "unstable-command-prioritisation") {
             build_args.push("--features");
             build_args.push("unstable-command-prioritisation");
-        }
-        if cfg!(feature = "always-joinable") {
-            build_args.push("--features");
-            build_args.push("always-joinable");
         }
         if cfg!(feature = "test-utils") {
             build_args.push("--features");

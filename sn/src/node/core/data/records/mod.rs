@@ -243,6 +243,8 @@ impl Node {
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
         let adults = self.network_knowledge().adults().await;
 
+        trace!("Total adults known about: {:?}", adults.len());
+
         let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
 
         let candidates = adults_names

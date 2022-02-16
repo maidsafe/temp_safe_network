@@ -3295,7 +3295,7 @@ checksum = "73b4b750c782965c211b42f022f59af1fbceabdd026623714f104152f1ec149f"
 
 [[package]]
 name = "safe_network"
-version = "0.57.0"
+version = "0.57.1"
 dependencies = [
  "assert_matches",
  "backoff",
@@ -3706,7 +3706,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.49.0"
+version = "0.49.1"
 dependencies = [
  "ansi_term 0.12.1",
  "assert_cmd",

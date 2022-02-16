@@ -41,7 +41,8 @@ impl Display for SectionAuthorityProvider {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(
             f,
-            "{{{}}}/({:b})",
+            "sap len:{} contains: {{{}}}/({:b})",
+            self.elders.len(),
             self.elders.keys().format(", "),
             self.prefix,
         )
