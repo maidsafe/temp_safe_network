@@ -6,26 +6,39 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::{JoinResponse, SectionAuth, SystemMsg};
-use crate::node::{api::cmds::Cmd, core::Node, network_knowledge::NodeState};
-use crate::types::log_markers::LogMarker;
+use crate::messaging::system::{JoinResponse, NodeState, SectionAuth, SystemMsg};
+use crate::node::{api::cmds::Cmd, core::Node};
+use crate::types::{log_markers::LogMarker, Peer};
 
 impl Node {
     // Send `NodeApproval` to a joining node which makes it a section member
     pub(crate) async fn send_node_approval(&self, node_state: SectionAuth<NodeState>) -> Vec<Cmd> {
-        let peer = node_state.peer().clone();
-        let prefix = self.network_knowledge.prefix().await;
-        info!("Our section with {:?} has approved peer {}.", prefix, peer,);
+        let peer = Peer::new(node_state.value.name, node_state.value.addr);
+        let section_chain = self.network_knowledge.section_chain().await;
+        let genesis_key = *self.network_knowledge.genesis_key();
+        let section_auth = self
+            .network_knowledge
+            .section_signed_authority_provider()
+            .await
+            .into_authed_msg();
+        let section_peers = self
+            .network_knowledge
+            .section_signed_members()
+            .await
+            .iter()
+            .map(|state| state.clone().into_authed_msg())
+            .collect();
+
+        info!(
+            "Our section with {:?} has approved peer {}.",
+            section_auth.prefix, peer,
+        );
 
         let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
-            genesis_key: *self.network_knowledge.genesis_key(),
-            section_auth: self
-                .network_knowledge
-                .section_signed_authority_provider()
-                .await
-                .into_authed_msg(),
-            node_state: node_state.into_authed_msg(),
-            section_chain: self.network_knowledge.section_chain().await,
+            genesis_key,
+            section_auth,
+            section_chain,
+            section_peers,
         }));
 
         let dst_section_pk = self.network_knowledge.section_key().await;

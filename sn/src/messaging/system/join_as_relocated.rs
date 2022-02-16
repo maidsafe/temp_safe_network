@@ -10,6 +10,7 @@ use super::{NodeState, SectionAuth};
 use crate::messaging::SectionAuthorityProvider;
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Signature;
+use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
@@ -36,4 +37,14 @@ pub enum JoinAsRelocatedResponse {
     Redirect(SectionAuthorityProvider),
     /// The requesting node is not externally reachable
     NodeNotReachable(SocketAddr),
+    /// Message sent to joining peer containing the necessary
+    /// info to become a member of the section.
+    Approval {
+        /// Section Authority over this message for validation
+        section_auth: SectionAuth<SectionAuthorityProvider>,
+        /// info on current members of the section
+        node_state: SectionAuth<NodeState>,
+        /// The secured (signed) and verifiable section chain
+        section_chain: SecuredLinkedList,
+    },
 }

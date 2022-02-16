@@ -89,21 +89,12 @@ impl NodeState {
         self.peer.addr()
     }
 
-    pub(crate) fn state(&self) -> MembershipState {
-        self.state.clone()
-    }
-
     pub(crate) fn previous_name(&self) -> Option<XorName> {
         self.previous_name
     }
 
     pub(crate) fn age(&self) -> u8 {
         self.peer.age()
-    }
-
-    // Returns true if the state is a Relocated node
-    pub(crate) fn is_relocated(&self) -> bool {
-        matches!(self.state, MembershipState::Relocated(_))
     }
 
     pub(crate) fn leave(self) -> Result<Self, Error> {

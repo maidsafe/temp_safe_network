@@ -267,7 +267,7 @@ impl Node {
         // if so we can skip the SectionInfo agreement proposal phase.
         if self
             .network_knowledge
-            .try_update_current_sap(key_share_pk, &sap.prefix())
+            .try_update_current_sap(&key_share, &sap.prefix())
             .await
         {
             self.update_self_for_new_node_state(snapshot).await
@@ -280,8 +280,7 @@ impl Node {
                 .authority_provider()
                 .await
                 .elders_vec();
-            self.send_proposal_with(recipients, proposal, &key_share)
-                .await
+            self.send_proposal(recipients, proposal, &key_share).await
         }
     }
 

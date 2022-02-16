@@ -10,40 +10,52 @@ use crate::messaging::system::{JoinResponse, ResourceProofResponse, SystemMsg};
 use crate::node::{
     api::cmds::Cmd,
     core::{Node, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
-    ed25519, Error, Result,
+    ed25519,
+    network_knowledge::NodeState,
+    Error, Result,
 };
 use crate::types::{log_markers::LogMarker, Peer};
 
 use ed25519_dalek::Verifier;
-use xor_name::XorName;
 
 // Resource signed
 impl Node {
-    pub(crate) async fn validate_resource_proof_response(
+    pub(crate) async fn handle_resource_proof_response(
         &self,
-        peer_name: &XorName,
-        response: ResourceProofResponse,
-    ) -> bool {
-        let serialized = if let Ok(serialized) = bincode::serialize(&(peer_name, &response.nonce)) {
-            serialized
+        peer: Peer,
+        resource_proof: ResourceProofResponse,
+    ) -> Result<Vec<Cmd>> {
+        let sig_is_verified =
+            if let Ok(serialized) = bincode::serialize(&(peer.name(), &resource_proof.nonce)) {
+                self.info
+                    .read()
+                    .await
+                    .keypair
+                    .public
+                    .verify(&serialized, &resource_proof.nonce_signature)
+                    .is_ok()
+            } else {
+                false
+            };
+
+        let is_valid = sig_is_verified
+            && self.resource_proof.validate_all(
+                &resource_proof.nonce,
+                &resource_proof.data,
+                resource_proof.solution,
+            );
+
+        if is_valid {
+            // Propose Join with BRB membership consensus protocol
+            let node_state = NodeState::joined(peer, None);
+            Ok(vec![Cmd::HandleNewNodeOnline(node_state)])
         } else {
-            return false;
-        };
-
-        if self
-            .info
-            .read()
-            .await
-            .keypair
-            .public
-            .verify(&serialized, &response.nonce_signature)
-            .is_err()
-        {
-            return false;
+            debug!(
+                "Ignoring JoinRequest from {} - invalid resource signed response",
+                peer
+            );
+            Ok(vec![])
         }
-
-        self.resource_proof
-            .validate_all(&response.nonce, &response.data, response.solution)
     }
 
     pub(crate) async fn send_resource_proof_challenge(&self, peer: Peer) -> Result<Cmd> {

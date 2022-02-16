@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{agreement::SectionAuth, KeyedSig, NodeState, SectionPeers, SigShare};
+use super::{agreement::SectionAuth, KeyedSig, SectionPeers};
 use crate::messaging::SectionAuthorityProvider;
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Signature;
@@ -21,8 +21,6 @@ pub struct JoinRequest {
     pub section_key: BlsPublicKey,
     /// Proof of the resource proofing.
     pub resource_proof_response: Option<ResourceProofResponse>,
-    /// Aggregated approval from the Elders
-    pub aggregated: Option<SectionAuth<NodeState>>,
 }
 
 /// Joining peer's proof of resolvement of given resource proofing challenge.
@@ -71,32 +69,17 @@ pub enum JoinResponse {
     /// containing addresses of nodes that are closer (than the recipient) to the
     /// requested name. The `JoinRequest` should be re-sent to these addresses.
     Redirect(SectionAuthorityProvider),
-    /// Send a share of approval that the joining node will aggregate
-    ApprovalShare {
-        /// State of the Node at the time of sending the ApprovalShare
-        node_state: NodeState,
-        /// SignatureShare of an elder over the NodeState
-        sig_share: SigShare,
-        /// Current `SectionAuthorityProvider` of the section.
-        section_auth: SectionAuthorityProvider,
-        /// Section signature over the `SectionAuthorityProvider`.
-        section_signed: KeyedSig,
-        /// Section chain of the current section
-        section_chain: SecuredLinkedList,
-        /// Signed NodeState of section members
-        members: SectionPeers,
-    },
     /// Message sent to joining peer containing the necessary
     /// info to become a member of the section.
     Approval {
-        /// Network genesis key (needed to validate) section_chain
+        /// Network genesis key, needed to validate section_chain
         genesis_key: BlsPublicKey,
-        /// SectionAuthorityProvider Signed by (current section)
+        /// SectionAuthorityProvider signed by (current section)
         section_auth: SectionAuth<SectionAuthorityProvider>,
-        /// Current node's state
-        node_state: SectionAuth<NodeState>,
         /// Full verifiable section chain
         section_chain: SecuredLinkedList,
+        /// Complete list of section members, i.e. Elders and Adults, including the approved node
+        section_peers: SectionPeers,
     },
     /// Join was rejected
     Rejected(JoinRejectionReason),

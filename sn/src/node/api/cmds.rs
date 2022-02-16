@@ -7,13 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    system::{DkgFailureSigSet, KeyedSig, NodeState, SectionAuth, SystemMsg},
+    system::{DkgFailureSigSet, KeyedSig, SectionAuth, SystemMsg},
     DstLocation, MsgId, NodeMsgAuthority, WireMsg,
 };
 use crate::node::{
-    core::Proposal,
-    network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
-    XorName,
+    network_knowledge::{NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare},
+    NodeInfo, XorName,
 };
 use crate::types::{Peer, UnnamedPeer};
 
@@ -28,7 +27,7 @@ use std::{
 
 /// Internal cmds for a node.
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub(crate) enum Cmd {
     /// Handle `message` from `sender`.
     /// Holding the WireMsg that has been received from the network,
@@ -56,12 +55,19 @@ pub(crate) enum Cmd {
     HandleTimeout(u64),
     /// Handle peer that's been detected as lost.
     HandlePeerLost(Peer),
-    /// Handle agreement on a proposal.
-    HandleAgreement { proposal: Proposal, sig: KeyedSig },
-    /// Handle a new Node joining agreement.
-    HandleNewNodeOnline(SectionAuth<NodeState>),
-    /// Handle agree on elders. This blocks node message processing until complete.
-    HandleNewEldersAgreement { proposal: Proposal, sig: KeyedSig },
+    /// Handle agreement on proposal for section new info.
+    HandleSectionInfoAgreement {
+        section_auth: SectionAuthorityProvider,
+        sig: KeyedSig,
+    },
+    /// Handle a new Node joining request.
+    HandleNewNodeOnline(NodeState),
+    /// Handle agreement of new Elders triggering consensus to handover.
+    /// This blocks node message processing until complete.
+    HandleNewEldersAgreement {
+        signed_sap: SectionAuth<SectionAuthorityProvider>,
+        sig: KeyedSig,
+    },
     /// Handle the outcome of a DKG session where we are one of the participants (that is, one of
     /// the proposed new elders).
     HandleDkgOutcome {
@@ -87,11 +93,12 @@ pub(crate) enum Cmd {
     /// Schedule a timeout after the given duration. When the timeout expires, a `HandleTimeout`
     /// cmd is raised. The token is used to identify the timeout.
     ScheduleTimeout { duration: Duration, token: u64 },
-    /// Test peer's connectivity
-    SendAcceptedOnlineShare {
-        peer: Peer,
-        // Previous name if relocated.
-        previous_name: Option<XorName>,
+    /// Once we joined as relocated to a new section, switch our local section info to new section.
+    HandleRelocationComplete {
+        /// New Node state and information
+        node_info: NodeInfo,
+        /// New section's knowledge where we relocated
+        section: NetworkKnowledge,
     },
     /// Proposes a peer as offline
     ProposeOffline(XorName),
@@ -114,7 +121,7 @@ impl fmt::Display for Cmd {
                 write!(f, "HandleMsg {:?}", wire_msg.msg_id())
             }
             Cmd::HandlePeerLost(peer) => write!(f, "HandlePeerLost({:?})", peer.name()),
-            Cmd::HandleAgreement { .. } => write!(f, "HandleAgreement"),
+            Cmd::HandleSectionInfoAgreement { .. } => write!(f, "HandleSectionInfoAgreement"),
             Cmd::HandleNewEldersAgreement { .. } => write!(f, "HandleNewEldersAgreement"),
             Cmd::HandleNewNodeOnline(_) => write!(f, "HandleNewNodeOnline"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
@@ -136,9 +143,9 @@ impl fmt::Display for Cmd {
             Cmd::SendMsgDeliveryGroup { wire_msg, .. } => {
                 write!(f, "SendMsgDeliveryGroup {:?}", wire_msg.msg_id())
             }
-            Cmd::SendAcceptedOnlineShare { .. } => write!(f, "SendAcceptedOnlineShare"),
             Cmd::ProposeOffline(_) => write!(f, "ProposeOffline"),
             Cmd::StartConnectivityTest(_) => write!(f, "StartConnectivityTest"),
+            Cmd::HandleRelocationComplete { .. } => write!(f, "HandleRelocationComplete"),
             Cmd::TestConnectivity(_) => write!(f, "TestConnectivity"),
         }
     }

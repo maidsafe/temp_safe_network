@@ -21,9 +21,11 @@ pub enum LogMarker {
     SplitAttempt,
     NewPrefix,
     AeSendUpdateToSiblings,
-    AgreementOfOnline,
     // Malice
     DeviantsDetected,
+    // Membership
+    AgreementOfJoin,
+    MembershipMsg,
     // Messaging
     ServiceMsgToBeHandled,
     SystemMsgToBeHandled,

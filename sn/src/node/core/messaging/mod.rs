@@ -8,5 +8,3 @@
 
 mod handling;
 mod sending;
-
-pub(crate) use handling::handle_proposal;

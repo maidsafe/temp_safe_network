@@ -8,17 +8,14 @@
 
 use super::{delivery_group, Comm, Node};
 
-use crate::messaging::{
-    system::{JoinResponse, MembershipState, NodeState, SigShare, SystemMsg},
-    WireMsg,
-};
+use crate::messaging::WireMsg;
 use crate::node::{
     api::cmds::Cmd,
     error::Result,
     network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionKeyShare},
     Event, NodeInfo,
 };
-use crate::types::{log_markers::LogMarker, Peer};
+use crate::types::log_markers::LogMarker;
 use crate::UsedSpace;
 
 use secured_linked_list::SecuredLinkedList;
@@ -41,6 +38,7 @@ impl Node {
 
         let (section, section_key_share) =
             NetworkKnowledge::first_node(node.peer(), genesis_sk_set).await?;
+
         Self::new(
             comm,
             node,
@@ -92,15 +90,6 @@ impl Node {
     /// Returns connection info of this node.
     pub(crate) fn our_connection_info(&self) -> SocketAddr {
         self.comm.our_connection_info()
-    }
-
-    /// Tries to sign with the secret corresponding to the provided BLS public key
-    pub(crate) async fn sign_with_section_key_share(
-        &self,
-        data: &[u8],
-        public_key: &bls::PublicKey,
-    ) -> Result<(usize, bls::SignatureShare)> {
-        self.section_keys_provider.sign_with(data, public_key).await
     }
 
     /// Returns the current BLS public key set
@@ -214,56 +203,5 @@ impl Node {
         }
 
         Ok(cmds)
-    }
-
-    pub(crate) async fn send_accepted_online_share(
-        &self,
-        peer: Peer,
-        previous_name: Option<XorName>,
-    ) -> Result<Vec<Cmd>> {
-        let public_key_set = self.public_key_set().await?;
-        let section_key = public_key_set.public_key();
-
-        let node_state = NodeState {
-            name: peer.name(),
-            addr: peer.addr(),
-            state: MembershipState::Joined,
-            previous_name,
-        };
-        let serialized_details = bincode::serialize(&node_state)?;
-        let (index, signature_share) = self
-            .sign_with_section_key_share(&serialized_details, &section_key)
-            .await?;
-
-        let sig_share = SigShare {
-            public_key_set,
-            index,
-            signature_share,
-        };
-
-        let members = self
-            .network_knowledge
-            .section_signed_members()
-            .await
-            .into_iter()
-            .map(|itr| itr.into_authed_msg())
-            .collect();
-        let signed_sap = self
-            .network_knowledge
-            .section_signed_authority_provider()
-            .await;
-
-        let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::ApprovalShare {
-            node_state,
-            sig_share,
-            section_auth: signed_sap.value.to_msg(),
-            section_signed: signed_sap.sig,
-            section_chain: self.network_knowledge.section_chain().await,
-            members,
-        }));
-
-        Ok(vec![
-            self.send_direct_msg(peer, node_msg, section_key).await?,
-        ])
     }
 }
