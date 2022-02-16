@@ -17,39 +17,8 @@ use crate::node::{
 use crate::types::Peer;
 
 impl Node {
-    /// Send proposal to all our elders.
-    pub(crate) async fn propose(&self, proposal: Proposal) -> Result<Vec<Cmd>> {
-        let elders = self
-            .network_knowledge
-            .authority_provider()
-            .await
-            .elders_vec();
-        self.send_proposal(elders, proposal).await
-    }
-
-    /// Send `proposal` to `recipients`.
-    pub(crate) async fn send_proposal(
-        &self,
-        recipients: Vec<Peer>,
-        proposal: Proposal,
-    ) -> Result<Vec<Cmd>> {
-        let section_key = self.network_knowledge.section_key().await;
-
-        let key_share = self
-            .section_keys_provider
-            .key_share(&section_key)
-            .await
-            .map_err(|err| {
-                trace!("Can't propose {:?}: {:?}", proposal, err);
-                err
-            })?;
-
-        self.send_proposal_with(recipients, proposal, &key_share)
-            .await
-    }
-
     /// Send `proposal` to `recipients` signing it with the provided key share.
-    pub(crate) async fn send_proposal_with(
+    pub(crate) async fn send_proposal(
         &self,
         recipients: Vec<Peer>,
         proposal: Proposal,
@@ -94,15 +63,8 @@ impl Node {
         for peer in recipients.clone() {
             if peer.name() == our_name {
                 cmds.extend(
-                    super::super::handle_proposal(
-                        msg_id,
-                        proposal.clone(),
-                        sig_share.clone(),
-                        peer,
-                        &self.network_knowledge,
-                        &self.proposal_aggregator,
-                    )
-                    .await?,
+                    self.handle_proposal(msg_id, proposal.clone(), sig_share.clone(), peer)
+                        .await?,
                 )
             }
         }

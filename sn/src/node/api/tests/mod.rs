@@ -99,7 +99,6 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
         SystemMsg::JoinRequest(Box::new(JoinRequest {
             section_key,
             resource_proof_response: None,
-            aggregated: None,
         })),
         section_key,
     )?;
@@ -195,7 +194,6 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
                 nonce,
                 nonce_signature,
             }),
-            aggregated: Some(auth.clone()),
         })),
         section_key,
     )?;
@@ -213,9 +211,9 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
     let mut test_connectivity = false;
     for cmd in cmds {
         if let Cmd::HandleNewNodeOnline(response) = cmd {
-            assert_eq!(response.value.name, new_node.name());
-            assert_eq!(response.value.addr, new_node.addr);
-            assert_eq!(response.value.age(), MIN_ADULT_AGE);
+            assert_eq!(response.name(), new_node.name());
+            assert_eq!(response.addr(), new_node.addr);
+            assert_eq!(response.age(), MIN_ADULT_AGE);
 
             test_connectivity = true;
         }
@@ -303,13 +301,9 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
 
     for cmd in inner_cmds {
         // third pass should now be handled and return propose
-        if let Cmd::SendAcceptedOnlineShare {
-            peer,
-            previous_name,
-        } = cmd
-        {
-            assert_eq!(peer, relocated_node.peer());
-            assert_eq!(previous_name, Some(relocated_node_old_name));
+        if let Cmd::HandleNewNodeOnline(node_state) = cmd {
+            assert_eq!(node_state.peer(), &relocated_node.peer());
+            assert_eq!(node_state.previous_name(), Some(relocated_node_old_name));
 
             propose_cmd_returned = true;
         }
@@ -411,7 +405,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
 
     let cmds = dispatcher
-        .process_cmd(Cmd::HandleNewNodeOnline(auth), "cmd-id")
+        .process_cmd(Cmd::HandleNewNodeOnline(auth.into_state()), "cmd-id")
         .await?;
 
     // Verify we sent a `DkgStart` message with the expected participants.
@@ -463,7 +457,7 @@ async fn handle_online_cmd(
     let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
 
     let cmds = dispatcher
-        .process_cmd(Cmd::HandleNewNodeOnline(auth), "cmd-id")
+        .process_cmd(Cmd::HandleNewNodeOnline(auth.into_state()), "cmd-id")
         .await?;
 
     let mut status = HandleOnlineStatus {
@@ -943,7 +937,6 @@ async fn get_internal_cmds(cmd: Cmd, dispatcher: &Dispatcher) -> RoutingResult<V
     let cmds = dispatcher.process_cmd(cmd, "cmd-id").await?;
 
     let mut node_msg_handling = vec![];
-    // let mut inner_handling = vec![];
 
     for cmd in cmds {
         // first pass gets us into node msg handling
@@ -1021,7 +1014,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
 
     let auth = create_relocation_trigger(sk_set.secret_key(), relocated_peer.age())?;
     let cmds = dispatcher
-        .process_cmd(Cmd::HandleNewNodeOnline(auth), "cmd-id")
+        .process_cmd(Cmd::HandleNewNodeOnline(auth.into_state()), "cmd-id")
         .await?;
 
     let mut offline_relocate_sent = false;
@@ -1335,7 +1328,7 @@ async fn handle_demote_during_split() -> Result<()> {
 
     let dispatcher = Dispatcher::new(node);
 
-    // Create agreement on `OurElder` for both sub-sections
+    // Create agreement on `NewElders` for both sub-sections
     let create_our_elders_cmd = |signed_sap| -> Result<_> {
         let proposal = Proposal::NewElders(signed_sap);
         let signature = sk_set_v0.secret_key().sign(&proposal.as_signable_bytes()?);

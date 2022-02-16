@@ -90,6 +90,7 @@ impl MsgType {
                     | SystemMsg::Relocate(_)
                     | SystemMsg::JoinRequest(_)
                     | SystemMsg::JoinAsRelocatedRequest(_)
+                    | SystemMsg::Membership(_)
                     | SystemMsg::Propose { .. }
                     | SystemMsg::StartConnectivityTest(_),
                 ..

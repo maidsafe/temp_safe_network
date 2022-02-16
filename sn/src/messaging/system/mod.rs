@@ -28,6 +28,7 @@ use bls_dkg::key_gen::message::Message as DkgMessage;
 use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
+use sn_membership::{Reconfig, SignedVote};
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
@@ -166,6 +167,8 @@ pub enum SystemMsg {
     /// Sent to the current elders by the DKG participants when at least majority of them observe
     /// a DKG failure.
     DkgFailureAgreement(DkgFailureSigSet),
+    /// Voting message for membership consensus protocol to add/remove peers to/from a section.
+    Membership(SignedVote<Reconfig<NodeState>>),
     /// Message containing a single `Proposal` to be aggregated in the proposal aggregator.
     Propose {
         /// The content of the proposal

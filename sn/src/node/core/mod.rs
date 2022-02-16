@@ -139,7 +139,7 @@ impl Node {
     ) -> Result<Self> {
         let section_keys_provider = SectionKeysProvider::new(section_key_share).await;
 
-        // make sure the Node has the correct local addr as Comm
+        // Make sure the Node has the correct local addr as Comm
         info.addr = comm.our_connection_info();
 
         let data_storage = DataStorage::new(&root_storage_dir, used_space.clone())?;
@@ -181,6 +181,28 @@ impl Node {
     ////////////////////////////////////////////////////////////////////////////
     // Miscellaneous
     ////////////////////////////////////////////////////////////////////////////
+
+    /// Update our private `joins allowed` flag according to our current section information
+    pub(crate) async fn update_joins_allowed_flag(&self) {
+        // Do not disable node joins in first section.
+        let is_allowed = if cfg!(feature = "always-joinable")
+            || self.network_knowledge.prefix().await.is_empty()
+        {
+            true
+        } else {
+            // if we are ready to split we don't accept new nodes to join
+            let our_name = self.info.read().await.name();
+            self.network_knowledge
+                .get_split_info(&our_name, &BTreeSet::default())
+                .await
+                .is_none()
+            // TODO:
+            // } else if storage_level < MIN_LEVEL_WHEN_FULL {
+            //    false
+        };
+
+        *self.joins_allowed.write().await = is_allowed;
+    }
 
     pub(crate) async fn generate_probe_msg(&self) -> Result<Cmd> {
         // Generate a random address not belonging to our Prefix
@@ -251,13 +273,6 @@ impl Node {
 
                 if !self.section_keys_provider.is_empty().await {
                     cmds.extend(self.promote_and_demote_elders().await?);
-
-                    // Whenever there is an elders change, casting a round of joins_allowed
-                    // proposals to sync.
-                    cmds.extend(
-                        self.propose(Proposal::JoinsAllowed(*self.joins_allowed.read().await))
-                            .await?,
-                    );
                 }
 
                 self.print_network_stats().await;
@@ -396,7 +411,10 @@ impl Node {
             .await
             .elder_count();
         let prefix = self.network_knowledge.prefix().await;
-        debug!("{:?}: {:?} Elders, {:?} Adults.", prefix, elders, adults);
+        info!(
+            ">>> {:?}: {:?} Elders, {:?} Adults.",
+            prefix, elders, adults
+        );
     }
 }
 

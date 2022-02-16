@@ -13,7 +13,11 @@ use crate::messaging::{
     DstLocation, WireMsg,
 };
 use crate::node::{
-    api::cmds::Cmd, ed25519, messages::WireMsgUtils, network_knowledge::SectionAuthorityProvider,
+    api::cmds::Cmd,
+    dkg::SectionAuthUtils,
+    ed25519,
+    messages::WireMsgUtils,
+    network_knowledge::{NetworkKnowledge, SectionAuthorityProvider},
     Error, NodeInfo, Result,
 };
 use crate::types::{Peer, PublicKey};
@@ -25,7 +29,7 @@ use xor_name::{Prefix, XorName};
 
 /// Re-join as a relocated node.
 pub(crate) struct JoiningAsRelocated {
-    pub(crate) node: NodeInfo,
+    pub(crate) node_info: NodeInfo,
     genesis_key: BlsPublicKey,
     relocate_proof: SectionAuth<NodeState>,
     // Avoid sending more than one duplicated request (with same SectionKey) to the same peer.
@@ -40,7 +44,7 @@ impl JoiningAsRelocated {
     // Generates the first cmd to send a `JoinAsRelocatedRequest`, responses
     // shall be fed back with `handle_join_response` function.
     pub(crate) fn start(
-        node: NodeInfo,
+        node_info: NodeInfo,
         genesis_key: BlsPublicKey,
         relocate_proof: SectionAuth<NodeState>,
         bootstrap_addrs: Vec<SocketAddr>,
@@ -62,11 +66,11 @@ impl JoiningAsRelocated {
         // we will then used calculate our new name and send the `JoinAsRelocatedRequest` again.
         // This time we just send a dummy signature for the name.
         // TODO: include the section Prefix in the RelocationDetails so we save one request.
-        let old_keypair = node.keypair.clone();
-        let dummy_signature = ed25519::sign(&node.name().0, &old_keypair);
+        let old_keypair = node_info.keypair.clone();
+        let dummy_signature = ed25519::sign(&node_info.name().0, &old_keypair);
 
         let relocating = Self {
-            node,
+            node_info,
             genesis_key,
             relocate_proof,
             used_recipient_saps,
@@ -188,6 +192,48 @@ impl JoiningAsRelocated {
                 );
                 Err(Error::NodeNotReachable(addr))
             }
+            JoinAsRelocatedResponse::Approval {
+                section_auth,
+                node_state,
+                section_chain,
+            } => {
+                if node_state.value.name != self.node_info.name() {
+                    trace!("Ignore JoinAsRelocatedResponse Approval, not for us");
+                    return Ok(None);
+                }
+
+                if !section_auth.verify(&section_chain) || !node_state.verify(&section_chain) {
+                    return Err(Error::InvalidMessage);
+                }
+
+                if !section_chain.check_trust(Some(&self.dst_section_key)) {
+                    error!(
+                        "Verification failed - untrusted JoinAsRelocatedResponse approval message",
+                    );
+                    return Ok(None);
+                }
+
+                let new_prefix = section_auth.value.prefix;
+
+                // This will also make additional validations for section chain and SAP
+                let new_network_knowledge = NetworkKnowledge::new(
+                    self.genesis_key,
+                    section_chain,
+                    section_auth.into_authed_state(),
+                    None, // current prefix map will be maintained when we relocate our Core
+                    None, // FIXME: create Membership state with new section's members list
+                )?;
+
+                info!(
+                    "This node has been approved to join a section as relocated at {:?}",
+                    new_prefix,
+                );
+
+                Ok(Some(Cmd::HandleRelocationComplete {
+                    node_info: self.node_info.clone(),
+                    section: new_network_knowledge,
+                }))
+            }
         }
     }
 
@@ -205,7 +251,7 @@ impl JoiningAsRelocated {
         let signature_over_new_name = ed25519::sign(&new_name.0, &self.old_keypair);
 
         info!("Changing name to {}", new_name);
-        self.node = NodeInfo::new(new_keypair, self.node.addr);
+        self.node_info = NodeInfo::new(new_keypair, self.node_info.addr);
 
         signature_over_new_name
     }
@@ -226,7 +272,7 @@ impl JoiningAsRelocated {
 
         let node_msg = SystemMsg::JoinAsRelocatedRequest(Box::new(join_request));
         let wire_msg = WireMsg::single_src(
-            &self.node,
+            &self.node_info,
             DstLocation::Section {
                 name: dst_name,
                 section_pk: self.dst_section_key,

@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Cmd;
+use super::{Cmd, Event};
 
 use crate::messaging::{system::SystemMsg, MsgKind, WireMsg};
 use crate::node::{
-    core::{Node, Proposal, SendStatus},
+    core::{Node, SendStatus},
     messages::WireMsgUtils,
     Error, Result,
 };
@@ -246,25 +246,17 @@ impl Dispatcher {
                 original_bytes,
             } => self.node.handle_msg(sender, wire_msg, original_bytes).await,
             Cmd::HandleTimeout(token) => self.node.handle_timeout(token).await,
-            Cmd::HandleAgreement { proposal, sig } => {
-                self.node.handle_general_agreements(proposal, sig).await
-            }
-            Cmd::HandleNewNodeOnline(auth) => {
+            Cmd::HandleSectionInfoAgreement { section_auth, sig } => {
                 self.node
-                    .handle_online_agreement(auth.value.into_state(), auth.sig)
+                    .handle_section_info_agreement(section_auth, sig)
                     .await
             }
-            Cmd::HandleNewEldersAgreement { proposal, sig } => match proposal {
-                Proposal::NewElders(section_auth) => {
-                    self.node
-                        .handle_new_elders_agreement(section_auth, sig)
-                        .await
-                }
-                _ => {
-                    error!("Other agreement messages should be handled in `HandleAgreement`, which is non-blocking ");
-                    Ok(vec![])
-                }
-            },
+            Cmd::HandleNewNodeOnline(node_state) => {
+                Ok(self.node.propose_join_membership(node_state).await)
+            }
+            Cmd::HandleNewEldersAgreement { signed_sap, sig } => {
+                self.node.handle_new_elders_agreement(signed_sap, sig).await
+            }
             Cmd::HandlePeerLost(peer) => self.node.handle_peer_lost(&peer.addr()).await,
             Cmd::HandleDkgOutcome {
                 section_auth,
@@ -292,13 +284,22 @@ impl Dispatcher {
                 .await
                 .into_iter()
                 .collect()),
-            Cmd::SendAcceptedOnlineShare {
-                peer,
-                previous_name,
-            } => {
+            Cmd::HandleRelocationComplete { node_info, section } => {
+                let previous_name = self.node.info.read().await.name();
+                let new_keypair = node_info.keypair.clone();
+
+                self.node.relocate(node_info, section).await?;
+
                 self.node
-                    .send_accepted_online_share(peer, previous_name)
-                    .await
+                    .send_event(Event::Relocated {
+                        previous_name,
+                        new_keypair,
+                    })
+                    .await;
+
+                trace!("{}", LogMarker::RelocateEnd);
+
+                Ok(vec![])
             }
             Cmd::ProposeOffline(name) => self.node.propose_offline(name).await,
             Cmd::StartConnectivityTest(name) => Ok(vec![

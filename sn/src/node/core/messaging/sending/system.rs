@@ -7,12 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    system::{SectionAuth, SystemMsg},
+    system::{NodeState, SectionAuth, SystemMsg},
     DstLocation, MsgKind, WireMsg,
 };
-use crate::node::{
-    api::cmds::Cmd, core::Node, messages::WireMsgUtils, network_knowledge::NodeState, Error, Result,
-};
+use crate::node::{api::cmds::Cmd, core::Node, messages::WireMsgUtils, Error, Result};
 use crate::types::{log_markers::LogMarker, Peer, UnnamedPeer};
 
 use bls::PublicKey as BlsPublicKey;
@@ -65,7 +63,7 @@ impl Node {
         recipient: Peer,
         node_state: SectionAuth<NodeState>,
     ) -> Result<Cmd> {
-        let node_msg = SystemMsg::Relocate(node_state.into_authed_msg());
+        let node_msg = SystemMsg::Relocate(node_state);
         let section_pk = self.network_knowledge.section_key().await;
         self.send_direct_msg(recipient, node_msg, section_pk).await
     }

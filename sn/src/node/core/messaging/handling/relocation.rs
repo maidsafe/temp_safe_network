@@ -6,93 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::elder_count;
-use crate::messaging::system::{
-    MembershipState, NodeState as NodeStateMsg, RelocateDetails, SectionAuth,
-};
+use crate::messaging::system::{MembershipState, NodeState, SectionAuth};
 use crate::node::{
     api::cmds::Cmd,
-    core::{
-        bootstrap::JoiningAsRelocated,
-        relocation::{find_nodes_to_relocate, ChurnId, RelocateDetailsUtils},
-        Node, Proposal,
-    },
-    network_knowledge::NodeState,
+    core::{bootstrap::JoiningAsRelocated, Node},
     Event, Result,
 };
 use crate::types::log_markers::LogMarker;
 
-use std::collections::BTreeSet;
-use xor_name::XorName;
-
 // Relocation
 impl Node {
-    pub(crate) async fn relocate_peers(
-        &self,
-        churn_id: ChurnId,
-        excluded: BTreeSet<XorName>,
-    ) -> Result<Vec<Cmd>> {
-        // Do not carry out relocations in the first section
-        // TODO: consider avoiding relocations in first 16 sections instead.
-        if self.network_knowledge.prefix().await.is_empty() {
-            return Ok(vec![]);
-        }
-
-        // Do not carry out relocation when there is not enough elder nodes.
-        if self
-            .network_knowledge
-            .authority_provider()
-            .await
-            .elder_count()
-            < elder_count()
-        {
-            return Ok(vec![]);
-        }
-
-        let mut cmds = vec![];
-        for (node_state, relocate_details) in
-            find_nodes_to_relocate(&self.network_knowledge, &churn_id, excluded).await
-        {
-            debug!(
-                "Relocating {:?} to {} (on churn of {})",
-                node_state.peer(),
-                relocate_details.dst,
-                churn_id
-            );
-
-            cmds.extend(
-                self.propose(Proposal::Offline(node_state.relocate(relocate_details)))
-                    .await?,
-            );
-        }
-
-        Ok(cmds)
-    }
-
-    pub(crate) async fn relocate_rejoining_peer(
-        &self,
-        node_state: NodeState,
-        age: u8,
-    ) -> Result<Vec<Cmd>> {
-        let peer = node_state.peer();
-        let relocate_details =
-            RelocateDetails::with_age(&self.network_knowledge, peer, peer.name(), age);
-
-        trace!(
-            "Relocating {:?} to {} with age {} due to rejoin",
-            peer,
-            relocate_details.dst,
-            relocate_details.age
-        );
-
-        Ok(self
-            .propose(Proposal::Offline(node_state.relocate(relocate_details)))
-            .await?)
-    }
-
     pub(crate) async fn handle_relocate(
         &self,
-        relocate_proof: SectionAuth<NodeStateMsg>,
+        relocate_proof: SectionAuth<NodeState>,
     ) -> Result<Option<Cmd>> {
         let (dst_xorname, dst_section_key, new_age) =
             if let MembershipState::Relocated(ref relocate_details) = relocate_proof.value.state {

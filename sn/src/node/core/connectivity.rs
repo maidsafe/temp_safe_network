@@ -6,11 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{
-    api::cmds::Cmd,
-    core::{Node, Proposal},
-    Result,
-};
+use crate::node::{api::cmds::Cmd, core::Node, Result};
 use std::{collections::BTreeSet, iter, net::SocketAddr};
 use xor_name::XorName;
 
@@ -43,28 +39,13 @@ impl Node {
         &self,
         names: &BTreeSet<XorName>,
     ) -> Result<Vec<Cmd>> {
-        // Don't send the `Offline` proposal to the peer being lost as that send would fail,
-        // triggering a chain of further `Offline` proposals.
-        let elders: Vec<_> = self
-            .network_knowledge
-            .authority_provider()
-            .await
-            .elders()
-            .filter(|peer| !names.contains(&peer.name()))
-            .cloned()
-            .collect();
-        let mut result: Vec<Cmd> = Vec::new();
+        let mut cmds = vec![];
         for name in names.iter() {
             if let Some(info) = self.network_knowledge.get_section_member(name).await {
                 let info = info.leave()?;
-                if let Ok(cmds) = self
-                    .send_proposal(elders.clone(), Proposal::Offline(info))
-                    .await
-                {
-                    result.extend(cmds);
-                }
+                cmds.extend(self.propose_remove_from_membership(info).await);
             }
         }
-        Ok(result)
+        Ok(cmds)
     }
 }

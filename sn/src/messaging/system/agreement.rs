@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{KeyedSig, NodeState};
+use super::KeyedSig;
 use crate::messaging::SectionAuthorityProvider;
 use ed25519_dalek::{PublicKey, Signature};
 use hex_fmt::HexFmt;
@@ -86,8 +86,6 @@ impl<T: Serialize> Deref for SectionAuth<T> {
 /// This can be a result of seeing a node come online, go offline, changes to section info etc.
 /// Anything where we need section authority before action can be taken
 pub enum Proposal {
-    /// Proposal to remove a node from our section
-    Offline(NodeState),
     /// Proposal to update info about a section.
     ///
     /// It signals the completion of a DKG by the elder candidates to the current elders.
@@ -104,6 +102,4 @@ pub enum Proposal {
     /// Which we can use to update the section section authority provider and the section chain at
     /// the same time as a single atomic operation without needing to cache anything.
     NewElders(SectionAuth<SectionAuthorityProvider>),
-    /// Proposal to change whether new nodes are allowed to join our section.
-    JoinsAllowed(bool),
 }
