@@ -115,6 +115,7 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
             let mut launcher = Box::new(SnLaunchToolNetworkLauncher::default());
             node_commander(cmd, &mut get_config().await?, &mut launcher).await
         }
+        Some(SubCommands::Keys(cmd)) => key_commander(cmd, output_fmt, safe).await,
         Some(SubCommands::Xorurl {
             cmd,
             location,
@@ -155,7 +156,6 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
             }
 
             match other {
-                SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, safe).await,
                 SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, safe).await,
                 SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, safe).await,
                 SubCommands::Files(cmd) => files_commander(cmd, output_fmt, safe).await,
