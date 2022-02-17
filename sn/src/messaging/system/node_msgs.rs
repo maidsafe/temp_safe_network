@@ -14,7 +14,7 @@ use crate::messaging::{
 };
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
-    Chunk, PublicKey, ReplicatedData,
+    Chunk, PublicKey, ReplicatedData, ReplicatedDataAddress,
 };
 
 use serde::{Deserialize, Serialize};
@@ -45,6 +45,12 @@ pub enum NodeCmd {
     },
     /// Tells an Adult to store a replica of the data
     ReplicateData(ReplicatedData),
+    /// Tells an Adult to fetch and replicate data from the sender
+    SendReplicateDataAddress(ReplicatedDataAddress),
+    /// Fetch the given replicated data we are missing
+    FetchReplicateData(ReplicatedDataAddress),
+    /// Provide requested data for replication
+    ProvideReplicateData(ReplicatedData),
     /// Sent to all promoted nodes (also sibling if any) after
     /// a completed transition to a new constellation.
     ReceiveMetadata {

@@ -155,7 +155,7 @@ impl Node {
         for (_, (data, targets)) in data_for_replication {
             for name in targets {
                 cmds.push(Cmd::SignOutgoingSystemMsg {
-                    msg: SystemMsg::NodeCmd(NodeCmd::ReplicateData(data.clone())),
+                    msg: SystemMsg::NodeCmd(NodeCmd::SendReplicateDataAddress(data.address())),
                     dst: DstLocation::Node { name, section_pk },
                 })
             }

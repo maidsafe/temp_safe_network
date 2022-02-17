@@ -35,7 +35,7 @@ use crate::node::{
     network_knowledge::NetworkKnowledge,
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
 };
-use crate::types::{log_markers::LogMarker, Peer, PublicKey};
+use crate::types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedDataAddress};
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -732,6 +732,95 @@ impl Node {
                         }
                     }
                 };
+            }
+            SystemMsg::NodeCmd(NodeCmd::SendReplicateDataAddress(data_address)) => {
+                info!("ReplicateData MsgId: {:?}", msg_id);
+                return if self.is_elder().await {
+                    error!("Received unexpected message while Elder");
+                    Ok(vec![])
+                } else {
+                    // Check if we already have the data
+                    match self.data_storage.get_for_replication(&data_address).await {
+                        Err(crate::dbs::Error::NoSuchData(_))
+                        | Err(crate::dbs::Error::ChunkNotFound(_)) => {
+                            info!("to-be-replicated data is not present");
+
+                            // Send FetchData request
+                            Ok(vec![Cmd::SignOutgoingSystemMsg {
+                                msg: SystemMsg::NodeCmd(NodeCmd::FetchReplicateData(data_address)),
+                                dst: crate::messaging::DstLocation::Node {
+                                    name: sender.name(),
+                                    section_pk: self.section_key_by_name(&sender.name()).await,
+                                },
+                            }])
+                        }
+                        Ok(_) => {
+                            info!("We already have the data that was asked to be replicated");
+                            info!("Dropping SendReplicateDataAddress message from sender {sender}");
+                            Ok(vec![])
+                        }
+                        Err(e) => {
+                            error!("Error Sending FetchReplicateData for replication: {e}");
+                            Ok(vec![])
+                        }
+                    }
+                };
+            }
+            SystemMsg::NodeCmd(NodeCmd::FetchReplicateData(data_address)) => {
+                info!("FetchReplicateData MsgId: {:?}", msg_id);
+                return if self.is_elder().await {
+                    error!("Received unexpected message while Elder");
+                    Ok(vec![])
+                } else {
+                    // Check data replicator first
+                    let data = if let Some(data_from_replicator) = self
+                        .data_replicator
+                        .write()
+                        .await
+                        .get_for_replication(data_address, sender.name())
+                    {
+                        data_from_replicator
+                    } else {
+                        // Check storage for if it is for pre-emptive replication
+                        match self.data_storage.get_for_replication(&data_address).await {
+                            Ok(data_from_storage) => {
+                                info!("Data present for replication in storage");
+                                data_from_storage
+                            }
+                            Err(e) => {
+                                warn!("Error: {e} \n Data not present for replication. We should be holding it");
+                                return Ok(vec![]);
+                            }
+                        }
+                    };
+
+                    // Provide the requested data
+                    Ok(vec![Cmd::SignOutgoingSystemMsg {
+                        msg: SystemMsg::NodeCmd(NodeCmd::ProvideReplicateData(data)),
+                        dst: crate::messaging::DstLocation::Node {
+                            name: sender.name(),
+                            section_pk: self.section_key_by_name(&sender.name()).await,
+                        },
+                    }])
+                };
+            }
+            SystemMsg::NodeCmd(NodeCmd::ProvideReplicateData(data)) => {
+                info!("ProvideReplicateData MsgId: {:?}", msg_id);
+                if self.is_elder().await {
+                    error!("Received unexpected message while Elder");
+                } else {
+                    // Store the given data
+                    match self.data_storage.store(&data).await {
+                        Ok(levels) => {
+                            return Ok(self.record_storage_level_if_any(levels).await);
+                        }
+                        Err(_) => {
+                            warn!("Could not store data for replication");
+                        }
+                    }
+                }
+
+                Ok(vec![])
             }
             SystemMsg::NodeCmd(node_cmd) => {
                 self.send_event(Event::MessageReceived {

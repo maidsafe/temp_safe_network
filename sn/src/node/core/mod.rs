@@ -105,7 +105,7 @@ pub(crate) struct Node {
     // Network resources
     pub(crate) section_keys_provider: SectionKeysProvider,
     network_knowledge: NetworkKnowledge,
-    // Aggregators
+    // Signature aggregators
     message_aggregator: SignatureAggregator,
     proposal_aggregator: SignatureAggregator,
     // DKG/Split/Churn modules
@@ -113,14 +113,14 @@ pub(crate) struct Node {
     dkg_sessions: Arc<RwLock<HashMap<DkgSessionId, DkgSessionInfo>>>,
     dkg_voter: DkgVoter,
     relocate_state: Arc<RwLock<Option<Box<JoiningAsRelocated>>>>,
-    // ======== Elder only ========
+    // ======================== Elder only ========================
     joins_allowed: Arc<RwLock<bool>>,
     current_joins_semaphore: Arc<Semaphore>,
     // Trackers
     capacity: Capacity,
     liveness: Liveness,
     pending_data_queries: Arc<Cache<OperationId, Vec<Peer>>>,
-    data_replicator: DataReplicator,
+    data_replicator: Arc<RwLock<DataReplicator>>,
     // Caches
     ae_backoff_cache: AeBackoffCache,
 }
@@ -174,7 +174,7 @@ impl Node {
             capacity: Capacity::default(),
             liveness: adult_liveness,
             pending_data_queries: Arc::new(Cache::with_expiry_duration(DATA_QUERY_TIMEOUT)),
-            data_replicator: DataReplicator::new(),
+            data_replicator: Arc::new(RwLock::new(DataReplicator::new())),
             ae_backoff_cache: AeBackoffCache::default(),
         })
     }
