@@ -19,7 +19,7 @@ mod split_barrier;
 
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
-pub(crate) use data::MIN_LEVEL_WHEN_FULL;
+pub(crate) use data::{DataReplicator, MIN_LEVEL_WHEN_FULL};
 pub(crate) use proposal::Proposal;
 #[cfg(test)]
 pub(crate) use relocation::{check as relocation_check, ChurnId};
@@ -98,30 +98,30 @@ pub(crate) struct Node {
     pub(crate) info: Arc<RwLock<NodeInfo>>,
 
     pub(crate) comm: Comm,
-    pub(crate) section_keys_provider: SectionKeysProvider,
 
     pub(super) data_storage: DataStorage, // Adult only before cache
 
     resource_proof: ResourceProof,
-
+    // Network resources
+    pub(crate) section_keys_provider: SectionKeysProvider,
     network_knowledge: NetworkKnowledge,
-
+    // Aggregators
     message_aggregator: SignatureAggregator,
-
     proposal_aggregator: SignatureAggregator,
+    // DKG/Split/Churn modules
     split_barrier: Arc<RwLock<SplitBarrier>>,
     dkg_sessions: Arc<RwLock<HashMap<DkgSessionId, DkgSessionInfo>>>,
     dkg_voter: DkgVoter,
-
     relocate_state: Arc<RwLock<Option<Box<JoiningAsRelocated>>>>,
-
-    joins_allowed: Arc<RwLock<bool>>,        // Elder only
-    current_joins_semaphore: Arc<Semaphore>, // Elder only
-
-    capacity: Capacity,                                       // Elder only
-    liveness: Liveness,                                       // Elder only
-    pending_data_queries: Arc<Cache<OperationId, Vec<Peer>>>, // Elder only
-
+    // ======== Elder only ========
+    joins_allowed: Arc<RwLock<bool>>,
+    current_joins_semaphore: Arc<Semaphore>,
+    // Trackers
+    capacity: Capacity,
+    liveness: Liveness,
+    pending_data_queries: Arc<Cache<OperationId, Vec<Peer>>>,
+    data_replicator: DataReplicator,
+    // Caches
     ae_backoff_cache: AeBackoffCache,
 }
 
@@ -174,6 +174,7 @@ impl Node {
             capacity: Capacity::default(),
             liveness: adult_liveness,
             pending_data_queries: Arc::new(Cache::with_expiry_duration(DATA_QUERY_TIMEOUT)),
+            data_replicator: DataReplicator::new(),
             ae_backoff_cache: AeBackoffCache::default(),
         })
     }

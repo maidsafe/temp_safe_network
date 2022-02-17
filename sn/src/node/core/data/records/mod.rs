@@ -7,9 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod capacity;
+mod data_replicator;
 mod liveness_tracking;
 
 pub(crate) use self::capacity::{Capacity, MIN_LEVEL_WHEN_FULL};
+pub(crate) use self::data_replicator::DataReplicator;
 pub(crate) use self::liveness_tracking::Liveness;
 
 use crate::{
