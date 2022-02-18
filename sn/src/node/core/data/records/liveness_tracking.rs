@@ -21,6 +21,11 @@ use tokio::sync::RwLock;
 // NOTE: To be set relevant to section size when tweaked
 const NEIGHBOUR_COUNT: usize = DEFAULT_ELDER_COUNT;
 
+/// Minimum number of pending operations that are allowed to stagnate before liveness checks kick in
+// ~400 ops was the maximum number stagnating ops seen with client_api tests(multi-threaded).
+// Therefore 500 is better higher cap with some buffer. Setting it to 400 or lower might start replication on CI unnecessarily.
+const MIN_PENDING_OPS: usize = 500;
+
 // If the pending ops count of a node is 5 times higher than it's neighbours, it will be kicked.
 const EXCESSIVE_OPS_TOLERANCE: f64 = 5.0; // increasing this number increases tolerance
 
@@ -221,12 +226,17 @@ impl Liveness {
                 0
             };
 
-            // TODO: Asses if a threshold before computation here helps
+            let crossed_min_threshold = pending_operations_count > MIN_PENDING_OPS;
+
+            let excessive_stagnating_ops = pending_operations_count as f64
+                > max_pending_by_neighbours as f64 * EXCESSIVE_OPS_TOLERANCE;
+
+            let need_for_preemptive_replication = pending_operations_count as f64
+                > max_pending_by_neighbours as f64 * PREEMPTIVE_REPLICATION_TOLERANCE;
 
             // Replicate preemptively at 2.5x of neighbours max pending ops and kick at 5x.
-            if pending_operations_count as f64
-                > max_pending_by_neighbours as f64 * EXCESSIVE_OPS_TOLERANCE
-            {
+            // Checks begin only if op count crosses MIN_PENDING_OPS
+            if crossed_min_threshold && excessive_stagnating_ops {
                 tracing::info!(
                     "Pending ops for {}: {} Neighbour max: {}",
                     node,
@@ -236,11 +246,9 @@ impl Liveness {
                 unresponsive_nodes.push((node, pending_operations_count));
             }
 
-            if pending_operations_count as f64
-                > max_pending_by_neighbours as f64 * PREEMPTIVE_REPLICATION_TOLERANCE
-            {
+            if crossed_min_threshold && need_for_preemptive_replication {
                 info!(
-                "Probable deviant {node} crossed PREEMPTIVE_REPLICATION_TOLERANCE: {PREEMPTIVE_REPLICATION_TOLERANCE} \
+                    "Probable deviant {node} crossed PREEMPTIVE_REPLICATION_TOLERANCE: \
                 {pending_operations_count}: Neighbour max: {max_pending_by_neighbours}",
                 );
                 deviants.push(node);
@@ -261,6 +269,7 @@ mod tests {
     use crate::node::Error;
     use crate::types::ChunkAddress;
 
+    use crate::node::core::data::records::liveness_tracking::MIN_PENDING_OPS;
     use itertools::Itertools;
     use std::collections::BTreeSet;
     use xor_name::XorName;
@@ -270,9 +279,9 @@ mod tests {
         let adults = (0..10).map(|_| XorName::random()).collect::<Vec<XorName>>();
         let liveness_tracker = Liveness::new(adults.clone());
 
-        // Write data 50 times to the 10 adults
+        // Write data MIN_PENDING_OPS times to the 10 adults
         for adult in &adults {
-            for _ in 0..50 {
+            for _ in 0..MIN_PENDING_OPS {
                 let random_addr = ChunkAddress(XorName::random());
                 let op_id = chunk_operation_id(&random_addr)?;
                 liveness_tracker
@@ -299,8 +308,8 @@ mod tests {
         // Assert total adult count
         assert_eq!(liveness_tracker.closest_nodes_to.len(), 11);
 
-        // Write data (EXCESSIVE_OPS_TOLERANCE/2) + 1 x 50 times to the new adult to check for preemptive replication
-        for _ in 0..50 * ((EXCESSIVE_OPS_TOLERANCE as usize / 2) + 1) {
+        // Write data (EXCESSIVE_OPS_TOLERANCE/2) + 1 x MIN_PENDING_OPS times to the new adult to check for preemptive replication
+        for _ in 0..MIN_PENDING_OPS * ((EXCESSIVE_OPS_TOLERANCE as usize / 2) + 1) {
             let random_addr = ChunkAddress(XorName::random());
             let op_id = chunk_operation_id(&random_addr)?;
             liveness_tracker
@@ -317,7 +326,7 @@ mod tests {
             .contains(&new_adult));
 
         // Write data another EXCESSIVE_OPS_TOLERANCE x 50 times to the new adult to check for unresponsiveness.
-        for _ in 0..50 * EXCESSIVE_OPS_TOLERANCE as usize {
+        for _ in 0..MIN_PENDING_OPS * EXCESSIVE_OPS_TOLERANCE as usize {
             let random_addr = ChunkAddress(XorName::random());
             let op_id = chunk_operation_id(&random_addr)?;
             liveness_tracker

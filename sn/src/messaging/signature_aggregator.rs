@@ -41,7 +41,6 @@ pub struct SignatureAggregator {
 }
 
 impl SignatureAggregator {
-
     /// Create new aggregator with the given expiration.
     pub(crate) fn with_expiration(expiration: Duration) -> Self {
         Self {
