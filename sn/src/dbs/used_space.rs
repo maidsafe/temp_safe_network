@@ -29,6 +29,12 @@ impl UsedSpace {
         }
     }
 
+    // Total used
+    #[cfg(test)]
+    pub(crate) async fn total(&self) -> usize {
+        self.used_space.load(Ordering::Relaxed)
+    }
+
     pub(crate) fn increase(&self, size: usize) {
         let _ = self.used_space.fetch_add(size, Ordering::Relaxed);
     }

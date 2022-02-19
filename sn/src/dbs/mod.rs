@@ -10,6 +10,7 @@ mod chunk_store;
 mod encoding;
 mod errors;
 mod event_store;
+mod kv_store;
 mod lru_cache;
 mod used_space;
 
