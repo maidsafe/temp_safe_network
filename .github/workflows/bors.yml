@@ -12,7 +12,7 @@ env:
   RUST_LOG: "safe_network,sn_api,sn_node=trace"
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
-  NODE_COUNT: 11
+  NODE_COUNT: 15
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_DEFAULT_REGION: 'eu-west-2'
