@@ -115,7 +115,7 @@ impl DataStorage {
     #[allow(dead_code)]
     pub(crate) async fn remove(&self, address: &DataAddress) -> Result<()> {
         match address {
-            DataAddress::Chunk(addr) => self.chunks.remove_chunk(addr).await,
+            DataAddress::Chunk(addr) => self.chunks.remove_chunk(addr),
             DataAddress::Register(addr) => self.registers.remove_register(addr).await,
         }
     }

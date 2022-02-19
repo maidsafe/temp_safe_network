@@ -32,13 +32,13 @@ impl ChunkStorage {
     }
 
     pub(crate) fn keys(&self) -> Result<Vec<ChunkAddress>> {
-        self.db.list_all_chunk_addresses()
+        self.db.keys()
     }
 
     #[allow(dead_code)]
-    pub(crate) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
+    pub(crate) fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
         trace!("Removing chunk, {:?}", address);
-        self.db.delete_chunk(address).await
+        self.db.delete_chunk(address)
     }
 
     pub(crate) async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
@@ -65,7 +65,7 @@ impl ChunkStorage {
     /// If that chunk was already in the local store, just overwrites it
     #[instrument(skip_all)]
     pub(super) async fn store(&self, data: &Chunk) -> Result<()> {
-        if self.db.chunk_file_exists(data.address())? {
+        if self.db.exists(data.address())? {
             info!(
                 "{}: Chunk already exists, not storing: {:?}",
                 self,
@@ -84,7 +84,7 @@ impl ChunkStorage {
 
         // store the data
         trace!("{:?}", LogMarker::StoringChunk);
-        let _addr = self.db.write_chunk(data).await?;
+        let _addr = self.db.write_chunk(data.clone()).await?;
         trace!("{:?}", LogMarker::StoredNewChunk);
 
         Ok(())
