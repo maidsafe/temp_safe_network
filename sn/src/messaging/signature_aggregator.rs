@@ -41,10 +41,6 @@ pub struct SignatureAggregator {
 }
 
 impl SignatureAggregator {
-    /// Create new aggregator with default expiration.
-    pub(crate) fn new() -> Self {
-        Self::with_expiration(DEFAULT_EXPIRATION)
-    }
 
     /// Create new aggregator with the given expiration.
     pub(crate) fn with_expiration(expiration: Duration) -> Self {
@@ -104,7 +100,7 @@ impl SignatureAggregator {
 
 impl Default for SignatureAggregator {
     fn default() -> Self {
-        Self::new()
+        Self::with_expiration(DEFAULT_EXPIRATION)
     }
 }
 
@@ -221,7 +217,7 @@ mod tests {
         let threshold = 3;
         let sk_set = bls::SecretKeySet::random(threshold, &mut rng);
 
-        let aggregator = SignatureAggregator::new();
+        let aggregator = SignatureAggregator::default();
         let payload = b"good";
 
         // First insert less than threshold + 1 valid shares.
@@ -280,7 +276,7 @@ mod tests {
         let threshold = 3;
         let sk_set = bls::SecretKeySet::random(threshold, &mut rng);
 
-        let aggregator = SignatureAggregator::new();
+        let aggregator = SignatureAggregator::default();
 
         let payload = b"hello";
 
