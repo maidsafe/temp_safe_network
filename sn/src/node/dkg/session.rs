@@ -18,7 +18,7 @@ use crate::node::{
     network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
     NodeInfo, Result,
 };
-use crate::types::{log_markers::LogMarker, Peer, PublicKey};
+use crate::types::{log_markers::LogMarker, NamedPeer, PublicKey};
 
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{
@@ -163,7 +163,7 @@ impl Session {
         Ok(cmds)
     }
 
-    fn recipients(&self) -> Vec<Peer> {
+    fn recipients(&self) -> Vec<NamedPeer> {
         self.elder_candidates
             .elders()
             .enumerate()
@@ -171,7 +171,7 @@ impl Session {
             .collect()
     }
 
-    fn peers(&self) -> BTreeMap<XorName, Peer> {
+    fn peers(&self) -> BTreeMap<XorName, NamedPeer> {
         self.elder_candidates
             .elders()
             .map(|peer| (peer.name(), peer.clone()))
@@ -604,7 +604,7 @@ mod tests {
             }
         }
 
-        fn peer(&self) -> Peer {
+        fn peer(&self) -> NamedPeer {
             self.node.peer()
         }
 

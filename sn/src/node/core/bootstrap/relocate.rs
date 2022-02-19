@@ -16,7 +16,7 @@ use crate::node::{
     api::cmds::Cmd, ed25519, messages::WireMsgUtils, network_knowledge::SectionAuthorityProvider,
     Error, NodeInfo, Result,
 };
-use crate::types::{Peer, PublicKey};
+use crate::types::{NamedPeer, PublicKey};
 
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{Keypair, Signature};
@@ -50,7 +50,7 @@ impl JoiningAsRelocated {
     ) -> Result<(Self, Cmd)> {
         let recipients: Vec<_> = bootstrap_addrs
             .iter()
-            .map(|addr| Peer::new(dst_xorname, *addr))
+            .map(|addr| NamedPeer::new(dst_xorname, *addr))
             .collect();
 
         let used_recipient_saps = bootstrap_addrs
@@ -212,7 +212,7 @@ impl JoiningAsRelocated {
 
     fn build_join_request_cmd(
         &self,
-        recipients: &[Peer],
+        recipients: &[NamedPeer],
         dst_name: XorName,
         new_name_sig: Signature,
     ) -> Result<Cmd> {

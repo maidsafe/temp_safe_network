@@ -25,19 +25,13 @@ pub(crate) use section_authority_provider::SectionAuthorityProvider;
 use crate::elder_count;
 use crate::messaging::system::{KeyedSig, SectionAuth, SectionPeers as SectionPeersMsg};
 use crate::node::{dkg::SectionAuthUtils, recommended_section_size, Error, Result};
-use crate::types::{log_markers::LogMarker, prefix_map::NetworkPrefixMap, Peer};
+use crate::types::{log_markers::LogMarker, prefix_map::NetworkPrefixMap, NamedPeer};
 
 use bls::PublicKey as BlsPublicKey;
 use section_peers::SectionPeers;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    convert::TryInto,
-    iter,
-    net::SocketAddr,
-    sync::Arc,
-};
+use std::{collections::BTreeSet, convert::TryInto, iter, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};
 
@@ -163,7 +157,7 @@ impl NetworkKnowledge {
 
     /// Creates `NetworkKnowledge` for the first node in the network
     pub(super) async fn first_node(
-        peer: Peer,
+        peer: NamedPeer,
         genesis_sk_set: bls::SecretKeySet,
     ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
         let public_key_set = genesis_sk_set.public_keys();
@@ -566,7 +560,7 @@ impl NetworkKnowledge {
             expected_peers.len(),
             expected_peers
         );
-        let expected_names: BTreeSet<_> = expected_peers.iter().map(Peer::name).collect();
+        let expected_names: BTreeSet<_> = expected_peers.iter().map(NamedPeer::name).collect();
         let current_names: BTreeSet<_> = sap.names();
 
         if expected_names == current_names {
@@ -595,7 +589,7 @@ impl NetworkKnowledge {
     }
 
     /// Returns the elders of our section
-    pub(super) async fn elders(&self) -> Vec<Peer> {
+    pub(super) async fn elders(&self) -> Vec<NamedPeer> {
         self.authority_provider().await.elders_vec()
     }
 
@@ -625,7 +619,7 @@ impl NetworkKnowledge {
     }
 
     /// Returns live adults from our section.
-    pub(super) async fn adults(&self) -> Vec<Peer> {
+    pub(super) async fn adults(&self) -> Vec<NamedPeer> {
         let mut live_adults = vec![];
         for node_state in self.section_peers.members() {
             if !self.is_elder(&node_state.name()).await {
@@ -659,30 +653,12 @@ impl NetworkKnowledge {
         self.section_peers.is_relocated_to_our_section(name)
     }
 
-    pub(super) async fn find_member_by_addr(&self, addr: &SocketAddr) -> Option<Peer> {
+    pub(super) async fn find_member_by_addr(&self, addr: &SocketAddr) -> Option<NamedPeer> {
         self.section_peers
             .members()
             .into_iter()
-            .find(|info| &info.addr() == addr)
+            .find(|info| info.addr() == *addr)
             .map(|info| info.peer().clone())
-    }
-
-    /// Merge the connections from some source peers into our state.
-    ///
-    /// Peers are held in `signed_sap` and `section_peers`, and we match relevant peers with both.
-    pub(super) async fn merge_connections(&self, sources: impl IntoIterator<Item = &Peer>) {
-        let sources: BTreeMap<_, _> = sources
-            .into_iter()
-            .map(|peer| (peer.addr(), peer))
-            .collect();
-
-        for elder in self.signed_sap.read().await.elders() {
-            if let Some(source) = sources.get(&elder.addr()) {
-                elder.merge_connection(source).await;
-            }
-        }
-
-        self.section_peers.merge_connections(&sources).await;
     }
 
     // Tries to split our section.
@@ -775,7 +751,7 @@ impl NetworkKnowledge {
 fn create_first_section_authority_provider(
     pk_set: &bls::PublicKeySet,
     sk_share: &bls::SecretKeyShare,
-    peer: Peer,
+    peer: NamedPeer,
 ) -> Result<SectionAuth<SectionAuthorityProvider>> {
     let section_auth =
         SectionAuthorityProvider::new(iter::once(peer), Prefix::default(), pk_set.clone());

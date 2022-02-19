@@ -18,7 +18,7 @@ use crate::node::{
     network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
     Error, Result,
 };
-use crate::types::{log_markers::LogMarker, Peer};
+use crate::types::{log_markers::LogMarker, NamedPeer};
 
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
@@ -53,7 +53,7 @@ impl Node {
             } else if let Some(peer) = self.network_knowledge().find_member_by_addr(&addr).await {
                 peer
             } else {
-                Peer::new(name, addr)
+                NamedPeer::new(name, addr)
             };
 
             peers.push(peer);
@@ -88,7 +88,7 @@ impl Node {
         &self,
         session_id: DkgSessionId,
         message: DkgMessage,
-        sender: Peer,
+        sender: NamedPeer,
     ) -> Result<Vec<Cmd>> {
         trace!(
             "{} {:?} from {}",
@@ -110,7 +110,7 @@ impl Node {
 
     pub(crate) async fn handle_dkg_not_ready(
         &self,
-        sender: Peer,
+        sender: NamedPeer,
         message: DkgMessage,
         session_id: DkgSessionId,
         section_pk: BlsPublicKey,
@@ -142,7 +142,7 @@ impl Node {
         session_id: DkgSessionId,
         message_history: Vec<DkgMessage>,
         message: DkgMessage,
-        sender: Peer,
+        sender: NamedPeer,
     ) -> Result<Vec<Cmd>> {
         let section_key = self.network_knowledge().section_key().await;
         let current_generation = self.network_knowledge.chain_len().await;

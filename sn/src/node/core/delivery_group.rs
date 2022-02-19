@@ -9,7 +9,7 @@
 use crate::elder_count;
 use crate::messaging::DstLocation;
 use crate::node::{network_knowledge::NetworkKnowledge, supermajority, Error, Result};
-use crate::types::Peer;
+use crate::types::NamedPeer;
 
 use itertools::Itertools;
 use std::{cmp, iter};
@@ -33,7 +33,7 @@ pub(crate) async fn delivery_targets(
     dst: &DstLocation,
     our_name: &XorName,
     network_knowledge: &NetworkKnowledge,
-) -> Result<(Vec<Peer>, usize)> {
+) -> Result<(Vec<NamedPeer>, usize)> {
     // Adult now having the knowledge of other adults within the own section.
     // Functions of `section_candidates` and `candidates` only take section elder into account.
 
@@ -69,7 +69,7 @@ async fn section_candidates(
     target_name: &XorName,
     our_name: &XorName,
     network_knowledge: &NetworkKnowledge,
-) -> Result<(Vec<Peer>, usize)> {
+) -> Result<(Vec<NamedPeer>, usize)> {
     let default_sap = network_knowledge.authority_provider().await;
     // Find closest section to `target_name` out of the ones we know (including our own)
     let network_sections = network_knowledge.prefix_map().all();
@@ -82,7 +82,7 @@ async fn section_candidates(
         // Exclude our name since we don't need to send to ourself
         let chosen_section: Vec<_> = info
             .elders()
-            .filter(|node| &node.name() != our_name)
+            .filter(|node| node.name() != *our_name)
             .cloned()
             .collect();
         let dg_size = chosen_section.len();
@@ -97,7 +97,7 @@ async fn candidates(
     target_name: &XorName,
     our_name: &XorName,
     network_knowledge: &NetworkKnowledge,
-) -> Result<(Vec<Peer>, usize)> {
+) -> Result<(Vec<NamedPeer>, usize)> {
     // All sections we know (including our own), sorted by distance to `target_name`.
     let sections = network_knowledge.prefix_map().all();
 
@@ -136,7 +136,7 @@ async fn candidates(
 
         if *prefix == network_knowledge.prefix().await {
             // Send to all connected targets so they can forward the message
-            candidates.retain(|node| &node.name() != our_name);
+            candidates.retain(|node| node.name() != *our_name);
             dg_size = candidates.len();
             break;
         }
@@ -155,7 +155,7 @@ async fn candidates(
 }
 
 // Returns a `Peer` for a known node.
-async fn get_peer(name: &XorName, network_knowledge: &NetworkKnowledge) -> Option<Peer> {
+async fn get_peer(name: &XorName, network_knowledge: &NetworkKnowledge) -> Option<NamedPeer> {
     match network_knowledge.get_section_member(name).await {
         Some(info) => Some(info.peer().clone()),
         None => network_knowledge
@@ -216,7 +216,7 @@ mod tests {
 
         let name = ed25519::gen_name_with_age(MIN_ADULT_AGE);
         let dst_name = network_knowledge.prefix().await.substituted_in(name);
-        let peer = Peer::new(dst_name, gen_addr());
+        let peer = NamedPeer::new(dst_name, gen_addr());
         let node_state = NodeState::joined(peer, None);
         let node_state = section_signed(&sk, node_state)?;
         assert!(network_knowledge.update_member(node_state).await);

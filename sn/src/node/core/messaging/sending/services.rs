@@ -11,7 +11,7 @@ use crate::messaging::{
     DstLocation, EndUser, MsgId, MsgKind, ServiceAuth, WireMsg,
 };
 use crate::node::{api::cmds::Cmd, core::Node, Result};
-use crate::types::{Peer, PublicKey, Signature};
+use crate::types::{NamedPeer, PublicKey, Signature};
 
 use bytes::Bytes;
 use ed25519_dalek::Signer;
@@ -21,7 +21,7 @@ impl Node {
     pub(crate) async fn send_cmd_error_response(
         &self,
         error: CmdError,
-        target: Peer,
+        target: NamedPeer,
         msg_id: MsgId,
     ) -> Result<Vec<Cmd>> {
         let the_error_msg = ServiceMsg::CmdError {
@@ -32,7 +32,7 @@ impl Node {
     }
 
     /// Forms a CmdAck msg to send back to the client
-    pub(crate) async fn send_cmd_ack(&self, target: Peer, msg_id: MsgId) -> Result<Vec<Cmd>> {
+    pub(crate) async fn send_cmd_ack(&self, target: NamedPeer, msg_id: MsgId) -> Result<Vec<Cmd>> {
         let the_ack_msg = ServiceMsg::CmdAck {
             correlation_id: msg_id,
         };
@@ -40,7 +40,7 @@ impl Node {
     }
 
     /// Forms a cmd to send a cmd response error/ack to the client
-    async fn send_cmd_response(&self, target: Peer, msg: ServiceMsg) -> Result<Vec<Cmd>> {
+    async fn send_cmd_response(&self, target: NamedPeer, msg: ServiceMsg) -> Result<Vec<Cmd>> {
         let dst = DstLocation::EndUser(EndUser(target.name()));
 
         let (msg_kind, payload) = self.ed_sign_client_msg(&msg).await?;

@@ -31,10 +31,10 @@ use crate::node::{
     network_knowledge::{
         test_utils::*, NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare,
     },
-    recommended_section_size, supermajority, Error, Event, NodeInfo, Peer, Result as RoutingResult,
+    recommended_section_size, supermajority, Error, Event, NodeInfo, Result as RoutingResult,
     FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
-use crate::types::{Keypair, PublicKey, UnnamedPeer};
+use crate::types::{Keypair, NamedPeer, PublicKey};
 use crate::{elder_count, init_test_logger};
 
 use assert_matches::assert_matches;
@@ -106,7 +106,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
     let mut cmds = get_internal_cmds(
         Cmd::HandleMsg {
-            sender: UnnamedPeer::addressed(new_node.addr),
+            sender: new_node.peer(),
             wire_msg,
             original_bytes: None,
         },
@@ -202,7 +202,7 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
 
     let cmds = get_internal_cmds(
         Cmd::HandleMsg {
-            sender: UnnamedPeer::addressed(new_node.addr),
+            sender: new_node.peer(),
             wire_msg,
             original_bytes: None,
         },
@@ -293,7 +293,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
 
     let inner_cmds = get_internal_cmds(
         Cmd::HandleMsg {
-            sender: UnnamedPeer::addressed(relocated_node.addr),
+            sender: relocated_node.peer(),
             wire_msg,
             original_bytes: None,
         },
@@ -432,7 +432,9 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             Ok(MsgType::System {
                 msg: SystemMsg::DkgStart { elders, .. },
                 ..
-            }) => elders.into_iter().map(|(name, addr)| Peer::new(name, addr)),
+            }) => elders
+                .into_iter()
+                .map(|(name, addr)| NamedPeer::new(name, addr)),
             _ => continue,
         };
         itertools::assert_equal(actual_elder_candidates, expected_new_elders.clone());
@@ -454,7 +456,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
 // Handles a consensus-ed Online proposal.
 async fn handle_online_cmd(
-    peer: &Peer,
+    peer: &NamedPeer,
     sk_set: &SecretKeySet,
     dispatcher: &Dispatcher,
     section_auth: &SectionAuthorityProvider,
@@ -709,7 +711,9 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
             Ok(MsgType::System {
                 msg: SystemMsg::DkgStart { elders, .. },
                 ..
-            }) => elders.into_iter().map(|(name, addr)| Peer::new(name, addr)),
+            }) => elders
+                .into_iter()
+                .map(|(name, addr)| NamedPeer::new(name, addr)),
             _ => continue,
         };
 
@@ -842,7 +846,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
     let _cmds = get_internal_cmds(
         Cmd::HandleMsg {
-            sender: UnnamedPeer::addressed(old_node.addr),
+            sender: old_node.peer(),
             wire_msg,
             original_bytes: None,
         },
@@ -921,7 +925,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
 
     let _cmds = get_internal_cmds(
         Cmd::HandleMsg {
-            sender: UnnamedPeer::addressed(sender.addr),
+            sender: sender.peer(),
             wire_msg,
             original_bytes: None,
         },
@@ -1119,9 +1123,9 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
 
     assert!(cmds.is_empty());
 
-    let msg_type = assert_matches!(comm_rx.recv().await, Some(ConnectionEvent::Received((sender, bytes))) => {
+    let msg_type = assert_matches!(comm_rx.recv().await, Some(ConnectionEvent::Received { sender, wire_msg, .. }) => {
         assert_eq!(sender.addr(), info.addr);
-        assert_matches!(WireMsg::deserialize(bytes), Ok(msg_type) => msg_type)
+        assert_matches!(wire_msg.into_msg(), Ok(msg_type) => msg_type)
     });
 
     assert_matches!(msg_type, MsgType::System { msg, dst_location: dst, .. } => {
@@ -1400,14 +1404,14 @@ async fn handle_demote_during_split() -> Result<()> {
     Ok(())
 }
 
-fn create_peer(age: u8) -> Peer {
+fn create_peer(age: u8) -> NamedPeer {
     let name = ed25519::gen_name_with_age(age);
-    Peer::new(name, gen_addr())
+    NamedPeer::new(name, gen_addr())
 }
 
-fn create_peer_in_prefix(prefix: &Prefix, age: u8) -> Peer {
+fn create_peer_in_prefix(prefix: &Prefix, age: u8) -> NamedPeer {
     let name = ed25519::gen_name_with_age(age);
-    Peer::new(prefix.substituted_in(name), gen_addr())
+    NamedPeer::new(prefix.substituted_in(name), gen_addr())
 }
 
 fn gen_info(age: u8, prefix: Option<Prefix>) -> NodeInfo {

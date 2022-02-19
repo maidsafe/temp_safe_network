@@ -374,6 +374,8 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use crate::client::utils::test_utils::create_test_client_with;
     use crate::client::{
         client_api::file_apis::LargeFile,
@@ -555,15 +557,27 @@ mod tests {
 
         debug!("======> Data uploaded");
 
-        for i in 1..50 {
+        for i in 1..25 {
             debug!("starting client on thread #{:?}", i);
             let handle: Instrumented<tokio::task::JoinHandle<Result<()>>> =
                 tokio::spawn(async move {
                     debug!("started client #{:?}", i);
                     // use a fresh client
                     let client = create_test_client().await?;
+                    let mut last_try = true;
                     // to grab that data
-                    let _read_data = client.read_bytes(address).await?;
+                    for i in 0..250 {
+                        match client.read_bytes(address).await {
+                            Ok(_data) => {
+                                last_try = false;
+                                break;
+                            }
+                            Err(_) => tokio::time::sleep(Duration::from_millis(i * 100)).await,
+                        };
+                    }
+                    if last_try {
+                        let _ = client.read_bytes(address).await?;
+                    }
 
                     debug!("client #{:?} finished", i);
                     Ok(())

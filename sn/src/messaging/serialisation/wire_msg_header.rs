@@ -27,7 +27,7 @@ pub struct WireMsgHeader {
     // We serialise a header size field, but we don't know it up front until we deserialise it.
     // header_size: u16,
     version: u16,
-    pub msg_envelope: MsgEnvelope,
+    pub content: MsgEnvelope,
 }
 
 // The message envelope contains the ID of the message, the authority
@@ -77,7 +77,7 @@ impl WireMsgHeader {
         Self {
             //header_size: Self::max_size(),
             version: MESSAGING_PROTO_VERSION,
-            msg_envelope: MsgEnvelope {
+            content: MsgEnvelope {
                 msg_id,
                 msg_kind,
                 dst_location,
@@ -112,19 +112,18 @@ impl WireMsgHeader {
         }
 
         // ...finally, we read the message envelope bytes
-        let msg_envelope_bytes = &bytes[HeaderMeta::SIZE..meta.header_len()];
-        let msg_envelope: MsgEnvelope =
-            rmp_serde::from_slice(msg_envelope_bytes).map_err(|err| {
-                Error::FailedToParse(format!(
-                    "source authority couldn't be deserialized from the header: {}",
-                    err
-                ))
-            })?;
+        let content_bytes = &bytes[HeaderMeta::SIZE..meta.header_len()];
+        let content: MsgEnvelope = rmp_serde::from_slice(content_bytes).map_err(|err| {
+            Error::FailedToParse(format!(
+                "source authority couldn't be deserialized from the header: {}",
+                err
+            ))
+        })?;
 
         let header = Self {
             //header_size,
             version: meta.version,
-            msg_envelope,
+            content,
         };
 
         // Get a slice for the payload bytes, i.e. the bytes after the header bytes
@@ -135,7 +134,7 @@ impl WireMsgHeader {
 
     pub fn write<'a>(&self, mut buffer: &'a mut [u8]) -> Result<(&'a mut [u8], u16)> {
         // first serialise the msg envelope so we can figure out the total header size
-        let msg_envelope_vec = rmp_serde::to_vec_named(&self.msg_envelope).map_err(|err| {
+        let content_vec = rmp_serde::to_vec_named(&self.content).map_err(|err| {
             Error::Serialisation(format!(
                 "could not serialize message envelope with Msgpack: {}",
                 err
@@ -144,7 +143,7 @@ impl WireMsgHeader {
 
         let meta = HeaderMeta {
             // real header size based on the length of serialised msg envelope
-            header_len: (HeaderMeta::SIZE + msg_envelope_vec.len()) as u16,
+            header_len: (HeaderMeta::SIZE + content_vec.len()) as u16,
             version: self.version,
         };
 
@@ -159,7 +158,7 @@ impl WireMsgHeader {
             })?;
 
         // ...now write the message envelope
-        buffer.write_all(&msg_envelope_vec).map_err(|err| {
+        buffer.write_all(&content_vec).map_err(|err| {
             Error::Serialisation(format!(
                 "message envelope couldn't be serialized into the header: {}",
                 err

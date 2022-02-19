@@ -3298,6 +3298,7 @@ name = "safe_network"
 version = "0.57.1"
 dependencies = [
  "assert_matches",
+ "async-trait",
  "backoff",
  "base64 0.10.1",
  "bincode",

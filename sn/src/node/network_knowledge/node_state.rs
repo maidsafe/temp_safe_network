@@ -10,7 +10,7 @@ use crate::messaging::system::{
     MembershipState, NodeState as NodeStateMsg, RelocateDetails, SectionAuth,
 };
 use crate::node::error::Error;
-use crate::types::Peer;
+use crate::types::NamedPeer;
 
 use std::net::SocketAddr;
 use xor_name::XorName;
@@ -28,7 +28,7 @@ pub const FIRST_SECTION_MAX_AGE: u8 = 100;
 /// Information about a member of our section.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct NodeState {
-    peer: Peer,
+    peer: NamedPeer,
     state: MembershipState,
     previous_name: Option<XorName>,
 }
@@ -45,7 +45,7 @@ impl serde::Serialize for NodeState {
 
 impl NodeState {
     // Creates a `NodeState` in the `Joined` state.
-    pub(crate) fn joined(peer: Peer, previous_name: Option<XorName>) -> Self {
+    pub(crate) fn joined(peer: NamedPeer, previous_name: Option<XorName>) -> Self {
         Self {
             peer,
             state: MembershipState::Joined,
@@ -55,7 +55,7 @@ impl NodeState {
 
     // Creates a `NodeState` in the `Left` state.
     #[cfg(test)]
-    pub(crate) fn left(peer: Peer, previous_name: Option<XorName>) -> Self {
+    pub(crate) fn left(peer: NamedPeer, previous_name: Option<XorName>) -> Self {
         Self {
             peer,
             state: MembershipState::Left,
@@ -66,7 +66,7 @@ impl NodeState {
     // Creates a `NodeState` in the `Relocated` state.
     #[cfg(test)]
     pub(crate) fn relocated(
-        peer: Peer,
+        peer: NamedPeer,
         previous_name: Option<XorName>,
         relocate_details: RelocateDetails,
     ) -> Self {
@@ -77,7 +77,7 @@ impl NodeState {
         }
     }
 
-    pub(crate) fn peer(&self) -> &Peer {
+    pub(crate) fn peer(&self) -> &NamedPeer {
         &self.peer
     }
 
@@ -155,7 +155,7 @@ impl SectionAuth<NodeState> {
 impl NodeStateMsg {
     pub(crate) fn into_state(self) -> NodeState {
         NodeState {
-            peer: Peer::new(self.name, self.addr),
+            peer: NamedPeer::new(self.name, self.addr),
             state: self.state,
             previous_name: self.previous_name,
         }

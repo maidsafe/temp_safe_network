@@ -14,7 +14,7 @@ use crate::node::{
     api::cmds::Cmd, core::Node, messages::WireMsgUtils,
     network_knowledge::SectionAuthorityProvider, Error, Result,
 };
-use crate::types::{log_markers::LogMarker, Peer, PublicKey};
+use crate::types::{log_markers::LogMarker, NamedPeer, PublicKey};
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -74,7 +74,7 @@ impl Node {
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
         bounced_msg: Bytes,
-        sender: Peer,
+        sender: NamedPeer,
     ) -> Result<Vec<Cmd>> {
         let dst_section_key = section_auth.section_key();
         let snapshot = self.state_snapshot().await;
@@ -124,7 +124,7 @@ impl Node {
         section_signed: KeyedSig,
         section_chain: SecuredLinkedList,
         bounced_msg: Bytes,
-        sender: Peer,
+        sender: NamedPeer,
     ) -> Result<Vec<Cmd>> {
         let dst_section_key = section_auth.section_key();
 
@@ -187,7 +187,7 @@ impl Node {
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
         bounced_msg: Bytes,
-        sender: Peer,
+        sender: NamedPeer,
     ) -> Result<Option<(SystemMsg, MsgId)>> {
         let (bounced_msg, msg_id, dst_location) = match WireMsg::deserialize(bounced_msg)? {
             MsgType::System {
@@ -246,7 +246,7 @@ impl Node {
 
     /// Checks AE-BackoffCache for backoff, or creates a new instance
     /// waits for any required backoff duration
-    async fn create_or_wait_for_backoff(&self, peer: &Peer) {
+    async fn create_or_wait_for_backoff(&self, peer: &NamedPeer) {
         let mut ae_backoff_guard = self.ae_backoff_cache.write().await;
         let our_backoff = ae_backoff_guard
             .find(|(node, _)| node == peer)
@@ -286,7 +286,7 @@ impl Node {
         src_location: &SrcLocation,
         dst_section_key: &BlsPublicKey,
         dst_name: XorName,
-        sender: &Peer,
+        sender: &NamedPeer,
     ) -> Result<Option<Cmd>> {
         // Check if the message has reached the correct section,
         // if not, we'll need to respond with AE
@@ -425,7 +425,7 @@ impl Node {
     // Generate an AE redirect cmd for the given message
     pub(crate) async fn ae_redirect_to_our_elders(
         &self,
-        sender: Peer,
+        sender: NamedPeer,
         src_location: &SrcLocation,
         original_wire_msg: &WireMsg,
     ) -> Result<Cmd> {

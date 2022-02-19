@@ -13,7 +13,7 @@ use crate::messaging::{
     AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
 };
 use crate::node::{api::cmds::Cmd, core::Node, Result};
-use crate::types::{log_markers::LogMarker, register::User, Peer, PublicKey, ReplicatedData};
+use crate::types::{log_markers::LogMarker, register::User, NamedPeer, PublicKey, ReplicatedData};
 
 use xor_name::XorName;
 
@@ -163,7 +163,7 @@ impl Node {
         msg_id: MsgId,
         msg: ServiceMsg,
         auth: AuthorityProof<ServiceAuth>,
-        origin: Peer,
+        origin: NamedPeer,
     ) -> Result<Vec<Cmd>> {
         if self.is_not_elder().await {
             error!("Received unexpected message while Adult");
@@ -207,7 +207,7 @@ impl Node {
         msg: ServiceMsg,
         dst_location: DstLocation,
         auth: AuthorityProof<ServiceAuth>,
-        user: Peer,
+        user: NamedPeer,
     ) -> Result<Vec<Cmd>> {
         trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
         if let DstLocation::EndUser(_) = dst_location {

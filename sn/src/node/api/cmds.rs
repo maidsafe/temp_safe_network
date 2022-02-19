@@ -15,7 +15,7 @@ use crate::node::{
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     XorName,
 };
-use crate::types::{Peer, UnnamedPeer};
+use crate::types::NamedPeer;
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -33,7 +33,7 @@ pub(crate) enum Cmd {
     /// Handle `message` from `sender`.
     /// Holding the WireMsg that has been received from the network,
     HandleMsg {
-        sender: UnnamedPeer,
+        sender: NamedPeer,
         wire_msg: WireMsg,
         #[debug(skip)]
         // original bytes to avoid reserializing for entropy checks
@@ -42,7 +42,7 @@ pub(crate) enum Cmd {
     // TODO: rename this as/when this is all node for clarity
     /// Handle Node, either directly or notify via event listener
     HandleSystemMsg {
-        sender: Peer,
+        sender: NamedPeer,
         msg_id: MsgId,
         msg: SystemMsg,
         msg_authority: NodeMsgAuthority,
@@ -55,7 +55,7 @@ pub(crate) enum Cmd {
     /// Handle a timeout previously scheduled with `ScheduleTimeout`.
     HandleTimeout(u64),
     /// Handle peer that's been detected as lost.
-    HandlePeerLost(Peer),
+    HandlePeerLost(NamedPeer),
     /// Handle agreement on a proposal.
     HandleAgreement { proposal: Proposal, sig: KeyedSig },
     /// Handle a new Node joining agreement.
@@ -72,7 +72,7 @@ pub(crate) enum Cmd {
     HandleDkgFailure(DkgFailureSigSet),
     /// Send a message to the given `recipients`.
     SendMsg {
-        recipients: Vec<Peer>,
+        recipients: Vec<NamedPeer>,
         wire_msg: WireMsg,
     },
     /// Performs serialisation and signing for sending of NodeMsg.
@@ -80,7 +80,7 @@ pub(crate) enum Cmd {
     SignOutgoingSystemMsg { msg: SystemMsg, dst: DstLocation },
     /// Send a message to `delivery_group_size` peers out of the given `recipients`.
     SendMsgDeliveryGroup {
-        recipients: Vec<Peer>,
+        recipients: Vec<NamedPeer>,
         delivery_group_size: usize,
         wire_msg: WireMsg,
     },
@@ -89,7 +89,7 @@ pub(crate) enum Cmd {
     ScheduleTimeout { duration: Duration, token: u64 },
     /// Test peer's connectivity
     SendAcceptedOnlineShare {
-        peer: Peer,
+        peer: NamedPeer,
         // Previous name if relocated.
         previous_name: Option<XorName>,
     },

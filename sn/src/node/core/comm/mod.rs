@@ -14,15 +14,13 @@ use msg_count::MsgCount;
 
 use crate::messaging::{system::LoadReport, MsgId, WireMsg};
 use crate::node::error::{Error, Result};
-use crate::types::{log_markers::LogMarker, Peer, UnnamedPeer};
+use crate::types::{log_markers::LogMarker, NamedPeer};
+use crate::types::{Connections, NamelessPeer, SendToOneError};
 
 use bytes::Bytes;
-use futures::{
-    future::TryFutureExt,
-    stream::{FuturesUnordered, StreamExt},
-};
-use qp2p::Endpoint;
-use std::{future, net::SocketAddr};
+use futures::stream::{FuturesUnordered, StreamExt};
+use qp2p::{ConnectionIncoming, Endpoint};
+use std::net::SocketAddr;
 use tokio::{sync::mpsc, task};
 use tracing::Instrument;
 
@@ -33,6 +31,7 @@ pub(crate) struct Comm {
     event_tx: mpsc::Sender<ConnectionEvent>,
     msg_count: MsgCount,
     back_pressure: BackPressure,
+    connections: Connections,
 }
 
 impl Drop for Comm {
@@ -59,9 +58,16 @@ impl Comm {
 
         let msg_count = MsgCount::new();
 
+        let connections = Connections::new(endpoint.clone());
+
         let _handle = task::spawn(
-            handle_incoming_connections(incoming_connections, event_tx.clone(), msg_count.clone())
-                .in_current_span(),
+            handle_incoming_connections(
+                incoming_connections,
+                event_tx.clone(),
+                msg_count.clone(),
+                connections.clone(),
+            )
+            .in_current_span(),
         );
 
         let back_pressure = BackPressure::new();
@@ -71,6 +77,7 @@ impl Comm {
             event_tx,
             msg_count,
             back_pressure,
+            connections,
         })
     }
 
@@ -80,7 +87,7 @@ impl Comm {
         bootstrap_nodes: &[SocketAddr],
         config: qp2p::Config,
         event_tx: mpsc::Sender<ConnectionEvent>,
-    ) -> Result<(Self, UnnamedPeer)> {
+    ) -> Result<(Self, NamelessPeer)> {
         // Bootstrap to the network returning the connection to a node.
         // We can use the returned channels to listen for incoming messages and disconnection events
         let (endpoint, incoming_connections, bootstrap_peer) =
@@ -89,9 +96,16 @@ impl Comm {
 
         let msg_count = MsgCount::new();
 
+        let connections = Connections::new(endpoint.clone());
+
         let _handle = task::spawn(
-            handle_incoming_connections(incoming_connections, event_tx.clone(), msg_count.clone())
-                .in_current_span(),
+            handle_incoming_connections(
+                incoming_connections,
+                event_tx.clone(),
+                msg_count.clone(),
+                connections.clone(),
+            )
+            .in_current_span(),
         );
 
         let _ = task::spawn(
@@ -100,9 +114,12 @@ impl Comm {
                 peer_incoming,
                 event_tx.clone(),
                 msg_count.clone(),
+                connections.clone(),
             )
             .in_current_span(),
         );
+
+        // TODO: add with our name, since we don't have its name..: connections.try_add(our_id, bootstrap_peer)
 
         Ok((
             Self {
@@ -110,8 +127,9 @@ impl Comm {
                 event_tx,
                 msg_count,
                 back_pressure: BackPressure::new(),
+                connections,
             },
-            UnnamedPeer::connected(bootstrap_peer),
+            NamelessPeer::new(bootstrap_peer.remote_address()),
         ))
     }
 
@@ -123,7 +141,7 @@ impl Comm {
     /// Drops the connection after the message has been sent.
     pub(crate) async fn send_on_existing_connection_to_client(
         &self,
-        recipients: &[Peer],
+        recipients: &[NamedPeer],
         mut wire_msg: WireMsg,
     ) -> Result<(), Error> {
         trace!(
@@ -139,33 +157,21 @@ impl Comm {
             let bytes = wire_msg.serialize()?;
             // TODO: rework priority so this we dont need to deserialise payload to determine priority.
             let priority = wire_msg.into_msg()?.priority();
-            let retries = self.back_pressure.get(&addr).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 
-            let connection = if let Some(connection) = recipient.connection().await {
-                Ok(connection)
-            } else {
-                error!("No connection available to client");
-                Err(None)
-            };
+            let (_, error) = self
+                .send_to_one(recipient, wire_msg.msg_id(), priority, bytes)
+                .await;
 
-            future::ready(connection)
-                .and_then(|connection| async move {
-                    connection
-                        .send_with(bytes, priority, Some(&retries))
-                        .await
-                        .map_err(Some)
-                })
-                .await
-                .map_err(|err| {
-                    error!(
-                        "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed with {:?}",
-                        wire_msg.msg_id(),
-                        addr,
-                        name,
-                        err
-                    );
-                    Error::FailedSend(addr, name)
-                })?;
+            error.map_err(|err| {
+                error!(
+                    "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed with {:?}",
+                    wire_msg.msg_id(),
+                    addr,
+                    name,
+                    err
+                );
+                Error::FailedSend(addr, name)
+            })?;
 
             // count outgoing msgs..
             self.msg_count.increase_outgoing(addr);
@@ -221,7 +227,7 @@ impl Comm {
     #[tracing::instrument(skip(self))]
     pub(crate) async fn send<'r>(
         &self,
-        recipients: &'r [Peer],
+        recipients: &'r [NamedPeer],
         delivery_group_size: usize,
         wire_msg: WireMsg,
     ) -> Result<SendStatus> {
@@ -255,7 +261,7 @@ impl Comm {
         // succeeds or if there are no more recipients to pick.
         let mut tasks: FuturesUnordered<_> = recipients[0..delivery_group_size]
             .iter()
-            .map(|recipient| self.send_to_one(recipient, msg_id, priority, msg_bytes.clone(), None))
+            .map(|recipient| self.send_to_one(recipient, msg_id, priority, msg_bytes.clone()))
             .collect();
 
         let mut next = delivery_group_size;
@@ -274,22 +280,12 @@ impl Comm {
                     // we are terminating so let's cut this short.
                     return Err(Error::ConnectionClosed);
                 }
-                Err(SendToOneError::Send {
-                    source: qp2p::SendError::ConnectionLost(_),
-                    connection_id,
-                    reused_connection: true,
-                }) => {
+                Err(SendToOneError::Send(qp2p::SendError::ConnectionLost(_))) => {
                     // We reused an existing connection, but it was lost when we tried to send. This
                     // could indicate the connection timed out whilst it was held, or some other
                     // transient connection issue. We don't treat this as a failed recipient, and
                     // instead push the same recipient again, but force a reconnection.
-                    tasks.push(self.send_to_one(
-                        recipient,
-                        msg_id,
-                        priority,
-                        msg_bytes.clone(),
-                        Some(connection_id),
-                    ));
+                    tasks.push(self.send_to_one(recipient, msg_id, priority, msg_bytes.clone()));
                 }
                 Err(error) => {
                     warn!("during sending, received error {:?}", error);
@@ -301,7 +297,6 @@ impl Comm {
                             msg_id,
                             priority,
                             msg_bytes.clone(),
-                            None,
                         ));
                         next += 1;
                     }
@@ -332,12 +327,11 @@ impl Comm {
     #[allow(clippy::needless_lifetimes)] // clippy is wrong here
     async fn send_to_one<'r>(
         &self,
-        recipient: &'r Peer,
+        recipient: &'r NamedPeer,
         msg_id: MsgId,
         msg_priority: i32,
         msg_bytes: Bytes,
-        failed_connection_id: Option<usize>,
-    ) -> (&'r Peer, Result<(), SendToOneError>) {
+    ) -> (&'r NamedPeer, Result<(), SendToOneError>) {
         trace!(
             "Sending message ({} bytes, msg_id: {:?}) to {}",
             msg_bytes.len(),
@@ -348,51 +342,23 @@ impl Comm {
         // TODO: more laid back retries with lower priority, more aggressive with higher
         let retries = self.back_pressure.get(&recipient.addr()).await;
 
-        let mut reused_connection = true;
-        let connection = recipient
-            .ensure_connection(
-                |connection| Some(connection.id()) != failed_connection_id,
-                |addr| {
-                    reused_connection = false;
-                    async move {
-                        let (connection, connection_incoming) =
-                            self.endpoint.connect_to(&addr).await?;
-                        let _ = task::spawn(
-                            handle_incoming_messages(
-                                connection.clone(),
-                                connection_incoming,
-                                self.event_tx.clone(),
-                                self.msg_count.clone(),
-                            )
-                            .in_current_span(),
-                        );
-                        Ok(connection)
-                    }
-                },
-            )
-            .await
-            .map_err(SendToOneError::Connection);
+        let connection = self.connections.get_or_create(&recipient.id()).await;
 
-        if let (true, Ok(connection)) = (reused_connection, &connection) {
-            trace!(
-                connection_id = connection.id(),
-                src = %connection.remote_address(),
-                "{}",
-                LogMarker::ConnectionReused
+        let listen = |conn, incoming_msgs| {
+            let _ = task::spawn(
+                handle_incoming_messages(
+                    conn,
+                    incoming_msgs,
+                    self.event_tx.clone(),
+                    self.msg_count.clone(),
+                    self.connections.clone(),
+                )
+                .in_current_span(),
             );
-        }
+        };
 
-        let result = future::ready(connection)
-            .and_then(|connection| async move {
-                connection
-                    .send_with(msg_bytes, msg_priority, Some(&retries))
-                    .await
-                    .map_err(|source| SendToOneError::Send {
-                        source,
-                        connection_id: connection.id(),
-                        reused_connection,
-                    })
-            })
+        let result = connection
+            .send_with(msg_bytes, msg_priority, Some(&retries), listen)
             .await;
 
         (recipient, result)
@@ -405,7 +371,7 @@ impl Comm {
     }
 
     /// Returns cpu load report if being strained.
-    pub(crate) async fn check_strain(&self, caller: SocketAddr) -> Option<LoadReport> {
+    pub(crate) async fn check_strain(&self, caller: &SocketAddr) -> Option<LoadReport> {
         self.back_pressure.load_report(caller).await
     }
 
@@ -417,35 +383,13 @@ impl Comm {
     }
 }
 
-/// Errors that can be returned from `Comm::send_to_one`.
-#[derive(Debug)]
-enum SendToOneError {
-    Connection(qp2p::ConnectionError),
-    Send {
-        source: qp2p::SendError,
-        connection_id: usize,
-        reused_connection: bool,
-    },
-}
-
-impl SendToOneError {
-    fn is_local_close(&self) -> bool {
-        matches!(
-            self,
-            SendToOneError::Connection(qp2p::ConnectionError::Closed(qp2p::Close::Local))
-                | SendToOneError::Send {
-                    source: qp2p::SendError::ConnectionLost(qp2p::ConnectionError::Closed(
-                        qp2p::Close::Local
-                    )),
-                    ..
-                }
-        )
-    }
-}
-
 #[derive(Debug)]
 pub(crate) enum ConnectionEvent {
-    Received((UnnamedPeer, Bytes)),
+    Received {
+        sender: NamedPeer,
+        wire_msg: WireMsg,
+        original_bytes: Bytes,
+    },
 }
 
 #[tracing::instrument(skip_all)]
@@ -453,64 +397,87 @@ async fn handle_incoming_connections(
     mut incoming_connections: qp2p::IncomingConnections,
     event_tx: mpsc::Sender<ConnectionEvent>,
     msg_count: MsgCount,
+    connections: Connections,
 ) {
-    while let Some((connection, connection_incoming)) = incoming_connections.next().await {
+    while let Some((connection, incoming_msgs)) = incoming_connections.next().await {
         trace!(
             "incoming_connection from {:?} with connection_id {:?}",
             connection.remote_address(),
             connection.id()
         );
+
         let _ = task::spawn(
             handle_incoming_messages(
                 connection,
-                connection_incoming,
+                incoming_msgs,
                 event_tx.clone(),
                 msg_count.clone(),
+                connections.clone(),
             )
             .in_current_span(),
         );
     }
 }
 
-#[tracing::instrument(skip(incoming_msgs, event_tx, msg_count))]
+#[tracing::instrument(skip_all)]
 async fn handle_incoming_messages(
-    connection: qp2p::Connection,
-    mut incoming_msgs: qp2p::ConnectionIncoming,
+    conn: qp2p::Connection,
+    mut incoming_msgs: ConnectionIncoming,
     event_tx: mpsc::Sender<ConnectionEvent>,
     msg_count: MsgCount,
+    connections: Connections,
 ) {
-    let connection_id = connection.id();
-    let src = connection.remote_address();
-    trace!(%connection_id, %src, "{}", LogMarker::ConnectionOpened);
+    let conn_id = conn.id();
+    let remote_address = conn.remote_address();
+    let mut first = true;
 
     while let Some(result) = incoming_msgs.next().await.transpose() {
         match result {
-            Ok(msg) => {
+            Ok(msg_bytes) => {
+                let wire_msg = match WireMsg::from(msg_bytes.clone()) {
+                    Ok(wire_msg) => wire_msg,
+                    Err(error) => {
+                        // TODO: should perhaps rather drop this connection.. as it is a spam vector
+                        debug!("Failed to deserialize message: {:?}", error);
+                        continue;
+                    }
+                };
+
+                let src_name = wire_msg.msg_kind().src().name();
+
+                if first {
+                    first = false;
+                    let node_id = (src_name, remote_address);
+                    connections.add_incoming(&node_id, conn.clone()).await;
+                }
+
                 let _send_res = event_tx
-                    .send(ConnectionEvent::Received((
-                        UnnamedPeer::connected(connection.clone()),
-                        msg,
-                    )))
+                    .send(ConnectionEvent::Received {
+                        sender: NamedPeer::new(src_name, remote_address),
+                        wire_msg,
+                        original_bytes: msg_bytes,
+                    })
                     .await;
+
                 // count incoming msgs..
-                msg_count.increase_incoming(src);
+                msg_count.increase_incoming(remote_address);
             }
             Err(error) => {
                 // TODO: should we propagate this?
-                warn!("error on connection with {}: {:?}", src, error);
+                warn!("error on connection with {}: {:?}", remote_address, error);
             }
         }
     }
 
-    trace!(%connection_id, %src, "{}", LogMarker::ConnectionClosed);
+    trace!(%conn_id, %remote_address, "{}", LogMarker::ConnectionClosed);
 }
 
 /// Returns the status of the send operation.
 #[derive(Debug, Clone)]
 pub(crate) enum SendStatus {
     AllRecipients,
-    MinDeliveryGroupSizeReached(Vec<Peer>),
-    MinDeliveryGroupSizeFailed(Vec<Peer>),
+    MinDeliveryGroupSizeReached(Vec<NamedPeer>),
+    MinDeliveryGroupSizeFailed(Vec<NamedPeer>),
 }
 
 #[cfg(test)]
@@ -518,8 +485,7 @@ mod tests {
     use super::*;
     use crate::messaging::data::{DataQuery, ServiceMsg};
     use crate::messaging::{DstLocation, MsgId, MsgKind, ServiceAuth};
-    use crate::node::Peer;
-    use crate::types::{ChunkAddress, Keypair};
+    use crate::types::{ChunkAddress, Keypair, NamedPeer};
     use assert_matches::assert_matches;
     use eyre::Result;
     use futures::future;
@@ -683,7 +649,7 @@ mod tests {
 
         let msg0 = new_test_msg()?;
         let status = send_comm
-            .send(&[Peer::new(name, recv_addr)], 1, msg0.clone())
+            .send(&[NamedPeer::new(name, recv_addr)], 1, msg0.clone())
             .await?;
         assert_matches!(status, SendStatus::AllRecipients);
 
@@ -704,7 +670,7 @@ mod tests {
 
         let msg1 = new_test_msg()?;
         let status = send_comm
-            .send(&[Peer::new(name, recv_addr)], 1, msg1.clone())
+            .send(&[NamedPeer::new(name, recv_addr)], 1, msg1.clone())
             .await?;
         assert_matches!(status, SendStatus::AllRecipients);
 
@@ -733,11 +699,15 @@ mod tests {
 
         // Send a message to establish the connection
         let status = comm1
-            .send(&[Peer::new(XorName::random(), addr0)], 1, new_test_msg()?)
+            .send(
+                &[NamedPeer::new(XorName::random(), addr0)],
+                1,
+                new_test_msg()?,
+            )
             .await?;
         assert_matches!(status, SendStatus::AllRecipients);
 
-        assert_matches!(rx0.recv().await, Some(ConnectionEvent::Received(_)));
+        assert_matches!(rx0.recv().await, Some(ConnectionEvent::Received { .. }));
         // Drop `comm1` to cause connection lost.
         drop(comm1);
 
@@ -773,7 +743,7 @@ mod tests {
         Ok(wire_msg)
     }
 
-    async fn new_peer() -> Result<(Peer, mpsc::Receiver<Bytes>)> {
+    async fn new_peer() -> Result<(NamedPeer, mpsc::Receiver<Bytes>)> {
         let (endpoint, mut incoming_connections, _) =
             Endpoint::new_peer(local_addr(), &[], Config::default()).await?;
         let addr = endpoint.public_addr();
@@ -788,10 +758,10 @@ mod tests {
             }
         });
 
-        Ok((Peer::new(XorName::random(), addr), rx))
+        Ok((NamedPeer::new(XorName::random(), addr), rx))
     }
 
-    async fn get_invalid_peer() -> Result<Peer> {
+    async fn get_invalid_peer() -> Result<NamedPeer> {
         let socket = UdpSocket::bind((Ipv4Addr::LOCALHOST, 0)).await?;
         let addr = socket.local_addr()?;
 
@@ -803,7 +773,7 @@ mod tests {
             let _ = socket;
         });
 
-        Ok(Peer::new(XorName::random(), addr))
+        Ok(NamedPeer::new(XorName::random(), addr))
     }
 
     fn local_addr() -> SocketAddr {

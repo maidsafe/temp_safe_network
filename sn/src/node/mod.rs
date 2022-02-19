@@ -21,7 +21,7 @@ mod logging;
 mod messages;
 mod network_knowledge;
 
-use crate::types::{Peer, PublicKey};
+use crate::types::{NamedPeer, PublicKey};
 
 use ed25519_dalek::Keypair;
 use std::{
@@ -85,8 +85,8 @@ impl NodeInfo {
         }
     }
 
-    pub(crate) fn peer(&self) -> Peer {
-        Peer::new(self.name(), self.addr)
+    pub(crate) fn peer(&self) -> NamedPeer {
+        NamedPeer::new(self.name(), self.addr)
     }
 
     pub(crate) fn name(&self) -> XorName {

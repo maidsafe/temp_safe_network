@@ -99,9 +99,9 @@ impl BackPressure {
     }
 
     /// Sent to nodes calling us, if we are strained
-    pub(crate) async fn load_report(&self, caller: SocketAddr) -> Option<LoadReport> {
+    pub(crate) async fn load_report(&self, caller: &SocketAddr) -> Option<LoadReport> {
         let now = Instant::now();
-        let sent = { self.our_reports.read().await.get(&caller).copied() };
+        let sent = { self.our_reports.read().await.get(caller).copied() };
         let load = match sent {
             Some((then, _)) => {
                 // do not refresh too often
@@ -121,7 +121,7 @@ impl BackPressure {
         }
     }
 
-    async fn get_load(&self, caller: SocketAddr, now: Instant) -> LoadReport {
+    async fn get_load(&self, caller: &SocketAddr, now: Instant) -> LoadReport {
         {
             self.system.write().await.refresh_cpu();
         }
@@ -130,7 +130,7 @@ impl BackPressure {
             .our_reports
             .write()
             .await
-            .insert(caller, (now, current_load));
+            .insert(*caller, (now, current_load));
 
         // placed in this block, we reduce the frequency of this check
         let last_eviction = { *self.last_eviction.read().await };

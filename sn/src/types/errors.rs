@@ -118,6 +118,9 @@ pub enum Error {
     /// The CRDT operation cannot be applied as it targets a different content address.
     #[error("The CRDT operation cannot be applied as it targets a different content address.")]
     CrdtWrongAddress(RegisterAddress),
+    // /// Connection error.
+    // #[error("Connection error {0}")]
+    // Connection(qp2p::ConnectionError),
 }
 
 pub(crate) fn convert_bincode_error(err: bincode::Error) -> Error {

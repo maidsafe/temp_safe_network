@@ -14,7 +14,7 @@ use crate::node::{
     messages::WireMsgUtils,
     Error, Result,
 };
-use crate::types::{log_markers::LogMarker, Peer};
+use crate::types::{log_markers::LogMarker, NamedPeer};
 
 use std::{sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
@@ -331,7 +331,7 @@ impl Dispatcher {
 
     async fn send_msg(
         &self,
-        recipients: &[Peer],
+        recipients: &[NamedPeer],
         delivery_group_size: usize,
         wire_msg: WireMsg,
     ) -> Result<Vec<Cmd>> {
@@ -360,7 +360,7 @@ impl Dispatcher {
 
     async fn deliver_msgs(
         &self,
-        recipients: &[Peer],
+        recipients: &[NamedPeer],
         delivery_group_size: usize,
         wire_msg: WireMsg,
     ) -> Result<Vec<Cmd>> {

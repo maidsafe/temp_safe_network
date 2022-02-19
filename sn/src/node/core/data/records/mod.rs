@@ -25,7 +25,7 @@ use crate::{
         messages::WireMsgUtils,
         Error, Result,
     },
-    types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData, ReplicatedDataAddress},
+    types::{log_markers::LogMarker, NamedPeer, PublicKey, ReplicatedData, ReplicatedDataAddress},
 };
 
 use itertools::Itertools;
@@ -58,7 +58,7 @@ impl Node {
         query: DataQuery,
         msg_id: MsgId,
         auth: AuthorityProof<ServiceAuth>,
-        origin: Peer,
+        origin: NamedPeer,
     ) -> Result<Vec<Cmd>> {
         let address = query.address();
         let operation_id = query.operation_id()?;
@@ -264,8 +264,11 @@ impl Node {
         candidates
     }
 
-    // Takes a message and forms cmds to send to specified targets
+    // Takes a message for specified targets, and builds internal send cmds
+    // for sending to each of the targets.
     // Targets are XorName specified so must be within the section
+    // (Within which section?? Further down, we seem to expect different sections,
+    // since we call self.section_key_by_name(&target) ???)
     async fn send_node_msg_to_nodes(
         &self,
         msg: SystemMsg,

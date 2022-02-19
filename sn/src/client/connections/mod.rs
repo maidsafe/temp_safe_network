@@ -9,18 +9,20 @@
 mod listeners;
 mod messaging;
 
-use crate::messaging::{
-    data::{CmdError, OperationId, QueryResponse},
-    MsgId,
-};
 use crate::types::prefix_map::NetworkPrefixMap;
+use crate::{
+    messaging::{
+        data::{CmdError, OperationId, QueryResponse},
+        MsgId,
+    },
+    types::Connections,
+};
 
 use dashmap::DashMap;
 use qp2p::Endpoint;
 use std::sync::Arc;
 use tokio::sync::{mpsc::Sender, RwLock};
 use tokio::time::Duration;
-use xor_name::XorName;
 
 // Here we dont track the msg_id across the network, but just use it as a local identifier to remove the correct listener
 type PendingQueryResponses = Arc<DashMap<OperationId, Vec<(MsgId, QueryResponseSender)>>>;
@@ -54,6 +56,6 @@ pub(super) struct Session {
     initial_connection_check_msg_id: Arc<RwLock<Option<MsgId>>>,
     /// Standard time to await potential AE messages:
     cmd_ack_wait: Duration,
-    /// Closed connection tracking, used to validate if a new connection is needed or not. Xorname to ConnectionId
-    elder_last_closed_connections: Arc<DashMap<XorName, Vec<usize>>>,
+    ///
+    connections: Connections,
 }

@@ -118,7 +118,7 @@ impl WireMsg {
 
     /// Deserialize the payload from this WireMsg returning a MsgType instance.
     pub fn into_msg(&self) -> Result<MsgType> {
-        match self.header.msg_envelope.msg_kind.clone() {
+        match self.header.content.msg_kind.clone() {
             MsgKind::ServiceMsg(auth) => {
                 let msg: ServiceMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
@@ -135,9 +135,9 @@ impl WireMsg {
                 };
 
                 Ok(MsgType::Service {
-                    msg_id: self.header.msg_envelope.msg_id,
+                    msg_id: self.header.content.msg_id,
                     auth,
-                    dst_location: self.header.msg_envelope.dst_location,
+                    dst_location: self.header.content.dst_location,
                     msg,
                 })
             }
@@ -147,12 +147,12 @@ impl WireMsg {
                 })?;
 
                 Ok(MsgType::System {
-                    msg_id: self.header.msg_envelope.msg_id,
+                    msg_id: self.header.content.msg_id,
                     msg_authority: NodeMsgAuthority::Node(AuthorityProof::verify(
                         node_signed,
                         &self.payload,
                     )?),
-                    dst_location: self.header.msg_envelope.dst_location,
+                    dst_location: self.header.content.dst_location,
                     msg,
                 })
             }
@@ -165,12 +165,12 @@ impl WireMsg {
                 })?;
 
                 Ok(MsgType::System {
-                    msg_id: self.header.msg_envelope.msg_id,
+                    msg_id: self.header.content.msg_id,
                     msg_authority: NodeMsgAuthority::BlsShare(AuthorityProof::verify(
                         bls_share_signed,
                         &self.payload,
                     )?),
-                    dst_location: self.header.msg_envelope.dst_location,
+                    dst_location: self.header.content.dst_location,
                     msg,
                 })
             }
@@ -179,43 +179,43 @@ impl WireMsg {
 
     /// Return the message id of this message
     pub fn msg_id(&self) -> MsgId {
-        self.header.msg_envelope.msg_id
+        self.header.content.msg_id
     }
 
     /// Update the message ID
     pub fn set_msg_id(&mut self, msg_id: MsgId) {
-        self.header.msg_envelope.msg_id = msg_id;
+        self.header.content.msg_id = msg_id;
     }
 
     /// Return the kind of this message
     pub fn msg_kind(&self) -> &MsgKind {
-        &self.header.msg_envelope.msg_kind
+        &self.header.content.msg_kind
     }
 
     /// Return the destination section PublicKey for this message
     pub fn dst_section_pk(&self) -> Option<BlsPublicKey> {
-        self.header.msg_envelope.dst_location.section_pk()
+        self.header.content.dst_location.section_pk()
     }
 
     /// Update the destination section PublicKey for this message
     pub fn set_dst_section_pk(&mut self, pk: BlsPublicKey) {
-        self.header.msg_envelope.dst_location.set_section_pk(pk)
+        self.header.content.dst_location.set_section_pk(pk)
     }
 
     /// Update the destination XorName for this message
     pub fn set_dst_xorname(&mut self, name: XorName) {
-        self.header.msg_envelope.dst_location.set_name(name)
+        self.header.content.dst_location.set_name(name)
     }
 
     /// Return the destination for this message
     pub fn dst_location(&self) -> &DstLocation {
-        &self.header.msg_envelope.dst_location
+        &self.header.content.dst_location
     }
 
     /// Return the source section PublicKey for this
     /// message if it's a NodeMsg
     pub fn src_section_pk(&self) -> Option<BlsPublicKey> {
-        match &self.header.msg_envelope.msg_kind {
+        match &self.header.content.msg_kind {
             MsgKind::NodeAuthMsg(node_signed) => Some(node_signed.section_pk),
             MsgKind::NodeBlsShareAuthMsg(bls_share_signed) => Some(bls_share_signed.section_pk),
             _ => None,
