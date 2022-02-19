@@ -6,24 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod chunk_store;
-mod encoding;
-mod errors;
-mod event_store;
-mod kv_store;
-mod lru_cache;
-mod used_space;
+use super::ToDbKey;
+use serde::{de::DeserializeOwned, Serialize};
 
-pub(crate) use chunk_store::ChunkStore;
-pub(crate) use encoding::{deserialise, serialise};
-pub(crate) use errors::{convert_to_error_msg, Error, Result};
-pub(crate) use event_store::EventStore;
-pub(crate) use lru_cache::LruCache;
-use std::path::Path;
-pub use used_space::UsedSpace;
+pub(crate) trait Key: ToDbKey + PartialEq + Eq + DeserializeOwned {}
 
-pub(crate) const SLED_FLUSH_TIME_MS: Option<u64> = Some(10000);
-
-pub(crate) trait Subdir {
-    fn subdir() -> &'static Path;
+/// A value in a key-value store.
+///
+/// The KV-store is paramaterised by the value type, from which a key can be derived.
+pub(crate) trait Value: Serialize + DeserializeOwned {
+    type Key: Key;
+    fn key(&self) -> &Self::Key;
 }
