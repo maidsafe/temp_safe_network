@@ -138,7 +138,7 @@ impl NodeMsgAuthority {
             }
             NodeMsgAuthority::Node(auth_proof) => {
                 let auth = auth_proof.into_inner();
-                let pk = auth.public_key;
+                let pk = auth.node_ed_pk;
 
                 XorName::from(PublicKey::from(pk))
             }
