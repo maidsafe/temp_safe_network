@@ -3295,7 +3295,7 @@ checksum = "73b4b750c782965c211b42f022f59af1fbceabdd026623714f104152f1ec149f"
 
 [[package]]
 name = "safe_network"
-version = "0.58.0"
+version = "0.58.1"
 dependencies = [
  "assert_matches",
  "backoff",
