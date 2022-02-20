@@ -162,7 +162,7 @@ fn build_forward_query_response(
     let signature = keypair.sign(&payload);
 
     let auth = ServiceAuth {
-        public_key: keypair.public_key(),
+        node_pk: keypair.public_key(),
         signature,
     };
 

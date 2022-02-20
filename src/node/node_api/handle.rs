@@ -197,7 +197,7 @@ impl Node {
                     let mut ops = vec![
                         adult
                             .chunks
-                            .read(&read, msg_id, auth.public_key, our_section_pk)
+                            .read(&read, msg_id, auth.node_pk, our_section_pk)
                             .await,
                     ];
                     ops.extend(adult.chunks.check_storage().await?);
@@ -212,7 +212,7 @@ impl Node {
             } => {
                 let adult = self.as_adult().await?;
                 let handle = tokio::spawn(async move {
-                    let mut ops = vec![adult.chunks.write(&write, msg_id, auth.public_key).await?];
+                    let mut ops = vec![adult.chunks.write(&write, msg_id, auth.node_pk).await?];
                     ops.extend(adult.chunks.check_storage().await?);
                     Ok(NodeTask::from(ops))
                 });

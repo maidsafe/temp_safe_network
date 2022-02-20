@@ -29,7 +29,7 @@ impl Client {
     ) -> Result<QueryResult, Error> {
         debug!("Sending Query: {:?}", query);
         let auth = ServiceAuth {
-            public_key: client_pk,
+            node_pk: client_pk,
             signature,
         };
 

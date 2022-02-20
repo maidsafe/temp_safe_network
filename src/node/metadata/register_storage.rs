@@ -169,8 +169,8 @@ impl RegisterStorage {
                             }
                             // TODO - Register::check_permission() doesn't support Delete yet in safe-nd
                             // register.check_permission(action, Some(auth.public_key))?;
-                            if auth.public_key != entry.state.owner() {
-                                Err(Error::InvalidOwner(auth.public_key))
+                            if auth.node_pk != entry.state.owner() {
+                                Err(Error::InvalidOwner(auth.node_pk))
                             } else {
                                 info!("Deleting Register");
                                 let _ = self.db.drop_tree(key)?;
@@ -212,7 +212,7 @@ impl RegisterStorage {
                 info!("Editing Register");
                 entry
                     .state
-                    .check_permissions(Action::Write, Some(auth.public_key))?;
+                    .check_permissions(Action::Write, Some(auth.node_pk))?;
                 let result = entry.state.apply_op(reg_op).map_err(Error::NetworkData);
 
                 if result.is_ok() {
@@ -437,7 +437,7 @@ mod test {
         let write = RegisterWrite::New(replica1);
 
         let auth = ServiceAuth {
-            public_key: pk,
+            node_pk: pk,
             signature: authority_keypair1.sign(b""),
         };
 

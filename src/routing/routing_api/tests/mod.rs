@@ -1000,7 +1000,7 @@ async fn handle_untrusted_message(source: UntrustedMessageSource) -> Result<()> 
             let keypair = ed25519_dalek::Keypair::generate(&mut rng);
             MsgKind::NodeAuthMsg(NodeAuth {
                 section_pk: pk1,
-                public_key: keypair.public,
+                node_pk: keypair.public,
                 signature: keypair.sign(&payload),
             })
         }

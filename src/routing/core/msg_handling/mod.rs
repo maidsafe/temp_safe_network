@@ -480,7 +480,7 @@ impl Core {
         let signature = keypair.sign(&payload);
 
         let msg = MsgKind::ServiceMsg(ServiceAuth {
-            public_key: keypair.public_key(),
+            node_pk: keypair.public_key(),
             signature,
         });
 

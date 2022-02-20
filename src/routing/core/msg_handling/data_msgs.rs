@@ -74,7 +74,7 @@ impl Core {
         user: EndUser,
         auth: AuthorityProof<ServiceAuth>,
     ) -> Result<Vec<Command>> {
-        match self.register_storage.read(&query, auth.public_key) {
+        match self.register_storage.read(&query, auth.node_pk) {
             Ok(response) => {
                 if response.failed_with_data_not_found() {
                     // we don't return data not found errors.

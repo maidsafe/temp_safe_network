@@ -415,7 +415,7 @@ mod tests {
 
         let payload = WireMsg::serialize_msg_payload(&client_msg)?;
         let auth = ServiceAuth {
-            public_key: src_client_keypair.public_key(),
+            node_pk: src_client_keypair.public_key(),
             signature: src_client_keypair.sign(&payload),
         };
         let auth_proof = AuthorityProof::verify(auth.clone(), &payload).unwrap();

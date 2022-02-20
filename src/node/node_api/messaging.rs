@@ -130,7 +130,7 @@ fn random_client_signature(client_msg: &ServiceMsg) -> Result<(MsgKind, Bytes)> 
     let signature = keypair.sign(&payload);
 
     let msg_kind = MsgKind::ServiceMsg(ServiceAuth {
-        public_key: keypair.public_key(),
+        node_pk: keypair.public_key(),
         signature,
     });
 

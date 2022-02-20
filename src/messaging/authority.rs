@@ -17,7 +17,7 @@ use xor_name::XorName;
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct ServiceAuth {
     /// Peer's public key.
-    pub public_key: PublicKey,
+    pub node_pk: PublicKey,
     /// Peer's signature.
     pub signature: Signature,
 }
@@ -29,7 +29,7 @@ pub struct NodeAuth {
     pub section_pk: BlsPublicKey,
     /// Public key of the source peer.
     #[debug(with = "PublicKey::fmt_ed25519")]
-    pub public_key: EdPublicKey,
+    pub node_pk: EdPublicKey,
     /// Ed25519 signature of the message corresponding to the public key of the source peer.
     #[debug(with = "Signature::fmt_ed25519")]
     #[serde(with = "serde_bytes")]
@@ -45,7 +45,7 @@ impl NodeAuth {
     ) -> AuthorityProof<Self> {
         AuthorityProof(NodeAuth {
             section_pk,
-            public_key: keypair.public,
+            node_pk: keypair.public,
             signature: keypair.sign(payload.as_ref()),
         })
     }
@@ -163,7 +163,7 @@ pub trait VerifyAuthority: Sized + sealed::Sealed {
 
 impl VerifyAuthority for ServiceAuth {
     fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {
-        self.public_key
+        self.node_pk
             .verify(&self.signature, payload)
             .map_err(|_| Error::InvalidSignature)?;
         Ok(self)
@@ -173,7 +173,7 @@ impl sealed::Sealed for ServiceAuth {}
 
 impl VerifyAuthority for NodeAuth {
     fn verify_authority(self, payload: impl AsRef<[u8]>) -> Result<Self> {
-        self.public_key
+        self.node_pk
             .verify(payload.as_ref(), &self.signature)
             .map_err(|_| Error::InvalidSignature)?;
         Ok(self)

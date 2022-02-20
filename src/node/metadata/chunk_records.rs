@@ -113,7 +113,7 @@ impl ChunkRecords {
         auth: AuthorityProof<ServiceAuth>,
         origin: EndUser,
     ) -> Result<NodeDuty> {
-        if let Err(error) = validate_chunk_owner(&chunk, &auth.public_key) {
+        if let Err(error) = validate_chunk_owner(&chunk, &auth.node_pk) {
             return self.send_error(error, msg_id, origin).await;
         }
 
