@@ -25,7 +25,7 @@ impl NodeMsgAuthorityUtils for NodeMsgAuthority {
     fn src_location(&self) -> SrcLocation {
         match self {
             NodeMsgAuthority::Node(node_auth) => SrcLocation::Node {
-                name: ed25519::name(&node_auth.public_key),
+                name: ed25519::name(&node_auth.node_ed_pk),
                 section_pk: node_auth.section_pk,
             },
             NodeMsgAuthority::BlsShare(bls_share_auth) => SrcLocation::Section {
@@ -41,7 +41,7 @@ impl NodeMsgAuthorityUtils for NodeMsgAuthority {
 
     fn name(&self) -> XorName {
         match self {
-            NodeMsgAuthority::Node(node_auth) => ed25519::name(&node_auth.public_key),
+            NodeMsgAuthority::Node(node_auth) => ed25519::name(&node_auth.node_ed_pk),
             NodeMsgAuthority::BlsShare(bls_share_auth) => bls_share_auth.src_name,
             NodeMsgAuthority::Section(section_auth) => section_auth.src_name,
         }

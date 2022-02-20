@@ -798,7 +798,7 @@ impl Node {
             } => {
                 debug!("{:?}", LogMarker::ChunkQueryResponseReceviedFromAdult);
                 let sending_nodes_pk = match msg_authority {
-                    NodeMsgAuthority::Node(auth) => PublicKey::from(auth.into_inner().public_key),
+                    NodeMsgAuthority::Node(auth) => PublicKey::from(auth.into_inner().node_ed_pk),
                     _ => return Err(Error::InvalidQueryResponseAuthority),
                 };
 

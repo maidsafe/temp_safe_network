@@ -45,7 +45,7 @@ impl MsgKind {
                 section_pk: auth.sig_share.public_key_set.public_key(),
             },
             Self::NodeAuthMsg(auth) => SrcLocation::Node {
-                name: crate::types::PublicKey::Ed25519(auth.public_key).into(),
+                name: crate::types::PublicKey::Ed25519(auth.node_ed_pk).into(),
                 section_pk: auth.section_pk,
             },
             Self::ServiceMsg(auth) => SrcLocation::EndUser(super::EndUser(auth.public_key.into())),
