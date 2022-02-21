@@ -109,21 +109,6 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn ed25519_rmp_fmt() -> Result<(), Box<dyn std::error::Error>> {
-        let signature = gen_ed25519_sig();
-        let serialized = rmp_serde::to_vec(&signature)?;
-
-        assert_eq!(serialized.len(), 68);
-        assert_eq!(serialized[0], 0x81); // fixmap of length 1
-        assert_eq!(serialized[1], 0x00); // variant index
-        assert_eq!(serialized[2], 0xc4); // bin 8 bytearray
-        assert_eq!(serialized[3], 64); // bytearray length
-        assert_eq!(&serialized[4..], signature.into_ed().unwrap().as_ref());
-
-        Ok(())
-    }
-
     /// The new `from_bytes` mechanism for checking a signature, checks the value of the last byte
     /// in the array passed in, and does a bitwise and operation on it. If that operation doesn't
     /// result in 0, an error is returned. The only thing that makes sense to me is to keep trying
