@@ -1,13 +1,12 @@
 name: Benchmarks
 
-on:
-  schedule:
-    - cron:  '0 22 * * *'
+on: pull_request
 
 env:
   CARGO_INCREMENTAL: '0'
   RUST_BACKTRACE: 1
   RUSTFLAGS: "-D warnings"
+  NODE_COUNT: 15
 
 jobs:
   benchmarks:
@@ -36,20 +35,25 @@ jobs:
 
       - name: Run testnet
         run: ./target/release/testnet
-        if: matrix.os != 'windows-latest'
         env:
           RUST_LOG: "safe_network=trace"
 
-      - name: Run testnet on Windows with 11 nodes
-        run: ./target/release/testnet
+      - name: Mac install ripgrep
+        if: matrix.os == 'macos-latest'
+        run: brew install ripgrep
+
+      - name: ubuntu install ripgrep
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get -y install ripgrep
+
+      - name: windows install ripgrep
         if: matrix.os == 'windows-latest'
-        env:
-          RUST_LOG: "safe_network=trace"
-          NODE_COUNT: 11
+        run: choco install ripgrep
 
-      - name: Have we had a section split?
-        if: matrix.os != 'windows-latest'
-        run: ./resources/scripts/has_split.sh
+      - name: Wait for all nodes to join
+        shell: bash
+        run: ./resources/scripts/wait_for_nodes_to_join.sh
+        timeout-minutes: 10
 
       - name: Bench
         run: cargo bench
