@@ -223,7 +223,7 @@ jobs:
         if: matrix.os != 'windows-latest'
         # always joinable not actually needed here, but should speed up compilation as we've just built with it
         run: cd sn && repeat 5 cargo test --release --features=test-utils -- client --skip client_api::reg --skip client_api::file --test-threads=2 && sleep $POST_TEST_SLEEP
-        timeout-minutes: 7
+        timeout-minutes: 10 # avg run is 80s * 5 is _just_ under 7 mins. so set to 10 mins
 
       # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
       - name: Initial client tests... (win)
@@ -425,7 +425,7 @@ jobs:
         shell: zsh {0}
         # always joinable not actually needed here, but should speed up compilation as we've just built with it
         run: cd sn && repeat 5 cargo test --release --features=test-utils -- client --skip client_api::reg --skip client_api::file --test-threads=2 && sleep $POST_TEST_SLEEP
-        timeout-minutes: 7
+        timeout-minutes: 10 # avg run is 80s * 5 is _just_ under 7 mins. so set to 10 mins
 
 
       # register api
