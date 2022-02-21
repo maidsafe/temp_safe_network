@@ -13,7 +13,7 @@ use crate::messaging::{
 use crate::node::{
     api::cmds::Cmd, core::Node, messages::WireMsgUtils, network_knowledge::NodeState, Error, Result,
 };
-use crate::types::{log_markers::LogMarker, Peer, UnnamedPeer};
+use crate::types::{log_markers::LogMarker, NamedPeer};
 
 use bls::PublicKey as BlsPublicKey;
 use xor_name::XorName;
@@ -22,7 +22,7 @@ impl Node {
     /// Send a direct (`SystemMsg`) message to a node in the specified section
     pub(crate) async fn send_direct_msg(
         &self,
-        recipient: Peer,
+        recipient: NamedPeer,
         node_msg: SystemMsg,
         section_pk: BlsPublicKey,
     ) -> Result<Cmd> {
@@ -34,7 +34,7 @@ impl Node {
     /// Send a direct (`SystemMsg`) message to a set of nodes in the specified section
     pub(crate) async fn send_direct_msg_to_nodes(
         &self,
-        recipients: Vec<Peer>,
+        recipients: Vec<NamedPeer>,
         node_msg: SystemMsg,
         section_name: XorName,
         section_pk: BlsPublicKey,
@@ -62,7 +62,7 @@ impl Node {
     /// Send a `Relocate` message to the specified node
     pub(crate) async fn send_relocate(
         &self,
-        recipient: Peer,
+        recipient: NamedPeer,
         node_state: SectionAuth<NodeState>,
     ) -> Result<Cmd> {
         let node_msg = SystemMsg::Relocate(node_state.into_authed_msg());
@@ -84,7 +84,7 @@ impl Node {
     // network but handle it directly (should only be used when accumulation is necesary)
     pub(crate) async fn send_messages_to_all_nodes_or_directly_handle_for_accumulation(
         &self,
-        recipients: Vec<Peer>,
+        recipients: Vec<NamedPeer>,
         mut wire_msg: WireMsg,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
@@ -124,7 +124,7 @@ impl Node {
             wire_msg.set_dst_xorname(our_name);
 
             cmds.push(Cmd::HandleMsg {
-                sender: UnnamedPeer::addressed(self.our_connection_info()),
+                sender: NamedPeer::new(our_name, self.our_connection_info()),
                 wire_msg,
                 original_bytes: None,
             });

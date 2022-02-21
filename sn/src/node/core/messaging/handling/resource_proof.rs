@@ -12,7 +12,7 @@ use crate::node::{
     core::{Node, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
     ed25519, Error, Result,
 };
-use crate::types::{log_markers::LogMarker, Peer};
+use crate::types::{log_markers::LogMarker, NamedPeer};
 
 use ed25519_dalek::Verifier;
 use xor_name::XorName;
@@ -46,7 +46,7 @@ impl Node {
             .validate_all(&response.nonce, &response.data, response.solution)
     }
 
-    pub(crate) async fn send_resource_proof_challenge(&self, peer: Peer) -> Result<Cmd> {
+    pub(crate) async fn send_resource_proof_challenge(&self, peer: NamedPeer) -> Result<Cmd> {
         let nonce: [u8; 32] = rand::random();
         let serialized =
             bincode::serialize(&(peer.name(), &nonce)).map_err(|_| Error::InvalidMessage)?;

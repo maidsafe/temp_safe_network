@@ -35,12 +35,11 @@ use crate::node::{
     network_knowledge::NetworkKnowledge,
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
 };
-use crate::types::{log_markers::LogMarker, PublicKey};
-use crate::types::{Peer, UnnamedPeer};
-use std::collections::BTreeSet;
+use crate::types::{log_markers::LogMarker, NamedPeer, PublicKey};
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
 // Message handling
@@ -48,14 +47,14 @@ impl Node {
     #[instrument(skip(self, original_bytes))]
     pub(crate) async fn handle_msg(
         &self,
-        sender: UnnamedPeer,
+        sender: NamedPeer,
         wire_msg: WireMsg,
         original_bytes: Option<Bytes>,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
 
         // Apply backpressure if needed.
-        if let Some(load_report) = self.comm.check_strain(sender.addr()).await {
+        if let Some(load_report) = self.comm.check_strain(&sender.addr()).await {
             let msg_src = wire_msg.msg_kind().src();
             if !msg_src.is_end_user() {
                 cmds.push(Cmd::SignOutgoingSystemMsg {
@@ -114,8 +113,6 @@ impl Node {
                     sender,
                     msg
                 );
-
-                let sender = sender.named(msg_authority.name());
 
                 // Let's check for entropy before we proceed further
                 // Adult nodes don't need to carry out entropy checking,
@@ -195,7 +192,6 @@ impl Node {
                 };
 
                 let src_location = wire_msg.msg_kind().src();
-                let sender = sender.named(src_location.name());
 
                 if self.is_not_elder().await {
                     trace!("Redirecting from adult to section elders");
@@ -258,7 +254,7 @@ impl Node {
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn handle_system_msg(
         &self,
-        sender: Peer,
+        sender: NamedPeer,
         msg_id: MsgId,
         mut msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
@@ -300,11 +296,9 @@ impl Node {
         msg_authority: NodeMsgAuthority,
         dst_location: DstLocation,
         node_msg: SystemMsg,
-        sender: Peer,
+        sender: NamedPeer,
         known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Cmd>> {
-        self.network_knowledge().merge_connections([&sender]).await;
-
         let src_name = msg_authority.name();
         trace!("Handling non blocking message");
         match node_msg {

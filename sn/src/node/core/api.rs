@@ -18,7 +18,7 @@ use crate::node::{
     network_knowledge::{NetworkKnowledge, SectionAuthorityProvider, SectionKeyShare},
     Event, NodeInfo,
 };
-use crate::types::{log_markers::LogMarker, Peer};
+use crate::types::{log_markers::LogMarker, NamedPeer};
 use crate::UsedSpace;
 
 use secured_linked_list::SecuredLinkedList;
@@ -218,7 +218,7 @@ impl Node {
 
     pub(crate) async fn send_accepted_online_share(
         &self,
-        peer: Peer,
+        peer: NamedPeer,
         previous_name: Option<XorName>,
     ) -> Result<Vec<Cmd>> {
         let public_key_set = self.public_key_set().await?;

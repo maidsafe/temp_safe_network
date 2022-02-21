@@ -12,11 +12,11 @@ use crate::messaging::{
     system::SectionAuth, SectionAuthorityProvider as SectionAuthorityProviderMsg,
 };
 use crate::node::{Prefix, XorName};
-use crate::types::Peer;
+use crate::types::NamedPeer;
 
 use bls::{PublicKey, PublicKeySet};
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeSet,
     fmt::{self, Display, Formatter},
     net::SocketAddr,
 };
@@ -29,7 +29,7 @@ use std::{
 pub struct SectionAuthorityProvider {
     prefix: Prefix,
     public_key_set: PublicKeySet,
-    elders: BTreeSet<Peer>,
+    elders: BTreeSet<NamedPeer>,
 }
 
 impl Display for SectionAuthorityProvider {
@@ -63,7 +63,7 @@ impl SectionAuthorityProvider {
     /// Creates a new `SectionAuthorityProvider` with the given members, prefix and public keyset.
     pub(crate) fn new<I>(elders: I, prefix: Prefix, pk_set: PublicKeySet) -> Self
     where
-        I: IntoIterator<Item = Peer>,
+        I: IntoIterator<Item = NamedPeer>,
     {
         Self {
             prefix,
@@ -88,12 +88,12 @@ impl SectionAuthorityProvider {
         self.prefix
     }
 
-    pub(crate) fn elders(&self) -> impl Iterator<Item = &Peer> + '_ {
+    pub(crate) fn elders(&self) -> impl Iterator<Item = &NamedPeer> + '_ {
         self.elders.iter()
     }
 
     /// A convenience function since we often use SAP elders as recipients.
-    pub(crate) fn elders_vec(&self) -> Vec<Peer> {
+    pub(crate) fn elders_vec(&self) -> Vec<NamedPeer> {
         self.elders.iter().cloned().collect()
     }
 
@@ -112,45 +112,18 @@ impl SectionAuthorityProvider {
         self.elders.iter().any(|elder| &elder.name() == name)
     }
 
-    /// Returns the elder `Peer` witht the given `name`.
-    pub(crate) fn get_elder(&self, name: &XorName) -> Option<&Peer> {
-        self.elders.iter().find(|elder| &elder.name() == name)
+    /// Returns the elder `NamedPeer` witht the given `name`.
+    pub(crate) fn get_elder(&self, name: &XorName) -> Option<&NamedPeer> {
+        self.elders.iter().find(|elder| elder.name() == *name)
     }
 
     /// Returns the set of elder names.
     pub(crate) fn names(&self) -> BTreeSet<XorName> {
-        self.elders.iter().map(Peer::name).collect()
+        self.elders.iter().map(NamedPeer::name).collect()
     }
 
     pub(crate) fn addresses(&self) -> Vec<SocketAddr> {
-        self.elders.iter().map(Peer::addr).collect()
-    }
-
-    /// Merge the connections from some source peers into our own elders.
-    // Although the library will compile if this is as an `async fn`, it seems to lose some fidelity
-    // in the lifetime bounds, since the routing stress example will fail to compile with a bizarre
-    // lifetime mismatch error.
-    #[allow(clippy::manual_async_fn)]
-    pub(crate) fn merge_connections<'a, 'b, I>(
-        &'a self,
-        sources: I,
-    ) -> impl std::future::Future<Output = ()> + Send + '_
-    where
-        I: IntoIterator<Item = &'b Peer> + Send + 'a,
-        I::IntoIter: Send,
-    {
-        async move {
-            let sources: BTreeMap<_, &Peer> = sources
-                .into_iter()
-                .map(|peer| (peer.addr(), peer))
-                .collect();
-
-            for elder in self.elders() {
-                if let Some(source) = sources.get(&elder.addr()) {
-                    elder.merge_connection(source).await;
-                }
-            }
-        }
+        self.elders.iter().map(NamedPeer::addr).collect()
     }
 
     /// Key of the section.
@@ -189,7 +162,7 @@ impl SectionAuthorityProviderMsg {
             elders: self
                 .elders
                 .into_iter()
-                .map(|(name, value)| Peer::new(name, value))
+                .map(|(name, value)| NamedPeer::new(name, value))
                 .collect(),
         }
     }

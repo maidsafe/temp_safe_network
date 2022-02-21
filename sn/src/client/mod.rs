@@ -30,7 +30,6 @@ mod connections;
 mod errors;
 
 // Export public API.
-
 pub use client_api::{Client, RegisterWriteAheadLog};
 pub use config_handler::{ClientConfig, DEFAULT_ACK_WAIT, DEFAULT_OPERATION_TIMEOUT};
 pub use errors::ErrorMsg;

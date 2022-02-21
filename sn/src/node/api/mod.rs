@@ -31,7 +31,7 @@ use crate::node::{
     logging::{log_ctx::LogCtx, run_system_logger},
     messages::WireMsgUtils,
     network_knowledge::SectionAuthorityProvider,
-    Config, NodeInfo, Peer, MIN_ADULT_AGE,
+    Config, NamedPeer, NodeInfo, MIN_ADULT_AGE,
 };
 use crate::types::{log_markers::LogMarker, PublicKey as TypesPublicKey};
 use crate::UsedSpace;
@@ -313,12 +313,12 @@ impl NodeApi {
     }
 
     /// Returns the information of all the current section elders.
-    pub async fn our_elders(&self) -> Vec<Peer> {
+    pub async fn our_elders(&self) -> Vec<NamedPeer> {
         self.dispatcher.node.network_knowledge().elders().await
     }
 
     /// Returns the information of all the current section adults.
-    pub async fn our_adults(&self) -> Vec<Peer> {
+    pub async fn our_adults(&self) -> Vec<NamedPeer> {
         self.dispatcher.node.network_knowledge().adults().await
     }
 
@@ -375,21 +375,16 @@ async fn handle_connection_events(
 ) {
     while let Some(event) = incoming_conns.recv().await {
         match event {
-            ConnectionEvent::Received((sender, bytes)) => {
+            ConnectionEvent::Received {
+                sender,
+                wire_msg,
+                original_bytes,
+            } => {
                 trace!(
                     "New message ({} bytes) received from: {:?}",
-                    bytes.len(),
+                    original_bytes.len(),
                     sender
                 );
-
-                // bytes.clone is cheap
-                let wire_msg = match WireMsg::from(bytes.clone()) {
-                    Ok(wire_msg) => wire_msg,
-                    Err(error) => {
-                        error!("Failed to deserialize message header: {:?}", error);
-                        continue;
-                    }
-                };
 
                 let span = {
                     let node = &dispatcher.node;
@@ -401,12 +396,12 @@ async fn handle_connection_events(
                     "{:?} from {:?} length {}",
                     LogMarker::DispatchHandleMsgCmd,
                     sender,
-                    bytes.len(),
+                    original_bytes.len(),
                 );
                 let cmd = Cmd::HandleMsg {
                     sender,
                     wire_msg,
-                    original_bytes: Some(bytes),
+                    original_bytes: Some(original_bytes),
                 };
 
                 let _handle = dispatcher

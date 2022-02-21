@@ -13,7 +13,7 @@ use crate::messaging::{
     AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
 };
 use crate::node::{api::cmds::Cmd, core::Node, Result};
-use crate::types::{log_markers::LogMarker, register::User, Peer, PublicKey, ReplicatedData};
+use crate::types::{log_markers::LogMarker, register::User, NamedPeer, PublicKey, ReplicatedData};
 
 use crate::messaging::system::NodeEvent;
 use xor_name::XorName;
@@ -81,7 +81,7 @@ impl Node {
             peers
         } else {
             warn!(
-                "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client orthe client connection cache has expired: {}",
+                "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client or the client connection cache has expired: {}",
                 sending_node_pk, user.0
             );
             return Ok(cmds);
@@ -123,7 +123,7 @@ impl Node {
                 .iter()
                 .filter(|peer| !deviants.contains(&peer.name()))
                 .cloned()
-                .collect::<Vec<Peer>>();
+                .collect::<Vec<NamedPeer>>();
 
             for adult in valid_adults {
                 cmds.push(Cmd::SignOutgoingSystemMsg {
@@ -142,7 +142,7 @@ impl Node {
             return Ok(cmds);
         }
 
-        // Send response if one is warrented
+        // Send response if one is warranted
         if query_response.failed_with_data_not_found()
             || (!query_response.is_success()
                 && self
@@ -188,7 +188,7 @@ impl Node {
         msg_id: MsgId,
         msg: ServiceMsg,
         auth: AuthorityProof<ServiceAuth>,
-        origin: Peer,
+        origin: NamedPeer,
     ) -> Result<Vec<Cmd>> {
         if self.is_not_elder().await {
             error!("Received unexpected message while Adult");
@@ -232,7 +232,7 @@ impl Node {
         msg: ServiceMsg,
         dst_location: DstLocation,
         auth: AuthorityProof<ServiceAuth>,
-        user: Peer,
+        user: NamedPeer,
     ) -> Result<Vec<Cmd>> {
         trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
         if let DstLocation::EndUser(_) = dst_location {

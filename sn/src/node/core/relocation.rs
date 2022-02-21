@@ -13,7 +13,7 @@ use crate::messaging::system::RelocateDetails;
 use crate::node::{
     ed25519,
     network_knowledge::{NetworkKnowledge, NodeState},
-    recommended_section_size, Peer,
+    recommended_section_size, NamedPeer,
 };
 
 use ed25519_dalek::{Signature, Verifier};
@@ -94,7 +94,7 @@ pub(super) async fn find_nodes_to_relocate(
 pub(super) trait RelocateDetailsUtils {
     fn with_age(
         network_knowledge: &NetworkKnowledge,
-        peer: &Peer,
+        peer: &NamedPeer,
         dst: XorName,
         age: u8,
     ) -> RelocateDetails;
@@ -105,7 +105,7 @@ pub(super) trait RelocateDetailsUtils {
 impl RelocateDetailsUtils for RelocateDetails {
     fn with_age(
         network_knowledge: &NetworkKnowledge,
-        peer: &Peer,
+        peer: &NamedPeer,
         dst: XorName,
         age: u8,
     ) -> RelocateDetails {
@@ -205,7 +205,7 @@ mod tests {
         }
     }
 
-    fn proptest_actions_impl(peers: Vec<Peer>, signature_trailing_zeros: u8) -> Result<()> {
+    fn proptest_actions_impl(peers: Vec<NamedPeer>, signature_trailing_zeros: u8) -> Result<()> {
         let sk_set = SecretKeySet::random();
         let sk = sk_set.secret_key();
         let genesis_pk = sk.public_key();
@@ -267,7 +267,7 @@ mod tests {
         // Only the oldest matching peers should be relocated.
         let expected_relocated_age = peers
             .iter()
-            .map(Peer::age)
+            .map(NamedPeer::age)
             .filter(|age| *age <= signature_trailing_zeros)
             .max();
 
@@ -324,11 +324,11 @@ mod tests {
         }
     }
 
-    // Generate Vec<Peer> where no two peers have the same name.
+    // Generate Vec<NamedPeer> where no two peers have the same name.
     fn arbitrary_unique_peers(
         count: impl Into<SizeRange>,
         age: impl Strategy<Value = u8>,
-    ) -> impl Strategy<Value = Vec<Peer>> {
+    ) -> impl Strategy<Value = Vec<NamedPeer>> {
         proptest::collection::btree_map(arbitrary_bytes(), (any::<SocketAddr>(), age), count)
             .prop_map(|peers| {
                 peers
@@ -336,7 +336,7 @@ mod tests {
                     .map(|(mut bytes, (addr, age))| {
                         bytes[XOR_NAME_LEN - 1] = age;
                         let name = XorName(bytes);
-                        Peer::new(name, addr)
+                        NamedPeer::new(name, addr)
                     })
                     .collect()
             })

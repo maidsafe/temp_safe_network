@@ -12,7 +12,7 @@ use crate::node::{
     core::{Node, StateSnapshot},
     Result,
 };
-use crate::types::{log_markers::LogMarker, Peer};
+use crate::types::{log_markers::LogMarker, NamedPeer};
 
 use bls::PublicKey as BlsPublicKey;
 use xor_name::Prefix;
@@ -47,7 +47,7 @@ impl Node {
     /// Send `AntiEntropyUpdate` message to the specified nodes.
     pub(crate) async fn send_ae_update_to_nodes(
         &self,
-        recipients: Vec<Peer>,
+        recipients: Vec<NamedPeer>,
         prefix: &Prefix,
         section_pk: BlsPublicKey,
     ) -> Vec<Cmd> {
@@ -78,7 +78,7 @@ impl Node {
     /// Send `MetadataExchange` packet to the specified nodes
     pub(crate) async fn send_metadata_updates_to_nodes(
         &self,
-        recipients: Vec<Peer>,
+        recipients: Vec<NamedPeer>,
         prefix: &Prefix,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {

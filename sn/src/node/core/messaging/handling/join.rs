@@ -16,7 +16,7 @@ use crate::node::{
     core::{relocation::RelocateDetailsUtils, Node},
     Error, Result, SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE,
 };
-use crate::types::{log_markers::LogMarker, Peer};
+use crate::types::{log_markers::LogMarker, NamedPeer};
 
 use bls::PublicKey as BlsPublicKey;
 use std::vec;
@@ -27,7 +27,7 @@ const FIRST_SECTION_MIN_ELDER_AGE: u8 = 90;
 impl Node {
     pub(crate) async fn handle_join_request(
         &self,
-        peer: Peer,
+        peer: NamedPeer,
         join_request: JoinRequest,
     ) -> Result<Vec<Cmd>> {
         debug!("Received {:?} from {}", join_request, peer);
@@ -199,7 +199,7 @@ impl Node {
         Ok(vec![cmd])
     }
 
-    pub(crate) async fn verify_joining_node_age(&self, peer: &Peer) -> (bool, u8) {
+    pub(crate) async fn verify_joining_node_age(&self, peer: &NamedPeer) -> (bool, u8) {
         // During the first section, nodes shall use ranged age to avoid too many nodes getting
         // relocated at the same time. After the first section splits, nodes shall only
         // start with an age of MIN_ADULT_AGE
@@ -236,7 +236,7 @@ impl Node {
 
     pub(crate) async fn handle_join_as_relocated_request(
         &self,
-        peer: Peer,
+        peer: NamedPeer,
         join_request: JoinAsRelocatedRequest,
         known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Cmd>> {

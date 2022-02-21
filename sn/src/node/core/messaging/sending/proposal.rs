@@ -14,7 +14,7 @@ use crate::node::{
     network_knowledge::SectionKeyShare,
     Result,
 };
-use crate::types::Peer;
+use crate::types::NamedPeer;
 
 impl Node {
     /// Send proposal to all our elders.
@@ -30,7 +30,7 @@ impl Node {
     /// Send `proposal` to `recipients`.
     pub(crate) async fn send_proposal(
         &self,
-        recipients: Vec<Peer>,
+        recipients: Vec<NamedPeer>,
         proposal: Proposal,
     ) -> Result<Vec<Cmd>> {
         let section_key = self.network_knowledge.section_key().await;
@@ -51,7 +51,7 @@ impl Node {
     /// Send `proposal` to `recipients` signing it with the provided key share.
     pub(crate) async fn send_proposal_with(
         &self,
-        recipients: Vec<Peer>,
+        recipients: Vec<NamedPeer>,
         proposal: Proposal,
         key_share: &SectionKeyShare,
     ) -> Result<Vec<Cmd>> {

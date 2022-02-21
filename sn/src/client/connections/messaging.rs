@@ -8,24 +8,23 @@
 
 use super::{QueryResult, Session};
 
-use crate::client::{connections::CmdResponse, Error};
-use crate::elder_count;
+use crate::client::{connections::CmdResponse, Error, Result};
 use crate::messaging::{
     data::{CmdError, DataQuery, QueryResponse},
     DstLocation, MsgId, MsgKind, ServiceAuth, WireMsg,
 };
-use crate::types::{prefix_map::NetworkPrefixMap, Peer, PublicKey};
+use crate::types::{
+    prefix_map::NetworkPrefixMap, Connections, NamedPeer, PublicKey, SendToOneError,
+};
+use crate::{at_least_one_correct_elder, elder_count};
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
 use dashmap::DashMap;
 use futures::future::join_all;
 use qp2p::{Close, Config as QuicP2pConfig, ConnectionError, Endpoint, SendError};
-use rand::rngs::OsRng;
-use rand::seq::SliceRandom;
-use std::path::PathBuf;
-use std::time::Duration;
-use std::{net::SocketAddr, sync::Arc};
+use rand::{rngs::OsRng, seq::SliceRandom};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::{
     sync::mpsc::{channel, Sender},
     sync::RwLock,
@@ -46,7 +45,7 @@ const INITIAL_WAIT: u64 = 1;
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
     #[instrument(skip(err_sender), level = "debug")]
-    pub(crate) async fn new(
+    pub(crate) fn new(
         client_pk: PublicKey,
         genesis_key: bls::PublicKey,
         qp2p_config: QuicP2pConfig,
@@ -54,10 +53,9 @@ impl Session {
         local_addr: SocketAddr,
         cmd_ack_wait: Duration,
         prefix_map: NetworkPrefixMap,
-    ) -> Result<Session, Error> {
-        trace!("Trying to bootstrap to the network");
-
+    ) -> Result<Session> {
         let endpoint = Endpoint::new_client(local_addr, qp2p_config)?;
+        let connections = Connections::new(endpoint.clone());
 
         let session = Session {
             pending_queries: Arc::new(DashMap::default()),
@@ -68,7 +66,7 @@ impl Session {
             genesis_key,
             initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
             cmd_ack_wait,
-            elder_last_closed_connections: Arc::new(DashMap::default()),
+            connections,
         };
 
         Ok(session)
@@ -80,38 +78,13 @@ impl Session {
         dst_address: XorName,
         auth: ServiceAuth,
         payload: Bytes,
-        targets_count: usize,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         let endpoint = self.endpoint.clone();
         // TODO: Consider other approach: Keep a session per section!
 
-        // Get DataSection elders details.
-        let (mut elders, section_pk) =
-            if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
-                let sap_elders = sap.elders_vec();
-
-                trace!("SAP elders found {:?}", sap_elders);
-
-                (sap_elders, sap.section_key())
-            } else {
-                return Err(Error::NoNetworkKnowledge);
-            };
+        let (section_pk, elders) = self.get_cmd_elders(dst_address).await?;
 
         let msg_id = MsgId::new();
-
-        // any SAP that does not hold elders_count() is indicative of a broken network (after genesis)
-        if elders.len() < elder_count() {
-            error!("Insufficient knowledge to send to {:?}", dst_address);
-            return Err(Error::InsufficientElderKnowledge {
-                connections: elders.len(),
-                required: targets_count,
-                section_pk,
-            });
-        }
-
-        elders.shuffle(&mut OsRng);
-        // now we use only the required count
-        let elders: Vec<_> = elders.into_iter().take(targets_count).collect();
 
         debug!(
             "Sending cmd w/id {:?}, from {}, to {} Elders w/ dst: {:?}",
@@ -129,26 +102,20 @@ impl Session {
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
+        let elder_count = elders.len();
         // The insertion of channel will be executed AFTER the completion of the `send_message`.
-        let (sender, mut receiver) = channel::<CmdResponse>(targets_count);
+        let (sender, mut receiver) = channel::<CmdResponse>(elder_count);
         let _ = self.pending_cmds.insert(msg_id, sender);
         trace!("Inserted channel for cmd {:?}", msg_id);
 
-        let res = send_msg(
-            self.clone(),
-            elders.clone(),
-            wire_msg,
-            self.endpoint.clone(),
-            msg_id,
-        )
-        .await;
+        let res = send_msg(self.clone(), elders, wire_msg, msg_id).await;
 
         if res.as_ref().is_err() {
             // shortcircuit the ack awaiting
             return res;
         }
 
-        let expected_acks = std::cmp::max(1, targets_count * 2 / 3);
+        let expected_acks = std::cmp::max(1, elder_count * 2 / 3);
         // We are not wait for the receive of majority of cmd Acks.
         // This could be further strict to wait for ALL the Acks get received.
         // The period is expected to have AE completed, hence no extra wait is required.
@@ -217,7 +184,7 @@ impl Session {
         query: DataQuery,
         auth: ServiceAuth,
         payload: Bytes,
-    ) -> Result<QueryResult, Error> {
+    ) -> Result<QueryResult> {
         let endpoint = self.endpoint.clone();
 
         let chunk_addr = if let DataQuery::GetChunk(address) = query {
@@ -228,23 +195,9 @@ impl Session {
 
         let dst = query.dst_name();
 
-        // Get DataSection elders details. Resort to own section if DataSection is not available.
-        let sap = self.network.closest_or_opposite(&dst, None);
-        let (section_pk, mut elders) = if let Some(sap) = &sap {
-            (sap.section_key(), sap.elders_vec())
-        } else {
-            return Err(Error::NoNetworkKnowledge);
-        };
+        let (section_pk, elders) = self.get_query_elders(dst).await?;
 
-        elders.shuffle(&mut OsRng);
-
-        // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying
-        let chosen_elders: Vec<_> = elders
-            .into_iter()
-            .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
-            .collect();
-
-        let elders_len = chosen_elders.len();
+        let elders_len = elders.len();
         if elders_len < NUM_OF_ELDERS_SUBSET_FOR_QUERIES && elders_len > 1 {
             return Err(Error::InsufficientElderConnections {
                 connections: elders_len,
@@ -260,7 +213,7 @@ impl Session {
             msg_id,
             endpoint.public_addr(),
             elders_len,
-            chosen_elders
+            elders
         );
 
         let (sender, mut receiver) = channel::<QueryResponse>(7);
@@ -287,14 +240,7 @@ impl Session {
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
-        send_msg(
-            self.clone(),
-            chosen_elders,
-            wire_msg,
-            endpoint.clone(),
-            msg_id,
-        )
-        .await?;
+        send_msg(self.clone(), elders, wire_msg, msg_id).await?;
 
         // TODO:
         // We are now simply accepting the very first valid response we receive,
@@ -394,7 +340,7 @@ impl Session {
     #[instrument(skip_all, level = "debug")]
     pub(crate) async fn make_contact_with_nodes(
         &self,
-        nodes: Vec<Peer>,
+        nodes: Vec<NamedPeer>,
         dst_address: XorName,
         auth: ServiceAuth,
         payload: Bytes,
@@ -438,14 +384,7 @@ impl Session {
             .take(NODES_TO_CONTACT_PER_STARTUP_BATCH)
             .collect();
 
-        send_msg(
-            self.clone(),
-            initial_contacts,
-            wire_msg.clone(),
-            self.endpoint.clone(),
-            msg_id,
-        )
-        .await?;
+        send_msg(self.clone(), initial_contacts, wire_msg.clone(), msg_id).await?;
 
         *self.initial_connection_check_msg_id.write().await = Some(msg_id);
 
@@ -513,18 +452,6 @@ impl Session {
                         // mark as tried all
                         tried_every_contact = true;
 
-                        // Now mark prior attempted Peers as failed for retries in future.
-                        for peer in &elders_or_adults {
-                            if let Some(conn) = peer.connection().await {
-                                let connection_id = conn.id();
-                                mark_connection_id_as_failed(
-                                    self.clone(),
-                                    peer.name(),
-                                    connection_id,
-                                );
-                            }
-                        }
-
                         next
                     } else {
                         elders_or_adults[start_pos..start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH]
@@ -532,14 +459,7 @@ impl Session {
                     };
 
                     trace!("Sending out another batch of initial contact msgs to new nodes");
-                    send_msg(
-                        self.clone(),
-                        next_contacts,
-                        wire_msg.clone(),
-                        self.endpoint.clone(),
-                        msg_id,
-                    )
-                    .await?;
+                    send_msg(self.clone(), next_contacts, wire_msg.clone(), msg_id).await?;
 
                     let next_wait = backoff.next_backoff();
                     trace!(
@@ -571,39 +491,72 @@ impl Session {
 
         Ok(())
     }
-}
 
-/// Logs a conneciton id as failed for a session
-#[instrument(skip_all, level = "trace")]
-pub(super) fn mark_connection_id_as_failed(
-    session: Session,
-    peer_name: XorName,
-    connection_id: usize,
-) {
-    trace!("Marking connection id as failed: {:?}", connection_id);
-    let prev = session.elder_last_closed_connections.remove(&peer_name);
+    async fn get_query_elders(&self, dst: XorName) -> Result<(bls::PublicKey, Vec<NamedPeer>)> {
+        // Get DataSection elders details. Resort to own section if DataSection is not available.
+        let sap = self.network.closest_or_opposite(&dst, None);
+        let (section_pk, mut elders) = if let Some(sap) = &sap {
+            (sap.section_key(), sap.elders_vec())
+        } else {
+            return Err(Error::NoNetworkKnowledge);
+        };
 
-    let new_failed_conns = if let Some((_name, mut conns)) = prev {
-        conns.push(connection_id);
-        conns
-    } else {
-        vec![connection_id]
-    };
-    let _nonexistant_prior_entry = session
-        .elder_last_closed_connections
-        .insert(peer_name, new_failed_conns);
+        elders.shuffle(&mut OsRng);
+
+        // We select the NUM_OF_ELDERS_SUBSET_FOR_QUERIES closest Elders we are querying
+        let elders: Vec<_> = elders
+            .into_iter()
+            .take(NUM_OF_ELDERS_SUBSET_FOR_QUERIES)
+            .collect();
+
+        Ok((section_pk, elders))
+    }
+
+    async fn get_cmd_elders(
+        &self,
+        dst_address: XorName,
+    ) -> Result<(bls::PublicKey, Vec<NamedPeer>)> {
+        // Get DataSection elders details.
+        let (mut elders, section_pk) =
+            if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
+                let sap_elders = sap.elders_vec();
+
+                trace!("SAP elders found {:?}", sap_elders);
+
+                (sap_elders, sap.section_key())
+            } else {
+                return Err(Error::NoNetworkKnowledge);
+            };
+
+        let targets_count = at_least_one_correct_elder(); // stored at Adults, so only 1 correctly functioning Elder need to relay
+
+        // any SAP that does not hold elders_count() is indicative of a broken network (after genesis)
+        if elders.len() < elder_count() {
+            error!("Insufficient knowledge to send to {:?}", dst_address);
+            return Err(Error::InsufficientElderKnowledge {
+                connections: elders.len(),
+                required: targets_count,
+                section_pk,
+            });
+        }
+
+        elders.shuffle(&mut OsRng);
+
+        // now we use only the required count
+        let elders = elders.into_iter().take(targets_count).collect();
+
+        Ok((section_pk, elders))
+    }
 }
 
 #[instrument(skip_all, level = "trace")]
 pub(super) async fn send_msg(
     session: Session,
-    elders: Vec<Peer>,
+    nodes: Vec<NamedPeer>,
     wire_msg: WireMsg,
-    endpoint: Endpoint,
     msg_id: MsgId,
-) -> Result<(), Error> {
+) -> Result<()> {
     let priority = wire_msg.clone().into_msg()?.priority();
-
     let msg_bytes = wire_msg.serialize()?;
 
     let mut last_error = None;
@@ -614,90 +567,36 @@ pub(super) async fn send_msg(
 
     let successes = Arc::new(RwLock::new(0));
 
-    // clone elders as we want to update them in this process
-    for peer in elders.clone() {
+    for peer in nodes.clone() {
         let session = session.clone();
         let msg_bytes_clone = msg_bytes.clone();
-        let endpoint = endpoint.clone();
-
-        let mut reused_connection = true;
         let peer_name = peer.name();
-        let cloned_peer = peer.clone();
-        let failed_connection_ids = session
-            .elder_last_closed_connections
-            .get(&peer_name)
-            .map(|entry| entry.value().clone());
 
-        let task_handle: JoinHandle<(XorName, usize, Result<(), Error>)> = tokio::spawn(
-            async move {
-                let connection = peer
-                        .ensure_connection(
-                            |connection| {
-                                // Some(connection.id()) !=
-                                if let Some(failed_connection_ids) = failed_connection_ids.clone() {
-                                    !failed_connection_ids.contains(&connection.id())
-                                }
-                                else {
-                                    true
-                                }
-                            },
-                            |addr| {
-                                reused_connection = false;
-                                async move {
-                                    trace!(
-                                        "Prior connection no longer valid, opening a new connection to: {:?} ",
-                                        addr
-                                    );
-                                    let (connection, connection_incoming) = endpoint.connect_to(&addr).await?;
-                                    let conn_id = connection.id();
-                                    Session::spawn_msg_listener_thread(
-                                        session.clone(),
-                                        conn_id,
-                                        cloned_peer,
-                                        connection_incoming,
-                                    );
-                                    Ok(connection)
-                                }
-                            },
-                        )
-                        .await;
+        let task_handle: JoinHandle<(XorName, Result<()>)> = tokio::spawn(async move {
+            let connection = session.connections.get_or_create(&peer.id()).await;
 
-                let connection_id = match connection {
-                    Ok(conn) => conn.id(),
-                    Err(err) => {
-                        warn!("Failed to get connection_id of {:?} {:?}", peer_name, err);
-                        return (peer_name, 0, Err(Error::from(err)));
-                    }
-                };
+            let listen = |conn, incoming_msgs| {
+                Session::spawn_msg_listener_thread(
+                    session.clone(),
+                    peer.clone(),
+                    conn,
+                    incoming_msgs,
+                );
+            };
 
-                if reused_connection {
-                    trace!(
-                        connection_id,
-                        src = %peer.addr(),
-                        "Client::ConnectionReused",
-                    );
-                }
+            let result = match connection
+                .send_with(msg_bytes_clone, priority, None, listen)
+                .await
+            {
+                Ok(()) => Ok(()),
+                Err(error) => match error {
+                    SendToOneError::Connection(err) => Err(Error::QuicP2pConnection(err)),
+                    SendToOneError::Send(err) => Err(Error::QuicP2pSend(err)),
+                },
+            };
 
-                let connection = peer.connection().await;
-                if let Some(connection) = connection {
-                    (
-                        peer_name,
-                        connection_id,
-                        connection
-                            .send_with(msg_bytes_clone, priority, None)
-                            .await
-                            .map_err(Error::from),
-                    )
-                } else {
-                    warn!("Peer connection did not exist, even after using 'ensure_connection'. Message to {:?} was not sent.",peer);
-                    (
-                        peer_name,
-                        connection_id,
-                        Err(Error::PeerConnection(peer.addr())),
-                    )
-                }
-            },
-        );
+            (peer_name, result)
+        });
 
         tasks.push(task_handle);
     }
@@ -707,28 +606,28 @@ pub(super) async fn send_msg(
 
     for r in results {
         match r {
-            Ok((peer_name, connection_id, send_result)) => match send_result {
+            Ok((peer_name, send_result)) => match send_result {
                 Err(Error::QuicP2pSend(SendError::ConnectionLost(ConnectionError::Closed(
                     Close::Application { reason, error_code },
                 )))) => {
                     warn!(
-                        "Connection was closed by the node: {:?}",
+                        "Connection was closed by node {}, reason: {:?}",
+                        peer_name,
                         String::from_utf8(reason.to_vec())
                     );
-
-                    mark_connection_id_as_failed(session.clone(), peer_name, connection_id);
                     last_error = Some(Error::QuicP2pSend(SendError::ConnectionLost(
                         ConnectionError::Closed(Close::Application { reason, error_code }),
                     )));
                 }
                 Err(Error::QuicP2pSend(SendError::ConnectionLost(error))) => {
-                    warn!("Connection was lost: {:?}", error);
-
-                    mark_connection_id_as_failed(session.clone(), peer_name, connection_id);
+                    warn!("Connection to {} was lost: {:?}", peer_name, error);
                     last_error = Some(Error::QuicP2pSend(SendError::ConnectionLost(error)));
                 }
                 Err(error) => {
-                    warn!("Issue during {:?} send: {:?}", msg_id, error);
+                    warn!(
+                        "Issue during {:?} send to {}: {:?}",
+                        msg_id, peer_name, error
+                    );
                     last_error = Some(error);
                 }
                 Ok(_) => *successes.write().await += 1,
@@ -739,16 +638,16 @@ pub(super) async fn send_msg(
         }
     }
 
-    let failures = elders.len() - *successes.read().await;
+    let failures = nodes.len() - *successes.read().await;
 
     if failures > 0 {
         trace!(
-            "Sending the message ({:?}) from {} to {}/{} of the elders failed: {:?}",
+            "Sending the message ({:?}) from {} to {}/{} of the nodes failed: {:?}",
             msg_id,
-            endpoint.public_addr(),
+            session.endpoint.public_addr(),
             failures,
-            elders.len(),
-            elders,
+            nodes.len(),
+            nodes,
         );
     }
 

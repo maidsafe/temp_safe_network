@@ -20,16 +20,14 @@ use crate::messaging::{
     ServiceAuth, WireMsg,
 };
 use crate::types::{
-    prefix_map::NetworkPrefixMap, utils::read_prefix_map_from_disk, Chunk, Keypair, Peer,
+    prefix_map::NetworkPrefixMap, utils::read_prefix_map_from_disk, Chunk, Keypair, NamedPeer,
     PublicKey, RegisterAddress,
 };
 
 use bytes::Bytes;
 use itertools::Itertools;
 use rand::rngs::OsRng;
-use std::collections::BTreeSet;
-use std::net::SocketAddr;
-use std::sync::Arc;
+use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
 use tokio::{
     sync::{mpsc::Receiver, RwLock},
     time::Duration,
@@ -160,8 +158,7 @@ impl Client {
             config.local_addr,
             config.cmd_ack_wait,
             prefix_map.clone(),
-        )
-        .await?;
+        )?;
 
         let client = Self {
             keypair,
@@ -207,11 +204,13 @@ impl Client {
             if let Some(sap) = prefix_map.closest_or_opposite(&XorName::random(), None) {
                 sap.elders_vec()
             } else {
-                // these peers will be nonsense peers, and dropped after we connect. Reaplced by whatever SectionAuthorityProvider peers we have received
+                // these peers will be nonsense peers, and dropped after we connect. Replaced by whatever SectionAuthorityProvider peers we have received
+                // therefore we use a dummy name (our own) for them initially
+                let dummy_name = client.public_key().into();
                 bootstrap_nodes
                     .iter()
                     .copied()
-                    .map(|socket| Peer::new(XorName::random(), socket))
+                    .map(|socket| NamedPeer::new(dummy_name, socket))
                     .collect_vec()
             }
         };

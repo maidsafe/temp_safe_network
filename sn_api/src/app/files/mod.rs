@@ -631,7 +631,8 @@ impl Safe {
         } else {
             debug!("Storing {} bytes of data", bytes.len());
             let client = self.get_safe_client()?;
-            client.upload_and_verify(bytes, Scope::Public).await?
+            let (address, _) = client.upload_and_verify(bytes, Scope::Public).await?;
+            address
         };
         let xorurl = SafeUrl::encode_bytes(address, content_type, self.xorurl_base)?;
 

@@ -41,7 +41,7 @@ use crate::messaging::{
 };
 use crate::node::error::Result;
 use crate::types::{
-    log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk, Cache, Peer,
+    log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk, Cache, NamedPeer,
 };
 use crate::UsedSpace;
 
@@ -79,11 +79,11 @@ const DATA_QUERY_TIMEOUT: Duration = Duration::from_secs(60 * 5 /* 5 mins */);
 // This prevents pending query limit unbound growth
 pub(crate) const DATA_QUERY_LIMIT: usize = 100;
 // per query we can have this many peers, so the total peers waiting can be QUERY_LIMIT * MAX_WAITING_PEERS_PER_QUERY
-pub(crate) const MAX_WAITING_PEERS_PER_QUERY: usize = 25;
+pub(crate) const MAX_WAITING_PEERS_PER_QUERY: usize = 100;
 
 // Store up to 100 in use backoffs
 pub(crate) type AeBackoffCache =
-    Arc<RwLock<LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>>>;
+    Arc<RwLock<LRUCache<(NamedPeer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>>>;
 
 #[derive(Clone)]
 pub(crate) struct DkgSessionInfo {
@@ -118,9 +118,9 @@ pub(crate) struct Node {
     joins_allowed: Arc<RwLock<bool>>,        // Elder only
     current_joins_semaphore: Arc<Semaphore>, // Elder only
 
-    capacity: Capacity,                                       // Elder only
-    liveness: Liveness,                                       // Elder only
-    pending_data_queries: Arc<Cache<OperationId, Vec<Peer>>>, // Elder only
+    capacity: Capacity,                                            // Elder only
+    liveness: Liveness,                                            // Elder only
+    pending_data_queries: Arc<Cache<OperationId, Vec<NamedPeer>>>, // Elder only
 
     ae_backoff_cache: AeBackoffCache,
 }

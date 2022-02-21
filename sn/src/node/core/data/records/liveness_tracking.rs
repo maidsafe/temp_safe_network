@@ -172,7 +172,7 @@ impl Liveness {
                 );
             } else {
                 trace!(
-                    "No Pending operation find for node: {:?} op: {:?}",
+                    "No Pending operation found for node: {:?} op: {:?}",
                     node_id,
                     operation_id
                 );

@@ -14,7 +14,7 @@ use crate::node::{
     messages::WireMsgUtils,
     Error, Result,
 };
-use crate::types::{log_markers::LogMarker, Peer};
+use crate::types::{log_markers::LogMarker, NamedPeer};
 
 use std::{sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
@@ -331,7 +331,7 @@ impl Dispatcher {
 
     async fn send_msg(
         &self,
-        recipients: &[Peer],
+        recipients: &[NamedPeer],
         delivery_group_size: usize,
         wire_msg: WireMsg,
     ) -> Result<Vec<Cmd>> {
@@ -341,14 +341,18 @@ impl Dispatcher {
                     .await?
             }
             MsgKind::ServiceMsg(_) => {
-                if let Err(err) = self
-                    .node
-                    .comm
-                    .send_on_existing_connection_to_client(recipients, wire_msg.clone())
-                    .await
-                {
-                    error!("Failed sending message {:?} to recipients {:?} on existing connection with error {:?}",
-                            wire_msg, recipients, err);
+                // we should never be sending such a msg to more than one recipient
+                // might need refactors further up to solve in a nicer way
+                if let Some(recipient) = recipients.get(0) {
+                    if let Err(err) = self
+                        .node
+                        .comm
+                        .send_to_client(recipient, wire_msg.clone())
+                        .await
+                    {
+                        error!("Failed sending message {:?} to recipient {:?} on existing connection with error {:?}",
+                                wire_msg, recipient, err);
+                    }
                 }
 
                 vec![]
@@ -360,7 +364,7 @@ impl Dispatcher {
 
     async fn deliver_msgs(
         &self,
-        recipients: &[Peer],
+        recipients: &[NamedPeer],
         delivery_group_size: usize,
         wire_msg: WireMsg,
     ) -> Result<Vec<Cmd>> {

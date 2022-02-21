@@ -19,19 +19,18 @@ use crate::node::{
     core::{Comm, ConnectionEvent, SendStatus},
     dkg::SectionAuthUtils,
     ed25519,
-    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
+    messages::WireMsgUtils,
     network_knowledge::NetworkKnowledge,
     Error, NodeInfo, Result, MIN_ADULT_AGE,
 };
-use crate::types::{log_markers::LogMarker, prefix_map::NetworkPrefixMap, Peer, UnnamedPeer};
+use crate::types::{log_markers::LogMarker, prefix_map::NetworkPrefixMap, NamedPeer, NamelessPeer};
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
 use resource_proof::ResourceProof;
 use std::collections::BTreeMap;
-use tokio::time::sleep;
-use tokio::{sync::mpsc, time::Duration};
+use tokio::{sync::mpsc, time::sleep, time::Duration};
 use tracing::Instrument;
 use xor_name::Prefix;
 
@@ -47,7 +46,7 @@ pub(crate) async fn join_network(
     node: NodeInfo,
     comm: &Comm,
     incoming_conns: &mut mpsc::Receiver<ConnectionEvent>,
-    bootstrap_peer: UnnamedPeer,
+    bootstrap_peer: NamelessPeer,
     genesis_key: BlsPublicKey,
 ) -> Result<(NodeInfo, NetworkKnowledge)> {
     let (send_tx, send_rx) = mpsc::channel(1);
@@ -67,7 +66,7 @@ pub(crate) async fn join_network(
 
 struct Join<'a> {
     // Sender for outgoing messages.
-    send_tx: mpsc::Sender<(WireMsg, Vec<Peer>)>,
+    send_tx: mpsc::Sender<(WireMsg, Vec<NamedPeer>)>,
     // Receiver for incoming messages.
     recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
     node: NodeInfo,
@@ -82,7 +81,7 @@ struct Join<'a> {
 impl<'a> Join<'a> {
     fn new(
         node: NodeInfo,
-        send_tx: mpsc::Sender<(WireMsg, Vec<Peer>)>,
+        send_tx: mpsc::Sender<(WireMsg, Vec<NamedPeer>)>,
         recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
         prefix_map: NetworkPrefixMap,
     ) -> Self {
@@ -115,14 +114,13 @@ impl<'a> Join<'a> {
     // - `ResourceChallenge`: carry out resource proof calculation.
     // - `Approval`: returns the initial `Section` value to use by this node,
     //    completing the bootstrap.
-    async fn run(self, bootstrap_peer: UnnamedPeer) -> Result<(NodeInfo, NetworkKnowledge)> {
+    async fn run(self, bootstrap_peer: NamelessPeer) -> Result<(NodeInfo, NetworkKnowledge)> {
         // Use our XorName as we do not know their name or section key yet.
-        let bootstrap_peer = bootstrap_peer.named(self.node.name());
+        let bootstrap_peer = bootstrap_peer.with_name(self.node.name());
         let genesis_key = self.prefix_map.genesis_key();
 
         let (target_section_key, recipients) =
             if let Ok(sap) = self.prefix_map.section_by_name(&bootstrap_peer.name()) {
-                sap.merge_connections([&bootstrap_peer]).await;
                 (sap.section_key(), sap.elders_vec())
             } else {
                 (genesis_key, vec![bootstrap_peer])
@@ -136,7 +134,7 @@ impl<'a> Join<'a> {
         mut self,
         network_genesis_key: BlsPublicKey,
         target_section_key: BlsPublicKey,
-        recipients: Vec<Peer>,
+        recipients: Vec<NamedPeer>,
     ) -> Result<(NodeInfo, NetworkKnowledge)> {
         // We first use genesis key as the target section key, we'll be getting
         // a response with the latest section key for us to retry with.
@@ -200,9 +198,6 @@ impl<'a> Join<'a> {
 
                     // Building our network knowledge instance will validate SAP and section chain.
                     let section_auth = section_auth.into_authed_state();
-
-                    // Include the sender's connection in our initial knowledge
-                    section_auth.merge_connections([&sender]).await;
 
                     let network_knowledge = NetworkKnowledge::new(
                         genesis_key,
@@ -279,7 +274,7 @@ impl<'a> Join<'a> {
                                 aggregated: Some(auth),
                             };
                             let name = self.node.name();
-                            let recipients: Vec<Peer> = if let Some(signed_sap) =
+                            let recipients: Vec<NamedPeer> = if let Some(signed_sap) =
                                 self.prefix_map.closest_or_opposite(&name, None)
                             {
                                 signed_sap.value.elders().cloned().collect()
@@ -414,9 +409,6 @@ impl<'a> Join<'a> {
                         aggregated: None,
                     };
 
-                    section_auth
-                        .merge_connections(recipients.iter().chain([&sender]))
-                        .await;
                     let new_recipients = section_auth.elders_vec();
                     self.send_join_requests(join_request, &new_recipients, section_key, true)
                         .await?;
@@ -473,9 +465,6 @@ impl<'a> Join<'a> {
                         aggregated: None,
                     };
 
-                    section_auth
-                        .merge_connections(recipients.iter().chain([&sender]))
-                        .await;
                     self.send_join_requests(join_request, &new_recipients, section_key, true)
                         .await?;
                 }
@@ -513,7 +502,7 @@ impl<'a> Join<'a> {
     async fn send_join_requests(
         &mut self,
         join_request: JoinRequest,
-        recipients: &[Peer],
+        recipients: &[NamedPeer],
         section_key: BlsPublicKey,
         should_backoff: bool,
     ) -> Result<()> {
@@ -552,47 +541,40 @@ impl<'a> Join<'a> {
     // TODO: receive JoinResponse from the JoinResponse handler directly,
     // analogous to the JoinAsRelocated flow.
     #[tracing::instrument(skip(self))]
-    async fn receive_join_response(&mut self) -> Result<(JoinResponse, Peer)> {
+    async fn receive_join_response(&mut self) -> Result<(JoinResponse, NamedPeer)> {
         while let Some(event) = self.recv_rx.recv().await {
             // We are interested only in `JoinResponse` type of messages
             let (join_response, sender) = match event {
-                ConnectionEvent::Received((sender, bytes)) => match WireMsg::from(bytes) {
-                    Ok(wire_msg) => match wire_msg.msg_kind() {
-                        MsgKind::ServiceMsg(_) => continue,
-                        MsgKind::NodeBlsShareAuthMsg(_) => {
+                ConnectionEvent::Received {
+                    sender, wire_msg, ..
+                } => match wire_msg.msg_kind() {
+                    MsgKind::ServiceMsg(_) => continue,
+                    MsgKind::NodeBlsShareAuthMsg(_) => {
+                        trace!(
+                            "Bootstrap message discarded: sender: {:?} wire_msg: {:?}",
+                            sender,
+                            wire_msg
+                        );
+                        continue;
+                    }
+                    MsgKind::NodeAuthMsg(NodeAuth { .. }) => match wire_msg.into_msg() {
+                        Ok(MsgType::System {
+                            msg: SystemMsg::JoinResponse(resp),
+                            ..
+                        }) => (*resp, sender),
+                        Ok(MsgType::Service { msg_id, .. } | MsgType::System { msg_id, .. }) => {
                             trace!(
-                                "Bootstrap message discarded: sender: {:?} wire_msg: {:?}",
+                                "Bootstrap message discarded: sender: {:?} msg_id: {:?}",
                                 sender,
-                                wire_msg
+                                msg_id
                             );
                             continue;
                         }
-                        MsgKind::NodeAuthMsg(NodeAuth { .. }) => match wire_msg.into_msg() {
-                            Ok(MsgType::System {
-                                msg: SystemMsg::JoinResponse(resp),
-                                msg_authority,
-                                ..
-                            }) => (*resp, sender.named(msg_authority.src_location().name())),
-                            Ok(
-                                MsgType::Service { msg_id, .. } | MsgType::System { msg_id, .. },
-                            ) => {
-                                trace!(
-                                    "Bootstrap message discarded: sender: {:?} msg_id: {:?}",
-                                    sender,
-                                    msg_id
-                                );
-                                continue;
-                            }
-                            Err(err) => {
-                                debug!("Failed to deserialize message payload: {:?}", err);
-                                continue;
-                            }
-                        },
+                        Err(err) => {
+                            debug!("Failed to deserialize message payload: {:?}", err);
+                            continue;
+                        }
                     },
-                    Err(err) => {
-                        debug!("Failed to deserialize message: {:?}", err);
-                        continue;
-                    }
                 },
             };
 
@@ -606,7 +588,10 @@ impl<'a> Join<'a> {
 }
 
 // Keep reading messages from `rx` and send them using `comm`.
-async fn send_messages(mut rx: mpsc::Receiver<(WireMsg, Vec<Peer>)>, comm: &Comm) -> Result<()> {
+async fn send_messages(
+    mut rx: mpsc::Receiver<(WireMsg, Vec<NamedPeer>)>,
+    comm: &Comm,
+) -> Result<()> {
     while let Some((wire_msg, recipients)) = rx.recv().await {
         match comm
             .send(&recipients, recipients.len(), wire_msg.clone())
@@ -682,7 +667,7 @@ mod tests {
         // Create the bootstrap task, but don't run it yet.
         let bootstrap = async move {
             state
-                .run(UnnamedPeer::addressed(bootstrap_addr))
+                .run(NamelessPeer::new(bootstrap_addr))
                 .await
                 .map_err(Error::from)
         };
@@ -788,7 +773,7 @@ mod tests {
             NetworkPrefixMap::new(genesis_key),
         );
 
-        let bootstrap_task = state.run(UnnamedPeer::addressed(bootstrap_node.addr));
+        let bootstrap_task = state.run(NamelessPeer::new(bootstrap_node.addr));
         let test_task = async move {
             // Receive JoinRequest
             let (wire_msg, recipients) = send_rx
@@ -891,7 +876,7 @@ mod tests {
             NetworkPrefixMap::new(section_key),
         );
 
-        let bootstrap_task = state.run(UnnamedPeer::addressed(bootstrap_node.addr));
+        let bootstrap_task = state.run(NamelessPeer::new(bootstrap_node.addr));
         let test_task = async {
             let (wire_msg, _) = send_rx
                 .recv()
@@ -979,7 +964,7 @@ mod tests {
             NetworkPrefixMap::new(section_key),
         );
 
-        let bootstrap_task = state.run(UnnamedPeer::addressed(bootstrap_node.addr));
+        let bootstrap_task = state.run(NamelessPeer::new(bootstrap_node.addr));
         let test_task = async {
             let (wire_msg, _) = send_rx
                 .recv()
@@ -1051,7 +1036,7 @@ mod tests {
         );
 
         let elders = (0..elder_count())
-            .map(|_| Peer::new(good_prefix.substituted_in(rand::random()), gen_addr()))
+            .map(|_| NamedPeer::new(good_prefix.substituted_in(rand::random()), gen_addr()))
             .collect();
         let join_task = state.join(section_key, section_key, elders);
 
@@ -1138,10 +1123,13 @@ mod tests {
 
         debug!("wire msg built");
 
-        recv_tx.try_send(ConnectionEvent::Received((
-            UnnamedPeer::addressed(bootstrap_node.addr),
-            wire_msg.serialize()?,
-        )))?;
+        let original_bytes = wire_msg.serialize()?;
+
+        recv_tx.try_send(ConnectionEvent::Received {
+            sender: bootstrap_node.peer(),
+            wire_msg,
+            original_bytes,
+        })?;
 
         Ok(())
     }

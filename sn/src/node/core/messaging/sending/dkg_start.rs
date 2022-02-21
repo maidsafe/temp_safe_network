@@ -14,7 +14,7 @@ use crate::node::{
     api::cmds::Cmd, core::Node, dkg::DkgSessionIdUtils, messages::WireMsgUtils,
     network_knowledge::ElderCandidates, Result,
 };
-use crate::types::Peer;
+use crate::types::NamedPeer;
 
 use xor_name::XorName;
 
@@ -64,7 +64,7 @@ impl Node {
         src: XorName,
         dst: DstLocation,
         node_msg: SystemMsg,
-        recipients: Vec<Peer>,
+        recipients: Vec<NamedPeer>,
     ) -> Result<Vec<Cmd>> {
         let section_key = self.network_knowledge.section_key().await;
 

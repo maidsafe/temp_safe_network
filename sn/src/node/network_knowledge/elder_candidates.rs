@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::types::Peer;
+use crate::types::NamedPeer;
 
 use std::collections::BTreeMap;
 use xor_name::{Prefix, XorName};
@@ -15,11 +15,11 @@ use xor_name::{Prefix, XorName};
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct ElderCandidates {
     prefix: Prefix,
-    elders: BTreeMap<XorName, Peer>,
+    elders: BTreeMap<XorName, NamedPeer>,
 }
 
 impl ElderCandidates {
-    pub(crate) fn new(prefix: Prefix, elders: impl IntoIterator<Item = Peer>) -> Self {
+    pub(crate) fn new(prefix: Prefix, elders: impl IntoIterator<Item = NamedPeer>) -> Self {
         Self {
             prefix,
             elders: elders.into_iter().map(|peer| (peer.name(), peer)).collect(),
@@ -30,7 +30,7 @@ impl ElderCandidates {
         self.prefix
     }
 
-    pub(crate) fn elders(&self) -> impl Iterator<Item = &Peer> + '_ {
+    pub(crate) fn elders(&self) -> impl Iterator<Item = &NamedPeer> + '_ {
         self.elders.values()
     }
 

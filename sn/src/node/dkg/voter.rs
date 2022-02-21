@@ -18,7 +18,7 @@ use crate::node::{
     network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
     supermajority, NodeInfo, Result,
 };
-use crate::types::Peer;
+use crate::types::NamedPeer;
 
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};
@@ -166,7 +166,7 @@ impl DkgVoter {
     // Handle a received DkgMessage.
     pub(crate) async fn process_msg(
         &self,
-        sender: Peer,
+        sender: NamedPeer,
         node: &NodeInfo,
         session_id: &DkgSessionId,
         message: DkgMessage,
