@@ -120,7 +120,6 @@ pub(crate) struct Node {
     capacity: Capacity,
     liveness: Liveness,
     pending_data_queries: Arc<Cache<OperationId, Vec<Peer>>>,
-    data_replicator: Arc<RwLock<DataReplicator>>,
     // Caches
     ae_backoff_cache: AeBackoffCache,
 }
@@ -174,7 +173,6 @@ impl Node {
             capacity: Capacity::default(),
             liveness: adult_liveness,
             pending_data_queries: Arc::new(Cache::with_expiry_duration(DATA_QUERY_TIMEOUT)),
-            data_replicator: Arc::new(RwLock::new(DataReplicator::new())),
             ae_backoff_cache: AeBackoffCache::default(),
         })
     }

@@ -6,18 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::types::{ReplicatedData, ReplicatedDataAddress};
-use itertools::Itertools;
+use crate::types::ReplicatedDataAddress;
 use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet};
-use std::ops::Index;
-use tracing_subscriber::registry::Data;
 use xor_name::XorName;
 
-/// Keeps track of all the data replication tasks.
+/// Keeps track of all the data that needs to be replicated.
 pub(crate) struct DataReplicator {
     // Nodes and the replicas we need to provide them
-    to_be_transmitted: BTreeMap<XorName, BTreeMap<ReplicatedDataAddress, ReplicatedData>>, // Target -> Set<Data> mapping
+    to_be_transmitted: BTreeMap<XorName, Vec<ReplicatedDataAddress>>, // Target -> Set<Data> mapping
 }
 
 impl DataReplicator {
@@ -30,45 +27,61 @@ impl DataReplicator {
     // Keep track of nodes and the replicas we need to provide them
     pub(crate) fn add_to_transmitter(
         &mut self,
-        data: &ReplicatedData,
+        data_address: &ReplicatedDataAddress,
         targets: &BTreeSet<XorName>,
     ) {
         for target in targets {
             let entry = self.to_be_transmitted.entry(*target);
-            let data_address = data.address();
-            info!("Storing {data_address:?} in replicator");
+            info!("Storing {data_address:?} in replicator for node {target}");
             match entry {
                 Entry::Occupied(mut present_entries) => {
-                    let addresses = present_entries
-                        .get()
-                        .keys()
-                        .collect::<Vec<&ReplicatedDataAddress>>();
+                    let addresses = present_entries.get_mut();
                     info!("We already need to provide {addresses:?} for node {target}");
-                    present_entries.get_mut().insert(data_address, data.clone());
+                    addresses.push(*data_address);
                 }
                 Entry::Vacant(e) => {
-                    let mut map = BTreeMap::new();
-                    map.insert(data_address, data.clone());
-                    e.insert(map);
+                    let _ = e.insert(vec![*data_address]);
                 }
             }
         }
     }
 
+    // Returns:
+    // Some(true) if we still need to hold the data after handing out a replica
+    // Some(false) if we can delete the data since we have handed out to all replicas
+    // None if we are not
     pub(crate) fn get_for_replication(
         &mut self,
         data_address: ReplicatedDataAddress,
         target: XorName,
-    ) -> Option<ReplicatedData> {
+    ) -> Option<bool> {
         let data_collection = self.to_be_transmitted.get_mut(&target)?;
 
-        let data = data_collection.remove(&data_address);
+        if let Some(idx) = data_collection
+            .iter()
+            .position(|address| address == &data_address)
+        {
+            let _ = data_collection.remove(idx);
 
-        // Clean up of there is not data left for the target
-        if data_collection.is_empty() {
-            self.to_be_transmitted.remove(&target);
+            // Clean up if there is not data left for the target
+            if data_collection.is_empty() {
+                let _ = self.to_be_transmitted.remove(&target);
+            }
+
+            let mut all_addresses = vec![];
+            for addresses in self.to_be_transmitted.values() {
+                all_addresses.extend(addresses);
+            }
+
+            // Check if we still need to hold the data
+            // i.e. if we have completed replication for this data
+            if !all_addresses.contains(&data_address) {
+                // We can now safely delete it from our storage
+                // as we have given away all the replicas
+                return Some(false);
+            }
+            return Some(true);
         }
-
-        data
+        None
     }
 }

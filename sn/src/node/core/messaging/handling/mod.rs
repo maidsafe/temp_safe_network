@@ -745,7 +745,8 @@ impl Node {
                         | Err(crate::dbs::Error::ChunkNotFound(_)) => {
                             info!("to-be-replicated data is not present");
 
-                            // Send FetchData request
+                            // We do not have the data which we are supposed to have since the new reorg
+                            // Send FetchReplicateData request
                             Ok(vec![Cmd::SignOutgoingSystemMsg {
                                 msg: SystemMsg::NodeCmd(NodeCmd::FetchReplicateData(data_address)),
                                 dst: crate::messaging::DstLocation::Node {
@@ -772,36 +773,27 @@ impl Node {
                     error!("Received unexpected message while Elder");
                     Ok(vec![])
                 } else {
-                    // Check data replicator first
-                    let data = if let Some(data_from_replicator) = self
-                        .data_replicator
-                        .write()
+                    match self
+                        .data_storage
+                        .get_from_replicator(data_address, sender.name())
                         .await
-                        .get_for_replication(data_address, sender.name())
                     {
-                        data_from_replicator
-                    } else {
-                        // Check storage for if it is for pre-emptive replication
-                        match self.data_storage.get_for_replication(&data_address).await {
-                            Ok(data_from_storage) => {
-                                info!("Data present for replication in storage");
-                                data_from_storage
-                            }
-                            Err(e) => {
-                                warn!("Error: {e} \n Data not present for replication. We should be holding it");
-                                return Ok(vec![]);
-                            }
+                        Ok(data) => {
+                            info!("Providing {data_address:?} for replication");
+                            // Provide the requested data
+                            Ok(vec![Cmd::SignOutgoingSystemMsg {
+                                msg: SystemMsg::NodeCmd(NodeCmd::ProvideReplicateData(data)),
+                                dst: crate::messaging::DstLocation::Node {
+                                    name: sender.name(),
+                                    section_pk: self.section_key_by_name(&sender.name()).await,
+                                },
+                            }])
                         }
-                    };
-
-                    // Provide the requested data
-                    Ok(vec![Cmd::SignOutgoingSystemMsg {
-                        msg: SystemMsg::NodeCmd(NodeCmd::ProvideReplicateData(data)),
-                        dst: crate::messaging::DstLocation::Node {
-                            name: sender.name(),
-                            section_pk: self.section_key_by_name(&sender.name()).await,
-                        },
-                    }])
+                        Err(e) => {
+                            warn!("Error providing data for replication: {e}");
+                            Ok(vec![])
+                        }
+                    }
                 };
             }
             SystemMsg::NodeCmd(NodeCmd::ProvideReplicateData(data)) => {

@@ -24,6 +24,9 @@ use crate::{
 pub(crate) use chunks::ChunkStorage;
 pub(crate) use registers::RegisterStorage;
 
+use crate::dbs::Error;
+use crate::node::core::DataReplicator;
+use crate::types::ReplicatedDataAddress;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
@@ -40,6 +43,7 @@ pub(crate) struct DataStorage {
     registers: RegisterStorage,
     used_space: UsedSpace,
     last_recorded_level: Arc<RwLock<StorageLevel>>,
+    data_replicator: Arc<RwLock<DataReplicator>>,
 }
 
 impl DataStorage {
@@ -49,6 +53,7 @@ impl DataStorage {
             registers: RegisterStorage::new(path, used_space.clone())?,
             used_space,
             last_recorded_level: Arc::new(RwLock::new(StorageLevel::zero())),
+            data_replicator: Arc::new(RwLock::new(DataReplicator::new())),
         })
     }
 
@@ -128,6 +133,41 @@ impl DataStorage {
             .map(DataAddress::Register);
         Ok(reg_keys.chain(chunk_keys).collect())
     }
+
+    pub(crate) async fn add_to_replicator(
+        &self,
+        data_address: &ReplicatedDataAddress,
+        targets: &BTreeSet<XorName>,
+    ) {
+        self.data_replicator
+            .write()
+            .await
+            .add_to_transmitter(data_address, targets)
+    }
+
+    pub(crate) async fn get_from_replicator(
+        &self,
+        data_address: ReplicatedDataAddress,
+        target: XorName,
+    ) -> Result<ReplicatedData> {
+        if let Some(should_delete) = self
+            .data_replicator
+            .write()
+            .await
+            .get_for_replication(data_address, target)
+        {
+            let data = self.get_for_replication(&data_address).await?;
+
+            if should_delete {
+                // We can now delete the data since we do not need to hold it anymore
+                self.remove(&data_address).await?;
+            }
+
+            Ok(data)
+        } else {
+            Err(Error::NoSuchDataForReplication(data_address))
+        }
+    }
 }
 
 impl Node {
@@ -146,16 +186,16 @@ impl Node {
                 .get_replica_targets(addr, &new_adults, &lost_adults, &remaining)
                 .await
             {
-                let _prev = data_for_replication.insert(data.name(), (data, holders));
+                let _prev = data_for_replication.insert(data, holders);
             }
         }
 
         let mut cmds = vec![];
         let section_pk = self.network_knowledge.section_key().await;
-        for (_, (data, targets)) in data_for_replication {
+        for (data_address, targets) in data_for_replication {
             for name in targets {
                 cmds.push(Cmd::SignOutgoingSystemMsg {
-                    msg: SystemMsg::NodeCmd(NodeCmd::SendReplicateDataAddress(data.address())),
+                    msg: SystemMsg::NodeCmd(NodeCmd::SendReplicateDataAddress(data_address)),
                     dst: DstLocation::Node { name, section_pk },
                 })
             }
@@ -194,6 +234,9 @@ impl Node {
             let data = match storage.get_for_replication(address).await {
                 Ok(data) => {
                     info!("Data found and republishing: {address:?}");
+                    self.data_storage
+                    .add_to_replicator(&address.to_replicated_address(), &new_holders)
+                    .await;
                     Ok(data)
                 }
                 Err(error) => {
