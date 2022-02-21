@@ -322,6 +322,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "backoff"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b62ddb9cb1ec0a098ad4bbf9344d0713fa193ae1a80af55febcff2627b6a00c1"
+dependencies = [
+ "futures-core",
+ "getrandom 0.2.4",
+ "instant",
+ "pin-project-lite",
+ "rand 0.8.4",
+ "tokio",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.63"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -454,7 +468,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "thiserror",
- "tiny-keccak 2.0.2",
+ "tiny-keccak",
  "xor_name 3.1.0",
 ]
 
@@ -487,7 +501,7 @@ dependencies = [
  "rand_chacha 0.2.2",
  "serde",
  "thiserror",
- "tiny-keccak 2.0.2",
+ "tiny-keccak",
  "zeroize",
 ]
 
@@ -556,6 +570,12 @@ name = "cache-padded"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1db59621ec70f09c5e9b597b220c7a2b43611f4710dc03ceb8748637775692c"
+
+[[package]]
+name = "cargo-husky"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b02b629252fe8ef6460461409564e2c21d0c8e77e0944f3d189ff06c4e932ad"
 
 [[package]]
 name = "cast"
@@ -628,12 +648,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f1885697ee8a177096d42f158922251a41973117f6d8a234cee94b9509157b7"
 dependencies = [
  "backtrace",
- "color-spantrace",
+ "color-spantrace 0.1.6",
  "eyre",
  "indenter",
  "once_cell",
- "owo-colors",
- "tracing-error",
+ "owo-colors 1.3.0",
+ "tracing-error 0.1.2",
+]
+
+[[package]]
+name = "color-eyre"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d6ec7641ff3474b7593009c809db602c414cd97c7d47a78ed004162b74ff96c"
+dependencies = [
+ "backtrace",
+ "color-spantrace 0.2.0",
+ "eyre",
+ "indenter",
+ "once_cell",
+ "owo-colors 3.2.0",
+ "tracing-error 0.2.0",
 ]
 
 [[package]]
@@ -643,9 +678,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6eee477a4a8a72f4addd4de416eb56d54bc307b284d6601bafdee1f4ea462d1"
 dependencies = [
  "once_cell",
- "owo-colors",
+ "owo-colors 1.3.0",
  "tracing-core",
- "tracing-error",
+ "tracing-error 0.1.2",
+]
+
+[[package]]
+name = "color-spantrace"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ba75b3d9449ecdccb27ecbc479fdc0b87fa2dd43d2f8298f9bf0e59aacc8dce"
+dependencies = [
+ "once_cell",
+ "owo-colors 3.2.0",
+ "tracing-core",
+ "tracing-error 0.2.0",
 ]
 
 [[package]]
@@ -762,7 +809,7 @@ dependencies = [
  "quickcheck",
  "rand 0.7.3",
  "serde",
- "tiny-keccak 2.0.2",
+ "tiny-keccak",
 ]
 
 [[package]]
@@ -1208,9 +1255,9 @@ dependencies = [
 
 [[package]]
 name = "file-rotate"
-version = "0.5.3"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31c2536ee16e019920dbef075aa3edc7efa8029fe17fe4330dd9690ee155a411"
+checksum = "f8071df7315b1cd4006ce687043f393cca212761889b3626c1444ae06e8f72d0"
 dependencies = [
  "chrono",
  "flate2",
@@ -1640,12 +1687,6 @@ dependencies = [
 
 [[package]]
 name = "hex"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
-
-[[package]]
-name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
@@ -1841,7 +1882,19 @@ checksum = "7baab56125e25686df467fe470785512329883aab42696d661247aca2a2896e4"
 dependencies = [
  "console 0.15.0",
  "lazy_static",
- "number_prefix",
+ "number_prefix 0.3.0",
+ "regex",
+]
+
+[[package]]
+name = "indicatif"
+version = "0.16.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d207dc617c7a380ab07ff572a6e52fa202a2a8f355860ac9c38e23f8196be1b"
+dependencies = [
+ "console 0.15.0",
+ "lazy_static",
+ "number_prefix 0.4.0",
  "regex",
 ]
 
@@ -2082,17 +2135,6 @@ dependencies = [
 
 [[package]]
 name = "multibase"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b78c60039650ff12e140ae867ef5299a58e19dded4d334c849dc7177083667e2"
-dependencies = [
- "base-x",
- "data-encoding",
- "data-encoding-macro",
-]
-
-[[package]]
-name = "multibase"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b3539ec3c1f04ac9748a260728e855f261b4977f5c3406612c884564f329404"
@@ -2263,6 +2305,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "17b02fc0ff9a9e4b35b3342880f48e896ebf69f2967921fe8646bf5b7125956a"
 
 [[package]]
+name = "number_prefix"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
+
+[[package]]
 name = "numtoa"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2319,6 +2367,12 @@ name = "owo-colors"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2386b4ebe91c2f7f51082d4cefa145d030e33a1842a96b12e4885cc3c01f7a55"
+
+[[package]]
+name = "owo-colors"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "20448fd678ec04e6ea15bbe0476874af65e98a01515d667aa49f1434dc44ebf4"
 
 [[package]]
 name = "pairing"
@@ -2708,7 +2762,7 @@ version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2fc25e3ac9db1359413ae728b1e0bffb65ec8f7e593991378c1e3eb3fdeac4f"
 dependencies = [
- "backoff",
+ "backoff 0.3.0",
  "bincode",
  "bytes",
  "futures",
@@ -3162,14 +3216,14 @@ dependencies = [
 
 [[package]]
 name = "resource_proof"
-version = "0.8.0"
+version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e66c5d4c791f45a7aed7ad699b1d0ddce80544a17eeb703f4480b775e9b593b1"
+checksum = "297f34e590f33704543f29d3001db82bf89f30cfbbc026a7f16fc92526430b07"
 dependencies = [
  "clap",
  "rand 0.4.6",
  "termion",
- "tiny-keccak 1.5.0",
+ "tiny-keccak",
 ]
 
 [[package]]
@@ -3202,6 +3256,17 @@ name = "rmp-serde"
 version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "723ecff9ad04f4ad92fe1c8ca6c20d2196d9286e9c60727c4cb5511629260e9d"
+dependencies = [
+ "byteorder",
+ "rmp",
+ "serde",
+]
+
+[[package]]
+name = "rmp-serde"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3eedffbfcc6a428f230c04baf8f59bd73c1781361e4286111fe900849aaddaf"
 dependencies = [
  "byteorder",
  "rmp",
@@ -3298,13 +3363,14 @@ name = "safe_network"
 version = "0.58.1"
 dependencies = [
  "assert_matches",
- "backoff",
- "base64 0.10.1",
+ "backoff 0.4.0",
+ "base64 0.13.0",
  "bincode",
  "bls_dkg",
  "blsttc",
  "bytes",
- "color-eyre",
+ "cargo-husky",
+ "color-eyre 0.6.0",
  "console-subscriber",
  "crdts",
  "criterion",
@@ -3318,11 +3384,11 @@ dependencies = [
  "file-rotate",
  "futures",
  "grep",
- "hex 0.3.2",
+ "hex",
  "hex_fmt",
  "itertools 0.10.3",
  "lazy_static",
- "multibase 0.8.0",
+ "multibase 0.9.1",
  "num_cpus",
  "priority-queue",
  "proptest",
@@ -3331,10 +3397,10 @@ dependencies = [
  "rand_xorshift",
  "rayon",
  "resource_proof",
- "rmp-serde",
+ "rmp-serde 1.0.0",
  "secured_linked_list",
  "self_encryption",
- "self_update 0.26.0",
+ "self_update 0.28.0",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -3348,7 +3414,7 @@ dependencies = [
  "tempfile",
  "termcolor",
  "thiserror",
- "tiny-keccak 2.0.2",
+ "tiny-keccak",
  "tokio",
  "tokio-util",
  "tracing",
@@ -3428,21 +3494,21 @@ dependencies = [
  "rand_chacha 0.2.2",
  "rayon",
  "serde",
- "tiny-keccak 2.0.2",
+ "tiny-keccak",
  "tokio",
  "xor_name 3.1.0",
 ]
 
 [[package]]
 name = "self_update"
-version = "0.26.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9031099ba3962ce8faaff991066bcbe6ec1f7ccb0be12a4b56733028ae090054"
+checksum = "6fb85f1802f7b987237b8525c0fde86ea86f31c957c1875467c727d5b921179c"
 dependencies = [
  "either",
  "flate2",
  "hyper",
- "indicatif",
+ "indicatif 0.15.0",
  "log",
  "quick-xml",
  "regex",
@@ -3456,14 +3522,14 @@ dependencies = [
 
 [[package]]
 name = "self_update"
-version = "0.27.0"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6fb85f1802f7b987237b8525c0fde86ea86f31c957c1875467c727d5b921179c"
+checksum = "5bc3e89793fe56c82104ddc103c998e4e94713cb975202207829e61031eb4be6"
 dependencies = [
  "either",
  "flate2",
  "hyper",
- "indicatif",
+ "indicatif 0.16.2",
  "log",
  "quick-xml",
  "regex",
@@ -3669,12 +3735,12 @@ dependencies = [
  "bincode",
  "blsttc",
  "bytes",
- "color-eyre",
+ "color-eyre 0.5.11",
  "dirs-next 2.0.0",
  "ed25519-dalek",
  "env_logger 0.8.4",
  "futures",
- "hex 0.4.3",
+ "hex",
  "hmac",
  "lazy_static",
  "log",
@@ -3686,14 +3752,14 @@ dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",
  "relative-path",
- "rmp-serde",
+ "rmp-serde 0.15.5",
  "safe_network",
  "serde",
  "serde_json",
  "sha3",
  "thiserror",
  "time 0.3.7",
- "tiny-keccak 2.0.2",
+ "tiny-keccak",
  "tokio",
  "tracing",
  "tracing-subscriber 0.3.7",
@@ -3715,14 +3781,14 @@ dependencies = [
  "blsttc",
  "bytes",
  "chrono",
- "color-eyre",
+ "color-eyre 0.5.11",
  "console 0.14.1",
  "criterion",
  "ctor",
  "dirs-next 2.0.0",
  "duct",
  "ed25519-dalek",
- "hex 0.4.3",
+ "hex",
  "human-panic",
  "isatty",
  "multibase 0.6.0",
@@ -3757,7 +3823,7 @@ name = "sn_cmd_test_utilities"
 version = "1.1.0"
 dependencies = [
  "assert_cmd",
- "color-eyre",
+ "color-eyre 0.5.11",
  "ctor",
  "dirs-next 2.0.0",
  "multibase 0.6.0",
@@ -3766,7 +3832,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sn_api",
- "tiny-keccak 2.0.2",
+ "tiny-keccak",
  "walkdir",
 ]
 
@@ -3776,7 +3842,7 @@ version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "162afd7d07769ed4d6d1727ad60c62c617361bf38ce124b74a6a84bbd49d9e78"
 dependencies = [
- "color-eyre",
+ "color-eyre 0.5.11",
  "dirs-next 1.0.2",
  "eyre",
  "serde_json",
@@ -3844,19 +3910,20 @@ dependencies = [
 
 [[package]]
 name = "strum"
-version = "0.21.0"
+version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aaf86bbcfd1fa9670b7a129f64fc0c9fcbbfe4f1bc4210e9e98fe71ffc12cde2"
+checksum = "cae14b91c7d11c9a851d3fbc80a963198998c2a64eec840477fa92d8ce9b70bb"
 
 [[package]]
 name = "strum_macros"
-version = "0.21.1"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d06aaeeee809dbc59eb4556183dd927df67db1540de5be8d3ec0b6636358a5ec"
+checksum = "5bb0dc7ee9c15cea6199cde9a127fa16a4c5819af85395457ad72d68edc85a38"
 dependencies = [
  "heck",
  "proc-macro2",
  "quote",
+ "rustversion",
  "syn",
 ]
 
@@ -3891,13 +3958,12 @@ dependencies = [
 
 [[package]]
 name = "sysinfo"
-version = "0.19.2"
+version = "0.23.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e7de153d0438a648bb71e06e300e54fc641685e96af96d49b843f43172d341c"
+checksum = "92d82ade9d6621d4ca052a00bb6ea9ed513d223cba75a84625c5e9c0698ab6f5"
 dependencies = [
  "cfg-if 1.0.0",
  "core-foundation-sys",
- "doc-comment",
  "libc",
  "ntapi",
  "once_cell",
@@ -4044,15 +4110,6 @@ dependencies = [
  "itoa 1.0.1",
  "libc",
  "num_threads",
-]
-
-[[package]]
-name = "tiny-keccak"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d8a021c69bb74a44ccedb824a046447e2c84a01df9e5c20779750acb38e11b2"
-dependencies = [
- "crunchy",
 ]
 
 [[package]]
@@ -4301,6 +4358,16 @@ checksum = "b4d7c0b83d4a500748fa5879461652b361edf5c9d51ede2a2ac03875ca185e24"
 dependencies = [
  "tracing",
  "tracing-subscriber 0.2.25",
+]
+
+[[package]]
+name = "tracing-error"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d686ec1c0f384b1277f097b2f279a2ecc11afe8c133c1aabf036a27cb4cd206e"
+dependencies = [
+ "tracing",
+ "tracing-subscriber 0.3.7",
 ]
 
 [[package]]
@@ -4808,7 +4875,7 @@ dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",
  "serde",
- "tiny-keccak 2.0.2",
+ "tiny-keccak",
 ]
 
 [[package]]
@@ -4820,7 +4887,7 @@ dependencies = [
  "rand 0.7.3",
  "rand_core 0.5.1",
  "serde",
- "tiny-keccak 2.0.2",
+ "tiny-keccak",
 ]
 
 [[package]]

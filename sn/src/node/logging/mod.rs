@@ -11,11 +11,11 @@ mod system;
 
 use self::log_ctx::LogCtx;
 use std::time::Duration;
-use sysinfo::AsU32;
 use sysinfo::{System, SystemExt};
 use system::Process;
 use tokio::time::MissedTickBehavior;
 use tracing::trace;
+use sysinfo::PidExt;
 
 const LOG_INTERVAL: Duration = std::time::Duration::from_secs(60);
 

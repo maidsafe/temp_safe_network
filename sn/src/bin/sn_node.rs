@@ -29,7 +29,7 @@
 
 use color_eyre::{Section, SectionExt};
 use eyre::{eyre, Result, WrapErr};
-use file_rotate::{compression::Compression, suffix::CountSuffix, ContentLimit, FileRotate};
+use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
 use safe_network::node::{add_connection_info, set_connection_info, Config, Error, NodeApi};
 
 #[cfg(not(feature = "tokio-console"))]
@@ -84,7 +84,7 @@ fn main() -> Result<()> {
 //
 // The above functionality is provided using crate file_rotation
 pub struct FileRotateAppender {
-    writer: FileRotate<CountSuffix>,
+    writer: FileRotate<AppendCount>,
 }
 
 #[derive(Debug)]
@@ -101,7 +101,7 @@ impl<'a> FileRotateAppender {
         let path = Path::new(&log_directory).join(&log_filename_prefix);
         let writer = FileRotate::new(
             &Path::new(&path),
-            CountSuffix::new(9),
+            AppendCount::new(9),
             ContentLimit::Bytes(10 * 1024 * 1024),
             Compression::OnRotate(1),
         );
@@ -113,7 +113,7 @@ impl<'a> FileRotateAppender {
     pub fn make_rotate_appender(
         directory: impl AsRef<Path>,
         file_name_prefix: impl AsRef<Path>,
-        num_logs: CountSuffix,
+        num_logs: AppendCount,
         max_log_size: ContentLimit,
         compression: Compression,
     ) -> FileRotateAppender {
@@ -193,7 +193,7 @@ async fn run_node() -> Result<()> {
             let file_appender = FileRotateAppender::make_rotate_appender(
                 log_dir,
                 "sn_node.log",
-                CountSuffix::new(logs_retained),
+                AppendCount::new(logs_retained),
                 content_limit,
                 Compression::OnRotate(config.logs_uncompressed),
             );
