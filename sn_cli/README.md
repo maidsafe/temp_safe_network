@@ -23,6 +23,8 @@
     - [Connection Info via HTTP](#connection-info-via-http)
     - [Direct Connection Info](#direct-connection-info)
     - [Provide a Node](#provide-a-node)
+- [XorUrl](#xorurl)
+- [Keys](#xorurl)
 - [Files](#files)
   - [Put](#put)
     - [Base Path](#base-path)
@@ -33,17 +35,15 @@
     - [Performance](#performance)
   - [Tree](#files-tree)
   - [Rm](#files-rm)
-- [Xorurl](#xorurl)
-- [Xorurl decode](#xorurl-decode)
 - [Cat](#cat)
-  - [Retrieving Binary Files](#retrieving-binary-files)
-  - [Retrieving Older Versions](#retrieving-older-versions)
-- [Safe-URLs](#safe-urls)
-  - [Symlinks](#symlinks)
+  - [Retrieve Files and Containers](#retrieve-files-and-containers)
+  - [Retrieve Binary Files](#retrieve-binary-files)
+  - [Versioning](#versioning)
+- [NRS](#nrs)
+  - [Register a Top Name](#register-a-top-name)
+  - [Add a Sub Name](#add-a-sub-name)
+  - [List the NRS Map](#list-the-nrs-map)
 - [Dog](#dog)
-- [Shell Completions](#shell-completions)
-  - [Bash Completions](#bash-completions)
-  - [Windows PowerShell Completions](#windows-powershell-completions)
 - [Further Help](#further-help)
 - [License](#license)
 - [Contributing](#contributing)
@@ -53,6 +53,8 @@
 This crate implements a CLI (Command Line Interface) for the Safe Network.
 
 The Safe CLI provides all the tools necessary to interact with the Safe Network, including storing and browsing data of any kind, following links contained in the data, using their addresses on the network, and much more. Using the CLI, users have access to any type of operation that can be made on the Safe Network and the data stored on it. Due to it being a CLI, it can also be used in automated scripts and Unix-style piping and redirection.
+
+This is a user guide for the CLI. It can be used as a reference, but if you're completely new to the network, reading in order is recommended, since we present concepts in the order we think makes the most sense.
 
 ## Quick Start
 
@@ -180,7 +182,7 @@ The first thing we'll do is create a local network and connect to it, but in ord
 
 ### Node Management
 
-Before we can create a local network, we need to obtain the `sn_node` binary. 
+Before we can create a local network, we need to obtain the `sn_node` binary.
 
 We can get the latest version using the `node install` command:
 ```
@@ -387,6 +389,79 @@ Regardless of which `join` command you used, if the join request is successful, 
 
 It's also possible to join a network without adding a network to the networks list. You can use the `--contact-list` and `--genesis-key` arguments. Run `safe node join --help` for more details.
 
+## XorUrl
+
+Almost everything on the network involves the use of what we call an XOR-URL. You'll see these in
+the form `safe://hoxm5aps8my8he8cpgdqh8k5wuox5p7kzed6bsbajayc3gc8pgp36s`. This isn't just a random
+string: it's generated based on the content the URL points to. These URLs are then used to retrieve
+said content.
+
+Each piece of content is located at an address we call an XorName. This is a 256-bit number, so we
+have an [absolutely enormous](https://www.youtube.com/watch?v=S9JGmA5_unY) 2^256 possible addresses.
+The XOR-URL has the XorName encoded in it, plus some other information about the content, such as
+its type, e.g., a file. As you'll see in the [Files](#files) section, each file you upload will have
+its own XOR-URL, which can be determined before the file is uploaded.
+
+As an example, I can use the `xorurl` command on this document:
+```
+$ safe xorurl sn_cli/README.md
+1 file/s processed:
+sn_cli/README.md  safe://hy8oyeyybi347nyusj15sfs73t4gkqzbi7tftpo33crgfgyijxh69jhedjepy
+```
+
+If we decided to upload that file, it would be located at this XOR-URL. This command can be useful
+if you lost the URL of something you uploaded.
+
+An XOR-URL can also be decoded to yield information about it:
+```
+$ safe xorurl decode safe://hy8oyeyybwsanc3ehnecyab9n3ufoip6x47e6553rb539aeqnej1xwadcbfdo
+UrlType: XOR-URL
+Xorname: a5b026651c12180c07e2cccb0ab7cfd751edef240ef3fc21c24264fa606c0947
+Public Name: <unknown>
+Sub names:
+Type tag: 0
+Native data type: File
+Path:
+QueryString:
+QueryPairs: []
+Fragment:
+Content version: latest
+```
+
+You may be thinking these URLs seem a bit unwieldy. To deal with this, the network has a concept
+similar to internet DNS, which enables us to alias human readable names to these addresses. See the
+[NRS](#nrs) section for more information.
+
+## Keys
+
+Every message sent to the network is signed with a public/private keypair, which is used to assign
+the owner of any data that was uploaded. If you're familiar with SSH keys, the keypair here is
+analogous.
+
+It's possible to use `safe` without a keypair, but in this case, it will generate a new one for each
+command. So if you uploaded some files, the owner of them would be assigned the one-time keypair,
+and effectively they would be read-only. If you want to subsequently write to them, you need to use
+the same keypair. We'll need this for the `files sync` command in the next section, so let's use the
+`keys create` command to get a persistent keypair:
+```
+$ safe keys create --for-cli
+New SafeKey created: "safe://hyryyyyyym96apoapogoieau7yxkifo6xgppzxh66n1fh1hwnibz6xaku4tfy"
+Key pair generated:
+Public Key = 5ffd86c30d81a154627d03d552c3cf335b77f3de148bc97282a86fe7e153d44a
+Secret Key = 70c1936dbb9143e8c4eeb335a2731b2fe93679c1e6c9b28a1f79ec710b21c9cc
+Setting new SafeKey to be used by CLI...
+New credentials were successfully stored in /home/chris/.safe/cli/credentials
+Safe CLI now has write access to the network
+```
+
+We also need the keypair for writing NRS entries.
+
+At the moment, this is all we're using the keypair for; however, in the future, it may be used for
+many other things, including the encryption of data.
+
+To avoid confusion when working with files, it's worth generating a persistent keypair to use with
+all your commands.
+
 ## Files
 
 We can use the CLI to upload files and folders and keep them in sync with local modifications.
@@ -557,7 +632,7 @@ FilesContainer synced up (version h6fpc6brw7a65zb5brwo6gigpryqeyothgpmgnwqy549ks
 
 We may want to add a file to an existing container rather than perform a full sync. We can use the `files add` command for this.
 
-First, create a new container by uploading the example directory: 
+First, create a new container by uploading the example directory:
 ```
 $ safe files put ./to-upload/ --recursive
 FilesContainer created at: "safe://hyryyryyn7y13rpg7jgitypn47f6dkprjbxh4j5skk3iafxayqo6pgh3om5poeuy?v=h3tipnhnf5iq89gfkqprs3hdg5hb3zyq8ton3ukjoakbzsqujiayo"
@@ -593,7 +668,7 @@ The `files get` command copies file(s) from the network to the local filesystem.
 
 This command works similarly to Unix `cp` or `scp` or the windows `copy` command.
 
-First, create a new container by uploading the example directory: 
+First, create a new container by uploading the example directory:
 ```
 $ safe files put ./to-upload/ --recursive
 FilesContainer created at: "safe://hyryyryyn68cfxon3diif17w87nkj5mesc95f4noxnr85yqt6nj4qhbaaktjyeuy?v=htj4d87x47jnpyzkgyj5gm657eak33bpbaegfgtk56kznws654dxo"
@@ -662,7 +737,7 @@ Future releases may operate differently.
 
 The `files tree` command displays a visual representation of an entire directory tree of a container.
 
-First, create a new container by uploading the example directory: 
+First, create a new container by uploading the example directory:
 ```
 $ safe files put ./to-upload/ --recursive
 FilesContainer created at: "safe://hyryyryynrqxhdosmk1xr9bsz1a8jkc6a9mwmhxueqoiwueicknboakwdk7toeuy?v=h8h3mrhkzr793pwxdwga6i31stcr35ckhkegr51rfcgmufkjcrz5y"
@@ -706,7 +781,7 @@ safe://hyryyryynrqxhdosmk1xr9bsz1a8jkc6a9mwmhxueqoiwueicknboakwdk7toeuy/myotherf
 
 Files and directories can be removed from a container using `files sync`, but it's also possible with the `files rm` command.
 
-First, create a new container by uploading the example directory: 
+First, create a new container by uploading the example directory:
 ```
 $ safe files put ./to-upload/ --recursive
 FilesContainer created at: "safe://hyryyryyny8xnytj1rgad3siak49cyeuzfxnd8ggafpifcna1jj55b86914uyeuy?v=ht9kwqnhoxcrq9z9gwkwdkfk3dgig3fxi4uk88ynkqzex4nyenagy"
@@ -726,7 +801,7 @@ FilesContainer updated (version hsh1bc78zckusbj3y43fsh3hj8uwdwprm7r9qc1u9uy5p7yy
 -  /file1.txt  safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
 ```
 
-To remove a directory, use the `--recursive` flag: 
+To remove a directory, use the `--recursive` flag:
 ```
 $ safe files rm safe://hyryyryyny8xnytj1rgad3siak49cyeuzfxnd8ggafpifcna1jj55b86914uyeuy/myotherfolder --recursive
 FilesContainer updated (version h6zr4xmy7pw6bcpcat5ofs4rt9zfu3x4shjctm1mqx8it7ucda8bo): "safe://hyryyryyny8xnytj1rgad3siak49cyeuzfxnd8ggafpifcna1jj55b86914uyeuy?v=h6zr4xmy7pw6bcpcat5ofs4rt9zfu3x4shjctm1mqx8it7ucda8bo"
@@ -734,243 +809,442 @@ FilesContainer updated (version h6zr4xmy7pw6bcpcat5ofs4rt9zfu3x4shjctm1mqx8it7uc
 -  /myotherfolder/subfolder/file3.txt  safe://hy8oycyybut5ea65nec5q4s8tpouws8ax5ej1jazu9c9r8e5p3ry97xkhdp7o
 ```
 
-## Xorurl
-
-As we've seen, when uploading files to the network, each file is uploaded as one or more chunks using the [self-encryption algorithm](https://github.com/maidsafe/self_encryption) in the client, splitting the files into encrypted chunks, and the resulting file's XOR-URL is linked from a `FilesContainer`.
-
-The file's XOR-URL is deterministic based on its content, i.e. the location where each of its chunks are stored is determined based on the file's content, and performed at the client before uploading the chunks to the network. Therefore the XOR-URL is always the same if the content of a file doesn't change. All this means is we can know what the file's XOR-URL will be without uploading it to the network.
-
-Obtaining local files' XOR-URLs without uploading them to the network can be done in two different ways. We can use the `--dry-run` flag in any of the files commands, e.g.:
-```shell
-$ safe files put ./to-upload/ --recursive --dry-run
-NOTE the operation is being performed in dry-run mode, therefore no changes are committed to the network.
-FilesContainer not created since running in dry-run mode
-+  ./to-upload/another.md              safe://hoxm5aps8my8he8cpgdqh8k5wuox5p7kzed6bsbajayc3gc8pgp36s
-+  ./to-upload/subfolder/subexists.md  safe://hoqc6etdwbx6s86u3bkxenos3rf7dtr51eqdt17smxsw7aejot81dc
-+  ./to-upload/test.md                 safe://hoxibhqth9awkjgi35sz73u35wyyscuht65m3ztrznb6thd5z8hepx
-```
-
-There is also a handy `safe xorurl` command which allows us to provide a local path and obtain the XOR-URLs of the files found in such path, without uploading them to the network:
-```shell
-$ safe xorurl ./to-upload/ --recursive
-3 file/s processed:
-+  ./to-upload/another.md              safe://hoxm5aps8my8he8cpgdqh8k5wuox5p7kzed6bsbajayc3gc8pgp36s
-+  ./to-upload/subfolder/subexists.md  safe://hoqc6etdwbx6s86u3bkxenos3rf7dtr51eqdt17smxsw7aejot81dc
-+  ./to-upload/test.md                 safe://hoxibhqth9awkjgi35sz73u35wyyscuht65m3ztrznb6thd5z8hepx
-```
-
-### Decode
-
-XOR-URLs encode not only information about the location of the content, but also about the content type, native data type the data is being held on, etc.
-
-In some particular cases it may be useful for the user to be able to decode this type of information from a given XOR-URL:
-```shell
-$ safe xorurl decode safe://hnyynyzonskbrgd57kt8c1pnb14qg8oh8wjo7xiku4mh4tc67wjax3c54sbnc
-Information decoded from XOR-URL: safe://hnyynyzonskbrgd57kt8c1pnb14qg8oh8wjo7xiku4mh4tc67wjax3c54sbnc
-Xorname: e02b282430f7d544ec93441969c63c387a261d7d553d2f9a8b3dda270fcb37ab
-Type tag: 1100
-Native data type: PublicSequence
-Path: none
-Sub names: []
-Content version: latest
-```
-
 ## Cat
 
-The `cat` command is probably the most straight forward command, it allows users to fetch data from the Network using a URL, and render it according to the type of data being fetched:
-```shell
-$ safe cat safe://<NRS-URL or XOR-URL>
+We can retrieve and display content using the `cat` command.
+
+Create a files container to give us some material to work with:
 ```
+$ safe keys create --for-cli
+New SafeKey created: "safe://hyryyyyyyft14jnfkkjos96bu5qtkg6tttzjoskjj4jucj6gxcaedxgm5xgto"
+Key pair generated:
+Public Key = 2c65a488aa52616ff833dba2a37a318dd30b2929d266c4f8cf661037997b79a3
+Secret Key = e984d5bbee24991357178abe2e90e31f6e39b08e59e4a03b3f05385362563c53
+Setting new SafeKey to be used by CLI...
+New credentials were successfully stored in /home/chris/.safe/cli/credentials
+Safe CLI now has write access to the network
 
-If the URL targets a published `FilesContainer`, the `cat` command will fetch its content, and render it showing the list of files contained (linked) in it, along with the corresponding XOR-URLs for each of the linked files.
-
-Let's see this in action, if we upload some folder using the `files put` command, e.g.:
-```shell
 $ safe files put ./to-upload/ --recursive
-FilesContainer created at: "safe://hnyynyixxj9uewuhh64rgg9zsdhaynwhc88mpyfpor5carg8xx6qs6jknnbnc"
-+  ./to-upload/another.md              safe://hbhyrynyr3osimhxa3mfqok7tto6cf3hhjy4sp3wdri6ee46x8xg68r9mj
-+  ./to-upload/subfolder/subexists.md  safe://hbhyryn9uodh1ju5uzyti3gmmtwburrssd89rcwcy3rzofdpypwomrzzte
-+  ./to-upload/test.md                 safe://hbhyrydpan7d94mwp1bun3mxfnrfrui131an7ihu11wsn8dkr8odab9qwn
+FilesContainer created at: "safe://hyryyryynqxwh3aadnwn111mc4db53e677ccewemq9ighy1fkpytfip8bbfjyeuy?v=hpgzkdo1b5b45k8k815b55uzco669zprxm7oq797c3p1zneq33pro"
++  to-upload/file1.txt                          safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
++  to-upload/myfolder
++  to-upload/myfolder/file2.txt                 safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy
++  to-upload/myotherfolder
++  to-upload/myotherfolder/subfolder
++  to-upload/myotherfolder/subfolder/file3.txt  safe://hy8oycyybut5ea65nec5q4s8tpouws8ax5ej1jazu9c9r8e5p3ry97xkhdp7o
 ```
 
-We can then use `safe cat` command with the XOR-URL of the `FilesContainer` just created to render the list of files linked from it:
-```shell
-$ safe cat safe://hnyynyixxj9uewuhh64rgg9zsdhaynwhc88mpyfpor5carg8xx6qs6jknnbnc
-Files of FilesContainer (version 0) at "safe://hnyynyixxj9uewuhh64rgg9zsdhaynwhc88mpyfpor5carg8xx6qs6jknnbnc":
-+-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
-| Name                    | Size | Created              | Modified             | Link                                                              |
-+-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
-| /another.md             | 11   | 2020-01-28T20:51:05Z | 2020-01-28T20:51:05Z | safe://hbhyrynyr3osimhxa3mfqok7tto6cf3hhjy4sp3wdri6ee46x8xg68r9mj |
-+-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
-| /test.md                | 12   | 2020-01-28T20:51:05Z | 2020-01-28T20:51:05Z | safe://hbhyrydpan7d94mwp1bun3mxfnrfrui131an7ihu11wsn8dkr8odab9qwn |
-+-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
-| /subfolder/subexists.md | 23   | 2020-01-28T20:51:05Z | 2020-01-28T20:51:05Z | safe://hbhyryn9uodh1ju5uzyti3gmmtwburrssd89rcwcy3rzofdpypwomrzzte |
-+-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+We generate persistent keys because we'll later add a binary file to the same container. Refer back
+to the [Keys](#keys) section to see why this is required.
+
+### Retrieve Files and Containers
+
+Use the `cat` command to retrieve `file3.txt` with its XOR-URL:
+```
+$ safe cat safe://hy8oycyybut5ea65nec5q4s8tpouws8ax5ej1jazu9c9r8e5p3ry97xkhdp7o
+A text file with other stuff in it.
 ```
 
-We could also take any of the XOR-URLs of the individual files and have the `cat` command fetch the content of the file and show it in the output, e.g. let's use the XOR-URL of the `/test.md` file to fetch its content:
-```shell
-$ safe cat safe://hbhyrydpan7d94mwp1bun3mxfnrfrui131an7ihu11wsn8dkr8odab9qwn
-hello tests!
+The content displayed depends on the content the URL points to. In this case, it was pointing to a
+file, so `safe` displayed the file contents.
+
+The URL of the container has a different content type, so try `cat` with that:
+```
+$ safe cat safe://hyryyryynqxwh3aadnwn111mc4db53e677ccewemq9ighy1fkpytfip8bbfjyeuy
+Files of FilesContainer (version hpgzkdo1b5b45k8k815b55uzco669zprxm7oq797c3p1zneq33pro) at "safe://hyryyryynqxwh3aadnwn111mc4db53e677ccewemq9ighy1fkpytfip8bbfjyeuy":
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| Name                               | Type            | Size | Created    | Modified   | Link                                                                 |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| /file1.txt                         | text/plain      | 29   | 1645402864 | 1645402864 | safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| /myfolder                          | inode/directory | 0    | 1645402864 | 1645402864 |                                                                      |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| /myfolder/file2.txt                | text/plain      | 35   | 1645402864 | 1645402864 | safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| /myotherfolder                     | inode/directory | 0    | 1645402864 | 1645402864 |                                                                      |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| /myotherfolder/subfolder           | inode/directory | 0    | 1645402864 | 1645402864 |                                                                      |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| /myotherfolder/subfolder/file3.txt | text/plain      | 36   | 1645402864 | 1645402864 | safe://hy8oycyybut5ea65nec5q4s8tpouws8ax5ej1jazu9c9r8e5p3ry97xkhdp7o |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
 ```
 
-Alternatively, we could use the XOR-URL of the `FilesContainer` and provide the path of the file we are trying to fetch, in this case the `cat` command will resolve the path and follow the corresponding link to read the file's content directly for us. E.g. we can also read the content of the `/test.md` file with the following command:
-```shell
-$ safe cat safe://hnyynyixxj9uewuhh64rgg9zsdhaynwhc88mpyfpor5carg8xx6qs6jknnbnc/test.md
-hello tests!
+As we can see, it lists the contents of the container in a table.
+
+You can also address the files in the container by appending a path to its URL:
+```
+$ safe cat safe://hyryyryynqxwh3aadnwn111mc4db53e677ccewemq9ighy1fkpytfip8bbfjyeuy/myfolder/file2.txt
+A text file with some stuff in it.
 ```
 
-As seen above, the `safe cat` command can be used to fetch any type of content from the Safe Network. At this point it only supports files, `FilesContainer`s, `Wallet`s, and `NRS-Container`s (see further below about NRS Containers and commands), but it will be expanded as more types are supported by the CLI and its API.
+### Retrieve Binary Files
 
-### Retrieving Binary Files
+The previous example retrieved a text file. If we retrieve a binary file, `cat` will also print the
+file directly to the terminal. Since binary content isn't human readable, this isn't very useful. We
+can use the `--hexdump` argument to print the file in the same fashion as a hex editor.
 
-By default, binary files are treated just like a plaintext file and will typically display unreadable garbage on the screen unless the output is redirected to a file, eg:
-
-```shell
-$ safe cat safe://hbwybynbbwotm5qykdfxuu4r4doogaywf8jupxats5zg39xjjtd8xmtpky > /tmp/favicon.ico
+Upload a binary file to our example container (any image file will do):
+```
+$ safe files add to-upload/island.jpg safe://hyryyryynqxwh3aadnwn111mc4db53e677ccewemq9ighy1fkpytfip8bbfjyeuy
+FilesContainer updated (version h8e3s1ur5hek97jmsacu8yg6ska18kdtf7hai1uf38icgfpxrx5uo): "safe://hyryyryynqxwh3aadnwn111mc4db53e677ccewemq9ighy1fkpytfip8bbfjyeuy?v=h8e3s1ur5hek97jmsacu8yg6ska18kdtf7hai1uf38icgfpxrx5uo"
++  to-upload/island.jpg  safe://hygoygyyb11oaeofunmfyej6c6q9ximnuphtxasyueb5jdgp3i5rgrdtikzbo
 ```
 
-However, the flag --hexdump is available which provides a more human-friendly hexadecimal dump, similar to that of the standard *xxd* Unix tool.  Here's an example.
-
-```shell
-$ safe cat --hexdump safe://hbwybynbbwotm5qykdfxuu4r4doogaywf8jupxats5zg39xjjtd8xmtpky | head
-Length: 1406 (0x57e) bytes
-0000:   00 00 01 00  01 00 10 10  00 00 01 00  08 00 68 05   ..............h.
-0010:   00 00 16 00  00 00 28 00  00 00 10 00  00 00 20 00   ......(....... .
-0020:   00 00 01 00  08 00 00 00  00 00 00 01  00 00 00 00   ................
-0030:   00 00 00 00  00 00 00 01  00 00 00 00  00 00 f4 cc   ................
-0040:   a8 00 cb 7b  45 00 fb f2  e5 00 ab 62  46 00 ab 60   ...{E......bF..`
-0050:   46 00 c0 a6  8e 00 f2 d9  c1 00 f5 e8  df 00 e0 9a   F...............
-0060:   5e 00 ea c0  9e 00 e8 ae  77 00 be 85  5d 00 bb 61   ^.......w...]..a
-0070:   35 00 fa ed  d7 00 ff fc  f7 00 ce 88  4c 00 b0 56   5...........L..V
-0080:   34 00 fe fa  f6 00 bf 87  5b 00 b1 6b  50 00 dd 82   4.......[..kP...
+Now retrieve it using `--hexdump`:
+```
+$ safe -- cat safe://hygoygyyb11oaeofunmfyej6c6q9ximnuphtxasyueb5jdgp3i5rgrdtikzbo --hexdump
+Length: 62317 (0xf36d) bytes
+0000:   ff d8 ff e0  00 10 4a 46  49 46 00 01  01 00 00 01   ......JFIF......
+0010:   00 01 00 00  ff db 00 84  00 04 04 04  04 05 04 05   ................
+0020:   06 06 05 07  08 07 08 07  0a 0a 09 09  0a 0a 10 0b   ................
+0030:   0c 0b 0c 0b  10 18 0f 11  0f 0f 11 0f  18 15 19 15   ................
+0040:   13 15 19 15  26 1e 1a 1a  1e 26 2c 25  23 25 2c 35   ....&....&,%#%,5
+0050:   2f 2f 35 43  3f 43 57 57  75 01 04 04  04 04 05 04   //5C?CWWu.......
+0060:   05 06 06 05  07 08 07 08  07 0a 0a 09  09 0a 0a 10   ................
+0070:   0b 0c 0b 0c  0b 10 18 0f  11 0f 0f 11  0f 18 15 19   ................
+0080:   15 13 15 19  15 26 1e 1a  1a 1e 26 2c  25 23 25 2c   .....&....&,%#%,
+0090:   35 2f 2f 35  43 3f 43 57  57 75 ff c2  00 11 08 01   5//5C?CWWu......
+00a0:   fa 03 84 03  01 22 00 02  11 01 03 11  01 ff c4 00   ....."..........
+00b0:   35 00 00 02  03 01 01 01  01 00 00 00  00 00 00 00   5...............
+<remaining output snipped>
 ```
 
-### Retrieving Older Versions
-
-As we've seen above, we can use `cat` command to retrieve the latest/current version of any type of content from the Network using their URL. But every change made to content that is uploaded to the Network as `Public` data is perpetual, and therefore a new version is generated when performing any amendments to it, keeping older versions also available forever.
-
-We can use the `cat` command to also retrieve any version of content that was uploaded by appending a query param to the URL. E.g. given the XOR-URL of the `FilesContainer` we created in previous sections (`safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc`), which reached version 2 after a couple of amendments we made with `files sync` command, we can retrieve the very first version (version 0) by using `v=<version>` query param:
-```shell
-$ safe cat "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=0"
-Files of FilesContainer (version 0) at "safe://hnyynyi6tgumo67yoauewe3ee3ojh37sbyr7rnh3nd6kkqhbo9decpjk64bnc?v=0":
-+-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
-| Name                    | Size | Created              | Modified             | Link                                                              |
-+-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
-| /another.md             | 6    | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hoxm5aps8my8he8cpgdqh8k5wuox5p7kzed6bsbajayc3gc8pgp36s |
-+-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
-| /subfolder/subexists.md | 7    | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hoqc6etdwbx6s86u3bkxenos3rf7dtr51eqdt17smxsw7aejot81dc |
-+-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
-| /test.md                | 12   | 2019-07-24T13:22:49Z | 2019-07-24T13:22:49Z | safe://hoxibhqth9awkjgi35sz73u35wyyscuht65m3ztrznb6thd5z8hepx |
-+-------------------------+------+----------------------+----------------------+-------------------------------------------------------------------+
+We could also use standard Unix redirection to output to file:
+```
+$ safe cat safe://hygoygyyb11oaeofunmfyej6c6q9ximnuphtxasyueb5jdgp3i5rgrdtikzbo > island.jpg
 ```
 
-## Safe-URLs
+### Versioning
 
-In previous sections of this guide we explained how we can create two types of safe:// URLs, XOR-URLs and NRS-URLs. It has been explained that safe:// URLs can contain a path as well, if they target a `FilesContainer`, and they can also be post-fixed with `v=<version>` query param in order to target a specific version of the content rather than the latest/current version when this query param is omitted.
+When the binary file was added, a new version of the container was created. We can use this to
+demonstrate retrieval of specific versions. You can see the output of the `files put` and
+`files add` commands present a version string for the container. This string is a hash of the
+container content. The reason the version doesn't just use consecutive integers is because it would
+be possible for the container to be updated by two or more people at the same time. We would then be
+able to ask the user to resolve the conflicts between the updates.
 
-All these types of safe:// URLs can be used in any of the supported CLI commands interchangeably as the argument of any command which expects safe:// URL.
+Retrieve the first version of the container by supplying this version using the `v` query parameter
+on its XOR-URL:
+```
+$ safe cat "safe://hyryyryynqxwh3aadnwn111mc4db53e677ccewemq9ighy1fkpytfip8bbfjyeuy?v=hpgzkdo1b5b45k8k815b55uzco669zprxm7oq797c3p1zneq33pro"
+Files of FilesContainer (version hpgzkdo1b5b45k8k815b55uzco669zprxm7oq797c3p1zneq33pro) at "safe://hyryyryynqxwh3aadnwn111mc4db53e677ccewemq9ighy1fkpytfip8bbfjyeuy?v=hpgzkdo1b5b45k8k815b55uzco669zprxm7oq797c3p1zneq33pro":
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| Name                               | Type            | Size | Created    | Modified   | Link                                                                 |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| /file1.txt                         | text/plain      | 29   | 1645402864 | 1645402864 | safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| /myfolder                          | inode/directory | 0    | 1645402864 | 1645402864 |                                                                      |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| /myfolder/file2.txt                | text/plain      | 35   | 1645402864 | 1645402864 | safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| /myotherfolder                     | inode/directory | 0    | 1645402864 | 1645402864 |                                                                      |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| /myotherfolder/subfolder           | inode/directory | 0    | 1645402864 | 1645402864 |                                                                      |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| /myotherfolder/subfolder/file3.txt | text/plain      | 36   | 1645402864 | 1645402864 | safe://hy8oycyybut5ea65nec5q4s8tpouws8ax5ej1jazu9c9r8e5p3ry97xkhdp7o |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+```
 
-E.g. we can retrieve the content of a website with the `cat` command using either its XOR-URL or its NRS-URL, and either fetching the latest version of it or supplying the query param to get a specific version of it. Thus, if we wanted to fetch `version #1` of the site we published at `safe://mywebsite` (which NRS Map Container XOR-URL is `safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh`), the following two commands would be equivalent:
-- `$ safe cat "safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh?v=1"`
-- `$ safe cat "safe://mywebsite?v=1"`
+As expected, notice it doesn't contain the new `island.jpg` file.
 
-In both cases the NRS Map Container will be found (from above URLs) by decoding the XOR-URL or by resolving NRS public name. Once that's done, and since the content is an NRS Map, following the rules defined by NRS and the map found in it the target link will be resolved from it. In some circumstances, it may be useful to get information about the resolution of a URL, which can be obtained using the `dog` command.
+Retrieve the current version by using the XOR-URL as normal:
+```
+$ safe cat "safe://hyryyryynqxwh3aadnwn111mc4db53e677ccewemq9ighy1fkpytfip8bbfjyeuy"
+Files of FilesContainer (version h8e3s1ur5hek97jmsacu8yg6ska18kdtf7hai1uf38icgfpxrx5uo) at "safe://hyryyryynqxwh3aadnwn111mc4db53e677ccewemq9ighy1fkpytfip8bbfjyeuy":
++------------------------------------+-----------------+-------+------------+------------+----------------------------------------------------------------------+
+| Name                               | Type            | Size  | Created    | Modified   | Link                                                                 |
++------------------------------------+-----------------+-------+------------+------------+----------------------------------------------------------------------+
+| /file1.txt                         | text/plain      | 29    | 1645402864 | 1645402864 | safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy |
++------------------------------------+-----------------+-------+------------+------------+----------------------------------------------------------------------+
+| /island.jpg                        | image/jpeg      | 62317 | 1645403232 | 1645403232 | safe://hygoygyyb11oaeofunmfyej6c6q9ximnuphtxasyueb5jdgp3i5rgrdtikzbo |
++------------------------------------+-----------------+-------+------------+------------+----------------------------------------------------------------------+
+| /myfolder                          | inode/directory | 0     | 1645402864 | 1645402864 |                                                                      |
++------------------------------------+-----------------+-------+------------+------------+----------------------------------------------------------------------+
+| /myfolder/file2.txt                | text/plain      | 35    | 1645402864 | 1645402864 | safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy |
++------------------------------------+-----------------+-------+------------+------------+----------------------------------------------------------------------+
+| /myotherfolder                     | inode/directory | 0     | 1645402864 | 1645402864 |                                                                      |
++------------------------------------+-----------------+-------+------------+------------+----------------------------------------------------------------------+
+| /myotherfolder/subfolder           | inode/directory | 0     | 1645402864 | 1645402864 |                                                                      |
++------------------------------------+-----------------+-------+------------+------------+----------------------------------------------------------------------+
+| /myotherfolder/subfolder/file3.txt | text/plain      | 36    | 1645402864 | 1645402864 | safe://hy8oycyybut5ea65nec5q4s8tpouws8ax5ej1jazu9c9r8e5p3ry97xkhdp7o |
++------------------------------------+-----------------+-------+------------+------------+----------------------------------------------------------------------+
+```
 
-## Symlinks
+Note the addition of the binary file, and the version, which is the current version. It would
+also be possible to supply this version in the XOR-URL, but if it isn't supplied, `cat` will fetch
+the latest version by default.
 
-The sn_cli supports upload and retrieval of symlinks using the above commands. It can also resolve relative symlinks in a FileContainer provided that the target exists in the FileContainer.
+### Symlinks
 
-[More Details](README-symlinks.md)
+The CLI supports upload and retrieval of symlinks. It can also resolve relative symlinks in a
+container, provided the target exists.
+
+More details on symlinks are available [here](README-symlinks.md).
+
+## NRS
+
+As we've seen, content on the network is accessible via XOR-URLs, but these can be hard to keep
+track of. For this reason, Safe has a Name Resolution System (NRS) which is analogous to the
+internet DNS system.
+
+The main aspects to be aware of are:
+
+* A 'fully qualified domain name' in DNS, e.g., `maps.google.com`, is a 'public name' in NRS.
+* A 'top level domain' in DNS, e.g., `google.com`, is a 'top name' in NRS.
+* A 'sub domain' in DNS, e.g., the `maps` part of `maps.google.com`, is a 'sub name' in NRS.
+
+As usual, let's use our example directory to give us something to work with:
+```
+$ safe keys create --for-cli
+New SafeKey created: "safe://hyryyyyyy4m3odsss55kg5iwx66in5go5j5nwyh6a3cg9hifa4acsdo9exify"
+Key pair generated:
+Public Key = d2f301dad6ded46dd68ff7aa2d9a1b4ec54073d8cb0dfe54b8d61961c3e87d4a
+Secret Key = 1339bcd172d88e92ab7cd70d7d0fa4196706dd89b515e7d40646ef32fe898f54
+Setting new SafeKey to be used by CLI...
+New credentials were successfully stored in /home/chris/.safe/cli/credentials
+Safe CLI now has write access to the network
+
+$ safe files put to-upload/ --recursive
+FilesContainer created at: "safe://hyryyryyn6j99m1ar1mc6hub3mcfwcddrgtqho3pobg6k9fjs1en77rztrjjyeuy?v=hw3yk4y1yzop438imze96wajpedexecauewhs46u1mmxnqi534hyy"
++  to-upload/file1.txt                          safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
++  to-upload/myfolder
++  to-upload/myfolder/file2.txt                 safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy
++  to-upload/myotherfolder
++  to-upload/myotherfolder/subfolder
++  to-upload/myotherfolder/subfolder/file3.txt  safe://hy8oycyybut5ea65nec5q4s8tpouws8ax5ej1jazu9c9r8e5p3ry97xkhdp7o
+```
+
+We generate keys because we'll add sub name entries to the top name we register. As the
+[Keys](#keys) section explained, we'll require persistent keys to keep writing to the same data
+structure, which is owned by the key that created it. Refer to that section again if you wish to
+re-familiarise yourself.
+
+### Register a Top Name
+
+First, let's register a new top name, and we'll link it to the container:
+```
+$ safe nrs register example --link "safe://hyryyryyn6j99m1ar1mc6hub3mcfwcddrgtqho3pobg6k9fjs1en77rztrjjyeuy?v=hw3yk4y1yzop438imze96wajpedexecauewhs46u1mmxnqi534hyy"
+New NRS Map created for "safe://example"
+The container for the map is located at safe://hyryygyynqncd44jxc1yam9i6piz4cb5dbmuec1xzh56rmqkgoyrsabzr9mpomzy
+The entry points to safe://hyryyryyn6j99m1ar1mc6hub3mcfwcddrgtqho3pobg6k9fjs1en77rztrjjyeuy?v=hw3yk4y1yzop438imze96wajpedexecauewhs46u1mmxnqi534hyy
++  example  safe://example
+```
+
+Note that the `--link` argument used the version of the container. This is required because when
+linking to versionable content, NRS requires us to specify the version we wish to link to. A files
+container is a mutable structure and is therefore versionable.
+
+Also important to note is, the output supplies an XOR-URL to a container for the NRS map. This is
+where the data related to the top name is stored. The NRS map is a list of all the sub names for the
+top name, and the content they point to. We'll come back to this concept when we create a sub name.
+
+For now, let's retrieve the content using its NRS name:
+```
+$ safe cat safe://example
+Files of FilesContainer (version hw3yk4y1yzop438imze96wajpedexecauewhs46u1mmxnqi534hyy) at "safe://example":
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| Name                               | Type            | Size | Created    | Modified   | Link                                                                 |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| /file1.txt                         | text/plain      | 29   | 1645407121 | 1645407121 | safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| /myfolder                          | inode/directory | 0    | 1645407121 | 1645407121 |                                                                      |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| /myfolder/file2.txt                | text/plain      | 35   | 1645407121 | 1645407121 | safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| /myotherfolder                     | inode/directory | 0    | 1645407121 | 1645407121 |                                                                      |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| /myotherfolder/subfolder           | inode/directory | 0    | 1645407121 | 1645407121 |                                                                      |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+| /myotherfolder/subfolder/file3.txt | text/plain      | 36   | 1645407121 | 1645407121 | safe://hy8oycyybut5ea65nec5q4s8tpouws8ax5ej1jazu9c9r8e5p3ry97xkhdp7o |
++------------------------------------+-----------------+------+------------+------------+----------------------------------------------------------------------+
+```
+
+It lists the container, in the same way it would if we had used its XOR-URL directly.
+
+It's also possible to register a top name without linking it to any content.
+
+### Add a Sub Name
+
+Let's add a sub name for the `example` top name, and link it to a file in the container:
+```
+$ safe nrs add file1.example --link safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
+Existing NRS Map updated.
+Now at version hf6zjb8j3d4nezh917extkumwf5f8nxry38inwq9z66cwyewuqh4o.
++  file1.example  safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
+```
+
+Note that we didn't use a version with the `--link` argument. On Safe, a file is immutable content
+and therefore has no version.
+
+Now retrieve the file:
+```
+$ safe cat safe://file1.example
+A file with some text in it.
+```
+
+Add another sub name with a link to the second file, then retrieve it:
+```
+$ safe nrs add file2.example --link safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy
+Existing NRS Map updated.
+Now at version hra3toibhg1zg6h9y4do4g6s177iejkqfx9enpbroq61z5zrnpryo.
++  file2.example  safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy
+
+$ safe cat safe://file2.example
+A text file with some stuff in it.
+```
+
+Finally, it's possible to add a sub name and register a top name in one step. Run `nrs add` with the
+`--register-top-name` flag:
+```
+$ safe nrs add file2.example2 --link safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy --register-top-name
+New NRS Map created.
+The container for the map is located at safe://hyryygyynwfb5q7rzss18dnfqomgkzqfdr5hamzrn881ubh74mykwhk4g3mbomzy
+Now at version h4dprogdr98hj9ecrygfoico5o66r1dfwgdnt9z13m57n3bnm9phy.
++  file2.example2  safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy
+
+$ safe cat safe://file2.example2
+A text file with some stuff in it.
+```
+
+Here we've registered `example2` and created a `file2` sub name. We linked it to the same file, just
+to illustrate the point.
+
+### List the NRS Map
+
+We can see all the sub names for a registered top name by retrieving the content of the container
+where the NRS map is stored.  Use the container address supplied when the top name was created:
+```
+$ safe cat safe://hyryygyynqncd44jxc1yam9i6piz4cb5dbmuec1xzh56rmqkgoyrsabzr9mpomzy
+NRS Map Container at safe://hyryygyynqncd44jxc1yam9i6piz4cb5dbmuec1xzh56rmqkgoyrsabzr9mpomzy
+Listing NRS map contents:
+example: safe://hyryyryyn6j99m1ar1mc6hub3mcfwcddrgtqho3pobg6k9fjs1en77rztrjjyeuy?v=hw3yk4y1yzop438imze96wajpedexecauewhs46u1mmxnqi534hyy
+file1.example: safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
+file2.example: safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy
+```
+
+The output has all the sub names for our `example` top name, and all the associated links.
 
 ## Dog
 
-The Safe Network relates information and content using links, as an example, just considering some of the type of content we've seen in this guide, `FilesContainer`s, `Wallet`s and `NRS Map Container`s, they are all containers with named links (Safe-URLs) to other content on the network, and depending on the abstraction they provide, each of these links are resolved following a specific set of rules for each type of container, e.g. NRS subnames are resolved with a predefined set of rules, while a file's location is resolved from a FilesContainer with another set of predefined rules.
+The `dog` command provides us with information about content on the network, namely, how it is
+resolved and the data types that represent it.
 
-Using the `cat` command is a very straightforward way of retrieving any type of data and see its content, but sometimes we may want to understand how the location of the content being retrieved is resolved using these set of predefined rules, and how links are resolved to eventually find the location of the content we are retrieving. This is when we need the `dog` command to sniff around and show the trace when resolving all these links from a URL.
+Let's setup some context for illustrating `dog`. Create a container with the usual example directory
+and associate some NRS entries with it:
+```
+$ safe keys create --for-cli
+New SafeKey created: "safe://hyryyyyyy78fnjgmwzw118jicqc1b6c6917h7jf3t4xnpbioas9fqxabrba1y"
+Key pair generated:
+Public Key = e9ca249974bd2523a6ac73241f33df9779d49731d3c4d0d618b7cae7e0240e24
+Secret Key = d8609a4e885199af4a4535bd87d94af309d843e2f647bb9da8f0f6f162f11baf
+Setting new SafeKey to be used by CLI...
+New credentials were successfully stored in /home/chris/.safe/cli/credentials
+Safe CLI now has write access to the network
 
-The most basic case for the `dog` command is to get information about the native data type holding a content found with a XOR-URL:
-```shell
-$ safe dog safe://hnyynywttiyr6tf3qk811b3rto9azx8579h95ewbs3ikwpctxdhtqesmwnbnc
-Native data type: PublicSequence
-Version: 0
+$ safe files put to-upload/ --recursive
+FilesContainer created at: "safe://hyryyryyng6ymimc9yjrio1q6xgmdj73dj5gmnd999fgmw7swdrmtd364jzoyeuy?v=hj4i3bs677desbkkjkg683pmwqgzei1yfbtgf7t9mmj14ojt445yy"
++  to-upload/file1.txt                          safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
++  to-upload/myfolder
++  to-upload/myfolder/file2.txt                 safe://hy8oycyybrqkkwrnmneshqetpnzfoncfw9qznm331515xk936hm1gsrkkw1cy
++  to-upload/myotherfolder
++  to-upload/myotherfolder/subfolder
++  to-upload/myotherfolder/subfolder/file3.txt  safe://hy8oycyybut5ea65nec5q4s8tpouws8ax5ej1jazu9c9r8e5p3ry97xkhdp7o
+
+$ safe nrs register example --link "safe://hyryyryyng6ymimc9yjrio1q6xgmdj73dj5gmnd999fgmw7swdrmtd364jzoyeuy?v=hj4i3bs677desbkkjkg683pmwqgzei1yfbtgf7t9mmj14ojt445yy"
+New NRS Map created for "safe://example"
+The container for the map is located at safe://hyryygyynqncd44jxc1yam9i6piz4cb5dbmuec1xzh56rmqkgoyrsabzr9mpomzy
+The entry points to safe://hyryyryyng6ymimc9yjrio1q6xgmdj73dj5gmnd999fgmw7swdrmtd364jzoyeuy?v=hj4i3bs677desbkkjkg683pmwqgzei1yfbtgf7t9mmj14ojt445yy
++  example  safe://example
+
+$ safe nrs add file1.example --link safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
+Existing NRS Map updated.
+Now at version hf6zjb8j3d4nezh917extkumwf5f8nxry38inwq9z66cwyewuqh4o.
++  file1.example  safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
+```
+
+Start by running the command against `file1.txt`:
+```
+$ safe dog safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
+== URL resolution step 1 ==
+Resolved from: safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
+= File =
+XOR-URL: safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
+XOR name: 0xea4aeb538a8dc5fc738a97057de47c288856fb99d216622d3731890eed155360
+Native data type: PublicFile
+Media type: text/plain
+```
+
+This tells us the network resolved the link in one step and it refers to a `PublicFile`.
+
+Similarly, if we run it against the container XOR-URL, it too has one resolution step:
+```
+$ safe dog safe://hyryyryyng6ymimc9yjrio1q6xgmdj73dj5gmnd999fgmw7swdrmtd364jzoyeuy
+== URL resolution step 1 ==
+Resolved from: safe://hyryyryyng6ymimc9yjrio1q6xgmdj73dj5gmnd999fgmw7swdrmtd364jzoyeuy
+= FilesContainer =
+XOR-URL: safe://hyryyryyng6ymimc9yjrio1q6xgmdj73dj5gmnd999fgmw7swdrmtd364jzoyeuy
+Version: hj4i3bs677desbkkjkg683pmwqgzei1yfbtgf7t9mmj14ojt445yy
 Type tag: 1100
-XOR name: 0x231a809e8972e51e520e49187f1779f7dff3fb45036cd5546b22f1f22e459741
-XOR-URL: safe://hnyynywttiyr6tf3qk811b3rto9azx8579h95ewbs3ikwpctxdhtqesmwnbnc
+XOR name: 0x3780baad9f02495849de799634f7234eccb10ffff94cba76d4191711e7da4de0
+Native data type: Register
+Native data XOR-URL: safe://hyryyyyyng6ymimc9yjrio1q6xgmdj73dj5gmnd999fgmw7swdrmtd364jzoyeuy
 ```
 
-In this case we see the location where this data is stored on the Network (this is called the XOR name), a type tag number associated with the content (1100 was set for this particular type of container), and the native Safe Network data type where this data is being held on (`PublicSequence`), and since this type of data is versionable we also see which is the version of the content the URL resolves to.
+The output also tells us the container is represented by a `Register`, which is generic storage
+designed to work with our versioning system and support mechanisms for resolving conflicts that can
+occur during concurrent writes.
 
-Of course the `safe dog` command can be used also with other type of content like files, e.g. if we use it with a `FilesContainer`'s XOR-URL and the path of one of the files it contains:
-```shell
-$ safe dog safe://hnyynywttiyr6tf3qk811b3rto9azx8579h95ewbs3ikwpctxdhtqesmwnbnc/subfolder/index.html
+Let's try the command using an NRS-URL:
+```
+$ safe dog safe://file1.example
+== URL resolution step 1 ==
+Resolved from: safe://file1.example
+= NrsEntry =
+Public name: file1.example
+Target XOR-URL: safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
+Target native data type: File
+Resolves into: safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
+Version: none
+
+== URL resolution step 2 ==
+Resolved from: safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
+= File =
+XOR-URL: safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
+XOR name: 0xea4aeb538a8dc5fc738a97057de47c288856fb99d216622d3731890eed155360
 Native data type: PublicFile
-XOR name: 0xda4ce4aa59889874921817e79c2b98dc3dbede7fd9a9808a60aa2d35efaa05f4
-XOR-URL: safe://hbhybyds1ch1ifunraq1jbof98uoi3tzb7z5x89spjonfgbktpgzz4wbxw
-Media type: text/html
+Media type: text/plain
 ```
 
-But how about using the `dog` command with an NRS URL, as we now know it's resolved using the NRS rules and following the links found in the NRS Map Container:
-```shell
-$ safe dog safe://mywebsite/contact/form.html
-Native data type: PublicFile
-XOR name: 0xda4ce4aa59889874921817e79c2b98dc3dbede7fd9a9808a60aa2d35efaa05f4
-XOR-URL: safe://hbhybyds1ch1ifunraq1jbof98uoi3tzb7z5x89spjonfgbktpgzz4wbxw
-Media type: text/html
+We get some insight into the NRS system. The first step was to resolve the `file1.example`
+`NrsEntry`, which then points to the file. The second step was to retrieve the target file.
 
-Resolved using NRS Map:
-PublicName: "mywebsite"
-Container XOR-URL: safe://hnyydyz7utb6npt9kg3aksgorfwmkphet8u8z3or4nsu8n3bj8yiep4a91bqh
-Native data type: PublicSequence
+Finally, let's try `dog` against the NRS container:
+```
+$ safe dog safe://hyryygyynqncd44jxc1yam9i6piz4cb5dbmuec1xzh56rmqkgoyrsabzr9mpomzy
+== URL resolution step 1 ==
+= NRS Map Container =
+XOR-URL: safe://hyryygyynqncd44jxc1yam9i6piz4cb5dbmuec1xzh56rmqkgoyrsabzr9mpomzy
 Type tag: 1500
-XOR name: 0xfb3887c26c7ea3670ab1a042d16a6f1113ccf7cc09a15a6716429382a86eb1f9
-Version: 3
-+------------------+----------------------+----------------------+--------------------------------------------------------------------------+
-| NRS name/subname | Created              | Modified             | Link                                                                     |
-+------------------+----------------------+----------------------+--------------------------------------------------------------------------+
-| mywebsite        | 2019-07-24T14:32:13Z | 2019-07-24T14:32:13Z | safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0 |
-+------------------+----------------------+----------------------+--------------------------------------------------------------------------+
-| blog.mywebsite   | 2019-07-24T16:52:30Z | 2019-07-24T16:52:30Z | safe://hnyynyie8kccparz3pcxj9uisdc4gyzcpem9dfhehhjd6hpzwf8se5w1zobnc?v=0 |
-+------------------+----------------------+----------------------+--------------------------------------------------------------------------+
+XOR name: 0x70983d692f648185febe6d6fa607630ae68649f7e6fc45b94680096c06e4fadb
+Native data type: Register
+Native data XOR-URL: safe://hyryyyyynqncd44jxc1yam9i6piz4cb5dbmuec1xzh56rmqkgoyrsabzr9mpomzy
+Listing NRS map contents:
+example: safe://hyryyryyng6ymimc9yjrio1q6xgmdj73dj5gmnd999fgmw7swdrmtd364jzoyeuy?v=hj4i3bs677desbkkjkg683pmwqgzei1yfbtgf7t9mmj14ojt445yy
+file1.example: safe://hy8oycyyb7jfqswhktzn9ahhk1hnz53dhfnrfp6h34emgrmjzggro75eikpoy
 ```
 
-In this case we don't only get information about the content that the URL resolves to, but also about the NRS Map Container this NRS-URL was resolved with. E.g. we see the XOR-URL of the NRS Map Container, its version, and among other data we also see the list of all NRS names defined by it with their corresponding XOR-URL links.
-
-## Shell Completions
-
-Automatic command completions via <tab> are available for popular shells such as bash and PowerShell (Windows). Completions are also provided for the shells fish, zsh, and elvish.
-
-Until an installer becomes available, these completions must be manually enabled as per below.
-
-### Bash Completions
-
-To enable bash completions in the current bash session, use the following command:
-```shell
-SC=/tmp/safe.rc && safe setup completions bash > $SC && source $SC
-```
-
-To enable bash completions always for the current user:
-```shell
-SC=~/.bash_sn_cli CL="source $SC" RC=~/.bashrc; safe setup completions bash > $SC && grep -qxF "$CL" $RC || echo $CL >> $RC
-```
-
-### Windows PowerShell Completions
-
-To enable completions in the current PowerShell session, use the following commands:
-```shell
-safe setup completions bash > sn_cli.ps1
-sn_cli.ps1
-```
-
-To enable PowerShell completions permanently, generate the sn_cli.ps1 file as per above and then see this [stackoverflow answer](<https://stackoverflow.com/questions/20575257/how-do-i-run-a-powershell-script-when-the-computer-starts#32189430>).
+Like the file container, the output tells us this container is also represented by a `Register`, and
+it also prints the NRS map.
 
 ## Further Help
 
-You can discuss development-related topics on the [Safe Dev Forum](https://forum.safedev.org/).
+If you want further help or information related to using the CLI, or perhaps more details about the
+internals of the network, please feel free to join us and ask questions on the [Safe Network
+Forum](https://safenetforum.org/).
 
-If you are just starting to develop an application for the Safe Network, it's very advisable to visit the [Safe Network Dev Hub](https://hub.safedev.org) where you will find a lot of relevant information.
-
-If you find any issues, or have ideas for improvements and/or new features for this application and the project, please raise them by [creating a new issue in this repository](https://github.com/maidsafe/sn_cli/issues).
+If you find any issues, or have ideas for improvements and/or new features for this application and
+the project, please raise them by [creating a new issue in this
+repository](https://github.com/maidsafe/sn_cli/issues).
 
 ## License
 
