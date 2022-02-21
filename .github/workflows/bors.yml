@@ -261,6 +261,18 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
+      - name: Mac install ripgrep
+        if: matrix.os == 'macos-latest'
+        run: brew install ripgrep
+
+      - name: ubuntu install ripgrep
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get -y install ripgrep
+
+      - name: windows install ripgrep
+        if: matrix.os == 'windows-latest'
+        run: choco install ripgrep
+
       - name: Build all safe_network tests
         run: cd sn && cargo test --no-run --release --features=test-utils
         timeout-minutes: 60
@@ -270,6 +282,12 @@ jobs:
         id: section-startup
         env:
           RUST_LOG: "safe_network,sn_api,sn_node=trace"
+
+      - name: Wait for all nodes to join
+        shell: bash
+        # we are not running with 'always-joinable' set, so we should not have the full 33 nodes as yet.
+        run: ./resources/scripts/wait_for_nodes_to_join.sh
+        timeout-minutes: 10
 
       - name: Print Network Log Stats at start
         shell: bash
@@ -400,7 +418,7 @@ jobs:
     runs-on: "${{ matrix.os }}"
     needs: ["e2e"]
     env:
-      NODE_COUNT: 33
+      NODE_COUNT: 30
     strategy:
       matrix:
         os: [self-hosted-ubuntu]
@@ -448,7 +466,7 @@ jobs:
         shell: bash
         # we are not running with 'always-joinable' set, so we should not have the full 33 nodes as yet.
         run: NODE_COUNT=28 ./resources/scripts/wait_for_nodes_to_join.sh
-        timeout-minutes: 5
+        timeout-minutes: 10
 
       - name: Is the network split and ready?
         shell: bash
