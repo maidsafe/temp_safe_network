@@ -515,7 +515,7 @@ impl Session {
 
                         // Now mark prior attempted Peers as failed for retries in future.
                         for peer in &elders_or_adults {
-                            if let Some(conn) = peer.connection().await {
+                            if let Some(conn) = peer.get_connection() {
                                 let connection_id = conn.id();
                                 mark_connection_id_as_failed(
                                     self.clone(),
@@ -622,11 +622,17 @@ pub(super) async fn send_msg(
 
         let mut reused_connection = true;
         let peer_name = peer.name();
-        let cloned_peer = peer.clone();
+
         let failed_connection_ids = session
             .elder_last_closed_connections
             .get(&peer_name)
             .map(|entry| entry.value().clone());
+        if let Some(ref failed_connection_ids) = failed_connection_ids {
+            for failed_id in failed_connection_ids.iter() {
+                peer.remove_connection(*failed_id);
+            }
+        }
+        let cloned_peer = peer.clone();
 
         let task_handle: JoinHandle<(XorName, usize, Result<(), Error>)> = tokio::spawn(
             async move {
@@ -634,10 +640,9 @@ pub(super) async fn send_msg(
                         .ensure_connection(
                             |connection| {
                                 // Some(connection.id()) !=
-                                if let Some(failed_connection_ids) = failed_connection_ids.clone() {
+                                if let Some(ref failed_connection_ids) = failed_connection_ids {
                                     !failed_connection_ids.contains(&connection.id())
-                                }
-                                else {
+                                } else {
                                     true
                                 }
                             },
@@ -678,8 +683,7 @@ pub(super) async fn send_msg(
                     );
                 }
 
-                let connection = peer.connection().await;
-                if let Some(connection) = connection {
+                if let Some(connection) = peer.get_connection() {
                     (
                         peer_name,
                         connection_id,

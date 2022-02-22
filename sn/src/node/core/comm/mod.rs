@@ -141,7 +141,7 @@ impl Comm {
             let priority = wire_msg.into_msg()?.priority();
             let retries = self.back_pressure.get(&addr).await; // TODO: more laid back retries with lower priority, more aggressive with higher
 
-            let connection = if let Some(connection) = recipient.connection().await {
+            let connection = if let Some(connection) = recipient.get_connection() {
                 Ok(connection)
             } else {
                 error!("No connection available to client");

@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use dashmap::DashMap;
 use std::{
     cmp::Ordering,
     fmt::{self, Display, Formatter},
@@ -14,7 +15,6 @@ use std::{
     net::SocketAddr,
     sync::Arc,
 };
-use tokio::sync::{RwLock, RwLockReadGuard};
 use xor_name::{XorName, XOR_NAME_LEN};
 
 /// Network peer identity.
@@ -27,31 +27,19 @@ pub struct Peer {
     name: XorName,
     addr: SocketAddr,
 
-    // An existing connection to the peer. There are no guarantees about the state of the connection
+    // Connections to the peer. There are no guarantees about the state of the connection
     // except that it once connected to this peer's `addr` (e.g. it may already be closed or
     // otherwise unusable).
-    connection: Arc<RwLock<Option<qp2p::Connection>>>,
+    connections: Arc<DashMap<usize, qp2p::Connection>>,
 }
 
 impl fmt::Debug for Peer {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let guard = self.connection.try_read();
-        let connection; // needed to avoid issues with temporary bindings
+        let connection_ids: Vec<usize> = self.connection_ids();
         f.debug_struct("Peer")
             .field("name", &self.name)
             .field("addr", &self.addr)
-            .field(
-                "connection",
-                // It's likely that the lock will be free, so attempt to read without blocking in
-                // order to show more useful info.
-                match &guard {
-                    Ok(guard) => {
-                        connection = guard.as_ref();
-                        &connection
-                    }
-                    Err(_) => &"<locked>",
-                },
-            )
+            .field("connection_ids", &connection_ids)
             .finish()
     }
 }
@@ -60,16 +48,10 @@ impl Display for Peer {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(
             f,
-            "{} at {} ({})",
+            "{} at {} ({:?})",
             self.name,
             self.addr,
-            match self.connection.try_read() {
-                Ok(guard) => guard
-                    .as_ref()
-                    .map(|_| "connected")
-                    .unwrap_or("not connected"),
-                Err(_) => "<locked>",
-            }
+            self.connection_ids()
         )
     }
 }
@@ -115,7 +97,7 @@ impl Peer {
         Self {
             name,
             addr,
-            connection: Arc::new(RwLock::new(None)),
+            connections: Arc::new(DashMap::new()),
         }
     }
 
@@ -134,58 +116,36 @@ impl Peer {
         self.name[XOR_NAME_LEN - 1]
     }
 
-    /// Get the existing connection to the peer, if any.
-    pub(crate) async fn connection(&self) -> Option<qp2p::Connection> {
-        self.connection.read().await.as_ref().cloned()
+    /// Remove the specified connection, if any.
+    pub(crate) fn remove_connection(&self, connection_id: usize) {
+        let _ = self.connections.remove(&connection_id);
     }
 
-    /// Copy the connection from another peer, if this peer doesn't have one.
-    ///
-    /// This prefers the keep the existing connection, if one is set. This choice is made to avoid
-    /// taking the write lock if we don't need to. [`ensure_connection`] can be used to force a new
-    /// connection to be set, if necessary.
-    pub(crate) async fn merge_connection(&self, other: &Self) {
+    /// Get the connection to the peer, if any.
+    pub(crate) fn get_connection(&self) -> Option<qp2p::Connection> {
+        self.connections
+            .iter()
+            .next()
+            .map(|item| item.value().clone())
+    }
+
+    /// Get the connection_ids to the peer, if any.
+    pub(crate) fn connection_ids(&self) -> Vec<usize> {
+        self.connections.iter().map(|item| *item.key()).collect()
+    }
+
+    /// Copy the connections from another peer, if this peer doesn't have one.
+    pub(crate) async fn merge_connections(&self, other: &Self) {
         // As a quick sanity check, do nothing if the addresses differ
         if self.addr != other.addr {
             return;
         }
-
-        // Fast-path: try to get a read lock synchronously, and if the connection is set do nothing
-        if let Ok(true) = self
-            .connection
-            .try_read()
-            .map(|connection| connection.is_some())
-        {
-            return;
+        for item in other.connections.iter() {
+            // Another sanity check: the connection itself matches our address
+            if self.addr == item.value().remote_address() {
+                let _ = self.connections.insert(*item.key(), item.value().clone());
+            }
         }
-
-        let other_connection = if let Ok(connection) =
-            RwLockReadGuard::try_map(other.connection.read().await, Option::as_ref)
-        {
-            // eager clone to drop the read lock, clones should be quite cheap
-            connection.clone()
-        } else {
-            // There's nothing to do if `other` has no connection
-            return;
-        };
-
-        // Another sanity check: the connection itself matches our address
-        // TODO: we could consider panicking here, since this would represent corrupt state
-        if self.addr != other_connection.remote_address() {
-            return;
-        }
-
-        // Either we couldn't get the read lock, or the connection isn't set, so we have to take the
-        // write lock.
-        let mut guard = self.connection.write().await;
-
-        if guard.is_some() {
-            // The connection was set while we waited, defer to it and do nothing
-            return;
-        }
-
-        // Set the connection
-        *guard = Some(other_connection);
     }
 
     /// Ensure the peer has a connection, and connect if not.
@@ -204,49 +164,24 @@ impl Peer {
         &self,
         is_valid: impl Fn(&qp2p::Connection) -> bool,
         connect: Connect,
-    ) -> Result<RwLockReadGuard<'_, qp2p::Connection>, qp2p::ConnectionError>
+    ) -> Result<qp2p::Connection, qp2p::ConnectionError>
     where
         Connect: FnOnce(SocketAddr) -> Fut,
         Fut: Future<Output = Result<qp2p::Connection, qp2p::ConnectionError>>,
     {
-        // Fast-path: try to get a read lock synchronously, and return the existing connection.
-        if let Some(guard) = self
-            .connection
-            .try_read()
-            .ok()
-            .and_then(|guard| RwLockReadGuard::try_map(guard, Option::as_ref).ok())
-        {
-            if is_valid(&guard) {
-                return Ok(guard);
+        for item in self.connections.iter() {
+            // TODO: carry out the remove in case of connection is invalid?
+            if is_valid(item.value()) {
+                return Ok(item.value().clone());
             }
         }
 
-        // If we couldn't get the read lock synchronously, we conservatively take the write lock.
-        // This will prevent anyone else from looking at the connection until we have set one.
-        let mut guard = self.connection.write().await;
-
-        if let Some(connection) = guard.as_ref() {
-            // Someone else set the connection while we waited.
-
-            if is_valid(connection) {
-                // We can't avoid an unwrap here, but we can be sure it will succeed because we hold
-                // the write lock (meaning no one else can fiddle with `self.connection`), and
-                // because we just tested that a connection is set.
-                return Ok(RwLockReadGuard::try_map(guard.downgrade(), Option::as_ref)
-                    .expect("write-locked value can't have changed"));
-            }
-        }
-
-        // We now know the connection isn't set/valid, so we call `connect` and set it.
-        // TODO: we could consider panicking here if `connect` breaks our invariant by returning an
-        // connection with the wrong address.
-        *guard = Some(connect(self.addr).await?);
-
-        // We can't avoid an unwrap here, but we can be sure it will succeed because we hold the
-        // write lock (meaning no one else can fiddle with `self.connection`), and we just set a
-        // connection above.
-        Ok(RwLockReadGuard::try_map(guard.downgrade(), Option::as_ref)
-            .expect("write-locked value can't have changed"))
+        let new_connection = connect(self.addr).await?;
+        let new_connection_id = new_connection.id();
+        let _ = self
+            .connections
+            .insert(new_connection_id, new_connection.clone());
+        Ok(new_connection)
     }
 }
 
@@ -287,10 +222,14 @@ impl UnnamedPeer {
     }
 
     pub(crate) fn named(self, name: XorName) -> Peer {
+        let connections = DashMap::new();
+        if let Some(connection) = self.connection {
+            let _ = connections.insert(connection.id(), connection);
+        }
         Peer {
             name,
             addr: self.addr,
-            connection: Arc::new(RwLock::new(self.connection)),
+            connections: Arc::new(connections),
         }
     }
 }

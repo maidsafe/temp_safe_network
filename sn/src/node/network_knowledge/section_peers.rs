@@ -173,7 +173,7 @@ impl SectionPeers {
         for entry in self.members.iter() {
             let (_, node) = entry.pair();
             if let Some(source) = sources.get(&node.addr()) {
-                node.peer().merge_connection(source).await;
+                node.peer().merge_connections(source).await;
             }
         }
     }

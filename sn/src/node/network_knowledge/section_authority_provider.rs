@@ -147,7 +147,7 @@ impl SectionAuthorityProvider {
 
             for elder in self.elders() {
                 if let Some(source) = sources.get(&elder.addr()) {
-                    elder.merge_connection(source).await;
+                    elder.merge_connections(source).await;
                 }
             }
         }

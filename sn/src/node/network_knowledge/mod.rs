@@ -678,7 +678,7 @@ impl NetworkKnowledge {
 
         for elder in self.signed_sap.read().await.elders() {
             if let Some(source) = sources.get(&elder.addr()) {
-                elder.merge_connection(source).await;
+                elder.merge_connections(source).await;
             }
         }
 
