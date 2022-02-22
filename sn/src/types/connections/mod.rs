@@ -8,7 +8,7 @@
 
 mod connection;
 
-pub(crate) use connection::{Connection, SendToOneError};
+pub(crate) use connection::{NetworkConnection, SendToOneError};
 
 use qp2p::Endpoint;
 use std::{collections::BTreeMap, fmt::Debug, net::SocketAddr, sync::Arc};
@@ -22,7 +22,7 @@ type PeerId = (XorName, SocketAddr);
 /// underlying I/O resources are not leaked, overused or left dangling.
 #[derive(Clone, Debug)]
 pub(crate) struct Connections {
-    data: Arc<RwLock<BTreeMap<PeerId, Connection>>>,
+    data: Arc<RwLock<BTreeMap<PeerId, NetworkConnection>>>,
     endpoint: Endpoint,
 }
 
@@ -53,7 +53,7 @@ impl Connections {
             Some(c) => c.add(conn).await,
             // still not in list, go ahead and insert
             None => {
-                let conn = Connection::new_with(*id, self.endpoint.clone(), conn).await;
+                let conn = NetworkConnection::new_with(*id, self.endpoint.clone(), conn).await;
                 let _ = list.insert(*id, conn);
             }
         }
@@ -61,7 +61,7 @@ impl Connections {
 
     /// This method is tailored to the use-case of connecting on send.
     /// I.e. it will not connect here, but on calling send on the returned connection.
-    pub(crate) async fn get_or_create(&self, id: &PeerId) -> Connection {
+    pub(crate) async fn get_or_create(&self, id: &PeerId) -> NetworkConnection {
         if let Some(conn) = self.get(id).await {
             return conn;
         }
@@ -76,7 +76,7 @@ impl Connections {
             Some(conn) => conn,
             // still not in list, go ahead and create + insert
             None => {
-                let conn = Connection::new(*id, self.endpoint.clone());
+                let conn = NetworkConnection::new(*id, self.endpoint.clone());
                 let _ = list.insert(*id, conn.clone());
                 conn
             }
@@ -95,7 +95,7 @@ impl Connections {
         conn.disconnect().await;
     }
 
-    async fn get(&self, id: &PeerId) -> Option<Connection> {
+    async fn get(&self, id: &PeerId) -> Option<NetworkConnection> {
         let list = self.data.read().await;
         list.get(id).cloned()
     }

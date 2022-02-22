@@ -37,7 +37,7 @@ const UNUSED_TTL: Duration = Duration::from_secs(120);
 
 ///
 #[derive(Clone, Debug)]
-pub(crate) struct Connection {
+pub(crate) struct NetworkConnection {
     id: PeerId,
     endpoint: Endpoint,
     create_mutex: Arc<Mutex<usize>>,
@@ -46,7 +46,7 @@ pub(crate) struct Connection {
     access_counter: Arc<AtomicU64>,
 }
 
-impl Connection {
+impl NetworkConnection {
     pub(crate) fn new(id: PeerId, endpoint: Endpoint) -> Self {
         Self {
             id,
