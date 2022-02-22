@@ -59,3 +59,11 @@ jobs:
 
       - name: Bench safe_network
         run: cargo bench -p safe_network
+
+      - name: Stop the network on fail
+        if: failure()
+        run: safe node killall || true && safe auth stop || true
+
+      - name: Failure logs
+        if: failure()
+        run: tail $HOME/.safe/node/local-test-network/*/*.log*
