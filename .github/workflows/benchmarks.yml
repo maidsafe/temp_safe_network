@@ -30,30 +30,32 @@ jobs:
         with:
           cache-on-failure: true
 
-      - name: Build launch local network
-        run: cargo build --release
+      # TODO: reenable network when we're running a benchmark. At the moment everything is skipped
 
-      - name: Run testnet
-        run: ./target/release/testnet
-        env:
-          RUST_LOG: "safe_network=trace"
+      # - name: Build launch local network
+      #   run: cargo build --release
 
-      - name: Mac install ripgrep
-        if: matrix.os == 'macos-latest'
-        run: brew install ripgrep
+      # - name: Run testnet
+      #   run: ./target/release/testnet
+      #   env:
+      #     RUST_LOG: "safe_network=trace"
 
-      - name: ubuntu install ripgrep
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get -y install ripgrep
+      # - name: Mac install ripgrep
+      #   if: matrix.os == 'macos-latest'
+      #   run: brew install ripgrep
 
-      - name: windows install ripgrep
-        if: matrix.os == 'windows-latest'
-        run: choco install ripgrep
+      # - name: ubuntu install ripgrep
+      #   if: matrix.os == 'ubuntu-latest'
+      #   run: sudo apt-get -y install ripgrep
 
-      - name: Wait for all nodes to join
-        shell: bash
-        run: ./resources/scripts/wait_for_nodes_to_join.sh
-        timeout-minutes: 10
+      # - name: windows install ripgrep
+      #   if: matrix.os == 'windows-latest'
+      #   run: choco install ripgrep
 
-      - name: Bench
-        run: cargo bench
+      # - name: Wait for all nodes to join
+      #   shell: bash
+      #   run: ./resources/scripts/wait_for_nodes_to_join.sh
+      #   timeout-minutes: 10
+
+      - name: Bench safe_network
+        run: cargo bench -p safe_network
