@@ -11,10 +11,10 @@ use super::PeerId;
 use crate::types::log_markers::LogMarker;
 
 use bytes::Bytes;
+use dashmap::DashMap;
 use priority_queue::DoublePriorityQueue;
 use qp2p::{ConnectionIncoming as IncomingMsgs, Endpoint, RetryConfig};
 use std::{
-    collections::BTreeMap,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -35,13 +35,14 @@ type ConnId = usize;
 const CAPACITY: u8 = u8::MAX;
 const UNUSED_TTL: Duration = Duration::from_secs(120);
 
-///
+/// Manages Network Connections to specific qp2p peers.
+/// Minimizing connections to each peer in an efficient concurrent fashion
 #[derive(Clone, Debug)]
 pub(crate) struct NetworkConnection {
     id: PeerId,
     endpoint: Endpoint,
     create_mutex: Arc<Mutex<usize>>,
-    data: Arc<RwLock<BTreeMap<ConnId, ExpiringConn>>>,
+    data: Arc<DashMap<ConnId, ExpiringConn>>,
     queue: Arc<RwLock<DoublePriorityQueue<ConnId, Priority>>>,
     access_counter: Arc<AtomicU64>,
 }
@@ -52,7 +53,7 @@ impl NetworkConnection {
             id,
             endpoint,
             create_mutex: Arc::new(Mutex::new(0)),
-            data: Arc::new(RwLock::new(BTreeMap::new())),
+            data: Arc::new(DashMap::new()),
             queue: Arc::new(RwLock::new(DoublePriorityQueue::new())),
             access_counter: Arc::new(AtomicU64::new(0)),
         }
@@ -74,12 +75,11 @@ impl NetworkConnection {
     /// since that struct is cloneable and uses Arc internally.
     pub(crate) async fn disconnect(self) {
         let _ = self.queue.write().await.clear();
-        let mut guard = self.data.write().await;
-        for (_, item) in guard.iter() {
+        for entry in self.data.iter() {
+            let item = entry.value();
             item.conn
                 .close(Some("We disconnected from peer.".to_string()));
         }
-        guard.clear();
     }
 
     /// Send a message to the peer with default retry configuration.
@@ -127,7 +127,7 @@ impl NetworkConnection {
                 // next send (e.g. when retrying) will use/create a new connection
                 let id = &conn.id();
                 {
-                    let _ = self.data.write().await.remove(id);
+                    let _ = self.data.remove(id);
                 }
                 {
                     let _ = self.queue.write().await.remove(id);
@@ -168,11 +168,11 @@ impl NetworkConnection {
         id: usize,
         listen: F,
     ) -> Result<qp2p::Connection, SendToOneError> {
-        let res = { self.data.read().await.get(&id).cloned() };
-        match res {
-            Some(item) => {
+        match self.data.get(&id) {
+            Some(entry) => {
+                let item = entry.value();
                 self.touch(item.conn.id()).await;
-                Ok(item.conn)
+                Ok(item.conn.clone())
             }
             None => self.create_connection(listen).await,
         }
@@ -206,7 +206,7 @@ impl NetworkConnection {
         let id = conn.id();
 
         {
-            let _ = self.data.write().await.insert(id, ExpiringConn::new(conn));
+            let _ = self.data.insert(id, ExpiringConn::new(conn));
         }
         {
             let _ = self.queue.write().await.push(id, self.priority().await);
@@ -224,7 +224,8 @@ impl NetworkConnection {
                 .change_priority(&id, self.priority().await);
         }
         {
-            if let Some(conn) = self.data.read().await.get(&id) {
+            if let Some(entry) = self.data.get(&id) {
+                let conn = entry.value();
                 conn.touch().await
             }
         }
@@ -257,8 +258,8 @@ impl NetworkConnection {
     async fn remove_expired(&self) {
         let mut expired_ids = vec![];
         {
-            let read_items = self.data.read().await;
-            for (id, conn) in read_items.iter() {
+            for entry in self.data.iter() {
+                let (id, conn) = entry.pair();
                 if conn.expired().await {
                     expired_ids.push(*id);
                 }
@@ -269,9 +270,7 @@ impl NetworkConnection {
             {
                 let _ = self.queue.write().await.remove(&id);
             }
-            // within braces as to not hold a lock to our data during subsequent call to the cleanup fn
-            let removed = { self.data.write().await.remove(&id) };
-            if let Some(item) = removed {
+            if let Some((_, item)) = self.data.remove(&id) {
                 trace!("Connection expired: {}", item.conn.id());
                 item.conn.close(Some("Connection expired.".to_string()));
             }
@@ -285,8 +284,7 @@ impl NetworkConnection {
             // remove the least recently used connections
             let popped = { self.queue.write().await.pop_min() };
             if let Some((evicted_id, _)) = popped {
-                let removed = { self.data.write().await.remove(&evicted_id) };
-                if let Some(item) = removed {
+                if let Some((_, item)) = self.data.remove(&evicted_id) {
                     trace!("Connection evicted: {}", evicted_id);
                     item.conn.close(Some("Connection evicted.".to_string()));
                 }
