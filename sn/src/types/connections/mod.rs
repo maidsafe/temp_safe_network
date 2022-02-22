@@ -10,11 +10,10 @@ mod connection;
 
 pub(crate) use connection::{NetworkConnection, SendToOneError};
 
+use dashmap::DashMap;
 use qp2p::Endpoint;
-use std::{collections::BTreeMap, fmt::Debug, net::SocketAddr, sync::Arc};
-use tokio::sync::RwLock;
+use std::{fmt::Debug, net::SocketAddr, sync::Arc};
 use xor_name::XorName;
-
 type PeerId = (XorName, SocketAddr);
 
 /// This is tailored to the use-case of connecting on send.
@@ -22,14 +21,14 @@ type PeerId = (XorName, SocketAddr);
 /// underlying I/O resources are not leaked, overused or left dangling.
 #[derive(Clone, Debug)]
 pub(crate) struct Connections {
-    data: Arc<RwLock<BTreeMap<PeerId, NetworkConnection>>>,
+    data: Arc<DashMap<PeerId, NetworkConnection>>,
     endpoint: Endpoint,
 }
 
 impl Connections {
     pub(crate) fn new(endpoint: Endpoint) -> Self {
         Self {
-            data: Arc::new(RwLock::new(BTreeMap::new())),
+            data: Arc::new(DashMap::new()),
             endpoint,
         }
     }
@@ -37,25 +36,14 @@ impl Connections {
     /// Any number of incoming qp2p:Connections can be added.
     /// We will eventually converge to the same one in our comms with the peer.
     pub(crate) async fn add_incoming(&self, id: &PeerId, conn: qp2p::Connection) {
-        {
-            let data = self.data.read().await;
-            if let Some(c) = data.get(id) {
-                // node id exists, add to it
-                c.add(conn).await;
-                return;
-            }
+        if let Some(entry) = self.data.get(id) {
+            let c = entry.value();
+            // node id exists, add to it
+            c.add(conn).await;
+        } else {
             // else still not in list, go ahead and insert
-        }
-
-        let mut list = self.data.write().await;
-        match list.get(id) {
-            // someone else inserted in the meanwhile, add to it
-            Some(c) => c.add(conn).await,
-            // still not in list, go ahead and insert
-            None => {
-                let conn = NetworkConnection::new_with(*id, self.endpoint.clone(), conn).await;
-                let _ = list.insert(*id, conn);
-            }
+            let conn = NetworkConnection::new_with(*id, self.endpoint.clone(), conn).await;
+            let _ = self.data.insert(*id, conn);
         }
     }
 
@@ -63,40 +51,28 @@ impl Connections {
     /// I.e. it will not connect here, but on calling send on the returned connection.
     pub(crate) async fn get_or_create(&self, id: &PeerId) -> NetworkConnection {
         if let Some(conn) = self.get(id).await {
-            return conn;
-        }
+            conn
+        } else {
+            let conn = NetworkConnection::new(*id, self.endpoint.clone());
+            let _ = self.data.insert(*id, conn.clone());
 
-        // if id is not in list, the entire list needs to be locked
-        // i.e. first conn to any node, will impact all sending at that instant..
-        // however, first conn should be a minor part of total time spent using conns,
-        // so that is ok
-        let mut list = self.data.write().await;
-        match list.get(id).cloned() {
-            // someone else inserted in the meanwhile, so use that
-            Some(conn) => conn,
-            // still not in list, go ahead and create + insert
-            None => {
-                let conn = NetworkConnection::new(*id, self.endpoint.clone());
-                let _ = list.insert(*id, conn.clone());
-                conn
-            }
+            conn
         }
     }
 
     /// Drops the connection and all underlying resources.
     pub(crate) async fn disconnect(&self, id: PeerId) {
-        let mut list = self.data.write().await;
-        let conn = match list.remove(&id) {
+        let (_peer_id, conn) = match self.data.remove(&id) {
             // someone else inserted in the meanwhile, so use that
             Some(conn) => conn,
             // still not in list, go ahead and create + insert
             None => return,
         };
+
         conn.disconnect().await;
     }
 
     async fn get(&self, id: &PeerId) -> Option<NetworkConnection> {
-        let list = self.data.read().await;
-        list.get(id).cloned()
+        self.data.get(id).map(|entry| entry.value().clone())
     }
 }
