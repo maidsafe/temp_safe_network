@@ -5,7 +5,6 @@ The Safe Network Core. API message definitions, routing and nodes, client core a
 | [![](https://img.shields.io/crates/v/sn_client)](https://crates.io/crates/sn_client) | [![Documentation](https://docs.rs/sn_client/badge.svg)](https://docs.rs/sn_client) |
 |:----------:|:----------:|
 
-
 ## License
 
 This Safe Network repository is licensed under the General Public License (GPL), version 3 ([LICENSE](LICENSE) http://www.gnu.org/licenses/gpl-3.0.en.html).
