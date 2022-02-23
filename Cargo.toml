@@ -5,6 +5,3 @@ members = [
     "sn_cli",
     "sn_cmd_test_utilities"
 ]
-
-[profile.release]
-debug = true
