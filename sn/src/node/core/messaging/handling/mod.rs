@@ -756,9 +756,18 @@ impl Node {
                             }])
                         }
                         Ok(_) => {
-                            info!("We already have the data that was asked to be replicated");
-                            info!("Dropping SendReplicateDataAddress message from sender {sender}");
-                            Ok(vec![])
+                            info!("We already have the data that was asked to be replicated. Responding it back to the sender");
+
+                            // TODO: Could we send back the data whole data so that the sender can verify if this message is true?
+                            Ok(vec![Cmd::SignOutgoingSystemMsg {
+                                msg: SystemMsg::NodeEvent(NodeEvent::ReplicateDataAlreadyPresent(
+                                    data_address,
+                                )),
+                                dst: crate::messaging::DstLocation::Node {
+                                    name: sender.name(),
+                                    section_pk: self.section_key_by_name(&sender.name()).await,
+                                },
+                            }])
                         }
                         Err(e) => {
                             error!("Error Sending FetchReplicateData for replication: {e}");
@@ -782,7 +791,7 @@ impl Node {
                             info!("Providing {data_address:?} for replication");
                             // Provide the requested data
                             Ok(vec![Cmd::SignOutgoingSystemMsg {
-                                msg: SystemMsg::NodeCmd(NodeCmd::ProvideReplicateData(data)),
+                                msg: SystemMsg::NodeCmd(NodeCmd::ReplicateData(data)),
                                 dst: crate::messaging::DstLocation::Node {
                                     name: sender.name(),
                                     section_pk: self.section_key_by_name(&sender.name()).await,
@@ -796,22 +805,10 @@ impl Node {
                     }
                 };
             }
-            SystemMsg::NodeCmd(NodeCmd::ProvideReplicateData(data)) => {
-                info!("ProvideReplicateData MsgId: {:?}", msg_id);
-                if self.is_elder().await {
-                    error!("Received unexpected message while Elder");
-                } else {
-                    // Store the given data
-                    match self.data_storage.store(&data).await {
-                        Ok(levels) => {
-                            return Ok(self.record_storage_level_if_any(levels).await);
-                        }
-                        Err(_) => {
-                            warn!("Could not store data for replication");
-                        }
-                    }
-                }
-
+            SystemMsg::NodeEvent(NodeEvent::ReplicateDataAlreadyPresent(data_address)) => {
+                self.data_storage
+                    .remove_from_replicator(data_address, &sender.name())
+                    .await;
                 Ok(vec![])
             }
             SystemMsg::NodeCmd(node_cmd) => {

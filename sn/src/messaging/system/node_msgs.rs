@@ -49,8 +49,6 @@ pub enum NodeCmd {
     SendReplicateDataAddress(ReplicatedDataAddress),
     /// Fetch the given replicated data we are missing
     FetchReplicateData(ReplicatedDataAddress),
-    /// Provide requested data for replication
-    ProvideReplicateData(ReplicatedData),
     /// Sent to all promoted nodes (also sibling if any) after
     /// a completed transition to a new constellation.
     ReceiveMetadata {
@@ -72,6 +70,8 @@ pub enum NodeEvent {
         /// Whether store failed due to full
         full: bool,
     },
+    /// To-Be-Replicated already present
+    ReplicateDataAlreadyPresent(ReplicatedDataAddress),
     /// Inform Adults of a possible deviant node
     DeviantsDetected(BTreeSet<XorName>),
 }

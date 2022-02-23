@@ -46,10 +46,31 @@ impl DataReplicator {
         }
     }
 
+    // Remove data address from replicator in case the target already has the data
+    pub(crate) fn remove_from_transmitter(
+        &mut self,
+        data_address: ReplicatedDataAddress,
+        target: &XorName,
+    ) {
+        if let Some(data_collection) = self.to_be_transmitted.get_mut(target) {
+            if let Some(idx) = data_collection
+                .iter()
+                .position(|address| address == &data_address)
+            {
+                let _ = data_collection.remove(idx);
+                info!("Successfully cleared replicator entry for {target}");
+            } else {
+                warn!("Given address {data_address:?} not on replication list for {target}");
+            }
+        } else {
+            warn!("Given node: {target} not on replicator");
+        }
+    }
+
     // Returns:
     // Some(true) if we still need to hold the data after handing out a replica
     // Some(false) if we can delete the data since we have handed out to all replicas
-    // None if we are not
+    // None if we do not handle the data at all
     pub(crate) fn get_for_replication(
         &mut self,
         data_address: ReplicatedDataAddress,
