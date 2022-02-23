@@ -269,7 +269,7 @@ pub mod util {
         let mut bytes = [0; 32];
         hasher.update(s_bytes);
         hasher.finalize(&mut bytes);
-        encode(Base::Base32, bytes)
+        encode(Base::Base32Z, bytes)
     }
 
     // returns sha3_256 digest/hash of a file as a string.
