@@ -2179,15 +2179,6 @@ dependencies = [
 
 [[package]]
 name = "multibase"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9c35dac080fd6e16a99924c8dfdef0af89d797dd851adab25feaffacf7850d6"
-dependencies = [
- "base-x",
-]
-
-[[package]]
-name = "multibase"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b3539ec3c1f04ac9748a260728e855f261b4977f5c3406612c884564f329404"
@@ -3424,7 +3415,7 @@ dependencies = [
  "hex_fmt",
  "itertools 0.10.3",
  "lazy_static",
- "multibase 0.9.1",
+ "multibase",
  "num_cpus",
  "priority-queue",
  "proptest",
@@ -3789,7 +3780,7 @@ dependencies = [
  "lazy_static",
  "log",
  "mime_guess",
- "multibase 0.9.1",
+ "multibase",
  "pbkdf2",
  "proptest",
  "qjsonrpc",
@@ -3836,7 +3827,7 @@ dependencies = [
  "hex",
  "human-panic",
  "isatty",
- "multibase 0.6.0",
+ "multibase",
  "num-traits",
  "percent-encoding",
  "predicates",
@@ -3870,7 +3861,7 @@ dependencies = [
  "color-eyre 0.6.0",
  "ctor",
  "dirs-next 2.0.0",
- "multibase 0.6.0",
+ "multibase",
  "rand 0.7.3",
  "reqwest",
  "serde",
@@ -4002,9 +3993,9 @@ dependencies = [
 
 [[package]]
 name = "sysinfo"
-version = "0.23.2"
+version = "0.23.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92d82ade9d6621d4ca052a00bb6ea9ed513d223cba75a84625c5e9c0698ab6f5"
+checksum = "9339fea9ca4725be840dd294b24156ba4fe7aa6b86deac222e99954757ee15e9"
 dependencies = [
  "cfg-if 1.0.0",
  "core-foundation-sys",
