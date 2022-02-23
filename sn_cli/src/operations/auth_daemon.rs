@@ -12,7 +12,7 @@ use crate::APP_ID;
 use color_eyre::{eyre::eyre, eyre::bail, eyre::WithErr, Result};
 use envy::from_env;
 use tracing::info;
-use prettytable::Table;
+use comfy_table::Table;
 use serde::Deserialize;
 use sn_api::{
     AuthAllowPrompt, AuthdStatus, AuthedAppsList, PendingAuthReqs, Safe, SafeAuthdClient,

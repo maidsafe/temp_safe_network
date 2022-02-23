@@ -11,7 +11,7 @@ use super::{
     OutputFmt,
 };
 use color_eyre::{eyre::WrapErr, Result};
-use prettytable::Table;
+use comfy_table::Table;
 use sn_api::{resolver::SafeData, Safe};
 use std::io::{self, Write};
 use structopt::StructOpt;
@@ -60,20 +60,18 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
                     url
                 );
                 let mut table = Table::new();
-                table.add_row(
-                    row![bFg->"Name", bFg->"Type", bFg->"Size", bFg->"Created", bFg->"Modified", bFg->"Link"],
-                );
+                table.add_row(&vec!["Name", "Type", "Size", "Created", "Modified", "Link"]);
                 files_map.iter().for_each(|(name, file_item)| {
-                    table.add_row(row![
+                    table.add_row(&vec![
                         name,
-                        file_item["type"],
-                        file_item["size"],
-                        file_item["created"],
-                        file_item["modified"],
+                        &file_item["type"],
+                        &file_item["size"],
+                        &file_item["created"],
+                        &file_item["modified"],
                         file_item.get("link").unwrap_or(&String::default()),
                     ]);
                 });
-                table.printstd();
+                println!("{table}");
             } else {
                 println!(
                     "{}",

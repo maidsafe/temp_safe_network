@@ -19,8 +19,7 @@ use std::panic::set_hook;
 use tracing::{self, debug};
 use tracing_subscriber::filter::EnvFilter;
 
-#[macro_use]
-extern crate prettytable;
+extern crate comfy_table;
 
 #[allow(dead_code)]
 const APP_ID: &str = "net.maidsafe.cli";

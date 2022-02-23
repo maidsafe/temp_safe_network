@@ -17,7 +17,7 @@ use super::{
 use ansi_term::Colour;
 use bytes::Bytes;
 use color_eyre::{eyre::bail, eyre::eyre, Result};
-use prettytable::{format::FormatBuilder, Table};
+use comfy_table::Table;
 use serde::Serialize;
 use sn_api::{
     files::{FilesMap, ProcessedFiles},
@@ -228,7 +228,7 @@ pub async fn files_commander(
                 }
 
                 let (table, _) = gen_processed_files_table(&processed_files, true);
-                table.printstd();
+                println!("{table}");
             } else {
                 print_serialized_output(files_container_xorurl, None, &processed_files, output_fmt);
             }
@@ -272,13 +272,13 @@ pub async fn files_commander(
                         "FilesContainer synced up ({}): \"{}\"",
                         version_str, target_url
                     );
-                    table.printstd();
+                    println!("{table}");
                 } else if !processed_files.is_empty() {
                     println!(
                         "No changes were made to FilesContainer ({}) at \"{}\"",
                         version_str, target_url
                     );
-                    table.printstd();
+                    println!("{table}");
                 } else {
                     println!(
                         "No changes were required, source location is already in sync with \
@@ -504,14 +504,14 @@ fn output_processed_files_list(
                 version.map_or_else(|| 0.to_string(), |v| v.to_string()),
                 url
             );
-            table.printstd();
+            println!("{table}");
         } else if !processed_files.is_empty() {
             println!(
                 "No changes were made to FilesContainer (version {}) at \"{}\"",
                 version.map_or_else(|| 0.to_string(), |v| v.to_string()),
                 target_url
             );
-            table.printstd();
+            println!("{table}");
         } else {
             println!(
                 "No changes were made to the FilesContainer (version {}) at: \"{}\"",
@@ -613,16 +613,12 @@ fn print_file_system_node_body(dir: &FileTreeNode, depth: u32, siblings: &mut Ha
 fn print_file_system_node_details(dir: &FileTreeNode, dirs: u64, files: u64) {
     let mut siblings = HashMap::new();
     let mut table = Table::new();
-    let format = FormatBuilder::new()
-        .column_separator(' ')
-        .padding(0, 1)
-        .build();
-    table.set_format(format);
-    table.add_row(row!["SIZE", "CREATED", "MODIFIED", "NAME"]);
+
+    table.add_row(&vec!["SIZE", "CREATED", "MODIFIED", "NAME"]);
 
     print_file_system_node_details_body(dir, 0, &mut siblings, &mut table);
 
-    table.printstd();
+    println!("{table}");
 
     // print summary row
     println!(
@@ -645,11 +641,11 @@ fn print_file_system_node_details_body(
     let name = format_file_system_node_line(dir, depth, siblings);
 
     let d = &dir.details;
-    table.add_row(row![
+    table.add_row(&vec![
         d.get("size").unwrap_or(&String::default()),
         d.get("created").unwrap_or(&String::default()),
         d.get("modified").unwrap_or(&String::default()),
-        name
+        &name,
     ]);
 
     // And now, for some recursion...
@@ -724,11 +720,7 @@ fn print_files_map(
         target_url
     );
     let mut table = Table::new();
-    let format = FormatBuilder::new()
-        .column_separator(' ')
-        .padding(0, 1)
-        .build();
-    table.set_format(format);
+
     let mut total_bytes = 0;
     let mut cwd_files = 0;
     let mut cwd_size = 0;
@@ -738,15 +730,15 @@ fn print_files_map(
     // 2. created timestamp,
     // 3. modified timestamp,
     // 4. file/directory name
-    table.add_row(row!["SIZE", "CREATED", "MODIFIED", "NAME"]);
+    table.add_row(&vec!["SIZE", "CREATED", "MODIFIED", "NAME"]);
     files_map.iter().for_each(|(name, file_item)| {
         total_bytes += file_item["size"].parse().unwrap_or(0);
         if name.ends_with('/') {
-            table.add_row(row![
+            table.add_row(&vec![
                 &file_item["size"],
-                file_item["created"],
-                file_item["modified"],
-                Fbb->name
+                &file_item["created"],
+                &file_item["modified"],
+                name,
             ]);
         } else {
             if None == name.trim_matches('/').find('/') {
@@ -759,11 +751,11 @@ fn print_files_map(
                 name.to_string()
             };
 
-            table.add_row(row![
+            table.add_row(&vec![
                 &file_item["size"],
-                file_item["created"],
-                file_item["modified"],
-                name_field
+                &file_item["created"],
+                &file_item["modified"],
+                &name_field,
             ]);
         }
     });
@@ -771,7 +763,7 @@ fn print_files_map(
         "Files: {}   Size: {}   Total Files: {}   Total Size: {}",
         cwd_files, cwd_size, total_files, total_bytes
     );
-    table.printstd();
+    println!("{table}");
 }
 
 fn filter_files_map(files_map: &FilesMap, target_url: &str) -> Result<(u64, FilesMap)> {
