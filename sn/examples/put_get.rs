@@ -9,15 +9,14 @@
 //! sn_node provides the interface to Safe routing.  The resulting executable is the node
 //! for the Safe network.
 
-use tokio::time::{sleep, Duration};
+use tokio::time::{sleep, Duration, Instant};
 use tracing::{debug, warn};
-
-use tiny_keccak::{Hasher, Sha3};
 
 use safe_network::{
     client::{Client, ClientConfig, Error, Result},
     types::{utils::random_bytes, BytesAddress, Scope},
 };
+use tiny_keccak::{Hasher, Sha3};
 
 #[cfg(feature = "test-utils")]
 use safe_network::{client::utils::test_utils::read_network_conn_info, init_test_logger};
@@ -89,7 +88,11 @@ pub async fn run_chunk_soak() -> Result<()> {
         put_tasks.push(put_handle);
     }
 
+    let start_putting = Instant::now();
     futures::future::join_all(put_tasks).await;
+    let duration = start_putting.elapsed();
+    println!("Time elapsed in while putting all data is: {:?}", duration);
+
     assert_eq!(
         all_data_put.read().await.len(),
         files_to_put,
@@ -166,7 +169,14 @@ async fn upload_data_using_client(
     println!("==================== Upload iteration {iteration:?} ======================= ");
     println!("Storing bytes.len : {bytes_len:?} w/ hash {:?}", output);
 
+    let start_putting = Instant::now();
     let address = client.upload(bytes, Scope::Public).await?;
+    let duration = start_putting.elapsed();
+
+    println!(
+        "Time elapsed in while putting {bytes_len_mbs}mbs: {:?}",
+        duration
+    );
 
     println!("Bytes stored at xorname: {:?}", address);
 
