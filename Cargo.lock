@@ -741,9 +741,7 @@ dependencies = [
  "encode_unicode",
  "libc",
  "once_cell",
- "regex",
  "terminal_size",
- "unicode-width",
  "winapi",
 ]
 
@@ -1915,25 +1913,13 @@ dependencies = [
 
 [[package]]
 name = "indicatif"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7baab56125e25686df467fe470785512329883aab42696d661247aca2a2896e4"
-dependencies = [
- "console 0.15.0",
- "lazy_static",
- "number_prefix 0.3.0",
- "regex",
-]
-
-[[package]]
-name = "indicatif"
 version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d207dc617c7a380ab07ff572a6e52fa202a2a8f355860ac9c38e23f8196be1b"
 dependencies = [
  "console 0.15.0",
  "lazy_static",
- "number_prefix 0.4.0",
+ "number_prefix",
  "regex",
 ]
 
@@ -2349,12 +2335,6 @@ checksum = "97ba99ba6393e2c3734791401b66902d981cb03bf190af674ca69949b6d5fb15"
 dependencies = [
  "libc",
 ]
-
-[[package]]
-name = "number_prefix"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17b02fc0ff9a9e4b35b3342880f48e896ebf69f2967921fe8646bf5b7125956a"
 
 [[package]]
 name = "number_prefix"
@@ -3442,7 +3422,7 @@ dependencies = [
  "rmp-serde 1.0.0",
  "secured_linked_list",
  "self_encryption",
- "self_update 0.28.0",
+ "self_update",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -3543,27 +3523,6 @@ dependencies = [
 
 [[package]]
 name = "self_update"
-version = "0.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6fb85f1802f7b987237b8525c0fde86ea86f31c957c1875467c727d5b921179c"
-dependencies = [
- "either",
- "flate2",
- "hyper",
- "indicatif 0.15.0",
- "log",
- "quick-xml",
- "regex",
- "reqwest",
- "semver 0.11.0",
- "serde_json",
- "tar",
- "tempfile",
- "zip",
-]
-
-[[package]]
-name = "self_update"
 version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5bc3e89793fe56c82104ddc103c998e4e94713cb975202207829e61031eb4be6"
@@ -3571,7 +3530,7 @@ dependencies = [
  "either",
  "flate2",
  "hyper",
- "indicatif 0.16.2",
+ "indicatif",
  "log",
  "quick-xml",
  "regex",
@@ -3807,7 +3766,7 @@ dependencies = [
  "bincode",
  "blsttc",
  "bytes",
- "color-eyre 0.5.11",
+ "color-eyre 0.6.0",
  "dirs-next 2.0.0",
  "ed25519-dalek",
  "env_logger 0.8.4",
@@ -3853,7 +3812,7 @@ dependencies = [
  "blsttc",
  "bytes",
  "chrono",
- "color-eyre 0.5.11",
+ "color-eyre 0.6.0",
  "comfy-table",
  "console 0.14.1",
  "criterion",
@@ -3872,7 +3831,7 @@ dependencies = [
  "rand 0.7.3",
  "relative-path",
  "reqwest",
- "self_update 0.27.0",
+ "self_update",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -3895,7 +3854,7 @@ name = "sn_cmd_test_utilities"
 version = "1.1.0"
 dependencies = [
  "assert_cmd",
- "color-eyre 0.5.11",
+ "color-eyre 0.6.0",
  "ctor",
  "dirs-next 2.0.0",
  "multibase 0.6.0",
