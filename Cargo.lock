@@ -2048,6 +2048,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "log_cmds_inspector"
+version = "0.1.0"
+dependencies = [
+ "color-eyre 0.6.0",
+ "console-subscriber",
+ "eyre",
+ "grep",
+ "safe_network",
+ "structopt",
+ "strum",
+ "strum_macros",
+ "walkdir",
+]
+
+[[package]]
 name = "matchers"
 version = "0.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3405,7 +3420,6 @@ dependencies = [
  "eyre",
  "file-rotate",
  "futures",
- "grep",
  "hex",
  "hex_fmt",
  "itertools 0.10.3",

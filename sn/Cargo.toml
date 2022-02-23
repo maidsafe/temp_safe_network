@@ -55,7 +55,6 @@ ed25519 = { version = "1.2.0", features = ["serde_bytes"] }
 ed25519-dalek = { version = "1.0.0", features = ["serde"] }
 eyre = "0.6.5"
 futures = "~0.3.13"
-grep="~0.2.8"
 hex = "0.4.3"
 hex_fmt = "~0.3.0"
 itertools = "0.10.0"
