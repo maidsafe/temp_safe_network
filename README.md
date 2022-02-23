@@ -11,6 +11,30 @@ The network is implemented in Rust. This repository is a workspace consisting of
 
 Currently, the network can be used via these 3 published crates. To see how, a good place to start is the [README](sn_cli/README.md) for the CLI. You can run your own local network or perhaps participate in a remote network.
 
+## Testing
+
+Some of the `safe_network` tests require a live network to test against.
+
+### Running a local testnet
+
+You should first ensure that your local machine does not have any artefacts from prior runs. Eg on unix: `killall sn_node ||true && rm  ~/.safe/node/local-test-network || true` will remove any running `sn_node` instances and remove any prior run's data stored.
+
+You can then run a local testnet using the `testnet` bin:
+
+`NODE_COUNT=15 RUST_LOG=safe_network=trace cargo run --release --bin testnet`
+
+`NODE_COUNT` defaults to 33 nodes and will give you a split section. 15 nodes as above will give only one section. How many nodes you want to run will depend on your hardware. 15 nodes can be considered the minimum for a viable section.
+
+### Running tests
+
+Once you have your network running you can simply run `cargo test --release --features=test-utils`. `test-utils` is needed to enable some of the test setup for the clients. This will run _all_ tests in `sn`. 
+
+> Note: if you're running in the root directory, either `cd sn` before running tests or inclide `-p safe_network` in the cargo command to target _only_ that package. Otherwise you'll be running tests from _all_ crates, including sn_api and sn_cli. Eg: `cargo test --release -p safe_network --features=test-utils`
+
+In general it can be useful to scope your test running, eg `cargo test --release --features=test-utils client_api` will run _only_ the client tests. Or perhaps you want to ignore `proptests` as they can be quite long: `cargo test --release --features=test-utils client_api --skip proptest`
+
+
+
 ## Releases
 
 Safe is being developed iteratively and has frequent [releases](https://github.com/maidsafe/safe_network/releases). You can use these to experiment with new features when they become available. It's also possible to participate in community 'testnets' hosted by members of [The Safe Network Forum](https://safenetforum.org/).
