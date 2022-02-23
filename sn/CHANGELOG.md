@@ -5,15 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.58.1 (2022-02-20)
+## v0.58.1 (2022-02-23)
+
+### Bug Fixes
+
+ - <csr-id-ddd45b7cc73bbacea19f5c93519ae16a74cc01cc/> add MIN_PENDING_OPS threshold for liveness checks
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
+ - 6 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
- - 0 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -23,35 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - chore(refactor) Remove new and use default ([`3ebae42`](https://github.com/maidsafe/safe_network/commit/3ebae421eacd65985fa0a2ff506c6abdd2fe372e))
-</details>
-
-## v0.57.1 (2022-02-15)
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 8 commits contributed to the release.
- - 2 days passed between releases.
- - 8 commits where understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - safe_network-0.57.1/sn_cli-0.49.1 ([`07dc30b`](https://github.com/maidsafe/safe_network/commit/07dc30b281f3c67cb5598aaaf72ba5c668353bf7))
-    - begin sorting out messaging ([`03cf556`](https://github.com/maidsafe/safe_network/commit/03cf556d1b73565d520e2c5b82ab1482b076e639))
-    - move capacity and liveness into data mod ([`7068445`](https://github.com/maidsafe/safe_network/commit/7068445cad25b0273c841c5072055833df9b8229))
-    - move chunk store to dbs ([`d3dd663`](https://github.com/maidsafe/safe_network/commit/d3dd663cfd6f3d0b0943ff49b1eed8c6b37d6263))
-    - co-locate related modules ([`5fe2892`](https://github.com/maidsafe/safe_network/commit/5fe289271fb0da28935b0b578928687be0dc4665))
-    - rename core to node ([`d6e7882`](https://github.com/maidsafe/safe_network/commit/d6e788221f332c3ff3a22eec39af428eebf5e75f))
-    - rename node to nodeinfo ([`283ff34`](https://github.com/maidsafe/safe_network/commit/283ff34f03dbf783b2299a3c7eb7a183c1e3c0a6))
-    - move peer and prefix map into types ([`e9e249a`](https://github.com/maidsafe/safe_network/commit/e9e249a674d4a64078a519b7e20baf6f0759c1c9))
+    - ignore cargo husky in udeps checks ([`d8c57e0`](https://github.com/maidsafe/safe_network/commit/d8c57e082b52196cc538271bc25a88e3efd2a97c))
+    - update qp2p ([`222742f`](https://github.com/maidsafe/safe_network/commit/222742f7c57a4b451af354d33015974d0d7a3561))
+    - chore(fmt) ([`2623b9f`](https://github.com/maidsafe/safe_network/commit/2623b9fd673bfa6d7f0b4a1fb124496e8db83de2))
+    - chore(refactor) Update deps including serde. ([`605bf69`](https://github.com/maidsafe/safe_network/commit/605bf6939b4fb675345bb3235dd1a7a29095e377))
+    - chore(refactor) make node ED key naming explicit ([`884d560`](https://github.com/maidsafe/safe_network/commit/884d5603b8bcb87a75f63f779255c7e245064c16))
+    - add MIN_PENDING_OPS threshold for liveness checks ([`ddd45b7`](https://github.com/maidsafe/safe_network/commit/ddd45b7cc73bbacea19f5c93519ae16a74cc01cc))
 </details>
 
 ## v0.58.0 (2022-02-17)
@@ -68,7 +49,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### New Features (BREAKING)
 
  - <csr-id-4e7bc8bbb3f521324edf0e4a6e329271b7f854f6/> remove always-joinable feature flag
-
 
 ### Commit Statistics
 
@@ -100,6 +80,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - log adults known about during storage calcs ([`7e15db2`](https://github.com/maidsafe/safe_network/commit/7e15db2de4d99d84126e7087d838047bae7a009b))
     - easier to read logging for saps ([`bd19e9e`](https://github.com/maidsafe/safe_network/commit/bd19e9e6eae4ce6068e1bee2d89528d36fce5329))
     - tweak command ack wait and interval looping. ([`a563998`](https://github.com/maidsafe/safe_network/commit/a56399864e18f2b2de7ba033497c5bbbe3e5394e))
+</details>
+
+## v0.57.1 (2022-02-15)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 8 commits contributed to the release.
+ - 2 days passed between releases.
+ - 8 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.57.1/sn_cli-0.49.1 ([`07dc30b`](https://github.com/maidsafe/safe_network/commit/07dc30b281f3c67cb5598aaaf72ba5c668353bf7))
+    - begin sorting out messaging ([`03cf556`](https://github.com/maidsafe/safe_network/commit/03cf556d1b73565d520e2c5b82ab1482b076e639))
+    - move capacity and liveness into data mod ([`7068445`](https://github.com/maidsafe/safe_network/commit/7068445cad25b0273c841c5072055833df9b8229))
+    - move chunk store to dbs ([`d3dd663`](https://github.com/maidsafe/safe_network/commit/d3dd663cfd6f3d0b0943ff49b1eed8c6b37d6263))
+    - co-locate related modules ([`5fe2892`](https://github.com/maidsafe/safe_network/commit/5fe289271fb0da28935b0b578928687be0dc4665))
+    - rename core to node ([`d6e7882`](https://github.com/maidsafe/safe_network/commit/d6e788221f332c3ff3a22eec39af428eebf5e75f))
+    - rename node to nodeinfo ([`283ff34`](https://github.com/maidsafe/safe_network/commit/283ff34f03dbf783b2299a3c7eb7a183c1e3c0a6))
+    - move peer and prefix map into types ([`e9e249a`](https://github.com/maidsafe/safe_network/commit/e9e249a674d4a64078a519b7e20baf6f0759c1c9))
 </details>
 
 ## v0.57.0 (2022-02-12)
@@ -169,9 +177,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Merge #995 ([`5176b3a`](https://github.com/maidsafe/safe_network/commit/5176b3a72e2f5f3f1dfc21116a6bf3ffa3893830))
     - simplify ae msg handling at clients ([`5869662`](https://github.com/maidsafe/safe_network/commit/5869662a29c4bd8dfe0d7bf07a30f10d89b450ad))
 </details>
-
-<csr-unknown>
-Removing some node’s public API which shouldn’t be needed for any user of it (e.g. a UI).<csr-unknown/>
 
 ## v0.56.0 (2022-02-08)
 
