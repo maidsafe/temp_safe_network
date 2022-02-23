@@ -11,7 +11,7 @@ use super::Session;
 use crate::at_least_one_correct_elder;
 use crate::client::{
     connections::{
-        messaging::{mark_connection_id_as_failed, send_msg, NUM_OF_ELDERS_SUBSET_FOR_QUERIES},
+        messaging::{send_msg, NUM_OF_ELDERS_SUBSET_FOR_QUERIES},
         PendingCmdAcks,
     },
     Error, Result,
@@ -26,7 +26,7 @@ use crate::types::{log_markers::LogMarker, utils::compare_and_write_prefix_map_t
 
 use bytes::Bytes;
 use itertools::Itertools;
-use qp2p::{Close, ConnectionError, ConnectionIncoming, SendError};
+use qp2p::{Close, ConnectionError, ConnectionIncoming as IncomingMsgs, SendError};
 use rand::rngs::OsRng;
 use rand::seq::SliceRandom;
 use secured_linked_list::SecuredLinkedList;
@@ -38,30 +38,32 @@ impl Session {
     #[instrument(skip_all, level = "debug")]
     pub(crate) fn spawn_msg_listener_thread(
         session: Session,
-        connection_id: usize,
-        connected_peer: Peer,
-        mut incoming_msgs: ConnectionIncoming,
+        peer: Peer,
+        conn: qp2p::Connection,
+        mut incoming_msgs: IncomingMsgs,
     ) {
-        let src = connected_peer.addr();
-        debug!("Listening for incoming msgs from {}", connected_peer);
+        let mut first = true;
+        let addr = peer.addr();
+        let node_id = peer.id();
+        let connection_id = conn.id();
 
-        trace!(
-            "{} to {} (id: {})",
-            LogMarker::ConnectionOpened,
-            src,
-            connection_id
-        );
+        debug!("Listening for incoming msgs from {:?}", peer);
 
         let _handle = tokio::spawn(async move {
             loop {
-                match Self::listen_for_incoming_msg(src, &mut incoming_msgs).await {
+                match Self::listen_for_incoming_msg(addr, &mut incoming_msgs).await {
                     Ok(Some(msg)) => {
-                        if let Err(err) = Self::handle_msg(msg, connected_peer.clone(), session.clone()).await {
+                        if first {
+                            first = false;
+                            session.peer_links.add_incoming(&node_id, conn.clone()).await;
+                        }
+
+                        if let Err(err) = Self::handle_msg(msg, peer.clone(), session.clone()).await {
                             error!("Error while handling incoming msg: {:?}. Listening for next msg...", err);
                         }
                     },
                     Ok(None) => {
-                        info!("Incoming msg listener has closed for connection {}.", connection_id);
+                        // once the msg loop breaks, we know this specific connection is closed
                         break;
                     }
                     Err( Error::QuicP2pSend(SendError::ConnectionLost(
@@ -71,15 +73,10 @@ impl Session {
                             "Connection was closed by the node: {:?}",
                             String::from_utf8(reason.to_vec())
                         );
-
-                        mark_connection_id_as_failed(session.clone(), connected_peer.name(), connection_id);
-
                     },
                     Err(Error::QuicP2p(qp2p_err)) => {
                           // TODO: Can we recover here?
                           info!("Error from Qp2p received, closing listener loop. {:?}", qp2p_err);
-
-
                           break;
                     },
                     Err(error) => {
@@ -89,19 +86,18 @@ impl Session {
             }
 
             // once the msg loop breaks, we know the connection is closed
-            trace!("{} to {} (id: {})", LogMarker::ConnectionClosed, src, connection_id);
-        }.instrument(info_span!("Listening for incoming msgs from {}", ?src))).in_current_span();
+            trace!("{} to {} (id: {})", LogMarker::ConnectionClosed, addr, connection_id);
+        }.instrument(info_span!("Listening for incoming msgs from {}", ?addr))).in_current_span();
     }
 
     #[instrument(skip_all, level = "debug")]
     pub(crate) async fn listen_for_incoming_msg(
         src: SocketAddr,
-        incoming_msgs: &mut ConnectionIncoming,
+        incoming_msgs: &mut IncomingMsgs,
     ) -> Result<Option<MsgType>, Error> {
         if let Some(msg) = incoming_msgs.next().await? {
             trace!("Incoming msg from {:?}", src);
             let msg_type = WireMsg::deserialize(msg)?;
-
             Ok(Some(msg_type))
         } else {
             Ok(None)
@@ -226,10 +222,9 @@ impl Session {
                         if let Some(entry) = queries.get(&op_id) {
                             let all_senders = entry.value();
                             for (_msg_id, sender) in all_senders {
-                                trace!("Sending response for query w/{:?} via channel.", op_id);
-                                let result = sender.try_send(response.clone());
-                                if result.is_err() {
-                                    trace!("Error sending query response on a channel for {:?} op_id {:?}: {:?}. (It has likely been removed)", msg_id, op_id, result)
+                                let res = sender.try_send(response.clone());
+                                if res.is_err() {
+                                    trace!("Error relaying query response internally on a channel for {:?} op_id {:?}: {:?}. (It has likely been removed)", msg_id, op_id, res)
                                 }
                             }
                         } else {
@@ -304,7 +299,7 @@ impl Session {
         if let Some((msg_id, elders, service_msg, dst_location, auth)) =
             Self::new_target_elders(bounced_msg.clone(), &target_sap).await?
         {
-            let ae_msg_src_name = src_peer.clone().name();
+            let ae_msg_src_name = src_peer.name();
             // here we send this to only one elder for each AE message we get in. We _should_ have one per elder we sent to.
             // deterministically send to most elder based upon sender
             let target_elder = elders
@@ -326,8 +321,7 @@ impl Session {
 
                 debug!("Resending original message on AE-Redirect with updated details. Expecting an AE-Retry next");
 
-                let endpoint = session.endpoint.clone();
-                send_msg(session, vec![elder], wire_msg, endpoint, msg_id).await?;
+                send_msg(session, vec![elder], wire_msg, msg_id).await?;
             } else {
                 error!("No elder determined for resending AE message");
             }

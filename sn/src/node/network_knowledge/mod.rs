@@ -31,13 +31,7 @@ use bls::PublicKey as BlsPublicKey;
 use section_peers::SectionPeers;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    convert::TryInto,
-    iter,
-    net::SocketAddr,
-    sync::Arc,
-};
+use std::{collections::BTreeSet, convert::TryInto, iter, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};
 
@@ -663,26 +657,8 @@ impl NetworkKnowledge {
         self.section_peers
             .members()
             .into_iter()
-            .find(|info| &info.addr() == addr)
+            .find(|info| info.addr() == *addr)
             .map(|info| info.peer().clone())
-    }
-
-    /// Merge the connections from some source peers into our state.
-    ///
-    /// Peers are held in `signed_sap` and `section_peers`, and we match relevant peers with both.
-    pub(super) async fn merge_connections(&self, sources: impl IntoIterator<Item = &Peer>) {
-        let sources: BTreeMap<_, _> = sources
-            .into_iter()
-            .map(|peer| (peer.addr(), peer))
-            .collect();
-
-        for elder in self.signed_sap.read().await.elders() {
-            if let Some(source) = sources.get(&elder.addr()) {
-                elder.merge_connection(source).await;
-            }
-        }
-
-        self.section_peers.merge_connections(&sources).await;
     }
 
     // Tries to split our section.

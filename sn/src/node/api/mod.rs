@@ -208,7 +208,7 @@ impl NodeApi {
             let node_name = ed25519::name(&keypair.public);
             info!("{} Bootstrapping a new node.", node_name);
 
-            let (comm, bootstrap_peer) = Comm::bootstrap(
+            let (comm, bootstrap_addr) = Comm::bootstrap(
                 local_addr,
                 config
                     .hard_coded_contacts
@@ -225,7 +225,7 @@ impl NodeApi {
                 node_name,
                 std::process::id(),
                 comm.our_connection_info(),
-                bootstrap_peer.addr(),
+                bootstrap_addr,
                 genesis_key
             );
 
@@ -234,7 +234,7 @@ impl NodeApi {
                 joining_node,
                 &comm,
                 &mut connection_event_rx,
-                bootstrap_peer,
+                bootstrap_addr,
                 genesis_key,
             )
             .await?;
@@ -375,21 +375,16 @@ async fn handle_connection_events(
 ) {
     while let Some(event) = incoming_conns.recv().await {
         match event {
-            ConnectionEvent::Received((sender, bytes)) => {
+            ConnectionEvent::Received {
+                sender,
+                wire_msg,
+                original_bytes,
+            } => {
                 trace!(
                     "New message ({} bytes) received from: {:?}",
-                    bytes.len(),
+                    original_bytes.len(),
                     sender
                 );
-
-                // bytes.clone is cheap
-                let wire_msg = match WireMsg::from(bytes.clone()) {
-                    Ok(wire_msg) => wire_msg,
-                    Err(error) => {
-                        error!("Failed to deserialize message header: {:?}", error);
-                        continue;
-                    }
-                };
 
                 let span = {
                     let node = &dispatcher.node;
@@ -401,12 +396,12 @@ async fn handle_connection_events(
                     "{:?} from {:?} length {}",
                     LogMarker::DispatchHandleMsgCmd,
                     sender,
-                    bytes.len(),
+                    original_bytes.len(),
                 );
                 let cmd = Cmd::HandleMsg {
                     sender,
                     wire_msg,
-                    original_bytes: Some(bytes),
+                    original_bytes: Some(original_bytes),
                 };
 
                 let _handle = dispatcher

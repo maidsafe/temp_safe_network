@@ -20,10 +20,13 @@ pub mod utils;
 mod address;
 mod cache;
 mod chunk;
+mod connections;
 mod errors;
 mod keys;
 mod peer;
 mod token;
+
+pub(crate) use connections::{PeerLinks, SendToOneError};
 
 pub use address::{
     BytesAddress, ChunkAddress, DataAddress, RegisterAddress, ReplicatedDataAddress,
@@ -39,7 +42,7 @@ pub use keys::{
     secret_key::SecretKey,
     signature::{Signature, SignatureShare},
 };
-pub use peer::{Peer, UnnamedPeer};
+pub use peer::Peer;
 pub use token::Token;
 
 use crate::messaging::data::{RegisterCmd, ReplicatedRegisterLog};
