@@ -21,8 +21,7 @@ use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
-use std::collections::BTreeSet;
-use std::time::Duration;
+use std::{collections::BTreeSet, time::Duration};
 use xor_name::XorName;
 
 impl Node {

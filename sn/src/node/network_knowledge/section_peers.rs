@@ -13,12 +13,7 @@ use crate::types::Peer;
 use dashmap::{mapref::entry::Entry, DashMap};
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
-use std::{
-    cmp::Ordering,
-    collections::{BTreeMap, BTreeSet},
-    net::SocketAddr,
-    sync::Arc,
-};
+use std::{cmp::Ordering, collections::BTreeSet, sync::Arc};
 use xor_name::{Prefix, XorName};
 
 // Number of Elder churn events before a Left/Relocated member
@@ -166,16 +161,6 @@ impl SectionPeers {
     /// Remove all members whose name does not match `prefix`.
     pub(super) fn retain(&self, prefix: &Prefix) {
         self.members.retain(|name, _| prefix.matches(name))
-    }
-
-    /// Merge connections into of our current members
-    pub(super) async fn merge_connections(&self, sources: &BTreeMap<SocketAddr, &Peer>) {
-        for entry in self.members.iter() {
-            let (_, node) = entry.pair();
-            if let Some(source) = sources.get(&node.addr()) {
-                node.peer().merge_connection(source).await;
-            }
-        }
     }
 
     // Remove any member which Left, or was Relocated, more

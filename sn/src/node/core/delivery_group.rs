@@ -82,7 +82,7 @@ async fn section_candidates(
         // Exclude our name since we don't need to send to ourself
         let chosen_section: Vec<_> = info
             .elders()
-            .filter(|node| &node.name() != our_name)
+            .filter(|node| node.name() != *our_name)
             .cloned()
             .collect();
         let dg_size = chosen_section.len();
@@ -136,7 +136,7 @@ async fn candidates(
 
         if *prefix == network_knowledge.prefix().await {
             // Send to all connected targets so they can forward the message
-            candidates.retain(|node| &node.name() != our_name);
+            candidates.retain(|node| node.name() != *our_name);
             dg_size = candidates.len();
             break;
         }

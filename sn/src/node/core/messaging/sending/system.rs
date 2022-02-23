@@ -13,7 +13,7 @@ use crate::messaging::{
 use crate::node::{
     api::cmds::Cmd, core::Node, messages::WireMsgUtils, network_knowledge::NodeState, Error, Result,
 };
-use crate::types::{log_markers::LogMarker, Peer, UnnamedPeer};
+use crate::types::{log_markers::LogMarker, Peer};
 
 use bls::PublicKey as BlsPublicKey;
 use xor_name::XorName;
@@ -124,7 +124,7 @@ impl Node {
             wire_msg.set_dst_xorname(our_name);
 
             cmds.push(Cmd::HandleMsg {
-                sender: UnnamedPeer::addressed(self.our_connection_info()),
+                sender: Peer::new(our_name, self.our_connection_info()),
                 wire_msg,
                 original_bytes: None,
             });

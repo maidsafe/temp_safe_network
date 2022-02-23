@@ -198,13 +198,17 @@ impl Client {
     /// form of immutable chunks, without any batching.
     /// It also attempts to verify that all the data was uploaded to the network before returning.
     #[instrument(skip_all, level = "trace")]
-    pub async fn upload_and_verify(&self, bytes: Bytes, scope: Scope) -> Result<BytesAddress> {
+    pub async fn upload_and_verify(
+        &self,
+        bytes: Bytes,
+        scope: Scope,
+    ) -> Result<(BytesAddress, Bytes)> {
         let address = self.upload(bytes, scope).await?;
 
         // let's now try to retrieve it
-        let _bytes = self.read_bytes(address).await?;
+        let bytes = self.read_bytes(address).await?;
 
-        Ok(address)
+        Ok((address, bytes))
     }
 
     /// Calculates a LargeFile's/SmallFile's address from self encrypted chunks,
@@ -382,10 +386,12 @@ mod tests {
     };
     use crate::types::log_markers::LogMarker;
     use crate::types::{utils::random_bytes, BytesAddress, Keypair, Scope};
+
     use bytes::Bytes;
     use eyre::Result;
     use futures::future::join_all;
     use rand::rngs::OsRng;
+    use std::time::Duration;
     use tokio::time::Instant;
     use tracing::{instrument::Instrumented, Instrument};
 
@@ -425,13 +431,10 @@ mod tests {
 
         let file = LargeFile::new(random_bytes(LARGE_FILE_SIZE_MIN))?;
 
-        // Store private file
-        let private_address = client
+        // Store private file (also verifies that the file is stored)
+        let (private_address, read_data) = client
             .upload_and_verify(file.bytes(), Scope::Private)
             .await?;
-
-        // Assert that the file is stored.
-        let read_data = client.read_bytes(private_address).await?;
 
         compare(file.bytes(), read_data)?;
 
@@ -474,7 +477,7 @@ mod tests {
         let size = 2 * LARGE_FILE_SIZE_MIN;
         let file = LargeFile::new(random_bytes(size))?;
 
-        let address = client
+        let (address, _) = client
             .upload_and_verify(file.bytes(), Scope::Public)
             .await?;
 
@@ -501,7 +504,7 @@ mod tests {
                 let len = size / divisor;
                 let file = LargeFile::new(random_bytes(size))?;
 
-                let address = client
+                let (address, _) = client
                     .upload_and_verify(file.bytes(), Scope::Public)
                     .await?;
 
@@ -536,51 +539,92 @@ mod tests {
         init_test_logger();
         let _start_span = tracing::info_span!("store_and_read_5mb_from_many_clients").entered();
 
-        let client = create_test_client().await?;
+        let uploader = create_test_client().await?;
         // create file with random bytes 5mb
         let bytes = random_bytes(5 * 1024 * 1024);
         let file = LargeFile::new(bytes)?;
 
-        // Store file
-        let address = client
+        // Store file (also verifies that the file is stored)
+        let (address, read_data) = uploader
             .upload_and_verify(file.bytes(), Scope::Public)
             .await?;
 
-        // Assert that the file is stored.
-        let read_data = client.read_bytes(address).await?;
-
         compare(file.bytes(), read_data)?;
-
-        let mut tasks = vec![];
 
         debug!("======> Data uploaded");
 
-        for i in 1..50 {
-            debug!("starting client on thread #{:?}", i);
+        let reader_count = 25;
+        let clients = create_clients(reader_count).await;
+        assert_eq!(reader_count, clients.len());
+
+        let mut tasks = vec![];
+
+        for client in clients {
             let handle: Instrumented<tokio::task::JoinHandle<Result<()>>> =
                 tokio::spawn(async move {
-                    debug!("started client #{:?}", i);
-                    // use a fresh client
-                    let client = create_test_client().await?;
-                    // to grab that data
-                    let _read_data = client.read_bytes(address).await?;
+                    let mut last_try = true;
+                    // get the data with many retries
+                    for i in 0..250 {
+                        match client.read_bytes(address).await {
+                            Ok(_data) => {
+                                last_try = false;
+                                break;
+                            }
+                            Err(_) => {
+                                debug!(
+                                    "client #{:?} failed the data, sleeping..",
+                                    client.public_key()
+                                );
+                                tokio::time::sleep(Duration::from_millis(i * 100)).await;
+                            }
+                        };
+                    }
+                    if last_try {
+                        let _ = client.read_bytes(address).await?;
+                    }
 
-                    debug!("client #{:?} finished", i);
+                    debug!("client #{:?} got the data", client.public_key());
+
                     Ok(())
                 })
                 .in_current_span();
 
             tasks.push(handle);
         }
-        let responses = join_all(tasks).await;
 
-        for res in responses {
-            debug!("a response is done");
+        let results = join_all(tasks).await;
+
+        for res in results {
             let _ok = res??;
         }
 
         // TODO: we need to use the node log analysis to check the mem usage across nodes does not exceed X
         Ok(())
+    }
+
+    async fn create_clients(count: usize) -> Vec<Client> {
+        let mut tasks = vec![];
+
+        for i in 0..count {
+            debug!("starting client on thread #{:?}", i);
+            let handle: Instrumented<tokio::task::JoinHandle<Result<Client>>> =
+                tokio::spawn(async move {
+                    debug!("starting client #{:?}..", i);
+                    // use a fresh client
+                    let client = create_test_client().await?;
+                    debug!("client #{:?} started", i);
+                    Ok(client)
+                })
+                .in_current_span();
+            tasks.push(handle);
+        }
+
+        join_all(tasks)
+            .await
+            .into_iter()
+            .flatten()
+            .flatten()
+            .collect()
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -746,11 +790,8 @@ mod tests {
         let expected_address = Client::calculate_address(bytes.clone(), scope)?;
 
         // we use upload_and_verify since it uploads and also confirms it was uploaded
-        let address = client.upload_and_verify(bytes.clone(), scope).await?;
+        let (address, read_data) = client.upload_and_verify(bytes.clone(), scope).await?;
         assert_eq!(address, expected_address);
-
-        // now that it was written to the network we should be able to retrieve it
-        let read_data = client.read_bytes(address).await?;
 
         // then the content should be what we stored
         compare(bytes, read_data)?;

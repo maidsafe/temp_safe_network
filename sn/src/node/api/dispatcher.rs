@@ -341,14 +341,24 @@ impl Dispatcher {
                     .await?
             }
             MsgKind::ServiceMsg(_) => {
-                if let Err(err) = self
-                    .node
-                    .comm
-                    .send_on_existing_connection_to_client(recipients, wire_msg.clone())
-                    .await
-                {
-                    error!("Failed sending message {:?} to recipients {:?} on existing connection with error {:?}",
-                            wire_msg, recipients, err);
+                // we should never be sending such a msg to more than one recipient
+                // need refactors further up to solve in a nicer way
+                if recipients.len() > 1 {
+                    warn!("Unexpected number of client recipients {:?} for msg {:?}. Only sending to first.",
+                    recipients.len(), wire_msg);
+                }
+                if let Some(recipient) = recipients.get(0) {
+                    if let Err(err) = self
+                        .node
+                        .comm
+                        .send_to_client(recipient, wire_msg.clone())
+                        .await
+                    {
+                        error!(
+                            "Failed sending message {:?} to client {:?} with error {:?}",
+                            wire_msg, recipient, err
+                        );
+                    }
                 }
 
                 vec![]

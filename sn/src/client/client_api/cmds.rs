@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Client;
-use crate::at_least_one_correct_elder;
 use crate::client::Error;
 use crate::messaging::{
     data::{DataCmd, ServiceMsg},
@@ -38,7 +37,6 @@ impl Client {
         let dst_name = cmd.dst_name(); // let msg = ServiceMsg::Cmd(cmd.clone());
 
         let debug_cmd = format!("{:?}", cmd);
-        let target_count = at_least_one_correct_elder(); // stored at Adults, so only 1 correctly functioning Elder need to relay
 
         let serialised_cmd = {
             let msg = ServiceMsg::Cmd(cmd);
@@ -72,7 +70,6 @@ impl Client {
                     client_pk,
                     serialised_cmd.clone(),
                     signature.clone(),
-                    target_count,
                 )
                 .await;
 
@@ -108,7 +105,6 @@ impl Client {
         client_pk: PublicKey,
         serialised_cmd: Bytes,
         signature: Signature,
-        targets: usize,
     ) -> Result<(), Error> {
         let auth = ServiceAuth {
             public_key: client_pk,
@@ -116,7 +112,7 @@ impl Client {
         };
 
         self.session
-            .send_cmd(dst_address, auth, serialised_cmd, targets)
+            .send_cmd(dst_address, auth, serialised_cmd)
             .await
     }
 

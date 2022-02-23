@@ -11,7 +11,7 @@ use std::{net::SocketAddr, sync::Arc};
 
 type MsgRegistry = DashMap<SocketAddr, usize>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(super) struct MsgCount {
     incoming: Arc<MsgRegistry>,
     outgoing: Arc<MsgRegistry>,

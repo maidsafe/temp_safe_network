@@ -264,7 +264,8 @@ impl Node {
         candidates
     }
 
-    // Takes a message and forms cmds to send to specified targets
+    // Takes a message for specified targets, and builds internal send cmds
+    // for sending to each of the targets.
     // Targets are XorName specified so must be within the section
     async fn send_node_msg_to_nodes(
         &self,

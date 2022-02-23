@@ -16,7 +16,7 @@ use crate::types::Peer;
 
 use bls::{PublicKey, PublicKeySet};
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeSet,
     fmt::{self, Display, Formatter},
     net::SocketAddr,
 };
@@ -112,9 +112,9 @@ impl SectionAuthorityProvider {
         self.elders.iter().any(|elder| &elder.name() == name)
     }
 
-    /// Returns the elder `Peer` witht the given `name`.
+    /// Returns the elder `Peer` with the given `name`.
     pub(crate) fn get_elder(&self, name: &XorName) -> Option<&Peer> {
-        self.elders.iter().find(|elder| &elder.name() == name)
+        self.elders.iter().find(|elder| elder.name() == *name)
     }
 
     /// Returns the set of elder names.
@@ -124,33 +124,6 @@ impl SectionAuthorityProvider {
 
     pub(crate) fn addresses(&self) -> Vec<SocketAddr> {
         self.elders.iter().map(Peer::addr).collect()
-    }
-
-    /// Merge the connections from some source peers into our own elders.
-    // Although the library will compile if this is as an `async fn`, it seems to lose some fidelity
-    // in the lifetime bounds, since the routing stress example will fail to compile with a bizarre
-    // lifetime mismatch error.
-    #[allow(clippy::manual_async_fn)]
-    pub(crate) fn merge_connections<'a, 'b, I>(
-        &'a self,
-        sources: I,
-    ) -> impl std::future::Future<Output = ()> + Send + '_
-    where
-        I: IntoIterator<Item = &'b Peer> + Send + 'a,
-        I::IntoIter: Send,
-    {
-        async move {
-            let sources: BTreeMap<_, &Peer> = sources
-                .into_iter()
-                .map(|peer| (peer.addr(), peer))
-                .collect();
-
-            for elder in self.elders() {
-                if let Some(source) = sources.get(&elder.addr()) {
-                    elder.merge_connection(source).await;
-                }
-            }
-        }
     }
 
     /// Key of the section.

@@ -81,7 +81,7 @@ impl Node {
             peers
         } else {
             warn!(
-                "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client orthe client connection cache has expired: {}",
+                "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client or the client connection cache has expired: {}",
                 sending_node_pk, user.0
             );
             return Ok(cmds);
@@ -142,7 +142,7 @@ impl Node {
             return Ok(cmds);
         }
 
-        // Send response if one is warrented
+        // Send response if one is warranted
         if query_response.failed_with_data_not_found()
             || (!query_response.is_success()
                 && self
