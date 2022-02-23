@@ -83,7 +83,7 @@ jobs:
 
       - shell: bash
         if: steps.sn_changes.outputs.src == 'true'
-        run: cargo clippy --all-targets
+        run: cargo clippy --all-targets --all-features
 
   test-publish:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
