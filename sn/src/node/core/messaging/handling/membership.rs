@@ -70,7 +70,7 @@ impl Node {
                 );
                 vec![]
             }
-            Ok(VoteResponse::Decided { proposals, .. }) => {
+            Ok(VoteResponse::Decided(decision)) => {
                 trace!(
                     ">>> Membership Vote msg successfully handled and consensus reached: {:?}",
                     signed_vote
@@ -78,37 +78,28 @@ impl Node {
                 // We now update our knowledge of peers in our section as per consensus
                 let mut section_peers = self.network_knowledge.section_signed_members().await;
                 let public_key = self.network_knowledge.section_key().await;
-                proposals.iter().for_each(|(reconfig, signature)| {
+                for (reconfig, signature) in decision.proposals.clone().into_iter() {
                     let sig = KeyedSig {
                         public_key,
-                        signature: signature.clone(),
+                        signature,
                     };
 
                     match reconfig {
-                        Reconfig::Join(node_state) => {
-                            let _ = section_peers.insert(
-                                SectionAuth {
-                                    value: node_state.clone(),
-                                    sig,
-                                }
-                                .into_authed_state(),
-                            );
+                        Reconfig::Join(value) => {
+                            let _ = section_peers
+                                .insert(SectionAuth { value, sig }.into_authed_state());
                         }
-                        Reconfig::Leave(node_state) => {
-                            let _ = section_peers.remove(
-                                &SectionAuth {
-                                    value: node_state.clone(),
-                                    sig,
-                                }
-                                .into_authed_state(),
-                            );
+                        Reconfig::Leave(value) => {
+                            let _ = section_peers
+                                .remove(&SectionAuth { value, sig }.into_authed_state());
                         }
                     }
-                });
+                }
 
                 self.network_knowledge.set_members(section_peers).await;
 
-                self.handle_new_membership_consensus(proposals).await
+                self.handle_new_membership_consensus(decision.proposals)
+                    .await
             }
         }
     }
