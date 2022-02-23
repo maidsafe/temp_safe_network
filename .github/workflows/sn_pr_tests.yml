@@ -3,57 +3,15 @@ name: PR Tests
 on: pull_request
 
 env:
-  # Turn on backtrace as needed. Generally (passing) CI should not need this.
-  # RUST_BACKTRACE: 1
-  # Deny all compiler warnings.
   RUSTFLAGS: "-D warnings"
-  # RUST_LOG: "safe_network,sn_api,sn_node=trace"
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
   NODE_COUNT: 15
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
   AWS_DEFAULT_REGION: 'eu-west-2'
-  POST_TEST_SLEEP: 5
 
 jobs:
-
-  build:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Build sn bins
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@v2
-      # Install Rust
-      - name: Install Rust
-        id: toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      - uses: Swatinem/rust-cache@v1
-        continue-on-error: true
-        with:
-          cache-on-failure: true
-          sharedKey: ${{github.run_id}}
-
-      - name: Build testnet
-        run: cargo build  --release --bin testnet
-        timeout-minutes: 60
-
-      - name: Build log_cmds_inspector
-        run: cargo build  --release --bin log_cmds_inspector
-        timeout-minutes: 60
-
-      - name: Build sn bins
-        run: cargo build -p safe_network --release --features=test-utils --bins
-        timeout-minutes: 60
-
   unit:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Unit Tests
@@ -64,41 +22,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v2
-      - uses: dorny/paths-filter@v2
-        id: changes
-        with:
-          filters: |
-            messaging:
-              - 'sn/src/messaging/**'
-              - 'sn/src/types/**'
-            node:
-              - 'sn/src/node/**'
-              - 'sn/src/routing/**'
-              - 'sn/src/messaging/**'
-              - 'sn/src/types/**'
-              - 'sn/src/dbs/**'
-              - 'sn/src/prefix_map/**'
-              - 'sn/src/url/**'
-            client:
-              - 'sn/src/client/**'
-              - 'sn/src/messaging/**'
-              - 'sn/src/types/**'
-              - 'sn/src/dbs/**'
-              - 'sn/src/prefix_map/**'
-              - 'sn/src/url/**'
-            routing:
-              - 'sn/src/routing/**'
-              - 'sn/src/messaging/**'
-              - 'sn/src/types/**'
-              - 'sn/src/prefix_map/**'
-            types:
-              - 'sn/src/types/**'
-            dbs:
-              - 'sn/src/dbs/**'
-            prefix_map:
-              - 'sn/src/prefix_map/**'
 
-      # Install Rust
       - name: Install Rust
         id: toolchain
         uses: actions-rs/toolchain@v1
@@ -115,43 +39,34 @@ jobs:
 
       - name: Build all test targets
         # all = all crates in workspace, lib/bins targets, with these features...
-        run: cd sn && cargo test --no-run --release --features=test-utils
+        run: cargo test --no-run --release --features=test-utils
+        working-directory: sn
 
-      - name: Run Data Types tests
-        if: steps.changes.outputs.types == 'true'
-        run: cd sn && cargo test --release --features=test-utils -- types
-        timeout-minutes: 10
+      - name: Run unit tests
+        uses: jacderida/cargo-nextest@main
+        with:
+          test-run-name: unit-tests-${{ matrix.os }}
+          profile: ci
+          junit-path: junit.xml
+          package: safe_network
+          release: true
+          features: test-utils
+          filters: "dbs messaging node prefix_map routing types"
 
-      - name: Run DBs tests
-        if: steps.changes.outputs.dbs == 'true'
-        run: cd sn && cargo test --release --features=test-utils -- dbs
-        timeout-minutes: 5
-
-      - name: Run PrefixMap tests
-        if: steps.changes.outputs.prefix_map == 'true'
-        run: cd sn && cargo test --release --features=test-utils -- prefix_map
-        timeout-minutes: 5
-
-      - name: Run Messaging tests
-        if: steps.changes.outputs.messaging == 'true'
-        run: cd sn && cargo test --release --features=test-utils -- messaging
-        timeout-minutes: 5
-
-      - name: Run Node tests
-        if: steps.changes.outputs.node == 'true'
-        run: cd sn && cargo test --release --features=test-utils -- node
-        timeout-minutes: 5
-
-      - name: Run Routing tests
-        if: steps.changes.outputs.routing == 'true'
-        run: cd sn && cargo test --release --features=test-utils -- routing
-        timeout-minutes: 10
+      - name: Run CLI unit tests
+        uses: jacderida/cargo-nextest@main
+        with:
+          test-run-name: cli-unit-tests-${{ matrix.os }}
+          profile: ci
+          junit-path: junit.xml
+          package: sn_cli
+          bin: safe
+          release: true
 
   e2e:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: E2E tests
     runs-on: ${{ matrix.os }}
-    needs: ["build"]
     strategy:
       fail-fast: false
       matrix:
@@ -159,7 +74,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      # Install Rust
       - name: Install Rust
         id: toolchain
         uses: actions-rs/toolchain@v1
@@ -189,7 +103,6 @@ jobs:
       - name: Build sn bins
         run: cd sn && cargo build --release --features=test-utils --bins
         timeout-minutes: 60
-
 
       - name: Build all safe_network tests
         run: cd sn && cargo test --no-run --release --features=test-utils
@@ -224,78 +137,31 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
-      - name: ubuntu install zsh
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get -y install zsh
-
-      - name: Run network asserts one by one
-        shell: bash
-        # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
-        run: cd sn && cargo test --release --features=test-utils -- --ignored network_assert --test-threads=1 --skip health && sleep $POST_TEST_SLEEP
-        timeout-minutes: 5
-        continue-on-error: true
-
-      # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
-      - name: Initial client tests... (unix)
-        shell: zsh {0}
-        if: matrix.os != 'windows-latest'
-        # always joinable not actually needed here, but should speed up compilation as we've just built with it
-        run: cd sn && repeat 5 cargo test --release --features=test-utils -- client --skip client_api::reg --skip client_api::file --test-threads=2 && sleep $POST_TEST_SLEEP
-        timeout-minutes: 10 # avg run is 80s * 5 is _just_ under 7 mins. so set to 10 mins
-
-      # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
-      - name: Initial client tests... (win)
-        if: matrix.os == 'windows-latest'
-        shell: bash
-        # always joinable not actually needed here, but should speed up compilation as we've just built with it
-        run: cd sn && cargo test --release --features=test-utils -- client --skip client_api::reg --skip client_api::file --test-threads=2 && sleep $POST_TEST_SLEEP
-        timeout-minutes: 5
-
-      # register api
-      - name: Client reg tests against local network (unix)
-        shell: zsh {0}
-        if: matrix.os != 'windows-latest'
-        run: cd sn && repeat 5 cargo test --release --features=test-utils -- client_api::reg --test-threads=1 --skip ae && sleep $POST_TEST_SLEEP
-        timeout-minutes: 10
-
-      # register api
-      - name: Client reg tests against local network (win)
-        shell: bash
-        if: matrix.os == 'windows-latest'
-        run: cd sn && cargo test --release --features=test-utils -- client_api::reg --test-threads=1 --skip ae && sleep $POST_TEST_SLEEP
-        timeout-minutes: 10
-
-
-      # file api
-      - name: client file tests against local network (unix)
-        shell: zsh {0}
-        if: matrix.os != 'windows-latest'
-        run: cd sn && repeat 5 cargo test --release --features=test-utils -- client_api::file --test-threads=1 --skip ae --skip from_many_clients  && sleep $POST_TEST_SLEEP
+      - name: Run client tests
+        uses: jacderida/cargo-nextest@main
+        with:
+          test-run-name: e2e-client-${{ matrix.os }}
+          profile: ci
+          junit-path: junit.xml
+          package: safe_network
+          release: true
+          features: test-utils
+          filters: client
+          test-threads: 2
         timeout-minutes: 25
 
-
-      # file api
-      - name: client file tests against local network (win)
-        shell: bash
-        if: matrix.os == 'windows-latest'
-        run: cd sn && cargo test --release --features=test-utils -- client_api::file --test-threads=1 --skip ae --skip from_many_clients  && sleep $POST_TEST_SLEEP
+      - name: Run AE tests
+        uses: jacderida/cargo-nextest@main
+        with:
+          test-run-name: e2e-ae-${{ matrix.os }}
+          profile: ci
+          junit-path: junit.xml
+          package: safe_network
+          release: true
+          features: test-utils
+          filters: ae_checks
+          test-threads: 2
         timeout-minutes: 15
-
-      # ae tests api
-      - name: client ae tests against local network (unix)
-        shell: zsh {0}
-        if: matrix.os != 'windows-latest'
-        run: cd sn && repeat 5 cargo test --release --features=test-utils -- ae_checks --test-threads=2 && sleep $POST_TEST_SLEEP
-        timeout-minutes: 15
-        env:
-          SN_AE_WAIT: 10
-
-      - name: client ae tests against local network (win)
-        shell: bash
-        if: matrix.os == 'windows-latest'
-        run: cd sn && cargo test --release --features=test-utils -- ae_checks --test-threads=2 && sleep $POST_TEST_SLEEP
-        timeout-minutes: 10
         env:
           SN_AE_WAIT: 10
 
@@ -303,14 +169,6 @@ jobs:
         timeout-minutes: 10
         shell: bash
         run: cd sn && cargo run  --release  --features=test-utils --example client_files
-
-      # # many client connections
-      # - name: many client test against local network
-      #   shell: bash
-      #   run: cd sn && cargo test --release --features=test-utils -- from_many_clients  && sleep $POST_TEST_SLEEP
-      #   timeout-minutes: 20
-      #   env:
-      #     SN_QUERY_TIMEOUT: 240 # 240 secs
 
       - name: Are nodes still running...?
         shell: bash
@@ -327,9 +185,17 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success' &&  matrix.os != 'windows-latest'
 
+      - name: Upload Node Logs to AWS for Windowns
+        run: aws s3 sync C:\Users\runneradmin\.safe\node\local-test-network\ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
+        if: failure() &&  matrix.os == 'windows-latest'
+        continue-on-error: true
+
+      - name: Upload Node Logs to AWS for Non-Windows
+        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
+        if: failure() &&  matrix.os != 'windows-latest'
+        continue-on-error: true
 
       - name: Upload Node Logs
-          # Upload artifacts.
         uses: actions/upload-artifact@v2
         with:
           name: sn_node_logs_e2e_${{matrix.os}}
@@ -347,17 +213,12 @@ jobs:
   e2e-split:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: E2E tests w/ full network
-    runs-on: "${{ matrix.os }}"
-    needs: ["e2e"]
+    runs-on: self-hosted-ubuntu
     env:
       NODE_COUNT: 33
-    strategy:
-      matrix:
-        os: [self-hosted-ubuntu]
     steps:
       - uses: actions/checkout@v2
 
-      # Install Rust
       - name: Install Rust
         id: toolchain
         uses: actions-rs/toolchain@v1
@@ -421,48 +282,30 @@ jobs:
         shell: bash
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
-      - name: ubuntu install zsh
-        run: |
-          sudo apt-get -y install zsh
-
-      - name: Run network asserts one by one
-        shell: bash
-        # here test-threads=1 is important so we dont pollute log counts by running tests in parallel
-        run: cd sn && cargo test --release --features=test-utils -- --ignored network_assert --test-threads=1 --skip health && sleep $POST_TEST_SLEEP
-        timeout-minutes: 5
-        continue-on-error: true
-
-      # many_clients test
-      - name: many client tests
-        run: cd sn && cargo test --release --features=test-utils -- from_many_clients  && sleep $POST_TEST_SLEEP
-        timeout-minutes: 15
-
-      # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
-      - name: Initial client tests... (unix)
-        shell: zsh {0}
-        # always joinable not actually needed here, but should speed up compilation as we've just built with it
-        run: cd sn && repeat 5 cargo test --release --features=test-utils -- client --skip client_api::reg --skip client_api::file --test-threads=2 && sleep $POST_TEST_SLEEP
-        timeout-minutes: 10 # avg run is 80s * 5 is _just_ under 7 mins. so set to 10 mins
-
-
-      # register api
-      - name: Client reg tests against local network (unix)
-        shell: zsh {0}
-        run: cd sn && repeat 5 cargo test --release --features=test-utils -- client_api::reg --test-threads=1 --skip ae && sleep $POST_TEST_SLEEP
-        timeout-minutes: 10
-
-
-      # file api
-      - name: client file tests against local network (unix)
-        shell: zsh {0}
-        run: cd sn && repeat 5 cargo test --release --features=test-utils -- client_api::file --test-threads=1 --skip ae --skip from_many_clients  && sleep $POST_TEST_SLEEP
+      - name: Run client tests
+        uses: jacderida/cargo-nextest@main
+        with:
+          test-run-name: e2e-split-client-self-hosted-ubuntu
+          profile: ci
+          junit-path: junit.xml
+          package: safe_network
+          release: true
+          features: test-utils
+          filters: client
+          test-threads: 2
         timeout-minutes: 25
 
-
-      # ae tests api
-      - name: client ae tests against local network (unix)
-        shell: zsh {0}
-        run: cd sn && repeat 5 cargo test --release --features=test-utils -- ae_checks --test-threads=2 && sleep $POST_TEST_SLEEP
+      - name: Run AE tests
+        uses: jacderida/cargo-nextest@main
+        with:
+          test-run-name: e2e-split-ae-self-hosted-ubuntu
+          profile: ci
+          junit-path: junit.xml
+          package: safe_network
+          release: true
+          features: test-utils
+          filters: ae_checks
+          test-threads: 2
         timeout-minutes: 15
         env:
           SN_AE_WAIT: 10
@@ -471,12 +314,6 @@ jobs:
         timeout-minutes: 10
         shell: bash
         run: cd sn && cargo run  --release  --features=test-utils --example client_files
-
-      # many client connections
-      - name: many client test against local network
-        shell: bash
-        run: cd sn && cargo test --release --features=test-utils -- from_many_clients  && sleep $POST_TEST_SLEEP
-        timeout-minutes: 20
 
       - name: Are nodes still running...?
         shell: bash
@@ -493,26 +330,23 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
       - name: Upload Node Logs
-          # Upload artifacts.
         uses: actions/upload-artifact@v2
         with:
-          name: sn_node_logs_e2e_split_${{matrix.os}}
+          name: sn_node_logs_e2e_split_self_hosted_ubuntu
           path: ~/.safe/node/local-test-network/**/*.log*
         if: failure()
         continue-on-error: true
 
       # if we don't clean up, the .safe folder might persist between runs
       - name: Cleanup self-hosted runner
-        if: matrix.os == 'self-hosted-ubuntu' && always()
+        if: always()
         run: |
           rm -rf ~/.safe
           killall -9 sn_node
 
-
   api:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run api tests
-    needs: ["build"]
+    name: Run API tests
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -521,7 +355,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      # Install Rust
       - name: Install Rust
         id: toolchain
         uses: actions-rs/toolchain@v1
@@ -561,7 +394,7 @@ jobs:
         timeout-minutes: 60
 
       - name: Build all sn_api tests
-        run: cd sn_api && cargo test --no-run --release --lib
+        run: cargo test --no-run -p sn_api --release --lib
 
       - name: Start the network
         run: ./target/release/testnet
@@ -584,14 +417,18 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
 
-      - name: Run sn_api tests
-        shell: bash
-        run: ./resources/scripts/api_tests.sh
-        timeout-minutes: 45
+      - name: Run API tests
+        uses: jacderida/cargo-nextest@main
+        with:
+          test-run-name: api-${{ matrix.os }}
+          profile: ci
+          junit-path: junit.xml
+          package: sn_api
+          release: true
+          test-threads: 10
+        timeout-minutes: 60
         env:
-          # these api tests realy heavily on retry_loop at the moment
-          # TODO: Remove that dependency
-          SN_QUERY_TIMEOUT: 20 # 20 secs
+          SN_QUERY_TIMEOUT: 10
 
       - name: Are nodes still running...?
         shell: bash
@@ -607,8 +444,17 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success'
 
+      - name: Upload Node Logs to AWS for Windowns
+        run: aws s3 sync C:\Users\runneradmin\.safe\node\local-test-network\ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
+        if: failure() &&  matrix.os == 'windows-latest'
+        continue-on-error: true
+
+      - name: Upload Node Logs to AWS for Non-Windows
+        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
+        if: failure() &&  matrix.os != 'windows-latest'
+        continue-on-error: true
+
       - name: Upload Node Logs
-          # Upload artifacts.
         uses: actions/upload-artifact@v2
         with:
           name: sn_node_logs_api_${{matrix.os}}
@@ -616,7 +462,6 @@ jobs:
         if: failure()
         continue-on-error: true
 
-
       # if we don't clean up, the .safe folder might persist between runs
       - name: Cleanup self-hosted runner
         if: matrix.os == 'ubuntu-latest' && always()
@@ -624,114 +469,18 @@ jobs:
           rm -rf ~/.safe
           killall -9 sn_node
 
-  cli:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run CLI tests
-    needs: ["build"]
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+  # This is required for publishing test results that come from forks. The actual publishing of the
+  # results occurs in another workflow that will be triggered when this one finishes. Uploading this
+  # 'event file' is necessary for the triggering to occur.
+  upload_event_file:
+    if: always()
+    name: Upload event file
+    needs: [unit, e2e, e2e-split, api]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-
-      # Install Rust
-      - name: Install Rust
-        id: toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      - uses: Swatinem/rust-cache@v1
-        continue-on-error: true
-        with:
-          cache-on-failure: true
-          sharedKey: ${{github.run_id}}
-
-      - name: Mac install ripgrep
-        if: matrix.os == 'macos-latest'
-        run: brew install ripgrep
-
-      - name: ubuntu install ripgrep
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get -y install ripgrep
-
-      - name: windows install ripgrep
-        if: matrix.os == 'windows-latest'
-        run: choco install ripgrep
-
-      - name: Build sn bins
-        run: cd sn && cargo build --release --features=test-utils --bins
-        timeout-minutes: 60
-
-      - name: Build testnet
-        run: cargo build  --release --bin testnet
-        timeout-minutes: 60
-
-      - name: Build log_cmds_inspector
-        run: cargo build  --release --bin log_cmds_inspector
-        timeout-minutes: 60
-
-      - name: Build all CLI tests
-        run: cd sn_cli && cargo test --no-run --release
-
-      - name: Start the network
-        run: ./target/release/testnet
-        id: section-startup
-        env:
-          RUST_LOG: "safe_network,sn_api,sn_node=trace"
-
-      - name: Print Network Log Stats at start
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
-
-      - name: Wait for all nodes to join
-        shell: bash
-        run: ./resources/scripts/wait_for_nodes_to_join.sh
-        timeout-minutes: 10
-
-      - name: Print Network Log Stats after nodes joined
-        shell: bash
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
-
-      - name: Run CLI tests
-        shell: bash
-        run: ./resources/scripts/cli_tests.sh
-        timeout-minutes: 90
-
-      - name: Are nodes still running...?
-        shell: bash
-        timeout-minutes: 1
-        if: failure() && matrix.os
-        run: |
-          echo "$(pgrep sn_node | wc -l) nodes still running"
-          ls $HOME/.safe/node/local-test-network
-
-      - name: Print Network Log Stats
-        shell: bash
-        continue-on-error: true
-        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success'
-
-
-      - name: Upload Node Logs
-          # Upload artifacts.
+      - name: Upload event file
         uses: actions/upload-artifact@v2
         with:
-          name: sn_node_logs_cli_${{matrix.os}}
-          path: ~/.safe/node/local-test-network/**/*.log*
-        if: failure()
-        continue-on-error: true
-
-
-      # if we don't clean up, the .safe folder might persist between runs
-      - name: Cleanup self-hosted runner
-        if: matrix.os == 'ubuntu-latest' && always()
-        run: |
-          rm -rf ~/.safe
-          killall -9 sn_node
+          name: event-file
+          path: ${{ github.event_path }}
