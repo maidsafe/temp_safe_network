@@ -3442,7 +3442,6 @@ dependencies = [
  "serde_json",
  "signature",
  "sled",
- "sn_launch_tool",
  "structopt",
  "strum",
  "strum_macros",
@@ -4088,6 +4087,24 @@ name = "termtree"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "507e9898683b6c43a9aa55b64259b721b52ba226e0f3779137e50ad114a4c90b"
+
+[[package]]
+name = "testnet"
+version = "0.1.0"
+dependencies = [
+ "color-eyre 0.6.0",
+ "console-subscriber",
+ "dirs-next 2.0.0",
+ "eyre",
+ "safe_network",
+ "sn_launch_tool",
+ "structopt",
+ "tokio",
+ "tracing",
+ "tracing-appender",
+ "tracing-core",
+ "tracing-subscriber 0.3.9",
+]
 
 [[package]]
 name = "textwrap"
