@@ -103,6 +103,8 @@ pub async fn run_chunk_soak() -> Result<()> {
 
     println!("Now we retrieve the data");
 
+    let start_reading = Instant::now();
+
     for (address, known_hash) in all_data_put.read().await.iter().as_ref() {
         println!("...reading bytes at address {:?} ...", address);
         let mut bytes = client.read_bytes(*address).await;
@@ -132,6 +134,10 @@ pub async fn run_chunk_soak() -> Result<()> {
 
         assert_eq!(&data_hash, known_hash);
     }
+
+    let duration = start_reading.elapsed();
+
+    println!("Time elapsed in while reading all data: {:?}", duration);
 
     println!("All okay");
 
