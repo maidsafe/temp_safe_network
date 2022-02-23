@@ -11,7 +11,7 @@ use super::{
     OutputFmt,
 };
 use color_eyre::{eyre::eyre, Help, Result};
-use prettytable::{format::FormatBuilder, Table};
+use comfy_table::Table;
 use sn_api::Error::{InvalidInput, NetDataError, NrsNameAlreadyExists, UnversionedContentError};
 use sn_api::{Safe, SafeUrl};
 use structopt::StructOpt;
@@ -274,19 +274,13 @@ fn print_summary(
 ) {
     if OutputFmt::Pretty == output_fmt {
         let mut table = Table::new();
-        let format = FormatBuilder::new()
-            .column_separator(' ')
-            .padding(0, 1)
-            .build();
-        table.set_format(format);
-
         let (change, top_name, url) = processed_entry;
-        table.add_row(row![change, top_name, url]);
+        table.add_row(&vec![change, top_name, url]);
         println!("{}", header);
         if !summary.is_empty() {
             println!("{}", summary.trim());
         }
-        table.printstd();
+        println!("{table}");
     } else {
         println!(
             "{}",

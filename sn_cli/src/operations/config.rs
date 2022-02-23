@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Help, Report, Result};
-use prettytable::Table;
+use comfy_table::Table;
 use serde::{Deserialize, Serialize};
 use sn_api::{NodeConfig, PublicKey};
 use std::{
@@ -319,8 +319,8 @@ impl Config {
 
     pub async fn print_networks(&self) {
         let mut table = Table::new();
-        table.add_row(row![bFg->"Networks"]);
-        table.add_row(row![bFg->"Current", bFg->"Network name", bFg->"Connection info"]);
+        table.add_row(&vec!["Networks"]);
+        table.add_row(&vec!["Current", "Network name", "Connection info"]);
         let current_node_config = match self.read_current_node_config().await {
             Ok((_, current_conn_info)) => Some(current_conn_info),
             Err(_) => None, // we simply ignore the error, none of the networks is currently active/set in the system
@@ -333,10 +333,10 @@ impl Config {
                     current = "*";
                 }
             }
-            table.add_row(row![current, network_name, net_info]);
+            table.add_row(&vec![current, network_name, &format!("{:?}", net_info)]);
         }
 
-        table.printstd();
+        println!("{table}");
     }
 
     //

@@ -111,7 +111,7 @@ pub async fn xorurl_of_files(
         } else {
             let (table, success_count) = gen_processed_files_table(&processed_files, false);
             println!("{} file/s processed:", success_count);
-            table.printstd();
+            println!("{table}");
         }
     } else {
         let mut list = Vec::<(String, String)>::new();

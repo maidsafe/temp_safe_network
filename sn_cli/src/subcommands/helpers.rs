@@ -9,8 +9,8 @@
 use super::OutputFmt;
 use ansi_term::Style;
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
+use comfy_table::Table;
 use num_traits::Float;
-use prettytable::{format::FormatBuilder, Table};
 use serde::ser::Serialize;
 use sn_api::{
     files::{FilesMapChange, ProcessedFiles},
@@ -125,11 +125,6 @@ pub fn gen_processed_files_table(
     show_change_sign: bool,
 ) -> (Table, u64) {
     let mut table = Table::new();
-    let format = FormatBuilder::new()
-        .column_separator(' ')
-        .padding(0, 1)
-        .build();
-    table.set_format(format);
     let mut success_count = 0;
     for (file_name, change) in processed_files.iter() {
         if change.is_success() {
@@ -144,9 +139,9 @@ pub fn gen_processed_files_table(
         };
 
         if show_change_sign {
-            table.add_row(row![change_sign, file_name.display(), link]);
+            table.add_row(&vec![change_sign, file_name.display().to_string(), link]);
         } else {
-            table.add_row(row![file_name.display(), link]);
+            table.add_row(&vec![file_name.display().to_string(), link]);
         }
     }
     (table, success_count)
