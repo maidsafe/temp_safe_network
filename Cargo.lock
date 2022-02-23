@@ -3883,9 +3883,9 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.9.5"
+version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "162afd7d07769ed4d6d1727ad60c62c617361bf38ce124b74a6a84bbd49d9e78"
+checksum = "1689177e72b895060494f69d8c2003071657f537c0306e35d78e314b60d2af7f"
 dependencies = [
  "color-eyre 0.5.11",
  "dirs-next 1.0.2",
