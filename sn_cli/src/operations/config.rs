@@ -118,32 +118,46 @@ impl Config {
         pb.pop();
         fs::create_dir_all(pb.as_path()).await?;
 
-        let settings: Settings;
-        if cli_config_path.exists() {
+        let settings = if cli_config_path.exists() {
             let content = fs::read(&cli_config_path).await.wrap_err_with(|| {
                 format!(
                     "Error reading config file from '{}'",
                     cli_config_path.display(),
                 )
             })?;
-            settings = serde_json::from_slice(&content).wrap_err_with(|| {
-                format!(
-                    "Format of the config file at '{}' is not valid and couldn't be parsed",
-                    cli_config_path.display()
-                )
-            })?;
-            debug!(
-                "Config settings retrieved from '{}': {:?}",
-                cli_config_path.display(),
+            if content.is_empty() {
+                // During the CLI test run, when running with more than one thread, i.e., running
+                // multiple instances of safe at the same time, it seems to be possible for there
+                // to be an empty config file, even though I can't determine how the scenario
+                // occurs.
+                //
+                // Checking if the content is empty prevents an error from trying to deserialize an
+                // empty byte array. We can just return the default empty settings.
+                //
+                // This shouldn't have any adverse effects on users, since concurrently running
+                // multiple instances of safe is unlikely.
+                Settings::default()
+            } else {
+                let settings = serde_json::from_slice(&content).wrap_err_with(|| {
+                    format!(
+                        "Format of the config file at '{}' is not valid and couldn't be parsed",
+                        cli_config_path.display()
+                    )
+                })?;
+                debug!(
+                    "Config settings retrieved from '{}': {:?}",
+                    cli_config_path.display(),
+                    settings
+                );
                 settings
-            );
+            }
         } else {
-            settings = Settings::default();
             debug!(
                 "Empty config file created at '{}'",
                 cli_config_path.display()
             );
-        }
+            Settings::default()
+        };
 
         let config = Config {
             settings,
@@ -524,6 +538,25 @@ mod constructor {
                 return Err(eyre!("connection info doesn't apply to this test"));
             }
         }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn given_an_empty_config_file_empty_settings_should_be_returned() -> Result<()> {
+        let tmp_dir = assert_fs::TempDir::new()?;
+        let cli_config_file = tmp_dir.child(".safe/cli/config.json");
+        cli_config_file.touch()?;
+        let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
+        let config = Config::new(
+            PathBuf::from(cli_config_file.path()),
+            PathBuf::from(node_config_file.path()),
+        )
+        .await?;
+
+        assert_eq!(0, config.settings.networks.len());
+        assert_eq!(cli_config_file.path(), config.cli_config_path.as_path());
+        assert_eq!(node_config_file.path(), config.node_config_path.as_path());
 
         Ok(())
     }
