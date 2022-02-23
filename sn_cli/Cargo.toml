@@ -19,7 +19,7 @@ path = "src/main.rs"
 ansi_term = "~0.12"
 async-std = "1.9.0"
 chrono = "~0.4"
-color-eyre = "~0.5"
+color-eyre = "~0.6"
 console = "~0.14"
 dirs-next = "2.0.0"
 hex = "~0.4"
@@ -65,7 +65,7 @@ version = "1.6.0"
 features = [ "macros" ]
 
 [dependencies.self_update]
-version = "0.27.0"
+version = "0.28.0"
 default-features = false
 features = [
     "rustls",
