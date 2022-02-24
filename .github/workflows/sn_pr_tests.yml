@@ -569,7 +569,7 @@ jobs:
         timeout-minutes: 60
 
       - name: Build all sn_api tests
-        run: cargo test --no-run -p sn_api --release --lib
+        run: cd sn_api && cargo test --no-run --release --lib
 
       - name: Start the network
         run: ./target/release/testnet
@@ -692,7 +692,7 @@ jobs:
         timeout-minutes: 60
 
       - name: Build all CLI tests
-        run: cargo test --no-run -p sn_cli --release
+        run: cd sn_cli && cargo test --no-run --release
 
       - name: Start the network
         run: ./target/release/testnet
