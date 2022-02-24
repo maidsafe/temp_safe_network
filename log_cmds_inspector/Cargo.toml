@@ -21,7 +21,6 @@ name="log_cmds_inspector"
 
 
 [dependencies]
-color-eyre = "0.6.0"
 console-subscriber = { version = "0.1.0", optional = true }
 eyre = "0.6.5"
 grep="~0.2.8"
