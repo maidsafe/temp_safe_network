@@ -136,10 +136,16 @@ jobs:
           sharedKey: ${{github.run_id}}
 
       - name: Build sn bins
-        # all = all crates in workspace, lib/bins targets, with these features...
         run: cargo build -p safe_network --release --features=test-utils --bins
         timeout-minutes: 60
 
+      - name: Build testnet
+        run: cargo build  --release --bin testnet
+        timeout-minutes: 60
+
+      - name: Build log_cmds_inspector
+        run: cargo build  --release --bin log_cmds_inspector
+        timeout-minutes: 60
 
   unit:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
