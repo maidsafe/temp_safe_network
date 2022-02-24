@@ -147,6 +147,60 @@ jobs:
         run: cd sn && cargo test --release --features=test-utils -- routing
         timeout-minutes: 10
 
+  split-data-test:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Split Data Integrity Tests
+    runs-on: ${{ matrix.os }}
+    needs: ["build"]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v2
+
+      # Install Rust
+      - name: Install Rust
+        id: toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+        continue-on-error: true
+        with:
+          cache-on-failure: true
+          sharedKey: ${{github.run_id}}
+
+
+      - name: Run network split data integrity test
+        timeout-minutes: 60
+        shell: bash
+        run: cargo run --release --features=test-utils --example network_split
+
+      - name: Print Network Log Stats
+        shell: bash
+        continue-on-error: true
+        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+        if: steps.section-startup.outcome == 'success' &&  matrix.os != 'windows-latest'
+
+      - name: Upload Node Logs
+          # Upload artifacts.
+        uses: actions/upload-artifact@v2
+        with:
+          name: sn_node_logs_e2e_${{matrix.os}}
+          path: ~/.safe/node/local-test-network/**/*.log*
+        if: failure()
+        continue-on-error: true
+
+      # if we don't clean up, the .safe folder might persist between runs
+      - name: Cleanup self-hosted runner
+        if: matrix.os == 'ubuntu-latest' && always()
+        run: |
+          rm -rf ~/.safe
+          killall -9 sn_node
   e2e:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: E2E tests
