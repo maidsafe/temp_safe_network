@@ -191,6 +191,14 @@ jobs:
         run: cd sn && cargo test --no-run --release --features=test-utils
         timeout-minutes: 60
 
+      - name: Build testnet
+        run: cargo build  --release --bin testnet
+        timeout-minutes: 60
+
+      - name: Build log_cmds_inspector
+        run: cargo build  --release --bin log_cmds_inspector
+        timeout-minutes: 60
+
       - name: Start the network
         run: ./target/release/testnet
         id: section-startup
@@ -387,6 +395,14 @@ jobs:
         run: cargo build -p safe_network --release --features=test-utils --bins
         timeout-minutes: 60
 
+      - name: Build testnet
+        run: cargo build  --release --bin testnet
+        timeout-minutes: 60
+
+      - name: Build log_cmds_inspector
+        run: cargo build  --release --bin log_cmds_inspector
+        timeout-minutes: 60
+
       - name: Start the network
         run: ./target/release/testnet
         id: section-startup
@@ -544,6 +560,14 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: choco install ripgrep
 
+      - name: Build testnet
+        run: cargo build  --release --bin testnet
+        timeout-minutes: 60
+
+      - name: Build log_cmds_inspector
+        run: cargo build  --release --bin log_cmds_inspector
+        timeout-minutes: 60
+
       - name: Build all sn_api tests
         run: cargo test --no-run -p sn_api --release --lib
 
@@ -659,6 +683,13 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: choco install ripgrep
 
+      - name: Build testnet
+        run: cargo build  --release --bin testnet
+        timeout-minutes: 60
+
+      - name: Build log_cmds_inspector
+        run: cargo build  --release --bin log_cmds_inspector
+        timeout-minutes: 60
 
       - name: Build all CLI tests
         run: cargo test --no-run -p sn_cli --release
