@@ -42,11 +42,17 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
-      - name: Build sn bins
-        # all = all crates in workspace, lib/bins targets, with these features...
-        run: cargo build -p safe_network --release --features=test-utils --bins
+      - name: Build testnet
+        run: cargo build  --release --bin testnet
         timeout-minutes: 60
 
+      - name: Build log_cmds_inspector
+        run: cargo build  --release --bin log_cmds_inspector
+        timeout-minutes: 60
+
+      - name: Build sn bins
+        run: cargo build -p safe_network --release --features=test-utils --bins
+        timeout-minutes: 60
 
   unit:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -105,7 +111,7 @@ jobs:
         continue-on-error: true
         with:
           cache-on-failure: true
-          sharedKey: ${{github.run_id}}
+          sharedKey: ${{github.run_id}}-unit
 
       - name: Build all test targets
         # all = all crates in workspace, lib/bins targets, with these features...
@@ -180,8 +186,21 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: choco install ripgrep
 
+      - name: Build sn bins
+        run: cd sn && cargo build --release --features=test-utils --bins
+        timeout-minutes: 60
+
+
       - name: Build all safe_network tests
         run: cd sn && cargo test --no-run --release --features=test-utils
+        timeout-minutes: 60
+
+      - name: Build testnet
+        run: cargo build  --release --bin testnet
+        timeout-minutes: 60
+
+      - name: Build log_cmds_inspector
+        run: cargo build  --release --bin log_cmds_inspector
         timeout-minutes: 60
 
       - name: Start the network
@@ -237,21 +256,16 @@ jobs:
       - name: Client reg tests against local network (unix)
         shell: zsh {0}
         if: matrix.os != 'windows-latest'
-        run: cd sn && repeat 5 cargo test --release --features=test-utils -- client_api::reg --test-threads=1 --skip ae --skip batching && sleep $POST_TEST_SLEEP
+        run: cd sn && repeat 5 cargo test --release --features=test-utils -- client_api::reg --test-threads=1 --skip ae && sleep $POST_TEST_SLEEP
         timeout-minutes: 10
 
       # register api
       - name: Client reg tests against local network (win)
         shell: bash
         if: matrix.os == 'windows-latest'
-        run: cd sn && cargo test --release --features=test-utils -- client_api::reg --test-threads=1 --skip ae --skip batching && sleep $POST_TEST_SLEEP
+        run: cd sn && cargo test --release --features=test-utils -- client_api::reg --test-threads=1 --skip ae && sleep $POST_TEST_SLEEP
         timeout-minutes: 10
 
-      # register api batching check, only run this once as it's slow, and we verify the basic tests above
-      - name: Client register batching
-        shell: bash
-        run: cd sn && cargo test --release --features=test-utils -- register_batching --test-threads=1 --skip ae && sleep $POST_TEST_SLEEP
-        timeout-minutes: 10
 
       # file api
       - name: client file tests against local network (unix)
@@ -361,12 +375,20 @@ jobs:
       - name: ubuntu install ripgrep
         run: sudo apt-get -y install ripgrep
 
+      - name: Build sn bins
+        run: cd sn && cargo build --release --features=test-utils --bins
+        timeout-minutes: 60
+
       - name: Build all safe_network tests
         run: cd sn && cargo test --no-run --release --features=test-utils
         timeout-minutes: 60
 
-      - name: Build all safe_network bins
-        run: cargo build -p safe_network --release --features=test-utils --bins
+      - name: Build testnet
+        run: cargo build  --release --bin testnet
+        timeout-minutes: 60
+
+      - name: Build log_cmds_inspector
+        run: cargo build  --release --bin log_cmds_inspector
         timeout-minutes: 60
 
       # This starts a 30 node network
@@ -426,15 +448,9 @@ jobs:
       # register api
       - name: Client reg tests against local network (unix)
         shell: zsh {0}
-        run: cd sn && repeat 5 cargo test --release --features=test-utils -- client_api::reg --test-threads=1 --skip ae --skip batching && sleep $POST_TEST_SLEEP
+        run: cd sn && repeat 5 cargo test --release --features=test-utils -- client_api::reg --test-threads=1 --skip ae && sleep $POST_TEST_SLEEP
         timeout-minutes: 10
 
-
-      # register api batching check, only run this once as it's slow, and we verify the basic tests above
-      - name: Client register batching
-        shell: bash
-        run: cd sn && cargo test --release --features=test-utils -- register_batching --test-threads=1 --skip ae && sleep $POST_TEST_SLEEP
-        timeout-minutes: 10
 
       # file api
       - name: client file tests against local network (unix)
@@ -459,7 +475,7 @@ jobs:
       # many client connections
       - name: many client test against local network
         shell: bash
-        run: cd sn && cargo test --release --features=always-joinable,test-utils -- from_many_clients  && sleep $POST_TEST_SLEEP
+        run: cd sn && cargo test --release --features=test-utils -- from_many_clients  && sleep $POST_TEST_SLEEP
         timeout-minutes: 20
 
       - name: Are nodes still running...?
@@ -532,8 +548,20 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: choco install ripgrep
 
+      - name: Build sn bins
+        run: cd sn && cargo build --release --features=test-utils --bins
+        timeout-minutes: 60
+
+      - name: Build testnet
+        run: cargo build  --release --bin testnet
+        timeout-minutes: 60
+
+      - name: Build log_cmds_inspector
+        run: cargo build  --release --bin log_cmds_inspector
+        timeout-minutes: 60
+
       - name: Build all sn_api tests
-        run: cargo test --no-run -p sn_api --release --lib
+        run: cd sn_api && cargo test --no-run --release --lib
 
       - name: Start the network
         run: ./target/release/testnet
@@ -635,9 +663,20 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: choco install ripgrep
 
+      - name: Build sn bins
+        run: cd sn && cargo build --release --features=test-utils --bins
+        timeout-minutes: 60
+
+      - name: Build testnet
+        run: cargo build  --release --bin testnet
+        timeout-minutes: 60
+
+      - name: Build log_cmds_inspector
+        run: cargo build  --release --bin log_cmds_inspector
+        timeout-minutes: 60
 
       - name: Build all CLI tests
-        run: cargo test --no-run -p sn_cli --release
+        run: cd sn_cli && cargo test --no-run --release
 
       - name: Start the network
         run: ./target/release/testnet

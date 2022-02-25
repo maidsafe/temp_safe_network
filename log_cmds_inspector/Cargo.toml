@@ -1,0 +1,31 @@
+[package]
+authors = ["MaidSafe Developers <dev@maidsafe.net>"]
+description = "The Safe Network Logs Inspector."
+documentation = "https://docs.rs/sn_node"
+edition = "2021"
+homepage = "https://maidsafe.net"
+license = "GPL-3.0"
+name = "log_cmds_inspector"
+readme = "README.md"
+repository = "https://github.com/maidsafe/safe_network"
+version = "0.1.0"
+
+
+[features]
+default = []
+
+[[bin]]
+path="bin.rs"
+name="log_cmds_inspector"
+
+
+
+[dependencies]
+console-subscriber = { version = "0.1.0", optional = true }
+eyre = "0.6.5"
+grep="~0.2.8"
+structopt = "~0.3.17"
+strum = "0.23.0"
+strum_macros = "0.23.1"
+walkdir = "2"
+safe_network = { path = "../sn", version = "^0.58.0", features=["test-utils"] }

@@ -12,7 +12,8 @@ unset RUST_LOG
 export SN_QUERY_TIMEOUT=10
 export RUST_BACKTRACE=full
 
-cargo run --package sn_cli --release -- keys create --for-cli || ((exit++))
+cd sn_cli
+cargo run --release -- keys create --for-cli || ((exit++))
 cargo test --release --test cli_node || ((exit++))
 cargo test --release --test cli_xorurl || ((exit++))
 cargo test --release --test cli_cat -- --test-threads=1 || ((exit++))
