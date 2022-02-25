@@ -24,9 +24,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e8b47f52ea9bae42228d07ec09eb676433d7c4ed1ebdf0f1d1c29ed446f1ab8"
 dependencies = [
  "cfg-if 1.0.0",
- "cipher",
+ "cipher 0.3.0",
  "cpufeatures",
  "opaque-debug",
+]
+
+[[package]]
+name = "aes"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bfe0133578c0986e1fe3dfcd4af1cc5b2dd6c3dbf534d69916ce16a2701d40ba"
+dependencies = [
+ "cfg-if 1.0.0",
+ "cipher 0.4.3",
+ "cpufeatures",
 ]
 
 [[package]]
@@ -418,7 +429,7 @@ version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4152116fd6e9dadb291ae18fc1ec3575ed6d84c29642d97890f4b4a3417297e4"
 dependencies = [
- "block-padding",
+ "block-padding 0.2.1",
  "generic-array",
 ]
 
@@ -428,8 +439,8 @@ version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2cb03d1bed155d89dce0f845b7899b18a9a163e148fd004e1c28421a783e2d8e"
 dependencies = [
- "block-padding",
- "cipher",
+ "block-padding 0.2.1",
+ "cipher 0.3.0",
 ]
 
 [[package]]
@@ -437,6 +448,15 @@ name = "block-padding"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d696c370c750c948ada61c69a0ee2cbbb9c50b1019ddb86d9317157a99c2cae"
+
+[[package]]
+name = "block-padding"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5808df4b2412175c4db3afb115c83d8d0cd26ca4f30a042026cddef8580e526a"
+dependencies = [
+ "generic-array",
+]
 
 [[package]]
 name = "blocking"
@@ -458,7 +478,7 @@ version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e0fe69538c9605742021daa40276f6be6651a00f8ce13b81e257bacd99f22a0"
 dependencies = [
- "aes",
+ "aes 0.7.5",
  "bincode",
  "block-modes",
  "blsttc",
@@ -588,6 +608,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cbc"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2c68b1d4a461fc5641967e1b255c976579a87ef000c043850ca1aff89faa128"
+dependencies = [
+ "cipher 0.4.3",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.73"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -628,6 +657,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cipher"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1873270f8f7942c191139cb8a40fd228da6c3fd2fc376d7e92d47aa14aeb59e"
+dependencies = [
+ "crypto-common",
+ "inout",
+]
+
+[[package]]
 name = "clap"
 version = "2.33.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -644,44 +683,17 @@ dependencies = [
 
 [[package]]
 name = "color-eyre"
-version = "0.5.11"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f1885697ee8a177096d42f158922251a41973117f6d8a234cee94b9509157b7"
+checksum = "8ebf286c900a6d5867aeff75cfee3192857bb7f24b547d4f0df2ed6baa812c90"
 dependencies = [
  "backtrace",
- "color-spantrace 0.1.6",
+ "color-spantrace",
  "eyre",
  "indenter",
  "once_cell",
- "owo-colors 1.3.0",
- "tracing-error 0.1.2",
-]
-
-[[package]]
-name = "color-eyre"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d6ec7641ff3474b7593009c809db602c414cd97c7d47a78ed004162b74ff96c"
-dependencies = [
- "backtrace",
- "color-spantrace 0.2.0",
- "eyre",
- "indenter",
- "once_cell",
- "owo-colors 3.2.0",
- "tracing-error 0.2.0",
-]
-
-[[package]]
-name = "color-spantrace"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6eee477a4a8a72f4addd4de416eb56d54bc307b284d6601bafdee1f4ea462d1"
-dependencies = [
- "once_cell",
- "owo-colors 1.3.0",
- "tracing-core",
- "tracing-error 0.1.2",
+ "owo-colors",
+ "tracing-error",
 ]
 
 [[package]]
@@ -691,9 +703,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ba75b3d9449ecdccb27ecbc479fdc0b87fa2dd43d2f8298f9bf0e59aacc8dce"
 dependencies = [
  "once_cell",
- "owo-colors 3.2.0",
+ "owo-colors",
  "tracing-core",
- "tracing-error 0.2.0",
+ "tracing-error",
 ]
 
 [[package]]
@@ -937,6 +949,16 @@ name = "crunchy"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
+
+[[package]]
+name = "crypto-common"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57952ca27b5e3606ff4dd79b0020231aaf9d6aa76dc05fd30137538c50bd3ce8"
+dependencies = [
+ "generic-array",
+ "typenum",
+]
 
 [[package]]
 name = "crypto-mac"
@@ -1207,9 +1229,9 @@ dependencies = [
 
 [[package]]
 name = "err-derive"
-version = "0.2.4"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22deed3a8124cff5fa835713fa105621e43bbdc46690c3a6b68328a012d350d4"
+checksum = "c34a887c8df3ed90498c1c437ce21f211c8e27672921a8ffa293cb8d6d4caa9e"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -1227,9 +1249,9 @@ checksum = "77f3309417938f28bf8228fcff79a4a37103981e3e186d2ccd19c74b38f4eb71"
 
 [[package]]
 name = "eyre"
-version = "0.6.6"
+version = "0.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc225d8f637923fe585089fcf03e705c222131232d2c1fb622e84ecf725d0eb8"
+checksum = "9289ed2c0440a6536e65119725cf91fc2c6b5e513bfd2e36e1134d7cca6ca12f"
 dependencies = [
  "indenter",
  "once_cell",
@@ -1924,6 +1946,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "inout"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e1f03d4ab4d5dc9ec2d219f86c15d2a15fc08239d1cd3b2d6a19717c0a2f443"
+dependencies = [
+ "block-padding 0.3.1",
+ "generic-array",
+]
+
+[[package]]
 name = "instant"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2393,12 +2425,6 @@ checksum = "c3df761f6470298359f84fcfb60d86db02acc22c251c37265c07a3d1057d2389"
 dependencies = [
  "regex",
 ]
-
-[[package]]
-name = "owo-colors"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2386b4ebe91c2f7f51082d4cefa145d030e33a1842a96b12e4885cc3c01f7a55"
 
 [[package]]
 name = "owo-colors"
@@ -3392,7 +3418,7 @@ dependencies = [
  "blsttc",
  "bytes",
  "cargo-husky",
- "color-eyre 0.6.0",
+ "color-eyre",
  "console-subscriber",
  "crdts",
  "criterion",
@@ -3500,20 +3526,20 @@ dependencies = [
 
 [[package]]
 name = "self_encryption"
-version = "0.27.1"
+version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a632280d1d1ada33389f77fe38521d1d66d03697b73426be55caa4d293d5dd04"
+checksum = "c37fee760a2a4e2560ea4de9e0914c3cc6bbfcadf2996cd8d1fc6f2c5d457d19"
 dependencies = [
- "aes",
+ "aes 0.8.1",
  "bincode",
- "block-modes",
  "brotli",
  "bytes",
+ "cbc",
  "err-derive",
  "itertools 0.10.3",
  "num_cpus",
- "rand 0.7.3",
- "rand_chacha 0.2.2",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
  "rayon",
  "serde",
  "tiny-keccak",
@@ -3766,7 +3792,7 @@ dependencies = [
  "bincode",
  "blsttc",
  "bytes",
- "color-eyre 0.6.0",
+ "color-eyre",
  "dirs-next 2.0.0",
  "ed25519-dalek",
  "env_logger 0.8.4",
@@ -3812,7 +3838,7 @@ dependencies = [
  "blsttc",
  "bytes",
  "chrono",
- "color-eyre 0.6.0",
+ "color-eyre",
  "comfy-table",
  "console 0.14.1",
  "criterion",
@@ -3854,7 +3880,7 @@ name = "sn_cmd_test_utilities"
 version = "1.1.0"
 dependencies = [
  "assert_cmd",
- "color-eyre 0.6.0",
+ "color-eyre",
  "ctor",
  "dirs-next 2.0.0",
  "multibase 0.6.0",
@@ -3869,11 +3895,11 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.9.5"
+version = "0.9.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "162afd7d07769ed4d6d1727ad60c62c617361bf38ce124b74a6a84bbd49d9e78"
+checksum = "dad300d170e638d94b318986e7531be658e303c5ff57c3b110231a72c813278b"
 dependencies = [
- "color-eyre 0.5.11",
+ "color-eyre",
  "dirs-next 1.0.2",
  "eyre",
  "serde_json",
@@ -3989,9 +4015,9 @@ dependencies = [
 
 [[package]]
 name = "sysinfo"
-version = "0.23.2"
+version = "0.23.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92d82ade9d6621d4ca052a00bb6ea9ed513d223cba75a84625c5e9c0698ab6f5"
+checksum = "70d06c623c041b6aec9830080e9069b4ab6a84de3b4b4d14b4bbb09c629efdc0"
 dependencies = [
  "cfg-if 1.0.0",
  "core-foundation-sys",
@@ -4394,16 +4420,6 @@ checksum = "03cfcb51380632a72d3111cb8d3447a8d908e577d31beeac006f836383d29a23"
 dependencies = [
  "lazy_static",
  "valuable",
-]
-
-[[package]]
-name = "tracing-error"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4d7c0b83d4a500748fa5879461652b361edf5c9d51ede2a2ac03875ca185e24"
-dependencies = [
- "tracing",
- "tracing-subscriber 0.2.25",
 ]
 
 [[package]]
