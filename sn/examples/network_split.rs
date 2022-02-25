@@ -35,7 +35,7 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node";
 const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
 const NODES_DIR: &str = "local-test-network";
-const INTERVAL: &str = "2";
+const INTERVAL: &str = "5";
 const RUST_LOG: &str = "RUST_LOG";
 const ADDITIONAL_NODES_TO_SPLIT: u64 = 30;
 #[tokio::main]
@@ -151,7 +151,10 @@ pub async fn run_split() -> Result<()> {
         all_data_put.push((address, hash));
     }
 
-    // add more nodes
+    // ======================
+    // Now we add more nodes
+    // ======================
+
     let additional_node_count = ADDITIONAL_NODES_TO_SPLIT;
     let additional_node_count_str = &ADDITIONAL_NODES_TO_SPLIT.to_string();
 
@@ -168,7 +171,7 @@ pub async fn run_split() -> Result<()> {
         .wrap_err("Error adding nodes to the testnet")?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
-    let interval_duration = Duration::from_secs(interval_as_int * additional_node_count);
+    let interval_duration = Duration::from_secs(interval_as_int * additional_node_count * 3);
 
     sleep(interval_duration).await;
 

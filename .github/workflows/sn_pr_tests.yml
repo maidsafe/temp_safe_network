@@ -391,9 +391,15 @@ jobs:
         run: cargo build  --release --bin log_cmds_inspector
         timeout-minutes: 60
 
-      - name: Start the network
-        run: ./target/release/testnet
-        id: section-startup
+      # This starts a 30 node network
+      - name: Run network split data integrity test
+        timeout-minutes: 30
+        shell: bash
+        run: cargo run --release --features=test-utils --example network_split
+
+      # - name: Start the network
+      #   run: ./target/release/testnet
+      #   id: section-startup
 
       - name: Print Network Log Stats at start
         shell: bash
