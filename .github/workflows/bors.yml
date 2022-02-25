@@ -462,7 +462,15 @@ jobs:
         timeout-minutes: 60
 
       - name: Build all safe_network bins
-        run: cargo build -p safe_network --release --features=test-utils --bins
+        run: cd sn && cargo build --release --features=test-utils --bins
+        timeout-minutes: 60
+
+      - name: Build testnet
+        run: cargo build  --release --bin testnet
+        timeout-minutes: 60
+
+      - name: Build log_cmds_inspector
+        run: cargo build  --release --bin log_cmds_inspector
         timeout-minutes: 60
 
       - name: Start the network
