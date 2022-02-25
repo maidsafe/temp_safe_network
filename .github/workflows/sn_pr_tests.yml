@@ -456,12 +456,6 @@ jobs:
         shell: bash
         run: cd sn && cargo run  --release  --features=test-utils --example client_files
 
-
-      - name: Run example app for file API against local network
-        timeout-minutes: 10
-        shell: bash
-        run: cd sn && cargo run  --release  --features=always-joinable,test-utils --example client_files && sleep $POST_TEST_SLEEP
-
       # many client connections
       - name: many client test against local network
         shell: bash
