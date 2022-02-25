@@ -136,10 +136,16 @@ jobs:
           sharedKey: ${{github.run_id}}
 
       - name: Build sn bins
-        # all = all crates in workspace, lib/bins targets, with these features...
         run: cargo build -p safe_network --release --features=test-utils --bins
         timeout-minutes: 60
 
+      - name: Build testnet
+        run: cargo build  --release --bin testnet
+        timeout-minutes: 60
+
+      - name: Build log_cmds_inspector
+        run: cargo build  --release --bin log_cmds_inspector
+        timeout-minutes: 60
 
   unit:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -277,6 +283,14 @@ jobs:
         run: cd sn && cargo test --no-run --release --features=test-utils
         timeout-minutes: 60
 
+      - name: Build testnet
+        run: cargo build  --release --bin testnet
+        timeout-minutes: 60
+
+      - name: Build log_cmds_inspector
+        run: cargo build  --release --bin log_cmds_inspector
+        timeout-minutes: 60
+
       - name: Start the network
         run: ./target/release/testnet
         id: section-startup
@@ -326,20 +340,14 @@ jobs:
       - name: Client reg tests against local network (unix)
         shell: zsh {0}
         if: matrix.os != 'windows-latest'
-        run: cd sn && repeat 5 cargo test --release --features=test-utils -- client_api::reg --test-threads=1 --skip ae --skip batching && sleep $POST_TEST_SLEEP
+        run: cd sn && repeat 5 cargo test --release --features=test-utils -- client_api::reg --test-threads=1 --skip ae  && sleep $POST_TEST_SLEEP
         timeout-minutes: 10
 
       # register api
       - name: Client reg tests against local network (win)
         shell: bash
         if: matrix.os == 'windows-latest'
-        run: cd sn && cargo test --release --features=test-utils -- client_api::reg --test-threads=1 --skip ae --skip batching && sleep $POST_TEST_SLEEP
-        timeout-minutes: 10
-
-      # register api batching check, only run this once as it's slow, and we verify the basic tests above
-      - name: Client register batching
-        shell: bash
-        run: cd sn && cargo test --release --features=test-utils -- register_batching --test-threads=1 --skip ae && sleep $POST_TEST_SLEEP
+        run: cd sn && cargo test --release --features=test-utils -- client_api::reg --test-threads=1 --skip ae && sleep $POST_TEST_SLEEP
         timeout-minutes: 10
 
 
@@ -448,7 +456,15 @@ jobs:
         timeout-minutes: 60
 
       - name: Build all safe_network bins
-        run: cargo build -p safe_network --release --features=test-utils --bins
+        run: cd sn && cargo build --release --features=test-utils --bins
+        timeout-minutes: 60
+
+      - name: Build testnet
+        run: cargo build  --release --bin testnet
+        timeout-minutes: 60
+
+      - name: Build log_cmds_inspector
+        run: cargo build  --release --bin log_cmds_inspector
         timeout-minutes: 60
 
       - name: Start the network
@@ -504,15 +520,9 @@ jobs:
       # register api
       - name: Client reg tests against local network (unix)
         shell: zsh {0}
-        run: cd sn && repeat 5 cargo test --release --features=test-utils -- client_api::reg --test-threads=1 --skip ae --skip batching && sleep $POST_TEST_SLEEP
+        run: cd sn && repeat 5 cargo test --release --features=test-utils -- client_api::reg --test-threads=1 --skip ae && sleep $POST_TEST_SLEEP
         timeout-minutes: 10
 
-
-      # register api batching check, only run this once as it's slow, and we verify the basic tests above
-      - name: Client register batching
-        shell: bash
-        run: cd sn && cargo test --release --features=test-utils -- register_batching --test-threads=1 --skip ae && sleep $POST_TEST_SLEEP
-        timeout-minutes: 10
 
       # file api
       - name: client file tests against local network (unix)
@@ -534,13 +544,11 @@ jobs:
         shell: bash
         run: cd sn && cargo run  --release  --features=test-utils --example client_files
 
-      # # many client connections
-      # - name: many client test against local network
-      #   shell: bash
-      #   run: cd sn && cargo test --release --features=test-utils -- from_many_clients  && sleep $POST_TEST_SLEEP
-      #   timeout-minutes: 20
-      #   env:
-      #     SN_QUERY_TIMEOUT: 240 # 240 secs
+      # many client connections
+      - name: many client test against local network
+        shell: bash
+        run: cd sn && cargo test --release --features=test-utils -- from_many_clients  && sleep $POST_TEST_SLEEP
+        timeout-minutes: 20
 
       - name: Are nodes still running...?
         shell: bash

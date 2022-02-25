@@ -45,7 +45,7 @@ impl Client {
         Ok(())
     }
 
-    /// Creates a Register on the network which can then be written to.
+    /// Creates a Register which can then be written to.
     ///
     /// Returns a write ahead log (WAL) of register operations, note that the changes are not uploaded to the
     /// network until the WAL is published with `publish_register_ops`
@@ -317,20 +317,10 @@ mod tests {
             .create_register(name, tag, private_policy(owner))
             .await?;
 
-        // make sure private register was not uploaded
-        tokio::time::sleep(one_sec).await;
-        let register = client.get_register(address).await;
-        assert!(register.is_err());
-
         // create a Public Register
         let (address2, mut batch2) = client
             .create_register(name, tag, public_policy(owner))
             .await?;
-
-        // make sure public register was not uploaded
-        tokio::time::sleep(one_sec).await;
-        let register = client.get_register(address2).await;
-        assert!(register.is_err());
 
         // batch them up
         batch.append(&mut batch2);
