@@ -78,7 +78,7 @@ mod test {
     async fn history() -> Result<()> {
         let id = xor_name::XorName::random();
         let tmp_dir = tempdir()?;
-        let db_dir = tmp_dir.path().join(Path::new(&"Token".to_string()));
+        let db_dir = tmp_dir.path().join(Path::new(&"Token"));
         let db = sled::open(db_dir).map_err(|error| {
             trace!("Sled Error: {:?}", error);
             Error::Sled(error)

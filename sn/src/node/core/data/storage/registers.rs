@@ -64,7 +64,7 @@ struct CacheEntry {
 impl RegisterStorage {
     /// Create new RegisterStorage
     pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
-        let create_path = |name: &str| path.join("db").join(name.to_string());
+        let create_path = |name: &str| path.join("db").join(name);
         let create_db = |db_dir| {
             sled::Config::default()
                 .path(&db_dir)
@@ -98,8 +98,7 @@ impl RegisterStorage {
             .key_db
             .export()
             .into_iter()
-            .map(|(_, _, pairs)| pairs)
-            .flatten()
+            .flat_map(|(_, _, pairs)| pairs)
             .par_bridge()
             .map(|pair| {
                 let src_key = &pair[0];
@@ -223,8 +222,7 @@ impl RegisterStorage {
             .key_db
             .export()
             .into_iter()
-            .map(|(_, _, pairs)| pairs)
-            .flatten()
+            .flat_map(|(_, _, pairs)| pairs)
             .par_bridge()
             .map(|pair| {
                 let src_key = &pair[0];
