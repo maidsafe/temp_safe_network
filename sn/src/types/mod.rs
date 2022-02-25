@@ -70,4 +70,12 @@ impl ReplicatedData {
             Self::RegisterWrite(cmd) => *cmd.dst_address().name(),
         }
     }
+
+    pub(crate) fn address(&self) -> ReplicatedDataAddress {
+        match self {
+            Self::Chunk(chunk) => ReplicatedDataAddress::Chunk(*chunk.address()),
+            Self::RegisterLog(log) => ReplicatedDataAddress::Register(log.address),
+            Self::RegisterWrite(cmd) => ReplicatedDataAddress::Register(cmd.dst_address()),
+        }
+    }
 }

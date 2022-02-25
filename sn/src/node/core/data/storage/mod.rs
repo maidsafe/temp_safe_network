@@ -70,7 +70,7 @@ impl DataStorage {
             ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd).await?,
         };
 
-        // check if we've filled another apprx. 10%-points of our storage
+        // check if we've filled another approx. 10%-points of our storage
         // if so, update the recorded level
         let last_recorded_level = { *self.last_recorded_level.read().await };
         if let Ok(next_level) = last_recorded_level.next() {
@@ -99,7 +99,7 @@ impl DataStorage {
     /// --- System calls ---
 
     // Read data from local store
-    pub(crate) async fn get_for_replication(
+    pub(crate) async fn get_from_local_store(
         &self,
         address: &DataAddress,
     ) -> Result<ReplicatedData> {
@@ -142,10 +142,10 @@ impl DataStorage {
         self.data_replicator
             .write()
             .await
-            .add_to_transmitter(data_address, targets)
+            .start_replication_for(data_address, targets)
     }
 
-    pub(crate) async fn get_from_replicator(
+    pub(crate) async fn get_for_replication(
         &self,
         data_address: ReplicatedDataAddress,
         target: XorName,
@@ -154,9 +154,9 @@ impl DataStorage {
             .data_replicator
             .write()
             .await
-            .get_for_replication(data_address, target)
+            .finish_replication_for(data_address, target)
         {
-            let data = self.get_for_replication(&data_address).await?;
+            let data = self.get_from_local_store(&data_address).await?;
 
             if should_delete {
                 // We can now delete the data since we do not need to hold it anymore
@@ -177,7 +177,7 @@ impl DataStorage {
         self.data_replicator
             .write()
             .await
-            .remove_from_transmitter(data_address, target);
+            .stop_replication_for(data_address, target);
     }
 }
 
@@ -197,16 +197,19 @@ impl Node {
                 .get_replica_targets(addr, &new_adults, &lost_adults, &remaining)
                 .await
             {
-                let _prev = data_for_replication.insert(data, holders);
+                let _prev = data_for_replication.insert(data.address(), (data, holders));
             }
         }
 
         let mut cmds = vec![];
         let section_pk = self.network_knowledge.section_key().await;
-        for (data_address, targets) in data_for_replication {
+
+        for (data_address, (_data, targets)) in data_for_replication {
             for name in targets {
                 cmds.push(Cmd::SignOutgoingSystemMsg {
-                    msg: SystemMsg::NodeCmd(NodeCmd::SendReplicateDataAddress(data_address)),
+                    msg: SystemMsg::NodeCmd(
+                        NodeCmd::SendReplicateDataAddress(data_address).clone(),
+                    ),
                     dst: DstLocation::Node { name, section_pk },
                 })
             }
@@ -242,16 +245,16 @@ impl Node {
                 new_adult_is_holder,
                 lost_old_holder
             );
-            let data = match storage.get_for_replication(address).await {
+            let data = match storage.get_from_local_store(address).await {
                 Ok(data) => {
-                    info!("Data found and republishing: {address:?}");
+                    info!("Data found for replication: {address:?}");
                     self.data_storage
-                    .add_to_replicator(&address.to_replicated_address(), &new_holders)
-                    .await;
+                        .add_to_replicator(&data.address(), &new_holders)
+                        .await;
                     Ok(data)
                 }
                 Err(error) => {
-                    warn!("Error finding {address:?} for republishing: {error:?}");
+                    warn!("Error finding {address:?} for replication: {error:?}");
                     Err(error)
                 }
             }
@@ -261,5 +264,88 @@ impl Node {
         } else {
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::dbs::Error;
+    use crate::node::core::data::DataStorage;
+    use crate::types::utils::random_bytes;
+    use crate::types::{Chunk, ReplicatedData};
+    use crate::UsedSpace;
+    use std::collections::BTreeSet;
+    use tempfile::tempdir;
+    use xor_name::XorName;
+
+    #[tokio::test]
+    async fn data_storage_basics() -> Result<(), Error> {
+        let tmp_dir = tempdir()?;
+        let path = tmp_dir.path();
+        let used_space = UsedSpace::new(usize::MAX);
+
+        let storage = DataStorage::new(path, used_space)?;
+
+        // 5mb random data
+        let bytes = random_bytes(5 * 1024 * 1024);
+        let chunk = Chunk::new(bytes);
+        let replicated_data = ReplicatedData::Chunk(chunk);
+        let _ = storage.store(&replicated_data).await?;
+
+        let fetched_data = storage
+            .get_from_local_store(&replicated_data.address())
+            .await?;
+
+        assert_eq!(replicated_data, fetched_data);
+
+        storage.remove(&replicated_data.address()).await?;
+
+        match storage
+            .get_from_local_store(&replicated_data.address())
+            .await
+        {
+            Err(Error::ChunkNotFound(address)) => assert_eq!(address, replicated_data.name()),
+            _ => panic!("Unexpected data found"),
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn data_is_deleted_when_replicator_is_emptied() -> Result<(), Error> {
+        let tmp_dir = tempdir()?;
+        let path = tmp_dir.path();
+        let used_space = UsedSpace::new(usize::MAX);
+
+        let storage = DataStorage::new(path, used_space)?;
+
+        // 5mb random data
+        let bytes = random_bytes(5 * 1024 * 1024);
+        let chunk = Chunk::new(bytes);
+        let original_data = ReplicatedData::Chunk(chunk);
+        let data_address = original_data.address();
+
+        // Store it in our storage
+        let _ = storage.store(&original_data).await?;
+
+        let targets = (0..4)
+            .map(|_| XorName::random().with_bit(0, false))
+            .collect::<BTreeSet<XorName>>();
+
+        storage.add_to_replicator(&data_address, &targets).await;
+
+        for target in targets {
+            let fetched_data = storage.get_for_replication(data_address, target).await?;
+            assert_eq!(fetched_data, original_data);
+        }
+
+        match storage.get_from_local_store(&original_data.address()).await {
+            Err(Error::ChunkNotFound(address)) => {
+                assert_eq!(address, original_data.name())
+            }
+            _ => panic!("Unexpected data found"),
+        }
+
+        Ok(())
     }
 }

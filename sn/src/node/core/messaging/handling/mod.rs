@@ -35,7 +35,7 @@ use crate::node::{
     network_knowledge::NetworkKnowledge,
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
 };
-use crate::types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedDataAddress};
+use crate::types::{log_markers::LogMarker, Peer, PublicKey};
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -740,7 +740,7 @@ impl Node {
                     Ok(vec![])
                 } else {
                     // Check if we already have the data
-                    match self.data_storage.get_for_replication(&data_address).await {
+                    match self.data_storage.get_from_local_store(&data_address).await {
                         Err(crate::dbs::Error::NoSuchData(_))
                         | Err(crate::dbs::Error::ChunkNotFound(_)) => {
                             info!("to-be-replicated data is not present");
@@ -784,7 +784,7 @@ impl Node {
                 } else {
                     match self
                         .data_storage
-                        .get_from_replicator(data_address, sender.name())
+                        .get_for_replication(data_address, sender.name())
                         .await
                     {
                         Ok(data) => {
