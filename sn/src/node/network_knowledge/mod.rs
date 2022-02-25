@@ -288,12 +288,11 @@ impl NetworkKnowledge {
                     .await
                     .join(proof_chain.clone())?;
 
-                // lets find out if we should be an elder after the change
-                let mut we_are_an_adult;
                 // and if we are... do we have the key share needed to perform elder duties
                 let mut we_have_a_share_of_this_key = false;
 
-                we_are_an_adult = !self.is_elder(our_name).await;
+                // lets find out if we should be an elder after the change
+                let mut we_are_an_adult = !self.is_elder(our_name).await;
 
                 // check we should not be _becoming_ an elder
                 if we_are_an_adult {

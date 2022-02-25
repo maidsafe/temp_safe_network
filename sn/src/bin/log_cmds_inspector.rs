@@ -539,6 +539,6 @@ fn populate_cmds_tree_for_msgs(
 // Given a cmd id, return the root id, e.g. the root cmd id of 'abc.1.0.2' is 'a.b.c'.
 fn get_root_cmd_id(cmd_id: &str) -> CmdId {
     let mut root_cmd_id = cmd_id.to_string();
-    root_cmd_id.truncate(cmd_id.find('.').unwrap_or_else(|| cmd_id.len()));
+    root_cmd_id.truncate(cmd_id.find('.').unwrap_or(cmd_id.len()));
     root_cmd_id
 }
