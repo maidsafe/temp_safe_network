@@ -313,17 +313,6 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success' &&  matrix.os != 'windows-latest'
 
-      - name: Upload Node Logs to AWS for Windowns
-          # Upload artifacts.
-        run: aws s3 sync C:\Users\runneradmin\.safe\node\local-test-network\ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure() &&  matrix.os == 'windows-latest'
-        continue-on-error: true
-
-      - name: Upload Node Logs to AWS for Non-Windows
-          # Upload artifacts.
-        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure() &&  matrix.os != 'windows-latest'
-        continue-on-error: true
 
       - name: Upload Node Logs
           # Upload artifacts.
@@ -590,18 +579,6 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success'
 
-      - name: Upload Node Logs to AWS for Windowns
-          # Upload artifacts.
-        run: aws s3 sync C:\Users\runneradmin\.safe\node\local-test-network\ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure() &&  matrix.os == 'windows-latest'
-        continue-on-error: true
-
-      - name: Upload Node Logs to AWS for Non-Windows
-          # Upload artifacts.
-        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure() &&  matrix.os != 'windows-latest'
-        continue-on-error: true
-
       - name: Upload Node Logs
           # Upload artifacts.
         uses: actions/upload-artifact@v2
@@ -702,11 +679,6 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success'
 
-      - name: Upload Node Logs to AWS
-          # Upload artifacts.
-        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure()
-        continue-on-error: true
 
       - name: Upload Node Logs
           # Upload artifacts.
