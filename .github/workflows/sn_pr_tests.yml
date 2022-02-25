@@ -187,6 +187,11 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: choco install ripgrep
 
+      - name: Build sn bins
+        run: cd sn && cargo build --release --features=test-utils --bins
+        timeout-minutes: 60
+
+
       - name: Build all safe_network tests
         run: cd sn && cargo test --no-run --release --features=test-utils
         timeout-minutes: 60
@@ -387,12 +392,12 @@ jobs:
       - name: ubuntu install ripgrep
         run: sudo apt-get -y install ripgrep
 
-      - name: Build all safe_network tests
-        run: cd sn && cargo test --no-run --release --features=test-utils
+      - name: Build sn bins
+        run: cd sn && cargo build --release --features=test-utils --bins
         timeout-minutes: 60
 
-      - name: Build all safe_network bins
-        run: cargo build -p safe_network --release --features=test-utils --bins
+      - name: Build all safe_network tests
+        run: cd sn && cargo test --no-run --release --features=test-utils
         timeout-minutes: 60
 
       - name: Build testnet
@@ -560,6 +565,10 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: choco install ripgrep
 
+      - name: Build sn bins
+        run: cd sn && cargo build --release --features=test-utils --bins
+        timeout-minutes: 60
+
       - name: Build testnet
         run: cargo build  --release --bin testnet
         timeout-minutes: 60
@@ -682,6 +691,10 @@ jobs:
       - name: windows install ripgrep
         if: matrix.os == 'windows-latest'
         run: choco install ripgrep
+
+      - name: Build sn bins
+        run: cd sn && cargo build --release --features=test-utils --bins
+        timeout-minutes: 60
 
       - name: Build testnet
         run: cargo build  --release --bin testnet
