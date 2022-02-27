@@ -5,7 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.57.1 (2022-02-27)
+
+### Bug Fixes
+
+ - <csr-id-38fb057da44a0e243186410df0c39361a21ec46e/> introduce cohesive conn handling
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 8 days passed between releases.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #1038 #1042 ([`08da844`](https://github.com/maidsafe/safe_network/commit/08da8440f9acd2eb8b2494ca7d1c2f8f3f8f631e))
+    - changes to appease clippy 1.59 ([`705995e`](https://github.com/maidsafe/safe_network/commit/705995ef67b3d4c45c95689c4a675e1063467ec9))
+    - introduce cohesive conn handling ([`38fb057`](https://github.com/maidsafe/safe_network/commit/38fb057da44a0e243186410df0c39361a21ec46e))
+    - more dep updates ([`f95ef3d`](https://github.com/maidsafe/safe_network/commit/f95ef3d1cdc5d588e99c343470b8f45aedda70b4))
+    - more general dep updates ([`d5e6f46`](https://github.com/maidsafe/safe_network/commit/d5e6f462615de830cd9c27dba49a34ba2da13b81))
+    - update multibase to be inline across codebase ([`7b4672d`](https://github.com/maidsafe/safe_network/commit/7b4672dfb6ae305221018e7eab090deabe4d6739))
+</details>
+
 ## v0.57.0 (2022-02-17)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 5 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.58.0/sn_api-0.57.0/sn_cli-0.50.0 ([`149665a`](https://github.com/maidsafe/safe_network/commit/149665a53c00f62be0e8c8ec340b951a06346848))
+</details>
 
 ## v0.56.0 (2022-02-12)
 
