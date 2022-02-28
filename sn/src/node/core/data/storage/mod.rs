@@ -11,20 +11,21 @@ mod registers;
 
 use crate::{
     dbs::Result,
-    messaging::{
-        data::{DataQuery, RegisterStoreExport, StorageLevel},
-        system::{NodeCmd, NodeQueryResponse, SystemMsg},
-        DstLocation,
-    },
     node::core::{Cmd, Node},
-    types::{register::User, ReplicatedData, ReplicatedDataAddress as DataAddress},
     UsedSpace,
 };
+
+use sn_interface::messaging::{
+    data::{DataQuery, RegisterStoreExport, StorageLevel},
+    system::{NodeCmd, NodeQueryResponse, SystemMsg},
+    DstLocation,
+};
+use sn_interface::types::{register::User, ReplicatedData, ReplicatedDataAddress as DataAddress};
 
 pub(crate) use chunks::ChunkStorage;
 pub(crate) use registers::RegisterStorage;
 
-use crate::types::ReplicatedDataAddress;
+use sn_interface::types::ReplicatedDataAddress;
 use std::collections::btree_map::Entry;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -241,13 +242,13 @@ impl Node {
 #[cfg(test)]
 mod tests {
     use crate::dbs::Error;
-    use crate::messaging::data::DataQuery;
-    use crate::messaging::system::NodeQueryResponse;
     use crate::node::core::data::DataStorage;
-    use crate::types::register::User;
-    use crate::types::utils::random_bytes;
-    use crate::types::{Chunk, ReplicatedData};
     use crate::UsedSpace;
+    use sn_interface::messaging::data::DataQuery;
+    use sn_interface::messaging::system::NodeQueryResponse;
+    use sn_interface::types::register::User;
+    use sn_interface::types::utils::random_bytes;
+    use sn_interface::types::{Chunk, ReplicatedData};
     use tempfile::tempdir;
 
     #[tokio::test]

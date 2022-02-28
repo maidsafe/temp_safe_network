@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use multibase::Base;
-use safe_network::types::register::EntryHash;
 use serde::{Deserialize, Serialize};
+use sn_interface::types::register::EntryHash;
 use std::convert::TryInto;
 use std::{
     fmt::{self, Display},

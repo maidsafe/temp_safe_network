@@ -25,24 +25,22 @@ pub(crate) use proposal::Proposal;
 pub(crate) use relocation::{check as relocation_check, ChurnId};
 
 use self::{data::DataStorage, split_barrier::SplitBarrier};
-
-use super::{
-    api::cmds::Cmd,
-    dkg::DkgVoter,
-    network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider},
-    Elders, Event, NodeElderChange, NodeInfo,
+use sn_interface::network_knowledge::{
+    NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider,
 };
 
-use crate::messaging::{
+use super::{api::cmds::Cmd, dkg::DkgVoter, Elders, Event, NodeElderChange};
+
+use crate::node::error::{Error, Result};
+use sn_interface::messaging::{
     data::OperationId,
     signature_aggregator::SignatureAggregator,
     system::{DkgSessionId, NodeEvent, SystemMsg},
     AuthorityProof, DstLocation, SectionAuth,
 };
-use crate::node::error::{Error, Result};
-use crate::types::{
-    log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk, Cache, Peer,
-};
+use sn_interface::types::{log_markers::LogMarker, Cache, Peer};
+
+use crate::utils::compare_and_write_prefix_map_to_disk;
 use crate::{elder_count, UsedSpace};
 
 use backoff::ExponentialBackoff;

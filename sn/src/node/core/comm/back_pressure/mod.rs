@@ -8,7 +8,7 @@
 
 mod load_monitoring;
 
-use crate::types::Peer;
+use sn_interface::types::Peer;
 
 use self::load_monitoring::{LoadMonitoring, INITIAL_MSGS_PER_S};
 

@@ -6,18 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
-    system::{KeyedSig, SectionAuth, SectionPeers, SystemMsg},
-    MsgId, MsgType, NodeMsgAuthority, SrcLocation, WireMsg,
-};
 use crate::node::{
     api::cmds::Cmd,
     core::Node,
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
-    network_knowledge::SectionAuthorityProvider,
     Error, Result,
 };
-use crate::types::{log_markers::LogMarker, Peer, PublicKey};
+use sn_interface::messaging::{
+    system::{KeyedSig, SectionAuth, SectionPeers, SystemMsg},
+    MsgId, MsgType, NodeMsgAuthority, SrcLocation, WireMsg,
+};
+
+use sn_interface::network_knowledge::SectionAuthorityProvider;
+use sn_interface::types::{log_markers::LogMarker, Peer, PublicKey};
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -489,22 +490,21 @@ impl Node {
 mod tests {
     use super::*;
     use crate::elder_count;
-    use crate::messaging::{
+    use crate::node::{
+        api::tests::create_comm, create_test_max_capacity_and_root_storage, MIN_ADULT_AGE,
+    };
+    use sn_interface::network_knowledge::test_utils::section_signed;
+
+    use crate::UsedSpace;
+    use sn_interface::messaging::{
         AuthorityProof, DstLocation, MsgId, MsgKind, MsgType, NodeAuth,
         SectionAuth as SectionAuthMsg,
     };
-    use crate::node::{
-        api::tests::create_comm,
-        create_test_max_capacity_and_root_storage,
-        dkg::test_utils::section_signed,
-        ed25519,
-        network_knowledge::{
-            test_utils::{gen_addr, gen_section_authority_provider},
-            SectionKeyShare, SectionKeysProvider,
-        },
-        NodeInfo, MIN_ADULT_AGE,
-    };
-    use crate::UsedSpace;
+    #[cfg(feature = "test-utils")]
+    use sn_interface::network_knowledge::test_utils::{gen_addr, gen_section_authority_provider};
+
+    use sn_interface::network_knowledge::{NodeInfo, SectionKeyShare, SectionKeysProvider};
+    use sn_interface::types::keys::ed25519;
 
     use assert_matches::assert_matches;
     use bls::SecretKey;

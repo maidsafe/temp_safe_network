@@ -8,15 +8,13 @@
 
 use super::UsedRecipientSaps;
 
-use crate::messaging::{
+use crate::node::{api::cmds::Cmd, messages::WireMsgUtils, Error, Result};
+use sn_interface::messaging::{
     system::{JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeState, SectionAuth, SystemMsg},
     DstLocation, WireMsg,
 };
-use crate::node::{
-    api::cmds::Cmd, ed25519, messages::WireMsgUtils, network_knowledge::SectionAuthorityProvider,
-    Error, NodeInfo, Result,
-};
-use crate::types::{Peer, PublicKey};
+use sn_interface::network_knowledge::{NodeInfo, SectionAuthorityProvider};
+use sn_interface::types::{keys::ed25519, Peer, PublicKey};
 
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{Keypair, Signature};

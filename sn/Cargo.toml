@@ -35,7 +35,7 @@ required-features = ["test-utils"]
 default = []
 chaos = []
 unstable-wiremsg-debuginfo = []
-test-utils = []
+test-utils = ["sn_interface/test-utils", "sn_interface/proptest"]
 # Needs to be built with RUSTFLAGS="--cfg tokio_unstable"
 tokio-console = ["console-subscriber"]
 
@@ -69,6 +69,7 @@ resource_proof = "1.0.38"
 rmp-serde = "1.0.0"
 secured_linked_list = "~0.5.0"
 self_encryption = "0.27.4"
+sn_interface = { path = "../sn_interface", version = "^0.1.0" }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_bytes = "~0.11.5"
 serde_json = "1.0.53"
@@ -109,7 +110,7 @@ features = ["fs", "io-util", "macros", "rt", "rt-multi-thread", "sync"]
 assert_matches = "1.3"
 criterion = { version = "0.3", features = ["async_tokio"] }
 ctor = "~0.1.20"
-proptest = "~0.10.1"
+proptest = "1.0.0"
 rand = { version = "~0.7.3", features = ["small_rng"] }
 rand_xorshift = "~0.2.0"
 termcolor="1.1.2"

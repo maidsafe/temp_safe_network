@@ -11,7 +11,17 @@
 use super::{Cmd, Comm, Dispatcher};
 
 use crate::dbs::UsedSpace;
-use crate::messaging::{
+use crate::node::{
+    core::{
+        relocation_check, ChurnId, MsgEvent, Node, Proposal, RESOURCE_PROOF_DATA_SIZE,
+        RESOURCE_PROOF_DIFFICULTY,
+    },
+    create_test_max_capacity_and_root_storage,
+    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
+    Error, Event, Result as RoutingResult,
+};
+use crate::{elder_count, init_test_logger};
+use sn_interface::messaging::{
     system::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState,
         NodeState as NodeStateMsg, RelocateDetails, ResourceProofResponse, SectionAuth, SystemMsg,
@@ -19,23 +29,18 @@ use crate::messaging::{
     AuthorityProof, DstLocation, MsgId, MsgKind, MsgType, NodeAuth,
     SectionAuth as MsgKindSectionAuth, WireMsg,
 };
-use crate::node::{
-    core::{
-        relocation_check, ChurnId, MsgEvent, Node, Proposal, RESOURCE_PROOF_DATA_SIZE,
-        RESOURCE_PROOF_DIFFICULTY,
-    },
-    create_test_max_capacity_and_root_storage,
-    dkg::test_utils::{prove, section_signed},
-    ed25519,
-    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
-    network_knowledge::{
-        test_utils::*, NetworkKnowledge, NodeState, SectionAuthorityProvider, SectionKeyShare,
-    },
-    recommended_section_size, supermajority, Error, Event, NodeInfo, Result as RoutingResult,
-    FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+#[cfg(feature = "test-utils")]
+use sn_interface::network_knowledge::test_utils::*;
+use sn_interface::network_knowledge::test_utils::{prove, section_signed};
+use sn_interface::network_knowledge::{
+    recommended_section_size, supermajority, NetworkKnowledge, NodeInfo, NodeState,
+    SectionAuthorityProvider, SectionKeyShare, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE,
+    MIN_ADULT_AGE,
 };
-use crate::types::{Keypair, Peer, PublicKey};
-use crate::{elder_count, init_test_logger};
+#[cfg(feature = "test-utils")]
+use sn_interface::types::{keyed_signed, SecretKeySet};
+
+use sn_interface::types::{keys::ed25519, Keypair, Peer, PublicKey};
 
 use assert_matches::assert_matches;
 use bls_dkg::message::Message;
@@ -45,6 +50,8 @@ use itertools::Itertools;
 use rand::{distributions::Alphanumeric, rngs::OsRng, Rng};
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
+#[cfg(feature = "test-utils")]
+use sn_interface::network_knowledge::test_utils::gen_section_authority_provider;
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     iter,
@@ -502,7 +509,7 @@ async fn handle_online_cmd(
             Ok(MsgType::System {
                 msg:
                     SystemMsg::Propose {
-                        proposal: crate::messaging::system::Proposal::Offline(node_state),
+                        proposal: sn_interface::messaging::system::Proposal::Offline(node_state),
                         ..
                     },
                 ..
@@ -1015,7 +1022,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         if let Ok(MsgType::System {
             msg:
                 SystemMsg::Propose {
-                    proposal: crate::messaging::system::Proposal::Offline(node_state),
+                    proposal: sn_interface::messaging::system::Proposal::Offline(node_state),
                     ..
                 },
             ..
@@ -1083,7 +1090,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     };
 
     let node_msg = SystemMsg::NodeMsgError {
-        error: crate::messaging::data::Error::FailedToWriteFile,
+        error: sn_interface::messaging::data::Error::FailedToWriteFile,
         correlation_id: MsgId::new(),
     };
     let wire_msg = WireMsg::single_src(&info, dst_location, node_msg.clone(), section_pk)?;
@@ -1454,43 +1461,5 @@ fn create_relocation_trigger(sk: &bls::SecretKey, age: u8) -> Result<SectionAuth
         if relocation_check(age, &churn_id) && !relocation_check(age + 1, &churn_id) {
             return Ok(auth);
         }
-    }
-}
-
-// Wrapper for `bls::SecretKeySet` that also allows to retrieve the corresponding `bls::SecretKey`.
-// Note: `bls::SecretKeySet` does have a `secret_key` method, but it's test-only and not available
-// for the consumers of the crate.
-pub(crate) struct SecretKeySet {
-    set: bls::SecretKeySet,
-    key: bls::SecretKey,
-}
-
-impl SecretKeySet {
-    pub(crate) fn random() -> Self {
-        let poly = bls::poly::Poly::random(threshold(), &mut rand::thread_rng());
-        let key = bls::SecretKey::from_mut(&mut poly.evaluate(0));
-        let set = bls::SecretKeySet::from(poly);
-
-        Self { set, key }
-    }
-
-    pub(crate) fn secret_key(&self) -> &bls::SecretKey {
-        &self.key
-    }
-}
-
-impl Deref for SecretKeySet {
-    type Target = bls::SecretKeySet;
-
-    fn deref(&self) -> &Self::Target {
-        &self.set
-    }
-}
-
-// Create signature for the given bytes using the given secret key.
-fn keyed_signed(secret_key: &bls::SecretKey, bytes: &[u8]) -> KeyedSig {
-    KeyedSig {
-        public_key: secret_key.public_key(),
-        signature: secret_key.sign(bytes),
     }
 }
