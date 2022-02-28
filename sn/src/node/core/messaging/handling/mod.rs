@@ -257,6 +257,8 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         trace!("{:?}", LogMarker::SystemMsgToBeHandled);
 
+        trace!("Aggregating {:?} / {:?} / {:?}", msg_id, msg_authority, msg);
+
         // We assume to be aggregated if it contains a BLS Share sig as authority.
         match self
             .aggregate_msg_and_stop(&mut msg_authority, payload)
@@ -292,6 +294,8 @@ impl Node {
         sender: Peer,
         known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Cmd>> {
+        trace!("Handling valid message {:?} - {:?}", msg_id, node_msg);
+
         let src_name = msg_authority.name();
         match node_msg {
             SystemMsg::AntiEntropyUpdate {
