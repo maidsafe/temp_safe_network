@@ -5,19 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.58.1 (2022-02-23)
+## v0.58.2 (2022-02-27)
 
 ### Bug Fixes
 
+ - <csr-id-38fb057da44a0e243186410df0c39361a21ec46e/> introduce cohesive conn handling
  - <csr-id-ddd45b7cc73bbacea19f5c93519ae16a74cc01cc/> add MIN_PENDING_OPS threshold for liveness checks
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 6 commits contributed to the release over the course of 1 calendar day.
- - 2 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 19 commits contributed to the release over the course of 4 calendar days.
+ - 5 days passed between releases.
+ - 15 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -27,12 +28,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1038 #1042 ([`08da844`](https://github.com/maidsafe/safe_network/commit/08da8440f9acd2eb8b2494ca7d1c2f8f3f8f631e))
+    - remove pointless and long checks in reg batch ([`85e5136`](https://github.com/maidsafe/safe_network/commit/85e513670aa61f8acb3e3302ee4b39763ade036e))
+    - changes to appease clippy 1.59 ([`705995e`](https://github.com/maidsafe/safe_network/commit/705995ef67b3d4c45c95689c4a675e1063467ec9))
+    - introduce cohesive conn handling ([`38fb057`](https://github.com/maidsafe/safe_network/commit/38fb057da44a0e243186410df0c39361a21ec46e))
+    - update deps. ([`f8bfe9e`](https://github.com/maidsafe/safe_network/commit/f8bfe9efe68593ceb4f968a6d2a396c431ad6429))
+    - Add testing documentation ([`61068aa`](https://github.com/maidsafe/safe_network/commit/61068aaf3e9cd1c7513b58c073c55004697fdf6f))
+    - add read timing logs into put_get example ([`ea2ba0a`](https://github.com/maidsafe/safe_network/commit/ea2ba0afa036b6abab35db9a76488d052e7682d6))
+    - add put timing logs into put_get example ([`912a2f8`](https://github.com/maidsafe/safe_network/commit/912a2f8d2da4159fcf40567666b3b14024e8c0da))
+    - more general dep updates ([`d5e6f46`](https://github.com/maidsafe/safe_network/commit/d5e6f462615de830cd9c27dba49a34ba2da13b81))
+    - add put_get chunk soak example ([`35a46f0`](https://github.com/maidsafe/safe_network/commit/35a46f06e6233aff25d03350abaefacbe57ad25c))
+    - sn_cli-0.50.1 ([`fc074ab`](https://github.com/maidsafe/safe_network/commit/fc074ab28d3c8c011016e6598cf840fc38026418))
+    - move testnet bin into its own crate ([`b44ac35`](https://github.com/maidsafe/safe_network/commit/b44ac353e254d8d67996c3185dc40e5e99c0e4c7))
     - ignore cargo husky in udeps checks ([`d8c57e0`](https://github.com/maidsafe/safe_network/commit/d8c57e082b52196cc538271bc25a88e3efd2a97c))
     - update qp2p ([`222742f`](https://github.com/maidsafe/safe_network/commit/222742f7c57a4b451af354d33015974d0d7a3561))
+    - more log cmd inspector into its own crate. ([`c086db9`](https://github.com/maidsafe/safe_network/commit/c086db96c09a77c43777783f614ca6a43eff7cdd))
     - chore(fmt) ([`2623b9f`](https://github.com/maidsafe/safe_network/commit/2623b9fd673bfa6d7f0b4a1fb124496e8db83de2))
     - chore(refactor) Update deps including serde. ([`605bf69`](https://github.com/maidsafe/safe_network/commit/605bf6939b4fb675345bb3235dd1a7a29095e377))
     - chore(refactor) make node ED key naming explicit ([`884d560`](https://github.com/maidsafe/safe_network/commit/884d5603b8bcb87a75f63f779255c7e245064c16))
     - add MIN_PENDING_OPS threshold for liveness checks ([`ddd45b7`](https://github.com/maidsafe/safe_network/commit/ddd45b7cc73bbacea19f5c93519ae16a74cc01cc))
+</details>
+
+## v0.58.1 (2022-02-20)
+
+### Bug Fixes
+
+ - <csr-id-ddd45b7cc73bbacea19f5c93519ae16a74cc01cc/> add MIN_PENDING_OPS threshold for liveness checks
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.58.1 ([`ea0387b`](https://github.com/maidsafe/safe_network/commit/ea0387b43233f95d10f19d403d289f272f42336f))
+    - chore(refactor) Remove new and use default ([`3ebae42`](https://github.com/maidsafe/safe_network/commit/3ebae421eacd65985fa0a2ff506c6abdd2fe372e))
 </details>
 
 ## v0.58.0 (2022-02-17)

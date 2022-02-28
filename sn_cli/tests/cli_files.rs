@@ -108,7 +108,7 @@ fn calling_safe_files_put_recursive_and_set_dst_path() -> Result<()> {
         .next()
         .ok_or_else(|| eyre!("Could not fetch next line".to_string()))?;
     let files_container_xor =
-        &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace('\"', "");
+        &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace('"', "");
 
     let mut safeurl = safeurl_from(files_container_xor)?;
     safeurl.set_path("/aha/test.md");
@@ -173,7 +173,7 @@ fn calling_safe_files_put_recursive_with_slash() -> Result<()> {
         .next()
         .ok_or_else(|| eyre!("Could not fetch next line".to_string()))?;
     let files_container_xor =
-        &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace('\"', "");
+        &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace('"', "");
 
     let mut safeurl = safeurl_from(files_container_xor)?;
     safeurl.set_path("/test.md");
@@ -201,7 +201,7 @@ fn calling_safe_files_put_recursive_without_slash() -> Result<()> {
         .next()
         .ok_or_else(|| eyre!("Could not fetch next line".to_string()))?;
     let files_container_xor =
-        &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace('\"', "");
+        &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace('"', "");
 
     let mut safeurl = safeurl_from(files_container_xor)?;
     safeurl.set_path("/testdata/test.md");
@@ -236,7 +236,7 @@ fn calling_safe_files_sync() -> Result<()> {
         .next()
         .ok_or_else(|| eyre!("Could not fetch next line".to_string()))?;
     let versioned_xorurl =
-        &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace('\"', "");
+        &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace('"', "");
 
     let mut url = SafeUrl::from_url(versioned_xorurl)?;
     url.set_content_version(None);

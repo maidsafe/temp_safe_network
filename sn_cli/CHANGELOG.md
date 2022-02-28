@@ -4,34 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.50.1 (2022-02-23)
-
-### Documentation
-
- - <csr-id-59caff8609e3263dfa9c63d29eb967b602bf85d8/> further updates for cli user guide
-   Several changes were made to bring the user guide up-to-date:
-   * Move the XorUrl section to near the top of the document, below the network setup section. I done
-     this because I think it makes sense to explain the URL concept early, since it's used by every
-     command.
-   * Add a new section on Keys, where it's relevant to current network functionality. The previous Keys
-     documentation was removed because it referred to out-of-date features.
-   * Re-write the NRS, Cat and Dog documentation to make it a bit leaner.
-   * Remove the section on shell completions. I'm going to come back to this very shortly and possibly
-     include the completions to install them along with the application.
-   * Remove links to the 'Safe Dev Hub' from the Further Help section.
-   
-   The new sections have been written with a line length of 100. This is just to make it easier to read
-   while it's being written, without having to use word wrapping, which mangles the tables that are
-   output by some CLI commands. Markdown will still render the document with a larger line length,
-   which I think will wrap based on the size of the browser window.
+## v0.50.2 (2022-02-27)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 5 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits contributed to the release.
+ - 2 days passed between releases.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -41,17 +22,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - further updates for cli user guide ([`59caff8`](https://github.com/maidsafe/safe_network/commit/59caff8609e3263dfa9c63d29eb967b602bf85d8))
+    - Merge #1038 #1042 ([`08da844`](https://github.com/maidsafe/safe_network/commit/08da8440f9acd2eb8b2494ca7d1c2f8f3f8f631e))
+    - changes to appease clippy 1.59 ([`705995e`](https://github.com/maidsafe/safe_network/commit/705995ef67b3d4c45c95689c4a675e1063467ec9))
+    - more dep updates ([`f95ef3d`](https://github.com/maidsafe/safe_network/commit/f95ef3d1cdc5d588e99c343470b8f45aedda70b4))
+    - remove outdated prettytable, use comfy-table in sn_cli ([`3b9f8d3`](https://github.com/maidsafe/safe_network/commit/3b9f8d3b4565a5fc26c821f0b517cc463d7e6ca3))
+    - ignore bad cli test for now ([`a267749`](https://github.com/maidsafe/safe_network/commit/a2677491d8e3d2e42045e596b9e36b36250d4c28))
+    - update multibase to be inline across codebase ([`7b4672d`](https://github.com/maidsafe/safe_network/commit/7b4672dfb6ae305221018e7eab090deabe4d6739))
 </details>
 
-## v0.49.1 (2022-02-15)
+## v0.50.1 (2022-02-23)
+
+### Documentation
+
+ - <csr-id-59caff8609e3263dfa9c63d29eb967b602bf85d8/> further updates for cli user guide
+   Several changes were made to bring the user guide up-to-date:
+   * Move the XorUrl section to near the top of the document, below the network setup section. I done
+   this because I think it makes sense to explain the URL concept early, since it's used by every
+   command.
+* Add a new section on Keys, where it's relevant to current network functionality. The previous Keys
+     documentation was removed because it referred to out-of-date features.
+* Re-write the NRS, Cat and Dog documentation to make it a bit leaner.
+* Remove the section on shell completions. I'm going to come back to this very shortly and possibly
+     include the completions to install them along with the application.
+* Remove links to the 'Safe Dev Hub' from the Further Help section.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 2 days passed between releases.
+ - 5 days passed between releases.
  - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -62,9 +62,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - safe_network-0.57.1/sn_cli-0.49.1 ([`07dc30b`](https://github.com/maidsafe/safe_network/commit/07dc30b281f3c67cb5598aaaf72ba5c668353bf7))
-    - sudo based installation for cli ([`6e40898`](https://github.com/maidsafe/safe_network/commit/6e40898eb9ff007f60ddc5ea946318773fb90e55))
+    - sn_cli-0.50.1 ([`fc074ab`](https://github.com/maidsafe/safe_network/commit/fc074ab28d3c8c011016e6598cf840fc38026418))
+    - further updates for cli user guide ([`59caff8`](https://github.com/maidsafe/safe_network/commit/59caff8609e3263dfa9c63d29eb967b602bf85d8))
 </details>
+
+<csr-unknown>
+The new sections have been written with a line length of 100. This is just to make it easier to readwhile it’s being written, without having to use word wrapping, which mangles the tables that areoutput by some CLI commands. Markdown will still render the document with a larger line length,which I think will wrap based on the size of the browser window.<csr-unknown/>
 
 ## v0.50.0 (2022-02-17)
 
@@ -91,6 +94,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - safe_network-0.58.0/sn_api-0.57.0/sn_cli-0.50.0 ([`149665a`](https://github.com/maidsafe/safe_network/commit/149665a53c00f62be0e8c8ec340b951a06346848))
     - have the keys command to run in dry-run mode since it doesn't need a connection ([`d56ba3f`](https://github.com/maidsafe/safe_network/commit/d56ba3f8972d8d16e73608c80e159af5f2cccd04))
     - powershell install script for cli ([`499db88`](https://github.com/maidsafe/safe_network/commit/499db88b4e3fb57671a069f36aa3a71c945fb2fd))
+</details>
+
+## v0.49.1 (2022-02-15)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.57.1/sn_cli-0.49.1 ([`07dc30b`](https://github.com/maidsafe/safe_network/commit/07dc30b281f3c67cb5598aaaf72ba5c668353bf7))
+    - sudo based installation for cli ([`6e40898`](https://github.com/maidsafe/safe_network/commit/6e40898eb9ff007f60ddc5ea946318773fb90e55))
 </details>
 
 ## v0.49.0 (2022-02-12)
