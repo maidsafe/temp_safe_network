@@ -6,19 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
-    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
-    DstLocation, WireMsg,
-};
 use crate::node::{
     api::cmds::{next_timer_token, Cmd},
     dkg::dkg_msgs_utils::{DkgFailureSigSetUtils, DkgFailureSigUtils},
-    ed25519,
     messages::WireMsgUtils,
-    network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
-    NodeInfo, Result,
+    Result,
 };
-use crate::types::{log_markers::LogMarker, Peer, PublicKey};
+use sn_interface::messaging::{
+    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
+    DstLocation, WireMsg,
+};
+use sn_interface::network_knowledge::{
+    ElderCandidates, NodeInfo, SectionAuthorityProvider, SectionKeyShare,
+};
+use sn_interface::types::{keys::ed25519, log_markers::LogMarker, Peer, PublicKey};
 
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{
@@ -478,19 +479,20 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use crate::elder_count;
-    use crate::messaging::MsgType;
-    use crate::node::{
-        dkg::voter::DkgVoter, dkg::DkgSessionIdUtils, ed25519,
-        network_knowledge::test_utils::gen_addr, NodeInfo, MIN_ADULT_AGE,
-    };
+    use crate::node::{dkg::voter::DkgVoter, dkg::DkgSessionIdUtils};
+    use sn_interface::messaging::MsgType;
+    #[cfg(feature = "test-utils")]
+    use sn_interface::network_knowledge::{test_utils::gen_addr, NodeInfo, MIN_ADULT_AGE};
+
+    #[cfg(feature = "test-utils")]
+    use sn_interface::types::keys::ed25519::{self, proptesting::arbitrary_keypair};
 
     use assert_matches::assert_matches;
     use eyre::{bail, ContextCompat, Result};
     use itertools::Itertools;
     use proptest::{collection::SizeRange, prelude::*};
-    use rand::{rngs::SmallRng, SeedableRng};
+    use rand::{rngs::SmallRng, Rng, SeedableRng};
     use std::{collections::HashMap, iter, net::SocketAddr};
     use xor_name::Prefix;
 
@@ -668,11 +670,9 @@ mod tests {
         })
     }
 
+    #[cfg(feature = "test-utils")]
     fn arbitrary_node() -> impl Strategy<Value = NodeInfo> {
-        (
-            ed25519::test_utils::arbitrary_keypair(),
-            any::<SocketAddr>(),
-        )
+        (arbitrary_keypair(), any::<SocketAddr>())
             .prop_map(|(keypair, addr)| NodeInfo::new(keypair, addr))
     }
 }

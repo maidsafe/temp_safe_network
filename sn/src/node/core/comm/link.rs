@@ -8,7 +8,7 @@
 
 use super::MsgListener;
 
-use crate::types::{log_markers::LogMarker, Peer};
+use sn_interface::types::{log_markers::LogMarker, Peer};
 
 use bytes::Bytes;
 use priority_queue::DoublePriorityQueue;

@@ -7,7 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{read_prefix_map_from_disk, UsedRecipientSaps};
-use crate::messaging::{
+use crate::node::{
+    core::{Comm, DeliveryStatus, MsgEvent},
+    messages::WireMsgUtils,
+    Error, Result,
+};
+use sn_interface::messaging::{
     signature_aggregator::{Error as AggregatorError, SignatureAggregator},
     system::{
         JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, SectionAuth,
@@ -15,15 +20,11 @@ use crate::messaging::{
     },
     DstLocation, MsgKind, MsgType, NodeAuth, WireMsg,
 };
-use crate::node::{
-    core::{Comm, DeliveryStatus, MsgEvent},
-    dkg::SectionAuthUtils,
-    ed25519,
-    messages::WireMsgUtils,
-    network_knowledge::NetworkKnowledge,
-    Error, NodeInfo, Result, MIN_ADULT_AGE,
+use sn_interface::network_knowledge::{
+    prefix_map::NetworkPrefixMap, NetworkKnowledge, NodeInfo, SectionAuthUtils, MIN_ADULT_AGE,
 };
-use crate::types::{log_markers::LogMarker, prefix_map::NetworkPrefixMap, Peer};
+
+use sn_interface::types::{keys::ed25519, log_markers::LogMarker, Peer};
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -623,15 +624,14 @@ async fn send_messages(
 mod tests {
     use super::*;
 
-    use crate::messaging::SectionAuthorityProvider as SectionAuthorityProviderMsg;
-    use crate::node::{
-        dkg::test_utils::*,
-        messages::WireMsgUtils,
-        network_knowledge::{test_utils::*, NodeState},
-        Error as RoutingError, MIN_ADULT_AGE,
-    };
-    use crate::types::PublicKey;
+    use crate::node::{messages::WireMsgUtils, Error as RoutingError, MIN_ADULT_AGE};
+
+    #[cfg(feature = "test-utils")]
+    use sn_interface::network_knowledge::{test_utils::*, NodeState};
+
     use crate::{elder_count, init_test_logger};
+    use sn_interface::messaging::SectionAuthorityProvider as SectionAuthorityProviderMsg;
+    use sn_interface::types::PublicKey;
 
     use assert_matches::assert_matches;
     use eyre::{eyre, Error, Result};
@@ -640,6 +640,8 @@ mod tests {
         pin_mut,
     };
     use secured_linked_list::SecuredLinkedList;
+    #[cfg(feature = "test-utils")]
+    use sn_interface::network_knowledge::test_utils::gen_section_authority_provider;
     use std::{collections::BTreeMap, net::SocketAddr};
     use tokio::task;
     use xor_name::XorName;

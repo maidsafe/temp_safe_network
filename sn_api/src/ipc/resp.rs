@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{IpcError, NodeConfig};
-use safe_network::types::Keypair;
 use serde::{Deserialize, Serialize};
+use sn_interface::types::Keypair;
 
 /// IPC response.
 #[allow(clippy::large_enum_variant)]

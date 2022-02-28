@@ -10,7 +10,7 @@ use crate::safeurl::{ContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe};
 use bytes::Bytes;
 use log::{debug, warn};
-use safe_network::types::Token;
+use sn_interface::types::Token;
 pub use sn_dbc::Dbc;
 use std::collections::{BTreeMap, BTreeSet};
 
