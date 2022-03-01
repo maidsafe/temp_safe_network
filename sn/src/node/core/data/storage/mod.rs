@@ -189,13 +189,18 @@ impl Node {
         let new_holders = self.compute_holders(address, &new_adult_list);
         let old_holders = self.compute_holders(address, &old_adult_list);
 
-        let we_are_not_holder_anymore = !new_holders.contains(our_name);
+        let we_are_a_holder_now = new_holders.contains(our_name);
         let new_adult_is_holder = !new_holders.is_disjoint(new_adults);
         let lost_old_holder = !old_holders.is_disjoint(lost_adults);
 
-        if we_are_not_holder_anymore || new_adult_is_holder || lost_old_holder {
+        if !we_are_a_holder_now || new_adult_is_holder || lost_old_holder {
             info!("Republishing data at {:?}", address);
-            trace!("We are not a holder anymore? {}, New Adult is Holder? {}, Lost Adult was holder? {}", we_are_not_holder_anymore, new_adult_is_holder, lost_old_holder);
+            trace!(
+                "We are a holder now {}, New Adult is Holder? {}, Lost Adult was holder? {}",
+                we_are_a_holder_now,
+                new_adult_is_holder,
+                lost_old_holder
+            );
             let data = match storage.get_for_replication(address).await {
                 Ok(data) => {
                     info!("Data found and republishing: {address:?}");
@@ -209,7 +214,7 @@ impl Node {
             .ok()?;
 
             // Do not delete data if this is just for preemptive replication
-            if we_are_not_holder_anymore && !preemptive_replication {
+            if !we_are_a_holder_now && !preemptive_replication {
                 if let Err(err) = storage.remove(address).await {
                     warn!("Error deleting data during republish: {:?}", err);
                 }
