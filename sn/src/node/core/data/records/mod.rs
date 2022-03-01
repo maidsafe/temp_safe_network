@@ -80,12 +80,6 @@ impl Node {
                 .await;
         }
 
-        for target in &targets {
-            self.liveness
-                .add_a_pending_request_operation(*target, operation_id)
-                .await;
-        }
-
         let mut already_waiting_on_response = false;
         let mut this_peer_already_waiting_on_response = false;
         let waiting_peers = if let Some(peers) = self.pending_data_queries.get(&operation_id).await
@@ -106,6 +100,13 @@ impl Node {
         if waiting_peers.len() > MAX_WAITING_PEERS_PER_QUERY {
             warn!("Dropping query from {origin:?}, there are more than {MAX_WAITING_PEERS_PER_QUERY} waiting already");
             return Ok(vec![]);
+        }
+
+        // ensure we only add a pending request when we're actually sending out requests.
+        for target in &targets {
+            self.liveness
+                .add_a_pending_request_operation(*target, operation_id)
+                .await;
         }
 
         let _prior_value = self
