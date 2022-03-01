@@ -289,8 +289,6 @@ impl Node {
     ) -> Result<Option<Cmd>> {
         // Check if the message has reached the correct section,
         // if not, we'll need to respond with AE
-        trace!("Checking for entropy");
-
         let our_prefix = self.network_knowledge.prefix().await;
 
         // Let's try to find a section closer to the destination, if it's not for us.
@@ -351,7 +349,6 @@ impl Node {
         );
 
         if dst_section_key == &self.network_knowledge.section_key().await {
-            trace!("Provided Section PK matching our latest. All AE checks passed!");
             // Destination section key matches our current section key
             return Ok(None);
         }

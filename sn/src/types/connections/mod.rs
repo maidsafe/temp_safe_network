@@ -62,6 +62,7 @@ impl PeerLinks {
     /// This method is tailored to the use-case of connecting on send.
     /// I.e. it will not connect here, but on calling send on the returned link.
     pub(crate) async fn get_or_create(&self, id: &PeerId) -> Link {
+        debug!("Total links known: {:?}", self.links.read().await.len());
         if let Some(link) = self.get(id).await {
             return link;
         }

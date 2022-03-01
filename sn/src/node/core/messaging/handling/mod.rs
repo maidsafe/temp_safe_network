@@ -107,13 +107,6 @@ impl Node {
                     return Ok(cmds);
                 }
 
-                trace!(
-                    "Trusted msg authority in message ({:?}) from {:?}: {:?}",
-                    msg_id,
-                    sender,
-                    msg
-                );
-
                 // Let's check for entropy before we proceed further
                 // Adult nodes don't need to carry out entropy checking,
                 // however the message shall always be handled.
@@ -300,7 +293,6 @@ impl Node {
         known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Cmd>> {
         let src_name = msg_authority.name();
-        trace!("Handling non blocking message");
         match node_msg {
             SystemMsg::AntiEntropyUpdate {
                 section_auth,

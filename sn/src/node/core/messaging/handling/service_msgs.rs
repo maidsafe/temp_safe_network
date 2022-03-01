@@ -28,7 +28,6 @@ impl Node {
         user: EndUser,
         requesting_elder: XorName,
     ) -> Result<Vec<Cmd>> {
-        trace!("Handling data query at adult");
         let mut cmds = vec![];
 
         let response = self
@@ -167,7 +166,7 @@ impl Node {
             let dst = DstLocation::EndUser(EndUser(origin.name()));
             let wire_msg = WireMsg::new_msg(msg_id, payload.clone(), msg_kind.clone(), dst)?;
 
-            trace!(
+            debug!(
                 "Responding with the first chunk query response to {:?}",
                 dst
             );

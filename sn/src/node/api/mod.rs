@@ -380,7 +380,7 @@ async fn handle_connection_events(
                 wire_msg,
                 original_bytes,
             } => {
-                trace!(
+                debug!(
                     "New message ({} bytes) received from: {:?}",
                     original_bytes.len(),
                     sender
