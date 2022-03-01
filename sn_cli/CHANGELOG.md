@@ -4,15 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.50.2 (2022-02-27)
+## v0.50.3 (2022-03-01)
+
+### Bug Fixes
+
+ - <csr-id-1e8224efef60b3c58cdd146ea1e6cb1a7229972b/> char string updates after 1.59 rust
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 6 commits contributed to the release.
- - 2 days passed between releases.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 1 day passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -22,6 +26,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - char string updates after 1.59 rust ([`1e8224e`](https://github.com/maidsafe/safe_network/commit/1e8224efef60b3c58cdd146ea1e6cb1a7229972b))
+</details>
+
+## v0.50.2 (2022-02-27)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 7 commits contributed to the release over the course of 1 calendar day.
+ - 3 days passed between releases.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.58.2/sn_api-0.57.1/sn_cli-0.50.2 ([`634010f`](https://github.com/maidsafe/safe_network/commit/634010fd79ce1487abbff5adf3d15da59709dd95))
     - Merge #1038 #1042 ([`08da844`](https://github.com/maidsafe/safe_network/commit/08da8440f9acd2eb8b2494ca7d1c2f8f3f8f631e))
     - changes to appease clippy 1.59 ([`705995e`](https://github.com/maidsafe/safe_network/commit/705995ef67b3d4c45c95689c4a675e1063467ec9))
     - more dep updates ([`f95ef3d`](https://github.com/maidsafe/safe_network/commit/f95ef3d1cdc5d588e99c343470b8f45aedda70b4))
@@ -65,9 +91,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - sn_cli-0.50.1 ([`fc074ab`](https://github.com/maidsafe/safe_network/commit/fc074ab28d3c8c011016e6598cf840fc38026418))
     - further updates for cli user guide ([`59caff8`](https://github.com/maidsafe/safe_network/commit/59caff8609e3263dfa9c63d29eb967b602bf85d8))
 </details>
-
-<csr-unknown>
-The new sections have been written with a line length of 100. This is just to make it easier to readwhile it’s being written, without having to use word wrapping, which mangles the tables that areoutput by some CLI commands. Markdown will still render the document with a larger line length,which I think will wrap based on the size of the browser window.<csr-unknown/>
 
 ## v0.50.0 (2022-02-17)
 

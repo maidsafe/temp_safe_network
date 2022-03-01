@@ -1,6 +1,6 @@
 [package]
 name = "sn_cli"
-version = "0.50.2"
+version = "0.50.3"
 description = "Safe CLI"
 authors = [
   "bochaco <gabrielviganotti@gmail.com>",
