@@ -196,7 +196,17 @@ impl Node {
         if we_are_not_holder_anymore || new_adult_is_holder || lost_old_holder {
             info!("Republishing data at {:?}", address);
             trace!("We are not a holder anymore? {}, New Adult is Holder? {}, Lost Adult was holder? {}", we_are_not_holder_anymore, new_adult_is_holder, lost_old_holder);
-            let data = storage.get_for_replication(address).await.ok()?;
+            let data = match storage.get_for_replication(address).await {
+                Ok(data) => {
+                    info!("Data found and republishing: {address:?}");
+                    Ok(data)
+                }
+                Err(error) => {
+                    warn!("Error finding {address:?} for republishing: {error:?}");
+                    Err(error)
+                }
+            }
+            .ok()?;
 
             // Do not delete data if this is just for preemptive replication
             if we_are_not_holder_anymore && !preemptive_replication {
