@@ -83,7 +83,7 @@ impl RegisterStorage {
 
     /// --- Node Synching ---
     /// These are node internal functions, not to be exposed to users.
-
+    #[allow(dead_code)]
     pub(crate) async fn remove_register(&self, address: &Address) -> Result<()> {
         trace!("Removing register, {:?}", address);
         self.drop_register_key(address.id()?).await

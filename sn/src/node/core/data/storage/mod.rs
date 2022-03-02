@@ -110,6 +110,7 @@ impl DataStorage {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) async fn remove(&self, address: &DataAddress) -> Result<()> {
         match address {
             DataAddress::Chunk(addr) => self.chunks.remove_chunk(addr).await,
@@ -133,25 +134,16 @@ impl Node {
     #[allow(clippy::mutable_key_type)]
     pub(crate) async fn reorganize_data(
         &self,
-        our_name: XorName,
         new_adults: BTreeSet<XorName>,
         lost_adults: BTreeSet<XorName>,
         remaining: BTreeSet<XorName>,
-        preemptive_replication: bool,
     ) -> Result<Vec<Cmd>, crate::node::Error> {
         let data = self.data_storage.clone();
         let keys = data.keys().await?;
         let mut data_for_replication = BTreeMap::new();
         for addr in keys.iter() {
             if let Some((data, holders)) = self
-                .get_replica_targets(
-                    addr,
-                    &our_name,
-                    &new_adults,
-                    &lost_adults,
-                    &remaining,
-                    preemptive_replication,
-                )
+                .get_replica_targets(addr, &new_adults, &lost_adults, &remaining)
                 .await
             {
                 let _prev = data_for_replication.insert(data.name(), (data, holders));
@@ -176,28 +168,26 @@ impl Node {
     async fn get_replica_targets(
         &self,
         address: &DataAddress,
-        our_name: &XorName,
         new_adults: &BTreeSet<XorName>,
         lost_adults: &BTreeSet<XorName>,
         remaining: &BTreeSet<XorName>,
-        preemptive_replication: bool,
     ) -> Option<(ReplicatedData, BTreeSet<XorName>)> {
         let storage = self.data_storage.clone();
 
         let old_adult_list = remaining.union(lost_adults).copied().collect();
         let new_adult_list = remaining.union(new_adults).copied().collect();
         let new_holders = self.compute_holders(address, &new_adult_list);
+
+        debug!("New holders len: {:?}", new_holders.len());
         let old_holders = self.compute_holders(address, &old_adult_list);
 
-        let we_are_a_holder_now = new_holders.contains(our_name);
         let new_adult_is_holder = !new_holders.is_disjoint(new_adults);
         let lost_old_holder = !old_holders.is_disjoint(lost_adults);
 
-        if !we_are_a_holder_now || new_adult_is_holder || lost_old_holder {
+        if new_adult_is_holder || lost_old_holder {
             info!("Republishing data at {:?}", address);
             trace!(
-                "We are a holder now {}, New Adult is Holder? {}, Lost Adult was holder? {}",
-                we_are_a_holder_now,
+                "New Adult is Holder? {}, Lost Adult was holder? {}",
                 new_adult_is_holder,
                 lost_old_holder
             );
@@ -213,12 +203,6 @@ impl Node {
             }
             .ok()?;
 
-            // Do not delete data if this is just for preemptive replication
-            if !we_are_a_holder_now && !preemptive_replication {
-                if let Err(err) = storage.remove(address).await {
-                    warn!("Error deleting data during republish: {:?}", err);
-                }
-            }
             Some((data, new_holders))
         } else {
             None

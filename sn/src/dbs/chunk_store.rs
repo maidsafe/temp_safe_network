@@ -104,6 +104,7 @@ impl ChunkStore {
         Ok(*addr)
     }
 
+    #[allow(dead_code)]
     pub(crate) async fn delete_chunk(&self, addr: &ChunkAddress) -> Result<()> {
         let filepath = self.address_to_filepath(addr)?;
         let meta = tokio::fs::metadata(filepath.clone()).await?;
