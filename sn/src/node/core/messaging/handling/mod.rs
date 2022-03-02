@@ -930,15 +930,9 @@ impl Node {
             .map(|peer| peer.name())
             .collect::<BTreeSet<XorName>>();
 
-        self.reorganize_data(
-            self.info.read().await.name(),
-            BTreeSet::new(),
-            deviants,
-            our_adults,
-            true,
-        )
-        .await
-        .map_err(crate::node::Error::from)
+        self.reorganize_data(BTreeSet::new(), deviants, our_adults)
+            .await
+            .map_err(crate::node::Error::from)
     }
 
     // Convert the provided NodeMsgAuthority to be a `Section` message

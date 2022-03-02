@@ -35,6 +35,7 @@ impl ChunkStorage {
         self.db.list_all_chunk_addresses()
     }
 
+    #[allow(dead_code)]
     pub(crate) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
         trace!("Removing chunk, {:?}", address);
         self.db.delete_chunk(address).await

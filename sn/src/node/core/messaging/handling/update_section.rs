@@ -41,9 +41,8 @@ impl Node {
         trace!("{:?}", LogMarker::DataReorganisationUnderway);
         // we are an adult, and there were changes to adults
         // so we reorganise the data stored in this section..:
-        let our_name = self.info.read().await.name();
         let remaining = old_adults.intersection(&current_adults).copied().collect();
-        self.reorganize_data(our_name, added, removed, remaining, false)
+        self.reorganize_data(added, removed, remaining)
             .await
             .map_err(super::Error::from)
     }
