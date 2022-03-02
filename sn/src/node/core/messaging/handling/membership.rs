@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use bls::Signature;
-use sn_membership::{consensus::VoteResponse, Ballot, Reconfig, SignedVote};
+use sn_membership::{consensus::VoteResponse, Ballot, SignedVote};
 use std::collections::{BTreeMap, BTreeSet};
 use tiny_keccak::{Hasher, Sha3};
 use xor_name::XorName;
@@ -31,27 +31,17 @@ impl Node {
     #[instrument(skip(self), level = "trace")]
     pub(crate) async fn handle_membership_msg(
         &self,
-        signed_vote: SignedVote<Reconfig<NodeState>>,
+        signed_vote: SignedVote<NodeState>,
     ) -> Vec<Cmd> {
-        debug!(">>> {}: {:?}", LogMarker::MembershipMsg, signed_vote);
-
         // Before we handle the signed vote msg, let's verify we are ok with voting as well
         if !self.do_we_agree_with_vote_msg(&signed_vote).await {
             return vec![];
         }
 
-        let state_write_guard = &mut *self.network_knowledge.membership_voting.write().await;
-        let state = if let Some(state) = state_write_guard {
-            state
-        } else {
-            warn!(
-                ">>> Dropping membership Vote msg since we don't hold a membership voting state: {:?}",
-                signed_vote
-            );
-            return vec![];
-        };
-
-        match state.handle_signed_vote(signed_vote.clone()) {
+        debug!(">>> {}: {:?}", LogMarker::MembershipMsg, signed_vote);
+        let membership = &mut *self.network_knowledge.membership.write().await;
+        let joins_allowed = *self.joins_allowed.read().await;
+        match membership.handle_signed_vote(signed_vote.clone(), joins_allowed) {
             Err(err) => {
                 error!(">>> Failed to handle membership Vote msg: {:?}", err);
                 vec![]
@@ -78,20 +68,20 @@ impl Node {
                 // We now update our knowledge of peers in our section as per consensus
                 let mut section_peers = self.network_knowledge.section_signed_members().await;
                 let public_key = self.network_knowledge.section_key().await;
-                for (reconfig, signature) in decision.proposals.clone().into_iter() {
+                for (node, signature) in decision.proposals.clone().into_iter() {
                     let sig = KeyedSig {
                         public_key,
                         signature,
                     };
 
-                    match reconfig {
-                        Reconfig::Join(value) => {
+                    match node.state() {
+                        MembershipState::Joined => {
                             let _ = section_peers
-                                .insert(SectionAuth { value, sig }.into_authed_state());
+                                .insert(SectionAuth { value: node, sig }.into_authed_state());
                         }
-                        Reconfig::Leave(value) => {
+                        MembershipState::Left | MembershipState::Relocated(_) => {
                             let _ = section_peers
-                                .remove(&SectionAuth { value, sig }.into_authed_state());
+                                .remove(&SectionAuth { value: node, sig }.into_authed_state());
                         }
                     }
                 }
@@ -104,30 +94,26 @@ impl Node {
         }
     }
 
-    // Private helper to check if we agree with reconfigs in an incoming signed_vote msg
-    async fn do_we_agree_with_vote_msg(
-        &self,
-        signed_vote: &SignedVote<Reconfig<NodeState>>,
-    ) -> bool {
-        let mut reconfigs = BTreeSet::default();
-        populate_set_of_reconfings(signed_vote, &mut reconfigs);
-        warn!(
-            ">>> Checking if we agree with {} reconfigs before voting: {:?}",
-            reconfigs.len(),
-            signed_vote
-        );
-
+    // Private helper to check if we agree with proposals in an incoming signed_vote msg
+    async fn do_we_agree_with_vote_msg(&self, signed_vote: &SignedVote<NodeState>) -> bool {
         // Are we accepting joins now?
         let joins_allowed = *self.joins_allowed.read().await;
 
-        for reconfig in reconfigs {
-            match reconfig {
-                Reconfig::Join(_) if !joins_allowed => {
+        let proposals = signed_vote.proposals();
+        warn!(
+            ">>> Checking if we agree with {} proposals before voting: {:?}",
+            proposals.len(),
+            signed_vote
+        );
+
+        for (node_state_proposal, _sig) in proposals {
+            match node_state_proposal.state() {
+                MembershipState::Joined if !joins_allowed => {
                     warn!(">>> Dropping membership Join vote msg since joins are currently not allowed: {:?}", signed_vote);
                     return false;
                 }
-                Reconfig::Join(node_state_msg) => {
-                    let node_state = node_state_msg.into_state();
+                MembershipState::Joined => {
+                    let node_state = node_state_proposal.into_state();
                     // Check if node wasn't relocated or perhaps was a member in the past and left
                     if self
                         .network_knowledge
@@ -448,21 +434,5 @@ impl Node {
         }
 
         cmds
-    }
-}
-
-fn populate_set_of_reconfings(
-    signed_vote: &SignedVote<Reconfig<NodeState>>,
-    reconfigs: &mut BTreeSet<Reconfig<NodeState>>,
-) {
-    match &signed_vote.vote.ballot {
-        Ballot::Propose(reconfig) => {
-            let _ = reconfigs.insert(reconfig.clone());
-        }
-        Ballot::Merge(votes) | Ballot::SuperMajority { votes, .. } => {
-            votes.iter().for_each(|signed_vote| {
-                populate_set_of_reconfings(signed_vote, reconfigs);
-            })
-        }
     }
 }

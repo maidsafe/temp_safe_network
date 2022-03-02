@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod elder_candidates;
+mod membership;
 mod section_peers;
 
 pub(super) mod node_state;
@@ -33,7 +34,6 @@ use bls::PublicKey as BlsPublicKey;
 use section_peers::SectionPeers;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
-use sn_membership::Membership;
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryInto,
@@ -54,13 +54,14 @@ pub(crate) struct NetworkKnowledge {
     /// Signed Section Authority Provider
     signed_sap: Arc<RwLock<SectionAuth<SectionAuthorityProvider>>>,
     /// Members of our section
-    section_peers: SectionPeers,
+    section_peers: SectionPeers, // TODO: remove this in favour of Self::membership
     /// The network prefix map, i.e. a map from prefix to SAPs
     prefix_map: NetworkPrefixMap,
     /// A DAG containing all section chains of the whole network that we are aware of
     all_sections_chains: Arc<RwLock<SecuredLinkedList>>,
     /// Section memberhip voting state
-    pub(crate) membership_voting: Arc<RwLock<Option<Membership<NodeStateMsg>>>>,
+    pub(crate) membership: Arc<RwLock<Membership>>,
+    pub(crate) handover: Arc<RwLock<Handover>>,
 }
 
 impl NetworkKnowledge {
@@ -73,7 +74,7 @@ impl NetworkKnowledge {
         chain: SecuredLinkedList,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
         passed_prefix_map: Option<NetworkPrefixMap>,
-        membership_voting: Option<Membership<NodeStateMsg>>,
+        membership: Membership,
     ) -> Result<Self, Error> {
         // Let's check the section chain's genesis key matches ours.
         if genesis_key != *chain.root_key() {
@@ -143,7 +144,7 @@ impl NetworkKnowledge {
             section_peers: SectionPeers::default(),
             prefix_map,
             all_sections_chains: Arc::new(RwLock::new(chain)),
-            membership_voting: Arc::new(RwLock::new(membership_voting)),
+            membership: Arc::new(RwLock::new(membership)),
         })
     }
 
@@ -173,8 +174,10 @@ impl NetworkKnowledge {
         genesis_peer: Peer,
         genesis_sk_set: bls::SecretKeySet,
     ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
+        let node_state = NodeState::joined(genesis_peer, None);
         let public_key_set = genesis_sk_set.public_keys();
-        let secret_key_share = genesis_sk_set.secret_key_share(0);
+        let node_id = 0;
+        let secret_key_share = genesis_sk_set.secret_key_share(node_id);
         let genesis_key = public_key_set.public_key();
 
         let section_auth = create_first_section_authority_provider(
@@ -185,21 +188,19 @@ impl NetworkKnowledge {
 
         // Initialise our BRB membership state with our key share and Elders pk set
         let num_of_elders = 1;
-        let node_id = 0;
-        let mut membership_voting = Membership::from(
+        let mut membership = Membership::from(
             (node_id, secret_key_share.clone()),
             public_key_set.clone(),
             num_of_elders,
+            BTreeMap::from_iter([(node_state.name(), node_state)]),
         );
-        let node_state = NodeState::joined(genesis_peer, None);
-        membership_voting.force_join(node_state.to_msg());
 
         let network_knowledge = NetworkKnowledge::new(
             genesis_key,
             SecuredLinkedList::new(genesis_key),
             section_auth,
             None,
-            Some(membership_voting),
+            membership,
         )?;
 
         let sig = create_first_sig(&public_key_set, &secret_key_share, &node_state)?;
@@ -478,12 +479,10 @@ impl NetworkKnowledge {
         for node_state in peers.iter() {
             // We should be getting this from trusted sources, but just to get
             // some log alert in case some inconsistencies hhave taken place
-            /*
             if !node_state.verify(&chain) {
                 error!("Member state verification failed: {:?}", node_state.value);
                 return;
             }
-            */
         }
 
         self.section_peers.set_members(peers.clone()).await;

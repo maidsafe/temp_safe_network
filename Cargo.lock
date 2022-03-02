@@ -3844,15 +3844,13 @@ dependencies = [
 
 [[package]]
 name = "sn_membership"
-version = "1.13.0"
+version = "1.14.0"
 dependencies = [
  "bincode",
  "blsttc",
- "hex",
  "log",
  "rand 0.7.3",
  "serde",
- "signature",
  "thiserror",
 ]
 

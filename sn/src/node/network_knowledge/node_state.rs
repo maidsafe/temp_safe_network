@@ -97,6 +97,10 @@ impl NodeState {
         self.peer.age()
     }
 
+    pub(crate) fn state(&self) -> &MembershipState {
+        &self.state
+    }
+
     pub(crate) fn leave(self) -> Result<Self, Error> {
         // Do not allow switching to `Left` when already relocated,
         // to avoid rejoining with the same name.
