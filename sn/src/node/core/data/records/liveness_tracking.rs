@@ -199,13 +199,12 @@ impl Liveness {
     pub(crate) async fn find_unresponsive_and_deviant_nodes(
         &self,
     ) -> (Vec<(XorName, usize)>, BTreeSet<XorName>) {
-        info!("Checking for unresponsive and deviant nodes");
+        debug!("Checking for unresponsive and deviant nodes");
         let mut unresponsive_nodes = Vec::new();
         let mut deviants = Vec::new();
 
         for entry in self.closest_nodes_to.iter() {
             let (node, neighbours) = entry.pair();
-            info!("Checking node/neighbours: {:?}/{:?}", node, neighbours);
 
             let node = *node;
             let mut max_pending_by_neighbours = 0;
