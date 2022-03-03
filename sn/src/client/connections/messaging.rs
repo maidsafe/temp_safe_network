@@ -40,6 +40,9 @@ pub(crate) const NODES_TO_CONTACT_PER_STARTUP_BATCH: usize = 3;
 // Duration of wait for the node to have chance to pickup network knowledge at the beginning
 const INITIAL_WAIT: u64 = 1;
 
+// Number of retries for sending a message due to a connection issue.
+const CLIENT_SEND_RETRIES: usize = 1;
+
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
     #[instrument(skip(err_sender), level = "debug")]
@@ -579,16 +582,26 @@ pub(super) async fn send_msg(
                 );
             };
 
-            let result = match link
-                .send_with(msg_bytes_clone, priority, None, listen)
-                .await
-            {
-                Ok(()) => Ok(()),
-                Err(error) => match error {
-                    SendToOneError::Connection(err) => Err(Error::QuicP2pConnection(err)),
-                    SendToOneError::Send(err) => Err(Error::QuicP2pSend(err)),
-                },
+            let mut retries = 0;
+
+            let send_and_retry = || async {
+                match link
+                    .send_with(msg_bytes_clone.clone(), priority, None, listen)
+                    .await
+                {
+                    Ok(()) => Ok(()),
+                    Err(error) => match error {
+                        SendToOneError::Connection(err) => Err(Error::QuicP2pConnection(err)),
+                        SendToOneError::Send(err) => Err(Error::QuicP2pSend(err)),
+                    },
+                }
             };
+            let mut result = send_and_retry().await;
+
+            while result.is_err() && retries < CLIENT_SEND_RETRIES {
+                retries += 1;
+                result = send_and_retry().await;
+            }
 
             (peer_name, result)
         });
