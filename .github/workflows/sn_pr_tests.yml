@@ -1,6 +1,10 @@
-name: PR Tests
+name: PR Checks
 
-on: pull_request
+on:
+  pull_request:
+    branches: ["*"]
+  push:
+    branches: [staging, trying]
 
 env:
   RUSTFLAGS: "-D warnings"
@@ -12,6 +16,97 @@ env:
   AWS_DEFAULT_REGION: 'eu-west-2'
 
 jobs:
+  # bors Continuous Integration
+  ci-success:
+    # refereneced in bors.toml
+    name: ci
+    if: ${{ success() }}
+    # github jobs that need to have passed for bors to give the all clear
+    needs:
+      - e2e
+      - e2e-split
+      - unit
+      - checks
+      - test-publish
+      - lint
+      - upload_event_file
+    runs-on: ubuntu-latest
+    steps:
+      - name: CI succeeded
+        run: exit 0
+
+  lint:
+      runs-on: ubuntu-latest
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      steps:
+        - uses: actions/checkout@v2
+          with:
+            fetch-depth: 0
+        - uses: wagoid/commitlint-github-action@f114310111fdbd07e99f47f9ca13d62b3ec98372
+
+  checks:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Run rustfmt and clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: dorny/paths-filter@v2
+        id: sn_changes
+        with:
+          filters: |
+            src:
+              - 'sn/src/**'
+              - 'sn_api/src/**'
+              - 'sn_cli/src/**'
+
+      - uses: actions-rs/toolchain@v1
+        if: steps.sn_changes.outputs.src == 'true'
+        id: toolchain
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
+
+      - name: Check formatting
+        if: steps.sn_changes.outputs.src == 'true'
+        run: cargo fmt --all -- --check
+
+      - shell: bash
+        if: steps.sn_changes.outputs.src == 'true'
+        run: cargo clippy --all-targets --all-features
+
+  test-publish:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Test Publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: dorny/paths-filter@v2
+        id: sn_changes
+        with:
+          filters: |
+            src:
+              - 'sn/src/**'
+
+      - uses: actions-rs/toolchain@v1
+        if: steps.sn_changes.outputs.src == 'true'
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Publish Dry Run
+        if: steps.sn_changes.outputs.src == 'true'
+        run: cd sn && cargo publish --dry-run
+
   unit:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Unit Tests
