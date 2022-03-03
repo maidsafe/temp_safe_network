@@ -37,7 +37,7 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 const NODES_DIR: &str = "local-test-network";
 const INTERVAL: &str = "5";
 const RUST_LOG: &str = "RUST_LOG";
-const ADDITIONAL_NODES_TO_SPLIT: u64 = 30;
+const ADDITIONAL_NODES_TO_SPLIT: u64 = 15;
 #[tokio::main]
 async fn main() -> Result<()> {
     // First lets build the network and testnet launcher, to ensure we're on the latest version
@@ -102,6 +102,10 @@ pub async fn run_split() -> Result<()> {
     let arg_node_log_dir = node_log_dir.display().to_string();
     info!("Storing nodes' generated data at {}", arg_node_log_dir);
 
+    // start with 15 nodes
+    let start_node_count = 15;
+    let start_node_count_string = start_node_count.to_string();
+
     // Let's create an args array to pass to the network launcher tool
     let mut sn_launch_tool_args = vec![
         "sn_launch_tool",
@@ -112,6 +116,8 @@ pub async fn run_split() -> Result<()> {
         "--interval",
         INTERVAL,
         "--local",
+        "-n",
+        &start_node_count_string,
     ];
 
     // If RUST_LOG was set we pass it down to the launch tool
@@ -125,9 +131,6 @@ pub async fn run_split() -> Result<()> {
     let interval_as_int = &INTERVAL
         .parse::<u64>()
         .context("Error parsing Interval argument")?;
-
-    // start with 11 nodes
-    let start_node_count = 11;
 
     debug!("Running testnet with args: {:?}", sn_launch_tool_args);
 
@@ -145,9 +148,9 @@ pub async fn run_split() -> Result<()> {
 
     let mut all_data_put = vec![];
 
-    let files_to_put: i32 = 12;
-    for _i in 0..files_to_put {
-        let (address, hash) = upload_data().await?;
+    let files_to_put: i32 = 15;
+    for i in 1..files_to_put {
+        let (address, hash) = upload_data(i).await?;
         all_data_put.push((address, hash));
     }
 
@@ -158,9 +161,11 @@ pub async fn run_split() -> Result<()> {
     let additional_node_count = ADDITIONAL_NODES_TO_SPLIT;
     let additional_node_count_str = &ADDITIONAL_NODES_TO_SPLIT.to_string();
 
-    sn_launch_tool_args.push("--add");
-    sn_launch_tool_args.push("-n");
+    // remove the prev node count
+    let _ = sn_launch_tool_args.pop();
     sn_launch_tool_args.push(additional_node_count_str);
+
+    sn_launch_tool_args.push("--add");
     debug!("Adding testnet nodes with args: {:?}", sn_launch_tool_args);
 
     // We can now call the tool with the args
@@ -185,7 +190,6 @@ pub async fn run_split() -> Result<()> {
     for (address, hash) in all_data_put {
         println!("...reading bytes at address {:?} ...", address);
         let mut bytes = client.read_bytes(address).await;
-
         let mut attempts = 0;
         while bytes.is_err() && attempts < 10 {
             attempts += 1;
@@ -196,6 +200,7 @@ pub async fn run_split() -> Result<()> {
 
         let bytes = bytes?;
         println!("Bytes read from {:?}:", address);
+        println!("byts len: {:?}", bytes.len());
 
         let mut hasher = Sha3::v256();
         let mut output = [0; 32];
@@ -210,7 +215,7 @@ pub async fn run_split() -> Result<()> {
     Ok(())
 }
 
-async fn upload_data() -> Result<(BytesAddress, [u8; 32])> {
+async fn upload_data(i: i32) -> Result<(BytesAddress, [u8; 32])> {
     // Now we upload the data.
     println!("Reading network bootstrap information...");
     let (genesis_key, bootstrap_nodes) =
@@ -220,7 +225,7 @@ async fn upload_data() -> Result<(BytesAddress, [u8; 32])> {
     let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
-    let bytes = random_bytes(1024 * 1024);
+    let bytes = random_bytes(1024 * 1024 * i as usize);
 
     let mut hasher = Sha3::v256();
     let mut output = [0; 32];
