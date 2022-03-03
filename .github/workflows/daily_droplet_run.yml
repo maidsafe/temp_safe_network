@@ -9,7 +9,7 @@ on:
       node-count:
         description: number of nodes for the testnet
         required: true
-        default: 11
+        default: 15
 
 env:
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -155,7 +155,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-access-key-secret: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           ssh-secret-key: ${{ secrets.SSH_SECRET_KEY  }}
-          node-count: ${{ github.event.inputs.node-count || 11 }}
+          node-count: ${{ github.event.inputs.node-count || 15 }}
           node-path: /tmp/sn_node
 
   client:
@@ -192,29 +192,18 @@ jobs:
           mkdir -p ~/.safe/node
           curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-node_connection_info.config > ~/.safe/node/node_connection_info.config
 
-      # a catchall to ensure any new client api tests are run (ideally any major new section should have its own test run)
-      - name: Initital client tests...
-        shell: bash
-        run: |
-          # always joinable isn't needed, but can speed up compilation.
-          cargo test \
-            --release \
-            --features=test-utils \
-            -- client --skip client_api::reg --skip client_api::file --test-threads=2
-          sleep 5
-
-      - name: Client reg tests
-        shell: bash
-        run: cargo test --release --features=test-utils -- client_api::reg && sleep 5
-
-      - name: Client file tests
-        shell: bash
-        run: |
-          cargo test \
-            --release \
-            --features=test-utils \
-            -- client_api::file --skip ae --skip from_many_clients --test-threads=1
-          sleep 5
+      - name: Run client tests
+        uses: jacderida/cargo-nextest@main
+        with:
+          test-run-name: nightly-e2e-client-${{ matrix.os }}
+          profile: ci
+          junit-path: junit.xml
+          package: safe_network
+          release: true
+          features: test-utils
+          filters: client
+          test-threads: 2
+        timeout-minutes: 25
 
       - name: Run example app for file API
         shell: bash
@@ -223,8 +212,8 @@ jobs:
   api:
     name: api tests
     if: ${{ always() }} # give the suite a chance to run, even if the client tests fail.
-    needs: client
     runs-on: ${{ matrix.os }}
+    needs: launch-testnet
     strategy:
       fail-fast: false
       matrix:
@@ -253,20 +242,24 @@ jobs:
           sharedKey: ${{github.run_id}}
       - name: Build all sn_api tests
         run: cargo test --no-run -p sn_api --release --lib
-      - name: run sn_api tests
-        shell: bash
-        run: ./resources/scripts/api_tests.sh
-        timeout-minutes: 45
+      - name: Run API tests
+        uses: jacderida/cargo-nextest@main
+        with:
+          test-run-name: nightly-api-${{ matrix.os }}
+          profile: ci
+          junit-path: junit.xml
+          package: sn_api
+          release: true
+          test-threads: 10
+        timeout-minutes: 60
         env:
-          # these tests rely heavily on retry_loop
-          # TODO: Remove that dependency
-          SN_QUERY_TIMEOUT: 20
+          SN_QUERY_TIMEOUT: 10
 
   cli:
     name: cli tests
     if: ${{ always() }} # give the suite a chance to run, even if the api tests fail.
-    needs: api
     runs-on: ${{ matrix.os }}
+    needs: launch-testnet
     strategy:
       fail-fast: false
       matrix:
@@ -296,9 +289,17 @@ jobs:
       - name: Build all CLI tests
         run: cargo test --no-run -p sn_cli --release
       - name: Run CLI tests
-        shell: bash
-        run: ./resources/scripts/cli_tests.sh
-        timeout-minutes: 90
+        uses: jacderida/cargo-nextest@main
+        with:
+          test-run-name: nightly-cli-${{ matrix.os }}
+          profile: ci
+          junit-path: junit.xml
+          package: sn_cli
+          release: true
+          test-threads: 10
+        timeout-minutes: 60
+        env:
+          SN_QUERY_TIMEOUT: 10
 
   kill-testnet:
     name: kill testnet
@@ -341,6 +342,11 @@ jobs:
           github_token: ${{ secrets.VERSION_BUMP_COMMIT_PAT }}
           branch: main
           tags: true
+      - name: Upload event file
+        uses: actions/upload-artifact@v2
+        with:
+          name: event-file
+          path: ${{ github.event_path }}
 
   kill-if-fail:
     name: kill testnet on fail
@@ -360,3 +366,8 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-access-key-secret: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           action: 'destroy'
+      - name: Upload event file
+        uses: actions/upload-artifact@v2
+        with:
+          name: event-file
+          path: ${{ github.event_path }}
