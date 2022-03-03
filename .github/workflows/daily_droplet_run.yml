@@ -192,6 +192,10 @@ jobs:
           mkdir -p ~/.safe/node
           curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-node_connection_info.config > ~/.safe/node/node_connection_info.config
 
+      - name: Build all test targets
+        run: cargo test --no-run --release --features=test-utils
+        working-directory: sn
+
       - name: Run client tests
         uses: jacderida/cargo-nextest@main
         with:
@@ -259,7 +263,7 @@ jobs:
     name: cli tests
     if: ${{ always() }} # give the suite a chance to run, even if the api tests fail.
     runs-on: ${{ matrix.os }}
-    needs: launch-testnet
+    needs: [api, client]
     strategy:
       fail-fast: false
       matrix:
