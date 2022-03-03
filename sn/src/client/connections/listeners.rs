@@ -131,11 +131,14 @@ impl Session {
                     section_signed,
                     section_chain,
                     bounced_msg,
-                    src_peer,
+                    src_peer.clone(),
                 )
                 .await;
                 if result.is_err() {
-                    warn!("Failed to handle AE-Redirect");
+                    error!(
+                        "Failed to handle AE-Redirect msg from {:?}",
+                        src_peer.addr()
+                    );
                 }
                 result
             }
@@ -160,7 +163,7 @@ impl Session {
                 )
                 .await;
                 if result.is_err() {
-                    warn!("Failed to handle AE-Retry msg from {:?}", src_peer.addr());
+                    error!("Failed to handle AE-Retry msg from {:?}", src_peer.addr());
                 }
                 result
             }
