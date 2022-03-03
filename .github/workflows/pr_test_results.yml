@@ -4,6 +4,7 @@ on:
   workflow_run:
     workflows:
       - "PR Tests"
+      - "Nightly Release Run"
     types:
       - completed
 
@@ -13,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.workflow_run.conclusion != 'skipped'
     steps:
-      - name: Download artifacts from PR workflow
+      - name: Download artifacts from workflow
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
