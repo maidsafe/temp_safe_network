@@ -292,6 +292,8 @@ jobs:
           curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-node_connection_info.config > ~/.safe/node/node_connection_info.config
       - name: Build all CLI tests
         run: cargo test --no-run -p sn_cli --release
+      - name: Generate keys for test run
+        run: cargo run --package sn_cli --release -- keys create --for-cli
       - name: Run CLI tests
         uses: jacderida/cargo-nextest@main
         with:
