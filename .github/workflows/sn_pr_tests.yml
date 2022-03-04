@@ -220,7 +220,7 @@ jobs:
       - name: Print Network Log Stats at start
         shell: bash
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+        if: matrix.os != 'windows-latest'
 
       - name: Wait for all nodes to join
         shell: bash
@@ -230,7 +230,7 @@ jobs:
       - name: Print Network Log Stats after nodes joined
         shell: bash
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+        if: matrix.os != 'windows-latest'
 
       - name: Run client tests
         uses: jacderida/cargo-nextest@main
@@ -278,7 +278,7 @@ jobs:
         shell: bash
         continue-on-error: true
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' &&  matrix.os != 'windows-latest'
+        if: matrix.os != 'windows-latest'
 
       - name: Upload Node Logs to AWS for Windowns
         run: aws s3 sync C:\Users\runneradmin\.safe\node\local-test-network\ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
@@ -360,7 +360,6 @@ jobs:
       - name: Print Network Log Stats at start
         shell: bash
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome
 
       - name: Wait for all nodes to join
         shell: bash
@@ -500,7 +499,7 @@ jobs:
       - name: Print Network Log Stats at start
         shell: bash
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+        if: matrix.os != 'windows-latest'
 
       - name: Wait for all nodes to join
         shell: bash
@@ -510,7 +509,7 @@ jobs:
       - name: Print Network Log Stats after nodes joined
         shell: bash
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+        if: matrix.os != 'windows-latest'
 
       - name: Run API tests
         uses: jacderida/cargo-nextest@main
@@ -622,7 +621,7 @@ jobs:
       - name: Print Network Log Stats at start
         shell: bash
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
-        if: steps.section-startup.outcome == 'success' && matrix.os != 'windows-latest'
+        if: matrix.os != 'windows-latest'
 
       - name: Wait for all nodes to join
         shell: bash
