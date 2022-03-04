@@ -5,15 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.58.3 (2022-03-01)
+## v0.58.4 (2022-03-04)
+
+### New Features
+
+ - <csr-id-076d5e3cfd64d7bd677c9e6d34baf93f2eb49b4a/> clients should retry message sending when Conn errors encountered
+ - <csr-id-5b530fec3cd6d182f4dba89e2144826977404aa9/> add basic PeerLink cleanup
+   prior to this client Peer Links were held forever. Now we trigger
+   a Cmd to clean them up if they're not waiting on any other response from
+   the network.
+   
+   We do this every X time
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 day passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 7 commits contributed to the release.
+ - 2 days passed between releases.
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -23,6 +33,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - clients should retry message sending when Conn errors encountered ([`076d5e3`](https://github.com/maidsafe/safe_network/commit/076d5e3cfd64d7bd677c9e6d34baf93f2eb49b4a))
+    - remove unneeded logs ([`43a4265`](https://github.com/maidsafe/safe_network/commit/43a42657ff18409dd83bba03135cd013c1298dc3))
+    - dont delete chunks on republish ([`7cb5ffd`](https://github.com/maidsafe/safe_network/commit/7cb5ffd03f9bfce6ebe74f66dcabddef661cf94d))
+    - add basic PeerLink cleanup ([`5b530fe`](https://github.com/maidsafe/safe_network/commit/5b530fec3cd6d182f4dba89e2144826977404aa9))
+    - only add liveness check when we're sending out reqs. ([`000fc62`](https://github.com/maidsafe/safe_network/commit/000fc62a87dac3cd41bb6ced59596635f056ff29))
+    - rename we_are_not_a_holder for clarity ([`0ff76c4`](https://github.com/maidsafe/safe_network/commit/0ff76c44aeddedd765fa4933c0841539feabaae5))
+    - tweak logging msg prio and removed unneeded msgs ([`6970533`](https://github.com/maidsafe/safe_network/commit/6970533f288ff867a702d3dbc5424314b3639674))
+</details>
+
+## v0.58.3 (2022-03-01)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.58.3/sn_cli-0.50.3 ([`51b3d75`](https://github.com/maidsafe/safe_network/commit/51b3d75fc7389de647f6df230bff32e8c7d7267c))
     - use split example to start network for e2e-split run ([`a3a2bbf`](https://github.com/maidsafe/safe_network/commit/a3a2bbfbaf3be846a1c1f22a74aee2f961341685))
 </details>
 

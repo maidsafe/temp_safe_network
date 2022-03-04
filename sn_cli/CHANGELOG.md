@@ -4,18 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.50.3 (2022-03-01)
-
-### Bug Fixes
-
- - <csr-id-1e8224efef60b3c58cdd146ea1e6cb1a7229972b/> char string updates after 1.59 rust
+## v0.50.4 (2022-03-04)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 1 day passed between releases.
+ - 2 days passed between releases.
  - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -26,6 +22,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - use nextest as test runner ([`8f44eab`](https://github.com/maidsafe/safe_network/commit/8f44eabd288cd23435bef6e646b981b881fb104b))
+</details>
+
+## v0.50.3 (2022-03-01)
+
+### Bug Fixes
+
+ - <csr-id-1e8224efef60b3c58cdd146ea1e6cb1a7229972b/> char string updates after 1.59 rust
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.58.3/sn_cli-0.50.3 ([`51b3d75`](https://github.com/maidsafe/safe_network/commit/51b3d75fc7389de647f6df230bff32e8c7d7267c))
     - char string updates after 1.59 rust ([`1e8224e`](https://github.com/maidsafe/safe_network/commit/1e8224efef60b3c58cdd146ea1e6cb1a7229972b))
 </details>
 
