@@ -352,6 +352,9 @@ jobs:
         timeout-minutes: 30
         shell: bash
         run: cargo run --release --features=test-utils --example network_split
+        env:
+          RUST_LOG: "safe_network=trace"
+
 
       # - name: Start the network
       #   run: ./target/release/testnet
