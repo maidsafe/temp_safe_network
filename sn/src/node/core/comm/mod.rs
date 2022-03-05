@@ -24,6 +24,9 @@ use tokio::{sync::mpsc, task};
 use tracing::Instrument;
 use xor_name::XorName;
 
+// Number of retries for sending a message due to a connection issue.
+const MSG_SEND_RETRIES: usize = 1;
+
 // Communication component of the node to interact with other nodes.
 #[derive(Clone)]
 pub(crate) struct Comm {
@@ -368,9 +371,18 @@ impl Comm {
             );
         };
 
-        let result = link
-            .send_with(msg_bytes, msg_priority, Some(&retry_config), listen)
-            .await;
+        let send_msg = || async {
+            link.send_with(msg_bytes.clone(), msg_priority, Some(&retry_config), listen)
+                .await
+        };
+
+        let mut retries = 0;
+        let mut result = send_msg().await;
+
+        while result.is_err() && retries < MSG_SEND_RETRIES {
+            retries += 1;
+            result = send_msg().await;
+        }
 
         (recipient, result)
     }
