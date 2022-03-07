@@ -67,19 +67,15 @@ impl DataReplicator {
         }
     }
 
-    /// Tracks and completes replication for the given data_address and target node.
-    // Returns:
-    // Some(false) if we still need to hold the data after handing out a replica
-    // Some(true) if we can delete the data since we have handed out to all replicas
-    // None if we do not handle the data at all
+    /// Finishes replication tracking for the given data_address and target node.
     pub(crate) fn finish_replication_for(
         &mut self,
         data_address: ReplicatedDataAddress,
         target: XorName,
-    ) -> Option<bool> {
+    ) -> Option<()> {
         let data_collection = self.to_be_transmitted.get_mut(&target)?;
 
-        // Checking for data address in list
+        // Checking for the given data_address in list
         if let Some(idx) = data_collection
             .iter()
             .position(|address| address == &data_address)
@@ -92,24 +88,10 @@ impl DataReplicator {
                 let _ = self.to_be_transmitted.remove(&target);
             }
 
-            // Aggregating all data addresses
-            let mut all_addresses = vec![];
-            for addresses in self.to_be_transmitted.values() {
-                all_addresses.extend(addresses);
-            }
-
-            // Check if we still need to hold the data
-            // i.e. if we have completed replication for this data
-            if !all_addresses.contains(&data_address) {
-                // We can now safely delete it from our storage
-                // as we have given away all the replicas
-                return Some(true);
-            }
-
-            // We still need to hold the data
-            return Some(false);
+            Some(())
+        } else {
+            None
         }
-        None
     }
 }
 

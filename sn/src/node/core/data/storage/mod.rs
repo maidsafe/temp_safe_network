@@ -151,20 +151,14 @@ impl DataStorage {
         data_address: ReplicatedDataAddress,
         target: XorName,
     ) -> Result<ReplicatedData> {
-        if let Some(should_delete) = self
+        if self
             .data_replicator
             .write()
             .await
             .finish_replication_for(data_address, target)
+            .is_some()
         {
-            let data = self.get_from_local_store(&data_address).await?;
-
-            if should_delete {
-                // We can now delete the data since we do not need to hold it anymore
-                self.remove(&data_address).await?;
-            }
-
-            Ok(data)
+            Ok(self.get_from_local_store(&data_address).await?)
         } else {
             Err(Error::NoSuchDataForReplication(data_address))
         }
@@ -286,7 +280,10 @@ impl Node {
 #[cfg(test)]
 mod tests {
     use crate::dbs::Error;
+    use crate::messaging::data::DataQuery;
+    use crate::messaging::system::NodeQueryResponse;
     use crate::node::core::data::DataStorage;
+    use crate::types::register::User;
     use crate::types::utils::random_bytes;
     use crate::types::{Chunk, ReplicatedData};
     use crate::UsedSpace;
@@ -296,26 +293,42 @@ mod tests {
 
     #[tokio::test]
     async fn data_storage_basics() -> Result<(), Error> {
+        // Generate temp path for storage
+        // Cleaned up automatically after test completes
         let tmp_dir = tempdir()?;
         let path = tmp_dir.path();
         let used_space = UsedSpace::new(usize::MAX);
 
+        // Create instance
         let storage = DataStorage::new(path, used_space)?;
 
-        // 5mb random data
+        // 5mb random data chunk
         let bytes = random_bytes(5 * 1024 * 1024);
         let chunk = Chunk::new(bytes);
-        let replicated_data = ReplicatedData::Chunk(chunk);
+        let replicated_data = ReplicatedData::Chunk(chunk.clone());
+
+        // Store the chunk
         let _ = storage.store(&replicated_data).await?;
 
+        // Test local fetch
         let fetched_data = storage
             .get_from_local_store(&replicated_data.address())
             .await?;
 
         assert_eq!(replicated_data, fetched_data);
 
+        // Test client fetch
+        let query = DataQuery::GetChunk(*chunk.address());
+        let user = User::Anyone;
+
+        let query_response = storage.query(&query, user).await;
+
+        assert_eq!(query_response, NodeQueryResponse::GetChunk(Ok(chunk)));
+
+        // Remove from storage
         storage.remove(&replicated_data.address()).await?;
 
+        // Assert data is not found after storage
         match storage
             .get_from_local_store(&replicated_data.address())
             .await
@@ -328,7 +341,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn data_is_deleted_when_replicator_is_emptied() -> Result<(), Error> {
+    async fn data_is_not_deleted_when_replication_finishes() -> Result<(), Error> {
+        // Generate temp path for storage
         let tmp_dir = tempdir()?;
         let path = tmp_dir.path();
         let used_space = UsedSpace::new(usize::MAX);
@@ -341,25 +355,26 @@ mod tests {
         let original_data = ReplicatedData::Chunk(chunk);
         let data_address = original_data.address();
 
-        // Store it in our storage
+        // Store the chunk
         let _ = storage.store(&original_data).await?;
 
+        // Generate adults for mimicking replication
         let targets = (0..4)
             .map(|_| XorName::random().with_bit(0, false))
             .collect::<BTreeSet<XorName>>();
 
+        // Start replication
         storage.add_to_replicator(&data_address, &targets).await;
 
+        // Simulate adults pulling data
         for target in targets {
             let fetched_data = storage.get_for_replication(data_address, target).await?;
             assert_eq!(fetched_data, original_data);
         }
 
         match storage.get_from_local_store(&original_data.address()).await {
-            Err(Error::ChunkNotFound(address)) => {
-                assert_eq!(address, original_data.name())
-            }
-            _ => panic!("Unexpected data found"),
+            Ok(data) => assert_eq!(data.address().name(), &original_data.name()),
+            _ => panic!("Unexpected: Data not found"),
         }
 
         Ok(())
