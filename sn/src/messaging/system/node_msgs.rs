@@ -44,11 +44,11 @@ pub enum NodeCmd {
         level: StorageLevel,
     },
     /// Tells an Adult to store a replica of the data
-    ReplicateData(ReplicatedData),
+    ReplicateData(Vec<ReplicatedData>),
     /// Tells an Adult to fetch and replicate data from the sender
-    SendReplicateDataAddress(ReplicatedDataAddress),
+    SendReplicateDataAddress(Vec<ReplicatedDataAddress>),
     /// Fetch the given replicated data we are missing
-    FetchReplicateData(ReplicatedDataAddress),
+    FetchReplicateData(Vec<ReplicatedDataAddress>),
     /// Sent to all promoted nodes (also sibling if any) after
     /// a completed transition to a new constellation.
     ReceiveMetadata {
@@ -71,7 +71,7 @@ pub enum NodeEvent {
         full: bool,
     },
     /// To-Be-Replicated already present
-    ReplicateDataAlreadyPresent(ReplicatedDataAddress),
+    ReplicateDataAlreadyPresent(Vec<ReplicatedDataAddress>),
     /// Inform Adults of a possible deviant node
     DeviantsDetected(BTreeSet<XorName>),
 }

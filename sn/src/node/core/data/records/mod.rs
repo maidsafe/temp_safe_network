@@ -48,7 +48,7 @@ impl Node {
                 &targets,
             );
 
-            let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(data));
+            let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data]));
             self.send_node_msg_to_nodes(msg, targets).await
         } else {
             Err(Error::InvalidState)

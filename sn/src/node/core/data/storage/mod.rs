@@ -27,6 +27,7 @@ pub(crate) use registers::RegisterStorage;
 use crate::dbs::Error;
 use crate::node::core::DataReplicator;
 use crate::types::ReplicatedDataAddress;
+use std::collections::btree_map::Entry;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
@@ -203,16 +204,31 @@ impl Node {
 
         let mut cmds = vec![];
         let section_pk = self.network_knowledge.section_key().await;
+        let mut send_list: BTreeMap<XorName, Vec<ReplicatedDataAddress>> = BTreeMap::new();
 
         for (data_address, (_data, targets)) in data_for_replication {
-            for name in targets {
-                cmds.push(Cmd::SignOutgoingSystemMsg {
-                    msg: SystemMsg::NodeCmd(
-                        NodeCmd::SendReplicateDataAddress(data_address).clone(),
-                    ),
-                    dst: DstLocation::Node { name, section_pk },
-                })
+            for target in targets {
+                let entry = send_list.entry(target);
+                match entry {
+                    Entry::Occupied(mut present_entries) => {
+                        let addresses = present_entries.get_mut();
+                        addresses.push(data_address);
+                    }
+                    Entry::Vacant(e) => {
+                        let _ = e.insert(vec![data_address]);
+                    }
+                }
             }
+        }
+
+        for (target, data_addresses) in send_list.into_iter() {
+            cmds.push(Cmd::SignOutgoingSystemMsg {
+                msg: SystemMsg::NodeCmd(NodeCmd::SendReplicateDataAddress(data_addresses).clone()),
+                dst: DstLocation::Node {
+                    name: target,
+                    section_pk,
+                },
+            })
         }
 
         Ok(cmds)

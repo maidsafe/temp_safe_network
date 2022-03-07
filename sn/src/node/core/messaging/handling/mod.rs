@@ -693,122 +693,150 @@ impl Node {
 
                 return self.republish_data_for_deviant_nodes(deviants).await;
             }
-            SystemMsg::NodeCmd(NodeCmd::ReplicateData(data)) => {
+            SystemMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
                 info!("ReplicateData MsgId: {:?}", msg_id);
                 return if self.is_elder().await {
                     error!("Received unexpected message while Elder");
                     Ok(vec![])
                 } else {
-                    // We are an adult here, so just store away!
-                    // This may return a DatabaseFull error... but we should have reported storage increase
-                    // well before this
-                    match self.data_storage.store(&data).await {
-                        Ok(level_report) => {
-                            info!("Storage level report: {:?}", level_report);
-                            return Ok(self.record_storage_level_if_any(level_report).await);
-                        }
-                        Err(error) => {
-                            let full = match error {
-                                //DbError::Io(_) | DbError::Sled(_) => false, // potential transient errors
-                                DbError::NotEnoughSpace => true, // db full
-                                _ => {
-                                    error!("Problem storing data, but it was ignored: {error}");
-                                    return Ok(vec![]);
-                                } // the rest seem to be non-problematic errors.. (?)
-                            };
+                    let mut cmds = vec![];
 
-                            if full {
-                                error!("Not enough space to store more data");
+                    for data in data_collection {
+                        // We are an adult here, so just store away!
+                        // This may return a DatabaseFull error... but we should have reported storage increase
+                        // well before this
+                        match self.data_storage.store(&data).await {
+                            Ok(level_report) => {
+                                info!("Storage level report: {:?}", level_report);
+                                cmds.extend(self.record_storage_level_if_any(level_report).await);
                             }
+                            Err(error) => {
+                                match error {
+                                    //DbError::Io(_) | DbError::Sled(_) => false, // potential transient errors
+                                    DbError::NotEnoughSpace => {
+                                        // db full
+                                        error!("Not enough space to store more data");
 
-                            let node_id = PublicKey::from(self.info.read().await.keypair.public);
-                            let msg = SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
-                                node_id,
-                                data,
-                                full,
-                            });
+                                        let node_id =
+                                            PublicKey::from(self.info.read().await.keypair.public);
+                                        let msg =
+                                            SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
+                                                node_id,
+                                                data,
+                                                full: true,
+                                            });
 
-                            Ok(vec![self.send_msg_to_our_elders(msg).await?])
+                                        cmds.push(self.send_msg_to_our_elders(msg).await?)
+                                    }
+                                    _ => {
+                                        error!("Problem storing data, but it was ignored: {error}");
+                                    } // the rest seem to be non-problematic errors.. (?)
+                                }
+                            }
                         }
                     }
+
+                    Ok(cmds)
                 };
             }
-            SystemMsg::NodeCmd(NodeCmd::SendReplicateDataAddress(data_address)) => {
+            SystemMsg::NodeCmd(NodeCmd::SendReplicateDataAddress(data_addresses)) => {
                 info!("ReplicateData MsgId: {:?}", msg_id);
+                let mut cmds = vec![];
+
                 return if self.is_elder().await {
                     error!("Received unexpected message while Elder");
-                    Ok(vec![])
+                    Ok(cmds)
                 } else {
-                    // Check if we already have the data
-                    match self.data_storage.get_from_local_store(&data_address).await {
-                        Err(crate::dbs::Error::NoSuchData(_))
-                        | Err(crate::dbs::Error::ChunkNotFound(_)) => {
-                            info!("to-be-replicated data is not present");
+                    // Data that we do not have
+                    let mut data_not_present = vec![];
+                    // Data that we already have
+                    let mut data_present = vec![];
 
-                            // We do not have the data which we are supposed to have since the new reorg
-                            // Send FetchReplicateData request
-                            Ok(vec![Cmd::SignOutgoingSystemMsg {
-                                msg: SystemMsg::NodeCmd(NodeCmd::FetchReplicateData(data_address)),
-                                dst: crate::messaging::DstLocation::Node {
-                                    name: sender.name(),
-                                    section_pk: self.section_key_by_name(&sender.name()).await,
-                                },
-                            }])
-                        }
-                        Ok(_) => {
-                            info!("We already have the data that was asked to be replicated. Responding it back to the sender");
+                    for data_address in data_addresses {
+                        // TODO: Check if the data name falls within our Xor namespace
+                        // Check if we already have the data
+                        match self.data_storage.get_from_local_store(&data_address).await {
+                            Err(crate::dbs::Error::NoSuchData(_))
+                            | Err(crate::dbs::Error::ChunkNotFound(_)) => {
+                                info!("to-be-replicated data is not present");
 
-                            // TODO: Could we send back the data whole data so that the sender can verify if this message is true?
-                            Ok(vec![Cmd::SignOutgoingSystemMsg {
-                                msg: SystemMsg::NodeEvent(NodeEvent::ReplicateDataAlreadyPresent(
-                                    data_address,
-                                )),
-                                dst: crate::messaging::DstLocation::Node {
-                                    name: sender.name(),
-                                    section_pk: self.section_key_by_name(&sender.name()).await,
-                                },
-                            }])
-                        }
-                        Err(e) => {
-                            error!("Error Sending FetchReplicateData for replication: {e}");
-                            Ok(vec![])
+                                // We do not have the data which we are supposed to have since the new reorg
+                                data_not_present.push(data_address);
+                            }
+                            Ok(data) => {
+                                info!("We already have the data that was asked to be replicated. Responding it back to the sender");
+                                data_present.push(data.address());
+                            }
+                            Err(e) => {
+                                error!("Error Sending FetchReplicateData for replication: {e}");
+                                return Ok(vec![]);
+                            }
                         }
                     }
+
+                    // Send FetchReplicateData request
+                    cmds.push(Cmd::SignOutgoingSystemMsg {
+                        msg: SystemMsg::NodeCmd(NodeCmd::FetchReplicateData(data_not_present)),
+                        dst: crate::messaging::DstLocation::Node {
+                            name: sender.name(),
+                            section_pk: self.section_key_by_name(&sender.name()).await,
+                        },
+                    });
+
+                    // TODO: Could we send back the data whole data so that the sender can verify if this message is true?
+                    cmds.push(Cmd::SignOutgoingSystemMsg {
+                        msg: SystemMsg::NodeEvent(NodeEvent::ReplicateDataAlreadyPresent(
+                            data_present,
+                        )),
+                        dst: crate::messaging::DstLocation::Node {
+                            name: sender.name(),
+                            section_pk: self.section_key_by_name(&sender.name()).await,
+                        },
+                    });
+                    Ok(cmds)
                 };
             }
-            SystemMsg::NodeCmd(NodeCmd::FetchReplicateData(data_address)) => {
+            SystemMsg::NodeCmd(NodeCmd::FetchReplicateData(data_addresses)) => {
                 info!("FetchReplicateData MsgId: {:?}", msg_id);
                 return if self.is_elder().await {
                     error!("Received unexpected message while Elder");
                     Ok(vec![])
                 } else {
-                    match self
-                        .data_storage
-                        .get_for_replication(data_address, sender.name())
-                        .await
-                    {
-                        Ok(data) => {
-                            info!("Providing {data_address:?} for replication");
-                            // Provide the requested data
-                            Ok(vec![Cmd::SignOutgoingSystemMsg {
-                                msg: SystemMsg::NodeCmd(NodeCmd::ReplicateData(data)),
-                                dst: crate::messaging::DstLocation::Node {
-                                    name: sender.name(),
-                                    section_pk: self.section_key_by_name(&sender.name()).await,
-                                },
-                            }])
-                        }
-                        Err(e) => {
-                            warn!("Error providing data for replication: {e}");
-                            Ok(vec![])
+                    let mut data_collection = vec![];
+                    for data_address in data_addresses {
+                        match self
+                            .data_storage
+                            .get_for_replication(data_address, sender.name())
+                            .await
+                        {
+                            Ok(data) => {
+                                info!("Providing {data_address:?} for replication");
+
+                                data_collection.push(data);
+                            }
+                            Err(e) => {
+                                warn!("Error providing data for replication: {e}");
+                                return Ok(vec![]);
+                            }
                         }
                     }
+
+                    // Provide the requested data
+                    Ok(vec![Cmd::SignOutgoingSystemMsg {
+                        msg: SystemMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)),
+                        dst: crate::messaging::DstLocation::Node {
+                            name: sender.name(),
+                            section_pk: self.section_key_by_name(&sender.name()).await,
+                        },
+                    }])
                 };
             }
-            SystemMsg::NodeEvent(NodeEvent::ReplicateDataAlreadyPresent(data_address)) => {
-                self.data_storage
-                    .remove_from_replicator(data_address, &sender.name())
-                    .await;
+            SystemMsg::NodeEvent(NodeEvent::ReplicateDataAlreadyPresent(data_addresses)) => {
+                for data_address in data_addresses {
+                    self.data_storage
+                        .remove_from_replicator(data_address, &sender.name())
+                        .await;
+                }
                 Ok(vec![])
             }
             SystemMsg::NodeCmd(node_cmd) => {
