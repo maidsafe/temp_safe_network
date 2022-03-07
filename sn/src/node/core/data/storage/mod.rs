@@ -163,17 +163,6 @@ impl DataStorage {
             Err(Error::NoSuchDataForReplication(data_address))
         }
     }
-
-    pub(crate) async fn remove_from_replicator(
-        &self,
-        data_address: ReplicatedDataAddress,
-        target: &XorName,
-    ) {
-        self.data_replicator
-            .write()
-            .await
-            .stop_replication_for(data_address, target);
-    }
 }
 
 impl Node {

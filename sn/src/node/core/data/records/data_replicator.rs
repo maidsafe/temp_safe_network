@@ -46,27 +46,6 @@ impl DataReplicator {
         }
     }
 
-    /// Remove data address from replicator in case the target already has the data
-    pub(crate) fn stop_replication_for(
-        &mut self,
-        data_address: ReplicatedDataAddress,
-        target: &XorName,
-    ) {
-        if let Some(data_collection) = self.to_be_transmitted.get_mut(target) {
-            if let Some(idx) = data_collection
-                .iter()
-                .position(|address| address == &data_address)
-            {
-                let _ = data_collection.remove(idx);
-                info!("Successfully cleared replicator entry for {target}");
-            } else {
-                warn!("Given address {data_address:?} not on replication list for {target}");
-            }
-        } else {
-            warn!("Given node: {target} not on replicator");
-        }
-    }
-
     /// Finishes replication tracking for the given data_address and target node.
     pub(crate) fn finish_replication_for(
         &mut self,

@@ -70,8 +70,6 @@ pub enum NodeEvent {
         /// Whether store failed due to full
         full: bool,
     },
-    /// To-Be-Replicated already present
-    ReplicateDataAlreadyPresent(Vec<ReplicatedDataAddress>),
     /// Inform Adults of a possible deviant node
     DeviantsDetected(BTreeSet<XorName>),
 }

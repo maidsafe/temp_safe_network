@@ -39,8 +39,11 @@ use crate::types::{log_markers::LogMarker, Peer, PublicKey};
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
+use itertools::Itertools;
 use std::collections::BTreeSet;
 use xor_name::XorName;
+
+const REPLICATION_BATCH_SIZE: usize = 50;
 
 // Message handling
 impl Node {
@@ -712,7 +715,6 @@ impl Node {
                             }
                             Err(error) => {
                                 match error {
-                                    //DbError::Io(_) | DbError::Sled(_) => false, // potential transient errors
                                     DbError::NotEnoughSpace => {
                                         // db full
                                         error!("Not enough space to store more data");
@@ -747,10 +749,8 @@ impl Node {
                     error!("Received unexpected message while Elder");
                     Ok(cmds)
                 } else {
-                    // Data that we do not have
+                    // Collection of data addresses that we do not have
                     let mut data_not_present = vec![];
-                    // Data that we already have
-                    let mut data_present = vec![];
 
                     for data_address in data_addresses {
                         // TODO: Check if the data name falls within our Xor namespace
@@ -763,9 +763,8 @@ impl Node {
                                 // We do not have the data which we are supposed to have since the new reorg
                                 data_not_present.push(data_address);
                             }
-                            Ok(data) => {
-                                info!("We already have the data that was asked to be replicated. Responding it back to the sender");
-                                data_present.push(data.address());
+                            Ok(_) => {
+                                info!("We already have the data that was asked to be replicated");
                             }
                             Err(e) => {
                                 error!("Error Sending FetchReplicateData for replication: {e}");
@@ -774,70 +773,77 @@ impl Node {
                         }
                     }
 
-                    // Send FetchReplicateData request
-                    cmds.push(Cmd::SignOutgoingSystemMsg {
-                        msg: SystemMsg::NodeCmd(NodeCmd::FetchReplicateData(data_not_present)),
-                        dst: crate::messaging::DstLocation::Node {
-                            name: sender.name(),
-                            section_pk: self.section_key_by_name(&sender.name()).await,
-                        },
-                    });
+                    let section_pk = self.section_key_by_name(&sender.name()).await;
 
-                    // TODO: Could we send back the data whole data so that the sender can verify if this message is true?
-                    cmds.push(Cmd::SignOutgoingSystemMsg {
-                        msg: SystemMsg::NodeEvent(NodeEvent::ReplicateDataAlreadyPresent(
-                            data_present,
-                        )),
-                        dst: crate::messaging::DstLocation::Node {
-                            name: sender.name(),
-                            section_pk: self.section_key_by_name(&sender.name()).await,
-                        },
-                    });
+                    // Chunks the collection into REPLICATION_BATCH_SIZE addresses in a batch. This avoids memory
+                    // explosion in the network when the amount of data to be replicated is high
+                    for chunked_data_address in
+                        &data_not_present.into_iter().chunks(REPLICATION_BATCH_SIZE)
+                    {
+                        // Send FetchReplicateData request
+                        cmds.push(Cmd::SignOutgoingSystemMsg {
+                            msg: SystemMsg::NodeCmd(NodeCmd::FetchReplicateData(
+                                chunked_data_address.collect_vec(),
+                            )),
+                            dst: crate::messaging::DstLocation::Node {
+                                name: sender.name(),
+                                section_pk,
+                            },
+                        });
+                    }
+
                     Ok(cmds)
                 };
             }
             SystemMsg::NodeCmd(NodeCmd::FetchReplicateData(data_addresses)) => {
+                let mut cmds = vec![];
                 info!("FetchReplicateData MsgId: {:?}", msg_id);
                 return if self.is_elder().await {
                     error!("Received unexpected message while Elder");
                     Ok(vec![])
                 } else {
-                    let mut data_collection = vec![];
-                    for data_address in data_addresses {
-                        match self
-                            .data_storage
-                            .get_for_replication(data_address, sender.name())
-                            .await
-                        {
-                            Ok(data) => {
-                                info!("Providing {data_address:?} for replication");
+                    // Chunk the full list into REPLICATION_BATCH_SIZE addresses a batch
+                    let mut addresses = vec![];
+                    for chunked_data_address in
+                        &data_addresses.into_iter().chunks(REPLICATION_BATCH_SIZE)
+                    {
+                        let data_address_collection = chunked_data_address.collect_vec();
+                        addresses.push(data_address_collection);
+                    }
 
-                                data_collection.push(data);
-                            }
-                            Err(e) => {
-                                warn!("Error providing data for replication: {e}");
-                                return Ok(vec![]);
+                    // Process each batch
+                    for chunked_addresses in addresses {
+                        let mut data_collection = vec![];
+                        for data_address in chunked_addresses {
+                            match self
+                                .data_storage
+                                .get_for_replication(data_address, sender.name())
+                                .await
+                            {
+                                Ok(data) => {
+                                    info!("Providing {data_address:?} for replication");
+
+                                    data_collection.push(data);
+                                }
+                                Err(e) => {
+                                    warn!("Error providing data for replication: {e}");
+                                    return Ok(vec![]);
+                                }
                             }
                         }
+
+                        cmds.push(Cmd::SignOutgoingSystemMsg {
+                            msg: SystemMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)),
+                            dst: crate::messaging::DstLocation::Node {
+                                name: sender.name(),
+                                section_pk: self.section_key_by_name(&sender.name()).await,
+                            },
+                        });
                     }
 
                     // Provide the requested data
-                    Ok(vec![Cmd::SignOutgoingSystemMsg {
-                        msg: SystemMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)),
-                        dst: crate::messaging::DstLocation::Node {
-                            name: sender.name(),
-                            section_pk: self.section_key_by_name(&sender.name()).await,
-                        },
-                    }])
+                    Ok(cmds)
                 };
-            }
-            SystemMsg::NodeEvent(NodeEvent::ReplicateDataAlreadyPresent(data_addresses)) => {
-                for data_address in data_addresses {
-                    self.data_storage
-                        .remove_from_replicator(data_address, &sender.name())
-                        .await;
-                }
-                Ok(vec![])
             }
             SystemMsg::NodeCmd(node_cmd) => {
                 self.send_event(Event::MessageReceived {
