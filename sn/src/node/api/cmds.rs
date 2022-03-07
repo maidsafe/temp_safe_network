@@ -77,6 +77,12 @@ pub(crate) enum Cmd {
         recipients: Vec<Peer>,
         wire_msg: WireMsg,
     },
+    /// Send the batch of given messages in a throttled/controlled fashion to the given `recipients`.
+    ThrottledSendBatchMsgs {
+        throttle_duration: Duration,
+        recipients: Vec<Peer>,
+        wire_msgs: Vec<WireMsg>,
+    },
     /// Performs serialisation and signing for sending of NodeMsg.
     /// This cmd only send this to other nodes
     SignOutgoingSystemMsg { msg: SystemMsg, dst: DstLocation },
@@ -138,6 +144,7 @@ impl fmt::Display for Cmd {
                 )
             }
             Cmd::SignOutgoingSystemMsg { .. } => write!(f, "SignOutgoingSystemMsg"),
+            Cmd::ThrottledSendBatchMsgs { .. } => write!(f, "ThrottledSendBatchMsgs"),
             Cmd::SendMsgDeliveryGroup { wire_msg, .. } => {
                 write!(f, "SendMsgDeliveryGroup {:?}", wire_msg.msg_id())
             }

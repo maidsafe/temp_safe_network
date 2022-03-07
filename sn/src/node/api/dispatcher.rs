@@ -327,6 +327,14 @@ impl Dispatcher {
                 recipients,
                 wire_msg,
             } => self.send_msg(&recipients, recipients.len(), wire_msg).await,
+            Cmd::ThrottledSendBatchMsgs {
+                throttle_duration,
+                recipients,
+                mut wire_msgs,
+            } => {
+                self.send_throttled_batch_msgs(recipients, &mut wire_msgs, throttle_duration)
+                    .await
+            }
             Cmd::SendMsgDeliveryGroup {
                 recipients,
                 delivery_group_size,
@@ -412,6 +420,33 @@ impl Dispatcher {
                 vec![]
             }
         };
+
+        Ok(cmds)
+    }
+
+    async fn send_throttled_batch_msgs(
+        &self,
+        recipients: Vec<Peer>,
+        messages: &mut Vec<WireMsg>,
+        throttle_duration: Duration,
+    ) -> Result<Vec<Cmd>> {
+        let mut cmds = vec![];
+
+        let mut interval = tokio::time::interval(throttle_duration);
+        interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+        loop {
+            let _instant = interval.tick().await;
+            if let Some(message) = messages.pop() {
+                cmds.extend(
+                    self.send_msg(&recipients, recipients.len(), message)
+                        .await?,
+                )
+            } else {
+                info!("Finished sending a batch of messages");
+                break;
+            }
+        }
 
         Ok(cmds)
     }

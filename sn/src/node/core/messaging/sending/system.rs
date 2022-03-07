@@ -81,7 +81,7 @@ impl Node {
     }
 
     // Send the message to all `recipients`. If one of the recipients is us, don't send it over the
-    // network but handle it directly (should only be used when accumulation is necesary)
+    // network but handle it directly (should only be used when accumulation is necessary)
     pub(crate) async fn send_messages_to_all_nodes_or_directly_handle_for_accumulation(
         &self,
         recipients: Vec<Peer>,

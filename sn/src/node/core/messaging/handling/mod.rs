@@ -41,9 +41,11 @@ use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
 use std::collections::BTreeSet;
+use tokio::time::Duration;
 use xor_name::XorName;
 
 const REPLICATION_BATCH_SIZE: usize = 50;
+const REPLICATION_MSG_THROTTLE_DURATION: Duration = Duration::from_secs(5);
 
 // Message handling
 impl Node {
@@ -743,11 +745,10 @@ impl Node {
             }
             SystemMsg::NodeCmd(NodeCmd::SendReplicateDataAddress(data_addresses)) => {
                 info!("ReplicateData MsgId: {:?}", msg_id);
-                let mut cmds = vec![];
 
                 return if self.is_elder().await {
                     error!("Received unexpected message while Elder");
-                    Ok(cmds)
+                    Ok(vec![])
                 } else {
                     // Collection of data addresses that we do not have
                     let mut data_not_present = vec![];
@@ -774,25 +775,38 @@ impl Node {
                     }
 
                     let section_pk = self.section_key_by_name(&sender.name()).await;
+                    let src_section_pk = self.network_knowledge().section_key().await;
+                    let our_info = &*self.info.read().await;
+                    let dst = crate::messaging::DstLocation::Node {
+                        name: sender.name(),
+                        section_pk,
+                    };
+                    let mut wire_msgs = vec![];
 
                     // Chunks the collection into REPLICATION_BATCH_SIZE addresses in a batch. This avoids memory
                     // explosion in the network when the amount of data to be replicated is high
                     for chunked_data_address in
                         &data_not_present.into_iter().chunks(REPLICATION_BATCH_SIZE)
                     {
-                        // Send FetchReplicateData request
-                        cmds.push(Cmd::SignOutgoingSystemMsg {
-                            msg: SystemMsg::NodeCmd(NodeCmd::FetchReplicateData(
-                                chunked_data_address.collect_vec(),
-                            )),
-                            dst: crate::messaging::DstLocation::Node {
-                                name: sender.name(),
-                                section_pk,
-                            },
-                        });
+                        let system_msg = SystemMsg::NodeCmd(NodeCmd::FetchReplicateData(
+                            chunked_data_address.collect_vec(),
+                        ));
+
+                        wire_msgs.push(WireMsg::single_src(
+                            our_info,
+                            dst,
+                            system_msg,
+                            src_section_pk,
+                        )?);
                     }
 
-                    Ok(cmds)
+                    let cmd = Cmd::ThrottledSendBatchMsgs {
+                        throttle_duration: REPLICATION_MSG_THROTTLE_DURATION,
+                        recipients: vec![sender],
+                        wire_msgs,
+                    };
+
+                    Ok(vec![cmd])
                 };
             }
             SystemMsg::NodeCmd(NodeCmd::FetchReplicateData(data_addresses)) => {
