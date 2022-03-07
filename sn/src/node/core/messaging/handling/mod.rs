@@ -829,11 +829,7 @@ impl Node {
                     for chunked_addresses in addresses {
                         let mut data_collection = vec![];
                         for data_address in chunked_addresses {
-                            match self
-                                .data_storage
-                                .get_for_replication(data_address, sender.name())
-                                .await
-                            {
+                            match self.data_storage.get_for_replication(data_address).await {
                                 Ok(data) => {
                                     info!("Providing {data_address:?} for replication");
 

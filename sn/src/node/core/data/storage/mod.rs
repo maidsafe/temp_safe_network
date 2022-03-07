@@ -24,8 +24,6 @@ use crate::{
 pub(crate) use chunks::ChunkStorage;
 pub(crate) use registers::RegisterStorage;
 
-use crate::dbs::Error;
-use crate::node::core::DataReplicator;
 use crate::types::ReplicatedDataAddress;
 use std::collections::btree_map::Entry;
 use std::{
@@ -44,7 +42,6 @@ pub(crate) struct DataStorage {
     registers: RegisterStorage,
     used_space: UsedSpace,
     last_recorded_level: Arc<RwLock<StorageLevel>>,
-    data_replicator: Arc<RwLock<DataReplicator>>,
 }
 
 impl DataStorage {
@@ -54,7 +51,6 @@ impl DataStorage {
             registers: RegisterStorage::new(path, used_space.clone())?,
             used_space,
             last_recorded_level: Arc::new(RwLock::new(StorageLevel::zero())),
-            data_replicator: Arc::new(RwLock::new(DataReplicator::new())),
         })
     }
 
@@ -135,33 +131,11 @@ impl DataStorage {
         Ok(reg_keys.chain(chunk_keys).collect())
     }
 
-    pub(crate) async fn add_to_replicator(
-        &self,
-        data_address: &ReplicatedDataAddress,
-        targets: &BTreeSet<XorName>,
-    ) {
-        self.data_replicator
-            .write()
-            .await
-            .start_replication_for(data_address, targets)
-    }
-
     pub(crate) async fn get_for_replication(
         &self,
         data_address: ReplicatedDataAddress,
-        target: XorName,
     ) -> Result<ReplicatedData> {
-        if self
-            .data_replicator
-            .write()
-            .await
-            .finish_replication_for(data_address, target)
-            .is_some()
-        {
-            Ok(self.get_from_local_store(&data_address).await?)
-        } else {
-            Err(Error::NoSuchDataForReplication(data_address))
-        }
+        self.get_from_local_store(&data_address).await
     }
 }
 
@@ -247,9 +221,6 @@ impl Node {
             let data = match storage.get_from_local_store(address).await {
                 Ok(data) => {
                     info!("Data found for replication: {address:?}");
-                    self.data_storage
-                        .add_to_replicator(&data.address(), &new_holders)
-                        .await;
                     Ok(data)
                 }
                 Err(error) => {
@@ -276,9 +247,7 @@ mod tests {
     use crate::types::utils::random_bytes;
     use crate::types::{Chunk, ReplicatedData};
     use crate::UsedSpace;
-    use std::collections::BTreeSet;
     use tempfile::tempdir;
-    use xor_name::XorName;
 
     #[tokio::test]
     async fn data_storage_basics() -> Result<(), Error> {
@@ -324,46 +293,6 @@ mod tests {
         {
             Err(Error::ChunkNotFound(address)) => assert_eq!(address, replicated_data.name()),
             _ => panic!("Unexpected data found"),
-        }
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn data_is_not_deleted_when_replication_finishes() -> Result<(), Error> {
-        // Generate temp path for storage
-        let tmp_dir = tempdir()?;
-        let path = tmp_dir.path();
-        let used_space = UsedSpace::new(usize::MAX);
-
-        let storage = DataStorage::new(path, used_space)?;
-
-        // 5mb random data
-        let bytes = random_bytes(5 * 1024 * 1024);
-        let chunk = Chunk::new(bytes);
-        let original_data = ReplicatedData::Chunk(chunk);
-        let data_address = original_data.address();
-
-        // Store the chunk
-        let _ = storage.store(&original_data).await?;
-
-        // Generate adults for mimicking replication
-        let targets = (0..4)
-            .map(|_| XorName::random().with_bit(0, false))
-            .collect::<BTreeSet<XorName>>();
-
-        // Start replication
-        storage.add_to_replicator(&data_address, &targets).await;
-
-        // Simulate adults pulling data
-        for target in targets {
-            let fetched_data = storage.get_for_replication(data_address, target).await?;
-            assert_eq!(fetched_data, original_data);
-        }
-
-        match storage.get_from_local_store(&original_data.address()).await {
-            Ok(data) => assert_eq!(data.address().name(), &original_data.name()),
-            _ => panic!("Unexpected: Data not found"),
         }
 
         Ok(())
