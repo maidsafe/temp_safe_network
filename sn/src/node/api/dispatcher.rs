@@ -257,27 +257,6 @@ impl Dispatcher {
 
                 Ok(vec![])
             }
-            Cmd::HandleSystemMsg {
-                sender,
-                msg_id,
-                msg_authority,
-                dst_location,
-                msg,
-                payload,
-                known_keys,
-            } => {
-                self.node
-                    .handle_system_msg(
-                        sender,
-                        msg_id,
-                        msg_authority,
-                        dst_location,
-                        msg,
-                        payload,
-                        known_keys,
-                    )
-                    .await
-            }
             Cmd::SignOutgoingSystemMsg { msg, dst } => {
                 let src_section_pk = self.node.network_knowledge().section_key().await;
                 let wire_msg =

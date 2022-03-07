@@ -104,16 +104,17 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
         section_key,
     )?;
 
-    let mut cmds = get_internal_cmds(
-        Cmd::HandleMsg {
-            sender: new_node.peer(),
-            wire_msg,
-            original_bytes: None,
-        },
-        &dispatcher,
-    )
-    .await?
-    .into_iter();
+    let mut cmds = dispatcher
+        .process_cmd(
+            Cmd::HandleMsg {
+                sender: new_node.peer(),
+                wire_msg,
+                original_bytes: None,
+            },
+            "cmd-id",
+        )
+        .await?
+        .into_iter();
 
     let mut next_cmd = cmds.next();
 
@@ -200,15 +201,16 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
         section_key,
     )?;
 
-    let cmds = get_internal_cmds(
-        Cmd::HandleMsg {
-            sender: new_node.peer(),
-            wire_msg,
-            original_bytes: None,
-        },
-        &dispatcher,
-    )
-    .await?;
+    let cmds = dispatcher
+        .process_cmd(
+            Cmd::HandleMsg {
+                sender: new_node.peer(),
+                wire_msg,
+                original_bytes: None,
+            },
+            "cmd-id",
+        )
+        .await?;
 
     let mut test_connectivity = false;
     for cmd in cmds {
@@ -291,15 +293,16 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
 
     let mut propose_cmd_returned = false;
 
-    let inner_cmds = get_internal_cmds(
-        Cmd::HandleMsg {
-            sender: relocated_node.peer(),
-            wire_msg,
-            original_bytes: None,
-        },
-        &dispatcher,
-    )
-    .await?;
+    let inner_cmds = dispatcher
+        .process_cmd(
+            Cmd::HandleMsg {
+                sender: relocated_node.peer(),
+                wire_msg,
+                original_bytes: None,
+            },
+            "cmd-id",
+        )
+        .await?;
 
     for cmd in inner_cmds {
         // third pass should now be handled and return propose
@@ -840,15 +843,16 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
     let dispatcher = Dispatcher::new(node);
 
-    let _cmds = get_internal_cmds(
-        Cmd::HandleMsg {
-            sender: old_node.peer(),
-            wire_msg,
-            original_bytes: None,
-        },
-        &dispatcher,
-    )
-    .await?;
+    let _cmds = dispatcher
+        .process_cmd(
+            Cmd::HandleMsg {
+                sender: old_node.peer(),
+                wire_msg,
+                original_bytes: None,
+            },
+            "cmd-id",
+        )
+        .await?;
 
     // Verify our `Section` got updated.
     assert_matches!(
@@ -919,15 +923,16 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
         bogus_section_pk,
     )?;
 
-    let _cmds = get_internal_cmds(
-        Cmd::HandleMsg {
-            sender: sender.peer(),
-            wire_msg,
-            original_bytes: None,
-        },
-        &dispatcher,
-    )
-    .await?;
+    let _cmds = dispatcher
+        .process_cmd(
+            Cmd::HandleMsg {
+                sender: sender.peer(),
+                wire_msg,
+                original_bytes: None,
+            },
+            "cmd-id",
+        )
+        .await?;
 
     assert_eq!(dispatcher.node.network_knowledge().genesis_key(), &pk0);
     assert_eq!(
@@ -936,27 +941,6 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
     );
 
     Ok(())
-}
-
-/// helper to get through first cmd layers used for concurrency, to cmds we can analyse in a useful fashion for testing
-async fn get_internal_cmds(cmd: Cmd, dispatcher: &Dispatcher) -> RoutingResult<Vec<Cmd>> {
-    let cmds = dispatcher.process_cmd(cmd, "cmd-id").await?;
-
-    let mut node_msg_handling = vec![];
-    // let mut inner_handling = vec![];
-
-    for cmd in cmds {
-        // first pass gets us into node msg handling
-        let cmds = dispatcher.process_cmd(cmd, "cmd-id").await?;
-        node_msg_handling.extend(cmds);
-    }
-    for cmd in node_msg_handling.clone() {
-        // first pass gets us into node msg handling
-        let cmds = dispatcher.process_cmd(cmd, "cmd-id").await?;
-        node_msg_handling.extend(cmds);
-    }
-
-    Ok(node_msg_handling)
 }
 
 #[tokio::test(flavor = "multi_thread")]
