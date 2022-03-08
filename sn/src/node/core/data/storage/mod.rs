@@ -24,6 +24,8 @@ use crate::{
 pub(crate) use chunks::ChunkStorage;
 pub(crate) use registers::RegisterStorage;
 
+use crate::types::ReplicatedDataAddress;
+use std::collections::btree_map::Entry;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
@@ -65,7 +67,7 @@ impl DataStorage {
             ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd).await?,
         };
 
-        // check if we've filled another apprx. 10%-points of our storage
+        // check if we've filled another approx. 10%-points of our storage
         // if so, update the recorded level
         let last_recorded_level = { *self.last_recorded_level.read().await };
         if let Ok(next_level) = last_recorded_level.next() {
@@ -94,7 +96,7 @@ impl DataStorage {
     /// --- System calls ---
 
     // Read data from local store
-    pub(crate) async fn get_for_replication(
+    pub(crate) async fn get_from_local_store(
         &self,
         address: &DataAddress,
     ) -> Result<ReplicatedData> {
@@ -128,6 +130,13 @@ impl DataStorage {
             .map(DataAddress::Register);
         Ok(reg_keys.chain(chunk_keys).collect())
     }
+
+    pub(crate) async fn get_for_replication(
+        &self,
+        data_address: ReplicatedDataAddress,
+    ) -> Result<ReplicatedData> {
+        self.get_from_local_store(&data_address).await
+    }
 }
 
 impl Node {
@@ -146,19 +155,37 @@ impl Node {
                 .get_replica_targets(addr, &new_adults, &lost_adults, &remaining)
                 .await
             {
-                let _prev = data_for_replication.insert(data.name(), (data, holders));
+                let _prev = data_for_replication.insert(data.address(), (data, holders));
             }
         }
 
         let mut cmds = vec![];
         let section_pk = self.network_knowledge.section_key().await;
-        for (_, (data, targets)) in data_for_replication {
-            for name in targets {
-                cmds.push(Cmd::SignOutgoingSystemMsg {
-                    msg: SystemMsg::NodeCmd(NodeCmd::ReplicateData(data.clone())),
-                    dst: DstLocation::Node { name, section_pk },
-                })
+        let mut send_list: BTreeMap<XorName, Vec<ReplicatedDataAddress>> = BTreeMap::new();
+
+        for (data_address, (_data, targets)) in data_for_replication {
+            for target in targets {
+                let entry = send_list.entry(target);
+                match entry {
+                    Entry::Occupied(mut present_entries) => {
+                        let addresses = present_entries.get_mut();
+                        addresses.push(data_address);
+                    }
+                    Entry::Vacant(e) => {
+                        let _ = e.insert(vec![data_address]);
+                    }
+                }
             }
+        }
+
+        for (target, data_addresses) in send_list.into_iter() {
+            cmds.push(Cmd::SignOutgoingSystemMsg {
+                msg: SystemMsg::NodeCmd(NodeCmd::SendReplicateDataAddress(data_addresses).clone()),
+                dst: DstLocation::Node {
+                    name: target,
+                    section_pk,
+                },
+            })
         }
 
         Ok(cmds)
@@ -191,13 +218,13 @@ impl Node {
                 new_adult_is_holder,
                 lost_old_holder
             );
-            let data = match storage.get_for_replication(address).await {
+            let data = match storage.get_from_local_store(address).await {
                 Ok(data) => {
-                    info!("Data found and republishing: {address:?}");
+                    info!("Data found for replication: {address:?}");
                     Ok(data)
                 }
                 Err(error) => {
-                    warn!("Error finding {address:?} for republishing: {error:?}");
+                    warn!("Error finding {address:?} for replication: {error:?}");
                     Err(error)
                 }
             }
@@ -207,5 +234,67 @@ impl Node {
         } else {
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::dbs::Error;
+    use crate::messaging::data::DataQuery;
+    use crate::messaging::system::NodeQueryResponse;
+    use crate::node::core::data::DataStorage;
+    use crate::types::register::User;
+    use crate::types::utils::random_bytes;
+    use crate::types::{Chunk, ReplicatedData};
+    use crate::UsedSpace;
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn data_storage_basics() -> Result<(), Error> {
+        // Generate temp path for storage
+        // Cleaned up automatically after test completes
+        let tmp_dir = tempdir()?;
+        let path = tmp_dir.path();
+        let used_space = UsedSpace::new(usize::MAX);
+
+        // Create instance
+        let storage = DataStorage::new(path, used_space)?;
+
+        // 5mb random data chunk
+        let bytes = random_bytes(5 * 1024 * 1024);
+        let chunk = Chunk::new(bytes);
+        let replicated_data = ReplicatedData::Chunk(chunk.clone());
+
+        // Store the chunk
+        let _ = storage.store(&replicated_data).await?;
+
+        // Test local fetch
+        let fetched_data = storage
+            .get_from_local_store(&replicated_data.address())
+            .await?;
+
+        assert_eq!(replicated_data, fetched_data);
+
+        // Test client fetch
+        let query = DataQuery::GetChunk(*chunk.address());
+        let user = User::Anyone;
+
+        let query_response = storage.query(&query, user).await;
+
+        assert_eq!(query_response, NodeQueryResponse::GetChunk(Ok(chunk)));
+
+        // Remove from storage
+        storage.remove(&replicated_data.address()).await?;
+
+        // Assert data is not found after storage
+        match storage
+            .get_from_local_store(&replicated_data.address())
+            .await
+        {
+            Err(Error::ChunkNotFound(address)) => assert_eq!(address, replicated_data.name()),
+            _ => panic!("Unexpected data found"),
+        }
+
+        Ok(())
     }
 }

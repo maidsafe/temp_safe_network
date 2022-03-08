@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::data::Error as ErrorMsg;
-use crate::types::{convert_dt_error_to_error_msg, DataAddress, PublicKey};
+use crate::types::{convert_dt_error_to_error_msg, DataAddress, PublicKey, ReplicatedDataAddress};
 use std::io;
 use thiserror::Error;
 use xor_name::XorName;
@@ -44,6 +44,9 @@ pub enum Error {
     /// Data not found.
     #[error("No such data: {0:?}")]
     NoSuchData(DataAddress),
+    /// Data not found for replication
+    #[error("No such data for replication: {0:?}")]
+    NoSuchDataForReplication(ReplicatedDataAddress),
     /// Chunk not found.
     #[error("Chunk not found: {0:?}")]
     ChunkNotFound(XorName),

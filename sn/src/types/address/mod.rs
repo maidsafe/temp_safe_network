@@ -119,13 +119,11 @@ impl ReplicatedDataAddress {
     }
 
     ///
-    pub fn register(name: XorName, scope: Scope, tag: u64) -> ReplicatedDataAddress {
-        ReplicatedDataAddress::Register(RegisterAddress::new(name, scope, tag))
-    }
-
-    ///
-    pub fn chunk(name: XorName) -> ReplicatedDataAddress {
-        ReplicatedDataAddress::Chunk(ChunkAddress(name))
+    pub fn to_replicated_address(&self) -> ReplicatedDataAddress {
+        match self {
+            Self::Chunk(address) => ReplicatedDataAddress::Chunk(*address),
+            Self::Register(address) => ReplicatedDataAddress::Register(*address),
+        }
     }
 }
 
