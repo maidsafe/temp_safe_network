@@ -371,6 +371,13 @@ impl Session {
         let msg_kind = MsgKind::ServiceMsg(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
+        // When the client bootstrap using the nodes read from the config, the list is sorted
+        // by socket addresses. To improve the efficiency, the `elders_or_adults` shall be sorted
+        // by `age`, so that `elders` can be contacted first.
+        // Unfortunately, the bootstrap nodes were created using random names as the stored
+        // prefix_map file doesn't contains the `name` info associated with the socket address,
+        // which invalidates the sorting on age.
+
         let initial_contacts = elders_or_adults
             .clone()
             .into_iter()
