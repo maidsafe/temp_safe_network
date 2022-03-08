@@ -273,7 +273,7 @@ impl Session {
         Ok(())
     }
 
-    // Handle Anti-Entropy Redirect msgs
+    // Handle Anti-Entropy Redirect or Retry msgs
     #[instrument(skip_all, level = "debug")]
     async fn handle_ae_msg(
         session: Session,
@@ -284,7 +284,7 @@ impl Session {
         src_peer: Peer,
     ) -> Result<(), Error> {
         debug!(
-            "Received AE-Redirect for from {}, with SAP: {:?}",
+            "Received Anti-Entropy from {}, with SAP: {:?}",
             src_peer.addr(),
             target_sap
         );
