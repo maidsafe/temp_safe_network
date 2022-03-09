@@ -43,10 +43,11 @@ use crate::node::error::Result;
 use crate::types::{
     log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk, Cache, Peer,
 };
-use crate::UsedSpace;
+use crate::{elder_count, UsedSpace};
 
 use backoff::ExponentialBackoff;
-use data::{Capacity, Liveness};
+use data::Capacity;
+use dys_function::DysfunctionDetection;
 use itertools::Itertools;
 use resource_proof::ResourceProof;
 use std::{
@@ -122,7 +123,7 @@ pub(crate) struct Node {
     current_joins_semaphore: Arc<Semaphore>,
     // Trackers
     capacity: Capacity,
-    liveness: Liveness,
+    dysfunction_tracking: DysfunctionDetection,
     pending_data_queries: Arc<Cache<OperationId, Vec<Peer>>>,
     /// Timed cache of suspect nodes and their score
     known_suspect_nodes: Arc<Cache<XorName, usize>>,
@@ -149,16 +150,20 @@ impl Node {
 
         let data_storage = DataStorage::new(&root_storage_dir, used_space.clone())?;
 
-        info!("Creating Liveness checks");
-        let adult_liveness = Liveness::new(
+        info!("Creating DysfunctionDetection checks");
+        let node_dysfunction_detector = DysfunctionDetection::new(
             network_knowledge
                 .adults()
                 .await
                 .iter()
                 .map(|peer| peer.name())
                 .collect::<Vec<XorName>>(),
+            elder_count(),
         );
-        info!("Liveness check: {:?}", adult_liveness);
+        info!(
+            "DysfunctionDetection check: {:?}",
+            node_dysfunction_detector
+        );
 
         Ok(Self {
             comm,
@@ -177,7 +182,7 @@ impl Node {
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             data_storage,
             capacity: Capacity::default(),
-            liveness: adult_liveness,
+            dysfunction_tracking: node_dysfunction_detector,
             pending_data_queries: Arc::new(Cache::with_expiry_duration(DATA_QUERY_TIMEOUT)),
             known_suspect_nodes: Arc::new(Cache::with_expiry_duration(
                 SUSPECT_NODE_RETENTION_DURATION,
@@ -214,6 +219,20 @@ impl Node {
 
         self.send_direct_msg_to_nodes(recipients, message, dst_name, section_key)
             .await
+    }
+
+    /// returns names that are relatively dysfunctional
+    pub(crate) async fn get_dysfunctional_names(&self) -> BTreeSet<XorName> {
+        let (unresponsive, _deviant) = self
+            .dysfunction_tracking
+            .find_unresponsive_and_deviant_nodes()
+            .await;
+
+        unresponsive
+    }
+    /// Log a communication problem
+    pub(crate) fn log_comm_issue(&self, name: XorName) {
+        self.dysfunction_tracking.track_comm_issue(name)
     }
 
     pub(crate) async fn write_prefix_map(&self) {

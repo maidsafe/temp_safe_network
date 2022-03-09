@@ -20,6 +20,7 @@ use crate::types::Peer;
 use bytes::Bytes;
 use custom_debug::Debug;
 use std::{
+    collections::BTreeSet,
     fmt,
     sync::atomic::{AtomicU64, Ordering},
     time::Duration,
@@ -87,8 +88,8 @@ pub(crate) enum Cmd {
         // Previous name if relocated.
         previous_name: Option<XorName>,
     },
-    /// Proposes a peer as offline
-    ProposeOffline(XorName),
+    /// Proposes peers as offline
+    ProposeOffline(BTreeSet<XorName>),
     /// Send a signal to all Elders to
     /// test the connectivity to a specific node
     StartConnectivityTest(XorName),

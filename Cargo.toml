@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "dys_function",
     "sn",
     "sn_api",
     "sn_cli",
