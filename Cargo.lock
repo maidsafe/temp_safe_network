@@ -3128,6 +3128,7 @@ dependencies = [
  "serde_json",
  "signature",
  "sled",
+ "sn_consensus",
  "sn_dysfunction",
  "sn_launch_tool",
  "structopt",
@@ -3545,6 +3546,20 @@ dependencies = [
  "sn_api",
  "tiny-keccak",
  "walkdir",
+]
+
+[[package]]
+name = "sn_consensus"
+version = "1.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c2cd6526c1cf5ab2926afebaa4c5b660bb5914382704c42c5c9e07a4f5ed4e3"
+dependencies = [
+ "bincode",
+ "blsttc",
+ "log",
+ "rand 0.7.3",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]

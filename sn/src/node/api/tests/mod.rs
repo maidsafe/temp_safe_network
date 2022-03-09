@@ -99,7 +99,6 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
         SystemMsg::JoinRequest(Box::new(JoinRequest {
             section_key,
             resource_proof_response: None,
-            aggregated: None,
         })),
         section_key,
     )?;
@@ -143,7 +142,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn receive_join_request_with_resource_proof_response() -> Result<()> {
+async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result<()> {
     let prefix1 = Prefix::default().pushed(true);
     let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix1, elder_count());
 
@@ -179,9 +178,6 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
     let mut prover = rp.create_prover(data.clone());
     let solution = prover.solve();
 
-    let node_state = NodeState::joined(new_node.peer(), None);
-    let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
-
     let wire_msg = WireMsg::single_src(
         &new_node,
         DstLocation::Section {
@@ -196,12 +192,11 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
                 nonce,
                 nonce_signature,
             }),
-            aggregated: Some(auth.clone()),
         })),
         section_key,
     )?;
 
-    let cmds = dispatcher
+    let _ = dispatcher
         .process_cmd(
             Cmd::HandleMsg {
                 sender: new_node.peer(),
@@ -212,24 +207,20 @@ async fn receive_join_request_with_resource_proof_response() -> Result<()> {
         )
         .await?;
 
-    let mut test_connectivity = false;
-    for cmd in cmds {
-        if let Cmd::HandleNewNodeOnline(response) = cmd {
-            assert_eq!(response.value.name, new_node.name());
-            assert_eq!(response.value.addr, new_node.addr);
-            assert_eq!(response.value.age(), MIN_ADULT_AGE);
-
-            test_connectivity = true;
-        }
-    }
-
-    assert!(test_connectivity);
+    assert!(dispatcher
+        .node
+        .membership
+        .read()
+        .await
+        .as_ref()
+        .unwrap()
+        .is_churn_in_progress());
 
     Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn receive_join_request_from_relocated_node() -> Result<()> {
+async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result<()> {
     init_test_logger();
     let _span = tracing::info_span!("receive_join_request_from_relocated_node").entered();
 
@@ -291,9 +282,7 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         section_key,
     )?;
 
-    let mut propose_cmd_returned = false;
-
-    let inner_cmds = dispatcher
+    let _ = dispatcher
         .process_cmd(
             Cmd::HandleMsg {
                 sender: relocated_node.peer(),
@@ -304,21 +293,14 @@ async fn receive_join_request_from_relocated_node() -> Result<()> {
         )
         .await?;
 
-    for cmd in inner_cmds {
-        // third pass should now be handled and return propose
-        if let Cmd::SendAcceptedOnlineShare {
-            peer,
-            previous_name,
-        } = cmd
-        {
-            assert_eq!(peer, relocated_node.peer());
-            assert_eq!(previous_name, Some(relocated_node_old_name));
-
-            propose_cmd_returned = true;
-        }
-    }
-
-    assert!(propose_cmd_returned);
+    assert!(dispatcher
+        .node
+        .membership
+        .read()
+        .await
+        .as_ref()
+        .unwrap()
+        .is_churn_in_progress());
 
     Ok(())
 }

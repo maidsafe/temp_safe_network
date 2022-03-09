@@ -18,6 +18,7 @@ mod dkg;
 mod ed25519;
 mod error;
 mod logging;
+mod membership;
 mod messages;
 mod network_knowledge;
 
@@ -25,6 +26,7 @@ use crate::types::{Peer, PublicKey};
 
 use ed25519_dalek::Keypair;
 use std::{
+    collections::BTreeSet,
     fmt::{self, Display, Formatter},
     net::SocketAddr,
     sync::Arc,
@@ -65,6 +67,24 @@ pub(crate) fn recommended_section_size() -> usize {
 #[inline]
 pub(crate) const fn supermajority(group_size: usize) -> usize {
     1 + group_size * 2 / 3
+}
+
+pub(crate) fn split(
+    prefix: &Prefix,
+    nodes: impl IntoIterator<Item = XorName>,
+) -> Option<(BTreeSet<XorName>, BTreeSet<XorName>)> {
+    let decision_index: u8 = if let Ok(idx) = prefix.bit_count().try_into() {
+        idx
+    } else {
+        return None;
+    };
+
+    let (one, zero) = nodes
+        .into_iter()
+        .filter(|name| prefix.matches(name))
+        .partition(|name| name.bit(decision_index));
+
+    Some((zero, one))
 }
 
 /// Information and state of our node

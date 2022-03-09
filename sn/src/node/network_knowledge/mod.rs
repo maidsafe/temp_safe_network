@@ -31,7 +31,7 @@ use bls::PublicKey as BlsPublicKey;
 use section_peers::SectionPeers;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
-use std::{collections::BTreeSet, convert::TryInto, iter, net::SocketAddr, sync::Arc};
+use std::{collections::BTreeSet, iter, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};
 
@@ -161,7 +161,8 @@ impl NetworkKnowledge {
         genesis_sk_set: bls::SecretKeySet,
     ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
         let public_key_set = genesis_sk_set.public_keys();
-        let secret_key_share = genesis_sk_set.secret_key_share(0);
+        let secret_key_index = 0u8;
+        let secret_key_share = genesis_sk_set.secret_key_share(secret_key_index as u64);
         let genesis_key = public_key_set.public_key();
 
         let section_auth =
@@ -711,29 +712,31 @@ impl NetworkKnowledge {
         our_name: &XorName,
         excluded_names: &BTreeSet<XorName>,
     ) -> Option<(bool, usize, usize)> {
-        let (next_bit_index, prefix_next_bit) =
-            if let Ok(index) = self.prefix().await.bit_count().try_into() {
-                let prefix_next_bit = our_name.bit(index);
-                (index, prefix_next_bit)
-            } else {
-                // Already at the longest prefix, can't split further.
-                warn!("We cannot split as we are at longest prefix possible");
-                return None;
-            };
+        let prefix = self.prefix().await;
 
-        let (our_new_size, sibling_new_size) = self
+        assert!(prefix.matches(our_name));
+
+        let split_candidates = self
             .section_peers
             .members()
-            .iter()
-            .filter(|info| !excluded_names.contains(&info.name()))
-            .map(|info| info.name().bit(next_bit_index) == prefix_next_bit)
-            .fold((0, 0), |(ours, siblings), is_our_prefix| {
-                if is_our_prefix {
-                    (ours + 1, siblings)
-                } else {
-                    (ours, siblings + 1)
-                }
-            });
+            .into_iter()
+            .map(|auth| auth.value.name())
+            .filter(|name| !excluded_names.contains(name));
+
+        let (zero, one) = match super::split(&prefix, split_candidates) {
+            Some(s) => s,
+            None => return None,
+        };
+
+        let prefix_next_bit = our_name.bit(prefix.bit_count() as u8);
+
+        let (our_new_size, sibling_new_size) = if prefix_next_bit {
+            // we are in the `one` section
+            (one.len(), zero.len())
+        } else {
+            // we are in the `zero` section
+            (zero.len(), one.len())
+        };
 
         // If none of the two new sections would contain enough entries, return `None`.
         if our_new_size < recommended_section_size()

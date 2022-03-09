@@ -66,23 +66,6 @@ impl SectionKeysProvider {
         }
     }
 
-    /// Uses the secret key from cache, corresponding to
-    /// the provided public key.
-    pub(crate) async fn sign_with(
-        &self,
-        data: &[u8],
-        public_key: &bls::PublicKey,
-    ) -> Result<(usize, bls::SignatureShare)> {
-        let key_share = self.key_share(public_key).await?;
-
-        Ok((key_share.index, key_share.secret_key_share.sign(data)))
-    }
-
-    /// Returns true if no key share exists.
-    pub(crate) async fn is_empty(&self) -> bool {
-        self.cache.read().await.is_empty()
-    }
-
     /// Adds a new key to the cache, and removes the oldest
     /// key if cache size is exceeded.
     pub(crate) async fn insert(&self, share: SectionKeyShare) {

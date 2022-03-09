@@ -29,6 +29,7 @@ use self::{data::DataStorage, split_barrier::SplitBarrier};
 use super::{
     api::cmds::Cmd,
     dkg::DkgVoter,
+    membership::Membership,
     network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider},
     Elders, Event, NodeElderChange, NodeInfo,
 };
@@ -58,7 +59,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::sync::{mpsc, RwLock, Semaphore};
+use tokio::sync::{mpsc, RwLock};
 use uluru::LRUCache;
 use xor_name::{Prefix, XorName};
 
@@ -66,7 +67,6 @@ pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 128;
 pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 10;
 
 const BACKOFF_CACHE_LIMIT: usize = 100;
-pub(crate) const CONCURRENT_JOINS: usize = 7;
 
 // How long to hold on to correlated `Peer`s for data queries. Since data queries are forwarded
 // from elders (with whom the client is connected) to adults (who hold the data), the elder handling
@@ -120,8 +120,8 @@ pub(crate) struct Node {
     dkg_voter: DkgVoter,
     relocate_state: Arc<RwLock<Option<Box<JoiningAsRelocated>>>>,
     // ======================== Elder only ========================
+    pub(crate) membership: Arc<RwLock<Option<Membership>>>,
     joins_allowed: Arc<RwLock<bool>>,
-    current_joins_semaphore: Arc<Semaphore>,
     // Trackers
     capacity: Capacity,
     dysfunction_tracking: DysfunctionDetection,
@@ -144,6 +144,31 @@ impl Node {
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
     ) -> Result<Self> {
+        let membership = if let Some(key) = section_key_share.clone() {
+            let n_elders = network_knowledge
+                .section_signed_authority_provider()
+                .await
+                .elder_count();
+
+            // TODO: the bootstrap members should come from handover
+            let bootstrap_members = BTreeSet::from_iter(
+                network_knowledge
+                    .section_signed_members()
+                    .await
+                    .into_iter()
+                    .map(|section_auth| section_auth.value.to_msg()),
+            );
+
+            Some(Membership::from(
+                (key.index as u8, key.secret_key_share),
+                key.public_key_set,
+                n_elders,
+                bootstrap_members,
+            ))
+        } else {
+            None
+        };
+
         let section_keys_provider = SectionKeysProvider::new(section_key_share).await;
 
         // make sure the Node has the correct local addr as Comm
@@ -179,7 +204,6 @@ impl Node {
             relocate_state: Arc::new(RwLock::new(None)),
             event_tx,
             joins_allowed: Arc::new(RwLock::new(true)),
-            current_joins_semaphore: Arc::new(Semaphore::new(CONCURRENT_JOINS)),
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             data_storage,
             capacity: Capacity::default(),
@@ -189,6 +213,7 @@ impl Node {
                 SUSPECT_NODE_RETENTION_DURATION,
             )),
             ae_backoff_cache: AeBackoffCache::default(),
+            membership: Arc::new(RwLock::new(membership)),
         })
     }
 
@@ -319,6 +344,45 @@ impl Node {
         }
     }
 
+    async fn initialize_membership(&self) -> Result<()> {
+        let key = self
+            .section_keys_provider
+            .key_share(&self.network_knowledge.section_key().await)
+            .await?;
+
+        let n_elders = self
+            .network_knowledge
+            .authority_provider()
+            .await
+            .elder_count();
+
+        // TODO: the bootstrap members should come from handover
+        let bootstrap_members = BTreeSet::from_iter(
+            self.network_knowledge
+                .section_signed_members()
+                .await
+                .into_iter()
+                .map(|section_auth| section_auth.value.to_msg()),
+        );
+
+        let mut membership = self.membership.write().await;
+
+        *membership = Some(Membership::from(
+            (key.index as u8, key.secret_key_share),
+            key.public_key_set,
+            n_elders,
+            bootstrap_members,
+        ));
+
+        Ok(())
+    }
+
+    async fn initialize_elder_state(&self) -> Result<()> {
+        self.initialize_membership().await?;
+        // TODO: self.initialize_handover().await?;
+        Ok(())
+    }
+
     /// Generate cmds and fire events based upon any node state changes.
     pub(super) async fn update_self_for_new_node_state(
         &self,
@@ -337,7 +401,22 @@ impl Node {
                     sap.elders().format(", ")
                 );
 
-                if !self.section_keys_provider.is_empty().await {
+                // It can happen that we recieve the SAP demonstrating that we've become elders
+                // before our local DKG can update the section_keys_provider with our Elder key share.
+                //
+                // Eventually our local DKG instance will complete and add our key_share to the
+                // `section_keys_provider` cache. Once that happens, this function will be called
+                // again and we can complete our Elder state transition.
+                let we_have_our_key_share_for_new_section_key = self
+                    .section_keys_provider
+                    .key_share(&new.section_key)
+                    .await
+                    .is_ok();
+
+                if we_have_our_key_share_for_new_section_key {
+                    // The section-key has changed, we are now able to function as an elder.
+                    self.initialize_elder_state().await?;
+
                     cmds.extend(self.promote_and_demote_elders().await?);
 
                     // Whenever there is an elders change, casting a round of joins_allowed

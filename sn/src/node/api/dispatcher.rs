@@ -386,14 +386,6 @@ impl Dispatcher {
                 .await
                 .into_iter()
                 .collect()),
-            Cmd::SendAcceptedOnlineShare {
-                peer,
-                previous_name,
-            } => {
-                self.node
-                    .send_accepted_online_share(peer, previous_name)
-                    .await
-            }
             Cmd::ProposeOffline(names) => self.node.cast_offline_proposals(&names).await,
             Cmd::StartConnectivityTest(name) => Ok(vec![
                 self.node
