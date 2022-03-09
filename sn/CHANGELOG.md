@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.58.5 (2022-03-09)
+
+### New Features
+
+ - <csr-id-7a1065c46f5d72f6997a504c984a70493e197a5b/> impl throttled message sending
+   - adds a new command that given sends messages in a throttled fashion
+   - makes use of the new command to throttle replication messages to avoid message explosion
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release over the course of 1 calendar day.
+ - 4 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - clarify comment regarding bootstrap ([`df398e1`](https://github.com/maidsafe/safe_network/commit/df398e1017221c0027542b597c8f7c38c1828723))
+    - discard DataReplicator module ([`df330fa`](https://github.com/maidsafe/safe_network/commit/df330fa0de1e334e55863828fb743131ab629a18))
+    - impl throttled message sending ([`7a1065c`](https://github.com/maidsafe/safe_network/commit/7a1065c46f5d72f6997a504c984a70493e197a5b))
+</details>
+
 ## v0.58.4 (2022-03-04)
 
 ### New Features
@@ -16,14 +45,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    the network.
    
    We do this every X time
+ - <csr-id-070c146ea287db9bf708b11fbaaa177422cea73d/> nodes retry link.send_with once blindly
+ - <csr-id-65c3adc8dd45368260bf60ef83d44a99eb6ee7ca/> batch-up data for replication
+ - <csr-id-d3fd698b756d100daa12230fb944129529b773fb/> impl pull model data replication
+ - <csr-id-a3a28bd7c816582218bea5dbf0f7e141b3ae2c76/> init data replicator module
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release.
+ - 17 commits contributed to the release.
  - 2 days passed between releases.
- - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 17 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -33,9 +66,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.58.4/sn_cli-0.50.4 ([`7cf7fd6`](https://github.com/maidsafe/safe_network/commit/7cf7fd675beec5e7aa122f0f127402b636e659b7))
+    - limit batch size to 50 chunks and remove ack message ([`98a0eb9`](https://github.com/maidsafe/safe_network/commit/98a0eb988ab819ffce4727a9b823709efdc18dab))
+    - do not delete data after finishing replication ([`bf7de42`](https://github.com/maidsafe/safe_network/commit/bf7de428cd1e091ef2a6e616c07fd6596d711992))
+    - nodes retry link.send_with once blindly ([`070c146`](https://github.com/maidsafe/safe_network/commit/070c146ea287db9bf708b11fbaaa177422cea73d))
+    - batch-up data for replication ([`65c3adc`](https://github.com/maidsafe/safe_network/commit/65c3adc8dd45368260bf60ef83d44a99eb6ee7ca))
+    - add unit tests to data storage and replicator modules ([`96bf83f`](https://github.com/maidsafe/safe_network/commit/96bf83f8635004fa23e6b5b870cac27bd5b42332))
+    - remove entries from replicator if target already has data ([`ba0a26d`](https://github.com/maidsafe/safe_network/commit/ba0a26db12823bd2de51a4c75c5e7c4875c8f3f5))
     - clients should retry message sending when Conn errors encountered ([`076d5e3`](https://github.com/maidsafe/safe_network/commit/076d5e3cfd64d7bd677c9e6d34baf93f2eb49b4a))
+    - do not cache to-be-replicated data; fetch from storage ([`94d58d5`](https://github.com/maidsafe/safe_network/commit/94d58d565d9a6870e334bb2ca249f26ac3f8a327))
     - remove unneeded logs ([`43a4265`](https://github.com/maidsafe/safe_network/commit/43a42657ff18409dd83bba03135cd013c1298dc3))
+    - impl pull model data replication ([`d3fd698`](https://github.com/maidsafe/safe_network/commit/d3fd698b756d100daa12230fb944129529b773fb))
     - dont delete chunks on republish ([`7cb5ffd`](https://github.com/maidsafe/safe_network/commit/7cb5ffd03f9bfce6ebe74f66dcabddef661cf94d))
+    - init data replicator module ([`a3a28bd`](https://github.com/maidsafe/safe_network/commit/a3a28bd7c816582218bea5dbf0f7e141b3ae2c76))
     - add basic PeerLink cleanup ([`5b530fe`](https://github.com/maidsafe/safe_network/commit/5b530fec3cd6d182f4dba89e2144826977404aa9))
     - only add liveness check when we're sending out reqs. ([`000fc62`](https://github.com/maidsafe/safe_network/commit/000fc62a87dac3cd41bb6ced59596635f056ff29))
     - rename we_are_not_a_holder for clarity ([`0ff76c4`](https://github.com/maidsafe/safe_network/commit/0ff76c44aeddedd765fa4933c0841539feabaae5))
