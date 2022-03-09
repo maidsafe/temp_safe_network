@@ -1150,6 +1150,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "dys_function"
+version = "0.1.0"
+dependencies = [
+ "dashmap",
+ "eyre",
+ "itertools 0.10.3",
+ "rand 0.8.5",
+ "tokio",
+ "tracing",
+ "xor_name",
+]
+
+[[package]]
 name = "ed25519"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3385,6 +3398,7 @@ dependencies = [
  "custom_debug",
  "dashmap",
  "dirs-next 2.0.0",
+ "dys_function",
  "ed25519",
  "ed25519-dalek",
  "eyre",

@@ -7,10 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod capacity;
-mod liveness_tracking;
 
 pub(crate) use self::capacity::{Capacity, MIN_LEVEL_WHEN_FULL};
-pub(crate) use self::liveness_tracking::Liveness;
 
 use crate::{
     data_copy_count,
@@ -104,7 +102,7 @@ impl Node {
 
         // ensure we only add a pending request when we're actually sending out requests.
         for target in &targets {
-            self.liveness
+            self.dysfunction_tracking
                 .add_a_pending_request_operation(*target, operation_id)
                 .await;
         }
@@ -147,7 +145,7 @@ impl Node {
         self.capacity.retain_members_only(&members).await;
 
         // stop tracking liveness of absent holders
-        self.liveness.retain_members_only(members);
+        self.dysfunction_tracking.retain_members_only(members);
 
         Ok(())
     }
@@ -157,7 +155,7 @@ impl Node {
         info!("Adding new Adult: {adult} to trackers");
         self.capacity.add_new_adult(adult).await;
 
-        self.liveness.add_new_adult(adult);
+        self.dysfunction_tracking.add_new_node(adult);
     }
 
     /// Set storage level of a given node.

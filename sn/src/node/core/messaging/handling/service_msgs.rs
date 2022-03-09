@@ -73,8 +73,10 @@ impl Node {
     async fn notify_about_newly_suspect_nodes(&self) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
 
-        let (unresponsives, all_suspect_nodes) =
-            self.liveness.find_unresponsive_and_deviant_nodes().await;
+        let (_unresponsives, all_suspect_nodes) = self
+            .dysfunction_tracking
+            .find_unresponsive_and_deviant_nodes()
+            .await;
 
         let known_suspect_nodes = self.known_suspect_nodes.get_items().await;
 
@@ -110,17 +112,6 @@ impl Node {
                     },
                 });
                 debug!("{:?}", LogMarker::SendDeviantsDetected);
-            }
-        }
-
-        // Check for newly unresponsive adults here.
-        for (name, count) in unresponsives {
-            if newly_suspect_nodes.contains(&name) {
-                warn!(
-                    "Node {} has {} pending ops. It might be unresponsive",
-                    name, count
-                );
-                cmds.push(Cmd::ProposeOffline(name));
             }
         }
 
@@ -172,7 +163,7 @@ impl Node {
 
         let pending_removed = match query_response.operation_id() {
             Ok(op_id) => {
-                self.liveness
+                self.dysfunction_tracking
                     .request_operation_fulfilled(&node_id, op_id)
                     .await
             }

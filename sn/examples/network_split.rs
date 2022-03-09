@@ -37,7 +37,7 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 const NODES_DIR: &str = "local-test-network";
 const INTERVAL: &str = "5";
 const RUST_LOG: &str = "RUST_LOG";
-const ADDITIONAL_NODES_TO_SPLIT: u64 = 30;
+const ADDITIONAL_NODES_TO_SPLIT: u64 = 15;
 #[tokio::main]
 async fn main() -> Result<()> {
     // First lets build the network and testnet launcher, to ensure we're on the latest version
@@ -220,7 +220,7 @@ async fn upload_data() -> Result<(BytesAddress, [u8; 32])> {
     let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
-    let bytes = random_bytes(1024 * 1024);
+    let bytes = random_bytes(1024 * 1024 * 3);
 
     let mut hasher = Sha3::v256();
     let mut output = [0; 32];

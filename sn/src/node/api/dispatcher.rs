@@ -159,6 +159,29 @@ impl Dispatcher {
             }
         });
     }
+    pub(super) async fn check_for_dysfunction_periodically(self: Arc<Self>) {
+        info!("Starting dysfunction checking");
+        let _handle = tokio::spawn(async move {
+            let dispatcher = self.clone();
+            let mut interval = tokio::time::interval(LINK_CLEANUP_INTERVAL);
+            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+            loop {
+                let _instant = interval.tick().await;
+
+                let unresponsives_nodes = dispatcher.node.get_dysfunctional_names().await;
+
+                let cmd = Cmd::ProposeOffline(unresponsives_nodes);
+                if let Err(e) = dispatcher
+                    .clone()
+                    .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
+                    .await
+                {
+                    error!("Error sending a cleaning up unused PeerLinks: {:?}", e);
+                }
+            }
+        });
+    }
 
     pub(super) async fn write_prefixmap_to_disk(self: Arc<Self>) {
         info!("Writing our PrefixMap to disk");
@@ -335,14 +358,13 @@ impl Dispatcher {
                     .send_accepted_online_share(peer, previous_name)
                     .await
             }
-            Cmd::ProposeOffline(name) => self.node.propose_offline(name).await,
+            Cmd::ProposeOffline(names) => self.node.cast_offline_proposals(&names).await,
             Cmd::StartConnectivityTest(name) => Ok(vec![
                 self.node
                     .send_msg_to_our_elders(SystemMsg::StartConnectivityTest(name))
                     .await?,
             ]),
             Cmd::TestConnectivity(name) => {
-                let mut cmds = vec![];
                 if let Some(member_info) = self
                     .node
                     .network_knowledge()
@@ -356,10 +378,10 @@ impl Dispatcher {
                         .await
                         .is_err()
                     {
-                        cmds.push(Cmd::ProposeOffline(member_info.name()));
+                        self.node.log_comm_issue(member_info.name())
                     }
                 }
-                Ok(cmds)
+                Ok(vec![])
             }
         }
     }
