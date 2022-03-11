@@ -47,7 +47,7 @@ bls_dkg = "0.9.2"
 bytes = { version = "1.0.1", features = ["serde"] }
 color-eyre = "0.6.0"
 console-subscriber = { version = "0.1.0", optional = true }
-crdts = "~7.0"
+crdts = "7.0"
 custom_debug = "0.5.0"
 dashmap = {version = "5.1.0", features = [ "serde" ]}
 dirs-next = "2.0.0"
@@ -71,24 +71,24 @@ secured_linked_list = "~0.5.0"
 self_encryption = "0.27.4"
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_bytes = "~0.11.5"
-serde_json = "~1.0.53"
+serde_json = "1.0.53"
 signature = "1.1.10"
 sled = "~0.34.6"
 structopt = "~0.3.17"
 strum = "~0.23.0"
 strum_macros = "~0.23.1"
 sysinfo = "~0.23.2"
-tempfile = "~3.2.0"
-thiserror = "~1.0.23"
+tempfile = "3.2.0"
+thiserror = "1.0.23"
 tiny-keccak = { version = "2.0.2", features = ["sha3"] }
 tracing = "~0.1.26"
 tracing-core = "~0.1.21"
 tracing-appender = "~0.2.0"
 tracing-subscriber = { version = "0.3.1", features = ["env-filter", "json"] }
-uluru="~3.0.0"
-url = "~2.2.0"
-walkdir = "~2"
-xor_name = "~4.0.1"
+uluru="3.0.0"
+url = "2.2.0"
+walkdir = "2"
+xor_name = "4.0.1"
 file-rotate = "~0.6.0"
 
 [dependencies.backoff]
@@ -101,7 +101,7 @@ default-features = false
 features = ["archive-tar", "archive-zip", "compression-flate2", "compression-zip-deflate", "rustls"]
 
 [dependencies.tokio]
-version = "~1.17.0"
+version = "1.17.0"
 features = ["fs", "io-util", "macros", "rt", "rt-multi-thread", "sync"]
 
 [dev-dependencies]

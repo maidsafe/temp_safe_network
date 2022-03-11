@@ -32,5 +32,5 @@ tracing-core = "0.1.21"
 tracing-subscriber = { version = "0.3.1", features = ["env-filter", "json"] }
 
 [dependencies.tokio]
-version = "~1.17.0"
+version = "1.17.0"
 features = ["fs", "io-util", "macros", "rt", "rt-multi-thread", "sync"]
