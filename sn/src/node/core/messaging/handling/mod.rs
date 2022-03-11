@@ -160,15 +160,19 @@ impl Node {
                     }
                 }
 
-                cmds.push(Cmd::HandleSystemMsg {
-                    sender,
-                    msg_id,
-                    msg_authority,
-                    dst_location,
-                    msg,
-                    payload,
-                    known_keys,
-                });
+                let handling_msg_cmds = self
+                    .handle_system_msg(
+                        sender,
+                        msg_id,
+                        msg_authority,
+                        dst_location,
+                        msg,
+                        payload,
+                        known_keys,
+                    )
+                    .await?;
+
+                cmds.extend(handling_msg_cmds);
 
                 Ok(cmds)
             }

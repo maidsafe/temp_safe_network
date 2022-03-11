@@ -8,7 +8,7 @@
 
 use crate::messaging::{
     system::{DkgFailureSigSet, KeyedSig, NodeState, SectionAuth, SystemMsg},
-    DstLocation, MsgId, NodeMsgAuthority, WireMsg,
+    DstLocation, WireMsg,
 };
 use crate::node::{
     core::Proposal,
@@ -17,7 +17,6 @@ use crate::node::{
 };
 use crate::types::Peer;
 
-use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use custom_debug::Debug;
 use std::{
@@ -40,19 +39,6 @@ pub(crate) enum Cmd {
         #[debug(skip)]
         // original bytes to avoid reserializing for entropy checks
         original_bytes: Option<Bytes>,
-    },
-    // TODO: rename this as/when this is all node for clarity
-    /// Handle Node, either directly or notify via event listener
-    HandleSystemMsg {
-        sender: Peer,
-        msg_id: MsgId,
-        msg: SystemMsg,
-        msg_authority: NodeMsgAuthority,
-        dst_location: DstLocation,
-        #[debug(skip)]
-        payload: Bytes,
-        #[debug(skip)]
-        known_keys: Vec<BlsPublicKey>,
     },
     /// Handle a timeout previously scheduled with `ScheduleTimeout`.
     HandleTimeout(u64),
@@ -118,9 +104,6 @@ impl fmt::Display for Cmd {
             }
             Cmd::HandleTimeout(_) => write!(f, "HandleTimeout"),
             Cmd::ScheduleTimeout { .. } => write!(f, "ScheduleTimeout"),
-            Cmd::HandleSystemMsg { msg_id, .. } => {
-                write!(f, "HandleSystemMsg {:?}", msg_id)
-            }
             Cmd::HandleMsg { wire_msg, .. } => {
                 write!(f, "HandleMsg {:?}", wire_msg.msg_id())
             }

@@ -263,7 +263,7 @@ mod tests {
         let safe_url = SafeUrl::from_url(&fc_xorurl)?;
         let content = retry_loop!(safe.fetch(&fc_xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&fc_xorurl))
-            .ok_or(anyhow!("files container was unexpectedly empty"))?;
+            .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
         match content.clone() {
             SafeData::FilesContainer {
@@ -314,7 +314,7 @@ mod tests {
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
-            .ok_or(anyhow!("files container was unexpectedly empty"))?;
+            .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
         // link to an nrs map
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
@@ -374,7 +374,7 @@ mod tests {
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
-            .ok_or(anyhow!("files container was unexpectedly empty"))?;
+            .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
         // link to an nrs map
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
@@ -558,7 +558,7 @@ mod tests {
             .await?;
         let _ = retry_loop!(safe.fetch(&xorurl, None));
         let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
-            .ok_or(anyhow!("files container was unexpectedly empty"))?;
+            .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
         // map to nrs name
         let mut safe_url = SafeUrl::from_url(&xorurl)?;

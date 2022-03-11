@@ -705,7 +705,7 @@ mod tests {
         let (version0, _) = safe
             .files_container_get(&link)
             .await?
-            .ok_or(anyhow!("files container was unexpectedly empty"))?;
+            .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
         // associate a first name
         let mut valid_link = SafeUrl::from_url(&link)?;
