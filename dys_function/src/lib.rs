@@ -76,7 +76,6 @@ type OperationId = [u8; 32];
 pub struct DysfunctionDetection {
     neighbour_count: usize,
     communication_issues: Arc<DashMap<NodeIdentifier, usize>>, // count of comm issues
-    /// One of (potentially many) different ways of assessing unresponsiveness of nodes.
     unfulfilled_requests: Arc<DashMap<NodeIdentifier, Arc<RwLock<Vec<OperationId>>>>>, // OperationId = [u8; 32]
     closest_nodes_to: Arc<DashMap<XorName, Vec<XorName>>>,
 }

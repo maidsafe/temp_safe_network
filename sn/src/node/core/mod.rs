@@ -223,12 +223,16 @@ impl Node {
 
     /// returns names that are relatively dysfunctional
     pub(crate) async fn get_dysfunctional_names(&self) -> BTreeSet<XorName> {
-        let (unresponsive, _deviant) = self
-            .dysfunction_tracking
-            .find_unresponsive_and_deviant_nodes()
-            .await;
+        self.dysfunction_tracking
+            .get_dysfunctional_node_names()
+            .await
+    }
 
-        unresponsive
+    /// returns names that are relatively dysfunctional
+    pub(crate) async fn get_suspicious_node_names(&self) -> BTreeSet<XorName> {
+        self.dysfunction_tracking
+            .get_dysfunctional_node_names()
+            .await
     }
     /// Log a communication problem
     pub(crate) fn log_comm_issue(&self, name: XorName) {
