@@ -24,6 +24,7 @@ pub enum LogMarker {
     AgreementOfOnline,
     // Malice
     DeviantsDetected,
+    ProposeOffline,
     // Messaging
     ServiceMsgToBeHandled,
     SystemMsgToBeHandled,
