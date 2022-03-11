@@ -694,13 +694,13 @@ impl Node {
                     Ok(vec![])
                 };
             }
-            SystemMsg::NodeEvent(NodeEvent::DeviantsDetected(deviants)) => {
+            SystemMsg::NodeEvent(NodeEvent::SuspiciousNodesDetected(suspects)) => {
                 info!(
-                    "Received probable deviants nodes {deviants:?} Starting preemptive data replication"
+                    "Received probable suspects nodes {suspects:?} Starting preemptive data replication"
                 );
                 debug!("{}", LogMarker::DeviantsDetected);
 
-                return self.republish_data_for_deviant_nodes(deviants).await;
+                return self.republish_data_for_suspicious_nodes(suspects).await;
             }
             SystemMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
                 info!("ReplicateData MsgId: {:?}", msg_id);
@@ -1044,9 +1044,9 @@ impl Node {
         cmds
     }
 
-    async fn republish_data_for_deviant_nodes(
+    async fn republish_data_for_suspicious_nodes(
         &self,
-        deviants: BTreeSet<XorName>,
+        suspects: BTreeSet<XorName>,
     ) -> Result<Vec<Cmd>> {
         let our_adults = self
             .network_knowledge
@@ -1056,7 +1056,7 @@ impl Node {
             .map(|peer| peer.name())
             .collect::<BTreeSet<XorName>>();
 
-        self.reorganize_data(BTreeSet::new(), deviants, our_adults)
+        self.reorganize_data(BTreeSet::new(), suspects, our_adults)
             .await
             .map_err(crate::node::Error::from)
     }

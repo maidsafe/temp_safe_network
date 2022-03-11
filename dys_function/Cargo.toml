@@ -28,6 +28,7 @@ features = ["sync"]
 
 [dev-dependencies]
 eyre = "~0.6.5"
+tracing-subscriber = { version = "0.3.1", features = ["env-filter", "json"] }
 
 [dev-dependencies.tokio]
 version = "1.17.0"

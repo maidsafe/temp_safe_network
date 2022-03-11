@@ -1159,6 +1159,7 @@ dependencies = [
  "rand 0.8.5",
  "tokio",
  "tracing",
+ "tracing-subscriber 0.3.9",
  "xor_name",
 ]
 

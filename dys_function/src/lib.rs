@@ -41,6 +41,7 @@
 #[macro_use]
 extern crate tracing;
 
+mod connections;
 mod detection;
 mod operations;
 
@@ -52,17 +53,6 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-/// Minimum number of pending operations that are allowed to stagnate before dysfunction checks kick in
-// ~400 ops was the maximum number stagnating ops seen with client_api tests(multi-threaded).
-// Therefore 500 is better higher cap with some buffer. Setting it to 400 or lower might start replication on CI unnecessarily.
-const MIN_PENDING_OPS: usize = 500;
-
-// If the pending ops count of a node is 5 times higher than it's neighbours, it will be kicked.
-const EXCESSIVE_OPS_TOLERANCE: f64 = 5.0; // increasing this number increases tolerance
-
-// If the pending ops count of a node is EXCESSIVE_OPS_TOLERANCE / 2 times higher than it's neighbours, preemptive replication starts.
-const PREEMPTIVE_REPLICATION_TOLERANCE: f64 = EXCESSIVE_OPS_TOLERANCE / 2.0; // increasing this number increases tolerance
-
 /// Some reproducible xorname derived from the operation. This is a permanent reference needed for logging all dysfunction.
 type NodeIdentifier = XorName;
 
@@ -72,11 +62,11 @@ type OperationId = [u8; 32];
 
 #[derive(Clone, Debug)]
 /// Dysfunctional node tracking. Allows various potential issues to be tracked and weighted,
-/// with unresposive or deviant nodes being noted on request, against which action can then be taken.
+/// with unresposive or suspect nodes being noted on request, against which action can then be taken.
 pub struct DysfunctionDetection {
     neighbour_count: usize,
     communication_issues: Arc<DashMap<NodeIdentifier, usize>>, // count of comm issues
-    unfulfilled_requests: Arc<DashMap<NodeIdentifier, Arc<RwLock<Vec<OperationId>>>>>, // OperationId = [u8; 32]
+    unfulfilled_ops: Arc<DashMap<NodeIdentifier, Arc<RwLock<Vec<OperationId>>>>>, // OperationId = [u8; 32]
     closest_nodes_to: Arc<DashMap<XorName, Vec<XorName>>>,
 }
 
@@ -98,7 +88,7 @@ impl DysfunctionDetection {
         Self {
             neighbour_count,
             communication_issues: Arc::new(DashMap::new()),
-            unfulfilled_requests: Arc::new(DashMap::new()),
+            unfulfilled_ops: Arc::new(DashMap::new()),
             closest_nodes_to: Arc::new(closest_nodes_to),
         }
     }
@@ -113,7 +103,7 @@ impl DysfunctionDetection {
 
     /// Add a new node to the tracker and recompute closest nodes.
     pub fn add_new_node(&self, adult: XorName) {
-        info!("Adding new adult:{adult} to DysfunctionDetection tracker");
+        debug!("Adding new adult:{adult} to DysfunctionDetection tracker");
 
         let our_adults: Vec<_> = self
             .closest_nodes_to
@@ -129,7 +119,7 @@ impl DysfunctionDetection {
             .cloned()
             .collect::<Vec<_>>();
 
-        info!("Closest nodes to {adult}:{closest_nodes:?}");
+        trace!("Closest nodes to {adult}:{closest_nodes:?}");
 
         if let Some(_old_entry) = self.closest_nodes_to.insert(adult, closest_nodes) {
             warn!("Throwing old dysfunction tracker for Adult {adult}:{_old_entry:?}");
@@ -138,25 +128,14 @@ impl DysfunctionDetection {
         self.recompute_closest_nodes();
     }
 
-    /// Track a communication issue for a given node
-    pub fn track_comm_issue(&self, node_id: NodeIdentifier) {
-        // iniital entry setup if non existent
-        let _entry = self.communication_issues.entry(node_id).or_default();
-
-        trace!("Noting comms issue against node: {:?}", node_id,);
-
-        if let Some(mut v) = self.communication_issues.get_mut(&node_id) {
-            *v += 1;
-        }
-    }
-
     /// Removes any tracked nodes not present in the passed `current_members`
     pub fn retain_members_only(&self, current_members: BTreeSet<XorName>) {
         let all_keys: Vec<_> = self.current_nodes();
 
         for key in &all_keys {
             if !current_members.contains(key) {
-                let _prev = self.unfulfilled_requests.remove(key);
+                let _prev = self.communication_issues.remove(key);
+                let _prev = self.unfulfilled_ops.remove(key);
                 let _prev = self.closest_nodes_to.remove(key);
             }
         }
@@ -164,8 +143,8 @@ impl DysfunctionDetection {
         self.recompute_closest_nodes();
     }
 
-    /// Recalculats the closest nodes
-    pub fn recompute_closest_nodes(&self) {
+    /// Recalculates the closest nodes
+    fn recompute_closest_nodes(&self) {
         let all_known_nodes: Vec<_> = self.current_nodes();
 
         self.closest_nodes_to.alter_all(|name, _| {
@@ -180,92 +159,44 @@ impl DysfunctionDetection {
     }
 }
 
+/// Calculates the avg value in a data set
+/// https://rust-lang-nursery.github.io/rust-cookbook/science/mathematics/statistics.html
+pub(crate) fn get_mean_of(data: &[f32]) -> Option<f32> {
+    let sum = data.iter().sum::<f32>();
+    let count = data.len();
+    match count {
+        positive if positive > 0 => Some(sum / count as f32),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{DysfunctionDetection, OperationId, EXCESSIVE_OPS_TOLERANCE};
+    use super::DysfunctionDetection;
 
-    use crate::MIN_PENDING_OPS;
     use eyre::Error;
-    use itertools::Itertools;
-    use rand::Rng;
     use std::collections::BTreeSet;
+    use std::sync::Once;
     use xor_name::XorName;
 
     type Result<T, E = Error> = std::result::Result<T, E>;
 
-    static ELDER_COUNT: usize = 7;
+    pub(crate) static ELDER_COUNT: usize = 7;
 
-    fn get_random_operation_id() -> OperationId {
-        let mut rng = rand::thread_rng();
-        rng.gen()
-    }
+    static INIT: Once = Once::new();
 
-    #[tokio::test]
-    async fn dysfunction_basics() -> Result<()> {
-        let adults = (0..10).map(|_| XorName::random()).collect::<Vec<XorName>>();
-
-        let dysfunctional_detection = DysfunctionDetection::new(adults.clone(), ELDER_COUNT);
-
-        // Write data MIN_PENDING_OPS times to the 10 adults
-        for adult in &adults {
-            for _ in 0..MIN_PENDING_OPS {
-                let op_id = get_random_operation_id();
-                dysfunctional_detection
-                    .add_a_pending_request_operation(*adult, op_id)
-                    .await;
-            }
-        }
-
-        // Assert there are not any unresponsive nodes
-        // This is because all of them are within the tolerance ratio of each other
-        assert_eq!(
-            dysfunctional_detection
-                .find_unresponsive_and_deviant_nodes()
-                .await
-                .0
-                .len(),
-            0
-        );
-
-        // Add a new adults
-        let new_adult = XorName::random();
-        dysfunctional_detection.add_new_node(new_adult);
-
-        // Assert total adult count
-        assert_eq!(dysfunctional_detection.closest_nodes_to.len(), 11);
-
-        // Write data (EXCESSIVE_OPS_TOLERANCE/2) + 1 x MIN_PENDING_OPS times to the new adult to check for preemptive replication
-        for _ in 0..MIN_PENDING_OPS * ((EXCESSIVE_OPS_TOLERANCE as usize / 2) + 1) {
-            let op_id = get_random_operation_id();
-            dysfunctional_detection
-                .add_a_pending_request_operation(new_adult, op_id)
-                .await;
-        }
-
-        // Assert that the new adult is detected as deviant.
-        assert!(dysfunctional_detection
-            .find_unresponsive_and_deviant_nodes()
-            .await
-            .1
-            .iter()
-            .contains(&new_adult));
-
-        // Write data another EXCESSIVE_OPS_TOLERANCE x 50 times to the new adult to check for unresponsiveness.
-        for _ in 0..MIN_PENDING_OPS * EXCESSIVE_OPS_TOLERANCE as usize {
-            let op_id = get_random_operation_id();
-            dysfunctional_detection
-                .add_a_pending_request_operation(new_adult, op_id)
-                .await;
-        }
-
-        let (unresponsive_nodes, _deviants) = dysfunctional_detection
-            .find_unresponsive_and_deviant_nodes()
-            .await;
-
-        // Assert that the new adult is detected unresponsive.
-        assert!(unresponsive_nodes.contains(&new_adult));
-
-        Ok(())
+    /// Initialise logger for tests, this is run only once, even if called multiple times.
+    pub(crate) fn init_test_logger() {
+        INIT.call_once(|| {
+            tracing_subscriber::fmt::fmt()
+                // NOTE: uncomment this line for pretty printed log output.
+                .with_thread_names(true)
+                .with_ansi(false)
+                .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+                .with_target(false)
+                // .event_format(LogFormatter::default())
+                .try_init().unwrap_or_else(|_| println!("Error initializing logger"));
+        });
     }
 
     #[tokio::test]
