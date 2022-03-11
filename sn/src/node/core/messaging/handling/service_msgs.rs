@@ -73,11 +73,7 @@ impl Node {
     async fn notify_about_newly_suspect_nodes(&self) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
 
-        let (_unresponsives, all_suspect_nodes) = self
-            .dysfunction_tracking
-            .find_unresponsive_and_deviant_nodes()
-            .await;
-
+        let all_suspect_nodes = self.get_suspicious_node_names().await;
         let known_suspect_nodes = self.known_suspect_nodes.get_items().await;
 
         let newly_suspect_nodes: BTreeSet<_> = all_suspect_nodes
@@ -114,6 +110,8 @@ impl Node {
                 debug!("{:?}", LogMarker::SendDeviantsDetected);
             }
         }
+
+
 
         Ok(cmds)
     }
