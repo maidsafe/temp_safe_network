@@ -99,19 +99,17 @@ impl Node {
 
             for adult in valid_adults {
                 cmds.push(Cmd::SignOutgoingSystemMsg {
-                    msg: SystemMsg::NodeEvent(NodeEvent::DeviantsDetected(
-                        all_suspect_nodes.clone(),
+                    msg: SystemMsg::NodeEvent(NodeEvent::SuspiciousNodesDetected(
+                        newly_suspect_nodes.clone(),
                     )),
                     dst: DstLocation::Node {
                         name: adult.name(),
                         section_pk: *self.section_chain().await.last_key(),
                     },
                 });
-                debug!("{:?}", LogMarker::SendDeviantsDetected);
+                debug!("{:?}", LogMarker::SendSuspiciousNodesDetected);
             }
         }
-
-
 
         Ok(cmds)
     }
