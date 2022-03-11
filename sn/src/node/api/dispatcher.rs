@@ -169,15 +169,18 @@ impl Dispatcher {
             loop {
                 let _instant = interval.tick().await;
 
-                let unresponsives_nodes = dispatcher.node.get_dysfunctional_names().await;
+                let unresponsive_nodes = dispatcher.node.get_dysfunctional_names().await;
 
-                let cmd = Cmd::ProposeOffline(unresponsives_nodes);
-                if let Err(e) = dispatcher
-                    .clone()
-                    .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
-                    .await
-                {
-                    error!("Error sending a cleaning up unused PeerLinks: {:?}", e);
+                if !unresponsive_nodes.is_empty() {
+                    debug!("{:?} : {unresponsive_nodes:?}", LogMarker::ProposeOffline);
+                    let cmd = Cmd::ProposeOffline(unresponsive_nodes);
+                    if let Err(e) = dispatcher
+                        .clone()
+                        .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
+                        .await
+                    {
+                        error!("Error sending a cleaning up unused PeerLinks: {:?}", e);
+                    }
                 }
             }
         });
