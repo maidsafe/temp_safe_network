@@ -908,7 +908,11 @@ impl Node {
                 correlation_id,
                 user,
             } => {
-                debug!("{:?}", LogMarker::ChunkQueryResponseReceviedFromAdult);
+                debug!(
+                    "{:?}: op_id {:?}, correlation_id: {correlation_id:?}, sender: {sender}",
+                    LogMarker::ChunkQueryResponseReceviedFromAdult,
+                    response.operation_id()?
+                );
                 let sending_nodes_pk = match msg_authority {
                     NodeMsgAuthority::Node(auth) => PublicKey::from(auth.into_inner().node_ed_pk),
                     _ => return Err(Error::InvalidQueryResponseAuthority),

@@ -73,16 +73,17 @@ impl Node {
             let error =
                 convert_to_error_msg(Error::NoAdults(self.network_knowledge().prefix().await));
 
+            debug!("No targets found for {msg_id:?}");
             return self
                 .send_cmd_error_response(CmdError::Data(error), origin, msg_id)
                 .await;
         }
 
-        let mut already_waiting_on_response = false;
+        let mut some_peer_already_waiting_on_response = false;
         let mut this_peer_already_waiting_on_response = false;
         let waiting_peers = if let Some(peers) = self.pending_data_queries.get(&operation_id).await
         {
-            already_waiting_on_response = true;
+            some_peer_already_waiting_on_response = true;
             this_peer_already_waiting_on_response = peers.contains(&origin.clone());
             peers
         } else {
@@ -102,17 +103,20 @@ impl Node {
 
         // ensure we only add a pending request when we're actually sending out requests.
         for target in &targets {
+            trace!("adding pending req for {target:?} in dysfunction tracking");
             self.dysfunction_tracking
                 .add_a_pending_request_operation(*target, operation_id)
                 .await;
         }
 
+        trace!("Adding to pending data queries");
         let _prior_value = self
             .pending_data_queries
             .set(operation_id, waiting_peers, None)
             .await;
 
-        if already_waiting_on_response {
+        if some_peer_already_waiting_on_response {
+            trace!("Query was already sent out, no need to do it again");
             // no need to send query again.
             return Ok(vec![]);
         }
