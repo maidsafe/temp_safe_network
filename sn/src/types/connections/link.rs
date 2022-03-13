@@ -153,6 +153,7 @@ impl Link {
     ) -> Result<qp2p::Connection, SendToOneError> {
         // get the most recently used connection
         let res = { self.queue.read().await.peek_max().map(|(id, _prio)| *id) };
+
         match res {
             None => {
                 // if none found, funnel one caller through at a time

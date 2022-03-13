@@ -73,6 +73,9 @@ impl Session {
                             "Connection was closed by the node: {:?}",
                             String::from_utf8(reason.to_vec())
                         );
+
+                        break;
+
                     },
                     Err(Error::QuicP2p(qp2p_err)) => {
                           // TODO: Can we recover here?
@@ -87,6 +90,7 @@ impl Session {
 
             // once the msg loop breaks, we know the connection is closed
             trace!("{} to {} (id: {})", LogMarker::ConnectionClosed, addr, connection_id);
+
         }.instrument(info_span!("Listening for incoming msgs from {}", ?addr))).in_current_span();
     }
 
@@ -136,7 +140,7 @@ impl Session {
                 .await;
                 if result.is_err() {
                     error!(
-                        "Failed to handle AE-Redirect msg from {:?}",
+                        "Failed to handle AE-Redirect msg from {:?}, {result:?}",
                         src_peer.addr()
                     );
                 }

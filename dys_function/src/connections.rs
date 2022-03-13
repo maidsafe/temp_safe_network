@@ -51,8 +51,6 @@ impl DysfunctionDetection {
             );
 
             trace!("let pending ops: in hood: {:?}", all_neighbourhood_counts);
-            let avg_in_neighbourhood =
-                get_mean_of(&all_neighbourhood_counts).unwrap_or(1.0) as usize;
 
             let final_score = nodes_count;
             // let final_score = usize::max( nodes_count, avg_in_neighbourhood);

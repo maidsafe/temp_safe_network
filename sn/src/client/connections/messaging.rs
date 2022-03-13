@@ -606,6 +606,10 @@ pub(super) async fn send_msg(
             let mut result = send_and_retry().await;
 
             while result.is_err() && retries < CLIENT_SEND_RETRIES {
+                warn!(
+                    "Attempting to send msg again {msg_id:?}, attempt #{:?}",
+                    retries.clone()
+                );
                 retries += 1;
                 result = send_and_retry().await;
             }

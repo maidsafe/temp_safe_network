@@ -136,6 +136,12 @@ impl Node {
         let op_id = response.operation_id()?;
 
         let querys_peers = self.pending_data_queries.remove(&op_id).await;
+        let query_response = response.convert();
+
+        debug!(
+            "QueryResponse operation id: {:?} ",
+            query_response.operation_id()
+        );
 
         let waiting_peers = if let Some(peers) = querys_peers {
             peers
@@ -175,16 +181,30 @@ impl Node {
         }
 
         // Send response if one is warranted
-        if query_response.failed_with_data_not_found()
-            || (!query_response.is_success()
-                && self
-                    .capacity
-                    .is_full(&XorName::from(sending_node_pk))
-                    .await
-                    .unwrap_or(false))
+        if query_response.failed_with_data_not_found() {
+            // we don't return data not found errors.
+            trace!(
+                "Node {:?}, reported data not found: {:?}",
+                sending_node_pk,
+                query_response.operation_id()
+            );
+
+            return Ok(cmds);
+        }
+
+        // Send response if one is warranted
+        if !query_response.is_success()
+            && self
+                .capacity
+                .is_full(&XorName::from(sending_node_pk))
+                .await
+                .unwrap_or(false)
         {
             // we don't return data not found errors.
-            trace!("Node {:?}, reported data not found", sending_node_pk);
+            trace!(
+                "Node {:?}, is full and so reporting data not found",
+                sending_node_pk
+            );
 
             return Ok(cmds);
         }
