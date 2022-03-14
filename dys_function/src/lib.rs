@@ -43,6 +43,7 @@ extern crate tracing;
 
 mod connections;
 mod detection;
+mod network_knowledge;
 mod operations;
 
 use xor_name::XorName;
@@ -66,6 +67,7 @@ type OperationId = [u8; 32];
 pub struct DysfunctionDetection {
     neighbour_count: usize,
     communication_issues: Arc<DashMap<NodeIdentifier, usize>>, // count of comm issues
+    knowledge_issues: Arc<DashMap<NodeIdentifier, usize>>,     // count of comm issues
     unfulfilled_ops: Arc<DashMap<NodeIdentifier, Arc<RwLock<Vec<OperationId>>>>>, // OperationId = [u8; 32]
     closest_nodes_to: Arc<DashMap<XorName, Vec<XorName>>>,
 }
@@ -88,6 +90,7 @@ impl DysfunctionDetection {
         Self {
             neighbour_count,
             communication_issues: Arc::new(DashMap::new()),
+            knowledge_issues: Arc::new(DashMap::new()),
             unfulfilled_ops: Arc::new(DashMap::new()),
             closest_nodes_to: Arc::new(closest_nodes_to),
         }

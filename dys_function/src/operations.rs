@@ -75,7 +75,7 @@ impl DysfunctionDetection {
     /// Calculate a score of this node, as compared to its closest neighbours...
     /// The average score of all neighbours is calculated, and the standard deviation therein.
     /// We then calculate the node's z-score and multiply excess pending ops by this
-    pub(crate) async fn calculate_ops_score(&self) -> BTreeMap<XorName, usize> {
+    pub(crate) async fn calculate_ops_score(&self) -> BTreeMap<XorName, f32> {
         let mut score_map = BTreeMap::default();
         // loop over all node/neighbour comparisons
         for (node, neighbours) in self.get_node_and_neighbours_vec() {
@@ -95,12 +95,18 @@ impl DysfunctionDetection {
                 }
             }
 
-            trace!("pending ops: in hood: {:?}", all_neighbourhood_counts);
-            let avg_in_neighbourhood =
-                get_mean_of(&all_neighbourhood_counts).unwrap_or(1.0) as usize;
-            trace!("mean ops: {:?}", avg_in_neighbourhood);
+            let avg_in_neighbourhood = get_mean_of(&all_neighbourhood_counts).unwrap_or(1.0);
+            trace!(
+                "node's ops {nodes_count:?} mean ops: {:?}",
+                avg_in_neighbourhood
+            );
 
-            let final_score = nodes_count;
+            // let final_score = nodes_count.checked_sub(avg_in_neighbourhood).unwrap_or(0);
+            let final_score = if nodes_count as f32 > avg_in_neighbourhood {
+                nodes_count as f32 / avg_in_neighbourhood
+            } else {
+                0.0
+            };
 
             let _prev = score_map.insert(node, final_score);
         }
@@ -113,14 +119,17 @@ impl DysfunctionDetection {
 mod tests {
     use super::{DysfunctionDetection, OperationId};
 
-    use crate::tests::ELDER_COUNT;
+    use crate::tests::{init_test_logger, ELDER_COUNT};
 
     use eyre::Error;
     use rand::Rng;
     use xor_name::XorName;
     type Result<T, E = Error> = std::result::Result<T, E>;
 
-    const NORMAL_PENDING_OPS_COUNT: usize = 200;
+    // Above this, nodes should be sus
+    pub(crate) const NORMAL_OPERATIONS_ISSUES: usize = 200;
+    pub(crate) const SUSPECT_OPERATIONS_ISSUES: usize = 350;
+    pub(crate) const DYSFUNCTIONAL_OPERATIONS_ISSUES: usize = 600;
 
     fn get_random_operation_id() -> OperationId {
         let mut rng = rand::thread_rng();
@@ -135,7 +144,7 @@ mod tests {
 
         // Write data PENDING_OPS_TOLERANCE times to the 10 adults
         for adult in &adults {
-            for _ in 0..NORMAL_PENDING_OPS_COUNT {
+            for _ in 0..NORMAL_OPERATIONS_ISSUES {
                 let op_id = get_random_operation_id();
                 dysfunctional_detection
                     .add_a_pending_request_operation(*adult, op_id)
@@ -165,13 +174,16 @@ mod tests {
     }
     #[tokio::test]
     async fn op_dysfunction_basics() -> Result<()> {
+        init_test_logger();
+        let _outer_span = tracing::info_span!("op_dysfunction_basics").entered();
+
         let adults = (0..10).map(|_| XorName::random()).collect::<Vec<XorName>>();
 
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone(), ELDER_COUNT);
 
-        // Write data PENDING_OPS_TOLERANCE times to the 10 adults
+        // Write data NORMAL_OPERATIONS_ISSUES times to the 10 adults
         for adult in &adults {
-            for _ in 0..NORMAL_PENDING_OPS_COUNT {
+            for _ in 0..NORMAL_OPERATIONS_ISSUES {
                 let op_id = get_random_operation_id();
                 dysfunctional_detection
                     .add_a_pending_request_operation(*adult, op_id)
@@ -186,8 +198,8 @@ mod tests {
         // Assert total adult count
         assert_eq!(dysfunctional_detection.closest_nodes_to.len(), 11);
 
-        // Write data 2 x PENDING_OPS_TOLERANCE times to the new adult to check for preemptive replication
-        for _ in 0..(NORMAL_PENDING_OPS_COUNT as f32 * 2.0) as usize {
+        // Write data a suspect amount above PENDING_OPS_TOLERANCE times to the new adult to check for preemptive replication
+        for _ in 0..SUSPECT_OPERATIONS_ISSUES {
             let op_id = get_random_operation_id();
             dysfunctional_detection
                 .add_a_pending_request_operation(new_adult, op_id)
@@ -209,11 +221,11 @@ mod tests {
                 .get_dysfunctional_node_names()
                 .await
                 .contains(&new_adult),
-            "node is dysfunctinal when it should only be sus"
+            "node is dysfunctional when it should only be sus"
         );
 
         // Write data another set of excessive ops.
-        for _ in 0..NORMAL_PENDING_OPS_COUNT {
+        for _ in 0..DYSFUNCTIONAL_OPERATIONS_ISSUES - SUSPECT_OPERATIONS_ISSUES {
             let op_id = get_random_operation_id();
             dysfunctional_detection
                 .add_a_pending_request_operation(new_adult, op_id)
