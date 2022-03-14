@@ -149,6 +149,16 @@ impl Node {
                                     )
                                     .await?
                                 {
+                                    // we want to log issues with an elder who is out of sync here...
+                                    let knowledge = self.network_knowledge.elders().await;
+                                    let mut known_elders = knowledge.iter().map(|peer| peer.name());
+
+                                    if known_elders.contains(&sender.name()) {
+                                        // we track a dysfunction against our elder here
+                                        self.dysfunction_tracking
+                                            .track_knowledge_issue(sender.name());
+                                    }
+
                                     // short circuit and send those AE responses
                                     cmds.push(ae_cmd);
                                     return Ok(cmds);
