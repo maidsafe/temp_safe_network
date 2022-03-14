@@ -182,6 +182,12 @@ impl Node {
 
         // Send response if one is warranted
         if query_response.failed_with_data_not_found() {
+            // this was a dud response, re-queue our waiting peers
+            let _prev = self
+                .pending_data_queries
+                .set(op_id, waiting_peers, None)
+                .await;
+
             // we don't return data not found errors.
             trace!(
                 "Node {:?}, reported data not found: {:?}",
@@ -192,7 +198,26 @@ impl Node {
             return Ok(cmds);
         }
 
-        // Send response if one is warranted
+        // update dysfunction tracking, at this point we know the response is good
+        let pending_removed = match query_response.operation_id() {
+            Ok(op_id) => {
+                self.dysfunction_tracking
+                    .request_operation_fulfilled(&node_id, op_id)
+                    .await
+            }
+            Err(error) => {
+                warn!("Node problems noted when retrieving data: {:?}", error);
+                false
+            }
+        };
+
+        // if there was nothing to update, we bail, this response was not expected
+        if !pending_removed {
+            trace!("Ignoring un-expected response");
+            return Ok(cmds);
+        }
+
+        // Don't send response response if we weren't successful, and the node isn't full
         if !query_response.is_success()
             && self
                 .capacity
@@ -200,6 +225,12 @@ impl Node {
                 .await
                 .unwrap_or(false)
         {
+            // this was a dud response, re-queue our waiting peers
+            let _prev = self
+                .pending_data_queries
+                .set(op_id, waiting_peers, None)
+                .await;
+
             // we don't return data not found errors.
             trace!(
                 "Node {:?}, is full and so reporting data not found",
