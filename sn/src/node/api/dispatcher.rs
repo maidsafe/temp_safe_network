@@ -23,7 +23,7 @@ use tokio::{sync::watch, time};
 use tracing::Instrument;
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
-const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(15);
+const CLEANUP_INTERVAL: Duration = Duration::from_secs(60);
 
 // A command/subcommand id e.g. "963111461", "963111461.0"
 type CmdId = String;
@@ -143,7 +143,7 @@ impl Dispatcher {
         info!("Starting cleaning up network links");
         let _handle = tokio::spawn(async move {
             let dispatcher = self.clone();
-            let mut interval = tokio::time::interval(LINK_CLEANUP_INTERVAL);
+            let mut interval = tokio::time::interval(CLEANUP_INTERVAL);
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
             loop {
@@ -163,7 +163,7 @@ impl Dispatcher {
         info!("Starting dysfunction checking");
         let _handle = tokio::spawn(async move {
             let dispatcher = self.clone();
-            let mut interval = tokio::time::interval(LINK_CLEANUP_INTERVAL);
+            let mut interval = tokio::time::interval(CLEANUP_INTERVAL);
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
             loop {
