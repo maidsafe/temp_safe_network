@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "dys_function",
+    "dysfunction",
     "sn",
     "sn_api",
     "sn_cli",

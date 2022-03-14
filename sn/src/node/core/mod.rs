@@ -47,7 +47,7 @@ use crate::{elder_count, UsedSpace};
 
 use backoff::ExponentialBackoff;
 use data::Capacity;
-use dys_function::DysfunctionDetection;
+use dysfunction::DysfunctionDetection;
 use itertools::Itertools;
 use resource_proof::ResourceProof;
 use std::{
