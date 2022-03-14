@@ -81,14 +81,19 @@ impl Node {
 
         let mut some_peer_already_waiting_on_response = false;
         let mut this_peer_already_waiting_on_response = false;
-        let waiting_peers = if let Some(peers) = self.pending_data_queries.get(&operation_id).await
-        {
-            some_peer_already_waiting_on_response = true;
-            this_peer_already_waiting_on_response = peers.contains(&origin.clone());
-            peers
-        } else {
-            vec![origin.clone()]
-        };
+        let waiting_peers =
+            if let Some(mut peers) = self.pending_data_queries.get(&operation_id).await {
+                some_peer_already_waiting_on_response = true;
+                this_peer_already_waiting_on_response = peers.contains(&origin.clone());
+
+                if !this_peer_already_waiting_on_response {
+                    peers.push(origin.clone());
+                }
+
+                peers
+            } else {
+                vec![origin.clone()]
+            };
 
         if this_peer_already_waiting_on_response {
             // no need to add to pending queue then

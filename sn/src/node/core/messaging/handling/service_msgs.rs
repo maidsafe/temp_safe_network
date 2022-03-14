@@ -143,17 +143,6 @@ impl Node {
             query_response.operation_id()
         );
 
-        let waiting_peers = if let Some(peers) = querys_peers {
-            peers
-        } else {
-            warn!(
-                "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client or the client connection cache has expired: {}",
-                sending_node_pk, user.0
-            );
-
-            return Ok(cmds);
-        };
-
         // Clear expired queries from the cache.
         self.pending_data_queries.remove_expired().await;
 
@@ -173,6 +162,17 @@ impl Node {
                 warn!("Node problems noted when retrieving data: {:?}", error);
                 false
             }
+        };
+
+        let waiting_peers = if let Some(peers) = querys_peers {
+            peers
+        } else {
+            warn!(
+                "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client or the client connection cache has expired: {}",
+                sending_node_pk, user.0
+            );
+
+            return Ok(cmds);
         };
 
         if !pending_removed {
