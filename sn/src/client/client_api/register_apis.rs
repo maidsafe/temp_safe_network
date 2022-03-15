@@ -84,6 +84,8 @@ impl Client {
             section_auth: section_auth(), // obtained after presenting a valid payment to the network
         });
 
+        debug!("Creating Register: {:?}", cmd);
+
         Ok((address, vec![cmd]))
     }
 
