@@ -133,6 +133,9 @@ pub enum Error {
     /// Sled error.
     #[error("Sled error:: {0}")]
     Sled(#[from] sled::Error),
+    /// DysfunctionDetection error.
+    #[error("DysfunctionDetection error:: {0}")]
+    DysfunctionDetection(#[from] dysfunction::Error),
 }
 
 impl From<qp2p::ClientEndpointError> for Error {

@@ -43,6 +43,7 @@ extern crate tracing;
 
 mod connections;
 mod detection;
+mod error;
 mod network_knowledge;
 mod operations;
 
@@ -50,11 +51,13 @@ use xor_name::XorName;
 
 use dashmap::DashMap;
 use itertools::Itertools;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, VecDeque};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 pub use detection::DysfunctionSeverity;
+
+pub use error::Error;
 
 /// Some reproducible xorname derived from the operation. This is a permanent reference needed for logging all dysfunction.
 type NodeIdentifier = XorName;
@@ -63,15 +66,15 @@ type NodeIdentifier = XorName;
 // TODO: depend on types once that's extracted
 type OperationId = [u8; 32];
 
-pub(crate) type BasicCountTracker = Arc<DashMap<NodeIdentifier, usize>>;
+pub(crate) type TimedTracker = Arc<DashMap<NodeIdentifier, Arc<RwLock<VecDeque<u64>>>>>;
 
 #[derive(Clone, Debug)]
 /// Dysfunctional node tracking. Allows various potential issues to be tracked and weighted,
 /// with unresposive or suspect nodes being noted on request, against which action can then be taken.
 pub struct DysfunctionDetection {
     neighbour_count: usize,
-    communication_issues: BasicCountTracker,
-    knowledge_issues: BasicCountTracker,
+    communication_issues: TimedTracker,
+    knowledge_issues: TimedTracker,
     unfulfilled_ops: Arc<DashMap<NodeIdentifier, Arc<RwLock<Vec<OperationId>>>>>, // OperationId = [u8; 32]
     closest_nodes_to: Arc<DashMap<XorName, Vec<XorName>>>,
 }

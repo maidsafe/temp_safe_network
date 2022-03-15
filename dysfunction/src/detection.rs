@@ -6,9 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{get_mean_of, BasicCountTracker, DysfunctionDetection};
+use crate::{error::Result, get_mean_of, DysfunctionDetection, TimedTracker};
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
+
+use std::time::{Duration, SystemTime};
+static RECENT_ISSUE_DURATION: Duration = Duration::from_secs(60 * 15);
 
 static CONN_WEIGHTING: f32 = 1.2;
 static OP_WEIGHTING: f32 = 1.0;
@@ -20,7 +23,7 @@ static SUSPECT_MEAN_RATIO: f32 = 1.2;
 
 #[derive(Clone)]
 enum ScoreType {
-    Basic(BasicCountTracker),
+    Timed(TimedTracker),
     Op,
 }
 
@@ -56,15 +59,21 @@ impl DysfunctionDetection {
             let score_type = score_type.clone();
 
             let (count_at_node, all_neighbourhood_counts) = match score_type {
-                ScoreType::Basic(tracker) => {
-                    let count = tracker.get(&node).map(|entry| *entry.value()).unwrap_or(0);
+                ScoreType::Timed(tracker) => {
+                    let count = if let Some(entry) = tracker.get(&node) {
+                        entry.value().read().await.len()
+                    } else {
+                        0
+                    };
 
-                    let all_neighbourhood_counts = Vec::from_iter(
-                        neighbours
-                            .iter()
-                            .filter_map(|n| tracker.get(n))
-                            .map(|entry| *entry.value() as f32),
-                    );
+                    let mut all_neighbourhood_counts = vec![];
+                    for neighbour in neighbours {
+                        if let Some(entry) = tracker.get(&neighbour) {
+                            let val = entry.value().read().await.len();
+
+                            all_neighbourhood_counts.push(val as f32);
+                        }
+                    }
 
                     (count, all_neighbourhood_counts)
                 }
@@ -113,10 +122,10 @@ impl DysfunctionDetection {
         let ops_scores = self.calculate_scores(ScoreType::Op).await;
 
         let conn_scores = self
-            .calculate_scores(ScoreType::Basic(self.communication_issues.clone()))
+            .calculate_scores(ScoreType::Timed(self.communication_issues.clone()))
             .await;
         let knowledge_scores = self
-            .calculate_scores(ScoreType::Basic(self.knowledge_issues.clone()))
+            .calculate_scores(ScoreType::Timed(self.knowledge_issues.clone()))
             .await;
 
         let mut final_scores = BTreeMap::default();
@@ -148,11 +157,34 @@ impl DysfunctionDetection {
         (final_scores, mean)
     }
 
+    async fn cleanup_time_sensistive_checks(&self) -> Result<()> {
+        // first remove anything older than RECENT_ISSUE_DURATION from the timed trackers
+        if let Some(time_check) = SystemTime::now().checked_sub(RECENT_ISSUE_DURATION) {
+            let time_check = time_check.duration_since(SystemTime::UNIX_EPOCH)?.as_secs();
+
+            // remove old comms issues
+            for node in self.communication_issues.iter() {
+                let mut issues = node.value().write().await;
+                issues.retain(|time| time > &time_check);
+            }
+
+            // remove old knowledge issues
+            for node in self.knowledge_issues.iter() {
+                let mut issues = node.value().write().await;
+                issues.retain(|time| time > &time_check);
+            }
+        }
+
+        Ok(())
+    }
+
     /// Get a list of all nodes who'se score is above mean * DysfunctionalSeverity weighting
     pub async fn get_nodes_beyond_severity(
         &self,
         severity: DysfunctionSeverity,
-    ) -> BTreeSet<XorName> {
+    ) -> Result<BTreeSet<XorName>> {
+        self.cleanup_time_sensistive_checks().await?;
+
         let mut dysfunctional_nodes = BTreeSet::new();
 
         let (final_scores, mean) = self.get_weighted_scores().await;
@@ -173,6 +205,7 @@ impl DysfunctionDetection {
                 let _existed = dysfunctional_nodes.insert(name);
             }
         }
-        dysfunctional_nodes
+
+        Ok(dysfunctional_nodes)
     }
 }

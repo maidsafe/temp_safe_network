@@ -21,13 +21,14 @@ dashmap = {version = "5.1.0", features = [ "serde" ]}
 itertools = "0.10.0"
 tracing = "~0.1.26"
 rand = "~0.8"
+eyre = "~0.6.5"
+thiserror = "1.0.23"
 
 [dependencies.tokio]
 version = "1.17.0"
 features = ["sync"]
 
 [dev-dependencies]
-eyre = "~0.6.5"
 tracing-subscriber = { version = "0.3.1", features = ["env-filter", "json"] }
 
 [dev-dependencies.tokio]

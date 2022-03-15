@@ -6,16 +6,23 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{DysfunctionDetection, NodeIdentifier};
+use crate::{error::Result, DysfunctionDetection, NodeIdentifier};
+use std::time::SystemTime;
 
 impl DysfunctionDetection {
     /// Track an issue with a node's network knowledge
-    pub fn track_knowledge_issue(&self, node_id: NodeIdentifier) {
+    pub async fn track_knowledge_issue(&self, node_id: NodeIdentifier) -> Result<()> {
         // initial entry setup if non existent
-        let mut entry = self.knowledge_issues.entry(node_id).or_default();
+        let mut entry = self.communication_issues.entry(node_id).or_default();
 
-        let value = entry.value_mut();
-        *value += 1;
+        let mut queue = entry.value_mut().write().await;
+        queue.push_back(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)?
+                .as_secs(),
+        );
+
+        Ok(())
     }
 }
 
@@ -43,7 +50,9 @@ mod tests {
         // Write data NORMAL_KNOWLEDGE_ISSUES times to the 10 adults
         for adult in &adults {
             for _ in 0..NORMAL_KNOWLEDGE_ISSUES {
-                dysfunctional_detection.track_knowledge_issue(*adult);
+                dysfunctional_detection
+                    .track_knowledge_issue(*adult)
+                    .await?;
             }
         }
 
@@ -52,7 +61,7 @@ mod tests {
         assert_eq!(
             dysfunctional_detection
                 .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
-                .await
+                .await?
                 .len(),
             0,
             "no nodes are dysfunctional"
@@ -60,7 +69,7 @@ mod tests {
         assert_eq!(
             dysfunctional_detection
                 .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
-                .await
+                .await?
                 .len(),
             0,
             "no nodes are suspect"
@@ -84,12 +93,14 @@ mod tests {
 
         // Add just one knowledge issue...
         for _ in 0..1 {
-            dysfunctional_detection.track_knowledge_issue(new_adult);
+            dysfunctional_detection
+                .track_knowledge_issue(new_adult)
+                .await?;
         }
 
         let sus = dysfunctional_detection
             .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
-            .await;
+            .await?;
 
         // Assert that the new adult is not detected as suspect.
         assert!(!sus.contains(&new_adult), "our adult should not be sus");
@@ -97,7 +108,7 @@ mod tests {
 
         let dysfunctional_nodes = dysfunctional_detection
             .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
-            .await;
+            .await?;
 
         // Assert that the new adult is not dysfuncitonal
         assert!(
@@ -126,7 +137,9 @@ mod tests {
         // Write data PENDING_OPS_TOLERANCE times to the 10 adults
         for adult in &adults {
             for _ in 0..NORMAL_KNOWLEDGE_ISSUES {
-                dysfunctional_detection.track_knowledge_issue(*adult);
+                dysfunctional_detection
+                    .track_knowledge_issue(*adult)
+                    .await?;
             }
         }
 
@@ -139,19 +152,21 @@ mod tests {
 
         // Add issues for our new adult knowledge issues
         for _ in 0..SUSPECT_KNOWLEDGE_ISSUES {
-            dysfunctional_detection.track_knowledge_issue(new_adult);
+            dysfunctional_detection
+                .track_knowledge_issue(new_adult)
+                .await?;
         }
 
         let sus = dysfunctional_detection
             .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
-            .await;
+            .await?;
         // Assert that the new adult is detected as suspect.
         assert_eq!(sus.len(), 1, "one node is not sus");
         assert!(sus.contains(&new_adult), "our adult is not sus");
 
         let dysfunctional_nodes = dysfunctional_detection
             .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
-            .await;
+            .await?;
 
         // Assert that the new adult is not yet dysfuncitonal
         assert!(
@@ -167,19 +182,21 @@ mod tests {
 
         // Add MORE knowledge issues... we should now get labelled as dysfunctional
         for _ in 0..DYSFUNCTIONAL_KNOWLEDGE_ISSUES - SUSPECT_KNOWLEDGE_ISSUES {
-            dysfunctional_detection.track_knowledge_issue(new_adult);
+            dysfunctional_detection
+                .track_knowledge_issue(new_adult)
+                .await?;
         }
 
         let sus = dysfunctional_detection
             .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
-            .await;
+            .await?;
         // Assert that the new adult is detected as suspect.
         assert!(sus.contains(&new_adult), "our adult is still sus");
         assert_eq!(sus.len(), 1, "only one adult is sus");
 
         let dysfunctional_nodes = dysfunctional_detection
             .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
-            .await;
+            .await?;
 
         // Assert that the new adult is not NOW dysfuncitonal
         assert!(

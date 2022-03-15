@@ -39,7 +39,7 @@ use crate::messaging::{
     system::{DkgSessionId, SystemMsg},
     AuthorityProof, SectionAuth,
 };
-use crate::node::error::Result;
+use crate::node::error::{Error, Result};
 use crate::types::{
     log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk, Cache, Peer,
 };
@@ -222,21 +222,27 @@ impl Node {
     }
 
     /// returns names that are relatively dysfunctional
-    pub(crate) async fn get_dysfunctional_names(&self) -> BTreeSet<XorName> {
+    pub(crate) async fn get_dysfunctional_names(&self) -> Result<BTreeSet<XorName>> {
         self.dysfunction_tracking
             .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
             .await
+            .map_err(Error::from)
     }
 
     /// returns names that are relatively dysfunctional
-    pub(crate) async fn get_suspicious_node_names(&self) -> BTreeSet<XorName> {
+    pub(crate) async fn get_suspicious_node_names(&self) -> Result<BTreeSet<XorName>> {
         self.dysfunction_tracking
             .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
             .await
+            .map_err(Error::from)
     }
+
     /// Log a communication problem
-    pub(crate) fn log_comm_issue(&self, name: XorName) {
-        self.dysfunction_tracking.track_comm_issue(name)
+    pub(crate) async fn log_comm_issue(&self, name: XorName) -> Result<()> {
+        self.dysfunction_tracking
+            .track_comm_issue(name)
+            .await
+            .map_err(Error::from)
     }
 
     pub(crate) async fn write_prefix_map(&self) {
