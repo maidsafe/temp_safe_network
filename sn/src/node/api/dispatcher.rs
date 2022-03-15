@@ -17,7 +17,7 @@ use crate::node::{
 };
 use crate::types::{log_markers::LogMarker, Peer};
 
-use std::{sync::Arc, time::Duration};
+use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
 use tokio::{sync::watch, time};
 use tracing::Instrument;
@@ -169,7 +169,13 @@ impl Dispatcher {
             loop {
                 let _instant = interval.tick().await;
 
-                let unresponsive_nodes = dispatcher.node.get_dysfunctional_names().await;
+                let unresponsive_nodes = match dispatcher.node.get_dysfunctional_names().await {
+                    Ok(nodes) => nodes,
+                    Err(error) => {
+                        error!("Error getting dysfunctional nodes: {error}");
+                        BTreeSet::default()
+                    }
+                };
 
                 if !unresponsive_nodes.is_empty() {
                     debug!("{:?} : {unresponsive_nodes:?}", LogMarker::ProposeOffline);
@@ -381,7 +387,7 @@ impl Dispatcher {
                         .await
                         .is_err()
                     {
-                        self.node.log_comm_issue(member_info.name())
+                        self.node.log_comm_issue(member_info.name()).await?
                     }
                 }
                 Ok(vec![])

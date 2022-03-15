@@ -1157,6 +1157,7 @@ dependencies = [
  "eyre",
  "itertools 0.10.3",
  "rand 0.8.5",
+ "thiserror",
  "tokio",
  "tracing",
  "tracing-subscriber 0.3.9",

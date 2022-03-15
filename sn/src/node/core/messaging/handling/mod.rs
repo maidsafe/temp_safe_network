@@ -156,7 +156,9 @@ impl Node {
                                     if known_elders.contains(&sender.name()) {
                                         // we track a dysfunction against our elder here
                                         self.dysfunction_tracking
-                                            .track_knowledge_issue(sender.name());
+                                            .track_knowledge_issue(sender.name())
+                                            .await
+                                            .map_err(Error::from)?;
                                     }
 
                                     // short circuit and send those AE responses
