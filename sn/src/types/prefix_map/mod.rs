@@ -55,8 +55,7 @@ impl NetworkPrefixMap {
     }
 
     /// Inserts new entry into the map. Replaces previous entry at the same prefix.
-    /// Removes those ancestors of the inserted prefix that are now fully covered by their
-    /// descendants.
+    /// Removes those ancestors of the inserted prefix.
     /// Does not insert anything if any descendant of the prefix of `entry` is already present in
     /// the map.
     /// Returns a boolean indicating whether anything changed.
@@ -72,7 +71,11 @@ impl NetworkPrefixMap {
 
         let _prev = self.sections.insert(prefix, sap);
 
+        if prefix.is_empty() {
+            return true;
+        }
         let parent_prefix = prefix.popped();
+
         self.prune(parent_prefix);
         true
     }
@@ -283,11 +286,13 @@ impl NetworkPrefixMap {
     }
 
     /// Returns the section authority provider for the prefix that matches `name`.
+    /// In case there is no prefix matches the `name`, we shall return the one with longest
+    /// common bits. i.e. for the name of `00xxx`, if we have `01` and `1`, then we shall return
+    /// with `01`.
     pub(crate) fn section_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
         self.sections
             .iter()
-            .filter(|e| e.key().matches(name))
-            .max_by_key(|e| e.key().bit_count())
+            .max_by_key(|e| e.key().common_prefix(name))
             .ok_or(Error::NoMatchingSection)
             .map(|entry| entry.value().value.clone())
     }
@@ -344,20 +349,10 @@ impl NetworkPrefixMap {
             .filter(move |e| e.key().is_extension_of(prefix))
     }
 
-    /// Remove `prefix` and any of its ancestors if they are covered by their descendants.
-    /// For example, if `(00)` and `(01)` are both in the map, we can remove `(0)` and `()`.
+    /// Remove `prefix` and any of its ancestors.
     fn prune(&self, mut prefix: Prefix) {
-        // TODO: can this be optimized?
         loop {
-            let is_covered = {
-                let descendants: Vec<_> = self.descendants(&prefix).collect();
-                let descendant_prefixes: Vec<&Prefix> =
-                    descendants.iter().map(|item| item.key()).collect();
-                prefix.is_covered_by(descendant_prefixes)
-            };
-            if is_covered {
-                let _prev = self.sections.remove(&prefix);
-            }
+            let _prev = self.sections.remove(&prefix);
 
             if prefix.is_empty() {
                 break;
@@ -445,18 +440,17 @@ mod tests {
         let p01 = prefix("01")?;
 
         let sap0 = gen_section_auth(p0)?;
-        assert!(map.insert(sap0.clone()));
+        assert!(map.insert(sap0));
 
-        // Insert the first sibling. Parent remain in the map.
+        // Insert the first sibling. Parent get pruned in the map.
         let sap00 = gen_section_auth(p00)?;
         assert!(map.insert(sap00.clone()));
 
         assert_eq!(map.get(&p00), Some(sap00.value.clone()));
         assert_eq!(map.get(&p01), None);
-        assert_eq!(map.get(&p0), Some(sap0.value));
+        assert_eq!(map.get(&p0), None);
 
-        // Insert the other sibling. Parent is removed because it is now fully covered by its
-        // descendants.
+        // Insert the other sibling.
         let sap3 = gen_section_auth(p01)?;
         assert!(map.insert(sap3.clone()));
 
@@ -479,8 +473,10 @@ mod tests {
 
         let _changed = map.insert(sap0.clone());
 
-        // There are no matching prefixes, so return Err.
-        assert!(map.section_by_name(&p1.substituted_in(rng.gen())).is_err(),);
+        assert_eq!(
+            map.section_by_name(&p1.substituted_in(rng.gen()))?,
+            sap0.value
+        );
 
         // There are no matching prefixes, so return an opposite prefix.
         assert_eq!(
@@ -513,28 +509,27 @@ mod tests {
         let sap000 = gen_section_auth(p000)?;
         let sap001 = gen_section_auth(p001)?;
 
-        assert!(map.insert(sap0.clone()));
+        assert!(map.insert(sap0));
 
         assert!(map.insert(sap000.clone()));
         assert_eq!(map.get(&p000), Some(sap000.value.clone()));
         assert_eq!(map.get(&p001), None);
         assert_eq!(map.get(&p00), None);
         assert_eq!(map.get(&p01), None);
-        assert_eq!(map.get(&p0), Some(sap0.value.clone()));
+        assert_eq!(map.get(&p0), None);
 
         assert!(map.insert(sap001.clone()));
         assert_eq!(map.get(&p000), Some(sap000.value.clone()));
         assert_eq!(map.get(&p001), Some(sap001.value.clone()));
         assert_eq!(map.get(&p00), None);
         assert_eq!(map.get(&p01), None);
-        assert_eq!(map.get(&p0), Some(sap0.value));
+        assert_eq!(map.get(&p0), None);
 
         assert!(map.insert(sap01.clone()));
         assert_eq!(map.get(&p000), Some(sap000.value));
         assert_eq!(map.get(&p001), Some(sap001.value));
         assert_eq!(map.get(&p00), None);
         assert_eq!(map.get(&p01), Some(sap01.value));
-        // (0) is now fully covered and so was removed
         assert_eq!(map.get(&p0), None);
 
         Ok(())
@@ -562,16 +557,31 @@ mod tests {
         let mut rng = rand::thread_rng();
 
         let (map, _, _) = new_network_prefix_map();
+        let p = prefix("")?;
         let p0 = prefix("0")?;
         let p1 = prefix("1")?;
         let p10 = prefix("10")?;
 
+        let sap = gen_section_auth(p)?;
         let sap0 = gen_section_auth(p0)?;
         let sap1 = gen_section_auth(p1)?;
         let sap10 = gen_section_auth(p10)?;
 
+        let _changed = map.insert(sap.clone());
+
+        assert_eq!(
+            map.section_by_name(&p0.substituted_in(rng.gen()))?,
+            sap.value
+        );
+
         let _changed = map.insert(sap0.clone());
-        let _changed = map.insert(sap1.clone());
+
+        assert_eq!(
+            map.section_by_name(&p1.substituted_in(rng.gen()))?,
+            sap0.value
+        );
+
+        let _changed = map.insert(sap1);
         let _changed = map.insert(sap10.clone());
 
         assert_eq!(
@@ -579,9 +589,10 @@ mod tests {
             sap0.value
         );
 
+        // sap1 get pruned once sap10 inserted.
         assert_eq!(
             map.section_by_name(&prefix("11")?.substituted_in(rng.gen()))?,
-            sap1.value
+            sap10.value
         );
 
         assert_eq!(
@@ -604,12 +615,13 @@ mod tests {
         let sap10 = gen_section_auth(p10)?;
 
         let _changed = map.insert(sap0.clone());
-        let _changed = map.insert(sap1.clone());
+        let _changed = map.insert(sap1);
         let _changed = map.insert(sap10.clone());
 
         assert_eq!(map.section_by_prefix(&p0)?, sap0.value);
 
-        assert_eq!(map.section_by_prefix(&prefix("11")?)?, sap1.value);
+        // sap1 get pruned once sap10 inserted.
+        assert_eq!(map.section_by_prefix(&prefix("11")?)?, sap10.value);
 
         assert_eq!(map.section_by_prefix(&p10)?, sap10.value);
 

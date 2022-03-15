@@ -49,7 +49,7 @@ fn fmt(string: Option<String>) -> String {
 
 #[tracing::instrument(skip(ctx))]
 async fn log(system: &mut System, ctx: &LogCtx, print_resources_usage: bool) {
-    let prefix: &str = &format!("{}", ctx.prefix().await.name());
+    let prefix: &str = &format!("({:?})", ctx.prefix().await);
 
     let processors = system.processors();
     let processor_count = processors.len();
@@ -63,16 +63,16 @@ async fn log(system: &mut System, ctx: &LogCtx, print_resources_usage: bool) {
 
         if print_resources_usage {
             println!(
-                "{:?} Node resource usage: {:?}",
+                "{}: Node resource usage: {:?}",
                 prefix,
                 Process::map(proc_, processor_count)
             )
         } else {
             trace!(
+                "{}: Node resource usage: {:?}",
                 prefix,
-                "Node resource usage: {:?}",
                 Process::map(proc_, processor_count)
-            );
+            )
         }
     }
 }
