@@ -384,7 +384,6 @@ impl Node {
             .prefix_map()
             .network_stats(&self.network_knowledge.authority_provider().await)
             .print();
-        self.comm.print_stats();
     }
 
     pub(super) async fn log_section_stats(&self) {

@@ -7,14 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod back_pressure;
-mod msg_count;
 
-use back_pressure::BackPressure;
-use msg_count::MsgCount;
+use self::back_pressure::BackPressure;
 
-use crate::messaging::{system::LoadReport, MsgId, WireMsg};
+use crate::messaging::{MsgId, WireMsg};
 use crate::node::error::{Error, Result};
 use crate::types::{log_markers::LogMarker, Peer, PeerLinks, SendToOneError};
+
 use bytes::Bytes;
 use futures::stream::{FuturesUnordered, StreamExt};
 use qp2p::{ConnectionIncoming, Endpoint};
@@ -32,9 +31,8 @@ const MSG_SEND_RETRIES: usize = 1;
 pub(crate) struct Comm {
     endpoint: Endpoint,
     event_tx: mpsc::Sender<ConnectionEvent>,
-    msg_count: MsgCount,
-    back_pressure: BackPressure,
     peer_links: PeerLinks,
+    back_pressure: BackPressure,
 }
 
 impl Drop for Comm {
@@ -59,28 +57,24 @@ impl Comm {
         let (endpoint, incoming_connections, _) =
             Endpoint::new_peer(local_addr, Default::default(), config).await?;
 
-        let msg_count = MsgCount::new();
-
         let peer_links = PeerLinks::new(endpoint.clone());
+        let back_pressure = BackPressure::new();
 
         let _handle = task::spawn(
             handle_incoming_connections(
                 incoming_connections,
                 event_tx.clone(),
-                msg_count.clone(),
                 peer_links.clone(),
+                back_pressure.clone(),
             )
             .in_current_span(),
         );
 
-        let back_pressure = BackPressure::new();
-
         Ok(Self {
             endpoint,
             event_tx,
-            msg_count,
-            back_pressure,
             peer_links,
+            back_pressure,
         })
     }
 
@@ -101,15 +95,16 @@ impl Comm {
             Endpoint::new_peer(local_addr, bootstrap_nodes, config).await?;
 
         let (connection, incoming_msgs) = bootstrap_node.ok_or(Error::BootstrapFailed)?;
-        let msg_count = MsgCount::new();
         let peer_links = PeerLinks::new(endpoint.clone());
+
+        let back_pressure = BackPressure::new();
 
         let _handle = task::spawn(
             handle_incoming_connections(
                 incoming_connections,
                 event_tx.clone(),
-                msg_count.clone(),
                 peer_links.clone(),
+                back_pressure.clone(),
             )
             .in_current_span(),
         );
@@ -119,8 +114,8 @@ impl Comm {
                 connection.clone(),
                 incoming_msgs,
                 event_tx.clone(),
-                msg_count.clone(),
                 peer_links.clone(),
+                back_pressure.clone(),
             )
             .in_current_span(),
         );
@@ -129,8 +124,7 @@ impl Comm {
             Self {
                 endpoint,
                 event_tx,
-                msg_count,
-                back_pressure: BackPressure::new(),
+                back_pressure,
                 peer_links,
             },
             connection.remote_address(),
@@ -177,7 +171,10 @@ impl Comm {
             .await;
 
         match result {
-            Ok(_) => self.msg_count.increase_outgoing(addr), // count outgoing msgs..
+            Ok(_) => {
+                // count outgoing msgs..
+                self.back_pressure.count_msg();
+            }
             Err(err) => {
                 error!(
                     "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed with {:?}",
@@ -286,7 +283,7 @@ impl Comm {
                 Ok(()) => {
                     successes += 1;
                     // count outgoing msgs..
-                    self.msg_count.increase_outgoing(recipient.addr());
+                    self.back_pressure.count_msg();
                 }
                 Err(error) if error.is_local_close() => {
                     // The connection was closed by us which means
@@ -352,9 +349,11 @@ impl Comm {
             recipient,
         );
 
-        // TODO: more laid back retries with lower priority, more aggressive with higher
-        // NB: This is retries per qp2p::connection!
-        let retry_config = self.back_pressure.get(&recipient.addr()).await;
+        // todo: regulate sending based on this value
+        let _msgs_per_s = self
+            .back_pressure
+            .get_peer_tolerance(&recipient.addr())
+            .await;
 
         let link = self.peer_links.get_or_create(&recipient.id()).await;
 
@@ -364,15 +363,15 @@ impl Comm {
                     conn,
                     incoming_msgs,
                     self.event_tx.clone(),
-                    self.msg_count.clone(),
                     self.peer_links.clone(),
+                    self.back_pressure.clone(),
                 )
                 .in_current_span(),
             );
         };
 
         let send_msg = || async {
-            link.send_with(msg_bytes.clone(), msg_priority, Some(&retry_config), listen)
+            link.send_with(msg_bytes.clone(), msg_priority, None, listen)
                 .await
         };
 
@@ -388,21 +387,14 @@ impl Comm {
     }
 
     /// Regulates comms with the specified peer
-    /// according to the cpu load report provided by it.
-    pub(crate) async fn regulate(&self, peer: SocketAddr, load_report: LoadReport) {
-        self.back_pressure.set(peer, load_report).await
+    /// according to the tolerated msgs per s provided by it.
+    pub(crate) async fn regulate(&self, peer: SocketAddr, msgs_per_s: usize) {
+        self.back_pressure.set(peer, msgs_per_s).await
     }
 
-    /// Returns cpu load report if being strained.
-    pub(crate) async fn check_strain(&self, caller: &SocketAddr) -> Option<LoadReport> {
-        self.back_pressure.load_report(caller).await
-    }
-
-    pub(crate) fn print_stats(&self) {
-        let incoming = self.msg_count.incoming();
-        let outgoing = self.msg_count.outgoing();
-        info!("*** Incoming msgs: {:?} ***", incoming);
-        info!("*** Outgoing msgs: {:?} ***", outgoing);
+    /// Returns tolerated msgs per s if being strained.
+    pub(crate) async fn check_strain(&self, caller: &SocketAddr) -> Option<usize> {
+        self.back_pressure.tolerated_msgs_per_s(caller).await
     }
 }
 
@@ -419,8 +411,8 @@ pub(crate) enum ConnectionEvent {
 async fn handle_incoming_connections(
     mut incoming_connections: qp2p::IncomingConnections,
     event_tx: mpsc::Sender<ConnectionEvent>,
-    msg_count: MsgCount,
     peer_links: PeerLinks,
+    back_pressure: BackPressure,
 ) {
     while let Some((connection, incoming_msgs)) = incoming_connections.next().await {
         trace!(
@@ -434,8 +426,8 @@ async fn handle_incoming_connections(
                 connection,
                 incoming_msgs,
                 event_tx.clone(),
-                msg_count.clone(),
                 peer_links.clone(),
+                back_pressure.clone(),
             )
             .in_current_span(),
         );
@@ -447,8 +439,8 @@ async fn handle_incoming_messages(
     conn: qp2p::Connection,
     mut incoming_msgs: ConnectionIncoming,
     event_tx: mpsc::Sender<ConnectionEvent>,
-    msg_count: MsgCount,
     peer_links: PeerLinks,
+    back_pressure: BackPressure,
 ) {
     let conn_id = conn.id();
     let remote_address = conn.remote_address();
@@ -483,7 +475,7 @@ async fn handle_incoming_messages(
                     .await;
 
                 // count incoming msgs..
-                msg_count.increase_incoming(remote_address);
+                back_pressure.count_msg();
             }
             Err(error) => {
                 // TODO: should we propagate this?
