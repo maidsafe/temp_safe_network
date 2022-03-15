@@ -79,11 +79,11 @@ impl Node {
                 .await;
         }
 
-        let mut some_peer_already_waiting_on_response = false;
+        let mut this_query_already_in_flight = false;
         let mut this_peer_already_waiting_on_response = false;
         let waiting_peers =
             if let Some(mut peers) = self.pending_data_queries.get(&operation_id).await {
-                some_peer_already_waiting_on_response = true;
+                this_query_already_in_flight = true;
                 this_peer_already_waiting_on_response = peers.contains(&origin.clone());
 
                 if !this_peer_already_waiting_on_response {
@@ -120,7 +120,7 @@ impl Node {
             .set(operation_id, waiting_peers, None)
             .await;
 
-        if some_peer_already_waiting_on_response {
+        if this_query_already_in_flight {
             trace!("Query was already sent out, no need to do it again");
             // no need to send query again.
             return Ok(vec![]);
@@ -263,11 +263,11 @@ impl Node {
             .collect::<BTreeSet<_>>();
 
         trace!(
-               "Target chunk holders of {:?} are empty adults: {:?} and full adults that were ignored: {:?}",
-               target,
-               candidates,
-               full_adults
-           );
+            "Target holders of {:?} are empty adults: {:?} and full adults that were ignored: {:?}",
+            target,
+            candidates,
+            full_adults
+        );
 
         candidates
     }

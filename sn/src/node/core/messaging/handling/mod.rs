@@ -1064,6 +1064,7 @@ impl Node {
         &self,
         suspects: BTreeSet<XorName>,
     ) -> Result<Vec<Cmd>> {
+        debug!("Republishing data for suspect nodes : {suspects:?}");
         let our_adults = self
             .network_knowledge
             .adults()

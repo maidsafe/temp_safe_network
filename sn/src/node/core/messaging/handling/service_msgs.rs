@@ -73,7 +73,8 @@ impl Node {
     async fn notify_about_newly_suspect_nodes(&self) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
 
-        let all_suspect_nodes = self.get_suspicious_node_names().await;
+        let all_suspect_nodes = self.get_suspicious_node_names().await?;
+
         let known_suspect_nodes = self.known_suspect_nodes.get_items().await;
 
         let newly_suspect_nodes: BTreeSet<_> = all_suspect_nodes
@@ -93,7 +94,7 @@ impl Node {
             let our_adults = self.network_knowledge.adults().await;
             let valid_adults = our_adults
                 .iter()
-                .filter(|peer| !all_suspect_nodes.contains(&peer.name()))
+                .filter(|peer| !newly_suspect_nodes.contains(&peer.name()))
                 .cloned()
                 .collect::<Vec<Peer>>();
 
@@ -136,33 +137,8 @@ impl Node {
         let op_id = response.operation_id()?;
 
         let querys_peers = self.pending_data_queries.remove(&op_id).await;
-        let query_response = response.convert();
-
-        debug!(
-            "QueryResponse operation id: {:?} ",
-            query_response.operation_id()
-        );
-
         // Clear expired queries from the cache.
         self.pending_data_queries.remove_expired().await;
-
-        // if there's anything sus going on at this point, lets trigger some activity
-        let sus_cmds = self.notify_about_newly_suspect_nodes().await?;
-        cmds.extend(sus_cmds);
-
-        let query_response = response.convert();
-
-        let pending_removed = match query_response.operation_id() {
-            Ok(op_id) => {
-                self.dysfunction_tracking
-                    .request_operation_fulfilled(&node_id, op_id)
-                    .await
-            }
-            Err(error) => {
-                warn!("Node problems noted when retrieving data: {:?}", error);
-                false
-            }
-        };
 
         let waiting_peers = if let Some(peers) = querys_peers {
             peers
@@ -175,6 +151,16 @@ impl Node {
             return Ok(cmds);
         };
 
+        // if there's anything sus going on at this point, lets trigger some activity
+        let sus_cmds = self.notify_about_newly_suspect_nodes().await?;
+        cmds.extend(sus_cmds);
+
+        let query_response = response.convert();
+
+        let pending_removed = self
+            .dysfunction_tracking
+            .request_operation_fulfilled(&node_id, op_id)
+            .await;
 
         if !pending_removed {
             trace!("Ignoring un-expected response");
@@ -182,42 +168,16 @@ impl Node {
         }
 
         // Send response if one is warranted
-        if query_response.failed_with_data_not_found() {
-            // this was a dud response, re-queue our waiting peers
-            let _prev = self
-            .pending_data_queries
-            .set(op_id, waiting_peers, None)
-            .await;
-
-            // we don't return data not found errors.
-            trace!(
-                "Node {:?}, reported data not found: {:?}",
-                sending_node_pk,
-                query_response.operation_id()
-            );
-
-            return Ok(cmds);
-        }
-
-        // Don't send response response if we weren't successful, and the node isn't full
-        if !query_response.is_success()
-            && self
-                .capacity
-                .is_full(&XorName::from(sending_node_pk))
-                .await
-                .unwrap_or(false)
+        if query_response.failed_with_data_not_found()
+            || (!query_response.is_success()
+                && self
+                    .capacity
+                    .is_full(&XorName::from(sending_node_pk))
+                    .await
+                    .unwrap_or(false))
         {
-            // this was a dud response, re-queue our waiting peers
-            let _prev = self
-                .pending_data_queries
-                .set(op_id, waiting_peers, None)
-                .await;
-
             // we don't return data not found errors.
-            trace!(
-                "Node {:?}, is full and so reporting data not found",
-                sending_node_pk
-            );
+            trace!("Node {:?}, reported data not found ", sending_node_pk);
 
             return Ok(cmds);
         }

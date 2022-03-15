@@ -55,8 +55,9 @@ impl DataStorage {
     }
 
     /// Store data in the local store
-    #[instrument(skip_all)]
+    #[instrument(skip(self))]
     pub(crate) async fn store(&self, data: &ReplicatedData) -> Result<Option<StorageLevel>> {
+        debug!("Replicating {data:?}");
         match data.clone() {
             ReplicatedData::Chunk(chunk) => self.chunks.store(&chunk).await?,
             ReplicatedData::RegisterLog(data) => {
