@@ -518,7 +518,7 @@ mod tests {
         let (msg, src_location) = env.create_msg(&env.other_sap.prefix(), other_pk)?;
         let sender = env.node.info.read().await.peer();
 
-        // since it's not aware of the other prefix, it shall redirect us to genesis section/SAP
+        // since it's not aware of the other prefix, it will redirect to self
         let dst_section_key = other_pk;
         let dst_name = env.other_sap.prefix().name();
         let cmd = env
@@ -540,7 +540,7 @@ mod tests {
 
         assert_matches!(msg_type, MsgType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
-                assert_eq!(section_auth, env.genesis_sap.to_msg());
+                assert_eq!(section_auth, env.node.network_knowledge().authority_provider().await.to_msg());
             });
         });
 
@@ -674,7 +674,6 @@ mod tests {
         node: Node,
         other_sap: SectionAuth<SectionAuthorityProvider>,
         proof_chain: SecuredLinkedList,
-        genesis_sap: SectionAuthorityProvider,
     }
 
     impl Env {
@@ -705,7 +704,6 @@ mod tests {
             )
             .await?;
 
-            let genesis_sap = node.network_knowledge().authority_provider().await;
             let section_key_share = SectionKeyShare {
                 public_key_set: secret_key_set.public_keys(),
                 index: 0,
@@ -741,7 +739,6 @@ mod tests {
                 node,
                 other_sap,
                 proof_chain,
-                genesis_sap,
             })
         }
 
