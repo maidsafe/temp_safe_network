@@ -54,6 +54,8 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+pub use detection::DysfunctionSeverity;
+
 /// Some reproducible xorname derived from the operation. This is a permanent reference needed for logging all dysfunction.
 type NodeIdentifier = XorName;
 

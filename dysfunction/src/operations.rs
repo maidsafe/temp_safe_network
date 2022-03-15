@@ -73,7 +73,7 @@ impl DysfunctionDetection {
 
 #[cfg(test)]
 mod tests {
-    use super::{DysfunctionDetection, OperationId};
+    use crate::{DysfunctionDetection, DysfunctionSeverity, OperationId};
 
     use crate::tests::{init_test_logger, ELDER_COUNT};
 
@@ -112,7 +112,7 @@ mod tests {
         // This is because all of them are within the tolerance ratio of each other
         assert_eq!(
             dysfunctional_detection
-                .get_dysfunctional_node_names()
+                .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
                 .await
                 .len(),
             0
@@ -120,7 +120,7 @@ mod tests {
 
         assert_eq!(
             dysfunctional_detection
-                .get_suspicious_node_names()
+                .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
                 .await
                 .len(),
             0
@@ -165,7 +165,7 @@ mod tests {
         // Assert that the new adult is detected as suspect.
         assert!(
             dysfunctional_detection
-                .get_suspicious_node_names()
+                .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
                 .await
                 .contains(&new_adult),
             "node is not showing as sus"
@@ -174,7 +174,7 @@ mod tests {
         // but it should not yet be dysfunctional
         assert!(
             !dysfunctional_detection
-                .get_dysfunctional_node_names()
+                .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
                 .await
                 .contains(&new_adult),
             "node is dysfunctional when it should only be sus"
@@ -190,14 +190,14 @@ mod tests {
 
         // Assert that the new adult is detected as suspect.
         assert!(dysfunctional_detection
-            .get_suspicious_node_names()
+            .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
             .await
             .contains(&new_adult));
 
         // Assert that the new adult is detected dysfunctional.
         assert!(
             dysfunctional_detection
-                .get_dysfunctional_node_names()
+                .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
                 .await
                 .contains(&new_adult),
             "our node has not been listed as dysfunctional"

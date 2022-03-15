@@ -21,8 +21,8 @@ impl DysfunctionDetection {
 
 #[cfg(test)]
 mod tests {
-    use super::DysfunctionDetection;
     use crate::tests::{init_test_logger, ELDER_COUNT};
+    use crate::{DysfunctionDetection, DysfunctionSeverity};
 
     use eyre::Error;
     use xor_name::XorName;
@@ -51,7 +51,7 @@ mod tests {
         // This is because all of them are within the tolerance ratio of each other
         assert_eq!(
             dysfunctional_detection
-                .get_dysfunctional_node_names()
+                .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
                 .await
                 .len(),
             0,
@@ -59,7 +59,7 @@ mod tests {
         );
         assert_eq!(
             dysfunctional_detection
-                .get_suspicious_node_names()
+                .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
                 .await
                 .len(),
             0,
@@ -87,13 +87,17 @@ mod tests {
             dysfunctional_detection.track_knowledge_issue(new_adult);
         }
 
-        let sus = dysfunctional_detection.get_suspicious_node_names().await;
+        let sus = dysfunctional_detection
+            .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
+            .await;
 
         // Assert that the new adult is not detected as suspect.
         assert!(!sus.contains(&new_adult), "our adult should not be sus");
         assert_eq!(sus.len(), 0, "no node is sus");
 
-        let dysfunctional_nodes = dysfunctional_detection.get_dysfunctional_node_names().await;
+        let dysfunctional_nodes = dysfunctional_detection
+            .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
+            .await;
 
         // Assert that the new adult is not dysfuncitonal
         assert!(
@@ -138,12 +142,16 @@ mod tests {
             dysfunctional_detection.track_knowledge_issue(new_adult);
         }
 
-        let sus = dysfunctional_detection.get_suspicious_node_names().await;
+        let sus = dysfunctional_detection
+            .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
+            .await;
         // Assert that the new adult is detected as suspect.
         assert_eq!(sus.len(), 1, "one node is not sus");
         assert!(sus.contains(&new_adult), "our adult is not sus");
 
-        let dysfunctional_nodes = dysfunctional_detection.get_dysfunctional_node_names().await;
+        let dysfunctional_nodes = dysfunctional_detection
+            .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
+            .await;
 
         // Assert that the new adult is not yet dysfuncitonal
         assert!(
@@ -162,12 +170,16 @@ mod tests {
             dysfunctional_detection.track_knowledge_issue(new_adult);
         }
 
-        let sus = dysfunctional_detection.get_suspicious_node_names().await;
+        let sus = dysfunctional_detection
+            .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
+            .await;
         // Assert that the new adult is detected as suspect.
         assert!(sus.contains(&new_adult), "our adult is still sus");
         assert_eq!(sus.len(), 1, "only one adult is sus");
 
-        let dysfunctional_nodes = dysfunctional_detection.get_dysfunctional_node_names().await;
+        let dysfunctional_nodes = dysfunctional_detection
+            .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
+            .await;
 
         // Assert that the new adult is not NOW dysfuncitonal
         assert!(
