@@ -47,7 +47,7 @@ use crate::{elder_count, UsedSpace};
 
 use backoff::ExponentialBackoff;
 use data::Capacity;
-use dysfunction::DysfunctionDetection;
+use dysfunction::{DysfunctionDetection, DysfunctionSeverity};
 use itertools::Itertools;
 use resource_proof::ResourceProof;
 use std::{
@@ -224,14 +224,14 @@ impl Node {
     /// returns names that are relatively dysfunctional
     pub(crate) async fn get_dysfunctional_names(&self) -> BTreeSet<XorName> {
         self.dysfunction_tracking
-            .get_dysfunctional_node_names()
+            .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
             .await
     }
 
     /// returns names that are relatively dysfunctional
     pub(crate) async fn get_suspicious_node_names(&self) -> BTreeSet<XorName> {
         self.dysfunction_tracking
-            .get_dysfunctional_node_names()
+            .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
             .await
     }
     /// Log a communication problem

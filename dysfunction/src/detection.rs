@@ -24,6 +24,17 @@ enum ScoreType {
     Op,
 }
 
+/// Severity of dysfunction... Is it not yet fully dysfunctional? But out of line with neighbours?
+/// Then it's Suspicious, or, if it's gone too far we can check if it's Dysfunctional.
+/// These can be passed in to the `check_for_maliciousness` function.
+#[derive(Debug)]
+pub enum DysfunctionSeverity {
+    /// A node is deemed suspicous (more dysfunction than neighbours, but not yet fully dysfunctional)
+    Suspicious,
+    /// A node is deemed dysfunctional when it is clearly having more issues than it's beighbours
+    Dysfunctional,
+}
+
 impl DysfunctionDetection {
     /// Helper func to get vec of a node and their neighbours for comparison
     pub fn get_node_and_neighbours_vec(&self) -> Vec<(XorName, Vec<XorName>)> {
@@ -137,17 +148,23 @@ impl DysfunctionDetection {
         (final_scores, mean)
     }
 
-    /// Get a list of all nodes deemed dysfunctional
-    pub async fn get_dysfunctional_node_names(&self) -> BTreeSet<XorName> {
+    /// Get a list of all nodes who'se score is above mean * DysfunctionalSeverity weighting
+    pub async fn get_nodes_beyond_severity(
+        &self,
+        severity: DysfunctionSeverity,
+    ) -> BTreeSet<XorName> {
         let mut dysfunctional_nodes = BTreeSet::new();
 
         let (final_scores, mean) = self.get_weighted_scores().await;
 
-        let to_beat = mean * DYSFUNCTION_MEAN_RATIO;
+        let to_beat = match severity {
+            DysfunctionSeverity::Dysfunctional => mean * DYSFUNCTION_MEAN_RATIO,
+            DysfunctionSeverity::Suspicious => mean * SUSPECT_MEAN_RATIO,
+        };
 
         for (name, nodes_score) in final_scores {
             trace!(
-                "Final dys score for {name} is {nodes_score} (mean is {mean}), needs to beat {:?}",
+                "Final {severity:?} score for {name} is {nodes_score} (mean is {mean}), needs to beat {:?}",
                 to_beat
             );
 
@@ -157,26 +174,5 @@ impl DysfunctionDetection {
             }
         }
         dysfunctional_nodes
-    }
-
-    /// Get a list of all nodes deemed suspect
-    pub async fn get_suspicious_node_names(&self) -> BTreeSet<XorName> {
-        let mut sus_nodes = BTreeSet::new();
-
-        let (final_scores, mean) = self.get_weighted_scores().await;
-
-        let to_beat = mean * SUSPECT_MEAN_RATIO;
-        for (name, nodes_score) in final_scores {
-            trace!(
-                "Final sus score for {name} is {nodes_score} (mean is {mean}), needs to beat {:?}",
-                to_beat
-            );
-
-            if nodes_score >= to_beat {
-                debug!("Adding {name} as sus node");
-                let _existed = sus_nodes.insert(name);
-            }
-        }
-        sus_nodes
     }
 }
