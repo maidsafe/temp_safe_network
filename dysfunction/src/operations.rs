@@ -6,9 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{get_mean_of, DysfunctionDetection, NodeIdentifier, OperationId};
-use std::collections::BTreeMap;
-use xor_name::XorName;
+use crate::{DysfunctionDetection, NodeIdentifier, OperationId};
 
 impl DysfunctionDetection {
     /// Inserts a pending_operation, and is deemed as such until we get the appropriate response from the node
@@ -70,48 +68,6 @@ impl DysfunctionDetection {
             }
         }
         has_removed
-    }
-
-    /// Calculate a score of this node, as compared to its closest neighbours...
-    /// The average score of all neighbours is calculated, and the standard deviation therein.
-    /// We then calculate the node's z-score and multiply excess pending ops by this
-    pub(crate) async fn calculate_ops_score(&self) -> BTreeMap<XorName, f32> {
-        let mut score_map = BTreeMap::default();
-        // loop over all node/neighbour comparisons
-        for (node, neighbours) in self.get_node_and_neighbours_vec() {
-            // let node = *node;
-            let nodes_count = if let Some(entry) = self.unfulfilled_ops.get(&node) {
-                entry.value().read().await.len()
-            } else {
-                0
-            };
-
-            let mut all_neighbourhood_counts = vec![];
-            for neighbour in neighbours {
-                if let Some(entry) = self.unfulfilled_ops.get(&neighbour) {
-                    let val = entry.value().read().await.len();
-
-                    all_neighbourhood_counts.push(val as f32);
-                }
-            }
-
-            let avg_in_neighbourhood = get_mean_of(&all_neighbourhood_counts).unwrap_or(1.0);
-            trace!(
-                "node's ops {nodes_count:?} mean ops: {:?}",
-                avg_in_neighbourhood
-            );
-
-            // let final_score = nodes_count.checked_sub(avg_in_neighbourhood).unwrap_or(0);
-            let final_score = if nodes_count as f32 > avg_in_neighbourhood {
-                nodes_count as f32 / avg_in_neighbourhood
-            } else {
-                0.0
-            };
-
-            let _prev = score_map.insert(node, final_score);
-        }
-
-        score_map
     }
 }
 

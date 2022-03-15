@@ -6,9 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{get_mean_of, DysfunctionDetection, NodeIdentifier};
-use std::collections::BTreeMap;
-use xor_name::XorName;
+use crate::{DysfunctionDetection, NodeIdentifier};
 
 impl DysfunctionDetection {
     /// Track an issue with a node's network knowledge
@@ -18,48 +16,6 @@ impl DysfunctionDetection {
 
         let value = entry.value_mut();
         *value += 1;
-    }
-
-    /// Calculate a score of this node, as compared to its closest neighbours...
-    pub(crate) fn calculate_knowledge_score(&self) -> BTreeMap<XorName, f32> {
-        let mut score_map = BTreeMap::default();
-        // loop over all node/neighbour comparisons
-        for (node, neighbours) in self.get_node_and_neighbours_vec() {
-            // let node = *node;
-            let nodes_count = if let Some(entry) = self.knowledge_issues.get(&node) {
-                *entry.value()
-            } else {
-                0
-            };
-
-            let mut all_neighbourhood_counts = vec![];
-
-            for neighbour in neighbours {
-                if let Some(entry) = self.knowledge_issues.get(&neighbour) {
-                    let val = *entry.value();
-
-                    all_neighbourhood_counts.push(val as f32);
-                }
-            }
-
-            let avg_in_neighbourhood = get_mean_of(&all_neighbourhood_counts).unwrap_or(1.0);
-            trace!(
-                "node's count: {nodes_count:?} & mean knowledge: {:?}",
-                avg_in_neighbourhood
-            );
-
-            // let final_score = nodes_count.checked_sub(avg_in_neighbourhood).unwrap_or(0);
-            let final_score = if nodes_count as f32 > avg_in_neighbourhood {
-                nodes_count as f32 / avg_in_neighbourhood
-            } else {
-                0.0
-            };
-
-            debug!("{node} Knowledge score {final_score}");
-            let _prev = score_map.insert(node, final_score);
-        }
-
-        score_map
     }
 }
 

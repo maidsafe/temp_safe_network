@@ -61,13 +61,15 @@ type NodeIdentifier = XorName;
 // TODO: depend on types once that's extracted
 type OperationId = [u8; 32];
 
+pub(crate) type BasicCountTracker = Arc<DashMap<NodeIdentifier, usize>>;
+
 #[derive(Clone, Debug)]
 /// Dysfunctional node tracking. Allows various potential issues to be tracked and weighted,
 /// with unresposive or suspect nodes being noted on request, against which action can then be taken.
 pub struct DysfunctionDetection {
     neighbour_count: usize,
-    communication_issues: Arc<DashMap<NodeIdentifier, usize>>, // count of comm issues
-    knowledge_issues: Arc<DashMap<NodeIdentifier, usize>>,     // count of comm issues
+    communication_issues: BasicCountTracker,
+    knowledge_issues: BasicCountTracker,
     unfulfilled_ops: Arc<DashMap<NodeIdentifier, Arc<RwLock<Vec<OperationId>>>>>, // OperationId = [u8; 32]
     closest_nodes_to: Arc<DashMap<XorName, Vec<XorName>>>,
 }
@@ -165,11 +167,12 @@ impl DysfunctionDetection {
 /// Calculates the avg value in a data set
 /// https://rust-lang-nursery.github.io/rust-cookbook/science/mathematics/statistics.html
 pub(crate) fn get_mean_of(data: &[f32]) -> Option<f32> {
-    let sum = data.iter().sum::<f32>();
+    let sum: f32 = data.iter().sum();
     let count = data.len();
-    match count {
-        positive if positive > 0 => Some(sum / count as f32),
-        _ => None,
+    if count > 0 {
+        Some(sum / count as f32)
+    } else {
+        None
     }
 }
 
