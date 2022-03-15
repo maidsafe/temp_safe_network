@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{get_mean_of, DysfunctionDetection};
+use crate::{get_mean_of, BasicCountTracker, DysfunctionDetection};
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
@@ -18,12 +18,15 @@ static KNOWLEDGE_WEIGHTING: f32 = 1.3;
 static DYSFUNCTION_MEAN_RATIO: f32 = 2.75;
 static SUSPECT_MEAN_RATIO: f32 = 1.2;
 
-// the minimum avg score needed before we start noting sus/dys
-// static MEAN_FLOOR: f32 = 2.0;
+#[derive(Clone)]
+enum ScoreType {
+    Basic(BasicCountTracker),
+    Op,
+}
 
 impl DysfunctionDetection {
     /// Helper func to get vec of a node and their neighbours for comparison
-    pub(crate) fn get_node_and_neighbours_vec(&self) -> Vec<(XorName, Vec<XorName>)> {
+    pub fn get_node_and_neighbours_vec(&self) -> Vec<(XorName, Vec<XorName>)> {
         let mut node_neighbours = vec![];
         for entry in self.closest_nodes_to.iter() {
             let (node, neighbours) = entry.pair();
@@ -33,12 +36,77 @@ impl DysfunctionDetection {
         node_neighbours
     }
 
+    /// Calculate a score of this node, as compared to its closest neighbours...
+    async fn calculate_scores(&self, score_type: ScoreType) -> BTreeMap<XorName, f32> {
+        let mut score_map = BTreeMap::default();
+
+        // loop over all node/neighbour comparisons
+        for (node, neighbours) in self.get_node_and_neighbours_vec() {
+            let score_type = score_type.clone();
+
+            let (count_at_node, all_neighbourhood_counts) = match score_type {
+                ScoreType::Basic(tracker) => {
+                    let count = tracker.get(&node).map(|entry| *entry.value()).unwrap_or(0);
+
+                    let all_neighbourhood_counts = Vec::from_iter(
+                        neighbours
+                            .iter()
+                            .filter_map(|n| tracker.get(n))
+                            .map(|entry| *entry.value() as f32),
+                    );
+
+                    (count, all_neighbourhood_counts)
+                }
+                ScoreType::Op => {
+                    let count = if let Some(entry) = self.unfulfilled_ops.get(&node) {
+                        entry.value().read().await.len()
+                    } else {
+                        0
+                    };
+
+                    let mut all_neighbourhood_counts = vec![];
+                    for neighbour in neighbours {
+                        if let Some(entry) = self.unfulfilled_ops.get(&neighbour) {
+                            let val = entry.value().read().await.len();
+
+                            all_neighbourhood_counts.push(val as f32);
+                        }
+                    }
+
+                    (count, all_neighbourhood_counts)
+                }
+            };
+
+            let avg_in_neighbourhood = get_mean_of(&all_neighbourhood_counts).unwrap_or(1.0);
+
+            trace!(
+                "node's ops {count_at_node:?} mean ops: {:?}",
+                avg_in_neighbourhood
+            );
+
+            // let final_score = nodes_count.checked_sub(avg_in_neighbourhood).unwrap_or(0);
+            let final_score = if count_at_node as f32 > avg_in_neighbourhood {
+                count_at_node as f32 / avg_in_neighbourhood
+            } else {
+                0.0
+            };
+
+            let _prev = score_map.insert(node, final_score);
+        }
+
+        score_map
+    }
+
     async fn get_weighted_scores(&self) -> (BTreeMap<XorName, f32>, f32) {
         trace!("Getting weighted scores");
-        let ops_scores = self.calculate_ops_score().await;
+        let ops_scores = self.calculate_scores(ScoreType::Op).await;
 
-        let conn_scores = self.calculate_connections_score();
-        let knowledge_scores = self.calculate_knowledge_score();
+        let conn_scores = self
+            .calculate_scores(ScoreType::Basic(self.communication_issues.clone()))
+            .await;
+        let knowledge_scores = self
+            .calculate_scores(ScoreType::Basic(self.knowledge_issues.clone()))
+            .await;
 
         let mut final_scores = BTreeMap::default();
         let mut scores_only = vec![];
