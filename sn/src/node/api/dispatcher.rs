@@ -169,7 +169,8 @@ impl Dispatcher {
             loop {
                 let _instant = interval.tick().await;
 
-                let unresponsive_nodes = match dispatcher.node.get_dysfunctional_names().await {
+                let unresponsive_nodes = match dispatcher.node.get_dysfunctional_node_names().await
+                {
                     Ok(nodes) => nodes,
                     Err(error) => {
                         error!("Error getting dysfunctional nodes: {error}");

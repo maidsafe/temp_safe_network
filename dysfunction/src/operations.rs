@@ -76,12 +76,13 @@ mod tests {
     use crate::tests::{init_test_logger, ELDER_COUNT};
     use crate::{error::Result, DysfunctionDetection, DysfunctionSeverity, OperationId};
     use rand::Rng;
-    use xor_name::XorName;
+    use xor_name::{rand::random as random_xorname, XorName};
 
+    // we can see 500 pending issues under load
+    pub(crate) const NORMAL_OPERATIONS_ISSUES: usize = 500;
     // Above this, nodes should be sus
-    pub(crate) const NORMAL_OPERATIONS_ISSUES: usize = 200;
-    pub(crate) const SUSPECT_OPERATIONS_ISSUES: usize = 350;
-    pub(crate) const DYSFUNCTIONAL_OPERATIONS_ISSUES: usize = 600;
+    pub(crate) const SUSPECT_OPERATIONS_ISSUES: usize = 800;
+    pub(crate) const DYSFUNCTIONAL_OPERATIONS_ISSUES: usize = 1100;
 
     fn get_random_operation_id() -> OperationId {
         let mut rng = rand::thread_rng();
@@ -90,7 +91,7 @@ mod tests {
 
     #[tokio::test]
     async fn op_dysfunction_no_variance_is_okay() -> Result<()> {
-        let adults = (0..10).map(|_| XorName::random()).collect::<Vec<XorName>>();
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
 
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone(), ELDER_COUNT);
 
@@ -129,7 +130,7 @@ mod tests {
         init_test_logger();
         let _outer_span = tracing::info_span!("op_dysfunction_basics").entered();
 
-        let adults = (0..10).map(|_| XorName::random()).collect::<Vec<XorName>>();
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
 
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone(), ELDER_COUNT);
 
@@ -144,7 +145,7 @@ mod tests {
         }
 
         // Add a new adults
-        let new_adult = XorName::random();
+        let new_adult = random_xorname();
         dysfunctional_detection.add_new_node(new_adult);
 
         // Assert total adult count
