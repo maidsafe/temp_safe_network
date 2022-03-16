@@ -32,18 +32,18 @@ mod tests {
     use crate::{DysfunctionDetection, DysfunctionSeverity};
 
     use eyre::Error;
-    use xor_name::XorName;
+    use xor_name::{rand::random as random_xorname, XorName};
 
     type Result<T, E = Error> = std::result::Result<T, E>;
 
-    // Above this, nodes should be sus
-    pub(crate) const NORMAL_KNOWLEDGE_ISSUES: usize = 5;
-    pub(crate) const SUSPECT_KNOWLEDGE_ISSUES: usize = 10;
-    pub(crate) const DYSFUNCTIONAL_KNOWLEDGE_ISSUES: usize = 20;
+    // 5 here means we have some tolerance for AE rounds while nodes are getting up to speed on churn/split
+    pub(crate) const NORMAL_KNOWLEDGE_ISSUES: usize = 7;
+    pub(crate) const SUSPECT_KNOWLEDGE_ISSUES: usize = 15;
+    pub(crate) const DYSFUNCTIONAL_KNOWLEDGE_ISSUES: usize = 28;
 
     #[tokio::test]
     async fn knowledge_dys_is_tolerant_of_norms() -> Result<()> {
-        let adults = (0..10).map(|_| XorName::random()).collect::<Vec<XorName>>();
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
 
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone(), ELDER_COUNT);
 
@@ -83,12 +83,12 @@ mod tests {
         init_test_logger();
         let _outer_span = tracing::info_span!("knowledge_dys_is_not_too_sharp").entered();
 
-        let adults = (0..10).map(|_| XorName::random()).collect::<Vec<XorName>>();
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
 
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone(), ELDER_COUNT);
 
         // Add a new adults
-        let new_adult = XorName::random();
+        let new_adult = random_xorname();
         dysfunctional_detection.add_new_node(new_adult);
 
         // Add just one knowledge issue...
@@ -130,7 +130,7 @@ mod tests {
         let _outer_span =
             tracing::info_span!("knowledge_dysfunction_basics_sus_comes_first").entered();
 
-        let adults = (0..10).map(|_| XorName::random()).collect::<Vec<XorName>>();
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
 
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone(), ELDER_COUNT);
 
@@ -144,7 +144,7 @@ mod tests {
         }
 
         // Add a new adults
-        let new_adult = XorName::random();
+        let new_adult = random_xorname();
         dysfunctional_detection.add_new_node(new_adult);
 
         // Assert total adult count
@@ -161,7 +161,7 @@ mod tests {
             .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
             .await?;
         // Assert that the new adult is detected as suspect.
-        assert_eq!(sus.len(), 1, "one node is not sus");
+        assert_eq!(sus.len(), 1, "only one node is sus");
         assert!(sus.contains(&new_adult), "our adult is not sus");
 
         let dysfunctional_nodes = dysfunctional_detection

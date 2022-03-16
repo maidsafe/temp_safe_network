@@ -188,7 +188,7 @@ mod tests {
     use eyre::Error;
     use std::collections::BTreeSet;
     use std::sync::Once;
-    use xor_name::XorName;
+    use xor_name::{rand::random as random_xorname, XorName};
 
     type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -212,7 +212,7 @@ mod tests {
 
     #[tokio::test]
     async fn dysfunction_retain_members() -> Result<()> {
-        let adults = (0..10).map(|_| XorName::random()).collect::<Vec<XorName>>();
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone(), ELDER_COUNT);
 
         let live_adults = adults[5..10].iter().cloned().collect::<BTreeSet<XorName>>();

@@ -32,18 +32,19 @@ mod tests {
     use crate::{DysfunctionDetection, DysfunctionSeverity};
 
     use eyre::Error;
-    use xor_name::XorName;
+    use xor_name::{rand::random as random_xorname, XorName};
 
     type Result<T, E = Error> = std::result::Result<T, E>;
 
     // Above this, nodes should be sus
-    pub(crate) const NORMAL_CONNECTION_PROBLEM_COUNT: usize = 20;
-    pub(crate) const SUSPECT_CONNECTION_PROBLEM_COUNT: usize = 30;
-    pub(crate) const DYSFUNCTIONAL_CONNECTION_PROBLEM_COUNT: usize = 50;
+    // this is only counting last RECENT minutes atm
+    pub(crate) const NORMAL_CONNECTION_PROBLEM_COUNT: usize = 5;
+    pub(crate) const SUSPECT_CONNECTION_PROBLEM_COUNT: usize = 15;
+    pub(crate) const DYSFUNCTIONAL_CONNECTION_PROBLEM_COUNT: usize = 25;
 
     #[tokio::test]
     async fn conn_dys_is_tolerant_of_norms() -> Result<()> {
-        let adults = (0..10).map(|_| XorName::random()).collect::<Vec<XorName>>();
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
 
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone(), ELDER_COUNT);
 
@@ -81,7 +82,7 @@ mod tests {
         init_test_logger();
         let _outer_span = tracing::info_span!("conn_dysfunction_basics_sus_comes_first").entered();
 
-        let adults = (0..10).map(|_| XorName::random()).collect::<Vec<XorName>>();
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
 
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone(), ELDER_COUNT);
 
@@ -93,7 +94,7 @@ mod tests {
         }
 
         // Add a new adults
-        let new_adult = XorName::random();
+        let new_adult = random_xorname();
         dysfunctional_detection.add_new_node(new_adult);
 
         // Assert total adult count
@@ -108,7 +109,7 @@ mod tests {
             .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
             .await?;
         // Assert that the new adult is detected as suspect.
-        assert_eq!(sus.len(), 1, "one node is not sus");
+        assert_eq!(sus.len(), 1, "only one node is sus");
         assert!(sus.contains(&new_adult), "our adult is not sus");
 
         let dysfunctional_nodes = dysfunctional_detection
@@ -148,12 +149,12 @@ mod tests {
         // Assert that the new adult is not NOW dysfuncitonal
         assert!(
             dysfunctional_nodes.contains(&new_adult),
-            "our adult should now be dysfunctional"
+            "our adult should now be dysfunctional but is not"
         );
         assert_eq!(
             dysfunctional_nodes.len(),
             1,
-            "our adult is the only dysfunctional nodes"
+            "our node should be the only dysfunctional nodes"
         );
 
         Ok(())

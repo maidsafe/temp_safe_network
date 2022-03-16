@@ -222,7 +222,7 @@ impl Node {
     }
 
     /// returns names that are relatively dysfunctional
-    pub(crate) async fn get_dysfunctional_names(&self) -> Result<BTreeSet<XorName>> {
+    pub(crate) async fn get_dysfunctional_node_names(&self) -> Result<BTreeSet<XorName>> {
         self.dysfunction_tracking
             .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
             .await

@@ -13,13 +13,13 @@ use xor_name::XorName;
 use std::time::{Duration, SystemTime};
 static RECENT_ISSUE_DURATION: Duration = Duration::from_secs(60 * 15);
 
-static CONN_WEIGHTING: f32 = 1.2;
-static OP_WEIGHTING: f32 = 1.0;
-static KNOWLEDGE_WEIGHTING: f32 = 1.3;
+static CONN_WEIGHTING: f32 = 25.0;
+static OP_WEIGHTING: f32 = 0.02;
+static KNOWLEDGE_WEIGHTING: f32 = 35.0;
 
-// Number of mean scores to be over to be considered dys/sus
-static DYSFUNCTION_MEAN_RATIO: f32 = 2.75;
-static SUSPECT_MEAN_RATIO: f32 = 1.2;
+// Ratio to mean scores should be over to be considered dys/sus
+static DYSFUNCTION_MEAN_RATIO: f32 = 8.0;
+static SUSPECT_MEAN_RATIO: f32 = 3.0;
 
 #[derive(Clone)]
 enum ScoreType {
@@ -63,12 +63,16 @@ impl DysfunctionDetection {
                     let count = if let Some(entry) = tracker.get(&node) {
                         entry.value().read().await.len()
                     } else {
-                        0
+                        1
                     };
 
                     let mut all_neighbourhood_counts = vec![];
                     for neighbour in neighbours {
                         if let Some(entry) = tracker.get(&neighbour) {
+                            if neighbour == node {
+                                continue;
+                            }
+
                             let val = entry.value().read().await.len();
 
                             all_neighbourhood_counts.push(val as f32);
@@ -81,7 +85,7 @@ impl DysfunctionDetection {
                     let count = if let Some(entry) = self.unfulfilled_ops.get(&node) {
                         entry.value().read().await.len()
                     } else {
-                        0
+                        1
                     };
 
                     let mut all_neighbourhood_counts = vec![];
@@ -104,12 +108,9 @@ impl DysfunctionDetection {
                 avg_in_neighbourhood
             );
 
-            // let final_score = nodes_count.checked_sub(avg_in_neighbourhood).unwrap_or(0);
-            let final_score = if count_at_node as f32 > avg_in_neighbourhood {
-                count_at_node as f32 / avg_in_neighbourhood
-            } else {
-                0.0
-            };
+            let final_score = count_at_node
+                .checked_sub(avg_in_neighbourhood as usize)
+                .unwrap_or(1) as f32;
 
             let _prev = score_map.insert(node, final_score);
         }
@@ -136,10 +137,10 @@ impl DysfunctionDetection {
 
             let ops_score = score * OP_WEIGHTING;
 
-            let node_conn_score = *conn_scores.get(&name).unwrap_or(&0.0);
+            let node_conn_score = *conn_scores.get(&name).unwrap_or(&1.0);
             let node_conn_score = node_conn_score * CONN_WEIGHTING;
 
-            let node_knowledge_score = *knowledge_scores.get(&name).unwrap_or(&0.0);
+            let node_knowledge_score = *knowledge_scores.get(&name).unwrap_or(&1.0);
             let node_knowledge_score = node_knowledge_score * KNOWLEDGE_WEIGHTING;
 
             trace!("Conns score: {name}, {node_conn_score}");
@@ -201,7 +202,7 @@ impl DysfunctionDetection {
             );
 
             if nodes_score >= to_beat {
-                debug!("Adding {name} as dsyf node");
+                debug!("DysfunctionDetection: Adding {name} as {severity:?} node");
                 let _existed = dysfunctional_nodes.insert(name);
             }
         }
