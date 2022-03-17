@@ -11,7 +11,7 @@ use super::Cmd;
 use crate::elder_count;
 use crate::messaging::{system::SystemMsg, MsgKind, WireMsg};
 use crate::node::{
-    core::{Node, Proposal, SendStatus},
+    core::{DeliveryStatus, Node, Proposal},
     messages::WireMsgUtils,
     Error, Result,
 };
@@ -490,11 +490,13 @@ impl Dispatcher {
             .await?;
 
         match status {
-            SendStatus::MinDeliveryGroupSizeReached(failed_recipients)
-            | SendStatus::MinDeliveryGroupSizeFailed(failed_recipients) => Ok(failed_recipients
-                .into_iter()
-                .map(Cmd::HandlePeerLost)
-                .collect()),
+            DeliveryStatus::MinDeliveryGroupSizeReached(failed_recipients)
+            | DeliveryStatus::MinDeliveryGroupSizeFailed(failed_recipients) => {
+                Ok(failed_recipients
+                    .into_iter()
+                    .map(Cmd::HandlePeerLost)
+                    .collect())
+            }
             _ => Ok(vec![]),
         }
         .map_err(|e: Error| e)
