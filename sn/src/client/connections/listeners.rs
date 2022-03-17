@@ -44,7 +44,6 @@ impl Session {
     ) {
         let mut first = true;
         let addr = peer.addr();
-        let node_id = peer.id();
         let connection_id = conn.id();
 
         debug!("Listening for incoming msgs from {:?}", peer);
@@ -55,10 +54,10 @@ impl Session {
                     Ok(Some(msg)) => {
                         if first {
                             first = false;
-                            session.peer_links.add_incoming(&node_id, conn.clone()).await;
+                            session.peer_links.add_incoming(&peer, conn.clone()).await;
                         }
 
-                        if let Err(err) = Self::handle_msg(msg, peer.clone(), session.clone()).await {
+                        if let Err(err) = Self::handle_msg(msg, peer, session.clone()).await {
                             error!("Error while handling incoming msg: {:?}. Listening for next msg...", err);
                         }
                     },
@@ -135,7 +134,7 @@ impl Session {
                     section_signed,
                     section_chain,
                     bounced_msg,
-                    src_peer.clone(),
+                    src_peer,
                 )
                 .await;
                 if result.is_err() {
@@ -163,7 +162,7 @@ impl Session {
                     section_signed,
                     proof_chain,
                     bounced_msg,
-                    src_peer.clone(),
+                    src_peer,
                 )
                 .await;
                 if result.is_err() {
@@ -299,7 +298,7 @@ impl Session {
             target_sap.clone(),
             section_signed,
             section_chain,
-            src_peer.clone(),
+            src_peer,
         )
         .await;
 

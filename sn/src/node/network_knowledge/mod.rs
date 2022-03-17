@@ -622,7 +622,7 @@ impl NetworkKnowledge {
         let mut live_adults = vec![];
         for node_state in self.section_peers.members() {
             if !self.is_elder(&node_state.name()).await {
-                live_adults.push(node_state.peer().clone())
+                live_adults.push(*node_state.peer())
             }
         }
         live_adults
@@ -657,7 +657,7 @@ impl NetworkKnowledge {
             .members()
             .into_iter()
             .find(|info| info.addr() == *addr)
-            .map(|info| info.peer().clone())
+            .map(|info| *info.peer())
     }
 
     // Tries to split our section.

@@ -1,0 +1,110 @@
+// Copyright 2022 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
+
+use super::MsgEvent;
+
+use crate::messaging::WireMsg;
+use crate::types::{log_markers::LogMarker, Peer};
+
+use qp2p::ConnectionIncoming;
+use tokio::sync::mpsc;
+use tokio::task;
+use tracing::Instrument;
+
+#[derive(Debug)]
+pub(crate) enum ListenerEvent {
+    Connected {
+        peer: Peer,
+        connection: qp2p::Connection,
+    },
+}
+
+#[derive(Clone)]
+pub(crate) struct MsgListener {
+    add_connection: mpsc::Sender<ListenerEvent>,
+    receive_msg: mpsc::Sender<MsgEvent>,
+    count_msg: mpsc::Sender<()>,
+}
+
+impl MsgListener {
+    pub(crate) fn new(
+        add_connection: mpsc::Sender<ListenerEvent>,
+        receive_msg: mpsc::Sender<MsgEvent>,
+        count_msg: mpsc::Sender<()>,
+    ) -> Self {
+        Self {
+            add_connection,
+            count_msg,
+            receive_msg,
+        }
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub(crate) fn listen(&self, conn: qp2p::Connection, incoming_msgs: ConnectionIncoming) {
+        let clone = self.clone();
+        let _ = task::spawn(clone.listen_internal(conn, incoming_msgs).in_current_span());
+    }
+
+    #[tracing::instrument(skip_all)]
+    async fn listen_internal(self, conn: qp2p::Connection, mut incoming_msgs: ConnectionIncoming) {
+        let conn_id = conn.id();
+        let remote_address = conn.remote_address();
+        let mut first = true;
+
+        while let Some(result) = incoming_msgs.next().await.transpose() {
+            match result {
+                Ok(msg_bytes) => {
+                    let wire_msg = match WireMsg::from(msg_bytes.clone()) {
+                        Ok(wire_msg) => wire_msg,
+                        Err(error) => {
+                            // TODO: should perhaps rather drop this connection.. as it is a spam vector
+                            debug!("Failed to deserialize message: {:?}", error);
+                            continue;
+                        }
+                    };
+
+                    let src_name = wire_msg.msg_kind().src().name();
+
+                    if first {
+                        first = false;
+                        let _ = self
+                            .add_connection
+                            .send(ListenerEvent::Connected {
+                                peer: Peer::new(src_name, remote_address),
+                                connection: conn.clone(),
+                            })
+                            .await;
+                    }
+
+                    let _send_res = self
+                        .receive_msg
+                        .send(MsgEvent::Received {
+                            sender: Peer::new(src_name, remote_address),
+                            wire_msg,
+                            original_bytes: msg_bytes,
+                        })
+                        .await;
+
+                    // count incoming msgs..
+                    let _ = self.count_msg.send(());
+                }
+                Err(error) => {
+                    // TODO: should we propagate this?
+                    warn!("error on connection with {}: {:?}", remote_address, error);
+                }
+            }
+        }
+
+        trace!(%conn_id, %remote_address, "{}", LogMarker::ConnectionClosed);
+    }
+
+    pub(crate) fn count_msg(&self) {
+        // count outgoing msgs..
+        let _ = self.count_msg.send(());
+    }
+}

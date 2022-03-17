@@ -18,7 +18,7 @@ mod relocation;
 mod split_barrier;
 
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
-pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
+pub(crate) use comm::{Comm, MsgEvent, SendStatus};
 pub(crate) use data::MIN_LEVEL_WHEN_FULL;
 pub(crate) use proposal::Proposal;
 #[cfg(test)]

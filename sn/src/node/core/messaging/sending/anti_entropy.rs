@@ -27,7 +27,7 @@ impl Node {
             .await
             .into_iter()
             .filter(|info| info.name() != our_name)
-            .map(|info| info.peer().clone())
+            .map(|info| *info.peer())
             .collect();
 
         if nodes.is_empty() {

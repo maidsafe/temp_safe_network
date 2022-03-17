@@ -149,11 +149,10 @@ impl Node {
 
             debug!("Responding with the first query response to {:?}", dst);
 
-            let command = Cmd::SendMsg {
-                recipients: vec![peer.clone()],
+            cmds.push(Cmd::SendMsg {
+                recipients: vec![*peer],
                 wire_msg,
-            };
-            cmds.push(command);
+            });
         }
 
         Ok(cmds)
@@ -198,7 +197,7 @@ impl Node {
             });
             return self.send_cmd_error_response(error, origin, msg_id).await;
         }
-        cmds.extend(self.send_cmd_ack(origin.clone(), msg_id).await?);
+        cmds.extend(self.send_cmd_ack(origin, msg_id).await?);
         Ok(cmds)
     }
 
