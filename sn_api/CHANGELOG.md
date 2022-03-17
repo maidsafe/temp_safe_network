@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.57.2 (2022-03-17)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release over the course of 4 calendar days.
+ - 16 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - tidy up some new test/clippy issues ([`6ca8181`](https://github.com/maidsafe/safe_network/commit/6ca81812df56858c789353383e018fcee8b4c297))
+</details>
+
 ## v0.57.1 (2022-02-27)
 
 ### Bug Fixes
@@ -15,9 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 6 commits contributed to the release.
- - 8 days passed between releases.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 7 commits contributed to the release over the course of 1 calendar day.
+ - 9 days passed between releases.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -27,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.58.2/sn_api-0.57.1/sn_cli-0.50.2 ([`634010f`](https://github.com/maidsafe/safe_network/commit/634010fd79ce1487abbff5adf3d15da59709dd95))
     - Merge #1038 #1042 ([`08da844`](https://github.com/maidsafe/safe_network/commit/08da8440f9acd2eb8b2494ca7d1c2f8f3f8f631e))
     - changes to appease clippy 1.59 ([`705995e`](https://github.com/maidsafe/safe_network/commit/705995ef67b3d4c45c95689c4a675e1063467ec9))
     - introduce cohesive conn handling ([`38fb057`](https://github.com/maidsafe/safe_network/commit/38fb057da44a0e243186410df0c39361a21ec46e))

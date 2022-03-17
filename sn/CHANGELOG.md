@@ -5,21 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.58.5 (2022-03-09)
+## v0.58.6 (2022-03-17)
 
 ### New Features
 
- - <csr-id-7a1065c46f5d72f6997a504c984a70493e197a5b/> impl throttled message sending
-   - adds a new command that given sends messages in a throttled fashion
-   - makes use of the new command to throttle replication messages to avoid message explosion
+ - <csr-id-d6e601a3c18dc2b7f60c297f5c794883952e1d14/> prune parent whenever a child inserted
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 3 commits contributed to the release over the course of 1 calendar day.
- - 4 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -29,7 +27,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1062 ([`22404e4`](https://github.com/maidsafe/safe_network/commit/22404e4bf07ce882aa10dbd53237b91c5f67751e))
+    - make resource logging consistent ([`20c057c`](https://github.com/maidsafe/safe_network/commit/20c057c72fdcacc0bcda6da1f97eb6fab1a0cf4c))
+    - prune parent whenever a child inserted ([`d6e601a`](https://github.com/maidsafe/safe_network/commit/d6e601a3c18dc2b7f60c297f5c794883952e1d14))
+</details>
+
+## v0.58.5 (2022-03-09)
+
+### New Features
+
+ - <csr-id-7a1065c46f5d72f6997a504c984a70493e197a5b/> impl throttled message sending
+   - adds a new command that given sends messages in a throttled fashion
+- makes use of the new command to throttle replication messages to avoid message explosion
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release over the course of 1 calendar day.
+ - 5 days passed between releases.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.58.5 ([`784870a`](https://github.com/maidsafe/safe_network/commit/784870abfdd5620da6839e7fd7df80702e0f3afa))
     - clarify comment regarding bootstrap ([`df398e1`](https://github.com/maidsafe/safe_network/commit/df398e1017221c0027542b597c8f7c38c1828723))
+    - remove unneeded HandleSystemMsg command ([`8c3bcc2`](https://github.com/maidsafe/safe_network/commit/8c3bcc2bb64063e646d368d90fff98420ab22dce))
     - discard DataReplicator module ([`df330fa`](https://github.com/maidsafe/safe_network/commit/df330fa0de1e334e55863828fb743131ab629a18))
     - impl throttled message sending ([`7a1065c`](https://github.com/maidsafe/safe_network/commit/7a1065c46f5d72f6997a504c984a70493e197a5b))
 </details>
