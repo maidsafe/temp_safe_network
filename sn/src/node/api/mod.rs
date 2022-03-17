@@ -25,7 +25,7 @@ use self::{
 use crate::messaging::{system::SystemMsg, DstLocation, WireMsg};
 use crate::node::{
     cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
-    core::{join_network, Comm, ConnectionEvent, Node},
+    core::{join_network, Comm, MsgEvent, Node},
     ed25519,
     error::{Error, Result},
     logging::{log_ctx::LogCtx, run_system_logger},
@@ -147,7 +147,7 @@ impl NodeApi {
                 std::process::id()
             );
 
-            let comm = Comm::new(
+            let comm = Comm::first_node(
                 local_addr,
                 config.network_config().clone(),
                 connection_event_tx,
@@ -376,11 +376,11 @@ impl NodeApi {
 // Listen for incoming connection events and handle them.
 async fn handle_connection_events(
     dispatcher: Arc<Dispatcher>,
-    mut incoming_conns: mpsc::Receiver<ConnectionEvent>,
+    mut incoming_conns: mpsc::Receiver<MsgEvent>,
 ) {
     while let Some(event) = incoming_conns.recv().await {
         match event {
-            ConnectionEvent::Received {
+            MsgEvent::Received {
                 sender,
                 wire_msg,
                 original_bytes,

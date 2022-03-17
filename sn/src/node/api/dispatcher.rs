@@ -289,15 +289,13 @@ impl Dispatcher {
                     return Ok(vec![]);
                 }
 
-                for (name, addr) in linked_peers.clone() {
-                    if !section_members.contains(&name) {
+                for peer in linked_peers.clone() {
+                    if !section_members.contains(&peer.name()) {
                         // not in our section
-                        let peer = Peer::new(name, addr);
-
                         // this will cleanup all adults too.
                         // but we can reestablish conns there happily, so not soo much a bother.
                         if !self.node.pending_data_queries_contains_client(&peer).await
-                            && !self.node.comm.peer_is_connected(&peer).await
+                            && !self.node.comm.is_connected(&peer).await
                         {
                             trace!("{peer:?} not waiting on queries and not in the section, so lets unlink them");
                             self.node.comm.unlink_peer(&peer).await;

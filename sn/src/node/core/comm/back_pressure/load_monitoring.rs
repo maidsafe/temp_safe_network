@@ -17,7 +17,7 @@ use std::{
 use sysinfo::{LoadAvg, RefreshKind, System, SystemExt};
 use tokio::{sync::RwLock, time::MissedTickBehavior};
 
-pub(crate) const INITIAL_MSGS_PER_S: usize = 100;
+pub(crate) const INITIAL_MSGS_PER_S: f64 = 100.0;
 
 const ONE_MINUTE_AS_SECONDS: u64 = 60;
 
@@ -25,9 +25,10 @@ const SAMPLING_INTERVAL_ONE: Duration = Duration::from_secs(ONE_MINUTE_AS_SECOND
 const SAMPLING_INTERVAL_FIVE: Duration = Duration::from_secs(5 * ONE_MINUTE_AS_SECONDS);
 const SAMPLING_INTERVAL_FIFTEEN: Duration = Duration::from_secs(15 * ONE_MINUTE_AS_SECONDS);
 
-const INITIAL_MSGS_PER_MINUTE: usize = ONE_MINUTE_AS_SECONDS as usize * INITIAL_MSGS_PER_S;
-
+const INITIAL_MSGS_PER_MINUTE: f64 = ONE_MINUTE_AS_SECONDS as f64 * INITIAL_MSGS_PER_S;
 const MAX_CPU_LOAD: f64 = 0.8;
+const DEFAULT_LOAD_PER_MSG: f64 = MAX_CPU_LOAD / INITIAL_MSGS_PER_S;
+
 const ORDER: Ordering = Ordering::SeqCst;
 
 /// Measure and return the rate of msgs per second that we can handle
@@ -37,7 +38,7 @@ pub(crate) struct LoadMonitoring {
     system: Arc<RwLock<System>>,
     load_sample: Arc<RwLock<LoadAvg>>,
     msg_samples: BTreeMap<Duration, MsgCount>,
-    msgs_per_s: BTreeMap<Duration, Arc<AtomicUsize>>,
+    msgs_per_s: BTreeMap<Duration, Arc<RwLock<f64>>>,
 }
 
 impl LoadMonitoring {
@@ -55,15 +56,15 @@ impl LoadMonitoring {
 
         let _ = msgs_per_s.insert(
             SAMPLING_INTERVAL_ONE,
-            Arc::new(AtomicUsize::new(INITIAL_MSGS_PER_MINUTE)),
+            Arc::new(RwLock::new(INITIAL_MSGS_PER_MINUTE)),
         );
         let _ = msgs_per_s.insert(
             SAMPLING_INTERVAL_FIVE,
-            Arc::new(AtomicUsize::new(5 * INITIAL_MSGS_PER_MINUTE)),
+            Arc::new(RwLock::new(5.0 * INITIAL_MSGS_PER_MINUTE)),
         );
         let _ = msgs_per_s.insert(
             SAMPLING_INTERVAL_FIFTEEN,
-            Arc::new(AtomicUsize::new(15 * INITIAL_MSGS_PER_MINUTE)),
+            Arc::new(RwLock::new(15.0 * INITIAL_MSGS_PER_MINUTE)),
         );
 
         let load_sample = Arc::new(RwLock::new(normalize(system.load_average())));
@@ -93,15 +94,17 @@ impl LoadMonitoring {
             .for_each(|(_, count)| count.increment());
     }
 
-    pub(crate) async fn msgs_per_s(&self) -> usize {
-        let data_points: Vec<_> = self
-            .msgs_per_s
-            .iter()
-            .map(|(_, count)| count.load(ORDER))
-            .collect();
-        let number_of_points = data_points.len();
+    pub(crate) async fn msgs_per_s(&self) -> f64 {
+        let mut sum = 0.0;
+        let mut number_of_points = 0;
+
+        for (_, point) in self.msgs_per_s.iter() {
+            sum += *point.read().await;
+            number_of_points += 1;
+        }
+
         if number_of_points > 0 {
-            data_points.into_iter().sum::<usize>() / number_of_points
+            sum / number_of_points as f64
         } else {
             // should be unreachable, since self.msgs_per_s is always > 0 len
             INITIAL_MSGS_PER_S
@@ -128,24 +131,22 @@ impl LoadMonitoring {
                 let load = self.load_sample.read().await;
 
                 sample.snapshot();
-                let msg_count = sample.read();
+                let msg_count = usize::max(1, sample.read()) as f64;
 
                 let load_per_msg = if period == SAMPLING_INTERVAL_ONE {
-                    load.one / msg_count as f64
+                    load.one / msg_count
                 } else if period == SAMPLING_INTERVAL_FIVE {
-                    load.five / msg_count as f64
+                    load.five / msg_count
                 } else if period == SAMPLING_INTERVAL_FIFTEEN {
-                    load.fifteen / msg_count as f64
+                    load.fifteen / msg_count
                 } else {
-                    MAX_CPU_LOAD / INITIAL_MSGS_PER_S as f64
+                    DEFAULT_LOAD_PER_MSG
                 };
 
-                let max_msgs_to_handle = MAX_CPU_LOAD / load_per_msg;
+                let max_msgs_to_handle =
+                    MAX_CPU_LOAD / f64::max(DEFAULT_LOAD_PER_MSG, load_per_msg);
                 if let Some(counter) = self.msgs_per_s.get(&period) {
-                    counter.store(
-                        usize::max(INITIAL_MSGS_PER_S, max_msgs_to_handle as usize),
-                        ORDER,
-                    )
+                    *counter.write().await = max_msgs_to_handle;
                 }
             }
         }

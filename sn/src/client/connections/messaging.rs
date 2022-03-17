@@ -578,15 +578,10 @@ pub(super) async fn send_msg(
         let peer_name = peer.name();
 
         let task_handle: JoinHandle<(XorName, Result<()>)> = tokio::spawn(async move {
-            let link = session.peer_links.get_or_create(&peer.id()).await;
+            let link = session.peer_links.get_or_create(&peer).await;
 
             let listen = |conn, incoming_msgs| {
-                Session::spawn_msg_listener_thread(
-                    session.clone(),
-                    peer.clone(),
-                    conn,
-                    incoming_msgs,
-                );
+                Session::spawn_msg_listener_thread(session.clone(), peer, conn, incoming_msgs);
             };
 
             let mut retries = 0;

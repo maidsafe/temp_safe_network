@@ -6,13 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Peer;
+use super::MsgListener;
 
-use crate::types::log_markers::LogMarker;
+use crate::types::{log_markers::LogMarker, Peer};
 
 use bytes::Bytes;
 use priority_queue::DoublePriorityQueue;
-use qp2p::{ConnectionIncoming as IncomingMsgs, Endpoint, RetryConfig};
+use qp2p::{Endpoint, RetryConfig};
 use std::{
     collections::BTreeMap,
     sync::{
@@ -22,7 +22,6 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::{Mutex, RwLock};
-use xor_name::XorName;
 
 type Priority = u64;
 type ConnId = usize;
@@ -46,7 +45,7 @@ const UNUSED_TTL: Duration = Duration::from_secs(120);
 /// comms initiation between the peers, and so on.
 /// Unused connections will expire, so the Link is cheap to keep around.
 /// The Link is kept around as long as the peer is deemed worth to keep contact with.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct Link {
     peer: Peer,
     endpoint: Endpoint,
@@ -54,10 +53,11 @@ pub(crate) struct Link {
     connections: Arc<RwLock<BTreeMap<ConnId, ExpiringConn>>>,
     queue: Arc<RwLock<DoublePriorityQueue<ConnId, Priority>>>,
     access_counter: Arc<AtomicU64>,
+    listener: MsgListener,
 }
 
 impl Link {
-    pub(crate) fn new(peer: Peer, endpoint: Endpoint) -> Self {
+    pub(crate) fn new(peer: Peer, endpoint: Endpoint, listener: MsgListener) -> Self {
         Self {
             peer,
             endpoint,
@@ -65,18 +65,19 @@ impl Link {
             connections: Arc::new(RwLock::new(BTreeMap::new())),
             queue: Arc::new(RwLock::new(DoublePriorityQueue::new())),
             access_counter: Arc::new(AtomicU64::new(0)),
+            listener,
         }
     }
 
-    pub(crate) async fn new_with(id: Peer, endpoint: Endpoint, conn: qp2p::Connection) -> Self {
-        let instance = Self::new(id, endpoint);
+    pub(crate) async fn new_with(
+        peer: Peer,
+        endpoint: Endpoint,
+        listener: MsgListener,
+        conn: qp2p::Connection,
+    ) -> Self {
+        let instance = Self::new(peer, endpoint, listener);
         instance.insert(conn).await;
         instance
-    }
-
-    #[allow(unused)]
-    pub(crate) fn name(&self) -> XorName {
-        self.peer.name()
     }
 
     pub(crate) async fn add(&self, conn: qp2p::Connection) {
@@ -107,33 +108,29 @@ impl Link {
     /// belongs to. See [`send_with`](Self::send_with) if you want to send a message with specific
     /// configuration.
     #[allow(unused)]
-    pub(crate) async fn send<F: Fn(qp2p::Connection, IncomingMsgs)>(
-        &self,
-        msg: Bytes,
-        listen: F,
-    ) -> Result<(), SendToOneError> {
-        self.send_with(msg, 0, None, listen).await
+    pub(crate) async fn send(&self, msg: Bytes) -> Result<(), SendToOneError> {
+        self.send_with(msg, 0, None).await
     }
 
     /// Send a message to the peer using the given configuration.
     ///
     /// See [`send`](Self::send) if you want to send with the default configuration.
-    pub(crate) async fn send_with<F: Fn(qp2p::Connection, IncomingMsgs)>(
+    pub(crate) async fn send_with(
         &self,
         msg: Bytes,
         priority: i32,
         retry_config: Option<&RetryConfig>,
-        listen: F,
     ) -> Result<(), SendToOneError> {
-        let conn = self.get_or_connect(listen).await?;
+        let conn = self.get_or_connect().await?;
         let queue_len = { self.queue.read().await.len() };
         trace!(
-            "We have {} open connections to peer {}.",
+            "We have {} open connections to node {:?}.",
             queue_len,
             self.peer
         );
         match conn.send_with(msg, priority, retry_config).await {
             Ok(()) => {
+                self.listener.count_msg();
                 self.remove_expired().await;
                 Ok(())
             }
@@ -153,13 +150,9 @@ impl Link {
         }
     }
 
-    async fn get_or_connect<F: Fn(qp2p::Connection, IncomingMsgs)>(
-        &self,
-        listen: F,
-    ) -> Result<qp2p::Connection, SendToOneError> {
+    async fn get_or_connect(&self) -> Result<qp2p::Connection, SendToOneError> {
         // get the most recently used connection
         let res = { self.queue.read().await.peek_max().map(|(id, _prio)| *id) };
-
         match res {
             None => {
                 // if none found, funnel one caller through at a time
@@ -170,12 +163,12 @@ impl Link {
                 // thus will find a connection here:
                 let res = { self.queue.read().await.peek_max().map(|(id, _prio)| *id) };
                 if let Some(id) = res {
-                    self.read_conn(id, listen).await
+                    self.read_conn(id).await
                 } else {
-                    self.create_connection(listen).await
+                    self.create_connection().await
                 }
             }
-            Some(id) => self.read_conn(id, listen).await,
+            Some(id) => self.read_conn(id).await,
         }
     }
 
@@ -193,25 +186,18 @@ impl Link {
         }
     }
 
-    async fn read_conn<F: Fn(qp2p::Connection, IncomingMsgs)>(
-        &self,
-        id: usize,
-        listen: F,
-    ) -> Result<qp2p::Connection, SendToOneError> {
+    async fn read_conn(&self, id: usize) -> Result<qp2p::Connection, SendToOneError> {
         let res = { self.connections.read().await.get(&id).cloned() };
         match res {
             Some(item) => {
                 self.touch(item.conn.id()).await;
                 Ok(item.conn)
             }
-            None => self.create_connection(listen).await,
+            None => self.create_connection().await,
         }
     }
 
-    async fn create_connection<F: Fn(qp2p::Connection, IncomingMsgs)>(
-        &self,
-        listen: F,
-    ) -> Result<qp2p::Connection, SendToOneError> {
+    async fn create_connection(&self) -> Result<qp2p::Connection, SendToOneError> {
         let (conn, incoming_msgs) = self
             .endpoint
             .connect_to(&self.peer.addr())
@@ -227,7 +213,7 @@ impl Link {
 
         self.insert(conn.clone()).await;
 
-        listen(conn.clone(), incoming_msgs);
+        self.listener.listen(conn.clone(), incoming_msgs);
 
         Ok(conn)
     }
@@ -340,7 +326,6 @@ pub(crate) enum SendToOneError {
 
 impl SendToOneError {
     ///
-    #[allow(unused)]
     pub(crate) fn is_local_close(&self) -> bool {
         matches!(
             self,

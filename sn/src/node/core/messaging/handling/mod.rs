@@ -59,7 +59,7 @@ impl Node {
         let mut cmds = vec![];
 
         // Apply backpressure if needed.
-        if let Some(load_report) = self.comm.check_strain(&sender.addr()).await {
+        if let Some(load_report) = self.comm.tolerated_msgs_per_s(&sender).await {
             let msg_src = wire_msg.msg_kind().src();
             if !msg_src.is_end_user() {
                 cmds.push(Cmd::SignOutgoingSystemMsg {
@@ -417,10 +417,15 @@ impl Node {
                 trace!("Received Probe message from {}: {:?}", sender, msg_id);
                 Ok(vec![])
             }
-            SystemMsg::BackPressure(load_report) => {
-                trace!("Handling msg: BackPressure from {}: {:?}", sender, msg_id);
+            SystemMsg::BackPressure(msgs_per_s) => {
+                trace!(
+                    "Handling msg: BackPressure with requested {} msgs/s, from {}: {:?}",
+                    msgs_per_s,
+                    sender,
+                    msg_id
+                );
                 // TODO: Factor in med/long term backpressure into general node liveness calculations
-                self.comm.regulate(sender.addr(), load_report).await;
+                self.comm.regulate(&sender, msgs_per_s).await;
                 Ok(vec![])
             }
             // The AcceptedOnlineShare for relocation will be received here.

@@ -49,7 +49,7 @@ impl Node {
                 .get_elder(&name)
                 .filter(|elder| elder.addr() == addr)
             {
-                elder.clone()
+                *elder
             } else if let Some(peer) = self.network_knowledge().find_member_by_addr(&addr).await {
                 peer
             } else {
