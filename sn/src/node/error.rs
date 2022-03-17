@@ -9,7 +9,7 @@
 use super::Prefix;
 
 use crate::messaging::data::Error as ErrorMsg;
-use crate::types::{convert_dt_error_to_error_msg, DataAddress, PublicKey};
+use crate::types::{convert_dt_error_to_error_msg, DataAddress, Peer, PublicKey};
 
 use secured_linked_list::error::Error as SecuredLinkedListError;
 use std::io;
@@ -60,10 +60,10 @@ pub enum Error {
     InvalidSignatureShare,
     #[error("The secret key share is missing for public key {0:?}")]
     MissingSecretKeyShare(bls::PublicKey),
-    #[error("Failed to send a message to {0}, {1}")]
-    FailedSend(SocketAddr, XorName),
-    #[error("Connection closed locally")]
-    ConnectionClosed,
+    #[error("Failed to send a message to {0}")]
+    FailedSend(Peer),
+    #[error("Link to peer has been dropped {0}")]
+    PeerLinkDropped(Peer),
     #[error("Invalid section chain: {0}")]
     InvalidSectionChain(#[from] SecuredLinkedListError),
     #[error("Messaging protocol error: {0}")]

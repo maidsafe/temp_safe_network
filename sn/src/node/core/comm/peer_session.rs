@@ -84,26 +84,29 @@ impl PeerSession {
         self.link.add(conn).await
     }
 
-    pub(crate) async fn send_among_others(
+    pub(crate) async fn send(
         &self,
         msg_id: MsgId,
         msg_priority: i32,
         msg_bytes: Bytes,
-    ) -> Result<()> {
+    ) -> Result<SendWatcher> {
         if self.disconnected().await {
-            // should not happen (be reachable) if we only access PeerSession from SessionMap
+            // should not happen (be reachable) if we only access PeerSession from Comm
             return Err(Error::InvalidState);
         }
+
+        let (watcher, reporter) = status_watching();
 
         let job = SendJob {
             msg_id,
             msg_bytes,
             retries: 0,
+            reporter,
         };
 
         let _ = self.msg_queue.write().await.push(job, msg_priority);
 
-        Ok(())
+        Ok(watcher)
     }
 
     pub(crate) async fn update_send_rate(&self, peer_desired_rate: f64) {
@@ -148,14 +151,25 @@ impl PeerSession {
                     // break this loop, report error to other nodes
                     // await decision on how to continue
 
-                    // or send event on a channel (to report error to other nodes), then sleep for a very long time, then try again
-                    break;
-                }
+                    // (or send event on a channel (to report error to other nodes), then sleep for a very long time, then try again?)
 
-                if let Err(_err) = self.link.send(job.msg_bytes.clone()).await {
+                    job.reporter
+                        .send(SendStatus::MaxRetriesReached(job.retries));
+
+                    break; // this means we will stop all sending to this peer!
+                }
+                if let Err(err) = self.link.send(job.msg_bytes.clone()).await {
                     job.retries += 1;
-                    let _ = self.msg_queue.write().await.push(job, prio);
+                    if err.is_local_close() {
+                        job.reporter.send(SendStatus::PeerLinkDropped);
+                        break; // this means we will stop all sending to this peer!
+                    } else {
+                        job.reporter
+                            .send(SendStatus::TransientError(format!("{:?}", err)));
+                        let _ = self.msg_queue.write().await.push(job, prio);
+                    }
                 } else {
+                    job.reporter.send(SendStatus::Sent);
                     self.sent.increment(); // on success
                 }
 
@@ -193,9 +207,76 @@ impl MsgThroughput {
     }
 }
 
-#[derive(Hash, Eq, PartialEq, Debug)]
+#[derive(Debug)]
 pub(crate) struct SendJob {
     msg_id: MsgId,
     msg_bytes: Bytes,
     retries: usize,
+    reporter: StatusReporting,
+}
+
+impl PartialEq for SendJob {
+    fn eq(&self, other: &Self) -> bool {
+        self.msg_id == other.msg_id
+            && self.msg_bytes == other.msg_bytes
+            && self.retries == other.retries
+    }
+}
+
+impl Eq for SendJob {}
+
+impl std::hash::Hash for SendJob {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.msg_id.hash(state);
+        self.msg_bytes.hash(state);
+        self.retries.hash(state);
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum SendStatus {
+    Enqueued,
+    Sent,
+    PeerLinkDropped,
+    TransientError(String),
+    MaxRetriesReached(usize),
+    WatcherDropped,
+}
+
+pub(crate) struct SendWatcher {
+    receiver: tokio::sync::watch::Receiver<SendStatus>,
+}
+
+impl SendWatcher {
+    /// Reads current status
+    #[allow(unused)]
+    pub(crate) fn status(&self) -> SendStatus {
+        self.receiver.borrow().clone()
+    }
+
+    /// Waits until a new status arrives.
+    pub(crate) async fn await_change(&mut self) -> SendStatus {
+        if self.receiver.changed().await.is_ok() {
+            self.receiver.borrow_and_update().clone()
+        } else {
+            SendStatus::WatcherDropped
+        }
+    }
+}
+
+#[derive(Debug)]
+struct StatusReporting {
+    sender: tokio::sync::watch::Sender<SendStatus>,
+}
+
+impl StatusReporting {
+    fn send(&self, status: SendStatus) {
+        // todo: ok to drop error here?
+        let _ = self.sender.send(status);
+    }
+}
+
+fn status_watching() -> (SendWatcher, StatusReporting) {
+    let (sender, receiver) = tokio::sync::watch::channel(SendStatus::Enqueued);
+    (SendWatcher { receiver }, StatusReporting { sender })
 }

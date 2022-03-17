@@ -16,7 +16,7 @@ use crate::messaging::{
     DstLocation, MsgKind, MsgType, NodeAuth, WireMsg,
 };
 use crate::node::{
-    core::{Comm, MsgEvent, SendStatus},
+    core::{Comm, DeliveryStatus, MsgEvent},
     dkg::SectionAuthUtils,
     ed25519,
     messages::WireMsgUtils,
@@ -603,8 +603,9 @@ async fn send_messages(
             .send(&recipients, recipients.len(), wire_msg.clone())
             .await
         {
-            Ok(SendStatus::AllRecipients) | Ok(SendStatus::MinDeliveryGroupSizeReached(_)) => {}
-            Ok(SendStatus::MinDeliveryGroupSizeFailed(recipients)) => {
+            Ok(DeliveryStatus::AllRecipients)
+            | Ok(DeliveryStatus::MinDeliveryGroupSizeReached(_)) => {}
+            Ok(DeliveryStatus::MinDeliveryGroupSizeFailed(recipients)) => {
                 error!("Failed to send message {:?} to {:?}", wire_msg, recipients)
             }
             Err(err) => {

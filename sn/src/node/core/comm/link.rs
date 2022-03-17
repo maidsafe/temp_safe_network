@@ -326,6 +326,7 @@ pub(crate) enum SendToOneError {
 
 impl SendToOneError {
     ///
+    #[allow(unused)]
     pub(crate) fn is_local_close(&self) -> bool {
         matches!(
             self,
