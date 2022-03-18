@@ -115,7 +115,7 @@ impl DataStorage {
     #[allow(dead_code)]
     pub(crate) async fn remove(&self, address: &DataAddress) -> Result<()> {
         match address {
-            DataAddress::Chunk(addr) => self.chunks.remove_chunk(addr),
+            DataAddress::Chunk(addr) => self.chunks.remove_chunk(addr).await,
             DataAddress::Register(addr) => self.registers.remove_register(addr).await,
         }
     }
@@ -291,7 +291,7 @@ mod tests {
             .get_from_local_store(&replicated_data.address())
             .await
         {
-            Err(Error::ChunkNotFound(address)) => assert_eq!(address, replicated_data.name()),
+            Err(Error::ChunkNotFound(name)) => assert_eq!(name, replicated_data.name()),
             _ => panic!("Unexpected data found"),
         }
 

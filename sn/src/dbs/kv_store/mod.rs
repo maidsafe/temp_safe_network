@@ -187,7 +187,7 @@ impl<V: Value + Send + Sync> KvStore<V> {
 
     /// Returns a value previously stored under `key`.
     ///
-    /// If the value can't be accessed, it returns `Error::NoSuchData`.
+    /// If the value can't be accessed, it returns `Error::KeyNotFound`.
     pub(crate) fn get(&self, key: &V::Key) -> Result<V> {
         let db_key = key.to_db_key()?;
         let res = self

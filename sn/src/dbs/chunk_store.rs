@@ -7,13 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::kv_store::KvStore;
-use super::Result;
+use super::{Error, Result};
 
 use crate::types::{Chunk, ChunkAddress};
 use crate::UsedSpace;
 
 use self_encryption::MAX_CHUNK_SIZE;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -24,6 +24,7 @@ pub(crate) struct ChunkStore {
     db: KvStore<Chunk>,
     mem_pool: Arc<RwLock<BTreeMap<ChunkAddress, Chunk>>>,
     old_mem_pool: Arc<RwLock<Vec<Chunk>>>,
+    deleted: Arc<RwLock<BTreeSet<ChunkAddress>>>,
     used_space: UsedSpace,
 }
 
@@ -38,6 +39,7 @@ impl ChunkStore {
             db: KvStore::new(root, used_space.clone())?,
             mem_pool: Arc::new(RwLock::new(BTreeMap::new())),
             old_mem_pool: Arc::new(RwLock::new(vec![])),
+            deleted: Arc::new(RwLock::new(BTreeSet::new())),
             used_space,
         })
     }
@@ -57,6 +59,10 @@ impl ChunkStore {
         let chunk_size = chunk.value().len();
 
         let store_batch = {
+            if self.deleted_from_mem(&addr).await {
+                let mut deleted_set = self.deleted.write().await;
+                let _ = deleted_set.remove(&addr);
+            }
             let mut pool = self.mem_pool.write().await;
             let _ = pool.insert(addr, chunk);
             let pool_len = pool.len();
@@ -64,11 +70,14 @@ impl ChunkStore {
 
             // TODO: randomize the flush
             if pool_len > 1000 || pool_size > 100 * MAX_CHUNK_SIZE {
-                self.old_mem_pool
-                    .write()
-                    .await
-                    .extend(pool.values().cloned());
+                let mut deleted_set = self.deleted.write().await;
+                self.old_mem_pool.write().await.extend(
+                    pool.values()
+                        .cloned()
+                        .filter(|c| !deleted_set.contains(c.address())),
+                );
                 pool.clear();
+                deleted_set.clear();
                 true
             } else {
                 false
@@ -89,15 +98,31 @@ impl ChunkStore {
         Ok(addr)
     }
 
+    async fn deleted_from_mem(&self, addr: &ChunkAddress) -> bool {
+        let deleted = self.deleted.read().await;
+        deleted.contains(addr)
+    }
+
     #[allow(dead_code)]
-    pub(crate) fn delete_chunk(&self, addr: &ChunkAddress) -> Result<()> {
+    pub(crate) async fn delete_chunk(&self, addr: &ChunkAddress) -> Result<()> {
         if let Some(size) = self.db.delete(addr)? {
             self.used_space.decrease(size);
+        } else {
+            let mut deleted_set = self.deleted.write().await;
+            if deleted_set.insert(*addr) {
+                let pool = self.mem_pool.read().await;
+                if let Some(chunk) = pool.get(addr) {
+                    self.used_space.decrease(chunk.payload_size());
+                } // else, hmm...
+            }
         }
         Ok(())
     }
 
     pub(crate) async fn read_chunk(&self, addr: &ChunkAddress) -> Result<Chunk> {
+        if self.deleted_from_mem(addr).await {
+            return Err(Error::ChunkNotFound(*addr.name()));
+        }
         let pool = self.mem_pool.read().await;
         match pool.get(addr) {
             Some(chunk) => Ok(chunk.clone()),

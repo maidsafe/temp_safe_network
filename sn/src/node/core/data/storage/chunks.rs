@@ -36,9 +36,9 @@ impl ChunkStorage {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
+    pub(crate) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
         trace!("Removing chunk, {:?}", address);
-        self.db.delete_chunk(address)
+        self.db.delete_chunk(address).await
     }
 
     pub(crate) async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
@@ -46,6 +46,7 @@ impl ChunkStorage {
 
         match self.db.read_chunk(address).await {
             Ok(res) => Ok(res),
+            Err(Error::KeyNotFound(_key)) => Err(Error::ChunkNotFound(*address.name())),
             Err(error) => match error {
                 Error::Io(io_error) if io_error.kind() == ErrorKind::NotFound => {
                     Err(Error::ChunkNotFound(*address.name()))
