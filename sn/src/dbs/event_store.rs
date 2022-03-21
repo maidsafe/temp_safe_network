@@ -73,10 +73,11 @@ mod test {
     use crate::types::Token;
     use std::path::Path;
     use tempfile::tempdir;
+    use xor_name::XorName;
 
     #[tokio::test]
     async fn history() -> Result<()> {
-        let id = xor_name::XorName::random();
+        let id: XorName = xor_name::rand::random();
         let tmp_dir = tempdir()?;
         let db_dir = tmp_dir.path().join(Path::new(&"Token"));
         let db = sled::open(db_dir).map_err(|error| {

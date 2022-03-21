@@ -178,7 +178,7 @@ impl Client {
             pk: PublicKey,
         ) -> Result<(XorName, ServiceAuth, Bytes), Error> {
             // Generate a random query to send a dummy message
-            let random_dst_addr = XorName::random();
+            let random_dst_addr = xor_name::rand::random();
             let serialised_cmd = {
                 let msg = ServiceMsg::Query(DataQuery::Register(RegisterQuery::Get(
                     RegisterAddress::Public {
@@ -201,7 +201,7 @@ impl Client {
 
         // either use our known prefixmap elders, or fallback to plain node config file
         let bootstrap_nodes = {
-            if let Some(sap) = prefix_map.closest_or_opposite(&XorName::random(), None) {
+            if let Some(sap) = prefix_map.closest_or_opposite(&xor_name::rand::random(), None) {
                 sap.elders_vec()
             } else {
                 // these peers will be nonsense peers, and dropped after we connect. Replaced by whatever SectionAuthorityProvider peers we have received
@@ -209,7 +209,7 @@ impl Client {
                 bootstrap_nodes
                     .iter()
                     .copied()
-                    .map(|socket| Peer::new(XorName::random(), socket))
+                    .map(|socket| Peer::new(xor_name::rand::random(), socket))
                     .collect_vec()
             }
         };

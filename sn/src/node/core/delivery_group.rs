@@ -242,7 +242,7 @@ mod tests {
         let dst_name = network_knowledge
             .prefix()
             .await
-            .substituted_in(rand::random());
+            .substituted_in(xor_name::rand::random());
         let section_pk = network_knowledge.authority_provider().await.section_key();
         let dst = DstLocation::Section {
             name: dst_name,
@@ -298,7 +298,9 @@ mod tests {
             .get(&Prefix::default().pushed(true))
             .context("unknown section")?;
 
-        let dst_name = section_auth1.prefix().substituted_in(rand::random());
+        let dst_name = section_auth1
+            .prefix()
+            .substituted_in(xor_name::rand::random());
         let section_pk = network_knowledge.authority_provider().await.section_key();
         let dst = DstLocation::Node {
             name: dst_name,
@@ -329,7 +331,7 @@ mod tests {
         let dst_name = elders_info1
             .prefix()
             .pushed(false)
-            .substituted_in(rand::random());
+            .substituted_in(xor_name::rand::random());
         let section_pk = network_knowledge.authority_provider().await.section_key();
         let dst = DstLocation::Node {
             name: dst_name,
@@ -358,7 +360,9 @@ mod tests {
             .get(&Prefix::default().pushed(true))
             .context("unknown section")?;
 
-        let dst_name = section_auth1.prefix().substituted_in(rand::random());
+        let dst_name = section_auth1
+            .prefix()
+            .substituted_in(xor_name::rand::random());
         let section_pk = network_knowledge.authority_provider().await.section_key();
         let dst = DstLocation::Section {
             name: dst_name,
@@ -389,7 +393,7 @@ mod tests {
         let dst_name = elders_info1
             .prefix()
             .pushed(false)
-            .substituted_in(rand::random());
+            .substituted_in(xor_name::rand::random());
         let section_pk = network_knowledge.authority_provider().await.section_key();
         let dst = DstLocation::Section {
             name: dst_name,
@@ -443,7 +447,7 @@ mod tests {
         let dst_name = network_knowledge
             .prefix()
             .await
-            .substituted_in(rand::random());
+            .substituted_in(xor_name::rand::random());
         let section_pk = network_knowledge.authority_provider().await.section_key();
         let dst = DstLocation::Node {
             name: dst_name,
@@ -471,7 +475,7 @@ mod tests {
         let dst_name = network_knowledge
             .prefix()
             .await
-            .substituted_in(rand::random());
+            .substituted_in(xor_name::rand::random());
         let section_pk = network_knowledge.authority_provider().await.section_key();
         let dst = DstLocation::Section {
             name: dst_name,
@@ -498,7 +502,7 @@ mod tests {
 
         let dst_name = Prefix::default()
             .pushed(true)
-            .substituted_in(rand::random());
+            .substituted_in(xor_name::rand::random());
         let section_pk = network_knowledge.authority_provider().await.section_key();
         let dst = DstLocation::Node {
             name: dst_name,
@@ -525,7 +529,7 @@ mod tests {
 
         let dst_name = Prefix::default()
             .pushed(true)
-            .substituted_in(rand::random());
+            .substituted_in(xor_name::rand::random());
         let section_pk = network_knowledge.authority_provider().await.section_key();
         let dst = DstLocation::Section {
             name: dst_name,
@@ -614,7 +618,7 @@ mod tests {
         let our_name = network_knowledge
             .prefix()
             .await
-            .substituted_in(rand::random());
+            .substituted_in(xor_name::rand::random());
 
         Ok((our_name, network_knowledge))
     }

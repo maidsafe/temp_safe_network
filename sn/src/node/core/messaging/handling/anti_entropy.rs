@@ -467,21 +467,19 @@ mod tests {
             test_utils::{gen_addr, gen_section_authority_provider},
             SectionKeyShare, SectionKeysProvider,
         },
-        NodeInfo, XorName, MIN_ADULT_AGE,
+        NodeInfo, MIN_ADULT_AGE,
     };
     use crate::UsedSpace;
 
     use assert_matches::assert_matches;
     use bls::SecretKey;
     use eyre::{Context, Result};
-    use rand::Rng;
     use secured_linked_list::SecuredLinkedList;
     use tokio::sync::mpsc;
     use xor_name::Prefix;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ae_everything_up_to_date() -> Result<()> {
-        let mut rng = rand::thread_rng();
         let env = Env::new().await?;
         let our_prefix = env.node.network_knowledge().prefix().await;
         let (msg, src_location) = env.create_msg(
@@ -489,7 +487,7 @@ mod tests {
             env.node.network_knowledge().section_key().await,
         )?;
         let sender = env.node.info.read().await.peer();
-        let dst_name = our_prefix.substituted_in(rng.gen());
+        let dst_name = our_prefix.substituted_in(xor_name::rand::random());
         let dst_section_key = env.node.network_knowledge().section_key().await;
 
         let cmd = env
@@ -588,7 +586,6 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ae_outdated_dst_key_of_our_section() -> Result<()> {
-        let mut rng = rand::thread_rng();
         let env = Env::new().await?;
         let our_prefix = env.node.network_knowledge().prefix().await;
 
@@ -597,7 +594,7 @@ mod tests {
             env.node.network_knowledge().section_key().await,
         )?;
         let sender = env.node.info.read().await.peer();
-        let dst_name = our_prefix.substituted_in(rng.gen());
+        let dst_name = our_prefix.substituted_in(xor_name::rand::random());
         let dst_section_key = env.node.network_knowledge().genesis_key();
 
         let cmd = env
@@ -629,7 +626,6 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ae_wrong_dst_key_of_our_section_returns_retry() -> Result<()> {
-        let mut rng = rand::thread_rng();
         let env = Env::new().await?;
         let our_prefix = env.node.network_knowledge().prefix().await;
 
@@ -638,7 +634,7 @@ mod tests {
             env.node.network_knowledge().section_key().await,
         )?;
         let sender = env.node.info.read().await.peer();
-        let dst_name = our_prefix.substituted_in(rng.gen());
+        let dst_name = our_prefix.substituted_in(xor_name::rand::random());
 
         let bogus_env = Env::new().await?;
         let dst_section_key = bogus_env.node.network_knowledge().genesis_key();
@@ -755,10 +751,10 @@ mod tests {
             let sender_name = sender.name();
             let src_node_keypair = sender.keypair;
 
-            let payload_msg = SystemMsg::StartConnectivityTest(XorName::random());
+            let payload_msg = SystemMsg::StartConnectivityTest(xor_name::rand::random());
             let payload = WireMsg::serialize_msg_payload(&payload_msg)?;
 
-            let dst_name = XorName::random();
+            let dst_name = xor_name::rand::random();
             let dst_section_key = SecretKey::random().public_key();
             let dst_location = DstLocation::Node {
                 name: dst_name,

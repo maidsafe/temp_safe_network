@@ -23,8 +23,7 @@ pub struct MsgId(#[debug(with = "Self::fmt_bytes")] [u8; MESSAGE_ID_LEN]);
 impl MsgId {
     /// Generates a new `MsgId` with random content.
     pub fn new() -> Self {
-        // Here we use XorName just as helper to generate a random id
-        Self(XorName::random().0)
+        Self(rand::random())
     }
 
     /// Convert an XorName into a MsgId

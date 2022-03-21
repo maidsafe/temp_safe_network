@@ -44,7 +44,7 @@ impl Safe {
             self.dry_run_mode
         );
 
-        let xorname = name.unwrap_or_else(rand::random);
+        let xorname = name.unwrap_or_else(xor_name::rand::random);
         info!("Xorname for new Register storage: {:?}", &xorname);
 
         let scope = if private {

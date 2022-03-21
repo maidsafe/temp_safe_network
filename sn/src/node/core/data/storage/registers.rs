@@ -726,7 +726,7 @@ mod test {
     use rand::rngs::OsRng;
     use rand::Rng;
     use tempfile::tempdir;
-    use xor_name::{Prefix, XorName};
+    use xor_name::Prefix;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_register_write() -> Result<()> {
@@ -986,7 +986,7 @@ mod test {
 
     fn create_reg_w_policy(policy: Policy, keypair: Keypair) -> Result<RegisterCmd> {
         let op = CreateRegister::Empty {
-            name: XorName::random(),
+            name: xor_name::rand::random(),
             tag: 1,
             size: u16::MAX,
             policy,

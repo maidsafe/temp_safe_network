@@ -786,7 +786,7 @@ mod tests {
 
             // Send JoinResponse::Redirect
             let new_bootstrap_addrs: BTreeMap<_, _> = (0..elder_count())
-                .map(|_| (XorName::random(), gen_addr()))
+                .map(|_| (xor_name::rand::random(), gen_addr()))
                 .collect();
 
             let (new_section_auth, _, new_sk_set) =
@@ -897,7 +897,7 @@ mod tests {
             task::yield_now().await;
 
             let addrs = (0..elder_count())
-                .map(|_| (XorName::random(), gen_addr()))
+                .map(|_| (xor_name::rand::random(), gen_addr()))
                 .collect();
 
             send_response(
@@ -1028,7 +1028,12 @@ mod tests {
         );
 
         let elders = (0..elder_count())
-            .map(|_| Peer::new(good_prefix.substituted_in(rand::random()), gen_addr()))
+            .map(|_| {
+                Peer::new(
+                    good_prefix.substituted_in(xor_name::rand::random()),
+                    gen_addr(),
+                )
+            })
             .collect();
         let join_task = state.join(section_key, section_key, elders);
 

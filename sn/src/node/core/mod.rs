@@ -183,11 +183,11 @@ impl Node {
 
     pub(crate) async fn generate_probe_msg(&self) -> Result<Cmd> {
         // Generate a random address not belonging to our Prefix
-        let mut dst = XorName::random();
+        let mut dst = xor_name::rand::random();
 
         // We don't probe ourselves
         while self.network_knowledge.prefix().await.matches(&dst) {
-            dst = XorName::random();
+            dst = xor_name::rand::random();
         }
 
         let matching_section = self.network_knowledge.section_by_name(&dst)?;

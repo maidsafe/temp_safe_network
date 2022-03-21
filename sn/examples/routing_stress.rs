@@ -426,7 +426,7 @@ impl Network {
         for (node, prefix) in nodes {
             let dst = *cache
                 .entry(prefix)
-                .or_insert_with(|| prefix.substituted_in(rand::random()));
+                .or_insert_with(|| prefix.substituted_in(xor_name::rand::random()));
 
             let nodes_section = node
                 .matching_section(&node.name().await)

@@ -34,7 +34,7 @@ pub(super) fn name(public_key: &PublicKey) -> XorName {
 /// Construct a random `XorName` whose last byte represents the targeted age.
 pub(super) fn gen_name_with_age(age: u8) -> XorName {
     loop {
-        let name = XorName::random();
+        let name: XorName = xor_name::rand::random();
         if age == name[XOR_NAME_LEN - 1] {
             return name;
         }

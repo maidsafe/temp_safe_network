@@ -151,11 +151,10 @@ impl ChunkAddress {
 #[cfg(test)]
 mod tests {
     use crate::types::{BytesAddress, DataAddress, Result};
-    use xor_name::XorName;
 
     #[test]
     fn zbase32_encode_decode_chunk_address() -> Result<()> {
-        let name = XorName::random();
+        let name = xor_name::rand::random();
         let address = DataAddress::Bytes(BytesAddress::Public(name));
         let encoded = address.encode_to_zbase32()?;
         let decoded = DataAddress::decode_from_zbase32(&encoded)?;
