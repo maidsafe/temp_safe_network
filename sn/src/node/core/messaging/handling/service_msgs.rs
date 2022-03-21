@@ -140,6 +140,7 @@ impl Node {
         // Clear expired queries from the cache.
         self.pending_data_queries.remove_expired().await;
 
+        // First check for waiting peers. If no one is waiting, we drop the response
         let waiting_peers = if let Some(peers) = querys_peers {
             peers
         } else {
@@ -192,10 +193,7 @@ impl Node {
             let dst = DstLocation::EndUser(EndUser(origin.name()));
             let wire_msg = WireMsg::new_msg(msg_id, payload.clone(), msg_kind.clone(), dst)?;
 
-            debug!(
-                "Responding with the first chunk query response to {:?}",
-                dst
-            );
+            debug!("Responding with the first query response to {:?}", dst);
 
             let command = Cmd::SendMsg {
                 recipients: vec![origin],
