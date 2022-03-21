@@ -516,7 +516,6 @@ mod tests {
     use rand::rngs::OsRng;
     use std::{net::Ipv4Addr, time::Duration};
     use tokio::{net::UdpSocket, sync::mpsc, time};
-    use xor_name::XorName;
 
     const TIMEOUT: Duration = Duration::from_secs(1);
 
@@ -668,7 +667,7 @@ mod tests {
         let (recv_endpoint, mut incoming_connections, _) =
             Endpoint::new_peer(local_addr(), &[], Config::default()).await?;
         let recv_addr = recv_endpoint.public_addr();
-        let name = XorName::random();
+        let name = xor_name::rand::random();
 
         let msg0 = new_test_msg()?;
         let status = send_comm
@@ -722,7 +721,11 @@ mod tests {
 
         // Send a message to establish the connection
         let status = comm1
-            .send(&[Peer::new(XorName::random(), addr0)], 1, new_test_msg()?)
+            .send(
+                &[Peer::new(xor_name::rand::random(), addr0)],
+                1,
+                new_test_msg()?,
+            )
             .await?;
         assert_matches!(status, SendStatus::AllRecipients);
 
@@ -737,7 +740,7 @@ mod tests {
 
     fn new_test_msg() -> Result<WireMsg> {
         let dst_location = DstLocation::Node {
-            name: XorName::random(),
+            name: xor_name::rand::random(),
             section_pk: bls::SecretKey::random().public_key(),
         };
 
@@ -745,7 +748,7 @@ mod tests {
         let src_keypair = Keypair::new_ed25519(&mut rng);
 
         let payload = WireMsg::serialize_msg_payload(&ServiceMsg::Query(DataQuery::GetChunk(
-            ChunkAddress(XorName::random()),
+            ChunkAddress(xor_name::rand::random()),
         )))?;
         let auth = ServiceAuth {
             public_key: src_keypair.public_key(),
@@ -777,7 +780,7 @@ mod tests {
             }
         });
 
-        Ok((Peer::new(XorName::random(), addr), rx))
+        Ok((Peer::new(xor_name::rand::random(), addr), rx))
     }
 
     async fn get_invalid_peer() -> Result<Peer> {
@@ -792,7 +795,7 @@ mod tests {
             let _ = socket;
         });
 
-        Ok(Peer::new(XorName::random(), addr))
+        Ok(Peer::new(xor_name::rand::random(), addr))
     }
 
     fn local_addr() -> SocketAddr {

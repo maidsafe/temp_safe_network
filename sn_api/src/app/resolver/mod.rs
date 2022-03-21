@@ -607,7 +607,7 @@ mod tests {
     #[tokio::test]
     async fn test_fetch_unsupported_with_media_type() -> Result<()> {
         let safe = new_safe_instance().await?;
-        let xorname = rand::random();
+        let xorname = xor_name::rand::random();
         let type_tag = 575_756_443;
         let xorurl = SafeUrl::encode(
             DataAddress::register(xorname, Scope::Public, type_tag),

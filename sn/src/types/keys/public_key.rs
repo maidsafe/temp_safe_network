@@ -187,7 +187,7 @@ impl From<PublicKey> for XorName {
             PublicKey::Bls(pub_key) => pub_key.to_bytes(),
             PublicKey::BlsShare(pub_key) => pub_key.to_bytes(),
         };
-        let mut xor_name = XorName::random();
+        let mut xor_name: XorName = xor_name::rand::random();
         xor_name.0.clone_from_slice(&bytes[..XOR_NAME_LEN]);
         xor_name
     }

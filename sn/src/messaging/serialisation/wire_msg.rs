@@ -258,7 +258,6 @@ mod tests {
     use bls::SecretKey;
     use eyre::Result;
     use rand::rngs::OsRng;
-    use xor_name::XorName;
 
     #[test]
     fn serialisation_node_msg() -> Result<()> {
@@ -266,7 +265,7 @@ mod tests {
         let mut rng = OsRng;
         let src_node_keypair = ed25519_dalek::Keypair::generate(&mut rng);
 
-        let dst_name = XorName::random();
+        let dst_name = xor_name::rand::random();
         let dst_section_pk = SecretKey::random().public_key();
         let dst_location = DstLocation::Node {
             name: dst_name,
@@ -317,7 +316,7 @@ mod tests {
         let mut rng = OsRng;
         let src_client_keypair = Keypair::new_ed25519(&mut rng);
 
-        let dst_name = XorName::random();
+        let dst_name = xor_name::rand::random();
         let dst_section_pk = SecretKey::random().public_key();
         let dst_location = DstLocation::Node {
             name: dst_name,
@@ -326,7 +325,8 @@ mod tests {
 
         let msg_id = MsgId::new();
 
-        let client_msg = ServiceMsg::Query(DataQuery::GetChunk(ChunkAddress(XorName::random())));
+        let client_msg =
+            ServiceMsg::Query(DataQuery::GetChunk(ChunkAddress(xor_name::rand::random())));
 
         let payload = WireMsg::serialize_msg_payload(&client_msg)?;
         let auth = ServiceAuth {

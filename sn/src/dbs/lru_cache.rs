@@ -101,15 +101,14 @@ mod test {
     use super::LruCache;
 
     use std::sync::Arc;
-    use xor_name::XorName;
 
     #[tokio::test]
     async fn test_basic() {
         let cache = LruCache::new(3);
 
-        let key_1 = &XorName::random();
-        let key_2 = &XorName::random();
-        let key_3 = &XorName::random();
+        let key_1 = &xor_name::rand::random();
+        let key_2 = &xor_name::rand::random();
+        let key_3 = &xor_name::rand::random();
         cache.insert(key_1, Arc::new("Strawberries")).await;
         cache.insert(key_2, Arc::new("Bananas")).await;
         cache.insert(key_3, Arc::new("Peaches")).await;
@@ -124,10 +123,10 @@ mod test {
     async fn test_lru() {
         let cache = LruCache::new(3);
 
-        let key_1 = &XorName::random();
-        let key_2 = &XorName::random();
-        let key_3 = &XorName::random();
-        let key_4 = &XorName::random();
+        let key_1 = &xor_name::rand::random();
+        let key_2 = &xor_name::rand::random();
+        let key_3 = &xor_name::rand::random();
+        let key_4 = &xor_name::rand::random();
         cache.insert(key_1, Arc::new("Strawberries")).await;
         cache.insert(key_2, Arc::new("Bananas")).await;
         cache.insert(key_3, Arc::new("Peaches")).await;
@@ -143,9 +142,9 @@ mod test {
     async fn test_remove() {
         let cache = LruCache::new(3);
 
-        let key_1 = &XorName::random();
-        let key_2 = &XorName::random();
-        let key_3 = &XorName::random();
+        let key_1 = &xor_name::rand::random();
+        let key_2 = &xor_name::rand::random();
+        let key_3 = &xor_name::rand::random();
         cache.insert(key_1, Arc::new("Strawberries")).await;
         cache.insert(key_2, Arc::new("Bananas")).await;
         cache.insert(key_3, Arc::new("Peaches")).await;

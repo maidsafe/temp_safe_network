@@ -244,7 +244,7 @@ mod tests {
 
     #[test]
     fn register_create_public() {
-        let name = XorName::random();
+        let name = xor_name::rand::random();
         let tag = 43_000;
         let (authority_keypair, register) = &gen_pub_reg_replicas(None, name, tag, None, 1)[0];
 
@@ -264,7 +264,7 @@ mod tests {
 
     #[test]
     fn register_create_private() {
-        let name = XorName::random();
+        let name = xor_name::rand::random();
         let tag = 43_000;
         let (authority_keypair, register) = &gen_priv_reg_replicas(None, name, tag, None, 1)[0];
 
@@ -289,7 +289,7 @@ mod tests {
         let authority_keypair2 = Keypair::new_ed25519(&mut OsRng);
         let authority2 = User::Key(authority_keypair2.public_key());
 
-        let name: XorName = rand::random();
+        let name: XorName = xor_name::rand::random();
         let tag = 43_000u64;
         let cap = u16::MAX;
 
@@ -387,7 +387,7 @@ mod tests {
 
     #[test]
     fn register_query_public_policy() -> eyre::Result<()> {
-        let name = XorName::random();
+        let name = xor_name::rand::random();
         let tag = 43_666;
 
         // one replica will allow write ops to anyone
@@ -451,7 +451,7 @@ mod tests {
 
     #[test]
     fn register_query_private_policy() -> eyre::Result<()> {
-        let name = XorName::random();
+        let name = xor_name::rand::random();
         let tag = 43_666;
 
         let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
@@ -579,7 +579,7 @@ mod tests {
     }
 
     fn create_public_reg_replicas(count: usize) -> Vec<(Keypair, Register)> {
-        let name = XorName::random();
+        let name = xor_name::rand::random();
         let tag = 43_000;
 
         gen_pub_reg_replicas(None, name, tag, None, count)
@@ -625,7 +625,7 @@ mod tests {
     fn generate_replicas(
         max_quantity: usize,
     ) -> impl Strategy<Value = Result<(Vec<Register>, Arc<Keypair>)>> {
-        let xorname = XorName::random();
+        let xorname = xor_name::rand::random();
         let tag = 45_000u64;
 
         let owner_keypair = Arc::new(Keypair::new_ed25519(&mut OsRng));
@@ -672,7 +672,7 @@ mod tests {
             _data in generate_reg_entry()
         ) {
             // Instantiate the same Register on two replicas
-            let name = XorName::random();
+            let name = xor_name::rand::random();
             let tag = 45_000u64;
             let owner_keypair = Keypair::new_ed25519(&mut OsRng);
             let policy = PublicPolicy {
@@ -702,7 +702,7 @@ mod tests {
             dataset in generate_dataset(1000)
         ) {
             // Instantiate the same Register on two replicas
-            let name = XorName::random();
+            let name = xor_name::rand::random();
             let tag = 43_000u64;
             let owner_keypair = Keypair::new_ed25519(&mut OsRng);
             let policy = PublicPolicy {
@@ -741,7 +741,7 @@ mod tests {
             dataset in generate_dataset(1000)
         ) {
             // Instantiate the same Register on two replicas
-            let name = XorName::random();
+            let name = xor_name::rand::random();
             let tag = 43_000u64;
             let owner_keypair = Keypair::new_ed25519(&mut OsRng);
             let policy = PublicPolicy {
@@ -881,7 +881,7 @@ mod tests {
             dataset in generate_dataset_and_probability(1000),
         ) {
             // Instantiate the same Register on two replicas
-            let name = XorName::random();
+            let name = xor_name::rand::random();
             let tag = 43_000u64;
             let owner_keypair = Keypair::new_ed25519(&mut OsRng);
             let policy = PublicPolicy {
@@ -1002,7 +1002,7 @@ mod tests {
             }
 
             // set up a replica that has nothing to do with the rest, random xor... different owner...
-            let xorname = XorName::random();
+            let xorname = xor_name::rand::random();
             let tag = 45_000u64;
             let cap = u16::MAX;
             let random_owner_keypair = Keypair::new_ed25519(&mut OsRng);

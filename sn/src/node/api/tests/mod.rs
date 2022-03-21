@@ -409,7 +409,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     // Handle agreement on Online of a peer that is older than the youngest
     // current elder - that means this peer is going to be promoted.
     let new_peer = create_peer(MIN_ADULT_AGE + 1);
-    let node_state = NodeState::joined(new_peer.clone(), Some(XorName::random()));
+    let node_state = NodeState::joined(new_peer.clone(), Some(xor_name::rand::random()));
 
     let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
 
@@ -1449,7 +1449,8 @@ async fn create_section(
 // (or greater that) `age`.
 fn create_relocation_trigger(sk: &bls::SecretKey, age: u8) -> Result<SectionAuth<NodeStateMsg>> {
     loop {
-        let node_state = NodeState::joined(create_peer(MIN_ADULT_AGE), Some(rand::random()));
+        let node_state =
+            NodeState::joined(create_peer(MIN_ADULT_AGE), Some(xor_name::rand::random()));
         let auth = section_signed(sk, node_state.to_msg())?;
 
         let churn_id = ChurnId(auth.sig.signature.to_bytes().to_vec());

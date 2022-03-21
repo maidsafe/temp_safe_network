@@ -299,7 +299,6 @@ mod tests {
     };
     use tokio::time::Duration;
     use tracing::Instrument;
-    use xor_name::XorName;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_register_batching() -> Result<()> {
@@ -308,7 +307,7 @@ mod tests {
 
         let client = create_test_client().await?;
         let one_sec = tokio::time::Duration::from_secs(1);
-        let name = XorName(rand::random());
+        let name = xor_name::rand::random();
         let tag = 15000;
         let owner = User::Key(client.public_key());
 
@@ -364,7 +363,7 @@ mod tests {
         let delay = tokio::time::Duration::from_secs(network_assert_delay);
         debug!("Running network asserts with delay of {:?}", delay);
 
-        let name = XorName(rand::random());
+        let name = xor_name::rand::random();
         let tag = 15000;
         let owner = User::Key(client.public_key());
 
@@ -391,7 +390,7 @@ mod tests {
 
         let client = create_test_client().await?;
 
-        let name = XorName(rand::random());
+        let name = xor_name::rand::random();
         let tag = 10;
         let owner = User::Key(client.public_key());
 
@@ -438,7 +437,7 @@ mod tests {
         let _outer_span = tracing::info_span!("test__register_basics").entered();
 
         let client = create_test_client().await?;
-        let name = XorName(rand::random());
+        let name = xor_name::rand::random();
         let tag = 15000;
         let owner = User::Key(client.public_key());
 
@@ -484,7 +483,7 @@ mod tests {
 
         let client = create_test_client().await?;
 
-        let name = XorName(rand::random());
+        let name = xor_name::rand::random();
         let tag = 15000;
         let owner = User::Key(client.public_key());
 
@@ -542,7 +541,7 @@ mod tests {
 
         let client = create_test_client().await?;
 
-        let name = XorName(rand::random());
+        let name = xor_name::rand::random();
         let tag = 15000;
         let owner = User::Key(client.public_key());
 
@@ -597,7 +596,7 @@ mod tests {
 
         let client = create_test_client().await?;
 
-        let name = XorName(rand::random());
+        let name = xor_name::rand::random();
         let tag = 10;
         let owner = User::Key(client.public_key());
 
@@ -698,7 +697,7 @@ mod tests {
 
         let client = create_test_client().await?;
 
-        let name = XorName(rand::random());
+        let name = xor_name::rand::random();
         let tag = 10;
         let owner = User::Key(client.public_key());
 
@@ -722,7 +721,7 @@ mod tests {
 
         let mut client = create_test_client().await?;
 
-        let name = XorName(rand::random());
+        let name = xor_name::rand::random();
         let tag = 15000;
         let owner = User::Key(client.public_key());
 
@@ -768,7 +767,7 @@ mod tests {
 
         let client = create_test_client().await?;
 
-        let name = XorName(rand::random());
+        let name = xor_name::rand::random();
         let tag = 15000;
         let owner = User::Key(client.public_key());
 
@@ -810,7 +809,7 @@ mod tests {
         let _outer_span = tracing::info_span!("ae_checks_register_test").entered();
         let client = create_test_client_with(None, None, false).await?;
 
-        let name = XorName::random();
+        let name = xor_name::rand::random();
         let tag = 15000;
         let owner = User::Key(client.public_key());
 

@@ -131,7 +131,7 @@ impl Liveness {
     /// Inserts a random OperationId to decrease the credibility of the given Adult node.
     #[allow(unused)]
     pub(crate) async fn penalise_member(&self, member: XorName) {
-        if let Ok(random_op_id) = chunk_operation_id(&ChunkAddress(XorName::random())) {
+        if let Ok(random_op_id) = chunk_operation_id(&ChunkAddress(xor_name::rand::random())) {
             self.add_a_pending_request_operation(member, random_op_id)
                 .await
         } else {
@@ -275,13 +275,15 @@ mod tests {
 
     #[tokio::test]
     async fn liveness_basics() -> Result<(), Error> {
-        let adults = (0..10).map(|_| XorName::random()).collect::<Vec<XorName>>();
+        let adults = (0..10)
+            .map(|_| xor_name::rand::random())
+            .collect::<Vec<XorName>>();
         let liveness_tracker = Liveness::new(adults.clone());
 
         // Write data MIN_PENDING_OPS times to the 10 adults
         for adult in &adults {
             for _ in 0..MIN_PENDING_OPS {
-                let random_addr = ChunkAddress(XorName::random());
+                let random_addr = ChunkAddress(xor_name::rand::random());
                 let op_id = chunk_operation_id(&random_addr)?;
                 liveness_tracker
                     .add_a_pending_request_operation(*adult, op_id)
@@ -301,7 +303,7 @@ mod tests {
         );
 
         // Add a new adults
-        let new_adult = XorName::random();
+        let new_adult = xor_name::rand::random();
         liveness_tracker.add_new_adult(new_adult);
 
         // Assert total adult count
@@ -309,7 +311,7 @@ mod tests {
 
         // Write data (EXCESSIVE_OPS_TOLERANCE/2) + 1 x MIN_PENDING_OPS times to the new adult to check for preemptive replication
         for _ in 0..MIN_PENDING_OPS * ((EXCESSIVE_OPS_TOLERANCE as usize / 2) + 1) {
-            let random_addr = ChunkAddress(XorName::random());
+            let random_addr = ChunkAddress(xor_name::rand::random());
             let op_id = chunk_operation_id(&random_addr)?;
             liveness_tracker
                 .add_a_pending_request_operation(new_adult, op_id)
@@ -326,7 +328,7 @@ mod tests {
 
         // Write data another EXCESSIVE_OPS_TOLERANCE x 50 times to the new adult to check for unresponsiveness.
         for _ in 0..MIN_PENDING_OPS * EXCESSIVE_OPS_TOLERANCE as usize {
-            let random_addr = ChunkAddress(XorName::random());
+            let random_addr = ChunkAddress(xor_name::rand::random());
             let op_id = chunk_operation_id(&random_addr)?;
             liveness_tracker
                 .add_a_pending_request_operation(new_adult, op_id)
@@ -347,7 +349,9 @@ mod tests {
 
     #[tokio::test]
     async fn liveness_retain_members() -> Result<(), Error> {
-        let adults = (0..10).map(|_| XorName::random()).collect::<Vec<XorName>>();
+        let adults = (0..10)
+            .map(|_| xor_name::rand::random())
+            .collect::<Vec<XorName>>();
         let liveness_tracker = Liveness::new(adults.clone());
 
         let live_adults = adults[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
@@ -367,12 +371,12 @@ mod tests {
     async fn liveness_compute_closest() -> Result<(), Error> {
         // Adults with prefix 0
         let mut adults0 = (0..10)
-            .map(|_| XorName::random().with_bit(0, false))
+            .map(|_| xor_name::rand::random::<XorName>().with_bit(0, false))
             .collect::<Vec<XorName>>();
 
         // Adults with prefix 1
         let mut adults1 = (0..10)
-            .map(|_| XorName::random().with_bit(0, true))
+            .map(|_| xor_name::rand::random::<XorName>().with_bit(0, true))
             .collect::<Vec<XorName>>();
 
         // Whole set of Adults
@@ -399,11 +403,11 @@ mod tests {
 
         // Add 5 new adults for each 0 and 1 prefix
         let new_adults0 = (0..5)
-            .map(|_| XorName::random().with_bit(0, false))
+            .map(|_| xor_name::rand::random::<XorName>().with_bit(0, false))
             .collect::<Vec<XorName>>();
 
         let new_adults1 = (0..5)
-            .map(|_| XorName::random().with_bit(0, true))
+            .map(|_| xor_name::rand::random::<XorName>().with_bit(0, true))
             .collect::<Vec<XorName>>();
 
         let mut new_adults = vec![];

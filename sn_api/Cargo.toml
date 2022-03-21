@@ -39,7 +39,7 @@ uhttp_uri = "~0.5"
 url = "2.2.0"
 urlencoding = "1.1.1"
 walkdir = "2.3.1"
-xor_name = "3.0.0"
+xor_name = "4.0.1"
 
   [dependencies.bls]
   package = "blsttc"

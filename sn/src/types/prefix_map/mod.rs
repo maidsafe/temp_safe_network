@@ -415,7 +415,6 @@ mod tests {
     use super::*;
     use crate::node::{gen_section_authority_provider, section_signed};
     use eyre::{eyre, Context, Result};
-    use rand::Rng;
 
     #[test]
     fn insert_existing_prefix() -> Result<()> {
@@ -463,8 +462,6 @@ mod tests {
 
     #[test]
     fn return_opposite_prefix_if_none_matching() -> Result<()> {
-        let mut rng = rand::thread_rng();
-
         let (map, _, _) = new_network_prefix_map();
         let p0 = prefix("0")?;
         let p1 = prefix("1")?;
@@ -474,20 +471,20 @@ mod tests {
         let _changed = map.insert(sap0.clone());
 
         assert_eq!(
-            map.section_by_name(&p1.substituted_in(rng.gen()))?,
+            map.section_by_name(&p1.substituted_in(xor_name::rand::random()))?,
             sap0.value
         );
 
         // There are no matching prefixes, so return an opposite prefix.
         assert_eq!(
-            map.closest_or_opposite(&p1.substituted_in(rng.gen()), None)
+            map.closest_or_opposite(&p1.substituted_in(xor_name::rand::random()), None)
                 .ok_or(Error::NoMatchingSection)?,
             sap0
         );
 
         let _changed = map.insert(sap0.clone());
         assert_eq!(
-            map.closest_or_opposite(&p1.substituted_in(rng.gen()), None)
+            map.closest_or_opposite(&p1.substituted_in(xor_name::rand::random()), None)
                 .ok_or(Error::NoMatchingSection)?,
             sap0
         );
@@ -554,8 +551,6 @@ mod tests {
 
     #[test]
     fn get_matching() -> Result<()> {
-        let mut rng = rand::thread_rng();
-
         let (map, _, _) = new_network_prefix_map();
         let p = prefix("")?;
         let p0 = prefix("0")?;
@@ -570,14 +565,14 @@ mod tests {
         let _changed = map.insert(sap.clone());
 
         assert_eq!(
-            map.section_by_name(&p0.substituted_in(rng.gen()))?,
+            map.section_by_name(&p0.substituted_in(xor_name::rand::random()))?,
             sap.value
         );
 
         let _changed = map.insert(sap0.clone());
 
         assert_eq!(
-            map.section_by_name(&p1.substituted_in(rng.gen()))?,
+            map.section_by_name(&p1.substituted_in(xor_name::rand::random()))?,
             sap0.value
         );
 
@@ -585,18 +580,18 @@ mod tests {
         let _changed = map.insert(sap10.clone());
 
         assert_eq!(
-            map.section_by_name(&p0.substituted_in(rng.gen()))?,
+            map.section_by_name(&p0.substituted_in(xor_name::rand::random()))?,
             sap0.value
         );
 
         // sap1 get pruned once sap10 inserted.
         assert_eq!(
-            map.section_by_name(&prefix("11")?.substituted_in(rng.gen()))?,
+            map.section_by_name(&prefix("11")?.substituted_in(xor_name::rand::random()))?,
             sap10.value
         );
 
         assert_eq!(
-            map.section_by_name(&p10.substituted_in(rng.gen()))?,
+            map.section_by_name(&p10.substituted_in(xor_name::rand::random()))?,
             sap10.value
         );
 
@@ -653,10 +648,9 @@ mod tests {
         chain10.insert(&genesis_pk, pk10, sig10)?;
         let _updated = map.verify_with_chain_and_update(section_auth_10, &chain10, &chain);
 
-        let mut rng = rand::thread_rng();
-        let n01 = p01.substituted_in(rng.gen());
-        let n10 = p10.substituted_in(rng.gen());
-        let n11 = p11.substituted_in(rng.gen());
+        let n01 = p01.substituted_in(xor_name::rand::random());
+        let n10 = p10.substituted_in(xor_name::rand::random());
+        let n11 = p11.substituted_in(xor_name::rand::random());
 
         assert_eq!(map.closest(&n01, None).map(|sap| sap.prefix()), Some(p01));
         assert_eq!(map.closest(&n10, None).map(|sap| sap.prefix()), Some(p10));
