@@ -1150,21 +1150,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dysfunction"
-version = "0.1.0"
-dependencies = [
- "dashmap",
- "eyre",
- "itertools 0.10.3",
- "rand 0.8.5",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber 0.3.9",
- "xor_name",
-]
-
-[[package]]
 name = "ed25519"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3400,7 +3385,6 @@ dependencies = [
  "custom_debug",
  "dashmap",
  "dirs-next 2.0.0",
- "dysfunction",
  "ed25519",
  "ed25519-dalek",
  "eyre",
@@ -3429,6 +3413,7 @@ dependencies = [
  "serde_json",
  "signature",
  "sled",
+ "sn_dysfunction",
  "sn_launch_tool",
  "structopt",
  "strum",
@@ -3856,6 +3841,21 @@ dependencies = [
  "sn_api",
  "tiny-keccak",
  "walkdir",
+]
+
+[[package]]
+name = "sn_dysfunction"
+version = "0.1.0"
+dependencies = [
+ "dashmap",
+ "eyre",
+ "itertools 0.10.3",
+ "rand 0.8.5",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.9",
+ "xor_name",
 ]
 
 [[package]]

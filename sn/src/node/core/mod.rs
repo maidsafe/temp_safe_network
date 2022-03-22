@@ -47,9 +47,9 @@ use crate::{elder_count, UsedSpace};
 
 use backoff::ExponentialBackoff;
 use data::Capacity;
-use dysfunction::{DysfunctionDetection, DysfunctionSeverity};
 use itertools::Itertools;
 use resource_proof::ResourceProof;
+use sn_dysfunction::{DysfunctionDetection, DysfunctionSeverity};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     net::SocketAddr,
