@@ -1,0 +1,121 @@
+name: Benchmarks
+
+on: pull_request
+
+env:
+  CARGO_INCREMENTAL: '0'
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: "-D warnings"
+  NODE_COUNT: 15
+
+jobs:
+  benchmarks:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Run Benchmarks
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        id: toolchain
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
+
+      # Download previous benchmark result from cache (if exists)
+      - name: Download previous benchmark data
+        uses: actions/cache@v1
+        with:
+          path: ./cache
+          key: ${{ runner.os }}-benchmark
+
+      - name: Mac install ripgrep
+        if: matrix.os == 'macos-latest'
+        run: brew install ripgrep
+
+      - name: ubuntu install ripgrep
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get -y install ripgrep
+
+      - name: windows install ripgrep
+        if: matrix.os == 'windows-latest'
+        run: choco install ripgrep
+
+      - name: Build sn bins
+        run: cd sn && cargo build --release --features=test-utils --bins
+        timeout-minutes: 60
+
+      - name: Build all safe_network tests
+        run: cd sn && cargo test --no-run --release --features=test-utils
+        timeout-minutes: 60
+
+      - name: Build testnet
+        run: cargo build  --release --bin testnet
+        timeout-minutes: 60
+
+      - name: Build log_cmds_inspector
+        run: cargo build  --release --bin log_cmds_inspector
+        timeout-minutes: 60
+
+      - name: Start the network
+        run: ./target/release/testnet
+        id: section-startup
+        env:
+          RUST_LOG: "safe_network,sn_api,sn_node=trace"
+
+      - name: Print Network Log Stats at start
+        shell: bash
+        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+        if: matrix.os != 'windows-latest'
+
+      - name: Wait for all nodes to join
+        shell: bash
+        run: ./resources/scripts/wait_for_nodes_to_join.sh
+        timeout-minutes: 10
+
+      - name: Print Network Log Stats after nodes joined
+        shell: bash
+        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+        if: matrix.os != 'windows-latest'
+
+      - name: Bench safe_network
+        run: cargo bench -p safe_network --features=test-utils | tee output.txt
+
+
+        # Run `github-action-benchmark` action
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          # What benchmark tool the output.txt came from
+          tool: 'cargo'
+          # Where the output from the benchmark tool is stored
+          output-file-path: output.txt
+          # Where the previous data file is stored
+          external-data-json-path: ./cache/benchmark-data.json
+          # Workflow will fail when an alert happens
+          fail-on-alert: true
+          # GitHub API token to make a commit comment
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Enable alert commit comment
+          comment-on-alert: true
+          # 150% regression will result in alert
+          alert-threshold: '150%'
+
+
+
+      - name: Stop the network on fail
+        if: failure()
+        run: safe node killall || true && safe auth stop || true
+
+      - name: Failure logs
+        if: failure()
+        run: tail $HOME/.safe/node/local-test-network/*/*.log*

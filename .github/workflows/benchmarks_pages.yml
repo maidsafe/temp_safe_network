@@ -1,6 +1,16 @@
-name: Benchmarks
+name: Benchmark Page Generation
 
-on: pull_request
+# Do not run this workflow on pull request since this workflow has permission to modify contents.
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  # deployments permission to deploy GitHub pages website
+  deployments: write
+  # contents permission to update benchmark contents in gh-pages branch
+  contents: write
 
 env:
   CARGO_INCREMENTAL: '0'
@@ -9,13 +19,9 @@ env:
   NODE_COUNT: 15
 
 jobs:
-  benchmarks:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run Benchmarks
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+  benchmark:
+    name: Performance regression check
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -81,7 +87,7 @@ jobs:
         if: matrix.os != 'windows-latest'
 
       - name: Bench safe_network
-        run: cargo bench -p safe_network --features=test-utils
+        run: cargo bench -p safe_network --features=test-utils | tee output.txt
 
       - name: Stop the network on fail
         if: failure()
@@ -90,3 +96,16 @@ jobs:
       - name: Failure logs
         if: failure()
         run: tail $HOME/.safe/node/local-test-network/*/*.log*
+
+      # gh-pages branch is updated and pushed automatically with extracted benchmark data
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Safe Network Benchmarks
+          tool: 'cargo'
+          output-file-path: output.txt
+          # Access token to deploy GitHub Pages branch
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Push and deploy GitHub pages branch automatically
+          auto-push: true
+
