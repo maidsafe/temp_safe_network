@@ -10,7 +10,7 @@ use crate::{error::Result, get_mean_of, DysfunctionDetection, TimedTracker};
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 static RECENT_ISSUE_DURATION: Duration = Duration::from_secs(60 * 15);
 
 static CONN_WEIGHTING: f32 = 20.0;
@@ -164,20 +164,17 @@ impl DysfunctionDetection {
 
     async fn cleanup_time_sensistive_checks(&self) -> Result<()> {
         // first remove anything older than RECENT_ISSUE_DURATION from the timed trackers
-        if let Some(time_check) = SystemTime::now().checked_sub(RECENT_ISSUE_DURATION) {
-            let time_check = time_check.duration_since(SystemTime::UNIX_EPOCH)?.as_secs();
 
-            // remove old comms issues
-            for node in self.communication_issues.iter() {
-                let mut issues = node.value().write().await;
-                issues.retain(|time| time > &time_check);
-            }
+        // remove old comms issues
+        for node in self.communication_issues.iter() {
+            let mut issues = node.value().write().await;
+            issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
+        }
 
-            // remove old knowledge issues
-            for node in self.knowledge_issues.iter() {
-                let mut issues = node.value().write().await;
-                issues.retain(|time| time > &time_check);
-            }
+        // remove old knowledge issues
+        for node in self.knowledge_issues.iter() {
+            let mut issues = node.value().write().await;
+            issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
 
         Ok(())

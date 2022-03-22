@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{error::Result, DysfunctionDetection, NodeIdentifier};
-use std::time::SystemTime;
+use std::time::Instant;
 
 impl DysfunctionDetection {
     /// Track an issue with a node's network knowledge
@@ -16,11 +16,7 @@ impl DysfunctionDetection {
         let mut entry = self.communication_issues.entry(node_id).or_default();
 
         let mut queue = entry.value_mut().write().await;
-        queue.push_back(
-            SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)?
-                .as_secs(),
-        );
+        queue.push_back(Instant::now());
 
         Ok(())
     }

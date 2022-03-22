@@ -55,6 +55,7 @@ use dashmap::DashMap;
 use itertools::Itertools;
 use std::collections::{BTreeSet, VecDeque};
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::RwLock;
 
 pub use detection::DysfunctionSeverity;
@@ -68,7 +69,7 @@ type NodeIdentifier = XorName;
 // TODO: depend on types once that's extracted
 type OperationId = [u8; 32];
 
-pub(crate) type TimedTracker = Arc<DashMap<NodeIdentifier, Arc<RwLock<VecDeque<u64>>>>>;
+pub(crate) type TimedTracker = Arc<DashMap<NodeIdentifier, Arc<RwLock<VecDeque<Instant>>>>>;
 
 #[derive(Clone, Debug)]
 /// Dysfunctional node tracking. Allows various potential issues to be tracked and weighted,
