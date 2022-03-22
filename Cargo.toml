@@ -1,9 +1,9 @@
 [workspace]
 members = [
-    "dysfunction",
     "sn",
     "sn_api",
     "sn_cli",
+    "sn_dysfunction",
     "sn_cmd_test_utilities",
     "log_cmds_inspector",
     "testnet"
