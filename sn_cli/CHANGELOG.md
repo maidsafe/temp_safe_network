@@ -4,14 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.50.4 (2022-03-04)
+## v0.50.5 (2022-03-22)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 2 days passed between releases.
+ - 17 days passed between releases.
  - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -22,6 +22,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - bump bls_dkg, self_encryption, xor_name ([`d3989bd`](https://github.com/maidsafe/safe_network/commit/d3989bdd95129999996e58736ec2553242697f2c))
+</details>
+
+## v0.50.4 (2022-03-04)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.58.4/sn_cli-0.50.4 ([`7cf7fd6`](https://github.com/maidsafe/safe_network/commit/7cf7fd675beec5e7aa122f0f127402b636e659b7))
     - use nextest as test runner ([`8f44eab`](https://github.com/maidsafe/safe_network/commit/8f44eabd288cd23435bef6e646b981b881fb104b))
 </details>
 

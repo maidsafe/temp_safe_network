@@ -5,14 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.57.2 (2022-03-17)
+## v0.57.3 (2022-03-22)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release over the course of 4 calendar days.
- - 16 days passed between releases.
+ - 1 commit contributed to the release.
+ - 4 days passed between releases.
  - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -23,6 +23,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - bump bls_dkg, self_encryption, xor_name ([`d3989bd`](https://github.com/maidsafe/safe_network/commit/d3989bdd95129999996e58736ec2553242697f2c))
+</details>
+
+## v0.57.2 (2022-03-17)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release over the course of 5 calendar days.
+ - 17 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.58.6/sn_api-0.57.2 ([`a741d93`](https://github.com/maidsafe/safe_network/commit/a741d930b906054d09f1311ddcf35479aa1aa3ee))
     - tidy up some new test/clippy issues ([`6ca8181`](https://github.com/maidsafe/safe_network/commit/6ca81812df56858c789353383e018fcee8b4c297))
 </details>
 

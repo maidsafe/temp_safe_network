@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.58.7 (2022-03-22)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 4 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - bump bls_dkg, self_encryption, xor_name ([`d3989bd`](https://github.com/maidsafe/safe_network/commit/d3989bdd95129999996e58736ec2553242697f2c))
+</details>
+
 ## v0.58.6 (2022-03-17)
 
 ### New Features
@@ -15,9 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release over the course of 1 calendar day.
- - 6 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits contributed to the release over the course of 2 calendar days.
+ - 7 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -27,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.58.6/sn_api-0.57.2 ([`a741d93`](https://github.com/maidsafe/safe_network/commit/a741d930b906054d09f1311ddcf35479aa1aa3ee))
     - Merge #1062 ([`22404e4`](https://github.com/maidsafe/safe_network/commit/22404e4bf07ce882aa10dbd53237b91c5f67751e))
     - make resource logging consistent ([`20c057c`](https://github.com/maidsafe/safe_network/commit/20c057c72fdcacc0bcda6da1f97eb6fab1a0cf4c))
     - prune parent whenever a child inserted ([`d6e601a`](https://github.com/maidsafe/safe_network/commit/d6e601a3c18dc2b7f60c297f5c794883952e1d14))
@@ -38,7 +60,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-7a1065c46f5d72f6997a504c984a70493e197a5b/> impl throttled message sending
    - adds a new command that given sends messages in a throttled fashion
-- makes use of the new command to throttle replication messages to avoid message explosion
 
 ### Commit Statistics
 
@@ -62,6 +83,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - discard DataReplicator module ([`df330fa`](https://github.com/maidsafe/safe_network/commit/df330fa0de1e334e55863828fb743131ab629a18))
     - impl throttled message sending ([`7a1065c`](https://github.com/maidsafe/safe_network/commit/7a1065c46f5d72f6997a504c984a70493e197a5b))
 </details>
+
+<csr-unknown>
+makes use of the new command to throttle replication messages to avoid message explosion<csr-unknown/>
 
 ## v0.58.4 (2022-03-04)
 
