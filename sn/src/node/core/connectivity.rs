@@ -9,7 +9,7 @@
 use crate::node::{
     api::cmds::Cmd,
     core::{Node, Proposal},
-    Error, Result,
+    Result,
 };
 use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;
@@ -29,7 +29,7 @@ impl Node {
             return Ok(vec![]);
         }
 
-        self.log_comm_issue(name).await.map_err(Error::from)?;
+        self.log_comm_issue(name).await?;
         let cmds = vec![Cmd::StartConnectivityTest(name)];
         Ok(cmds)
     }
