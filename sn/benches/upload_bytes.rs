@@ -9,7 +9,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use eyre::Result;
 use safe_network::client::{
-    utils::test_utils::{read_network_conn_info, run_w_backoff_delayed},
+    utils::test_utils::read_network_conn_info,
     Client, ClientConfig, Error,
 };
 use sn_interface::types::utils::random_bytes;
@@ -24,16 +24,8 @@ async fn upload_bytes(size: usize) -> Result<(), Error> {
     let client = Client::new(config, bootstrap_nodes, None).await?;
     let address = client.upload(bytes.clone(), Scope::Public).await?;
 
-    // the larger the file, the longer we have to wait before we start querying
-    let delay = usize::max(1, size / 2_000_000);
-
     // let's make sure the public chunk is stored
-    let received_bytes = run_w_backoff_delayed(
-        || async { Ok(client.read_bytes(address).await?) },
-        10,
-        delay,
-    )
-    .await?;
+    let received_bytes = client.read_bytes(address).await?;
 
     assert_eq!(received_bytes, bytes);
 
@@ -56,6 +48,14 @@ fn criterion_benchmark(c: &mut Criterion) {
     group.bench_function("upload 1mb", |b| {
         b.to_async(&runtime).iter(|| async {
             match upload_bytes(1024 * 1024).await {
+                Ok(_) => {}
+                Err(error) => println!("bench failed with {:?}", error),
+            }
+        });
+    });
+    group.bench_function("upload 10mb", |b| {
+        b.to_async(&runtime).iter(|| async {
+            match upload_bytes(1024 * 1024 * 10).await {
                 Ok(_) => {}
                 Err(error) => println!("bench failed with {:?}", error),
             }
