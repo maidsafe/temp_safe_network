@@ -36,6 +36,7 @@ jobs:
         with:
           cache-on-failure: true
 
+      - run: cargo install cargo-criterion
 
       - name: Mac install ripgrep
         if: matrix.os == 'macos-latest'
@@ -51,10 +52,6 @@ jobs:
 
       - name: Build sn bins
         run: cd sn && cargo build --release --features=test-utils --bins
-        timeout-minutes: 60
-
-      - name: Build all safe_network tests
-        run: cd sn && cargo test --no-run --release --features=test-utils
         timeout-minutes: 60
 
       - name: Build testnet
@@ -86,8 +83,13 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: matrix.os != 'windows-latest'
 
+
+      ########################
+      ### Benchmark itself ###
+      ########################
+
       - name: Bench safe_network
-        run: cargo bench -p safe_network --features=test-utils | tee output.txt
+        run: cargo criterion --features=test-utils -p safe_network --message-format json > output.txt
 
       - name: Stop the network on fail
         if: failure()
@@ -96,6 +98,10 @@ jobs:
       - name: Failure logs
         if: failure()
         run: tail $HOME/.safe/node/local-test-network/*/*.log*
+
+      #################################
+      ### Log any regression alerts ###
+      #################################
 
       # gh-pages branch is updated and pushed automatically with extracted benchmark data
       - name: Store benchmark result
