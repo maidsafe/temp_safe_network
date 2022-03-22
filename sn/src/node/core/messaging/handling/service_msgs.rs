@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::data_copy_count;
-use crate::messaging::system::NodeEvent;
 use crate::messaging::{
     data::{CmdError, DataCmd, DataQuery, Error as ErrorMsg, ServiceMsg},
     system::{NodeQueryResponse, SystemMsg},
@@ -15,7 +14,6 @@ use crate::messaging::{
 };
 use crate::node::{api::cmds::Cmd, core::Node, Result};
 use crate::types::{log_markers::LogMarker, register::User, Peer, PublicKey, ReplicatedData};
-use std::collections::BTreeSet;
 use xor_name::XorName;
 
 impl Node {
@@ -69,52 +67,6 @@ impl Node {
         false
     }
 
-    /// form Cmds about any newly suspicious nodes
-    async fn notify_about_newly_suspect_nodes(&self) -> Result<Vec<Cmd>> {
-        let mut cmds = vec![];
-
-        let all_suspect_nodes = self.get_suspicious_node_names().await?;
-
-        let known_suspect_nodes = self.known_suspect_nodes.get_items().await;
-
-        let newly_suspect_nodes: BTreeSet<_> = all_suspect_nodes
-            .iter()
-            .filter(|node| !known_suspect_nodes.contains_key(node))
-            .copied()
-            .collect();
-
-        if !newly_suspect_nodes.is_empty() {
-            warn!("New nodes have crossed preemptive replication threshold:  {newly_suspect_nodes:?} . Triggering preemptive data replication");
-
-            for sus in &all_suspect_nodes {
-                // 0 is set here as we actually don't need or want the score.
-                let _prev = self.known_suspect_nodes.set(*sus, 0, None).await;
-            }
-
-            let our_adults = self.network_knowledge.adults().await;
-            let valid_adults = our_adults
-                .iter()
-                .filter(|peer| !newly_suspect_nodes.contains(&peer.name()))
-                .cloned()
-                .collect::<Vec<Peer>>();
-
-            for adult in valid_adults {
-                cmds.push(Cmd::SignOutgoingSystemMsg {
-                    msg: SystemMsg::NodeEvent(NodeEvent::SuspiciousNodesDetected(
-                        newly_suspect_nodes.clone(),
-                    )),
-                    dst: DstLocation::Node {
-                        name: adult.name(),
-                        section_pk: *self.section_chain().await.last_key(),
-                    },
-                });
-                debug!("{:?}", LogMarker::SendSuspiciousNodesDetected);
-            }
-        }
-
-        Ok(cmds)
-    }
-
     /// Handle data read
     /// Records response in liveness tracking
     /// Forms a response to send to the requester
@@ -151,10 +103,6 @@ impl Node {
 
             return Ok(cmds);
         };
-
-        // if there's anything sus going on at this point, lets trigger some activity
-        let sus_cmds = self.notify_about_newly_suspect_nodes().await?;
-        cmds.extend(sus_cmds);
 
         let query_response = response.convert();
 
