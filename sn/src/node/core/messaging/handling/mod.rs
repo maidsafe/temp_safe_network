@@ -112,7 +112,8 @@ impl Node {
                 known_keys.extend(self.network_knowledge.prefix_map().section_keys());
                 known_keys.push(*self.network_knowledge.genesis_key());
 
-                if !msg_authority.verify_src_section_key_is_known(&known_keys) {
+                if !Self::verify_msg_can_be_trusted(msg_authority.clone(), msg.clone(), &known_keys)
+                {
                     warn!(
                         "Untrusted message ({:?}) dropped from {:?}: {:?} ",
                         msg_id, sender, msg

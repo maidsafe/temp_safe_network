@@ -8,11 +8,14 @@
 
 use crate::messaging::{
     system::{KeyedSig, SectionAuth, SectionPeers, SystemMsg},
-    MsgId, MsgType, SrcLocation, WireMsg,
+    MsgId, MsgType, NodeMsgAuthority, SrcLocation, WireMsg,
 };
 use crate::node::{
-    api::cmds::Cmd, core::Node, messages::WireMsgUtils,
-    network_knowledge::SectionAuthorityProvider, Error, Result,
+    api::cmds::Cmd,
+    core::Node,
+    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
+    network_knowledge::SectionAuthorityProvider,
+    Error, Result,
 };
 use crate::types::{log_markers::LogMarker, Peer, PublicKey};
 
@@ -278,6 +281,34 @@ impl Node {
         }
     }
 
+    pub(crate) fn verify_msg_can_be_trusted(
+        msg_authority: NodeMsgAuthority,
+        msg: SystemMsg,
+        known_keys: &[BlsPublicKey],
+    ) -> bool {
+        if !msg_authority.verify_src_section_key_is_known(known_keys) {
+            // In case the incoming message itself is trying to update our knowledge,
+            // it shall be allowed.
+            if let SystemMsg::AntiEntropyUpdate {
+                ref proof_chain, ..
+            } = msg
+            {
+                // The attached chain shall contains a key known to us
+                if !proof_chain.check_trust(known_keys) {
+                    return false;
+                } else {
+                    trace!(
+                        "Allows AntiEntropyUpdate msg({:?}) ahead of our knowledge",
+                        msg,
+                    );
+                }
+            } else {
+                return false;
+            }
+        }
+        true
+    }
+
     // If entropy is found, determine the msg to send in order to
     // bring the sender's knowledge about us up to date.
     pub(crate) async fn check_for_entropy(
@@ -458,7 +489,10 @@ impl Node {
 mod tests {
     use super::*;
     use crate::elder_count;
-    use crate::messaging::{DstLocation, MsgId, MsgKind, MsgType, NodeAuth};
+    use crate::messaging::{
+        AuthorityProof, DstLocation, MsgId, MsgKind, MsgType, NodeAuth,
+        SectionAuth as SectionAuthMsg,
+    };
     use crate::node::{
         api::tests::create_comm,
         create_test_max_capacity_and_root_storage,
@@ -503,6 +537,43 @@ mod tests {
             .await?;
 
         assert!(cmd.is_none());
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ae_update_msg_to_be_trusted() -> Result<()> {
+        let env = Env::new().await?;
+
+        let known_keys = vec![*env.node.network_knowledge().genesis_key()];
+
+        // This proof_chain already contains other_pk
+        let proof_chain = env.proof_chain.clone();
+        let (msg, msg_authority) = env.create_update_msg(proof_chain)?;
+
+        // AeUpdate message shall get pass through.
+        assert!(Node::verify_msg_can_be_trusted(
+            msg_authority.clone(),
+            msg,
+            &known_keys
+        ));
+
+        // AeUpdate message contains corrupted proof_chain shall get rejected.
+        let other_env = Env::new().await?;
+        let (corrupted_msg, _msg_authority) = env.create_update_msg(other_env.proof_chain)?;
+        assert!(!Node::verify_msg_can_be_trusted(
+            msg_authority.clone(),
+            corrupted_msg,
+            &known_keys
+        ));
+
+        // Other messages shall get rejected.
+        let other_msg = SystemMsg::StartConnectivityTest(xor_name::rand::random());
+        assert!(!Node::verify_msg_can_be_trusted(
+            msg_authority,
+            other_msg,
+            &known_keys
+        ));
 
         Ok(())
     }
@@ -776,6 +847,26 @@ mod tests {
             };
 
             Ok((wire_msg, src_location))
+        }
+
+        fn create_update_msg(
+            &self,
+            proof_chain: SecuredLinkedList,
+        ) -> Result<(SystemMsg, NodeMsgAuthority)> {
+            let payload_msg = SystemMsg::AntiEntropyUpdate {
+                section_auth: self.other_sap.value.to_msg(),
+                section_signed: self.other_sap.sig.clone(),
+                proof_chain,
+                members: BTreeSet::new(),
+            };
+
+            let auth_proof = AuthorityProof(SectionAuthMsg {
+                src_name: self.other_sap.value.prefix().name(),
+                sig: self.other_sap.sig.clone(),
+            });
+            let node_auth = NodeMsgAuthority::Section(auth_proof);
+
+            Ok((payload_msg, node_auth))
         }
     }
 
