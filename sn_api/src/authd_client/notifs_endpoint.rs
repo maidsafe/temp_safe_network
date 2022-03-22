@@ -7,11 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::AuthReq;
-use log::{debug, info};
+use log::{debug, error, info};
 use qjsonrpc::{
-    Endpoint, IncomingJsonRpcRequest, JsonRpcRequest, JsonRpcResponse, JsonRpcResponseStream,
+    IncomingJsonRpcRequest, JsonRpcRequest, JsonRpcResponse, JsonRpcResponseStream, ServerEndpoint,
 };
 use serde_json::json;
+use std::path::Path;
 use tokio::{
     runtime,
     sync::{mpsc, oneshot},
@@ -22,9 +23,10 @@ const JSONRPC_NOTIF_ERROR: isize = -1;
 
 // Start listening for incoming notifications from authd,
 // by setting up a JSON-RPC over QUIC server endpoint
-pub async fn jsonrpc_listen(
+pub async fn jsonrpc_listen<P: AsRef<Path>>(
     listen: &str,
-    cert_base_path: &str,
+    cert_path: P,
+    key_path: P,
     notif_channel: mpsc::UnboundedSender<(AuthReq, oneshot::Sender<Option<bool>>)>,
 ) -> Result<(), String> {
     debug!("Launching new QUIC endpoint on '{}'", listen);
@@ -34,7 +36,7 @@ pub async fn jsonrpc_listen(
         .socket_addrs(|| None)
         .map_err(|_| "Invalid endpoint address".to_string())?[0];
 
-    let qjsonrpc_endpoint = Endpoint::new(cert_base_path, None)
+    let qjsonrpc_endpoint = ServerEndpoint::new(cert_path, key_path, None)
         .map_err(|err| format!("Failed to create endpoint: {}", err))?;
 
     // We try to obtain current runtime or create a new one if there is none
@@ -51,23 +53,40 @@ pub async fn jsonrpc_listen(
     let mut incoming_conn = qjsonrpc_endpoint
         .bind(&listen_socket_addr)
         .map_err(|err| format!("Failed to bind endpoint: {}", err))?;
-
-    while let Some(conn) = incoming_conn.get_next().await {
-        tokio::spawn(handle_connection(conn, notif_channel.clone()));
+    loop {
+        match incoming_conn.get_next().await {
+            Ok(Some(conn)) => {
+                tokio::spawn(handle_connection(conn, notif_channel.clone()));
+            }
+            Ok(None) => {
+                break;
+            }
+            Err(e) => {
+                error!("{}", e.to_string());
+            }
+        }
     }
 
     Ok(())
 }
 
 async fn handle_connection(
-    mut conn: IncomingJsonRpcRequest,
+    mut incoming_request: IncomingJsonRpcRequest,
     notif_channel: mpsc::UnboundedSender<(AuthReq, oneshot::Sender<Option<bool>>)>,
 ) -> Result<(), String> {
-    // Each stream initiated by the client constitutes a new request.
     tokio::spawn(async move {
-        // Each stream initiated by the client constitutes a new request.
-        while let Some((jsonrpc_req, send)) = conn.get_next().await {
-            tokio::spawn(handle_request(jsonrpc_req, send, notif_channel.clone()));
+        loop {
+            match incoming_request.get_next().await {
+                Ok(Some((req, send))) => {
+                    tokio::spawn(handle_request(req, send, notif_channel.clone()));
+                }
+                Ok(None) => {
+                    break;
+                }
+                Err(e) => {
+                    error!("{}", e.to_string());
+                }
+            }
         }
     });
 

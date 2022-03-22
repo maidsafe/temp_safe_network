@@ -18,6 +18,7 @@ use crate::{
 use log::{debug, info};
 use safe_network::types::Keypair;
 use serde_json::json;
+use std::path::{Path, PathBuf};
 
 // Method for requesting application's authorisation
 const SN_AUTHD_METHOD_AUTHORISE: &str = "authorise";
@@ -30,6 +31,7 @@ impl Safe {
         app_name: &str,
         app_vendor: &str,
         endpoint: Option<&str>,
+        authd_cert_path: impl AsRef<Path>,
     ) -> Result<Keypair> {
         // TODO: allow to accept all type of permissions to be passed as args to this API
         info!("Sending authorisation request to SAFE Authenticator...");
@@ -42,7 +44,12 @@ impl Safe {
         );
 
         // Send the auth request to authd and obtain the response
-        let auth_res = send_app_auth_req(&auth_req_str, endpoint).await?;
+        let auth_res = send_app_auth_req(
+            &auth_req_str,
+            endpoint,
+            &PathBuf::from(authd_cert_path.as_ref()),
+        )
+        .await?;
 
         // Decode response and check if the app has been authorised
         match IpcMsg::from_string(&auth_res) {
@@ -70,7 +77,11 @@ impl Safe {
 
 // Sends an authorisation request string to the SAFE Authenticator daemon endpoint.
 // It returns the credentials necessary to connect to the network, encoded in a single string.
-async fn send_app_auth_req(auth_req_str: &str, endpoint: Option<&str>) -> Result<String> {
+async fn send_app_auth_req(
+    auth_req_str: &str,
+    endpoint: Option<&str>,
+    authd_cert_path: &Path,
+) -> Result<String> {
     let authd_service_url = match endpoint {
         None => format!("{}:{}", SN_AUTHD_ENDPOINT_HOST, SN_AUTHD_ENDPOINT_PORT,),
         Some(endpoint) => endpoint.to_string(),
@@ -78,6 +89,7 @@ async fn send_app_auth_req(auth_req_str: &str, endpoint: Option<&str>) -> Result
 
     info!("Sending authorisation request to SAFE Authenticator...");
     let authd_response = send_authd_request::<String>(
+        authd_cert_path,
         &authd_service_url,
         SN_AUTHD_METHOD_AUTHORISE,
         json!(auth_req_str),

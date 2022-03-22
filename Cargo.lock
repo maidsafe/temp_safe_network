@@ -195,7 +195,7 @@ dependencies = [
  "parking",
  "polling",
  "slab",
- "socket2 0.4.4",
+ "socket2",
  "waker-fn",
  "winapi",
 ]
@@ -1685,9 +1685,9 @@ dependencies = [
 
 [[package]]
 name = "h2"
-version = "0.3.12"
+version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62eeb471aa3e3c9197aa4bfeabfe02982f6dc96f750486c0bb0009ac58b26d2b"
+checksum = "d9f1f717ddc7b2ba36df7e871fd88db79326551d3d6f1fc406fbfd28b582ff8e"
 dependencies = [
  "bytes",
  "fnv",
@@ -1839,7 +1839,7 @@ dependencies = [
  "httpdate",
  "itoa 1.0.1",
  "pin-project-lite",
- "socket2 0.4.4",
+ "socket2",
  "tokio",
  "tower-service",
  "tracing",
@@ -1854,7 +1854,7 @@ checksum = "d87c48c02e0dc5e3b849a2041db3029fd066650f8f717c07bf8ed78ccb895cac"
 dependencies = [
  "http",
  "hyper",
- "rustls 0.20.4",
+ "rustls",
  "tokio",
  "tokio-rustls",
 ]
@@ -2051,9 +2051,9 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libc"
-version = "0.2.121"
+version = "0.2.119"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efaa7b300f3b5fe8eb6bf21ce3895e1751d9665086af2d64b42f19701015ff4f"
+checksum = "1bf2e165bb3457c8e098ea76f3e3bc9db55f87aa90d52d0e6be741470916aaa4"
 
 [[package]]
 name = "linked-hash-map"
@@ -2189,15 +2189,14 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.8.2"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52da4364ffb0e4fe33a9841a98a3f3014fb964045ce4f7a45a398243c8d6b0c9"
+checksum = "ba272f85fa0b41fc91872be579b3bbe0f56b792aa361a380eb669469f68dafb2"
 dependencies = [
  "libc",
  "log",
  "miow",
  "ntapi",
- "wasi 0.11.0+wasi-snapshot-preview1",
  "winapi",
 ]
 
@@ -2242,12 +2241,13 @@ dependencies = [
 
 [[package]]
 name = "nom"
-version = "7.1.1"
+version = "7.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8903e5a29a317527874d0402f867152a3d21c908bb0b933e416c65e301d4c36"
+checksum = "1b1d11e1ef389c76fe5b81bcaf2ea32cf88b62bc494e19f493d0b30e7a930109"
 dependencies = [
  "memchr",
  "minimal-lexical",
+ "version_check",
 ]
 
 [[package]]
@@ -2367,9 +2367,9 @@ dependencies = [
 
 [[package]]
 name = "num_threads"
-version = "0.1.5"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aba1801fb138d8e85e11d0fc70baf4fe1cdfffda7c6cd34a854905df588e5ed0"
+checksum = "97ba99ba6393e2c3734791401b66902d981cb03bf190af674ca69949b6d5fb15"
 dependencies = [
  "libc",
 ]
@@ -2806,18 +2806,22 @@ dependencies = [
 
 [[package]]
 name = "qjsonrpc"
-version = "0.2.3"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b2c16f879bf66823534fb35666cafcb7b8de2d35e4e6fbfe38fff3c832d6b1e"
+checksum = "24732645933876e5f243af8cb1a2673bc71193355205eb3249b93e83683edc48"
 dependencies = [
  "futures",
  "log",
- "quinn 0.7.2",
+ "quinn",
+ "quinn-proto",
  "rand 0.7.3",
  "rcgen 0.7.0",
+ "rustls",
  "serde",
  "serde_json",
+ "thiserror",
  "url",
+ "webpki 0.21.4",
 ]
 
 [[package]]
@@ -2831,10 +2835,10 @@ dependencies = [
  "bytes",
  "futures",
  "igd",
- "quinn 0.8.1",
- "quinn-proto 0.8.1",
+ "quinn",
+ "quinn-proto",
  "rcgen 0.8.14",
- "rustls 0.20.4",
+ "rustls",
  "serde",
  "thiserror",
  "tokio",
@@ -2871,26 +2875,6 @@ dependencies = [
 
 [[package]]
 name = "quinn"
-version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c82c0a393b300104f989f3db8b8637c0d11f7a32a9c214560b47849ba8f119aa"
-dependencies = [
- "bytes",
- "futures",
- "lazy_static",
- "libc",
- "mio 0.7.14",
- "quinn-proto 0.7.3",
- "rustls 0.19.1",
- "socket2 0.3.19",
- "thiserror",
- "tokio",
- "tracing",
- "webpki 0.21.4",
-]
-
-[[package]]
-name = "quinn"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "584865613896a1f644d757e52c45c573441c8b04cac38ac13990b0235203db66"
@@ -2899,30 +2883,13 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "fxhash",
- "quinn-proto 0.8.1",
+ "quinn-proto",
  "quinn-udp",
- "rustls 0.20.4",
+ "rustls",
  "thiserror",
  "tokio",
  "tracing",
  "webpki 0.22.0",
-]
-
-[[package]]
-name = "quinn-proto"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "047aa96ec7ee6acabad7a1318dff72e9aff8994316bf2166c9b94cbec78ca54c"
-dependencies = [
- "bytes",
- "rand 0.8.5",
- "ring",
- "rustls 0.19.1",
- "slab",
- "thiserror",
- "tinyvec",
- "tracing",
- "webpki 0.21.4",
 ]
 
 [[package]]
@@ -2935,7 +2902,7 @@ dependencies = [
  "fxhash",
  "rand 0.8.5",
  "ring",
- "rustls 0.20.4",
+ "rustls",
  "rustls-pemfile 0.2.1",
  "slab",
  "thiserror",
@@ -2953,8 +2920,8 @@ dependencies = [
  "futures-util",
  "libc",
  "mio 0.7.14",
- "quinn-proto 0.8.1",
- "socket2 0.4.4",
+ "quinn-proto",
+ "socket2",
  "tokio",
  "tracing",
 ]
@@ -3254,7 +3221,7 @@ dependencies = [
  "mime",
  "percent-encoding",
  "pin-project-lite",
- "rustls 0.20.4",
+ "rustls",
  "rustls-pemfile 0.3.0",
  "serde",
  "serde_json",
@@ -3346,26 +3313,13 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.19.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35edb675feee39aec9c99fa5ff985081995a06d594114ae14cbe797ad7b7a6d7"
-dependencies = [
- "base64 0.13.0",
- "log",
- "ring",
- "sct 0.6.1",
- "webpki 0.21.4",
-]
-
-[[package]]
-name = "rustls"
 version = "0.20.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4fbfeb8d0ddb84706bc597a5574ab8912817c52a397f819e5b614e2265206921"
 dependencies = [
  "log",
  "ring",
- "sct 0.7.0",
+ "sct",
  "webpki 0.22.0",
 ]
 
@@ -3495,16 +3449,6 @@ name = "scopeguard"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d29ab0c6d3fc0ee92fe66e2d99f700eab17a8d57d1c1d3b748380fb20baa78cd"
-
-[[package]]
-name = "sct"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b362b83898e0e69f38515b82ee15aa80636befe47c3b6d3d89a911e78fc228ce"
-dependencies = [
- "ring",
- "untrusted",
-]
 
 [[package]]
 name = "sct"
@@ -3860,6 +3804,7 @@ dependencies = [
  "predicates",
  "pretty-hex",
  "rand 0.7.3",
+ "rcgen 0.7.0",
  "relative-path",
  "reqwest",
  "self_update",
@@ -3910,17 +3855,6 @@ dependencies = [
  "structopt",
  "tracing",
  "tracing-subscriber 0.3.9",
-]
-
-[[package]]
-name = "socket2"
-version = "0.3.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "122e570113d28d773067fab24266b66753f6ea915758651696b6e35e49f88d6e"
-dependencies = [
- "cfg-if 1.0.0",
- "libc",
- "winapi",
 ]
 
 [[package]]
@@ -4232,10 +4166,10 @@ dependencies = [
  "bytes",
  "libc",
  "memchr",
- "mio 0.8.2",
+ "mio 0.8.0",
  "num_cpus",
  "pin-project-lite",
- "socket2 0.4.4",
+ "socket2",
  "tokio-macros",
  "tracing",
  "winapi",
@@ -4268,7 +4202,7 @@ version = "0.23.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a27d5f2b839802bd8267fa19b0530f5a08b9c08cd417976be2a65d130fe1c11b"
 dependencies = [
- "rustls 0.20.4",
+ "rustls",
  "tokio",
  "webpki 0.22.0",
 ]
@@ -4715,12 +4649,6 @@ name = "wasi"
 version = "0.10.2+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd6fbd9a79829dd1ad0cc20627bf1ed606756a7f77edff7b66b7064f9cb327c6"
-
-[[package]]
-name = "wasi"
-version = "0.11.0+wasi-snapshot-preview1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
 
 [[package]]
 name = "wasm-bindgen"

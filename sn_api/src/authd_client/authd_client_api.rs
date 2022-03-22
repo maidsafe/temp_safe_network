@@ -18,7 +18,7 @@ use serde_json::json;
 
 use std::{
     io::{self, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 use tokio::{
@@ -96,9 +96,10 @@ const SN_AUTHD_CMD_RESTART: &str = "restart";
 
 // Authd Client API
 pub struct SafeAuthdClient {
-    // authd endpoint
     pub authd_endpoint: String,
-    // keep track of (endpoint URL, join handle for the listening thread, join handle of callback thread)
+    pub authd_cert_path: PathBuf,
+    pub authd_notify_cert_path: PathBuf,
+    pub authd_notify_key_path: PathBuf,
     subscribed_endpoint: Option<(String, task::JoinHandle<()>, task::JoinHandle<()>)>,
     // TODO: add a session_token field to use for communicating with authd for restricted operations,
     // we should restrict operations like subscribe, or allow/deny, to only be accepted with a valid token
@@ -112,7 +113,11 @@ impl Drop for SafeAuthdClient {
         match &self.subscribed_endpoint {
             None => {}
             Some((url, _, _)) => {
-                match futures::executor::block_on(send_unsubscribe(url, &self.authd_endpoint)) {
+                match futures::executor::block_on(send_unsubscribe(
+                    url,
+                    &self.authd_endpoint,
+                    &self.authd_cert_path,
+                )) {
                     Ok(msg) => {
                         debug!("{}", msg);
                     }
@@ -130,7 +135,12 @@ impl Drop for SafeAuthdClient {
 }
 
 impl SafeAuthdClient {
-    pub fn new(endpoint: Option<String>) -> Self {
+    pub fn new<P: AsRef<Path>>(
+        endpoint: Option<String>,
+        authd_cert_path: P,
+        authd_notify_cert_path: P,
+        authd_notify_key_path: P,
+    ) -> Self {
         let endpoint = match endpoint {
             None => format!("{}:{}", SN_AUTHD_ENDPOINT_HOST, SN_AUTHD_ENDPOINT_PORT),
             Some(endpoint) => endpoint,
@@ -138,6 +148,9 @@ impl SafeAuthdClient {
         debug!("Creating new authd client for endpoint {}", endpoint);
         Self {
             authd_endpoint: endpoint,
+            authd_cert_path: PathBuf::from(authd_cert_path.as_ref()),
+            authd_notify_cert_path: PathBuf::from(authd_notify_cert_path.as_ref()),
+            authd_notify_key_path: PathBuf::from(authd_notify_key_path.as_ref()),
             subscribed_endpoint: None,
         }
     }
@@ -177,6 +190,7 @@ impl SafeAuthdClient {
     pub async fn status(&mut self) -> Result<AuthdStatus> {
         debug!("Attempting to retrieve status report from remote authd...");
         let status_report = send_authd_request::<AuthdStatus>(
+            &self.authd_cert_path,
             &self.authd_endpoint,
             SN_AUTHD_METHOD_STATUS,
             serde_json::Value::Null,
@@ -194,6 +208,7 @@ impl SafeAuthdClient {
     pub async fn unlock(&mut self, passphrase: &str, password: &str) -> Result<()> {
         debug!("Attempting to unlock a Safe on remote authd...");
         let authd_response = send_authd_request::<String>(
+            &self.authd_cert_path,
             &self.authd_endpoint,
             SN_AUTHD_METHOD_UNLOCK,
             json!(vec![passphrase, password]),
@@ -211,6 +226,7 @@ impl SafeAuthdClient {
     pub async fn lock(&mut self) -> Result<()> {
         debug!("Locking the Safe on a remote authd...");
         let authd_response = send_authd_request::<String>(
+            &self.authd_cert_path,
             &self.authd_endpoint,
             SN_AUTHD_METHOD_LOCK,
             serde_json::Value::Null,
@@ -230,6 +246,7 @@ impl SafeAuthdClient {
     pub async fn create(&self, passphrase: &str, password: &str) -> Result<()> {
         debug!("Attempting to create a Safe using remote authd...");
         let authd_response = send_authd_request::<String>(
+            &self.authd_cert_path,
             &self.authd_endpoint,
             SN_AUTHD_METHOD_CREATE,
             json!(vec![passphrase, password]),
@@ -244,6 +261,7 @@ impl SafeAuthdClient {
     pub async fn authed_apps(&self) -> Result<AuthedAppsList> {
         debug!("Attempting to fetch list of authorised apps from remote authd...");
         let authed_apps_list = send_authd_request::<AuthedAppsList>(
+            &self.authd_cert_path,
             &self.authd_endpoint,
             SN_AUTHD_METHOD_AUTHED_APPS,
             serde_json::Value::Null,
@@ -264,6 +282,7 @@ impl SafeAuthdClient {
             app_id
         );
         let authd_response = send_authd_request::<String>(
+            &self.authd_cert_path,
             &self.authd_endpoint,
             SN_AUTHD_METHOD_REVOKE,
             json!(app_id),
@@ -281,6 +300,7 @@ impl SafeAuthdClient {
     pub async fn auth_reqs(&self) -> Result<PendingAuthReqs> {
         debug!("Attempting to fetch list of pending authorisation requests from remote authd...");
         let auth_reqs_list = send_authd_request::<PendingAuthReqs>(
+            &self.authd_cert_path,
             &self.authd_endpoint,
             SN_AUTHD_METHOD_AUTH_REQS,
             serde_json::Value::Null,
@@ -298,6 +318,7 @@ impl SafeAuthdClient {
     pub async fn allow(&self, req_id: SafeAuthReqId) -> Result<()> {
         debug!("Requesting to allow authorisation request: {}", req_id);
         let authd_response = send_authd_request::<String>(
+            &self.authd_cert_path,
             &self.authd_endpoint,
             SN_AUTHD_METHOD_ALLOW,
             json!(req_id.to_string()),
@@ -315,6 +336,7 @@ impl SafeAuthdClient {
     pub async fn deny(&self, req_id: SafeAuthReqId) -> Result<()> {
         debug!("Requesting to deny authorisation request: {}", req_id);
         let authd_response = send_authd_request::<String>(
+            &self.authd_cert_path,
             &self.authd_endpoint,
             SN_AUTHD_METHOD_DENY,
             json!(req_id.to_string()),
@@ -340,25 +362,14 @@ impl SafeAuthdClient {
     ) -> Result<()> {
         debug!("Subscribing to receive authorisation requests notifications...",);
 
-        // Generate a path which is where we will store the endpoint certificates that authd will
-        // need to read to be able to create a secure channel to send us the notifications with
-        let dirs = dirs_next::home_dir().ok_or_else(|| {
-            Error::AuthdClientError(
-                "Failed to obtain local home directory where to store endpoint certificates to"
-                    .to_string(),
-            )
+        let cert_path = self.authd_cert_path.to_str().ok_or_else(|| {
+            Error::AuthdClientError("Could not convert authd_cert_path to string".to_string())
         })?;
-
-        // Let's postfix the path with the app id so we avoid clashes with other
-        // endpoints subscribed from within the same local box
-        let mut cert_base_path = dirs;
-        cert_base_path.push(".safe");
-        cert_base_path.push("authd");
-
         let authd_response = send_authd_request::<String>(
+            &self.authd_cert_path,
             &self.authd_endpoint,
             SN_AUTHD_METHOD_SUBSCRIBE,
-            json!(vec![endpoint_url, &cert_base_path.display().to_string()]),
+            json!(vec![endpoint_url, cert_path]),
         ).await.map_err(|err| Error::AuthdClientError(format!("Failed when trying to subscribe endpoint URL ({}) to receive authorisation request for self-auth: {}", endpoint_url, err)))?;
 
         debug!(
@@ -373,8 +384,12 @@ impl SafeAuthdClient {
         let listen = endpoint_url.to_string();
         // TODO: if there was a previous subscription,
         // make sure we kill/stop the previously created tasks
+
+        let authd_notify_cert_path = self.authd_notify_cert_path.clone();
+        let authd_notify_key_path = self.authd_notify_key_path.clone();
         let endpoint_thread_join_handle = tokio::spawn(async move {
-            match jsonrpc_listen(&listen, &cert_base_path.display().to_string(), tx).await {
+            match jsonrpc_listen(&listen, &authd_notify_cert_path, &authd_notify_key_path, tx).await
+            {
                 Ok(()) => {
                     info!("Endpoint successfully launched for receiving auth req notifications");
                 }
@@ -424,6 +439,7 @@ impl SafeAuthdClient {
         );
 
         let authd_response = send_authd_request::<String>(
+            &self.authd_cert_path,
             &self.authd_endpoint,
             SN_AUTHD_METHOD_SUBSCRIBE,
             json!(vec![endpoint_url]),
@@ -440,7 +456,8 @@ impl SafeAuthdClient {
     // Unsubscribe from notifications to allow/deny authorisation requests
     pub async fn unsubscribe(&mut self, endpoint_url: &str) -> Result<()> {
         debug!("Unsubscribing from authorisation requests notifications...",);
-        let authd_response = send_unsubscribe(endpoint_url, &self.authd_endpoint).await?;
+        let authd_response =
+            send_unsubscribe(endpoint_url, &self.authd_endpoint, &self.authd_cert_path).await?;
         debug!(
             "Successfully unsubscribed from authorisation requests notifications: {}",
             authd_response
@@ -458,8 +475,13 @@ impl SafeAuthdClient {
     }
 }
 
-async fn send_unsubscribe(endpoint_url: &str, authd_endpoint: &str) -> Result<String> {
+async fn send_unsubscribe(
+    endpoint_url: &str,
+    authd_endpoint: &str,
+    authd_cert_path: &Path,
+) -> Result<String> {
     send_authd_request::<String>(
+        authd_cert_path,
         authd_endpoint,
         SN_AUTHD_METHOD_UNSUBSCRIBE,
         json!(endpoint_url),
