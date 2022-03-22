@@ -13,7 +13,7 @@ use sn_api::{Keypair, Safe};
 use std::{
     fs::{create_dir_all, File},
     io::{Read, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     time::Duration,
 };
 use tracing::{debug, info, warn};
@@ -21,16 +21,26 @@ use tracing::{debug, info, warn};
 const AUTH_CREDENTIALS_FILENAME: &str = "credentials";
 
 #[allow(dead_code)]
-pub async fn authorise_cli(endpoint: Option<String>, is_self_authing: bool) -> Result<()> {
+pub async fn authorise_cli(
+    endpoint: Option<String>,
+    is_self_authing: bool,
+    authd_cert_path: &Path,
+) -> Result<()> {
     let (mut file, file_path) = create_credentials_file()?;
     println!("Authorising CLI application...");
     if !is_self_authing {
         println!("Note you can use this CLI from another console to authorise it with 'auth allow' command. Alternativelly, you can also use '--self-auth' flag with 'auth unlock' command to automatically self authorise the CLI app.");
     }
     println!("Waiting for authorising response from authd...");
-    let app_keypair = Safe::auth_app(APP_ID, APP_NAME, APP_VENDOR, endpoint.as_deref())
-        .await
-        .wrap_err("Application authorisation failed")?;
+    let app_keypair = Safe::auth_app(
+        APP_ID,
+        APP_NAME,
+        APP_VENDOR,
+        endpoint.as_deref(),
+        authd_cert_path,
+    )
+    .await
+    .wrap_err("Application authorisation failed")?;
 
     let serialised_keypair = serde_json::to_string(&app_keypair)
         .wrap_err("Unable to serialise the credentials obtained")?;

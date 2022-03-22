@@ -8,15 +8,22 @@
 
 use super::cli;
 use async_std::task;
-use color_eyre::Result;
+use color_eyre::{eyre::eyre, Result};
 use shrust::{Shell, ShellIO};
 use sn_api::{Safe, SafeAuthdClient};
 use std::io::Write;
+use std::path::{Path, PathBuf};
 
 pub fn shell_run() -> Result<()> {
     // We create a Safe instance which we''ll use for all commands till we exit.
     let safe = Safe::dry_runner(None);
-    let sn_authd_client = SafeAuthdClient::new(None);
+    let (authd_cert_path, authd_notify_cert_path, authd_notify_key_path) = get_certificates()?;
+    let sn_authd_client = SafeAuthdClient::new(
+        None,
+        &authd_cert_path,
+        &authd_notify_cert_path,
+        &authd_notify_key_path,
+    );
     let mut shell = Shell::new((safe, sn_authd_client));
 
     shell.set_default(|io, _, cmd| {
@@ -139,6 +146,56 @@ fn call_cli(
             Ok(())
         }
     }
+}
+
+/// Gets the paths of the certificate for authd and the certificate and private key for the
+/// authd notification service. These are located at:
+/// * ~/.safe/authd/authd_cert.der
+/// * ~/.safe/authd/authd_notify_cert.der
+/// * ~/.safe/authd/authd_notify_key.der
+///
+/// If the ~/.safe/authd directory doesn't exist, it will be created and self-signed certificates
+/// will be generated.
+fn get_certificates() -> Result<(PathBuf, PathBuf, PathBuf)> {
+    let cert_base_path = dirs_next::home_dir()
+        .ok_or_else(
+            || eyre!("Failed to obtain home directory for authd certificates".to_string(),),
+        )?
+        .join(".safe")
+        .join("authd");
+    let authd_cert_path = cert_base_path.join("authd_cert.der");
+    let authd_key_path = cert_base_path.join("authd_key.der");
+    let authd_notify_cert_path = cert_base_path.join("authd_notify_cert.der");
+    let authd_notify_key_path = cert_base_path.join("authd_notify_key.der");
+    if !cert_base_path.exists() {
+        std::fs::create_dir_all(cert_base_path)?;
+        generate_certificate(&authd_cert_path, &authd_key_path)?;
+        generate_certificate(&authd_notify_cert_path, &authd_notify_key_path)?;
+    }
+
+    Ok((
+        authd_cert_path,
+        authd_notify_cert_path,
+        authd_notify_key_path,
+    ))
+}
+
+fn generate_certificate(cert_path: &Path, key_path: &Path) -> Result<()> {
+    let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).map_err(|err| {
+        eyre!(format!(
+            "Failed to generate self-signed certificate: {}",
+            err
+        ))
+    })?;
+    let key = cert.serialize_private_key_der();
+    let cert = cert
+        .serialize_der()
+        .map_err(|err| eyre!(format!("Failed to serialise certificate: {}", err)))?;
+    std::fs::write(&cert_path, &cert)
+        .map_err(|err| eyre!(format!("Failed to write certificate: {}", err)))?;
+    std::fs::write(&key_path, &key)
+        .map_err(|err| eyre!(format!("Failed to write private key: {}", err)))?;
+    Ok(())
 }
 
 // #[allow(dead_code)]
