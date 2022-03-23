@@ -168,7 +168,7 @@ impl Node {
             return Ok(cmds);
         }
 
-        // Send response if one is warranted
+        // dont reply if data not found (but do keep peers around...)
         if query_response.failed_with_data_not_found()
             || (!query_response.is_success()
                 && self
@@ -177,9 +177,15 @@ impl Node {
                     .await
                     .unwrap_or(false))
         {
-            // we don't return data not found errors.
+            // lets requeue waiting peers in case another adult has the data...
+            // if no more responses come in this query should eventually time out
+            // TODO: What happens if we keep getting queries / client for some data that's always not found?
+            // We need to handle that
+            let _prev = self
+                .pending_data_queries
+                .set(op_id, waiting_peers.clone(), None)
+                .await;
             trace!("Node {:?}, reported data not found ", sending_node_pk);
-
             return Ok(cmds);
         }
 
