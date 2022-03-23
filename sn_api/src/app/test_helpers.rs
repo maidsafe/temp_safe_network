@@ -38,7 +38,8 @@ fn init_logger() {
     INIT.call_once(|| {
         fmt()
             // NOTE: comment out this line for more compact (but less readable) log output.
-            .pretty()
+            // .pretty()
+            .with_ansi(false)
             .with_env_filter(EnvFilter::from_default_env())
             .with_target(false)
             .init()

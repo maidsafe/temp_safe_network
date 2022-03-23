@@ -226,7 +226,7 @@ impl Client {
             .await;
         // Send the dummy message to probe the network for it's infrastructure details.
         while attempts < NETWORK_PROBE_RETRY_COUNT && initial_probe.is_err() {
-            error!(
+            warn!(
                 "Initial probe msg to network failed. Trying again (attempt {}): {:?}",
                 attempts, initial_probe
             );

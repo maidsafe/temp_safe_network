@@ -18,7 +18,7 @@ use bytes::Bytes;
 use tokio::time::Duration;
 use xor_name::XorName;
 
-const MAX_RETRY_COUNT: f32 = 25.0;
+const MAX_RETRY_COUNT: f32 = 5.0;
 
 impl Client {
     /// Send a Cmd to the network and await a response.

@@ -79,14 +79,9 @@ impl Node {
                 .await;
         }
 
-        let mut this_query_already_in_flight = false;
-        let mut this_peer_already_waiting_on_response = false;
         let waiting_peers =
             if let Some(mut peers) = self.pending_data_queries.get(&operation_id).await {
-                this_query_already_in_flight = true;
-                this_peer_already_waiting_on_response = peers.contains(&origin.clone());
-
-                if !this_peer_already_waiting_on_response {
+                if !peers.contains(&origin.clone()) {
                     peers.push(origin.clone());
                 }
 
@@ -95,10 +90,10 @@ impl Node {
                 vec![origin.clone()]
             };
 
-        if this_peer_already_waiting_on_response {
-            // no need to add to pending queue then
-            return Ok(vec![]);
-        }
+        // TODO: Previously we did _not_ requery for a peer if the same one came in, but as we requeue peers now
+        // When DataNotFound etc come in (cos maybe another Adult has our data), we bork the client's requery attempts
+        // if we do this.
+        // So... Do we need to filter incoming client responses here/ on query receipt in some fashion?
 
         // drop if we exceed
         if waiting_peers.len() > MAX_WAITING_PEERS_PER_QUERY {
@@ -119,12 +114,6 @@ impl Node {
             .pending_data_queries
             .set(operation_id, waiting_peers, None)
             .await;
-
-        if this_query_already_in_flight {
-            trace!("Query was already sent out, no need to do it again");
-            // no need to send query again.
-            return Ok(vec![]);
-        }
 
         let msg = SystemMsg::NodeQuery(NodeQuery::Data {
             query,
