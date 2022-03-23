@@ -162,7 +162,8 @@ impl Node {
             .await
         {
             info!(
-                "ignore Offline: {} at {}",
+                "{}: {} at {}",
+                LogMarker::IgnoredNodeAsOffline,
                 node_state.name(),
                 node_state.addr()
             );
@@ -170,7 +171,8 @@ impl Node {
         }
 
         info!(
-            "handle Offline: {} at {}",
+            "{}: {} at {}",
+            LogMarker::AcceptedNodeAsOffline,
             node_state.name(),
             node_state.addr()
         );

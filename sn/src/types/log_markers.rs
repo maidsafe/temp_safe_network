@@ -25,6 +25,8 @@ pub enum LogMarker {
     // Malice
     DeviantsDetected,
     ProposeOffline,
+    AcceptedNodeAsOffline,
+    IgnoredNodeAsOffline,
     // Messaging
     ServiceMsgToBeHandled,
     SystemMsgToBeHandled,

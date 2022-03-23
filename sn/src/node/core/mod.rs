@@ -321,8 +321,7 @@ impl Node {
                 trace!("{}: {:?}", LogMarker::PromotedToElder, new.prefix);
                 NodeElderChange::Promoted
             } else if old.is_elder && !new.is_elder {
-                trace!("{}", LogMarker::DemotedFromElder);
-                info!("Demoted");
+                info!("{}", LogMarker::DemotedFromElder);
                 self.section_keys_provider.wipe().await;
                 NodeElderChange::Demoted
             } else {
