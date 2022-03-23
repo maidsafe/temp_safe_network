@@ -7,6 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 //! Dysfunctional "Node" detection for the SAFE Network.
+//! All dysfunction detection should route through this for proper weighting in
+//! relation to other possible sources of dysfunction
 
 // For quick_error
 #![recursion_limit = "256"]
