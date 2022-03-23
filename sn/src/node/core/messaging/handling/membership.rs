@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use bls::Signature;
-use sn_membership::{consensus::VoteResponse, Ballot, Reconfig, SignedVote};
+use sn_consensus::{consensus::VoteResponse, Ballot, Reconfig, SignedVote};
 use std::collections::{BTreeMap, BTreeSet};
 use tiny_keccak::{Hasher, Sha3};
 use xor_name::XorName;
@@ -70,37 +70,37 @@ impl Node {
                 );
                 vec![]
             }
-            Ok(VoteResponse::Decided(decision)) => {
-                trace!(
-                    ">>> Membership Vote msg successfully handled and consensus reached: {:?}",
-                    signed_vote
-                );
-                // We now update our knowledge of peers in our section as per consensus
-                let mut section_peers = self.network_knowledge.section_signed_members().await;
-                let public_key = self.network_knowledge.section_key().await;
-                for (reconfig, signature) in decision.proposals.clone().into_iter() {
-                    let sig = KeyedSig {
-                        public_key,
-                        signature,
-                    };
-
-                    match reconfig {
-                        Reconfig::Join(value) => {
-                            let _ = section_peers
-                                .insert(SectionAuth { value, sig }.into_authed_state());
-                        }
-                        Reconfig::Leave(value) => {
-                            let _ = section_peers
-                                .remove(&SectionAuth { value, sig }.into_authed_state());
-                        }
-                    }
-                }
-
-                self.network_knowledge.set_members(section_peers).await;
-
-                self.handle_new_membership_consensus(decision.proposals)
-                    .await
-            }
+            // Ok(VoteResponse::Decided(decision)) => {
+            //     trace!(
+            //         ">>> Membership Vote msg successfully handled and consensus reached: {:?}",
+            //         signed_vote
+            //     );
+            //     // We now update our knowledge of peers in our section as per consensus
+            //     let mut section_peers = self.network_knowledge.section_signed_members().await;
+            //     let public_key = self.network_knowledge.section_key().await;
+            //     for (reconfig, signature) in decision.proposals.clone().into_iter() {
+            //         let sig = KeyedSig {
+            //             public_key,
+            //             signature,
+            //         };
+            //
+            //         match reconfig {
+            //             Reconfig::Join(value) => {
+            //                 let _ = section_peers
+            //                     .insert(SectionAuth { value, sig }.into_authed_state());
+            //             }
+            //             Reconfig::Leave(value) => {
+            //                 let _ = section_peers
+            //                     .remove(&SectionAuth { value, sig }.into_authed_state());
+            //             }
+            //         }
+            //     }
+            //
+            //     self.network_knowledge.set_members(section_peers).await;
+            //
+            //     self.handle_new_membership_consensus(decision.proposals)
+            //         .await
+            // }
         }
     }
 

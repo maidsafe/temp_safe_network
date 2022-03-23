@@ -3396,8 +3396,8 @@ dependencies = [
  "serde_json",
  "signature",
  "sled",
+ "sn_consensus",
  "sn_launch_tool",
- "sn_membership",
  "structopt",
  "strum",
  "strum_macros",
@@ -3828,6 +3828,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sn_consensus"
+version = "1.15.0"
+dependencies = [
+ "bincode",
+ "blsttc",
+ "log",
+ "rand 0.7.3",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "sn_launch_tool"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3840,20 +3852,6 @@ dependencies = [
  "structopt",
  "tracing",
  "tracing-subscriber 0.3.8",
-]
-
-[[package]]
-name = "sn_membership"
-version = "1.13.0"
-dependencies = [
- "bincode",
- "blsttc",
- "hex",
- "log",
- "rand 0.7.3",
- "serde",
- "signature",
- "thiserror",
 ]
 
 [[package]]

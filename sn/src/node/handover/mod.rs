@@ -1,4 +1,4 @@
-// Copyright 2022 MaidSafe.net limited.
+// Copyright 2021 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,11 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod anti_entropy;
-mod approval;
-mod dkg_start;
-mod handover;
-mod membership;
-mod proposal;
-mod services;
-mod system;
+pub(crate) mod errors;
+pub(crate) mod handover_consensus;
+
+pub use handover_consensus::Handover;
+pub use errors::Error;

@@ -31,6 +31,7 @@ use super::{
     dkg::DkgVoter,
     network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider},
     Elders, Event, NodeElderChange, NodeInfo,
+    handover::Handover,
 };
 
 use crate::messaging::{
@@ -115,6 +116,10 @@ pub(crate) struct Node {
 
     relocate_state: Arc<RwLock<Option<Box<JoiningAsRelocated>>>>,
 
+    // Section handover state (Some for Elders, None for others)
+    pub(crate) elder_handover: Arc<RwLock<Option<Handover>>>,  // Elder only
+    pub(crate) pending_split_sap_candidates: Arc<RwLock<BTreeSet<SectionAuthorityProvider>>>, // Elder only
+
     joins_allowed: Arc<RwLock<bool>>,        // Elder only
     current_joins_semaphore: Arc<Semaphore>, // Elder only
 
@@ -155,6 +160,22 @@ impl Node {
         );
         info!("Liveness check: {:?}", adult_liveness);
 
+        // create handover
+        let handover = if let Some(key) = section_key_share {
+            let sap = network_knowledge.signed_sap.read().await.value;
+
+            let secret_key = (key.index, key.secret_key_share);
+            let elders = key.public_key_set;
+            let n_elders = sap.elders.len();
+            let gen = 0; // TODO placeholder value for now
+            let section_prefix = sap.prefix;
+
+            let handover_data = Handover::from(secret_key, elders, n_elders, gen, section_prefix);
+            Some(handover_data)
+        } else {
+            None
+        }
+
         Ok(Self {
             comm,
             info: Arc::new(RwLock::new(info)),
@@ -167,6 +188,7 @@ impl Node {
             dkg_voter: DkgVoter::default(),
             relocate_state: Arc::new(RwLock::new(None)),
             event_tx,
+            elder_handover: handover,
             joins_allowed: Arc::new(RwLock::new(true)),
             current_joins_semaphore: Arc::new(Semaphore::new(CONCURRENT_JOINS)),
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),

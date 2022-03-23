@@ -9,6 +9,7 @@
 use super::Prefix;
 
 use crate::messaging::data::Error as ErrorMsg;
+use crate::node::handover::Error as HandoverError;
 use crate::types::{convert_dt_error_to_error_msg, DataAddress, PublicKey};
 
 use secured_linked_list::error::Error as SecuredLinkedListError;
@@ -78,6 +79,9 @@ pub enum Error {
         "A JoinResponse was reeived after we've already joined the network. It has been ignored."
     )]
     AlreadyJoinedTheNetwork,
+    /// Elder Handover related errors
+    #[error("Handover Error:: {0}")]
+    HandoverError(#[from] HandoverError),
     #[error("No matching Elder")]
     NoMatchingElder,
     #[error("Node cannot join the network since it is not externally reachable: {0}")]

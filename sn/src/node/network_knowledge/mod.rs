@@ -33,7 +33,7 @@ use bls::PublicKey as BlsPublicKey;
 use section_peers::SectionPeers;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
-use sn_membership::Membership;
+use sn_consensus::Membership;
 use std::{
     collections::{BTreeMap, BTreeSet},
     convert::TryInto,
@@ -174,7 +174,7 @@ impl NetworkKnowledge {
         genesis_sk_set: bls::SecretKeySet,
     ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
         let public_key_set = genesis_sk_set.public_keys();
-        let secret_key_share = genesis_sk_set.secret_key_share(0);
+        let secret_key_share = genesis_sk_set.secret_key_share(0u64);
         let genesis_key = public_key_set.public_key();
 
         let section_auth = create_first_section_authority_provider(

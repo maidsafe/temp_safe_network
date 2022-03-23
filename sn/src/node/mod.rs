@@ -17,6 +17,7 @@ mod core;
 mod dkg;
 mod ed25519;
 mod error;
+mod handover;
 mod logging;
 mod messages;
 mod network_knowledge;
@@ -43,6 +44,8 @@ pub use self::{
 };
 pub use qp2p::{Config as NetworkConfig, SendStream};
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
+
+pub(crate) use handover::Handover;
 
 #[cfg(any(test, feature = "test-utils"))]
 pub use test_utils::*;

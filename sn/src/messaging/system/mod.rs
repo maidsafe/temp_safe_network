@@ -28,7 +28,7 @@ use bls_dkg::key_gen::message::Message as DkgMessage;
 use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
-use sn_membership::{Reconfig, SignedVote};
+use sn_consensus::{Reconfig, SignedVote};
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
@@ -169,6 +169,8 @@ pub enum SystemMsg {
     DkgFailureAgreement(DkgFailureSigSet),
     /// Voting message for membership consensus protocol to add/remove peers to/from a section.
     Membership(SignedVote<Reconfig<NodeState>>),
+    /// Voting message for handover consensus protocol to handover a section to a set of new elders.
+    Handover(SignedVote<Vec<SectionAuthorityProvider>>),
     /// Message containing a single `Proposal` to be aggregated in the proposal aggregator.
     Propose {
         /// The content of the proposal

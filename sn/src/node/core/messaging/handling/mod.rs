@@ -11,6 +11,7 @@ mod anti_entropy;
 mod dkg;
 mod join;
 mod membership;
+mod handover;
 mod proposals;
 mod relocation;
 mod resource_proof;
@@ -451,6 +452,7 @@ impl Node {
                 self.handle_proposal(msg_id, proposal.into_state(), sig_share, sender)
                     .await
             }
+            SystemMsg::Handover(vote) => Ok(self.handle_handover_msg(vote).await),
             SystemMsg::DkgStart {
                 session_id,
                 prefix,

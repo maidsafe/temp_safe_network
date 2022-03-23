@@ -26,6 +26,9 @@ pub enum LogMarker {
     // Membership
     AgreementOfJoin,
     MembershipMsg,
+    // Handover
+    AgreementOfHandover,
+    HandoverMsg,
     // Messaging
     ServiceMsgToBeHandled,
     SystemMsgToBeHandled,

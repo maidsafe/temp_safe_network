@@ -8,7 +8,7 @@
 
 use crate::messaging::system::{NodeState as NodeStateMsg, SystemMsg};
 use crate::node::{api::cmds::Cmd, core::Node, network_knowledge::NodeState};
-use sn_membership::{Reconfig, SignedVote};
+use sn_consensus::{Reconfig, SignedVote};
 
 impl Node {
     /// Broadcast proposal to Elders to accept a new peer to join the section membership

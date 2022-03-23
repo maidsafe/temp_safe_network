@@ -26,56 +26,51 @@ impl Node {
         section_auth: SectionAuthorityProvider,
         sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
-        let equal_or_extension = section_auth.prefix() == self.network_knowledge.prefix().await
-            || section_auth
-                .prefix()
-                .is_extension_of(&self.network_knowledge.prefix().await);
-
-        if equal_or_extension {
-            // Our section or sub-section
-            debug!(
-                "Updating section info for our prefix: {:?}",
-                section_auth.prefix()
-            );
-
-            let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
-            let saps_candidates = self
-                .network_knowledge
-                .promote_and_demote_elders(&self.info.read().await.name(), &BTreeSet::new())
-                .await;
-
-            if !saps_candidates.contains(&signed_section_auth.elder_candidates()) {
-                // SectionInfo out of date, ignore.
-                return Ok(vec![]);
-            }
-
-            // Send the `NewElders` proposal to all of the to-be-Elders so it's aggregated by them.
-            let proposal = Proposal::NewElders(signed_section_auth);
-            let proposal_recipients = saps_candidates
-                .iter()
-                .flat_map(|info| info.elders())
-                .cloned()
-                .collect();
-
-            let section_key = self.network_knowledge.section_key().await;
-            let key_share = self
-                .section_keys_provider
-                .key_share(&section_key)
-                .await
-                .map_err(|err| {
-                    trace!("Can't propose {:?}: {:?}", proposal, err);
-                    err
-                })?;
-
-            self.send_proposal(proposal_recipients, proposal, &key_share)
-                .await
-        } else {
+        // check if section matches our prefix
+        let matches_prefix = section_auth.prefix() == self.network_knowledge.prefix().await;
+        let is_extension_prefix = section_auth.prefix().is_extension_of(&self.network_knowledge.prefix().await;
+        if !matches_prefix && !is_extension_prefix {
             // Other section. We shouln't be receiving or updating a SAP for
             // a remote section here, that is done with a AE msg response.
             debug!(
                 "Ignoring Proposal::SectionInfo since prefix doesn't match ours: {:?}",
                 section_auth
             );
+            return Ok(vec![])
+        }
+        debug!(
+            "Updating section info for our prefix: {:?}",
+            section_auth.prefix()
+        );
+
+        // check if SAP is already in our network knowledge
+        let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
+        let saps_candidates = self
+            .network_knowledge
+            .promote_and_demote_elders(&self.info.read().await.name(), &BTreeSet::new())
+            .await;
+        if !saps_candidates.contains(&signed_section_auth.elder_candidates()) {
+            // SectionInfo out of date, ignore.
+            return Ok(vec![]);
+        }
+
+        // handle regular elder handover (1 to 1)
+        // trigger handover consensus among elders
+        if matches_prefix {
+            debug!("Propose elder handover to: {:?}", section_auth.prefix());
+            return self.propose_handover_sap(SapCandidates::ElderHandover(section_auth)).await
+        }
+
+        // handle section split (1 to 2)
+        // TODO check for race conditions on pending_split_sap_candidates
+        // Do we ever need to clear it? when DKG fails on one side maybe?
+        // Don't like to keep states here, is there a better way?
+        self.pending_split_sap_candidates.write().await.insert(section_auth);
+        if let [sap1, sap2] = self.pending_split_sap_candidates.read().await.as_slice() {
+            debug!("Propose section split handover to: {:?} {:?}", sap1.prefix(), sap2.prefix());
+            self.propose_handover_sap(SapCandidates::SectionSplit(sap1, sap2)).await
+        } else {
+            debug!("Waiting for more split handover candidates");
             Ok(vec![])
         }
     }

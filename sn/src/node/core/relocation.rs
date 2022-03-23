@@ -229,6 +229,7 @@ mod tests {
             SecuredLinkedList::new(genesis_pk),
             section_auth,
             None,
+            None,
         )?;
 
         for peer in &peers {
