@@ -25,9 +25,9 @@ use crate::{
     },
     types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData, ReplicatedDataAddress},
 };
-
+use dashmap::DashSet;
 use itertools::Itertools;
-use std::{cmp::Ordering, collections::BTreeSet};
+use std::{cmp::Ordering, collections::BTreeSet, sync::Arc};
 use tracing::info;
 use xor_name::XorName;
 
@@ -79,21 +79,17 @@ impl Node {
                 .await;
         }
 
-        let waiting_peers =
-            if let Some(mut peers) = self.pending_data_queries.get(&operation_id).await {
-                if !peers.contains(&origin.clone()) {
-                    peers.push(origin.clone());
-                }
+        let mut op_was_already_underway = false;
+        let waiting_peers = if let Some(peers) = self.pending_data_queries.get(&operation_id).await
+        {
+            op_was_already_underway = peers.insert(origin.clone());
 
-                peers
-            } else {
-                vec![origin.clone()]
-            };
-
-        // TODO: Previously we did _not_ requery for a peer if the same one came in, but as we requeue peers now
-        // When DataNotFound etc come in (cos maybe another Adult has our data), we bork the client's requery attempts
-        // if we do this.
-        // So... Do we need to filter incoming client responses here/ on query receipt in some fashion?
+            peers
+        } else {
+            let peers = DashSet::new();
+            let _false_as_fresh = peers.insert(origin.clone());
+            Arc::new(peers)
+        };
 
         // drop if we exceed
         if waiting_peers.len() > MAX_WAITING_PEERS_PER_QUERY {
@@ -101,28 +97,37 @@ impl Node {
             return Ok(vec![]);
         }
 
-        // ensure we only add a pending request when we're actually sending out requests.
-        for target in &targets {
-            trace!("adding pending req for {target:?} in dysfunction tracking");
-            self.dysfunction_tracking
-                .add_a_pending_request_operation(*target, operation_id)
+        // only set pending data query cache if non existed.
+        // otherwise we've appended to the Peers above
+        // we rely on the data query cache timeout to decide as/when we'll be re-sending a query to adults
+        if !op_was_already_underway {
+            // ensure we only add a pending request when we're actually sending out requests.
+            for target in &targets {
+                trace!("adding pending req for {target:?} in dysfunction tracking");
+                self.dysfunction_tracking
+                    .add_a_pending_request_operation(*target, operation_id)
+                    .await;
+            }
+
+            trace!("Adding to pending data queries");
+
+            let _prior_value = self
+                .pending_data_queries
+                .set(operation_id, waiting_peers, None)
                 .await;
+
+            let msg = SystemMsg::NodeQuery(NodeQuery::Data {
+                query,
+                auth: auth.into_inner(),
+                origin: EndUser(origin.name()),
+                correlation_id: MsgId::from_xor_name(*address.name()),
+            });
+
+            self.send_node_msg_to_nodes(msg, targets).await
+        } else {
+            // we don't do anything as we're still within data query timeout
+            Ok(vec![])
         }
-
-        trace!("Adding to pending data queries");
-        let _prior_value = self
-            .pending_data_queries
-            .set(operation_id, waiting_peers, None)
-            .await;
-
-        let msg = SystemMsg::NodeQuery(NodeQuery::Data {
-            query,
-            auth: auth.into_inner(),
-            origin: EndUser(origin.name()),
-            correlation_id: MsgId::from_xor_name(*address.name()),
-        });
-
-        self.send_node_msg_to_nodes(msg, targets).await
     }
 
     pub(crate) async fn get_metadata_of(&self, prefix: &Prefix) -> MetadataExchange {

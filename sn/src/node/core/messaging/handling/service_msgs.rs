@@ -195,14 +195,14 @@ impl Node {
         };
         let (msg_kind, payload) = self.ed_sign_client_msg(&msg).await?;
 
-        for origin in waiting_peers {
-            let dst = DstLocation::EndUser(EndUser(origin.name()));
+        for peer in waiting_peers.iter() {
+            let dst = DstLocation::EndUser(EndUser(peer.name()));
             let wire_msg = WireMsg::new_msg(msg_id, payload.clone(), msg_kind.clone(), dst)?;
 
             debug!("Responding with the first query response to {:?}", dst);
 
             let command = Cmd::SendMsg {
-                recipients: vec![origin],
+                recipients: vec![peer.clone()],
                 wire_msg,
             };
             cmds.push(command);
