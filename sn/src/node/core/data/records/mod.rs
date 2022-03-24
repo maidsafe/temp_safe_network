@@ -7,10 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod capacity;
-mod liveness_tracking;
 
 pub(crate) use self::capacity::{Capacity, MIN_LEVEL_WHEN_FULL};
-pub(crate) use self::liveness_tracking::Liveness;
 
 use crate::{
     data_copy_count,
@@ -27,9 +25,9 @@ use crate::{
     },
     types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData, ReplicatedDataAddress},
 };
-
+use dashmap::DashSet;
 use itertools::Itertools;
-use std::{cmp::Ordering, collections::BTreeSet};
+use std::{cmp::Ordering, collections::BTreeSet, sync::Arc};
 use tracing::info;
 use xor_name::XorName;
 
@@ -75,26 +73,23 @@ impl Node {
             let error =
                 convert_to_error_msg(Error::NoAdults(self.network_knowledge().prefix().await));
 
+            debug!("No targets found for {msg_id:?}");
             return self
                 .send_cmd_error_response(CmdError::Data(error), origin, msg_id)
                 .await;
         }
 
-        let mut already_waiting_on_response = false;
-        let mut this_peer_already_waiting_on_response = false;
+        let mut op_was_already_underway = false;
         let waiting_peers = if let Some(peers) = self.pending_data_queries.get(&operation_id).await
         {
-            already_waiting_on_response = true;
-            this_peer_already_waiting_on_response = peers.contains(&origin.clone());
+            op_was_already_underway = peers.insert(origin.clone());
+
             peers
         } else {
-            vec![origin.clone()]
+            let peers = DashSet::new();
+            let _false_as_fresh = peers.insert(origin.clone());
+            Arc::new(peers)
         };
-
-        if this_peer_already_waiting_on_response {
-            // no need to add to pending queue then
-            return Ok(vec![]);
-        }
 
         // drop if we exceed
         if waiting_peers.len() > MAX_WAITING_PEERS_PER_QUERY {
@@ -102,31 +97,37 @@ impl Node {
             return Ok(vec![]);
         }
 
-        // ensure we only add a pending request when we're actually sending out requests.
-        for target in &targets {
-            self.liveness
-                .add_a_pending_request_operation(*target, operation_id)
+        // only set pending data query cache if non existed.
+        // otherwise we've appended to the Peers above
+        // we rely on the data query cache timeout to decide as/when we'll be re-sending a query to adults
+        if !op_was_already_underway {
+            // ensure we only add a pending request when we're actually sending out requests.
+            for target in &targets {
+                trace!("adding pending req for {target:?} in dysfunction tracking");
+                self.dysfunction_tracking
+                    .add_a_pending_request_operation(*target, operation_id)
+                    .await;
+            }
+
+            trace!("Adding to pending data queries");
+
+            let _prior_value = self
+                .pending_data_queries
+                .set(operation_id, waiting_peers, None)
                 .await;
+
+            let msg = SystemMsg::NodeQuery(NodeQuery::Data {
+                query,
+                auth: auth.into_inner(),
+                origin: EndUser(origin.name()),
+                correlation_id: MsgId::from_xor_name(*address.name()),
+            });
+
+            self.send_node_msg_to_nodes(msg, targets).await
+        } else {
+            // we don't do anything as we're still within data query timeout
+            Ok(vec![])
         }
-
-        let _prior_value = self
-            .pending_data_queries
-            .set(operation_id, waiting_peers, None)
-            .await;
-
-        if already_waiting_on_response {
-            // no need to send query again.
-            return Ok(vec![]);
-        }
-
-        let msg = SystemMsg::NodeQuery(NodeQuery::Data {
-            query,
-            auth: auth.into_inner(),
-            origin: EndUser(origin.name()),
-            correlation_id: MsgId::from_xor_name(*address.name()),
-        });
-
-        self.send_node_msg_to_nodes(msg, targets).await
     }
 
     pub(crate) async fn get_metadata_of(&self, prefix: &Prefix) -> MetadataExchange {
@@ -147,7 +148,7 @@ impl Node {
         self.capacity.retain_members_only(&members).await;
 
         // stop tracking liveness of absent holders
-        self.liveness.retain_members_only(members);
+        self.dysfunction_tracking.retain_members_only(members);
 
         Ok(())
     }
@@ -157,7 +158,7 @@ impl Node {
         info!("Adding new Adult: {adult} to trackers");
         self.capacity.add_new_adult(adult).await;
 
-        self.liveness.add_new_adult(adult);
+        self.dysfunction_tracking.add_new_node(adult);
     }
 
     /// Set storage level of a given node.
@@ -256,11 +257,11 @@ impl Node {
             .collect::<BTreeSet<_>>();
 
         trace!(
-               "Target chunk holders of {:?} are empty adults: {:?} and full adults that were ignored: {:?}",
-               target,
-               candidates,
-               full_adults
-           );
+            "Target holders of {:?} are empty adults: {:?} and full adults that were ignored: {:?}",
+            target,
+            candidates,
+            full_adults
+        );
 
         candidates
     }

@@ -311,6 +311,7 @@ impl RegisterStorage {
                 cmd: SignedRegisterCreate { op, auth },
                 ..
             } => {
+                debug!("Creating Register....");
                 // TODO 1: in higher layers we must verify that the section_auth is from a proper section..!
                 // TODO 2: Enable this check once we have section signature over the container key.
                 // let public_key = section_auth.sig.public_key;
@@ -324,6 +325,7 @@ impl RegisterStorage {
                 let old_value = None::<Vec<u8>>;
                 let new_value = Some(vec![]); // inserts empty value
 
+                debug!("Getting store for key");
                 // init store first, to allow append to happen asap after key insert
                 // could be races, but edge case for later todos.
                 let store = self.get_or_create_store(&key)?;

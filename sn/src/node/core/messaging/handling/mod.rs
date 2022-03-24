@@ -150,6 +150,18 @@ impl Node {
                                     )
                                     .await?
                                 {
+                                    // we want to log issues with an elder who is out of sync here...
+                                    let knowledge = self.network_knowledge.elders().await;
+                                    let mut known_elders = knowledge.iter().map(|peer| peer.name());
+
+                                    if known_elders.contains(&sender.name()) {
+                                        // we track a dysfunction against our elder here
+                                        self.dysfunction_tracking
+                                            .track_knowledge_issue(sender.name())
+                                            .await
+                                            .map_err(Error::from)?;
+                                    }
+
                                     // short circuit and send those AE responses
                                     cmds.push(ae_cmd);
                                     return Ok(cmds);
@@ -695,13 +707,13 @@ impl Node {
                     Ok(vec![])
                 };
             }
-            SystemMsg::NodeEvent(NodeEvent::DeviantsDetected(deviants)) => {
+            SystemMsg::NodeEvent(NodeEvent::SuspiciousNodesDetected(suspects)) => {
                 info!(
-                    "Received probable deviants nodes {deviants:?} Starting preemptive data replication"
+                    "Received probable suspects nodes {suspects:?} Starting preemptive data replication"
                 );
                 debug!("{}", LogMarker::DeviantsDetected);
 
-                return self.republish_data_for_deviant_nodes(deviants).await;
+                return self.republish_data_for_suspicious_nodes(suspects).await;
             }
             SystemMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
                 info!("ReplicateData MsgId: {:?}", msg_id);
@@ -909,7 +921,11 @@ impl Node {
                 correlation_id,
                 user,
             } => {
-                debug!("{:?}", LogMarker::ChunkQueryResponseReceviedFromAdult);
+                debug!(
+                    "{:?}: op_id {:?}, correlation_id: {correlation_id:?}, sender: {sender}",
+                    LogMarker::ChunkQueryResponseReceviedFromAdult,
+                    response.operation_id()?
+                );
                 let sending_nodes_pk = match msg_authority {
                     NodeMsgAuthority::Node(auth) => PublicKey::from(auth.into_inner().node_ed_pk),
                     _ => return Err(Error::InvalidQueryResponseAuthority),
@@ -1045,10 +1061,11 @@ impl Node {
         cmds
     }
 
-    async fn republish_data_for_deviant_nodes(
+    async fn republish_data_for_suspicious_nodes(
         &self,
-        deviants: BTreeSet<XorName>,
+        suspects: BTreeSet<XorName>,
     ) -> Result<Vec<Cmd>> {
+        debug!("Republishing data for suspect nodes : {suspects:?}");
         let our_adults = self
             .network_knowledge
             .adults()
@@ -1057,7 +1074,7 @@ impl Node {
             .map(|peer| peer.name())
             .collect::<BTreeSet<XorName>>();
 
-        self.reorganize_data(BTreeSet::new(), deviants, our_adults)
+        self.reorganize_data(BTreeSet::new(), suspects, our_adults)
             .await
             .map_err(crate::node::Error::from)
     }

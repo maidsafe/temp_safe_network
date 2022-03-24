@@ -245,7 +245,7 @@ mod tests {
     use crate::{
         app::files,
         app::test_helpers::{new_safe_instance, random_nrs_name, TestDataFilesContainer},
-        retry_loop, SafeUrl, Scope,
+        SafeUrl, Scope,
     };
     use anyhow::{anyhow, bail, Context, Result};
     use bytes::Bytes;
@@ -261,8 +261,10 @@ mod tests {
             .await?;
 
         let safe_url = SafeUrl::from_url(&fc_xorurl)?;
-        let content = retry_loop!(safe.fetch(&fc_xorurl, None));
-        let (version0, _) = retry_loop!(safe.files_container_get(&fc_xorurl))
+        let content = safe.fetch(&fc_xorurl, None).await?;
+        let (version0, _) = safe
+            .files_container_get(&fc_xorurl)
+            .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
         match content.clone() {
@@ -312,8 +314,10 @@ mod tests {
         let (xorurl, _, the_files_map) = safe
             .files_container_create_from("./testdata/", None, true, false)
             .await?;
-        let _ = retry_loop!(safe.fetch(&xorurl, None));
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
+        let _ = safe.fetch(&xorurl, None).await?;
+        let (version0, _) = safe
+            .files_container_get(&xorurl)
+            .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
         // link to an nrs map
@@ -323,7 +327,7 @@ mod tests {
         let _ = safe.nrs_add(&site_name, &safe_url).await?;
         let nrs_url = format!("safe://{}", site_name);
 
-        let content = retry_loop!(safe.fetch(&nrs_url, None));
+        let content = safe.fetch(&nrs_url, None).await?;
 
         safe_url.set_sub_names("")?;
         let xorurl_without_subname = safe_url.to_string();
@@ -372,8 +376,10 @@ mod tests {
         let (xorurl, _, _the_files_map) = safe
             .files_container_create_from("./testdata/", None, true, false)
             .await?;
-        let _ = retry_loop!(safe.fetch(&xorurl, None));
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
+        let _ = safe.fetch(&xorurl, None).await?;
+        let (version0, _) = safe
+            .files_container_get(&xorurl)
+            .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
         // link to an nrs map
@@ -387,7 +393,7 @@ mod tests {
         let nrs_url = format!("safe://{}", site_name);
 
         // this should resolve to a FilesContainer
-        let content = retry_loop!(safe.fetch(&nrs_url, None));
+        let content = safe.fetch(&nrs_url, None).await?;
         match &content {
             SafeData::FilesContainer {
                 xorurl,
@@ -443,7 +449,7 @@ mod tests {
             .await?;
 
         let safe_url = SafeUrl::from_url(&xorurl)?;
-        let content = retry_loop!(safe.fetch(&xorurl, None));
+        let content = safe.fetch(&xorurl, None).await?;
         assert!(
             content
                 == SafeData::PublicFile {
@@ -484,7 +490,9 @@ mod tests {
         let public_name = format!("file.{site_name}");
         safe.nrs_add(&public_name, &safe_url).await?;
 
-        let content = retry_loop!(safe.fetch(&format!("safe://{public_name}"), None));
+        println!("NRS ADDED");
+
+        let content = safe.fetch(&format!("safe://{public_name}"), None).await?;
         assert!(
             content
                 == SafeData::PublicFile {
@@ -524,7 +532,7 @@ mod tests {
 
         // Fetch first half and match
         let fetch_first_half = Some((None, Some(size as u64 / 2)));
-        let content = retry_loop!(safe.fetch(&xorurl, fetch_first_half));
+        let content = safe.fetch(&xorurl, fetch_first_half).await?;
 
         if let SafeData::PublicFile { data, .. } = content {
             assert_eq!(data, saved_data.slice(0..size / 2));
@@ -556,8 +564,10 @@ mod tests {
         let (xorurl, _, _files_map) = safe
             .files_container_create_from("./testdata/", None, true, false)
             .await?;
-        let _ = retry_loop!(safe.fetch(&xorurl, None));
-        let (version0, _) = retry_loop!(safe.files_container_get(&xorurl))
+        let _ = safe.fetch(&xorurl, None).await?;
+        let (version0, _) = safe
+            .files_container_get(&xorurl)
+            .await?
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
         // map to nrs name
@@ -576,7 +586,7 @@ mod tests {
         let file_size = file_data.len();
 
         // fetch full file and compare
-        let content = retry_loop!(safe.fetch(&nrs_url, None));
+        let content = safe.fetch(&nrs_url, None).await?;
         if let SafeData::PublicFile { data, .. } = &content {
             assert_eq!(data.clone(), file_data.clone());
         } else {

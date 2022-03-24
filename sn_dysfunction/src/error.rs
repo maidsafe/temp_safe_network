@@ -6,8 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod records;
-mod storage;
+use thiserror::Error;
 
-pub(crate) use self::records::{Capacity, MIN_LEVEL_WHEN_FULL};
-pub(crate) use self::storage::DataStorage;
+/// Specialisation of `std::Result` for dbs.
+pub(crate) type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Error, Debug)]
+#[non_exhaustive]
+/// Node error variants.
+pub enum Error {
+    /// System time error
+    #[error("Could not calculate system time")]
+    CouldNotCalculateSystemTime,
+    /// SystemTime error
+    #[error(transparent)]
+    SysTime(#[from] std::time::SystemTimeError),
+}

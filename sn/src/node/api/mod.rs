@@ -265,6 +265,10 @@ impl NodeApi {
         ));
 
         dispatcher.clone().start_network_probing().await;
+        dispatcher
+            .clone()
+            .check_for_dysfunction_periodically()
+            .await;
         dispatcher.clone().start_cleaning_peer_links().await;
         dispatcher.clone().write_prefixmap_to_disk().await;
 

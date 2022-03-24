@@ -11,7 +11,7 @@ use crate::node::{
     core::{Node, Proposal},
     Result,
 };
-use std::{collections::BTreeSet, iter, net::SocketAddr};
+use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;
 
 impl Node {
@@ -29,14 +29,9 @@ impl Node {
             return Ok(vec![]);
         }
 
-        let mut cmds = self.propose_offline(name).await?;
-        cmds.push(Cmd::StartConnectivityTest(name));
+        self.log_comm_issue(name).await?;
+        let cmds = vec![Cmd::StartConnectivityTest(name)];
         Ok(cmds)
-    }
-
-    pub(crate) async fn propose_offline(&self, name: XorName) -> Result<Vec<Cmd>> {
-        self.cast_offline_proposals(&iter::once(name).collect())
-            .await
     }
 
     pub(crate) async fn cast_offline_proposals(

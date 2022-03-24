@@ -39,16 +39,18 @@ use crate::messaging::{
     system::{DkgSessionId, SystemMsg},
     AuthorityProof, SectionAuth,
 };
-use crate::node::error::Result;
+use crate::node::error::{Error, Result};
 use crate::types::{
     log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk, Cache, Peer,
 };
-use crate::UsedSpace;
+use crate::{elder_count, UsedSpace};
 
 use backoff::ExponentialBackoff;
-use data::{Capacity, Liveness};
+use dashmap::DashSet;
+use data::Capacity;
 use itertools::Itertools;
 use resource_proof::ResourceProof;
+use sn_dysfunction::{DysfunctionDetection, DysfunctionSeverity};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     net::SocketAddr,
@@ -70,11 +72,15 @@ pub(crate) const CONCURRENT_JOINS: usize = 7;
 // from elders (with whom the client is connected) to adults (who hold the data), the elder handling
 // the query cannot reply immediately. For now, they stash a reference to the client `Peer` in
 // `Core::pending_data_queries`, which is a cache with duration-based expiry.
-// TODO: The value chosen here is longer than the default client timeout (see
+// TODO: The value chosen here is shorter than the default client timeout (see
 // `crate::client::SN_CLIENT_QUERY_TIMEOUT`), but the timeout is configurable. Ideally this would be
 // based on liveness properties (e.g. the timeout should be dynamic based on the responsiveness of
 // the section).
-const DATA_QUERY_TIMEOUT: Duration = Duration::from_secs(60 * 5 /* 5 mins */);
+const DATA_QUERY_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// How long to keep a cache of a given suspect node. Use to check if it's a newly suspicopus node
+/// and relevant flows should be triggered. (So a throttle on supect flows pehaps)
+const SUSPECT_NODE_RETENTION_DURATION: Duration = Duration::from_secs(60 * 25 /* 25 mins */);
 
 // This prevents pending query limit unbound growth
 pub(crate) const DATA_QUERY_LIMIT: usize = 100;
@@ -118,8 +124,10 @@ pub(crate) struct Node {
     current_joins_semaphore: Arc<Semaphore>,
     // Trackers
     capacity: Capacity,
-    liveness: Liveness,
-    pending_data_queries: Arc<Cache<OperationId, Vec<Peer>>>,
+    dysfunction_tracking: DysfunctionDetection,
+    pending_data_queries: Arc<Cache<OperationId, Arc<DashSet<Peer>>>>,
+    /// Timed cache of suspect nodes and their score
+    known_suspect_nodes: Arc<Cache<XorName, usize>>,
     // Caches
     ae_backoff_cache: AeBackoffCache,
 }
@@ -143,16 +151,20 @@ impl Node {
 
         let data_storage = DataStorage::new(&root_storage_dir, used_space.clone())?;
 
-        info!("Creating Liveness checks");
-        let adult_liveness = Liveness::new(
+        info!("Creating DysfunctionDetection checks");
+        let node_dysfunction_detector = DysfunctionDetection::new(
             network_knowledge
                 .adults()
                 .await
                 .iter()
                 .map(|peer| peer.name())
                 .collect::<Vec<XorName>>(),
+            elder_count(),
         );
-        info!("Liveness check: {:?}", adult_liveness);
+        info!(
+            "DysfunctionDetection check: {:?}",
+            node_dysfunction_detector
+        );
 
         Ok(Self {
             comm,
@@ -171,8 +183,11 @@ impl Node {
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             data_storage,
             capacity: Capacity::default(),
-            liveness: adult_liveness,
+            dysfunction_tracking: node_dysfunction_detector,
             pending_data_queries: Arc::new(Cache::with_expiry_duration(DATA_QUERY_TIMEOUT)),
+            known_suspect_nodes: Arc::new(Cache::with_expiry_duration(
+                SUSPECT_NODE_RETENTION_DURATION,
+            )),
             ae_backoff_cache: AeBackoffCache::default(),
         })
     }
@@ -205,6 +220,30 @@ impl Node {
 
         self.send_direct_msg_to_nodes(recipients, message, dst_name, section_key)
             .await
+    }
+
+    /// returns names that are relatively dysfunctional
+    pub(crate) async fn get_dysfunctional_node_names(&self) -> Result<BTreeSet<XorName>> {
+        self.dysfunction_tracking
+            .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
+            .await
+            .map_err(Error::from)
+    }
+
+    /// returns names that are relatively dysfunctional
+    pub(crate) async fn get_suspicious_node_names(&self) -> Result<BTreeSet<XorName>> {
+        self.dysfunction_tracking
+            .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
+            .await
+            .map_err(Error::from)
+    }
+
+    /// Log a communication problem
+    pub(crate) async fn log_comm_issue(&self, name: XorName) -> Result<()> {
+        self.dysfunction_tracking
+            .track_comm_issue(name)
+            .await
+            .map_err(Error::from)
     }
 
     pub(crate) async fn write_prefix_map(&self) {
@@ -283,8 +322,7 @@ impl Node {
                 trace!("{}: {:?}", LogMarker::PromotedToElder, new.prefix);
                 NodeElderChange::Promoted
             } else if old.is_elder && !new.is_elder {
-                trace!("{}", LogMarker::DemotedFromElder);
-                info!("Demoted");
+                info!("{}", LogMarker::DemotedFromElder);
                 self.section_keys_provider.wipe().await;
                 NodeElderChange::Demoted
             } else {

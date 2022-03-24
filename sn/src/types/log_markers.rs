@@ -24,6 +24,9 @@ pub enum LogMarker {
     AgreementOfOnline,
     // Malice
     DeviantsDetected,
+    ProposeOffline,
+    AcceptedNodeAsOffline,
+    IgnoredNodeAsOffline,
     // Messaging
     ServiceMsgToBeHandled,
     SystemMsgToBeHandled,
@@ -83,7 +86,7 @@ pub enum LogMarker {
     SendJoinsDisallowed,
     SendDKGUnderway,
     SendNodeApproval,
-    SendDeviantsDetected,
+    SendSuspiciousNodesDetected,
     // Approved to join
     ReceivedJoinApproval,
     // Connections

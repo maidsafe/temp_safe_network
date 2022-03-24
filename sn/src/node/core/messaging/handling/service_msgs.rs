@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::data_copy_count;
+use crate::messaging::system::NodeEvent;
 use crate::messaging::{
     data::{CmdError, DataCmd, DataQuery, Error as ErrorMsg, ServiceMsg},
     system::{NodeQueryResponse, SystemMsg},
@@ -14,8 +15,7 @@ use crate::messaging::{
 };
 use crate::node::{api::cmds::Cmd, core::Node, Result};
 use crate::types::{log_markers::LogMarker, register::User, Peer, PublicKey, ReplicatedData};
-
-use crate::messaging::system::NodeEvent;
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
 impl Node {
@@ -69,6 +69,52 @@ impl Node {
         false
     }
 
+    /// form Cmds about any newly suspicious nodes
+    async fn notify_about_newly_suspect_nodes(&self) -> Result<Vec<Cmd>> {
+        let mut cmds = vec![];
+
+        let all_suspect_nodes = self.get_suspicious_node_names().await?;
+
+        let known_suspect_nodes = self.known_suspect_nodes.get_items().await;
+
+        let newly_suspect_nodes: BTreeSet<_> = all_suspect_nodes
+            .iter()
+            .filter(|node| !known_suspect_nodes.contains_key(node))
+            .copied()
+            .collect();
+
+        if !newly_suspect_nodes.is_empty() {
+            warn!("New nodes have crossed preemptive replication threshold:  {newly_suspect_nodes:?} . Triggering preemptive data replication");
+
+            for sus in &all_suspect_nodes {
+                // 0 is set here as we actually don't need or want the score.
+                let _prev = self.known_suspect_nodes.set(*sus, 0, None).await;
+            }
+
+            let our_adults = self.network_knowledge.adults().await;
+            let valid_adults = our_adults
+                .iter()
+                .filter(|peer| !newly_suspect_nodes.contains(&peer.name()))
+                .cloned()
+                .collect::<Vec<Peer>>();
+
+            for adult in valid_adults {
+                cmds.push(Cmd::SignOutgoingSystemMsg {
+                    msg: SystemMsg::NodeEvent(NodeEvent::SuspiciousNodesDetected(
+                        newly_suspect_nodes.clone(),
+                    )),
+                    dst: DstLocation::Node {
+                        name: adult.name(),
+                        section_pk: *self.section_chain().await.last_key(),
+                    },
+                });
+                debug!("{:?}", LogMarker::SendSuspiciousNodesDetected);
+            }
+        }
+
+        Ok(cmds)
+    }
+
     /// Handle data read
     /// Records response in liveness tracking
     /// Forms a response to send to the requester
@@ -91,7 +137,10 @@ impl Node {
         let op_id = response.operation_id()?;
 
         let querys_peers = self.pending_data_queries.remove(&op_id).await;
+        // Clear expired queries from the cache.
+        self.pending_data_queries.remove_expired().await;
 
+        // First check for waiting peers. If no one is waiting, we drop the response
         let waiting_peers = if let Some(peers) = querys_peers {
             peers
         } else {
@@ -103,62 +152,23 @@ impl Node {
             return Ok(cmds);
         };
 
-        // Clear expired queries from the cache.
-        self.pending_data_queries.remove_expired().await;
+        // if there's anything sus going on at this point, lets trigger some activity
+        let sus_cmds = self.notify_about_newly_suspect_nodes().await?;
+        cmds.extend(sus_cmds);
 
         let query_response = response.convert();
 
-        let pending_removed = match query_response.operation_id() {
-            Ok(op_id) => {
-                self.liveness
-                    .request_operation_fulfilled(&node_id, op_id)
-                    .await
-            }
-            Err(error) => {
-                warn!("Node problems noted when retrieving data: {:?}", error);
-                false
-            }
-        };
-
-        let (unresponsives, deviants) = self.liveness.find_unresponsive_and_deviant_nodes().await;
-
-        // Check for unresponsive adults here.
-        for (name, count) in unresponsives {
-            warn!(
-                "Node {} has {} pending ops. It might be unresponsive",
-                name, count
-            );
-            cmds.push(Cmd::ProposeOffline(name));
-        }
-
-        if !deviants.is_empty() {
-            warn!("{deviants:?} have crossed preemptive replication threshold. Triggering preemptive data replication");
-
-            let our_adults = self.network_knowledge.adults().await;
-            let valid_adults = our_adults
-                .iter()
-                .filter(|peer| !deviants.contains(&peer.name()))
-                .cloned()
-                .collect::<Vec<Peer>>();
-
-            for adult in valid_adults {
-                cmds.push(Cmd::SignOutgoingSystemMsg {
-                    msg: SystemMsg::NodeEvent(NodeEvent::DeviantsDetected(deviants.clone())),
-                    dst: DstLocation::Node {
-                        name: adult.name(),
-                        section_pk: *self.section_chain().await.last_key(),
-                    },
-                });
-                debug!("{:?}", LogMarker::SendDeviantsDetected);
-            }
-        }
+        let pending_removed = self
+            .dysfunction_tracking
+            .request_operation_fulfilled(&node_id, op_id)
+            .await;
 
         if !pending_removed {
             trace!("Ignoring un-expected response");
             return Ok(cmds);
         }
 
-        // Send response if one is warranted
+        // dont reply if data not found (but do keep peers around...)
         if query_response.failed_with_data_not_found()
             || (!query_response.is_success()
                 && self
@@ -167,9 +177,15 @@ impl Node {
                     .await
                     .unwrap_or(false))
         {
-            // we don't return data not found errors.
-            trace!("Node {:?}, reported data not found", sending_node_pk);
-
+            // lets requeue waiting peers in case another adult has the data...
+            // if no more responses come in this query should eventually time out
+            // TODO: What happens if we keep getting queries / client for some data that's always not found?
+            // We need to handle that
+            let _prev = self
+                .pending_data_queries
+                .set(op_id, waiting_peers.clone(), None)
+                .await;
+            trace!("Node {:?}, reported data not found ", sending_node_pk);
             return Ok(cmds);
         }
 
@@ -179,17 +195,14 @@ impl Node {
         };
         let (msg_kind, payload) = self.ed_sign_client_msg(&msg).await?;
 
-        for origin in waiting_peers {
-            let dst = DstLocation::EndUser(EndUser(origin.name()));
+        for peer in waiting_peers.iter() {
+            let dst = DstLocation::EndUser(EndUser(peer.name()));
             let wire_msg = WireMsg::new_msg(msg_id, payload.clone(), msg_kind.clone(), dst)?;
 
-            debug!(
-                "Responding with the first chunk query response to {:?}",
-                dst
-            );
+            debug!("Responding with the first query response to {:?}", dst);
 
             let command = Cmd::SendMsg {
-                recipients: vec![origin],
+                recipients: vec![peer.clone()],
                 wire_msg,
             };
             cmds.push(command);

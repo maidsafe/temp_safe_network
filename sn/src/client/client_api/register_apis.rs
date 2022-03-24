@@ -84,6 +84,8 @@ impl Client {
             section_auth: section_auth(), // obtained after presenting a valid payment to the network
         });
 
+        debug!("Creating Register: {:?}", cmd);
+
         Ok((address, vec![cmd]))
     }
 
@@ -278,7 +280,6 @@ mod tests {
     use crate::client::{
         utils::test_utils::{
             create_test_client, create_test_client_with, gen_ed_keypair, init_test_logger,
-            run_w_backoff_delayed,
         },
         Error,
     };
@@ -405,19 +406,10 @@ mod tests {
         for i in 0..1000_usize {
             let now = Instant::now();
 
-            // write to the register
-            let _value1_hash = run_w_backoff_delayed(
-                || async {
-                    let (hash, batch) = client
-                        .write_to_register(address, value_1.clone(), BTreeSet::new())
-                        .await?;
-                    client.publish_register_ops(batch).await?;
-                    Ok(hash)
-                },
-                10,
-                1,
-            )
-            .await?;
+            let (_value1_hash, batch) = client
+                .write_to_register(address, value_1.clone(), BTreeSet::new())
+                .await?;
+            client.publish_register_ops(batch).await?;
 
             let elapsed = now.elapsed().as_millis();
             total += elapsed;
@@ -607,19 +599,10 @@ mod tests {
 
         let value_1 = random_register_entry();
 
-        // write to the register
-        let value1_hash = run_w_backoff_delayed(
-            || async {
-                let (hash, batch) = client
-                    .write_to_register(address, value_1.clone(), BTreeSet::new())
-                    .await?;
-                client.publish_register_ops(batch).await?;
-                Ok(hash)
-            },
-            10,
-            1,
-        )
-        .await?;
+        let (value1_hash, batch) = client
+            .write_to_register(address, value_1.clone(), BTreeSet::new())
+            .await?;
+        client.publish_register_ops(batch).await?;
 
         // now check last entry
         let hashes = retry_loop_for_pattern!(client.read_register(address), Ok(hashes) if !hashes.is_empty())?;
@@ -632,19 +615,13 @@ mod tests {
 
         drop(start_span);
         let _second_span = tracing::info_span!("test__register_write__second_write").entered();
+
         // write to the register
-        let value2_hash = run_w_backoff_delayed(
-            || async {
-                let (hash, batch) = client
-                    .write_to_register(address, value_2.clone(), BTreeSet::new())
-                    .await?;
-                client.publish_register_ops(batch).await?;
-                Ok(hash)
-            },
-            10,
-            1,
-        )
-        .await?;
+        let (value2_hash, batch) = client
+            .write_to_register(address, value_2.clone(), BTreeSet::new())
+            .await?;
+
+        client.publish_register_ops(batch).await?;
 
         // and then lets check all entries are returned
         // NB: these will not be ordered according to insertion order, but according to the hashes of the values.
@@ -655,6 +632,7 @@ mod tests {
 
         let delay = tokio::time::Duration::from_secs(1);
         tokio::time::sleep(delay).await;
+
         // get_register_entry
         let retrieved_value_1 = client
             .get_register_entry(address, value1_hash)

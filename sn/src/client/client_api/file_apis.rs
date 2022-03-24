@@ -719,6 +719,14 @@ mod tests {
         let client = create_test_client().await?;
         store_and_read(&client, 40 * 1024 * 1024, Scope::Private).await
     }
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "too heavy for CI"]
+    async fn store_and_read_100mb() -> Result<()> {
+        init_test_logger();
+        let _outer_span = tracing::info_span!("store_and_read_100mb").entered();
+        let client = create_test_client().await?;
+        store_and_read(&client, 100 * 1024 * 1024, Scope::Private).await
+    }
 
     // Essentially a load test, seeing how much parallel batting the nodes can take.
     #[tokio::test(flavor = "multi_thread")]

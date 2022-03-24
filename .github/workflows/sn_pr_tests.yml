@@ -138,6 +138,7 @@ jobs:
         working-directory: sn
 
       - name: Run unit tests
+        timeout-minutes: 15
         uses: jacderida/cargo-nextest@main
         with:
           test-run-name: unit-tests-${{ matrix.os }}
@@ -150,12 +151,23 @@ jobs:
 
       - name: Run CLI unit tests
         uses: jacderida/cargo-nextest@main
+        timeout-minutes: 25
         with:
           test-run-name: cli-unit-tests-${{ matrix.os }}
           profile: ci
           junit-path: junit.xml
           package: sn_cli
           bin: safe
+          release: true
+
+      - name: Run sn_dysfunction unit tests
+        timeout-minutes: 5
+        uses: jacderida/cargo-nextest@main
+        with:
+          test-run-name: dysfunction-unit-tests-${{ matrix.os }}
+          profile: ci
+          junit-path: junit.xml
+          package: sn_dysfunction
           release: true
 
   e2e:
