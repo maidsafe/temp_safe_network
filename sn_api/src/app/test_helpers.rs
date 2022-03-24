@@ -186,6 +186,7 @@ macro_rules! retry_loop_for_pattern {
             }
         }
     }};
+
     // Defaults to 10 retries if n is not provided
     ($async_func:expr, $pattern:pat $(if $cond:expr)?) => {{
         retry_loop_for_pattern!(10, $async_func, $pattern $(if $cond)?)
