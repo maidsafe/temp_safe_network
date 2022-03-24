@@ -158,15 +158,14 @@ jobs:
           bin: safe
           release: true
 
-     # TODO: enable dysfunction tests as they become stable
-      # - name: Run sn_dysfunction unit tests
-      #   uses: jacderida/cargo-nextest@main
-      #   with:
-      #     test-run-name: dysfunction-unit-tests-${{ matrix.os }}
-      #     profile: ci
-      #     junit-path: junit.xml
-      #     package: sn_dysfunction
-      #     release: true
+      - name: Run sn_dysfunction unit tests
+        uses: jacderida/cargo-nextest@main
+        with:
+          test-run-name: dysfunction-unit-tests-${{ matrix.os }}
+          profile: ci
+          junit-path: junit.xml
+          package: sn_dysfunction
+          release: true
 
   e2e:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"

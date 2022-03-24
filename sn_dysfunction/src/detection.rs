@@ -13,15 +13,15 @@ use xor_name::XorName;
 use std::time::{Duration, SystemTime};
 static RECENT_ISSUE_DURATION: Duration = Duration::from_secs(60 * 15);
 
-static CONN_WEIGHTING: f32 = 26.0;
-static OP_WEIGHTING: f32 = 0.02;
-static KNOWLEDGE_WEIGHTING: f32 = 35.0;
+static CONN_WEIGHTING: f32 = 20.0;
+static OP_WEIGHTING: f32 = 1.5;
+static KNOWLEDGE_WEIGHTING: f32 = 60.0;
 
 // Ratio to mean scores should be over to be considered dys/sus
-static DYSFUNCTION_MEAN_RATIO: f32 = 8.0;
-static SUSPECT_MEAN_RATIO: f32 = 3.0;
+static DYSFUNCTION_MEAN_RATIO: f32 = 3.5;
+static SUSPECT_MEAN_RATIO: f32 = 1.5;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum ScoreType {
     Timed(TimedTracker),
     Op,
@@ -94,6 +94,7 @@ impl DysfunctionDetection {
                             let val = entry.value().read().await.len();
 
                             all_neighbourhood_counts.push(val as f32);
+                            all_neighbourhood_counts.push(count as f32);
                         }
                     }
 
@@ -104,13 +105,16 @@ impl DysfunctionDetection {
             let avg_in_neighbourhood = get_mean_of(&all_neighbourhood_counts).unwrap_or(1.0);
 
             trace!(
-                "node's ops {count_at_node:?} mean ops: {:?}",
+                "node's score {count_at_node:?} mean: {:?}",
                 avg_in_neighbourhood
             );
 
             let final_score = count_at_node
                 .checked_sub(avg_in_neighbourhood as usize)
                 .unwrap_or(1) as f32;
+
+            // ensure we have at least 1 on avg
+            let final_score = if final_score < 1.0 { 1.0 } else { final_score };
 
             let _prev = score_map.insert(node, final_score);
         }
