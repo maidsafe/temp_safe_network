@@ -46,6 +46,7 @@ use crate::types::{
 use crate::{elder_count, UsedSpace};
 
 use backoff::ExponentialBackoff;
+use dashmap::DashSet;
 use data::Capacity;
 use itertools::Itertools;
 use resource_proof::ResourceProof;
@@ -71,11 +72,11 @@ pub(crate) const CONCURRENT_JOINS: usize = 7;
 // from elders (with whom the client is connected) to adults (who hold the data), the elder handling
 // the query cannot reply immediately. For now, they stash a reference to the client `Peer` in
 // `Core::pending_data_queries`, which is a cache with duration-based expiry.
-// TODO: The value chosen here is longer than the default client timeout (see
+// TODO: The value chosen here is shorter than the default client timeout (see
 // `crate::client::SN_CLIENT_QUERY_TIMEOUT`), but the timeout is configurable. Ideally this would be
 // based on liveness properties (e.g. the timeout should be dynamic based on the responsiveness of
 // the section).
-const DATA_QUERY_TIMEOUT: Duration = Duration::from_secs(60 * 5 /* 5 mins */);
+const DATA_QUERY_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// How long to keep a cache of a given suspect node. Use to check if it's a newly suspicopus node
 /// and relevant flows should be triggered. (So a throttle on supect flows pehaps)
@@ -124,7 +125,7 @@ pub(crate) struct Node {
     // Trackers
     capacity: Capacity,
     dysfunction_tracking: DysfunctionDetection,
-    pending_data_queries: Arc<Cache<OperationId, Vec<Peer>>>,
+    pending_data_queries: Arc<Cache<OperationId, Arc<DashSet<Peer>>>>,
     /// Timed cache of suspect nodes and their score
     known_suspect_nodes: Arc<Cache<XorName, usize>>,
     // Caches
