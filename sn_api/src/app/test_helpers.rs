@@ -170,27 +170,6 @@ fn get_bootstrap_contacts() -> Result<NodeConfig> {
 }
 
 #[macro_export]
-macro_rules! retry_loop {
-    ($n:literal, $async_func:expr) => {{
-        let mut retries: u64 = $n;
-        loop {
-            match $async_func.await {
-                Ok(val) => break val,
-                Err(_) if retries > 0 => {
-                    retries -= 1;
-                    tokio::time::sleep(std::time::Duration::from_secs(20)).await;
-                }
-                Err(e) => anyhow::bail!("Failed after {} retries: {:?}", $n, e),
-            }
-        }
-    }};
-    // Defaults to 10 retries if n is not provided
-    ($async_func:expr) => {{
-        retry_loop!(10, $async_func)
-    }};
-}
-
-#[macro_export]
 macro_rules! retry_loop_for_pattern {
     ($n:literal, $async_func:expr, $pattern:pat $(if $cond:expr)?) => {{
         let mut retries: u64 = $n;

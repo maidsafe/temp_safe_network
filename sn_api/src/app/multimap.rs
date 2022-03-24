@@ -364,8 +364,8 @@ mod tests {
         let xorurl = safe.multimap_create(None, 25_000, false).await?;
         let xorurl_priv = safe.multimap_create(None, 25_000, true).await?;
 
-        let _ = retry_loop!(safe.multimap_get_by_key(&xorurl, &key));
-        let _ = retry_loop!(safe.multimap_get_by_key(&xorurl_priv, &key));
+        let _ = safe.multimap_get_by_key(&xorurl, &key).await?;
+        let _ = safe.multimap_get_by_key(&xorurl_priv, &key).await?;
 
         let hash = safe
             .multimap_insert(&xorurl, key_val.clone(), BTreeSet::new())
