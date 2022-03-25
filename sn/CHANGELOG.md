@@ -5,15 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.58.7 (2022-03-22)
+## v0.58.8 (2022-03-25)
+
+### New Features
+
+ - <csr-id-5d80122d51dcbe8241e85f27d23e34b053b77651/> optimise DataQuery cache
+   Move the pending_requests to storing an Arc<DashSet<Peers>>
+   
+   This is due to cache providing a clone when we , which means
+   we may not always be setting pending peers correctly.
+   
+   Now we also use the DATA_QUERY_TIMEOUT, set to 15s to decide if we should
+   re-send a query. (Previously it was only sent if no peer was waiting; ).
+   
+   This means we have a hard limit on how often we may ask for a chunk if peers are waiting for
+   that chunk.
+ - <csr-id-8168be4ef68f467f1c4b35943442fd30102a34f2/> record time of conn/knowledge issues
+   Remove older issues (currently set to 15 mins) from the tracker to keep
+   node dysfunction detection relevant to current circumstance
+ - <csr-id-73fcad5160127c9e4d3a808df229947fa6163ae0/> add knowledge dysfunction tracking and weighting
+ - <csr-id-88e1800103ac8465bbfc377719ed5804853d833a/> use weighted averages for dysfunctional detection
+ - <csr-id-1d390ee298293ffe7533b4f1a3b47cc1d11a2198/> initial move of liveness->dysfunctional detection crate in root
+
+### Bug Fixes
+
+ - <csr-id-a45a3bda7044f07b6ecd99569ec4c043330d7160/> Improve query handling, keep peers on DataNotFound
+   Previously if we had DataNotFound, any waiting peers are not requeued.
+   So this means that one bogus adult can effectively fail a query which
+   might otherwise succeed.
+   
+   In doing so, we need to always resend queries to adults if clients retry
+   as otherwise they may remain queued but wont actually requery adults
+   ever again.
+   
+   This appears to improve test time, even after reducing the RETRY_COUNT
+   on messages.
+ - <csr-id-2619ca4b399cf8156b9fdf2e33abe2708e6673b9/> re-queue waiting peers on dud responses
+ - <csr-id-6915006f070811eccc7aea075a707d15a20abb93/> add new querying peer to wait list if that already exists
+ - <csr-id-dbcffd94114e36ac763e5718937d1228ba882baa/> throttle suspect node's preemptive replication.
+   Previous every query response could trigger this flow.
+   Now we only do it once every X time. (25 mins atm)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 4 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 26 commits contributed to the release.
+ - 2 days passed between releases.
+ - 26 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -23,6 +62,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - optimise DataQuery cache ([`5d80122`](https://github.com/maidsafe/safe_network/commit/5d80122d51dcbe8241e85f27d23e34b053b77651))
+    - update deps ([`90712c9`](https://github.com/maidsafe/safe_network/commit/90712c91368b4d88537acc65a3ccc5478fe38d2c))
+    - Improve query handling, keep peers on DataNotFound ([`a45a3bd`](https://github.com/maidsafe/safe_network/commit/a45a3bda7044f07b6ecd99569ec4c043330d7160))
+    - add LogMarker for dysfunction agreement ([`51d534d`](https://github.com/maidsafe/safe_network/commit/51d534d39caf3a4c029f7d1a9c87a3edf3192b2f))
+    - remove unneeded retry_backoff in reg tests ([`aa82ab7`](https://github.com/maidsafe/safe_network/commit/aa82ab7d691cca3990ece4e56d75cd63fda2fe15))
+    - remove unnecessary map_err call ([`b239e6b`](https://github.com/maidsafe/safe_network/commit/b239e6b38a99afda7a945a51d3f6e00841730a8f))
+    - rename dysfunction -> sn_dysfunction ([`aafb6d2`](https://github.com/maidsafe/safe_network/commit/aafb6d2a458fc4e2dc94ea3a08cb519fe52bc131))
+    - remove retry_loop! from nrs tests ([`6e897d0`](https://github.com/maidsafe/safe_network/commit/6e897d0bc93256f5ab72350c9774f9a33937da1b))
+    - tweaking values and thresholds ([`224079f`](https://github.com/maidsafe/safe_network/commit/224079f66832c0a914fd20af4fc2f9e90dc9c9c9))
+    - refactor NodeQueryResponse handling at elder ([`453b246`](https://github.com/maidsafe/safe_network/commit/453b246c002f9e964896876c254e6c31f1f6045d))
+    - record time of conn/knowledge issues ([`8168be4`](https://github.com/maidsafe/safe_network/commit/8168be4ef68f467f1c4b35943442fd30102a34f2))
+    - use one func to detect nodes beyond a severity ([`0cad4c9`](https://github.com/maidsafe/safe_network/commit/0cad4c981dbdf9eee58fc28b4637f136b817c384))
+    - remove _ from dys_function crate name ([`43489f6`](https://github.com/maidsafe/safe_network/commit/43489f6170ce13ea05148a52422fbff6bdb91f19))
+    - re-ignore 40/100mb tests for basic ci ([`196b32f`](https://github.com/maidsafe/safe_network/commit/196b32f348d3f5ce2a63c24877acb1a0a7f449e3))
+    - re-queue waiting peers on dud responses ([`2619ca4`](https://github.com/maidsafe/safe_network/commit/2619ca4b399cf8156b9fdf2e33abe2708e6673b9))
+    - enable 100mb test ([`1ea4b44`](https://github.com/maidsafe/safe_network/commit/1ea4b4413fee11fde2b69086caeb69cc191fe277))
+    - add new querying peer to wait list if that already exists ([`6915006`](https://github.com/maidsafe/safe_network/commit/6915006f070811eccc7aea075a707d15a20abb93))
+    - reduce node cleanup frequency ([`2ac9eda`](https://github.com/maidsafe/safe_network/commit/2ac9edab88602fa2aeb148baf6566cab876dc2af))
+    - add knowledge dysfunction tracking and weighting ([`73fcad5`](https://github.com/maidsafe/safe_network/commit/73fcad5160127c9e4d3a808df229947fa6163ae0))
+    - different logs for different data failures ([`e4a7c56`](https://github.com/maidsafe/safe_network/commit/e4a7c564180cb3b81601950c4f7623dfcdcd7650))
+    - log ProposeOffline ([`80c2ea0`](https://github.com/maidsafe/safe_network/commit/80c2ea0c2863ba8cc3500a1880337285e40fdf4c))
+    - use weighted averages for dysfunctional detection ([`88e1800`](https://github.com/maidsafe/safe_network/commit/88e1800103ac8465bbfc377719ed5804853d833a))
+    - split out deviant/unresponsive calculations ([`a49ea81`](https://github.com/maidsafe/safe_network/commit/a49ea81658b15280c23e93b1945f67aeb43a5962))
+    - initial move of liveness->dysfunctional detection crate in root ([`1d390ee`](https://github.com/maidsafe/safe_network/commit/1d390ee298293ffe7533b4f1a3b47cc1d11a2198))
+    - deps, remove ~ restriction on major versioned deps ([`6b83f38`](https://github.com/maidsafe/safe_network/commit/6b83f38f17c241c00b70480a18a47b04d9a51ee1))
+    - throttle suspect node's preemptive replication. ([`dbcffd9`](https://github.com/maidsafe/safe_network/commit/dbcffd94114e36ac763e5718937d1228ba882baa))
+</details>
+
+## v0.58.7 (2022-03-22)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 5 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.58.7/sn_api-0.57.3/sn_cli-0.50.5 ([`a6e2e0c`](https://github.com/maidsafe/safe_network/commit/a6e2e0c5eec5c2e88842d18167128991b76ecbe8))
     - bump bls_dkg, self_encryption, xor_name ([`d3989bd`](https://github.com/maidsafe/safe_network/commit/d3989bdd95129999996e58736ec2553242697f2c))
 </details>
 
@@ -83,9 +169,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - discard DataReplicator module ([`df330fa`](https://github.com/maidsafe/safe_network/commit/df330fa0de1e334e55863828fb743131ab629a18))
     - impl throttled message sending ([`7a1065c`](https://github.com/maidsafe/safe_network/commit/7a1065c46f5d72f6997a504c984a70493e197a5b))
 </details>
-
-<csr-unknown>
-makes use of the new command to throttle replication messages to avoid message explosion<csr-unknown/>
 
 ## v0.58.4 (2022-03-04)
 
