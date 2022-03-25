@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 This first version is being edited manually to trigger a release and publish of the first crate.
 
+Inserting another manual change for testing purposes.
+
 ### Bug Fixes
 
  - <csr-id-52aaf595293f2f0d3dd234907134bc624703a3ca/> ensure we have at least 1 when calculating each score
