@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.1.0 (2022-03-25)
 
+This first version is being edited manually to trigger a release and publish of the first crate.
+
 ### Bug Fixes
 
  - <csr-id-52aaf595293f2f0d3dd234907134bc624703a3ca/> ensure we have at least 1 when calculating each score
