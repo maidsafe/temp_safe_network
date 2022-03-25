@@ -233,6 +233,10 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - shell: bash
+        id: versioning
+        run: |
+          ./resources/scripts/output_versioning_info.sh
       - name: cargo login
         run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
       - name: cargo publish
