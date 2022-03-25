@@ -36,8 +36,8 @@ use super::{
 use crate::messaging::{
     data::OperationId,
     signature_aggregator::SignatureAggregator,
-    system::{DkgSessionId, SystemMsg},
-    AuthorityProof, SectionAuth,
+    system::{DkgSessionId, NodeEvent, SystemMsg},
+    AuthorityProof, DstLocation, SectionAuth,
 };
 use crate::node::error::{Error, Result};
 use crate::types::{
@@ -231,11 +231,57 @@ impl Node {
     }
 
     /// returns names that are relatively dysfunctional
-    pub(crate) async fn get_suspicious_node_names(&self) -> Result<BTreeSet<XorName>> {
+    async fn get_suspicious_node_names(&self) -> Result<BTreeSet<XorName>> {
         self.dysfunction_tracking
             .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
             .await
             .map_err(Error::from)
+    }
+
+    /// form Cmds about any newly suspicious nodes
+    pub(crate) async fn notify_about_newly_suspect_nodes(&self) -> Result<Vec<Cmd>> {
+        let mut cmds = vec![];
+
+        let all_suspect_nodes = self.get_suspicious_node_names().await?;
+
+        let known_suspect_nodes = self.known_suspect_nodes.get_items().await;
+
+        let newly_suspect_nodes: BTreeSet<_> = all_suspect_nodes
+            .iter()
+            .filter(|node| !known_suspect_nodes.contains_key(node))
+            .copied()
+            .collect();
+
+        if !newly_suspect_nodes.is_empty() {
+            warn!("New nodes have crossed preemptive replication threshold:  {newly_suspect_nodes:?} . Triggering preemptive data replication");
+
+            for sus in &all_suspect_nodes {
+                // 0 is set here as we actually don't need or want the score.
+                let _prev = self.known_suspect_nodes.set(*sus, 0, None).await;
+            }
+
+            let our_adults = self.network_knowledge.adults().await;
+            let valid_adults = our_adults
+                .iter()
+                .filter(|peer| !newly_suspect_nodes.contains(&peer.name()))
+                .cloned()
+                .collect::<Vec<Peer>>();
+
+            for adult in valid_adults {
+                cmds.push(Cmd::SignOutgoingSystemMsg {
+                    msg: SystemMsg::NodeEvent(NodeEvent::SuspiciousNodesDetected(
+                        newly_suspect_nodes.clone(),
+                    )),
+                    dst: DstLocation::Node {
+                        name: adult.name(),
+                        section_pk: *self.section_chain().await.last_key(),
+                    },
+                });
+                debug!("{:?}", LogMarker::SendSuspiciousNodesDetected);
+            }
+        }
+
+        Ok(cmds)
     }
 
     /// Log a communication problem
