@@ -5,15 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.57.3 (2022-03-22)
+## v0.58.0 (2022-03-25)
+
+### Bug Fixes
+
+ - <csr-id-a45a3bda7044f07b6ecd99569ec4c043330d7160/> Improve query handling, keep peers on DataNotFound
+   Previously if we had DataNotFound, any waiting peers are not requeued.
+   So this means that one bogus adult can effectively fail a query which
+   might otherwise succeed.
+   
+   In doing so, we need to always resend queries to adults if clients retry
+   as otherwise they may remain queued but wont actually requery adults
+   ever again.
+   
+   This appears to improve test time, even after reducing the RETRY_COUNT
+   on messages.
+
+### New Features (BREAKING)
+
+ - <csr-id-eaeca4223c4e35884bfd1129832b890e70b6ef5e/> upgrade to new version of qjsonrpc
+   The `sn_api` crate is updated to use the new version of `qjsonrpc`.
+   
+   The `qjsonrpc` library had breaking changes to pass cert and key paths rather than passing a
+   directory that was assumed to contain them. This change caused `sn_api` to do the same. There is an
+   unfortunate consequence here: to use `SafeAuthdClient` you need to pass a certificate, along with
+   another certificate and a private key for starting an endpoint that deals with notifications for
+   approving authentication requests. The previous setup was just making the assumption that both keys
+   and certificates were in the same directory. Since this change led to an odd interface for
+   `SafeAuthdClient` we had some discussion around using a different mechanism for notifications, but
+   we decided to come back to it later with a wider review.
+   
+   The API change forced an update to some code in the CLI, even though the authd system isn't really
+   being used at the moment. The self-signed certificates are now being generated in the CLI. Since the
+   CLI is a specific application, I think this is a more appropriate place for that to happen.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 4 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -23,6 +55,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - update deps ([`90712c9`](https://github.com/maidsafe/safe_network/commit/90712c91368b4d88537acc65a3ccc5478fe38d2c))
+    - Improve query handling, keep peers on DataNotFound ([`a45a3bd`](https://github.com/maidsafe/safe_network/commit/a45a3bda7044f07b6ecd99569ec4c043330d7160))
+    - remove retry_loop! from nrs tests ([`6e897d0`](https://github.com/maidsafe/safe_network/commit/6e897d0bc93256f5ab72350c9774f9a33937da1b))
+    - refactor NodeQueryResponse handling at elder ([`453b246`](https://github.com/maidsafe/safe_network/commit/453b246c002f9e964896876c254e6c31f1f6045d))
+    - deps, remove ~ restriction on major versioned deps ([`6b83f38`](https://github.com/maidsafe/safe_network/commit/6b83f38f17c241c00b70480a18a47b04d9a51ee1))
+    - upgrade to new version of qjsonrpc ([`eaeca42`](https://github.com/maidsafe/safe_network/commit/eaeca4223c4e35884bfd1129832b890e70b6ef5e))
+</details>
+
+## v0.57.3 (2022-03-22)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 5 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.58.7/sn_api-0.57.3/sn_cli-0.50.5 ([`a6e2e0c`](https://github.com/maidsafe/safe_network/commit/a6e2e0c5eec5c2e88842d18167128991b76ecbe8))
     - bump bls_dkg, self_encryption, xor_name ([`d3989bd`](https://github.com/maidsafe/safe_network/commit/d3989bdd95129999996e58736ec2553242697f2c))
 </details>
 
