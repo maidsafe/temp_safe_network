@@ -106,6 +106,8 @@ jobs:
         shell: bash
         run: |
           ./resources/scripts/insert_changelog_entry.py \
+            --sn-dysfunction-version "${{ steps.versioning.outputs.sn_dysfunction_version }}"
+          ./resources/scripts/insert_changelog_entry.py \
             --sn-version "${{ steps.versioning.outputs.sn_version }}"
           ./resources/scripts/insert_changelog_entry.py \
             --sn-api-version "${{ steps.versioning.outputs.sn_api_version }}"
@@ -189,8 +191,8 @@ jobs:
   # message needs to be checked at the point of publishing. The reason is because of the dependencies
   # between the publishing jobs. If one of the jobs doesn't run because its `if` condition was evaluated
   # to false, the next job won't run, regardless of whether its `if` condition would evaluate to true.
-  publish_sn:
-    name: publish safe network
+  publish_sn_dysfunction:
+    name: publish sn_dysfunction
     runs-on: ubuntu-latest
     needs: [gh_release]
     if: |
@@ -210,9 +212,38 @@ jobs:
       - name: cargo publish
         run: |
           commit_message="${{ github.event.head_commit.message }}"
+          if [[ $commit_message == *"sn_dysfunction"* ]]; then
+            # The sn_dysfunction crate doesn't have any dependencies so we can go ahead and publish.
+            cd sn_dysfunction && cargo publish --allow-dirty
+          fi
+
+  publish_sn:
+    name: publish safe network
+    runs-on: ubuntu-latest
+    needs: [publish_sn_dysfunction]
+    if: |
+      github.repository_owner == 'maidsafe' &&
+      startsWith(github.event.head_commit.message, 'chore(release):')
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: '0'
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: cargo login
+        run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
+      - name: cargo publish
+        run: |
+          commit_message="${{ github.event.head_commit.message }}"
           if [[ $commit_message == *"safe_network"* ]]; then
-            # The safe_network crate doesn't have any dependencies so we can go ahead and publish
-            cd sn && cargo publish --allow-dirty
+            # The safe_network crate is dependent on sn_dysfunction and sometimes the new version
+            # doesn't become available on crates.io immediately, so this script will use a retry
+            # loop.
+            ./resources/scripts/publish_crate.sh \
+              "safe_network" "${{ steps.versioning.outputs.sn_dysfunction_version }}" "sn_dysfunction"
           fi
 
   publish_sn_api:

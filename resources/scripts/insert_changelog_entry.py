@@ -25,7 +25,10 @@ def insert_changelog_entry(entry, pattern):
     with open("release_description.md", "w") as file:
         file.write(release_description)
 
-def main(sn_version, sn_api_version, sn_cli_version):
+def main(sn_dysfunction_version, sn_version, sn_api_version, sn_cli_version):
+    if sn_dysfunction_version:
+        sn_changelog_entry = get_changelog_entry("sn_dysfunction/CHANGELOG.md", sn_dysfunction_version)
+        insert_changelog_entry(sn_changelog_entry, "__SN_DYSFUNCTION_CHANGELOG_TEXT__")
     if sn_version:
         sn_changelog_entry = get_changelog_entry("sn/CHANGELOG.md", sn_version)
         insert_changelog_entry(sn_changelog_entry, "__SN_CHANGELOG_TEXT__")
@@ -37,16 +40,19 @@ def main(sn_version, sn_api_version, sn_cli_version):
         insert_changelog_entry(sn_cli_changelog_entry, "__SN_CLI_CHANGELOG_TEXT__")
 
 if __name__ == "__main__":
+    sn_dysfunction_version = ""
     sn_version = ""
     sn_api_version = ""
     sn_cli_version = ""
     opts, args = getopt.getopt(
         sys.argv[1:],
         "",
-        ["sn-version=", "sn-api-version=", "sn-cli-version="]
+        ["sn-dysfunction-version=", "sn-version=", "sn-api-version=", "sn-cli-version="]
     )
     for opt, arg in opts:
-        if opt in "--sn-version":
+        if opt in "--sn-dysfunction-version":
+            sn_dysfunction_version = arg
+        elif opt in "--sn-version":
             sn_version = arg
         elif opt in "--sn-api-version":
             sn_api_version = arg
