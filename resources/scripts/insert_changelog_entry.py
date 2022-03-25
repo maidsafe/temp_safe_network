@@ -58,4 +58,4 @@ if __name__ == "__main__":
             sn_api_version = arg
         elif opt in "--sn-cli-version":
             sn_cli_version = arg
-    main(sn_version, sn_api_version, sn_cli_version)
+    main(sn_dysfunction_version, sn_version, sn_api_version, sn_cli_version)
