@@ -187,8 +187,7 @@ impl Dispatcher {
                         .await
                     {
                         error!(
-                            "Error sending Propose Offline for dysfunctional nodes: {:?}",
-                            e
+                            "Error sending Propose Offline for dysfunctional nodes: {e:?}"
                         );
                     }
                 }
