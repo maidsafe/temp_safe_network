@@ -186,9 +186,7 @@ impl Dispatcher {
                         .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
                         .await
                     {
-                        error!(
-                            "Error sending Propose Offline for dysfunctional nodes: {e:?}"
-                        );
+                        error!("Error sending Propose Offline for dysfunctional nodes: {e:?}");
                     }
                 }
 
