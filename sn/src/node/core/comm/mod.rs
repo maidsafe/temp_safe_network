@@ -86,6 +86,13 @@ impl Comm {
         self.our_endpoint.public_addr()
     }
 
+    pub(crate) async fn remove_expired(&self) {
+        let sessions = self.sessions.read().await;
+        for (_, session) in sessions.iter() {
+            session.remove_expired().await;
+        }
+    }
+
     pub(crate) async fn is_connected(&self, id: &Peer) -> bool {
         let sessions = self.sessions.read().await;
         if let Some(c) = sessions.get(id) {
@@ -150,10 +157,8 @@ impl Comm {
     pub(crate) async fn unlink_peer(&self, peer: &Peer) {
         let mut sessions = self.sessions.write().await;
         let session = match sessions.remove(peer) {
-            // someone else inserted in the meanwhile, so use that
             Some(session) => session,
-            // none here, all good
-            None => return,
+            None => return, // none here, all good
         };
         session.disconnect().await;
     }
@@ -540,9 +545,11 @@ fn setup(our_endpoint: Endpoint, receive_msg: mpsc::Sender<MsgEvent>) -> (Comm, 
 
 #[tracing::instrument(skip_all)]
 async fn count_msgs(back_pressure: BackPressure, mut msg_counter: mpsc::Receiver<()>) {
+    debug!("Entered msg counting listener loop.");
     while let Some(()) = msg_counter.recv().await {
         back_pressure.count_msg();
     }
+    debug!("Exited msg counting listener loop..!");
 }
 
 #[tracing::instrument(skip_all)]

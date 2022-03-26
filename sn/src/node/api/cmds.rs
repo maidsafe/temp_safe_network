@@ -114,11 +114,11 @@ impl fmt::Display for Cmd {
             Cmd::HandleNewNodeOnline(_) => write!(f, "HandleNewNodeOnline"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Cmd::HandleDkgFailure(_) => write!(f, "HandleDkgFailure"),
-            #[cfg(not(feature = "unstable-wiremsg-debuginfo"))]
+            #[cfg(not(feature = "test-utils"))]
             Cmd::SendMsg { wire_msg, .. } => {
                 write!(f, "SendMsg {:?}", wire_msg.msg_id())
             }
-            #[cfg(feature = "unstable-wiremsg-debuginfo")]
+            #[cfg(feature = "test-utils")]
             Cmd::SendMsg { wire_msg, .. } => {
                 write!(
                     f,

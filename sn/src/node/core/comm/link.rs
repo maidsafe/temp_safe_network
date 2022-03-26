@@ -54,6 +54,7 @@ pub(crate) struct Link {
     queue: Arc<RwLock<DoublePriorityQueue<ConnId, Priority>>>,
     access_counter: Arc<AtomicU64>,
     listener: MsgListener,
+    expiration_check: Arc<RwLock<Instant>>,
 }
 
 impl Link {
@@ -66,6 +67,7 @@ impl Link {
             queue: Arc::new(RwLock::new(DoublePriorityQueue::new())),
             access_counter: Arc::new(AtomicU64::new(0)),
             listener,
+            expiration_check: Arc::new(RwLock::new(expiration())),
         }
     }
 
@@ -78,6 +80,11 @@ impl Link {
         let instance = Self::new(peer, endpoint, listener);
         instance.insert(conn).await;
         instance
+    }
+
+    #[cfg(feature = "test-utils")]
+    pub(crate) fn peer(&self) -> &Peer {
+        &self.peer
     }
 
     pub(crate) async fn add(&self, conn: qp2p::Connection) {
@@ -130,8 +137,7 @@ impl Link {
         );
         match conn.send_with(msg, priority, retry_config).await {
             Ok(()) => {
-                self.listener.count_msg();
-                self.remove_expired().await;
+                self.listener.count_msg().await;
                 Ok(())
             }
             Err(error) => {
@@ -174,13 +180,12 @@ impl Link {
 
     /// Is this Link currently connected?
     pub(crate) async fn is_connected(&self) -> bool {
-        self.remove_expired().await;
         // get the most recently used connection
         let res = { self.queue.read().await.peek_max().map(|(id, _prio)| *id) };
         match res {
             None => false,
             Some(id) => match self.connections.read().await.get(&id) {
-                Some(conn) => conn.expired().await,
+                Some(conn) => !conn.expired().await,
                 None => false,
             },
         }
@@ -231,8 +236,6 @@ impl Link {
         {
             let _ = self.queue.write().await.push(id, self.priority().await);
         }
-
-        self.drop_excess().await;
     }
 
     async fn touch(&self, id: ConnId) {
@@ -274,13 +277,32 @@ impl Link {
     }
 
     /// Remove expired connections.
-    async fn remove_expired(&self) {
+    pub(crate) async fn remove_expired(&self) {
+        if Instant::now() > { *self.expiration_check.read().await } {
+            *self.expiration_check.write().await = expiration();
+        } else {
+            return;
+        }
+
+        let queue = {
+            let queue = self.queue.read().await;
+            // take a clone of the connections
+            queue.clone()
+        };
+
+        let mut remaining = queue.len();
         let mut expired_ids = vec![];
-        {
+
+        // the iter is sorted from lowest to highest
+        for (id, _old_prio) in queue.into_sorted_iter() {
+            if remaining <= 1 {
+                break;
+            }
             let read_items = self.connections.read().await;
-            for (id, conn) in read_items.iter() {
+            if let Some(conn) = read_items.get(&id) {
                 if conn.expired().await {
-                    expired_ids.push(*id);
+                    expired_ids.push(id);
+                    remaining -= 1;
                 }
             }
         }
@@ -296,6 +318,8 @@ impl Link {
                 item.conn.close(Some("Connection expired.".to_string()));
             }
         }
+
+        self.drop_excess().await;
     }
 
     /// Remove connections that exceed capacity, oldest first.

@@ -25,9 +25,9 @@ const SAMPLING_INTERVAL_ONE: Duration = Duration::from_secs(ONE_MINUTE_AS_SECOND
 const SAMPLING_INTERVAL_FIVE: Duration = Duration::from_secs(5 * ONE_MINUTE_AS_SECONDS);
 const SAMPLING_INTERVAL_FIFTEEN: Duration = Duration::from_secs(15 * ONE_MINUTE_AS_SECONDS);
 
-const INITIAL_MSGS_PER_MINUTE: f64 = ONE_MINUTE_AS_SECONDS as f64 * INITIAL_MSGS_PER_S;
-const MAX_CPU_LOAD: f64 = 0.8;
-const DEFAULT_LOAD_PER_MSG: f64 = MAX_CPU_LOAD / INITIAL_MSGS_PER_S;
+const INITIAL_MSGS_PER_MINUTE: f64 = ONE_MINUTE_AS_SECONDS as f64 * INITIAL_MSGS_PER_S; // unit: msgs per minute
+const MAX_CPU_LOAD: f64 = 0.8; // unit: percent
+const DEFAULT_LOAD_PER_MSG: f64 = MAX_CPU_LOAD / INITIAL_MSGS_PER_S; // unit: percent-seconds per msg
 
 const ORDER: Ordering = Ordering::SeqCst;
 
@@ -40,6 +40,10 @@ pub(crate) struct LoadMonitoring {
     msg_samples: BTreeMap<Duration, MsgCount>,
     msgs_per_s: BTreeMap<Duration, Arc<RwLock<f64>>>,
 }
+
+/// We have background tasks which update values at specific intervals,
+/// and then consumer of the code reading (the avg of) those values at random times.
+/// We update the values when the defined intervals pass.
 
 impl LoadMonitoring {
     pub(crate) fn new() -> Self {
@@ -130,9 +134,17 @@ impl LoadMonitoring {
             if let Some(sample) = self.msg_samples.get(&period) {
                 let load = self.load_sample.read().await;
 
+                debug!("Load sample {:?} (for period {:?})", load, period);
+
                 sample.snapshot();
+
+                // unit: msgs per [period]
                 let msg_count = usize::max(1, sample.read()) as f64;
 
+                debug!("Msg count {:?} (for period {:?})", msg_count, period);
+
+                // unit: percent-seconds per msg
+                // (percent-seconds per [period] / msgs per [period] => percent-seconds per msg)
                 let load_per_msg = if period == SAMPLING_INTERVAL_ONE {
                     load.one / msg_count
                 } else if period == SAMPLING_INTERVAL_FIVE {
@@ -143,10 +155,19 @@ impl LoadMonitoring {
                     DEFAULT_LOAD_PER_MSG
                 };
 
-                let max_msgs_to_handle =
-                    MAX_CPU_LOAD / f64::max(DEFAULT_LOAD_PER_MSG, load_per_msg);
+                debug!("Load per msg {:?} (for period {:?})", load_per_msg, period);
+
+                // unit: msgs / s
+                // (percent / percent-seconds per msg => msgs / s)
+                let max_msgs_per_s = MAX_CPU_LOAD / f64::max(DEFAULT_LOAD_PER_MSG, load_per_msg);
+
+                debug!(
+                    "Max msgs per s {:?} (for period {:?})",
+                    max_msgs_per_s, period
+                );
+
                 if let Some(counter) = self.msgs_per_s.get(&period) {
-                    *counter.write().await = max_msgs_to_handle;
+                    *counter.write().await = max_msgs_per_s;
                 }
             }
         }

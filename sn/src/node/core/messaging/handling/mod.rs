@@ -62,9 +62,17 @@ impl Node {
         if let Some(load_report) = self.comm.tolerated_msgs_per_s(&sender).await {
             let msg_src = wire_msg.msg_kind().src();
             if !msg_src.is_end_user() {
-                cmds.push(Cmd::SignOutgoingSystemMsg {
-                    msg: SystemMsg::BackPressure(load_report),
-                    dst: msg_src.to_dst(),
+                trace!("Sending BackPressure: {}", load_report);
+                let src_section_pk = self.network_knowledge().section_key().await;
+
+                cmds.push(Cmd::SendMsg {
+                    wire_msg: WireMsg::single_src(
+                        &*self.info.read().await,
+                        msg_src.to_dst(),
+                        SystemMsg::BackPressure(load_report),
+                        src_section_pk,
+                    )?,
+                    recipients: vec![sender],
                 })
             }
         }
