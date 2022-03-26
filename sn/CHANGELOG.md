@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.58.9 (2022-03-26)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - safe_network-0.58.8/sn_api-0.58.0/sn_cli-0.51.0 ([`c0806e3`](https://github.com/maidsafe/safe_network/commit/c0806e384d99b94480e8f8e0322a6f5a6bd3636a))
+    - Update sn/src/node/api/dispatcher.rs ([`2453eed`](https://github.com/maidsafe/safe_network/commit/2453eedc40a218b42ab11e7a6aaa95525b87c9ac))
+    - check sus nodes periodically and not on query ([`dabdc55`](https://github.com/maidsafe/safe_network/commit/dabdc555d70be79b910c5fe2b2647ca85f2319f9))
+</details>
+
 ## v0.58.8 (2022-03-25)
 
 ### New Features
@@ -50,9 +72,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 26 commits contributed to the release.
- - 2 days passed between releases.
- - 26 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 27 commits contributed to the release.
+ - 3 days passed between releases.
+ - 27 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -62,6 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.58.8/sn_api-0.58.0/sn_cli-0.51.0 ([`907c7d3`](https://github.com/maidsafe/safe_network/commit/907c7d3ef4f65df5566627938154dfca1e2fdc05))
     - optimise DataQuery cache ([`5d80122`](https://github.com/maidsafe/safe_network/commit/5d80122d51dcbe8241e85f27d23e34b053b77651))
     - update deps ([`90712c9`](https://github.com/maidsafe/safe_network/commit/90712c91368b4d88537acc65a3ccc5478fe38d2c))
     - Improve query handling, keep peers on DataNotFound ([`a45a3bd`](https://github.com/maidsafe/safe_network/commit/a45a3bda7044f07b6ecd99569ec4c043330d7160))
