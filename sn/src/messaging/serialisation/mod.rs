@@ -19,8 +19,10 @@ pub(crate) const ANTIENTROPY_MSG_PRIORITY: i32 = 8;
 pub(crate) const JOIN_RESPONSE_PRIORITY: i32 = 6;
 // our joining to the network
 pub(crate) const JOIN_RELOCATE_MSG_PRIORITY: i32 = 4;
+// reporting dysfunction is somewhat critical, so not super low
+pub(crate) const DYSFUNCTION_MSG_PRIORITY: i32 = 2;
 // reporting backpressure isn't time critical, so fairly low
-pub(crate) const BACKPRESSURE_MSG_PRIORITY: i32 = 2;
+pub(crate) const BACKPRESSURE_MSG_PRIORITY: i32 = 0;
 // not maintaining network structure, so can wait
 pub(crate) const NODE_DATA_MSG_PRIORITY: i32 = -6;
 // has payment throttle, but is not critical for network function
@@ -32,8 +34,9 @@ use crate::types::PublicKey;
 
 pub use self::wire_msg::WireMsg;
 use super::{
-    data::ServiceMsg, system::SystemMsg, AuthorityProof, BlsShareAuth, DstLocation, MsgId,
-    NodeAuth, SectionAuth, ServiceAuth,
+    data::ServiceMsg,
+    system::{NodeEvent, SystemMsg},
+    AuthorityProof, BlsShareAuth, DstLocation, MsgId, NodeAuth, SectionAuth, ServiceAuth,
 };
 
 /// Type of message.
@@ -111,6 +114,12 @@ impl MsgType {
                 ..
             } => JOIN_RELOCATE_MSG_PRIORITY,
 
+            // Inter-node comms for dysfunction detection
+            MsgType::System {
+                msg: SystemMsg::NodeEvent(NodeEvent::SuspiciousNodesDetected(_)),
+                ..
+            } => DYSFUNCTION_MSG_PRIORITY,
+
             // Inter-node comms for backpressure
             MsgType::System {
                 msg: SystemMsg::BackPressure(_),
@@ -121,7 +130,7 @@ impl MsgType {
             MsgType::System {
                 msg:
                     SystemMsg::NodeCmd(_)
-                    | SystemMsg::NodeEvent(_)
+                    | SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData { .. })
                     | SystemMsg::NodeQuery(_)
                     | SystemMsg::NodeQueryResponse { .. }
                     | SystemMsg::NodeMsgError { .. },
