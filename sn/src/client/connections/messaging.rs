@@ -536,7 +536,7 @@ impl Session {
         let targets_count = at_least_one_correct_elder(); // stored at Adults, so only 1 correctly functioning Elder need to relay
 
         // any SAP that does not hold elders_count() is indicative of a broken network (after genesis)
-        if elders.len() < elder_count() {
+        if elders.len() < targets_count {
             error!("Insufficient knowledge to send to {:?}", dst_address);
             return Err(Error::InsufficientElderKnowledge {
                 connections: elders.len(),

@@ -171,7 +171,7 @@ pub async fn run_split() -> Result<()> {
         .wrap_err("Error adding nodes to the testnet")?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
-    let interval_duration = Duration::from_secs(interval_as_int * additional_node_count * 3);
+    let interval_duration = Duration::from_secs(interval_as_int * additional_node_count);
 
     sleep(interval_duration).await;
 

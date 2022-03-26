@@ -12,6 +12,7 @@ use crate::messaging::MsgId;
 use crate::node::{Error, Result};
 
 use bytes::Bytes;
+use custom_debug::Debug;
 use priority_queue::PriorityQueue;
 use std::{
     sync::{
@@ -53,6 +54,10 @@ impl PeerSession {
         let _ = tokio::task::spawn(async move { session_clone.keep_sending().await });
 
         session
+    }
+
+    pub(crate) async fn remove_expired(&self) {
+        self.link.remove_expired().await
     }
 
     pub(crate) async fn is_connected(&self) -> bool {
@@ -133,7 +138,7 @@ impl PeerSession {
                 break;
             }
 
-            let expected_rate = *self.peer_desired_rate.read().await;
+            let expected_rate = { *self.peer_desired_rate.read().await };
             let actual_rate = self.attempted.value();
             if actual_rate > expected_rate {
                 let diff = actual_rate - expected_rate;
@@ -143,6 +148,15 @@ impl PeerSession {
             } else if self.msg_queue.read().await.is_empty() {
                 tokio::time::sleep(SLEEP_TIME).await;
                 continue;
+            }
+
+            #[cfg(feature = "test-utils")]
+            {
+                let queue = self.msg_queue.read().await;
+                debug!("Peer {} queue length: {}", self.link.peer(), queue.len());
+                for (job, priority) in queue.iter() {
+                    debug!("Prio: {}, Job: {:?}", priority, job);
+                }
             }
 
             let queue_res = { self.msg_queue.write().await.pop() };
@@ -210,6 +224,7 @@ impl MsgThroughput {
 #[derive(Debug)]
 pub(crate) struct SendJob {
     msg_id: MsgId,
+    #[debug(skip)]
     msg_bytes: Bytes,
     retries: usize,
     reporter: StatusReporting,

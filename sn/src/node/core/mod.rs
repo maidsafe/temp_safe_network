@@ -480,15 +480,6 @@ impl Node {
         let prefix = self.network_knowledge.prefix().await;
         debug!("{:?}: {:?} Elders, {:?} Adults.", prefix, elders, adults);
     }
-
-    pub(super) async fn list_section_members(&self) -> BTreeSet<XorName> {
-        self.network_knowledge
-            .section_members()
-            .await
-            .iter()
-            .map(|state| state.name())
-            .collect()
-    }
 }
 
 pub(crate) struct StateSnapshot {

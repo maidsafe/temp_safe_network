@@ -103,8 +103,11 @@ impl MsgListener {
         trace!(%conn_id, %remote_address, "{}", LogMarker::ConnectionClosed);
     }
 
-    pub(crate) fn count_msg(&self) {
-        // count outgoing msgs..
-        let _ = self.count_msg.send(());
+    // count outgoing msgs
+    pub(crate) async fn count_msg(&self) {
+        if let Err(err) = self.count_msg.send(()).await {
+            // this is really a problem as we rely on this counting, make sure this doesn't normally error!
+            debug!("Error when trying to count outgoing msg..! {}", err);
+        }
     }
 }

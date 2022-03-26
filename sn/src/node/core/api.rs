@@ -152,14 +152,6 @@ impl Node {
         )
         .await?;
 
-        trace!(
-            "relay {:?} to first {:?} of {:?} (Section PK: {:?})",
-            wire_msg,
-            dg_size,
-            targets,
-            wire_msg.src_section_pk(),
-        );
-
         let target_name = dst_location.name();
 
         // To avoid loop: if destination is to Node, targets are multiple, self is an elder,
@@ -174,6 +166,14 @@ impl Node {
             // we just drop the message
             return Ok(None);
         }
+
+        trace!(
+            "relay {:?} to first {:?} of {:?} (Section PK: {:?})",
+            wire_msg,
+            dg_size,
+            targets,
+            wire_msg.src_section_pk(),
+        );
 
         let dst_pk = self.section_key_by_name(&target_name).await;
         wire_msg.set_dst_section_pk(dst_pk);

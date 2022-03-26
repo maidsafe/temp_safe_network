@@ -19,7 +19,8 @@ use tokio::{sync::RwLock, time::Instant};
 const MIN_REPORT_INTERVAL: Duration = Duration::from_secs(60);
 const REPORT_TTL: Duration = Duration::from_secs(300); // 5 minutes
 
-const DEFAULT_MSGS_PER_S_AND_PEER: f64 = INITIAL_MSGS_PER_S / 10.0;
+const SANITY_MAX_PER_S_AND_PEER: f64 = INITIAL_MSGS_PER_S;
+const SANITY_MIN_PER_S_AND_PEER: f64 = 1.0; // 1 every s
 
 type OutgoingReports = BTreeMap<Peer, (Instant, f64)>;
 
@@ -63,38 +64,79 @@ impl BackPressure {
     }
 
     async fn try_get_new_value(&self, caller: &Peer, now: Instant) -> Option<f64> {
-        let msgs_per_s = self.monitoring.msgs_per_s().await;
-        let num_callers = { self.our_reports.read().await.len() as f64 };
-
-        // avoid divide by 0 errors
-        let msgs_per_s_and_peer = f64::max(
-            DEFAULT_MSGS_PER_S_AND_PEER,
-            msgs_per_s / f64::max(1.0, num_callers),
-        );
-
-        let prev = self
-            .our_reports
-            .write()
-            .await
-            .insert(*caller, (now, msgs_per_s_and_peer));
-
-        // placed in this block, we reduce the frequency of this check
+        // first, try evict expired (placed in this block, we reduce the frequency of this check)
         let last_eviction = { *self.last_eviction.read().await };
         // only try evict when there's any likelihood of there being any expired..
         if now > last_eviction && now - last_eviction > REPORT_TTL {
             self.evict_expired(now).await;
         }
 
-        if let Some((_, previous)) = prev {
-            // bound update rates by require some minimum level of change:
+        // then measure stuff
+
+        let msgs_per_s = 10.0 * self.monitoring.msgs_per_s().await;
+        let num_callers = { self.our_reports.read().await.len() as f64 };
+
+        // avoid divide by 0 errors
+        let msgs_per_s_and_peer = msgs_per_s / f64::max(1.0, num_callers);
+
+        // make sure not more than sanity max
+        let msgs_per_s_and_peer = f64::min(SANITY_MAX_PER_S_AND_PEER, msgs_per_s_and_peer);
+
+        // make sure not less than sanity min
+        let msgs_per_s_and_peer = f64::max(SANITY_MIN_PER_S_AND_PEER, msgs_per_s_and_peer);
+
+        debug!("Number of callers {:?}", num_callers);
+        debug!("Msgs per s and peer {:?}", msgs_per_s_and_peer);
+
+        let prev = self.our_reports.read().await.get(caller).copied();
+
+        // bound update rates by require some minimum level of change
+        let significant_change = |change_ratio| {
             // if current val is 5 % worse, or 10 % better, then update our peer with it
+            0.95 >= change_ratio || change_ratio >= 1.1 || change_ratio == 0.0
+        };
+
+        let (record_changes, update_sender) = if let Some((_, previous)) = prev {
             let change_ratio = msgs_per_s_and_peer / previous;
-            if 0.95 >= change_ratio || change_ratio >= 1.1 || change_ratio == 0.0 {
-                return None;
+            if significant_change(change_ratio) {
+                // we want to store the value, and update the node
+                (true, true)
+            } else {
+                debug!(
+                    "No significant change of backpressure value (previous: {}, ratio: {})",
+                    previous, change_ratio
+                );
+                // we neither want to store the value, nor update the sender
+                (false, false)
             }
+        } else {
+            let change_ratio = msgs_per_s_and_peer / SANITY_MAX_PER_S_AND_PEER;
+            if significant_change(change_ratio) {
+                // we want to store the value, and update the node
+                (true, true)
+            } else {
+                debug!(
+                    "No significant change of sender default backpressure value (ratio: {})",
+                    change_ratio
+                );
+                // we want to store the value, but not update the sender
+                (true, false)
+            }
+        };
+
+        if record_changes {
+            let _ = self
+                .our_reports
+                .write()
+                .await
+                .insert(*caller, (now, msgs_per_s_and_peer));
         }
 
-        Some(msgs_per_s_and_peer)
+        if update_sender {
+            Some(msgs_per_s_and_peer)
+        } else {
+            None
+        }
     }
 
     async fn evict_expired(&self, now: Instant) {
