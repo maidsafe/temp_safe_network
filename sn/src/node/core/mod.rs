@@ -267,6 +267,11 @@ impl Node {
                 .cloned()
                 .collect::<Vec<Peer>>();
 
+            debug!(
+                "{:?}: {newly_suspect_nodes:?}",
+                LogMarker::SendSuspiciousNodesDetected
+            );
+
             for adult in valid_adults {
                 cmds.push(Cmd::SignOutgoingSystemMsg {
                     msg: SystemMsg::NodeEvent(NodeEvent::SuspiciousNodesDetected(
@@ -277,7 +282,6 @@ impl Node {
                         section_pk: *self.section_chain().await.last_key(),
                     },
                 });
-                debug!("{:?}", LogMarker::SendSuspiciousNodesDetected);
             }
         }
 
