@@ -247,7 +247,7 @@ jobs:
             # doesn't become available on crates.io immediately, so this script will use a retry
             # loop.
             ./resources/scripts/publish_crate.sh \
-              "safe_network" "${{ steps.versioning.outputs.sn_dysfunction_version }}" "sn_dysfunction"
+              "sn" "${{ steps.versioning.outputs.sn_dysfunction_version }}" "sn_dysfunction"
           fi
 
   publish_sn_api:
