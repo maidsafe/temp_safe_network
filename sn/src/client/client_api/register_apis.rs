@@ -783,7 +783,10 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ae_checks_register_test() -> Result<()> {
-        init_test_logger();
+        // TODO: Fix these tests: why do the test loggers conflict when
+        // only running ae_ tests? (and cause this/file tests to fail...)
+        // init_test_logger();
+
         let _outer_span = tracing::info_span!("ae_checks_register_test").entered();
         let client = create_test_client_with(None, None, false).await?;
 
