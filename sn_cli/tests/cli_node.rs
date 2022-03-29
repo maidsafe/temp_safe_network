@@ -19,7 +19,6 @@ pub(crate) const SN_NODE_BIN_NAME: &str = "sn_node";
 pub(crate) const SN_NODE_BIN_NAME: &str = "sn_node.exe";
 
 #[test]
-#[ignore = "unfortunately this test is subject to rate limiting from the Github API"]
 fn node_install_should_install_the_latest_version() -> Result<()> {
     let temp_dir = assert_fs::TempDir::new()?;
     let safe_dir = temp_dir.child(".safe");
