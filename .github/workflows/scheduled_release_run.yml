@@ -149,7 +149,7 @@ jobs:
         name: copy node to temp location
         run: cp sn_node/sn_node /tmp
       - name: launch testnet
-        uses: maidsafe/sn_testnet_action@master
+        uses: maidsafe/sn_testnet_action@main
         with:
           do-token: ${{ secrets.DO_TOKEN }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -313,7 +313,7 @@ jobs:
     needs: [launch-testnet, client, api, cli]
     steps:
       - name: kill testnet
-        uses: maidsafe/sn_testnet_action@master
+        uses: maidsafe/sn_testnet_action@main
         with:
           do-token: ${{ secrets.DO_TOKEN }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -366,7 +366,7 @@ jobs:
     needs: [launch-testnet, client, api, cli]
     steps:
       - name: Kill testnet
-        uses: maidsafe/sn_testnet_action@master
+        uses: maidsafe/sn_testnet_action@main
         with:
           do-token: ${{ secrets.DO_TOKEN }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
