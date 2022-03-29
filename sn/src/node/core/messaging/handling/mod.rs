@@ -725,7 +725,7 @@ impl Node {
                 );
                 debug!("{}", LogMarker::DeviantsDetected);
 
-                return self.republish_data_for_suspicious_nodes(suspects).await;
+                return self.replicate_data_of_suspicious_nodes(suspects).await;
             }
             SystemMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
                 info!("ReplicateData MsgId: {:?}", msg_id);
@@ -1073,17 +1073,23 @@ impl Node {
         cmds
     }
 
-    async fn republish_data_for_suspicious_nodes(
+    async fn replicate_data_of_suspicious_nodes(
         &self,
         suspects: BTreeSet<XorName>,
     ) -> Result<Vec<Cmd>> {
-        debug!("Republishing data for suspect nodes : {suspects:?}");
+        debug!("Replicating data of suspect nodes : {suspects:?}");
         let our_adults = self
             .network_knowledge
             .adults()
             .await
             .iter()
-            .map(|peer| peer.name())
+            .filter_map(|peer| {
+                if suspects.contains(&peer.name()) {
+                    None
+                } else {
+                    Some(peer.name())
+                }
+            })
             .collect::<BTreeSet<XorName>>();
 
         self.reorganize_data(BTreeSet::new(), suspects, our_adults)
