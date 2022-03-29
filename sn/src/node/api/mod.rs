@@ -176,7 +176,7 @@ impl NodeApi {
                 removed: BTreeSet::new(),
             };
 
-            trace!("{}", LogMarker::PromotedToElder);
+            info!("{}", LogMarker::PromotedToElder);
             node.send_event(Event::EldersChanged {
                 elders,
                 self_status_change: NodeElderChange::Promoted,

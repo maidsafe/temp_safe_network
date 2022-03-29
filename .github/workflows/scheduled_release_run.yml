@@ -1,4 +1,4 @@
-name: Nightly Release Run
+name: Scheduled Release Run
 
 on:
   schedule:
