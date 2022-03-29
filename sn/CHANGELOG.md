@@ -5,14 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.58.9 (2022-03-26)
+## v0.58.10 (2022-03-29)
+
+### New Features
+
+ - <csr-id-951d1bd87490ad8b3c3747cba952424416da013f/> watch status of individual msgs
+ - <csr-id-20c33249fceea1c3d085de048f13388187a77ea5/> individual send rates
+
+### Bug Fixes
+
+ - <csr-id-bd488cbc9d24324bec730f85bdcebccaec2e75c4/> exclude suspects from current
+ - <csr-id-bbd6a2370a809a4d23a1df0a813cac2809e06690/> bump node suspicion event prio
+ - <csr-id-63c5deae1a4c31c681c019846da95105c0ef7733/> improve success rate
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 7 commits contributed to the release over the course of 1 calendar day.
+ - 3 days passed between releases.
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -22,6 +34,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - exclude suspects from current ([`bd488cb`](https://github.com/maidsafe/safe_network/commit/bd488cbc9d24324bec730f85bdcebccaec2e75c4))
+    - debug promotion, rename workflow ([`c8f4eed`](https://github.com/maidsafe/safe_network/commit/c8f4eed0406253cc4c253292bc82e7320fdcbf70))
+    - bump node suspicion event prio ([`bbd6a23`](https://github.com/maidsafe/safe_network/commit/bbd6a2370a809a4d23a1df0a813cac2809e06690))
+    - improve success rate ([`63c5dea`](https://github.com/maidsafe/safe_network/commit/63c5deae1a4c31c681c019846da95105c0ef7733))
+    - watch status of individual msgs ([`951d1bd`](https://github.com/maidsafe/safe_network/commit/951d1bd87490ad8b3c3747cba952424416da013f))
+    - individual send rates ([`20c3324`](https://github.com/maidsafe/safe_network/commit/20c33249fceea1c3d085de048f13388187a77ea5))
+    - use msgs per s ([`3dac350`](https://github.com/maidsafe/safe_network/commit/3dac350598f863fc3d66669c9f8789db51573b96))
+</details>
+
+## v0.58.9 (2022-03-26)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_dysfunction-/safe_network-0.58.9 ([`b471b5c`](https://github.com/maidsafe/safe_network/commit/b471b5c9f539933dd12de7af3473d2b0f61d7f28))
     - safe_network-0.58.8/sn_api-0.58.0/sn_cli-0.51.0 ([`c0806e3`](https://github.com/maidsafe/safe_network/commit/c0806e384d99b94480e8f8e0322a6f5a6bd3636a))
     - Update sn/src/node/api/dispatcher.rs ([`2453eed`](https://github.com/maidsafe/safe_network/commit/2453eedc40a218b42ab11e7a6aaa95525b87c9ac))
     - check sus nodes periodically and not on query ([`dabdc55`](https://github.com/maidsafe/safe_network/commit/dabdc555d70be79b910c5fe2b2647ca85f2319f9))

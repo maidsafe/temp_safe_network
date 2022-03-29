@@ -365,7 +365,7 @@ impl Node {
             };
 
             let self_status_change = if !old.is_elder && new.is_elder {
-                trace!("{}: {:?}", LogMarker::PromotedToElder, new.prefix);
+                info!("{}: {:?}", LogMarker::PromotedToElder, new.prefix);
                 NodeElderChange::Promoted
             } else if old.is_elder && !new.is_elder {
                 info!("{}", LogMarker::DemotedFromElder);
