@@ -13,7 +13,7 @@ use crate::node::{
         relocation::{find_nodes_to_relocate, ChurnId, RelocateDetailsUtils},
         Node, Proposal,
     },
-    Event, Result,
+    Event, MembershipEvent, Result,
 };
 
 use sn_interface::{
@@ -128,9 +128,9 @@ impl Node {
             }
             None => {
                 trace!("{}", LogMarker::RelocateStart);
-                self.send_event(Event::RelocationStarted {
+                self.send_event(Event::Membership(MembershipEvent::RelocationStarted {
                     previous_name: node.name(),
-                })
+                }))
                 .await;
             }
         }

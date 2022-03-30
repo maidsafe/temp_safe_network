@@ -9,7 +9,7 @@
 use super::{delivery_group, Comm, Node};
 
 use crate::node::{
-    api::cmds::Cmd,
+    api::{cmds::Cmd, event_channel::EventSender},
     error::{Error, Result},
     Event,
 };
@@ -23,7 +23,6 @@ use sn_interface::{
 
 use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf};
-use tokio::sync::mpsc;
 use xor_name::XorName;
 
 impl Node {
@@ -31,7 +30,7 @@ impl Node {
     pub(crate) async fn first_node(
         comm: Comm,
         mut node: NodeInfo,
-        event_tx: mpsc::Sender<Event>,
+        event_sender: EventSender,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
         genesis_sk_set: bls::SecretKeySet,
@@ -46,7 +45,7 @@ impl Node {
             node,
             section,
             Some(section_key_share),
-            event_tx,
+            event_sender,
             used_space,
             root_storage_dir,
         )
@@ -120,17 +119,14 @@ impl Node {
     }
 
     pub(crate) async fn send_event(&self, event: Event) {
-        // Note: cloning the sender to avoid mutable access. Should have negligible cost.
-        if self.event_tx.clone().send(event).await.is_err() {
-            error!("Event receiver has been closed");
-        }
+        self.event_sender.send(event).await
     }
 
     // ----------------------------------------------------------------------------------------
     //   ---------------------------------- Mut ------------------------------------------
     // ----------------------------------------------------------------------------------------
 
-    pub(crate) async fn handle_timeout(&self, token: u64) -> Result<Vec<Cmd>> {
+    pub(crate) async fn handle_dkg_timeout(&self, token: u64) -> Result<Vec<Cmd>> {
         self.dkg_voter.handle_timeout(
             &self.info.read().await.clone(),
             token,

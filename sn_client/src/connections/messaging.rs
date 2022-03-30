@@ -45,7 +45,7 @@ pub(crate) const NODES_TO_CONTACT_PER_STARTUP_BATCH: usize = 3;
 const INITIAL_WAIT: u64 = 1;
 
 // Number of retries for sending a message due to a connection issue.
-const CLIENT_SEND_RETRIES: usize = 1;
+const CLIENT_SEND_RETRIES: usize = 3;
 
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
@@ -103,8 +103,8 @@ impl Session {
             section_pk,
         };
 
-        let msg_kind = AuthKind::Service(auth);
-        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+        let auth_kind = AuthKind::Service(auth);
+        let wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, 0, dst_location)?;
 
         // The insertion of channel will be executed AFTER the completion of the `send_message`.
         let (sender, mut receiver) = channel::<CmdResponse>(elders_len);
@@ -223,8 +223,8 @@ impl Session {
             name: dst,
             section_pk,
         };
-        let msg_kind = AuthKind::Service(auth);
-        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+        let auth_kind = AuthKind::Service(auth);
+        let wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, 0, dst_location)?;
 
         send_msg_in_bg(self.clone(), elders, wire_msg, msg_id)?;
 
@@ -361,8 +361,8 @@ impl Session {
             name: dst_address,
             section_pk,
         };
-        let msg_kind = AuthKind::Service(auth);
-        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+        let auth_kind = AuthKind::Service(auth);
+        let wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, 0, dst_location)?;
 
         // When the client bootstrap using the nodes read from the config, the list is sorted
         // by socket addresses. To improve the efficiency, the `elders_or_adults` shall be sorted
@@ -551,7 +551,7 @@ pub(super) async fn send_msg(
     wire_msg: WireMsg,
     msg_id: MsgId,
 ) -> Result<()> {
-    let priority = wire_msg.clone().into_msg()?.priority();
+    let priority = wire_msg.clone().priority();
     let msg_bytes = wire_msg.serialize()?;
 
     let mut last_error = None;

@@ -145,11 +145,17 @@ impl Node {
             response: query_response,
             correlation_id,
         };
-        let (msg_kind, payload) = self.ed_sign_client_msg(&msg).await?;
+        let (auth_kind, payload) = self.ed_sign_client_msg(&msg).await?;
 
         for peer in waiting_peers.iter() {
             let dst = DstLocation::EndUser(EndUser(peer.name()));
-            let wire_msg = WireMsg::new_msg(msg_id, payload.clone(), msg_kind.clone(), dst)?;
+            let wire_msg = WireMsg::new_msg(
+                msg_id,
+                payload.clone(),
+                auth_kind.clone(),
+                msg.priority(),
+                dst,
+            )?;
 
             debug!("Responding with the first query response to {:?}", dst);
 

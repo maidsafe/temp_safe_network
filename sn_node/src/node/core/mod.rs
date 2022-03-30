@@ -13,33 +13,36 @@ mod connectivity;
 mod data;
 mod delivery_group;
 mod messaging;
+mod monitoring;
 mod proposal;
 mod relocation;
 mod split_barrier;
 
 /// DataStorage apis.
 pub use self::data::DataStorage;
+use self::split_barrier::SplitBarrier;
 
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use comm::{Comm, DeliveryStatus, MsgEvent};
 pub(crate) use data::MIN_LEVEL_WHEN_FULL;
+pub(crate) use monitoring::RateLimits;
 pub(crate) use proposal::Proposal;
 #[cfg(test)]
 pub(crate) use relocation::{check as relocation_check, ChurnId};
 
-use self::{data::Capacity, split_barrier::SplitBarrier};
-
 use super::{
-    api::cmds::Cmd, dkg::DkgVoter, handover::Handover, membership::Membership, Elders, Event,
-    NodeElderChange,
+    api::{cmds::Cmd, event_channel::EventSender},
+    dkg::DkgVoter,
+    handover::Handover,
+    membership::Membership,
+    Elders, Event, MembershipEvent, NodeElderChange,
 };
 
+use crate::dbs::UsedSpace;
 use crate::node::{
     error::{Error, Result},
-    membership::elder_candidates,
-    membership::try_split_dkg,
+    membership::{elder_candidates, try_split_dkg},
 };
-use crate::UsedSpace;
 
 use sn_dysfunction::{DysfunctionDetection, DysfunctionSeverity, IssueType};
 use sn_interface::{
@@ -49,15 +52,16 @@ use sn_interface::{
         system::{DkgSessionId, NodeState, SystemMsg},
         AuthorityProof, SectionAuth, SectionAuthorityProvider,
     },
-    network_knowledge::utils::compare_and_write_prefix_map_to_disk,
     network_knowledge::{
-        supermajority, NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider,
+        supermajority, utils::compare_and_write_prefix_map_to_disk, NetworkKnowledge, NodeInfo,
+        SectionKeyShare, SectionKeysProvider,
     },
-    types::{keys::ed25519::Digest256, log_markers::LogMarker, Cache, Peer},
+    types::{keys::ed25519::Digest256, log_markers::LogMarker, Cache, Peer, ReplicatedDataAddress},
 };
 
 use backoff::ExponentialBackoff;
-use dashmap::DashSet;
+use dashmap::{DashMap, DashSet};
+use data::Capacity;
 use itertools::Itertools;
 use resource_proof::ResourceProof;
 use std::{
@@ -66,12 +70,17 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::RwLock;
 use uluru::LRUCache;
 use xor_name::{Prefix, XorName};
 
 pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 128;
 pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 10;
+
+// This prevents pending query limit unbound growth
+pub(crate) const DATA_QUERY_LIMIT: usize = 100;
+// per query we can have this many peers, so the total peers waiting can be QUERY_LIMIT * MAX_WAITING_PEERS_PER_QUERY
+pub(crate) const MAX_WAITING_PEERS_PER_QUERY: usize = 100;
 
 const BACKOFF_CACHE_LIMIT: usize = 100;
 
@@ -85,11 +94,6 @@ const BACKOFF_CACHE_LIMIT: usize = 100;
 // the section).
 const DATA_QUERY_TIMEOUT: Duration = Duration::from_secs(15);
 
-// This prevents pending query limit unbound growth
-pub(crate) const DATA_QUERY_LIMIT: usize = 100;
-// per query we can have this many peers, so the total peers waiting can be QUERY_LIMIT * MAX_WAITING_PEERS_PER_QUERY
-pub(crate) const MAX_WAITING_PEERS_PER_QUERY: usize = 100;
-
 #[derive(Debug, Clone)]
 pub(crate) struct DkgSessionInfo {
     pub(crate) session_id: DkgSessionId,
@@ -102,13 +106,15 @@ pub(crate) type AeBackoffCache =
 
 // Core state + logic of a node.
 pub(crate) struct Node {
-    pub(super) event_tx: mpsc::Sender<Event>,
-    pub(crate) info: Arc<RwLock<NodeInfo>>,
-
-    pub(crate) comm: Comm,
-
+    pub(super) event_sender: EventSender,
     pub(super) data_storage: DataStorage, // Adult only before cache
-
+    pub(crate) info: Arc<RwLock<NodeInfo>>,
+    pub(crate) comm: Comm,
+    /// queue up all batch data to be replicated (as a result of churn events atm)
+    // TODO: This can probably be reworked into the general per peer msg queue, but as
+    // we need to pull data first before we form the WireMsg, we won't do that just now
+    pub(crate) pending_data_to_replicate_to_peers:
+        Arc<DashMap<ReplicatedDataAddress, Arc<RwLock<BTreeSet<Peer>>>>>,
     resource_proof: ResourceProof,
     // Network resources
     pub(crate) section_keys_provider: SectionKeysProvider,
@@ -142,7 +148,7 @@ impl Node {
         mut info: NodeInfo,
         network_knowledge: NetworkKnowledge,
         section_key_share: Option<SectionKeyShare>,
-        event_tx: mpsc::Sender<Event>,
+        event_sender: EventSender,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
     ) -> Result<Self> {
@@ -204,7 +210,7 @@ impl Node {
             None
         };
 
-        Ok(Self {
+        let node = Self {
             comm,
             info: Arc::new(RwLock::new(info)),
             network_knowledge,
@@ -215,7 +221,7 @@ impl Node {
             message_aggregator: SignatureAggregator::default(),
             dkg_voter: DkgVoter::default(),
             relocate_state: Arc::new(RwLock::new(None)),
-            event_tx,
+            event_sender,
             handover_voting: Arc::new(RwLock::new(handover)),
             joins_allowed: Arc::new(RwLock::new(true)),
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
@@ -223,9 +229,14 @@ impl Node {
             capacity: Capacity::default(),
             dysfunction_tracking: node_dysfunction_detector,
             pending_data_queries: Arc::new(Cache::with_expiry_duration(DATA_QUERY_TIMEOUT)),
+            pending_data_to_replicate_to_peers: Arc::new(DashMap::new()),
             ae_backoff_cache: AeBackoffCache::default(),
             membership: Arc::new(RwLock::new(membership)),
-        })
+        };
+
+        node.write_prefix_map().await;
+
+        Ok(node)
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -323,20 +334,6 @@ impl Node {
     pub(crate) async fn log_dkg_session(&self, name: &XorName) {
         trace!("Logging Dkg session as responded to in dysfunction");
         self.dysfunction_tracking.dkg_ack_fulfilled(name).await;
-    }
-
-    pub(crate) async fn write_prefix_map(&self) {
-        info!("Writing our latest PrefixMap to disk");
-        // TODO: Make this serialization human readable
-
-        let prefix_map = self.network_knowledge.prefix_map().clone();
-
-        let _ = tokio::spawn(async move {
-            // Compare and write Prefix to `~/.safe/prefix_maps` dir
-            if let Err(e) = compare_and_write_prefix_map_to_disk(&prefix_map).await {
-                error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);
-            }
-        });
     }
 
     pub(super) async fn state_snapshot(&self) -> StateSnapshot {
@@ -624,10 +621,10 @@ impl Node {
                 )
                 .await?;
 
-                Event::SectionSplit {
+                Event::Membership(MembershipEvent::SectionSplit {
                     elders,
                     self_status_change,
-                }
+                })
             } else {
                 cmds.extend(
                     self.send_metadata_updates_to_nodes(
@@ -641,10 +638,10 @@ impl Node {
                     .await?,
                 );
 
-                Event::EldersChanged {
+                Event::Membership(MembershipEvent::EldersChanged {
                     elders,
                     self_status_change,
-                }
+                })
             };
 
             cmds.extend(
@@ -715,6 +712,20 @@ impl Node {
         } else {
             debug!("log_section_stats: No membership instance");
         };
+    }
+
+    async fn write_prefix_map(&self) {
+        info!("Writing our latest PrefixMap to disk");
+        // TODO: Make this serialization human readable
+
+        let prefix_map = self.network_knowledge.prefix_map().clone();
+
+        let _ = tokio::spawn(async move {
+            // Compare and write Prefix to `~/.safe/prefix_maps` dir
+            if let Err(e) = compare_and_write_prefix_map_to_disk(&prefix_map).await {
+                error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);
+            }
+        });
     }
 }
 

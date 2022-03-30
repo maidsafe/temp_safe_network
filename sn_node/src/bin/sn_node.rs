@@ -30,7 +30,8 @@
 #[cfg(not(feature = "tokio-console"))]
 use sn_interface::LogFormatter;
 use sn_node::node::{
-    add_connection_info, set_connection_info, Config, Error as NodeError, Event, NodeApi,
+    add_connection_info, set_connection_info, Config, Error as NodeError, Event, MembershipEvent,
+    NodeApi,
 };
 
 use color_eyre::{Section, SectionExt};
@@ -46,10 +47,8 @@ use tokio::{
     time::{sleep, Duration},
 };
 use tracing::{self, debug, error, info, trace, warn};
-
 #[cfg(not(feature = "tokio-console"))]
 use tracing_appender::non_blocking::WorkerGuard;
-
 #[cfg(not(feature = "tokio-console"))]
 use tracing_subscriber::filter::EnvFilter;
 
@@ -329,7 +328,7 @@ async fn run_node(config: Config) -> Result<()> {
     let log = format!("The network is not accepting nodes right now. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds");
 
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
-    let (node, mut event_stream) = loop {
+    let (node, mut event_receiver) = loop {
         match NodeApi::new(&config, bootstrap_retry_duration).await {
             Ok(result) => break result,
             Err(NodeError::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
@@ -420,12 +419,27 @@ async fn run_node(config: Config) -> Result<()> {
         }
     }
 
-    // This just keeps the node going as long as routing goes
-    while let Some(event) = event_stream.next().await {
-        trace!("Routing event! {:?}", event);
-        if let Event::ChurnJoinMissError = event {
+    // (this is a low-performing way of storing the logs,
+    // only added here for demonstration and test purposes)
+    // let root_dir_buf = config.root_dir()?;
+    // let event_log_filepath = root_dir_buf.as_path().join("events.log");
+    // let mut event_log = File::create(&event_log_filepath)?;
+
+    // This loop keeps the node going
+    while let Some(event) = event_receiver.next().await {
+        trace!("Node event! {:?}", event);
+        if let Event::Membership(MembershipEvent::ChurnJoinMissError) = event {
             return Err(NodeError::ChurnJoinMiss).map_err(ErrReport::msg);
         }
+        // (this is a low-performing way of storing the logs,
+        // only added here for demonstration and test purposes)
+        // if let Event::CmdProcessing(e) = event {
+        //     let str = format!("{}\n\n", e);
+        //     if let Err(e) = event_log.write_all(str.as_bytes()) {
+        //         trace!("Error when writing to event log: {}", e);
+        //     }
+        //     event_log.sync_all()?;
+        // }
     }
 
     Ok(())

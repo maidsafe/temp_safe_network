@@ -13,8 +13,8 @@ use sn_interface::{
     types::Cache,
 };
 use sn_node::node::{
-    create_test_max_capacity_and_root_storage, Config, Event as RoutingEvent, NodeApi,
-    NodeElderChange,
+    create_test_max_capacity_and_root_storage, Config, Event as RoutingEvent, MembershipEvent,
+    MessagingEvent, NodeApi, NodeElderChange,
 };
 
 use bls::PublicKey;
@@ -39,7 +39,7 @@ use std::{
 use structopt::StructOpt;
 use tokio::{
     sync::mpsc::{self, Sender},
-    time, // task,
+    time,
 };
 use tokio_util::time::delay_queue::DelayQueue;
 use tracing_subscriber::EnvFilter;
@@ -299,63 +299,7 @@ impl Network {
                 self.stats.join_failures += 1;
             }
             Event::Routing { id, event } => match event {
-                RoutingEvent::EldersChanged {
-                    elders,
-                    self_status_change,
-                    ..
-                }
-                | RoutingEvent::SectionSplit {
-                    elders,
-                    self_status_change,
-                    ..
-                } => {
-                    if let Some(Node::Joined {
-                        name,
-                        prefix,
-                        elder,
-                        ..
-                    }) = self.nodes.get_mut(&id)
-                    {
-                        let old_prefix = *prefix;
-                        *prefix = elders.prefix;
-
-                        if elders.added.contains(name) || elders.remaining.contains(name) {
-                            *elder = Some(ElderState {
-                                key: elders.key,
-                                num_elders: elders.remaining.len() + elders.added.len(),
-                            });
-                        } else if elders.removed.contains(name) && old_prefix == elders.prefix {
-                            *elder = None;
-                        }
-                    }
-                    match self_status_change {
-                        NodeElderChange::Promoted => self.stats.promotions += 1,
-                        NodeElderChange::Demoted => self.stats.demotions += 1,
-                        NodeElderChange::None => (),
-                    };
-                }
-                RoutingEvent::RelocationStarted { .. } => {
-                    if let Some(Node::Joined { is_relocating, .. }) = self.nodes.get_mut(&id) {
-                        *is_relocating = true;
-                        self.stats.relocation_attempts += 1;
-                    }
-                }
-                RoutingEvent::Relocated { .. } => {
-                    if let Some(Node::Joined {
-                        node,
-                        name,
-                        age,
-                        is_relocating,
-                        ..
-                    }) = self.nodes.get_mut(&id)
-                    {
-                        *name = node.name().await;
-                        *age = node.age().await;
-                        *is_relocating = false;
-                        self.stats.relocation_successes += 1;
-                    }
-                }
-                RoutingEvent::MessageReceived { dst, .. } => {
+                RoutingEvent::Messaging(MessagingEvent::SystemMsgReceived { dst, .. }) => {
                     let (dst, dst_section_pk) = match dst {
                         DstLocation::Section { name, section_pk } => (name, section_pk),
                         DstLocation::Node { name, section_pk } => (name, section_pk),
@@ -366,6 +310,68 @@ impl Network {
 
                     self.probe_tracker.receive(&dst, &dst_section_pk).await;
                 }
+                RoutingEvent::Membership(e) => match e {
+                    MembershipEvent::EldersChanged {
+                        elders,
+                        self_status_change,
+                        ..
+                    }
+                    | MembershipEvent::SectionSplit {
+                        elders,
+                        self_status_change,
+                        ..
+                    } => {
+                        if let Some(Node::Joined {
+                            name,
+                            prefix,
+                            elder,
+                            ..
+                        }) = self.nodes.get_mut(&id)
+                        {
+                            let old_prefix = *prefix;
+                            *prefix = elders.prefix;
+
+                            if elders.added.contains(name) || elders.remaining.contains(name) {
+                                *elder = Some(ElderState {
+                                    key: elders.key,
+                                    num_elders: elders.remaining.len() + elders.added.len(),
+                                });
+                            } else if elders.removed.contains(name) && old_prefix == elders.prefix {
+                                *elder = None;
+                            }
+                        }
+                        match self_status_change {
+                            NodeElderChange::Promoted => self.stats.promotions += 1,
+                            NodeElderChange::Demoted => self.stats.demotions += 1,
+                            NodeElderChange::None => (),
+                        };
+                    }
+                    MembershipEvent::RelocationStarted { .. } => {
+                        if let Some(Node::Joined { is_relocating, .. }) = self.nodes.get_mut(&id) {
+                            *is_relocating = true;
+                            self.stats.relocation_attempts += 1;
+                        }
+                    }
+                    MembershipEvent::Relocated { .. } => {
+                        if let Some(Node::Joined {
+                            node,
+                            name,
+                            age,
+                            is_relocating,
+                            ..
+                        }) = self.nodes.get_mut(&id)
+                        {
+                            *name = node.name().await;
+                            *age = node.age().await;
+                            *is_relocating = false;
+                            self.stats.relocation_successes += 1;
+                        }
+                    }
+                    _ => {
+                        // Currently ignore the other event variants. This might change in the future,
+                        // if we come up with something interesting to use those events for.
+                    }
+                },
                 _ => {
                     // Currently ignore the other event variants. This might change in the future,
                     // if we come up with something interesting to use those events for.
@@ -633,16 +639,16 @@ impl Network {
     }
 }
 
-async fn add_node(id: u64, mut config: Config, event_tx: Sender<Event>) -> Result<()> {
+async fn add_node(id: u64, mut config: Config, event_sender: Sender<Event>) -> Result<()> {
     let (_, root_dir) = create_test_max_capacity_and_root_storage()?;
 
     config.root_dir = Some(root_dir);
     let joining_timeout = Duration::from_secs(3 * 60);
 
-    let (node, mut events) = match NodeApi::new(&config, joining_timeout).await {
+    let (node, mut event_receiver) = match NodeApi::new(&config, joining_timeout).await {
         Ok(output) => output,
         Err(error) => {
-            let _res = event_tx
+            let _res = event_sender
                 .send(Event::JoinFailure {
                     id,
                     error: error.into(),
@@ -652,10 +658,14 @@ async fn add_node(id: u64, mut config: Config, event_tx: Sender<Event>) -> Resul
         }
     };
 
-    let _res = event_tx.send(Event::JoinSuccess { id, node }).await;
+    let _res = event_sender.send(Event::JoinSuccess { id, node }).await;
 
-    while let Some(event) = events.next().await {
-        if event_tx.send(Event::Routing { id, event }).await.is_err() {
+    while let Some(event) = event_receiver.next().await {
+        if event_sender
+            .send(Event::Routing { id, event })
+            .await
+            .is_err()
+        {
             break;
         }
     }

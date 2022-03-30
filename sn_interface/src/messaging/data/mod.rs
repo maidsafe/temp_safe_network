@@ -30,13 +30,10 @@ pub use self::{
     spentbook::{SpentbookCmd, SpentbookQuery},
 };
 
+use crate::messaging::{data::Error as ErrorMsg, MsgId};
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
-    Chunk, ChunkAddress, DataAddress,
-};
-use crate::{
-    messaging::{data::Error as ErrorMsg, MsgId},
-    types::utils,
+    utils, Chunk, ChunkAddress, DataAddress,
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
@@ -48,6 +45,13 @@ use std::{
 };
 use tiny_keccak::{Hasher, Sha3};
 use xor_name::XorName;
+
+#[cfg(any(feature = "chunks", feature = "registers"))]
+// has payment throttle, but is not critical for network function
+pub(crate) const SERVICE_CMD_PRIORITY: i32 = -8;
+#[cfg(any(feature = "chunks", feature = "registers"))]
+// has no throttle and is sent by clients, lowest prio
+pub(crate) const SERVICE_QUERY_PRIORITY: i32 = -10;
 
 /// Derivable Id of an operation. Query/Response should return the same id for simple tracking purposes.
 /// TODO: make uniquer per requester for some operations
@@ -95,8 +99,9 @@ pub struct ServiceError {
     pub source_message: Option<Bytes>,
 }
 
-/// Network service messages that clients or nodes send in order to use the services,
-/// communicate and carry out the tasks.
+/// Network service messages exchanged between clients
+/// and nodes in order for the clients to use the network services.
+/// NB: These are not used for node-to-node comms (see [`SystemMsg`] for those).
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum ServiceMsg {
@@ -149,6 +154,16 @@ impl ServiceMsg {
             Self::Cmd(cmd) => Some(cmd.dst_name()),
             Self::Query(query) => Some(query.dst_name()),
             _ => None,
+        }
+    }
+
+    #[cfg(any(feature = "chunks", feature = "registers"))]
+    /// The priority of the message, when handled by lower level comms.
+    pub fn priority(&self) -> i32 {
+        match self {
+            // Client <-> node service comms
+            ServiceMsg::Cmd(_) => SERVICE_CMD_PRIORITY,
+            _ => SERVICE_QUERY_PRIORITY,
         }
     }
 }

@@ -8,17 +8,18 @@
 
 #![allow(dead_code, unused_imports)]
 
-use super::{Cmd, Comm, Dispatcher};
+use super::{Cmd, Comm};
 
 use crate::dbs::UsedSpace;
 use crate::node::{
+    api::{dispatcher::Dispatcher, event_channel},
     core::{
-        relocation_check, ChurnId, MsgEvent, Node, Proposal, RESOURCE_PROOF_DATA_SIZE,
+        relocation_check, ChurnId, MsgEvent, Node, Proposal, RateLimits, RESOURCE_PROOF_DATA_SIZE,
         RESOURCE_PROOF_DIFFICULTY,
     },
     create_test_max_capacity_and_root_storage,
     messages::WireMsgUtils,
-    Error, Event, Result as RoutingResult,
+    Error, Event, MembershipEvent, Result as RoutingResult,
 };
 
 use sn_interface::{
@@ -54,6 +55,7 @@ use std::{
     net::Ipv4Addr,
     ops::Deref,
     path::Path,
+    sync::Arc,
 };
 use tempfile::tempdir;
 use tokio::{
@@ -80,12 +82,12 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
         node,
         section,
         Some(section_key_share),
-        mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+        event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
         UsedSpace::new(max_capacity),
         root_storage_dir,
     )
     .await?;
-    let dispatcher = Dispatcher::new(node);
+    let dispatcher = Dispatcher::new(Arc::new(node));
 
     let new_node_comm = create_comm().await?;
     let new_node = NodeInfo::new(
@@ -107,14 +109,11 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     )?;
 
     let mut cmds = dispatcher
-        .process_cmd(
-            Cmd::HandleMsg {
-                sender: new_node.peer(),
-                wire_msg,
-                original_bytes: None,
-            },
-            "cmd-id",
-        )
+        .process_cmd(Cmd::HandleMsg {
+            sender: new_node.peer(),
+            wire_msg,
+            original_bytes: None,
+        })
         .await?
         .into_iter();
 
@@ -160,12 +159,13 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
         node,
         section,
         Some(section_key_share),
-        mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+        event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
         UsedSpace::new(max_capacity),
         root_storage_dir,
     )
     .await?;
-    let dispatcher = Dispatcher::new(node);
+    let node = Arc::new(node);
+    let dispatcher = Dispatcher::new(node.clone());
 
     let new_node = NodeInfo::new(
         ed25519::gen_keypair(&prefix1.range_inclusive(), MIN_ADULT_AGE),
@@ -174,7 +174,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
 
     let nonce: [u8; 32] = rand::random();
     let serialized = bincode::serialize(&(new_node.name(), nonce))?;
-    let nonce_signature = ed25519::sign(&serialized, &dispatcher.node.info.read().await.keypair);
+    let nonce_signature = ed25519::sign(&serialized, &node.info.read().await.keypair);
 
     let rp = ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY);
     let data = rp.create_proof_data(&nonce);
@@ -199,19 +199,15 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
         section_key,
     )?;
 
-    let _ = dispatcher
-        .process_cmd(
-            Cmd::HandleMsg {
-                sender: new_node.peer(),
-                wire_msg,
-                original_bytes: None,
-            },
-            "cmd-id",
-        )
+    let _cmds = dispatcher
+        .process_cmd(Cmd::HandleMsg {
+            sender: new_node.peer(),
+            wire_msg,
+            original_bytes: None,
+        })
         .await?;
 
-    assert!(dispatcher
-        .node
+    assert!(node
         .membership
         .read()
         .await
@@ -221,8 +217,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
     // makes sure that the nonce signature is always valid
     let random_peer = Peer::new(xor_name::rand::random(), gen_addr());
     assert!(
-        !dispatcher
-            .node
+        !node
             .validate_resource_proof_response(&random_peer.name(), resource_proof_response)
             .await
     );
@@ -250,12 +245,13 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
         node,
         section,
         Some(section_key_share),
-        mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+        event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
         UsedSpace::new(max_capacity),
         root_storage_dir,
     )
     .await?;
-    let dispatcher = Dispatcher::new(node);
+    let node = Arc::new(node);
+    let dispatcher = Dispatcher::new(node.clone());
 
     let relocated_node = NodeInfo::new(
         ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
@@ -293,19 +289,15 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
         section_key,
     )?;
 
-    let _ = dispatcher
-        .process_cmd(
-            Cmd::HandleMsg {
-                sender: relocated_node.peer(),
-                wire_msg,
-                original_bytes: None,
-            },
-            "cmd-id",
-        )
+    let _cmds = dispatcher
+        .process_cmd(Cmd::HandleMsg {
+            sender: relocated_node.peer(),
+            wire_msg,
+            original_bytes: None,
+        })
         .await?;
 
-    assert!(dispatcher
-        .node
+    assert!(node
         .membership
         .read()
         .await
@@ -318,7 +310,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_agreement_on_online() -> Result<()> {
-    let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (event_sender, mut event_receiver) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
 
     let prefix = Prefix::default();
 
@@ -331,11 +323,12 @@ async fn handle_agreement_on_online() -> Result<()> {
         node,
         section,
         Some(section_key_share),
-        event_tx,
+        event_sender,
         UsedSpace::new(max_capacity),
         root_storage_dir,
     )
     .await?;
+    let node = Arc::new(node);
     let dispatcher = Dispatcher::new(node);
 
     let new_peer = create_peer(MIN_ADULT_AGE);
@@ -343,7 +336,7 @@ async fn handle_agreement_on_online() -> Result<()> {
     let status = handle_online_cmd(&new_peer, &sk_set, &dispatcher, &section_auth).await?;
     assert!(status.node_approval_sent);
 
-    assert_matches!(event_rx.recv().await, Some(Event::MemberJoined { name, age, .. }) => {
+    assert_matches!(event_receiver.next().await, Some(Event::Membership(MembershipEvent::MemberJoined { name, age, .. })) => {
         assert_eq!(name, new_peer.name());
         assert_eq!(age, MIN_ADULT_AGE);
     });
@@ -392,12 +385,13 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         node,
         section,
         Some(section_key_share),
-        mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+        event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
         UsedSpace::new(max_capacity),
         root_storage_dir,
     )
     .await?;
-    let dispatcher = Dispatcher::new(node);
+    let node = Arc::new(node);
+    let dispatcher = Dispatcher::new(node.clone());
 
     // Handle agreement on Online of a peer that is older than the youngest
     // current elder - that means this peer is going to be promoted.
@@ -407,9 +401,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
 
     // Force this node to join
-    dispatcher
-        .node
-        .membership
+    node.membership
         .write()
         .await
         .as_mut()
@@ -417,7 +409,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         .force_bootstrap(node_state.to_msg());
 
     let cmds = dispatcher
-        .process_cmd(Cmd::HandleNewNodeOnline(auth), "cmd-id")
+        .process_cmd(Cmd::HandleNewNodeOnline(auth))
         .await?;
 
     // Verify we sent a `DkgStart` message with the expected participants.
@@ -472,7 +464,7 @@ async fn handle_online_cmd(
     let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
 
     let cmds = dispatcher
-        .process_cmd(Cmd::HandleNewNodeOnline(auth), "cmd-id")
+        .process_cmd(Cmd::HandleNewNodeOnline(auth))
         .await?;
 
     let mut status = HandleOnlineStatus {
@@ -553,7 +545,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
     let _updated = section.update_member(node_state).await;
 
     // Make a Node
-    let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
     let info = node_infos.remove(0);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
@@ -561,11 +553,12 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
         info,
         section,
         Some(section_key_share),
-        event_tx,
+        event_sender,
         UsedSpace::new(max_capacity),
         root_storage_dir,
     )
     .await?;
+    let node = Arc::new(node);
     let dispatcher = Dispatcher::new(node);
 
     // Simulate peer with the same name is rejoin and verify resulted behaviours.
@@ -622,7 +615,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let node_state = section_signed(sk_set.secret_key(), node_state)?;
     let _updated = section.update_member(node_state).await;
 
-    let (event_tx, _event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
     let node = nodes.remove(0);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
@@ -630,23 +623,23 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
         node,
         section,
         Some(section_key_share),
-        event_tx,
+        event_sender,
         UsedSpace::new(max_capacity),
         root_storage_dir,
     )
     .await?;
-    let dispatcher = Dispatcher::new(node);
+    let node = Arc::new(node);
+    let dispatcher = Dispatcher::new(node.clone());
 
     let node_state = NodeState::left(existing_peer, None);
     let proposal = Proposal::Offline(node_state.clone());
     let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
     let _cmds = dispatcher
-        .process_cmd(Cmd::HandleAgreement { proposal, sig }, "cmd-id")
+        .process_cmd(Cmd::HandleAgreement { proposal, sig })
         .await?;
 
-    assert!(!dispatcher
-        .node
+    assert!(!node
         .network_knowledge()
         .section_members()
         .await
@@ -677,7 +670,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         .leave()?;
 
     // Create our node
-    let (event_tx, _event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = nodes.remove(0);
     let node = Node::new(
@@ -685,25 +678,25 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         node,
         section,
         Some(section_key_share),
-        event_tx,
+        event_sender,
         UsedSpace::new(max_capacity),
         root_storage_dir,
     )
     .await?;
-    let dispatcher = Dispatcher::new(node);
+    let node = Arc::new(node);
+    let dispatcher = Dispatcher::new(node.clone());
 
     // Handle agreement on the Offline proposal
     let proposal = Proposal::Offline(remove_node_state.clone());
     let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
     let _ = dispatcher
-        .process_cmd(Cmd::HandleAgreement { proposal, sig }, "cmd-id")
+        .process_cmd(Cmd::HandleAgreement { proposal, sig })
         .await?;
 
     // Verify we initiated a membership churn
 
-    assert!(dispatcher
-        .node
+    assert!(node
         .membership
         .read()
         .await
@@ -742,7 +735,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let network_knowledge = NetworkKnowledge::new(pk0, chain.clone(), signed_old_sap, None)?;
 
     // Create our node
-    let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (event_sender, mut event_receiver) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
     let section_key_share = create_section_key_share(&sk_set1, 0);
     let node = nodes.remove(0);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
@@ -751,7 +744,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         node,
         network_knowledge,
         Some(section_key_share),
-        event_tx,
+        event_sender,
         UsedSpace::new(max_capacity),
         root_storage_dir,
     )
@@ -807,23 +800,21 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         .insert(create_section_key_share(&sk_set2, 0))
         .await;
 
+    let node = Arc::new(node);
     let dispatcher = Dispatcher::new(node);
 
     let _cmds = dispatcher
-        .process_cmd(
-            Cmd::HandleMsg {
-                sender: old_node.peer(),
-                wire_msg,
-                original_bytes: None,
-            },
-            "cmd-id",
-        )
+        .process_cmd(Cmd::HandleMsg {
+            sender: old_node.peer(),
+            wire_msg,
+            original_bytes: None,
+        })
         .await?;
 
     // Verify our `Section` got updated.
     assert_matches!(
-        event_rx.recv().await,
-        Some(Event::EldersChanged { elders, .. }) => {
+        event_receiver.next().await,
+        Some(Event::Membership(MembershipEvent::EldersChanged { elders, .. })) => {
             assert_eq!(elders.key, pk2);
             assert!(elders.added.iter().all(|a| new_section_elders.contains(a)));
             assert!(elders.remaining.iter().all(|a| new_section_elders.contains(a)));
@@ -861,7 +852,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
         members: BTreeSet::default(),
     };
 
-    let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
     let info = gen_info(MIN_ADULT_AGE, None);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
@@ -869,13 +860,14 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
         info,
         our_section.clone(),
         None,
-        event_tx,
+        event_sender,
         UsedSpace::new(max_capacity),
         root_storage_dir,
     )
     .await?;
 
-    let dispatcher = Dispatcher::new(node);
+    let node = Arc::new(node);
+    let dispatcher = Dispatcher::new(node.clone());
 
     let sender = gen_info(MIN_ADULT_AGE, None);
     let wire_msg = WireMsg::single_src(
@@ -890,19 +882,16 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
     )?;
 
     let _cmds = dispatcher
-        .process_cmd(
-            Cmd::HandleMsg {
-                sender: sender.peer(),
-                wire_msg,
-                original_bytes: None,
-            },
-            "cmd-id",
-        )
+        .process_cmd(Cmd::HandleMsg {
+            sender: sender.peer(),
+            wire_msg,
+            original_bytes: None,
+        })
         .await?;
 
-    assert_eq!(dispatcher.node.network_knowledge().genesis_key(), &pk0);
+    assert_eq!(node.network_knowledge().genesis_key(), &pk0);
     assert_eq!(
-        dispatcher.node.network_knowledge().prefix_map().all(),
+        node.network_knowledge().prefix_map().all(),
         vec![section_signed_our_section_auth.value]
     );
 
@@ -953,11 +942,12 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         node,
         section,
         Some(section_key_share),
-        mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+        event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
         UsedSpace::new(max_capacity),
         root_storage_dir,
     )
     .await?;
+    let node = Arc::new(node);
     let dispatcher = Dispatcher::new(node);
 
     let relocated_peer = match relocated_peer_role {
@@ -967,7 +957,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
 
     let auth = create_relocation_trigger(sk_set.secret_key(), relocated_peer.age())?;
     let cmds = dispatcher
-        .process_cmd(Cmd::HandleNewNodeOnline(auth), "cmd-id")
+        .process_cmd(Cmd::HandleNewNodeOnline(auth))
         .await?;
 
     let mut offline_relocate_sent = false;
@@ -1017,17 +1007,22 @@ enum MessageDst {
 
 async fn message_to_self(dst: MessageDst) -> Result<()> {
     let info = gen_info(MIN_ADULT_AGE, None);
-    let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
     let (comm_tx, mut comm_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-    let comm =
-        Comm::first_node((Ipv4Addr::LOCALHOST, 0).into(), Default::default(), comm_tx).await?;
+    let comm = Comm::first_node(
+        (Ipv4Addr::LOCALHOST, 0).into(),
+        Default::default(),
+        RateLimits::new(),
+        comm_tx,
+    )
+    .await?;
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
 
     let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
     let node = Node::first_node(
         comm,
         info,
-        event_tx,
+        event_sender,
         UsedSpace::new(max_capacity),
         root_storage_dir,
         genesis_sk_set,
@@ -1035,6 +1030,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     .await?;
     let info = node.info.read().await.clone();
     let section_pk = node.network_knowledge().section_key().await;
+    let node = Arc::new(node);
     let dispatcher = Dispatcher::new(node);
 
     let dst_location = match dst {
@@ -1055,13 +1051,10 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     let wire_msg = WireMsg::single_src(&info, dst_location, node_msg.clone(), section_pk)?;
 
     let cmds = dispatcher
-        .process_cmd(
-            Cmd::SendMsg {
-                recipients: vec![info.peer()],
-                wire_msg,
-            },
-            "cmd-id",
-        )
+        .process_cmd(Cmd::SendMsg {
+            recipients: vec![info.peer()],
+            wire_msg,
+        })
         .await?;
 
     assert!(cmds.is_empty());
@@ -1146,14 +1139,14 @@ async fn handle_elders_update() -> Result<()> {
         public_key: pk0,
     };
 
-    let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (event_sender, mut event_receiver) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
         create_comm().await?,
         info,
         section0.clone(),
         Some(section_key_share),
-        event_tx,
+        event_sender,
         UsedSpace::new(max_capacity),
         root_storage_dir,
     )
@@ -1165,10 +1158,11 @@ async fn handle_elders_update() -> Result<()> {
         .insert(create_section_key_share(&sk_set1, 0))
         .await;
 
+    let node = Arc::new(node);
     let dispatcher = Dispatcher::new(node);
 
     let cmds = dispatcher
-        .process_cmd(Cmd::HandleNewEldersAgreement { proposal, sig }, "cmd-id")
+        .process_cmd(Cmd::HandleNewEldersAgreement { proposal, sig })
         .await?;
 
     let mut update_actual_recipients = HashSet::new();
@@ -1214,8 +1208,8 @@ async fn handle_elders_update() -> Result<()> {
     assert_eq!(update_actual_recipients, update_expected_recipients);
 
     assert_matches!(
-        event_rx.recv().await,
-        Some(Event::EldersChanged { elders, .. }) => {
+        event_receiver.next().await,
+        Some(Event::Membership(MembershipEvent::EldersChanged { elders, .. })) => {
             assert_eq!(elders.key, pk1);
             assert_eq!(elder_names1, elders.added.union(&elders.remaining).copied().collect());
             assert!(elders.removed.iter().all(|r| !elder_names1.contains(r)));
@@ -1279,14 +1273,14 @@ async fn handle_demote_during_split() -> Result<()> {
     }
 
     // we make a new full node from info, to see what it does
-    let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
         create_comm().await?,
         info,
         section,
         Some(section_key_share),
-        event_tx,
+        event_sender,
         UsedSpace::new(max_capacity),
         root_storage_dir,
     )
@@ -1307,6 +1301,7 @@ async fn handle_demote_during_split() -> Result<()> {
             .await;
     }
 
+    let node = Arc::new(node);
     let dispatcher = Dispatcher::new(node);
 
     // Create agreement on `OurElder` for both sub-sections
@@ -1332,7 +1327,7 @@ async fn handle_demote_during_split() -> Result<()> {
 
     let signed_sap = section_signed(sk_set_v1_p0.secret_key(), section_auth)?;
     let cmd = create_our_elders_cmd(signed_sap)?;
-    let mut cmds = dispatcher.process_cmd(cmd, "cmd-id-1").await?;
+    let mut cmds = dispatcher.process_cmd(cmd).await?;
 
     // Handle agreement on `NewElders` for prefix-1.
     let section_auth = SectionAuthorityProvider::new(
@@ -1346,7 +1341,7 @@ async fn handle_demote_during_split() -> Result<()> {
     let signed_sap = section_signed(sk_set_v1_p1.secret_key(), section_auth)?;
     let cmd = create_our_elders_cmd(signed_sap)?;
 
-    let new_cmds = dispatcher.process_cmd(cmd, "cmd-id-2").await?;
+    let new_cmds = dispatcher.process_cmd(cmd).await?;
 
     cmds.extend(new_cmds);
 
@@ -1400,7 +1395,13 @@ fn gen_info(age: u8, prefix: Option<Prefix>) -> NodeInfo {
 
 pub(crate) async fn create_comm() -> Result<Comm> {
     let (tx, _rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-    Ok(Comm::first_node((Ipv4Addr::LOCALHOST, 0).into(), Default::default(), tx).await?)
+    Ok(Comm::first_node(
+        (Ipv4Addr::LOCALHOST, 0).into(),
+        Default::default(),
+        RateLimits::new(),
+        tx,
+    )
+    .await?)
 }
 
 // Generate random SectionAuthorityProvider and the corresponding Nodes.
@@ -1456,3 +1457,41 @@ fn create_relocation_trigger(sk: &bls::SecretKey, age: u8) -> Result<SectionAuth
         }
     }
 }
+
+// // Wrapper for `bls::SecretKeySet` that also allows to retrieve the corresponding `bls::SecretKey`.
+// // Note: `bls::SecretKeySet` does have a `secret_key` method, but it's test-only and not available
+// // for the consumers of the crate.
+// pub(crate) struct SecretKeySet {
+//     set: bls::SecretKeySet,
+//     key: bls::SecretKey,
+// }
+
+// impl SecretKeySet {
+//     pub(crate) fn random() -> Self {
+//         let poly = bls::poly::Poly::random(threshold(), &mut rand::thread_rng());
+//         let key = bls::SecretKey::from_mut(&mut poly.evaluate(0));
+//         let set = bls::SecretKeySet::from(poly);
+
+//         Self { set, key }
+//     }
+
+//     pub(crate) fn secret_key(&self) -> &bls::SecretKey {
+//         &self.key
+//     }
+// }
+
+// impl Deref for SecretKeySet {
+//     type Target = bls::SecretKeySet;
+
+//     fn deref(&self) -> &Self::Target {
+//         &self.set
+//     }
+// }
+
+// // Create signature for the given bytes using the given secret key.
+// fn keyed_signed(secret_key: &bls::SecretKey, bytes: &[u8]) -> KeyedSig {
+//     KeyedSig {
+//         public_key: secret_key.public_key(),
+//         signature: secret_key.sign(bytes),
+//     }
+// }

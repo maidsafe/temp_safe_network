@@ -9,7 +9,7 @@
 use crate::node::{
     api::cmds::Cmd,
     core::{relocation::ChurnId, Node, Proposal},
-    Event, Result,
+    Event, MembershipEvent, Result,
 };
 
 use sn_consensus::Generation;
@@ -103,11 +103,11 @@ impl Node {
         info!("handle Online: {} at {}", new_info.name(), new_info.addr());
 
         // still used for testing
-        self.send_event(Event::MemberJoined {
+        self.send_event(Event::Membership(MembershipEvent::MemberJoined {
             name: new_info.name(),
             previous_name: new_info.previous_name(),
             age: new_info.age(),
-        })
+        }))
         .await;
 
         self.log_section_stats().await;

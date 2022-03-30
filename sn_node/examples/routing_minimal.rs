@@ -33,11 +33,13 @@
 //! command-line option for more details.
 //!
 
+use sn_node::node::{
+    create_test_max_capacity_and_root_storage, Config, Event, EventReceiver, MembershipEvent,
+    MessagingEvent, NodeApi,
+};
+
 use eyre::Result;
 use futures::future::join_all;
-use sn_node::node::{
-    create_test_max_capacity_and_root_storage, Config, Event, EventStream, NodeApi,
-};
 use std::{
     convert::TryInto,
     iter,
@@ -195,7 +197,7 @@ async fn start_node(
 
     let joining_timeout = Duration::from_secs(3 * 60);
 
-    let (node, event_stream) = NodeApi::new(&config, joining_timeout)
+    let (node, event_receiver) = NodeApi::new(&config, joining_timeout)
         .await
         .expect("Failed to instantiate a Node");
 
@@ -208,15 +210,15 @@ async fn start_node(
         contact_info
     );
 
-    let handle = run_node(index, node, event_stream);
+    let handle = run_node(index, node, event_receiver);
 
     Ok((contact_info, handle))
 }
 
 // Spawns a task to run the node until terminated.
-fn run_node(index: usize, mut node: NodeApi, mut event_stream: EventStream) -> JoinHandle<()> {
+fn run_node(index: usize, mut node: NodeApi, mut event_receiver: EventReceiver) -> JoinHandle<()> {
     tokio::spawn(async move {
-        while let Some(event) = event_stream.next().await {
+        while let Some(event) = event_receiver.next().await {
             if !handle_event(index, &mut node, event).await {
                 break;
             }
@@ -226,68 +228,78 @@ fn run_node(index: usize, mut node: NodeApi, mut event_stream: EventStream) -> J
 
 // Handles the event emitted by the node.
 async fn handle_event(index: usize, node: &mut NodeApi, event: Event) -> bool {
+    use MembershipEvent::*;
+    use MessagingEvent::*;
     match event {
-        Event::MemberJoined {
-            name,
-            previous_name,
-            age,
-        } => {
-            info!(
-                "Node #{} member joined - name: {}, previous_name: {:?}, age: {}",
-                index, name, previous_name, age
-            );
+        Event::Messaging(e) => match e {
+            SystemMsgReceived { msg, src, dst, .. } => info!(
+                "Node #{} received message - src: {:?}, dst: {:?}, content: {:?}",
+                index, src, dst, msg
+            ),
+            ServiceMsgReceived { msg, user, .. } => info!(
+                "Node #{} received message from user: {:?}, msg: {:?}",
+                index, user, msg
+            ),
+        },
+        Event::Membership(e) => match e {
+            MemberJoined {
+                name,
+                previous_name,
+                age,
+            } => {
+                info!(
+                    "Node #{} member joined - name: {}, previous_name: {:?}, age: {}",
+                    index, name, previous_name, age
+                );
+            }
+            MemberLeft { name, age } => {
+                info!("Node #{} member left - name: {}, age: {}", index, name, age);
+            }
+            ChurnJoinMissError => {
+                info!("Node #{} detected churn join miss and will restart", index);
+            }
+            SectionSplit {
+                elders,
+                self_status_change,
+            } => {
+                info!(
+                    "Node #{} section split - elders: {:?}, node elder status change: {:?}",
+                    index, elders, self_status_change
+                );
+            }
+            EldersChanged {
+                elders,
+                self_status_change,
+            } => {
+                info!(
+                    "Node #{} elders changed - elders: {:?}, node elder status change: {:?}",
+                    index, elders, self_status_change
+                );
+            }
+            RelocationStarted { previous_name } => info!(
+                "Node #{} relocation started - previous_name: {}",
+                index, previous_name
+            ),
+            Relocated { previous_name, .. } => {
+                let new_name = node.name().await;
+                info!(
+                    "Node #{} relocated - old name: {}, new name: {}",
+                    index, previous_name, new_name,
+                );
+            }
+            AdultsChanged {
+                remaining,
+                added,
+                removed,
+            } => info!(
+                "Node #{} adults changed - remaining: {:?}, added: {:?}, removed: {:?}",
+                index, remaining, added, removed
+            ),
+        },
+        _ => {
+            // Currently ignore the other event variants. This might change in the future,
+            // if we come up with something interesting to use those events for.
         }
-        Event::MemberLeft { name, age } => {
-            info!("Node #{} member left - name: {}, age: {}", index, name, age);
-        }
-        Event::ChurnJoinMissError => {
-            info!("Node #{} detected churn join miss and will restart", index);
-        }
-        Event::SectionSplit {
-            elders,
-            self_status_change,
-        } => {
-            info!(
-                "Node #{} section split - elders: {:?}, node elder status change: {:?}",
-                index, elders, self_status_change
-            );
-        }
-        Event::EldersChanged {
-            elders,
-            self_status_change,
-        } => {
-            info!(
-                "Node #{} elders changed - elders: {:?}, node elder status change: {:?}",
-                index, elders, self_status_change
-            );
-        }
-        Event::MessageReceived { msg, src, dst, .. } => info!(
-            "Node #{} received message - src: {:?}, dst: {:?}, content: {:?}",
-            index, src, dst, msg
-        ),
-        Event::RelocationStarted { previous_name } => info!(
-            "Node #{} relocation started - previous_name: {}",
-            index, previous_name
-        ),
-        Event::Relocated { previous_name, .. } => {
-            let new_name = node.name().await;
-            info!(
-                "Node #{} relocated - old name: {}, new name: {}",
-                index, previous_name, new_name,
-            );
-        }
-        Event::ServiceMsgReceived { msg, user, .. } => info!(
-            "Node #{} received message from user: {:?}, msg: {:?}",
-            index, user, msg
-        ),
-        Event::AdultsChanged {
-            remaining,
-            added,
-            removed,
-        } => info!(
-            "Node #{} adults changed - remaining: {:?}, added: {:?}, removed: {:?}",
-            index, remaining, added, removed
-        ),
     }
 
     true

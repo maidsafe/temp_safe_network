@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -10,18 +10,20 @@ pub(super) mod log_ctx;
 mod system;
 
 use self::log_ctx::LogCtx;
+
 use std::time::Duration;
-use sysinfo::PidExt;
-use sysinfo::{System, SystemExt};
+use sysinfo::{PidExt, System, SystemExt};
 use system::Process;
 use tokio::time::MissedTickBehavior;
 use tracing::trace;
+use xor_name::Prefix;
 
-const LOG_INTERVAL: Duration = std::time::Duration::from_secs(10);
+const LOG_INTERVAL: Duration = std::time::Duration::from_secs(60);
 
 pub(super) async fn run_system_logger(ctx: LogCtx, print_resources_usage: bool) {
     let mut system = System::new_all();
-    initial_log(&mut system, &ctx).await;
+    let prefix = ctx.prefix().await;
+    initial_log(&mut system, prefix).await;
 
     let _handle = tokio::task::spawn(async move {
         let mut interval = tokio::time::interval(LOG_INTERVAL);
@@ -29,13 +31,14 @@ pub(super) async fn run_system_logger(ctx: LogCtx, print_resources_usage: bool) 
         loop {
             let _instant = interval.tick().await;
             system.refresh_all();
-            log(&mut system, &ctx, print_resources_usage).await;
+            let prefix = ctx.prefix().await;
+            log(&mut system, prefix, print_resources_usage).await;
         }
     });
 }
 
-async fn initial_log(system: &mut System, ctx: &LogCtx) {
-    let prefix: &str = &format!("{}", ctx.prefix().await.name());
+async fn initial_log(system: &mut System, prefix: Prefix) {
+    let prefix: &str = &format!("{}", prefix.name());
     let os_name: &str = &fmt(system.name());
     let kernel_version: &str = &fmt(system.kernel_version());
     let os_version: &str = &fmt(system.os_version());
@@ -47,9 +50,8 @@ fn fmt(string: Option<String>) -> String {
     string.unwrap_or_else(|| "Unknown".to_string())
 }
 
-#[tracing::instrument(skip(ctx))]
-async fn log(system: &mut System, ctx: &LogCtx, print_resources_usage: bool) {
-    let prefix: &str = &format!("({:?})", ctx.prefix().await);
+async fn log(system: &mut System, prefix: Prefix, print_resources_usage: bool) {
+    let prefix: &str = &format!("({:?})", prefix);
 
     let processors = system.processors();
     let processor_count = processors.len();

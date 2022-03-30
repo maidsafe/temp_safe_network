@@ -357,6 +357,7 @@ impl Session {
                     msg_id,
                     payload,
                     AuthKind::Service(auth.into_inner()),
+                    0,
                     dst_location,
                 )?;
 

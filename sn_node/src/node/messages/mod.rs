@@ -45,20 +45,20 @@ impl WireMsgUtils for WireMsg {
         key_share: &SectionKeyShare,
         src_name: XorName,
         dst: DstLocation,
-        node_msg: SystemMsg,
+        msg: SystemMsg,
         src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg, Error> {
         let msg_payload =
-            WireMsg::serialize_msg_payload(&node_msg).map_err(|_| Error::InvalidMessage)?;
+            WireMsg::serialize_msg_payload(&msg).map_err(|_| Error::InvalidMessage)?;
 
-        let msg_kind = AuthKind::NodeBlsShare(
+        let auth_kind = AuthKind::NodeBlsShare(
             bls_share_authorize(src_section_pk, src_name, key_share, &msg_payload).into_inner(),
         );
 
-        let wire_msg = WireMsg::new_msg(MsgId::new(), msg_payload, msg_kind, dst)?;
+        let wire_msg = WireMsg::new_msg(MsgId::new(), msg_payload, auth_kind, msg.priority(), dst)?;
 
-        #[cfg(test)]
-        let wire_msg = wire_msg.set_payload_debug(node_msg);
+        #[cfg(feature = "test-utils")]
+        let wire_msg = wire_msg.set_payload_debug(msg);
 
         Ok(wire_msg)
     }
@@ -67,20 +67,20 @@ impl WireMsgUtils for WireMsg {
     fn single_src(
         node: &NodeInfo,
         dst: DstLocation,
-        node_msg: SystemMsg,
+        msg: SystemMsg,
         src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg> {
         let msg_payload =
-            WireMsg::serialize_msg_payload(&node_msg).map_err(|_| Error::InvalidMessage)?;
+            WireMsg::serialize_msg_payload(&msg).map_err(|_| Error::InvalidMessage)?;
 
-        let msg_kind = AuthKind::Node(
+        let auth_kind = AuthKind::Node(
             NodeAuth::authorize(src_section_pk, &node.keypair, &msg_payload).into_inner(),
         );
 
-        let wire_msg = WireMsg::new_msg(MsgId::new(), msg_payload, msg_kind, dst)?;
+        let wire_msg = WireMsg::new_msg(MsgId::new(), msg_payload, auth_kind, msg.priority(), dst)?;
 
-        #[cfg(test)]
-        let wire_msg = wire_msg.set_payload_debug(node_msg);
+        #[cfg(feature = "test-utils")]
+        let wire_msg = wire_msg.set_payload_debug(msg);
 
         Ok(wire_msg)
     }

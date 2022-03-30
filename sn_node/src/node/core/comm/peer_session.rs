@@ -157,9 +157,9 @@ impl PeerSession {
             {
                 let queue = self.msg_queue.read().await;
                 debug!("Peer {} queue length: {}", self.link.peer(), queue.len());
-                for (job, priority) in queue.iter() {
-                    debug!("Prio: {}, Job: {:?}", priority, job);
-                }
+                // for (job, priority) in queue.iter() {
+                //     debug!("Prio: {}, Job: {:?}", priority, job);
+                // }
             }
 
             let queue_res = { self.msg_queue.write().await.pop() };

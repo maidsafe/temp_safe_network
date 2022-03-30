@@ -14,7 +14,6 @@ mod node_msgs;
 mod node_state;
 mod signed;
 
-use crate::network_knowledge::SapCandidate;
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SectionAuth};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
@@ -22,12 +21,15 @@ pub use msg_authority::NodeMsgAuthorityUtils;
 pub use node_msgs::{NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse};
 pub use node_state::{MembershipState, NodeState, RelocateDetails};
 pub use signed::{KeyedSig, SigShare};
-use sn_consensus::{Generation, SignedVote};
 
-/// List of peers of a section
-pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
+use super::authority::SectionAuth as SectionAuthProof;
+use super::AuthorityProof;
 
 use crate::messaging::{EndUser, MsgId, SectionAuthorityProvider};
+use crate::network_knowledge::SapCandidate;
+
+use sn_consensus::{Generation, SignedVote};
+
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;
@@ -35,8 +37,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
-use super::authority::SectionAuth as SectionAuthProof;
-use super::AuthorityProof;
+/// List of peers of a section
+pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -202,4 +204,70 @@ pub enum SystemMsg {
         /// TEMP: Add user here as part of return flow. Remove this as we have chunk routing etc
         user: EndUser,
     },
+}
+
+// highest priority, since we must sort out membership first of all
+pub(crate) const DKG_MSG_PRIORITY: i32 = 8;
+// very high prio, since we must have correct contact details to the network
+pub(crate) const ANTIENTROPY_MSG_PRIORITY: i32 = 6;
+// high prio as recipient can't do anything until they've joined. Needs to be lower than DKG (or else no split)
+pub(crate) const JOIN_RESPONSE_PRIORITY: i32 = 4;
+// our joining to the network
+pub(crate) const JOIN_RELOCATE_MSG_PRIORITY: i32 = 2;
+#[cfg(feature = "back-pressure")]
+// reporting backpressure isn't time critical, so fairly low
+pub(crate) const BACKPRESSURE_MSG_PRIORITY: i32 = 0;
+// not maintaining network structure, so can wait
+pub(crate) const NODE_DATA_MSG_PRIORITY: i32 = -6;
+
+impl SystemMsg {
+    /// The priority of the message, when handled by lower level comms.
+    pub fn priority(&self) -> i32 {
+        match self {
+            // DKG messages
+            SystemMsg::DkgStart { .. }
+            | SystemMsg::DkgSessionUnknown { .. }
+            | SystemMsg::DkgSessionInfo { .. }
+            | SystemMsg::DkgNotReady { .. }
+            | SystemMsg::DkgRetry { .. }
+            | SystemMsg::DkgMessage { .. }
+            | SystemMsg::DkgFailureObservation { .. }
+            | SystemMsg::DkgFailureAgreement(_) => DKG_MSG_PRIORITY,
+
+            // Inter-node comms for AE updates
+            SystemMsg::AntiEntropyRetry { .. }
+            | SystemMsg::AntiEntropyRedirect { .. }
+            | SystemMsg::AntiEntropyUpdate { .. }
+            | SystemMsg::AntiEntropyProbe => ANTIENTROPY_MSG_PRIORITY,
+
+            // Join responses
+            SystemMsg::JoinResponse(_) | SystemMsg::JoinAsRelocatedResponse(_) => {
+                JOIN_RESPONSE_PRIORITY
+            }
+
+            // Inter-node comms for joining, relocating etc.
+            SystemMsg::Relocate(_)
+            | SystemMsg::JoinRequest(_)
+            | SystemMsg::JoinAsRelocatedRequest(_)
+            | SystemMsg::Propose { .. }
+            | SystemMsg::StartConnectivityTest(_)
+            | SystemMsg::MembershipVotes(_)
+            | SystemMsg::MembershipAE(_)
+            | SystemMsg::HandoverAE(_)
+            | SystemMsg::HandoverVotes(_) => JOIN_RELOCATE_MSG_PRIORITY,
+
+            #[cfg(feature = "back-pressure")]
+            // Inter-node comms for backpressure
+            SystemMsg::BackPressure(_) => BACKPRESSURE_MSG_PRIORITY,
+
+            SystemMsg::NodeMsgError { .. } => NODE_DATA_MSG_PRIORITY,
+
+            #[cfg(any(feature = "chunks", feature = "registers"))]
+            // Inter-node comms related to processing client requests
+            SystemMsg::NodeCmd(_)
+            | SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData { .. })
+            | SystemMsg::NodeQuery(_)
+            | SystemMsg::NodeQueryResponse { .. } => NODE_DATA_MSG_PRIORITY,
+        }
+    }
 }

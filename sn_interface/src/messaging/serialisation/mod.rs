@@ -11,33 +11,12 @@ mod wire_msg_header;
 
 use xor_name::XorName;
 
-// highest priority, since we must sort out membership first of all
-pub(crate) const DKG_MSG_PRIORITY: i32 = 8;
-// very high prio, since we must have correct contact details to the network
-pub(crate) const ANTIENTROPY_MSG_PRIORITY: i32 = 6;
-// high prio as recipient can't do anything until they've joined. Needs to be lower than DKG (or else no split)
-pub(crate) const JOIN_RESPONSE_PRIORITY: i32 = 4;
-// our joining to the network
-pub(crate) const JOIN_RELOCATE_MSG_PRIORITY: i32 = 2;
-#[cfg(feature = "back-pressure")]
-// reporting backpressure isn't time critical, so fairly low
-pub(crate) const BACKPRESSURE_MSG_PRIORITY: i32 = 0;
-// not maintaining network structure, so can wait
-pub(crate) const NODE_DATA_MSG_PRIORITY: i32 = -6;
-#[cfg(any(feature = "chunks", feature = "registers"))]
-// has payment throttle, but is not critical for network function
-pub(crate) const SERVICE_CMD_PRIORITY: i32 = -8;
-#[cfg(any(feature = "chunks", feature = "registers"))]
-// has no throttle and is sent by clients, lowest prio
-pub(crate) const SERVICE_QUERY_PRIORITY: i32 = -10;
-
 use crate::types::PublicKey;
 
 pub use self::wire_msg::WireMsg;
 use super::{
-    data::ServiceMsg,
-    system::{NodeEvent, SystemMsg},
-    AuthorityProof, BlsShareAuth, DstLocation, MsgId, NodeAuth, SectionAuth, ServiceAuth,
+    data::ServiceMsg, system::SystemMsg, AuthorityProof, BlsShareAuth, DstLocation, MsgId,
+    NodeAuth, SectionAuth, ServiceAuth,
 };
 
 /// Type of message.
@@ -47,7 +26,7 @@ use super::{
 #[allow(clippy::large_enum_variant)]
 pub enum MsgType {
     #[cfg(any(feature = "chunks", feature = "registers"))]
-    /// Service message
+    /// Service message for client<->node comms.
     Service {
         /// Message ID
         msg_id: MsgId,
@@ -58,7 +37,7 @@ pub enum MsgType {
         /// the message
         msg: ServiceMsg,
     },
-    /// System message
+    /// System message for node<->node comms.
     System {
         /// Message ID
         msg_id: MsgId,
@@ -69,90 +48,6 @@ pub enum MsgType {
         /// the message
         msg: SystemMsg,
     },
-}
-
-impl MsgType {
-    /// The priority of the message, when handled by lower level comms.
-    pub fn priority(&self) -> i32 {
-        match self {
-            // DKG messages
-            MsgType::System {
-                msg:
-                    SystemMsg::DkgStart { .. }
-                    | SystemMsg::DkgSessionUnknown { .. }
-                    | SystemMsg::DkgSessionInfo { .. }
-                    | SystemMsg::DkgNotReady { .. }
-                    | SystemMsg::DkgRetry { .. }
-                    | SystemMsg::DkgMessage { .. }
-                    | SystemMsg::DkgFailureObservation { .. }
-                    | SystemMsg::DkgFailureAgreement(_),
-                ..
-            } => DKG_MSG_PRIORITY,
-
-            // Inter-node comms for AE updates
-            MsgType::System {
-                msg:
-                    SystemMsg::AntiEntropyRetry { .. }
-                    | SystemMsg::AntiEntropyRedirect { .. }
-                    | SystemMsg::AntiEntropyUpdate { .. }
-                    | SystemMsg::AntiEntropyProbe,
-                ..
-            } => ANTIENTROPY_MSG_PRIORITY,
-
-            // Join responses
-            MsgType::System {
-                msg: SystemMsg::JoinResponse(_) | SystemMsg::JoinAsRelocatedResponse(_),
-                ..
-            } => JOIN_RESPONSE_PRIORITY,
-
-            // Inter-node comms for joining, relocating, section handover votes etc.
-            MsgType::System {
-                msg:
-                    SystemMsg::Relocate(_)
-                    | SystemMsg::JoinRequest(_)
-                    | SystemMsg::JoinAsRelocatedRequest(_)
-                    | SystemMsg::Propose { .. }
-                    | SystemMsg::StartConnectivityTest(_)
-                    | SystemMsg::MembershipVotes(_)
-                    | SystemMsg::MembershipAE(_)
-                    | SystemMsg::HandoverAE(_)
-                    | SystemMsg::HandoverVotes(_),
-                ..
-            } => JOIN_RELOCATE_MSG_PRIORITY,
-
-            #[cfg(feature = "back-pressure")]
-            // Inter-node comms for backpressure
-            MsgType::System {
-                msg: SystemMsg::BackPressure(_),
-                ..
-            } => BACKPRESSURE_MSG_PRIORITY,
-
-            // Inter-node comms related to processing client requests
-            MsgType::System {
-                msg: SystemMsg::NodeMsgError { .. },
-                ..
-            } => NODE_DATA_MSG_PRIORITY,
-            // Inter-node comms related to processing client requests
-            #[cfg(any(feature = "chunks", feature = "registers"))]
-            MsgType::System {
-                msg:
-                    SystemMsg::NodeCmd(_)
-                    | SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData { .. })
-                    | SystemMsg::NodeQuery(_)
-                    | SystemMsg::NodeQueryResponse { .. },
-                ..
-            } => NODE_DATA_MSG_PRIORITY,
-
-            // Client <-> node service comms
-            #[cfg(any(feature = "chunks", feature = "registers"))]
-            MsgType::Service {
-                msg: ServiceMsg::Cmd(_),
-                ..
-            } => SERVICE_CMD_PRIORITY,
-            #[cfg(any(feature = "chunks", feature = "registers"))]
-            MsgType::Service { .. } => SERVICE_QUERY_PRIORITY,
-        }
-    }
 }
 
 /// Authority of a NodeMsg.

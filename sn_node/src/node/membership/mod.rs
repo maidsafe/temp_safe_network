@@ -169,11 +169,13 @@ impl Membership {
     }
 
     #[cfg(test)]
+    #[allow(unused)]
     pub(crate) fn is_churn_in_progress(&self) -> bool {
         !self.consensus.votes.is_empty()
     }
 
     #[cfg(test)]
+    #[allow(unused)]
     pub(crate) fn force_bootstrap(&mut self, state: NodeState) {
         let _ = self.bootstrap_members.insert(state);
     }

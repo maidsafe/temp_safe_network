@@ -7,9 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    data::{
-        DataCmd, DataQuery, MetadataExchange, OperationId, QueryResponse, Result, StorageLevel,
-    },
+    data::{DataQuery, MetadataExchange, OperationId, QueryResponse, Result, StorageLevel},
     EndUser, MsgId, ServiceAuth,
 };
 use crate::types::{
@@ -26,15 +24,6 @@ use xor_name::XorName;
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeCmd {
-    /// Metadata is handled by Elders
-    Metadata {
-        /// The contained cmd
-        cmd: DataCmd,
-        /// Requester pk and signature
-        auth: ServiceAuth,
-        /// Message source
-        origin: EndUser,
-    },
     /// Notify Elders on nearing max capacity
     RecordStorageLevel {
         /// Node Id
@@ -76,15 +65,6 @@ pub enum NodeEvent {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum NodeQuery {
-    /// Metadata is handled by Elders
-    Metadata {
-        /// The actual query message
-        query: DataQuery,
-        /// Client signature
-        auth: ServiceAuth,
-        /// The user that has initiated this query
-        origin: EndUser,
-    },
     /// Data is handled by Adults
     Data {
         /// The query

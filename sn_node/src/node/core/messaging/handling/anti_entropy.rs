@@ -6,7 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{api::cmds::Cmd, core::Node, messages::WireMsgUtils, Error, Event, Result};
+use crate::node::{
+    api::cmds::Cmd, core::Node, messages::WireMsgUtils, Error, Event, MembershipEvent, Result,
+};
 
 use sn_interface::{
     messaging::{
@@ -240,7 +242,8 @@ impl Node {
 
             if was_in_ancestor_section && prefix_matches_our_name && !is_in_current_section {
                 error!("Detected churn join miss while processing msg ({:?}), was in section {:?}, updated to {:?}, wasn't in members anymore even if name matches: {:?}", msg_id, our_section_prefix, prefix, our_name);
-                self.send_event(Event::ChurnJoinMissError).await;
+                self.send_event(Event::Membership(MembershipEvent::ChurnJoinMissError))
+                    .await;
                 return Err(Error::ChurnJoinMiss);
             }
         }
@@ -470,7 +473,8 @@ mod tests {
     use super::*;
 
     use crate::node::{
-        api::tests::create_comm, create_test_max_capacity_and_root_storage, MIN_ADULT_AGE,
+        api::{event_channel, tests::create_comm},
+        create_test_max_capacity_and_root_storage, MIN_ADULT_AGE,
     };
     use crate::UsedSpace;
 
@@ -492,7 +496,6 @@ mod tests {
     use eyre::{Context, Result};
     use secured_linked_list::SecuredLinkedList;
     use std::collections::BTreeSet;
-    use tokio::sync::mpsc;
     use xor_name::Prefix;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -747,7 +750,7 @@ mod tests {
             let mut node = Node::first_node(
                 create_comm().await?,
                 info.clone(),
-                mpsc::channel(1).0,
+                event_channel::new(1).0,
                 UsedSpace::new(max_capacity),
                 root_storage_dir,
                 genesis_sk_set.clone(),
@@ -819,9 +822,15 @@ mod tests {
 
             let node_auth = NodeAuth::authorize(src_section_pk, &src_node_keypair, &payload);
 
-            let msg_kind = AuthKind::Node(node_auth.into_inner());
+            let auth_kind = AuthKind::Node(node_auth.into_inner());
 
-            let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+            let wire_msg = WireMsg::new_msg(
+                msg_id,
+                payload,
+                auth_kind,
+                payload_msg.priority(),
+                dst_location,
+            )?;
 
             let src_location = SrcLocation::Node {
                 name: sender_name,

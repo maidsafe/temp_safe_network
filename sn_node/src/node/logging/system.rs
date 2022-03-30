@@ -19,6 +19,7 @@ pub(super) struct Process {
 }
 
 impl Process {
+    #[allow(unused)]
     pub(super) fn map(process: &sysinfo::Process, processors: usize) -> Process {
         let usage = process.disk_usage();
         Process {
