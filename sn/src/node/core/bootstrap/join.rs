@@ -16,7 +16,7 @@ use crate::messaging::{
     DstLocation, MsgKind, MsgType, NodeAuth, WireMsg,
 };
 use crate::node::{
-    core::{Comm, ConnectionEvent, SendStatus},
+    core::{Comm, DeliveryStatus, MsgEvent},
     dkg::SectionAuthUtils,
     ed25519,
     messages::WireMsgUtils,
@@ -45,30 +45,33 @@ const JOIN_SHARE_EXPIRATION_DURATION: Duration = Duration::from_secs(900);
 pub(crate) async fn join_network(
     node: NodeInfo,
     comm: &Comm,
-    incoming_conns: &mut mpsc::Receiver<ConnectionEvent>,
+    incoming_msgs: &mut mpsc::Receiver<MsgEvent>,
     bootstrap_addr: SocketAddr,
     genesis_key: BlsPublicKey,
 ) -> Result<(NodeInfo, NetworkKnowledge)> {
-    let (send_tx, send_rx) = mpsc::channel(1);
+    let (outgoing_msgs_sender, outgoing_msgs_receiver) = mpsc::channel(1);
 
     let span = trace_span!("bootstrap");
 
     // Read prefix map from cache if available
     let prefix_map = read_prefix_map_from_disk(genesis_key).await?;
 
-    let state = Join::new(node, send_tx, incoming_conns, prefix_map);
+    let state = Join::new(node, outgoing_msgs_sender, incoming_msgs, prefix_map);
 
-    future::join(state.run(bootstrap_addr), send_messages(send_rx, comm))
-        .instrument(span)
-        .await
-        .0
+    future::join(
+        state.run(bootstrap_addr),
+        send_messages(outgoing_msgs_receiver, comm),
+    )
+    .instrument(span)
+    .await
+    .0
 }
 
 struct Join<'a> {
     // Sender for outgoing messages.
-    send_tx: mpsc::Sender<(WireMsg, Vec<Peer>)>,
+    outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
     // Receiver for incoming messages.
-    recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
+    incoming_msgs: &'a mut mpsc::Receiver<MsgEvent>,
     node: NodeInfo,
     prefix: Prefix,
     prefix_map: NetworkPrefixMap,
@@ -81,8 +84,8 @@ struct Join<'a> {
 impl<'a> Join<'a> {
     fn new(
         node: NodeInfo,
-        send_tx: mpsc::Sender<(WireMsg, Vec<Peer>)>,
-        recv_rx: &'a mut mpsc::Receiver<ConnectionEvent>,
+        outgoing_msgs: mpsc::Sender<(WireMsg, Vec<Peer>)>,
+        incoming_msgs: &'a mut mpsc::Receiver<MsgEvent>,
         prefix_map: NetworkPrefixMap,
     ) -> Self {
         let mut backoff = ExponentialBackoff {
@@ -96,8 +99,8 @@ impl<'a> Join<'a> {
         backoff.reset();
 
         Self {
-            send_tx,
-            recv_rx,
+            outgoing_msgs,
+            incoming_msgs,
             node,
             prefix: Prefix::default(),
             prefix_map,
@@ -533,7 +536,10 @@ impl<'a> Join<'a> {
             section_key,
         )?;
 
-        let _res = self.send_tx.send((wire_msg, recipients.to_vec())).await;
+        let _res = self
+            .outgoing_msgs
+            .send((wire_msg, recipients.to_vec()))
+            .await;
 
         Ok(())
     }
@@ -542,10 +548,10 @@ impl<'a> Join<'a> {
     // analogous to the JoinAsRelocated flow.
     #[tracing::instrument(skip(self))]
     async fn receive_join_response(&mut self) -> Result<(JoinResponse, Peer)> {
-        while let Some(event) = self.recv_rx.recv().await {
+        while let Some(event) = self.incoming_msgs.recv().await {
             // We are interested only in `JoinResponse` type of messages
             let (join_response, sender) = match event {
-                ConnectionEvent::Received {
+                MsgEvent::Received {
                     sender, wire_msg, ..
                 } => match wire_msg.msg_kind() {
                     MsgKind::ServiceMsg(_) => continue,
@@ -588,14 +594,18 @@ impl<'a> Join<'a> {
 }
 
 // Keep reading messages from `rx` and send them using `comm`.
-async fn send_messages(mut rx: mpsc::Receiver<(WireMsg, Vec<Peer>)>, comm: &Comm) -> Result<()> {
-    while let Some((wire_msg, recipients)) = rx.recv().await {
+async fn send_messages(
+    mut outgoing_msgs: mpsc::Receiver<(WireMsg, Vec<Peer>)>,
+    comm: &Comm,
+) -> Result<()> {
+    while let Some((wire_msg, recipients)) = outgoing_msgs.recv().await {
         match comm
             .send(&recipients, recipients.len(), wire_msg.clone())
             .await
         {
-            Ok(SendStatus::AllRecipients) | Ok(SendStatus::MinDeliveryGroupSizeReached(_)) => {}
-            Ok(SendStatus::MinDeliveryGroupSizeFailed(recipients)) => {
+            Ok(DeliveryStatus::AllRecipients)
+            | Ok(DeliveryStatus::MinDeliveryGroupSizeReached(_)) => {}
+            Ok(DeliveryStatus::MinDeliveryGroupSizeFailed(recipients)) => {
                 error!("Failed to send message {:?} to {:?}", wire_msg, recipients)
             }
             Err(err) => {
@@ -1103,7 +1113,7 @@ mod tests {
     // test helper
     #[instrument]
     fn send_response(
-        recv_tx: &mpsc::Sender<ConnectionEvent>,
+        recv_tx: &mpsc::Sender<MsgEvent>,
         node_msg: SystemMsg,
         bootstrap_node: &NodeInfo,
         section_pk: BlsPublicKey,
@@ -1122,7 +1132,7 @@ mod tests {
 
         let original_bytes = wire_msg.serialize()?;
 
-        recv_tx.try_send(ConnectionEvent::Received {
+        recv_tx.try_send(MsgEvent::Received {
             sender: bootstrap_node.peer(),
             wire_msg,
             original_bytes,

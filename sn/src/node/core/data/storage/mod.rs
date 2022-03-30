@@ -213,7 +213,7 @@ impl Node {
         let lost_old_holder = !old_holders.is_disjoint(lost_adults);
 
         if new_adult_is_holder || lost_old_holder {
-            info!("Republishing data at {:?}", address);
+            info!("Replicating data at {:?}", address);
             trace!(
                 "New Adult is Holder? {}, Lost Adult was holder? {}",
                 new_adult_is_holder,

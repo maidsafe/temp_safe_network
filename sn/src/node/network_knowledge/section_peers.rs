@@ -100,7 +100,7 @@ impl SectionPeers {
             })
             .sorted_by(|lhs, rhs| cmp_elder_candidates(lhs, rhs, current_elders))
             .take(elder_size)
-            .map(|node_state| node_state.peer().clone())
+            .map(|node_state| *node_state.peer())
             .collect()
     }
 

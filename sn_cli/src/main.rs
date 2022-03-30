@@ -9,7 +9,6 @@
 
 mod cli;
 mod operations;
-mod shell;
 mod subcommands;
 
 use cli::run;

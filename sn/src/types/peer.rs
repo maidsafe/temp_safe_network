@@ -15,7 +15,7 @@ use std::{
 use xor_name::{XorName, XOR_NAME_LEN};
 
 /// A Peer with name, derived from its PublicKey, and an address.
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Peer {
     name: XorName,
     addr: SocketAddr,
@@ -37,10 +37,6 @@ impl Peer {
     /// Returns the age.
     pub(crate) fn age(&self) -> u8 {
         self.name[XOR_NAME_LEN - 1]
-    }
-
-    pub(crate) fn id(&self) -> (XorName, SocketAddr) {
-        (self.name, self.addr)
     }
 }
 

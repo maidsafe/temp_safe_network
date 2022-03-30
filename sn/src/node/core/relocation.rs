@@ -232,7 +232,7 @@ mod tests {
         )?;
 
         for peer in &peers {
-            let info = NodeState::joined(peer.clone(), None);
+            let info = NodeState::joined(*peer, None);
             let info = section_signed(sk, info)?;
 
             let res = futures::executor::block_on(network_knowledge.update_member(info));

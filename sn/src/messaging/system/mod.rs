@@ -85,10 +85,9 @@ pub enum SystemMsg {
     },
     /// Probes the network by sending a message to a random dst triggering an AE flow.
     AntiEntropyProbe(XorName),
-    /// Sent when a msg-consuming node is surpassing certain thresholds for
-    /// cpu load. It tells msg-producing nodes to back off a bit, proportional
-    /// to the node's cpu load, as given by the included `LoadReport`.
-    BackPressure(LoadReport),
+    /// Sent when a msg-consuming node wants to update a msg-producing node on the number of msgs per s it wants to receive.
+    /// It tells the node to adjust msg sending rate according to the provided value in this msg.
+    BackPressure(f64),
     /// Send from a section to the node to be immediately relocated.
     Relocate(SectionAuth<NodeState>),
     /// Sent from a bootstrapping peer to the section requesting to join as a new member
@@ -200,30 +199,4 @@ pub enum SystemMsg {
         /// ID of causing cmd.
         correlation_id: MsgId,
     },
-}
-
-/// Load report to be sent over the wire.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub struct LoadReport {
-    /// CPU load short term (~1 min).
-    pub short_term: CpuLoad,
-    /// CPU load mid term (~5 min).
-    pub mid_term: CpuLoad,
-    /// CPU load long term (~15 min).
-    pub long_term: CpuLoad,
-}
-
-/// An evaluation of measured cpu load during a period.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub struct CpuLoad {
-    /// This is considered to be well below sustainable levels.
-    pub low: bool,
-    /// This is considered to be OK.
-    pub moderate: bool,
-    /// This is not a sustainable level.
-    pub high: bool,
-    /// This is not a sustainable level.
-    pub very_high: bool,
-    /// This is not a sustainable level.
-    pub critical: bool,
 }

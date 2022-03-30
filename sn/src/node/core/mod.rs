@@ -18,7 +18,7 @@ mod relocation;
 mod split_barrier;
 
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
-pub(crate) use comm::{Comm, ConnectionEvent, SendStatus};
+pub(crate) use comm::{Comm, DeliveryStatus, MsgEvent};
 pub(crate) use data::MIN_LEVEL_WHEN_FULL;
 pub(crate) use proposal::Proposal;
 #[cfg(test)]
@@ -369,7 +369,7 @@ impl Node {
             };
 
             let self_status_change = if !old.is_elder && new.is_elder {
-                trace!("{}: {:?}", LogMarker::PromotedToElder, new.prefix);
+                info!("{}: {:?}", LogMarker::PromotedToElder, new.prefix);
                 NodeElderChange::Promoted
             } else if old.is_elder && !new.is_elder {
                 info!("{}", LogMarker::DemotedFromElder);
@@ -472,7 +472,6 @@ impl Node {
             .prefix_map()
             .network_stats(&self.network_knowledge.authority_provider().await)
             .print();
-        self.comm.print_stats();
     }
 
     pub(super) async fn log_section_stats(&self) {
@@ -484,15 +483,6 @@ impl Node {
             .elder_count();
         let prefix = self.network_knowledge.prefix().await;
         debug!("{:?}: {:?} Elders, {:?} Adults.", prefix, elders, adults);
-    }
-
-    pub(super) async fn list_section_members(&self) -> BTreeSet<XorName> {
-        self.network_knowledge
-            .section_members()
-            .await
-            .iter()
-            .map(|state| state.name())
-            .collect()
     }
 }
 
