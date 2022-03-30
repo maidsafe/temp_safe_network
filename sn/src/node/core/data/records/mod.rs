@@ -82,12 +82,12 @@ impl Node {
         let mut op_was_already_underway = false;
         let waiting_peers = if let Some(peers) = self.pending_data_queries.get(&operation_id).await
         {
-            op_was_already_underway = peers.insert(origin.clone());
+            op_was_already_underway = peers.insert(origin);
 
             peers
         } else {
             let peers = DashSet::new();
-            let _false_as_fresh = peers.insert(origin.clone());
+            let _false_as_fresh = peers.insert(origin);
             Arc::new(peers)
         };
 

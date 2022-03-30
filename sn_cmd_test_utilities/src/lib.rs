@@ -442,6 +442,7 @@ pub mod util {
 
     fn get_version_from_release_version(release_version: &str) -> Result<String> {
         let mut parts = release_version.split('-');
+        parts.next();
         let version = parts
             .next()
             .ok_or_else(|| {

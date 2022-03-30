@@ -11,20 +11,32 @@ mod wire_msg_header;
 
 use xor_name::XorName;
 
-// highest prio as we can't do anything until we've joined
-pub(crate) const DKG_MSG_PRIORITY: i32 = 3;
-pub(crate) const INFRASTRUCTURE_MSG_PRIORITY: i32 = 1;
-pub(crate) const NODE_DATA_MSG_PRIORITY: i32 = 0;
-pub(crate) const SERVICE_CMD_PRIORITY: i32 = -1;
-pub(crate) const SERVICE_QUERY_PRIORITY: i32 = -2;
-pub(crate) const JOIN_RESPONSE_PRIORITY: i32 = -5;
+// highest priority, since we must sort out membership first of all
+pub(crate) const DKG_MSG_PRIORITY: i32 = 10;
+// very high prio, since we must have correct contact details to the network
+pub(crate) const ANTIENTROPY_MSG_PRIORITY: i32 = 8;
+// high prio as recipient can't do anything until they've joined. Needs to be lower than DKG (or else no split)
+pub(crate) const JOIN_RESPONSE_PRIORITY: i32 = 6;
+// our joining to the network
+pub(crate) const JOIN_RELOCATE_MSG_PRIORITY: i32 = 4;
+// reporting dysfunction is somewhat critical, so not super low
+pub(crate) const DYSFUNCTION_MSG_PRIORITY: i32 = 2;
+// reporting backpressure isn't time critical, so fairly low
+pub(crate) const BACKPRESSURE_MSG_PRIORITY: i32 = 0;
+// not maintaining network structure, so can wait
+pub(crate) const NODE_DATA_MSG_PRIORITY: i32 = -6;
+// has payment throttle, but is not critical for network function
+pub(crate) const SERVICE_CMD_PRIORITY: i32 = -8;
+// has no throttle and is sent by clients, lowest prio
+pub(crate) const SERVICE_QUERY_PRIORITY: i32 = -10;
 
 use crate::types::PublicKey;
 
 pub use self::wire_msg::WireMsg;
 use super::{
-    data::ServiceMsg, system::SystemMsg, AuthorityProof, BlsShareAuth, DstLocation, MsgId,
-    NodeAuth, SectionAuth, ServiceAuth,
+    data::ServiceMsg,
+    system::{NodeEvent, SystemMsg},
+    AuthorityProof, BlsShareAuth, DstLocation, MsgId, NodeAuth, SectionAuth, ServiceAuth,
 };
 
 /// Type of message.
@@ -61,10 +73,6 @@ impl MsgType {
     /// The priority of the message, when handled by lower level comms.
     pub fn priority(&self) -> i32 {
         match self {
-            MsgType::System {
-                msg: SystemMsg::JoinResponse(_) | SystemMsg::JoinAsRelocatedResponse(_),
-                ..
-            } => JOIN_RESPONSE_PRIORITY,
             // DKG messages
             MsgType::System {
                 msg:
@@ -79,34 +87,57 @@ impl MsgType {
                 ..
             } => DKG_MSG_PRIORITY,
 
-            // Node messages for AE updates
+            // Inter-node comms for AE updates
             MsgType::System {
                 msg:
                     SystemMsg::AntiEntropyRetry { .. }
                     | SystemMsg::AntiEntropyRedirect { .. }
                     | SystemMsg::AntiEntropyUpdate { .. }
-                    | SystemMsg::AntiEntropyProbe(_)
-                    | SystemMsg::BackPressure(_)
-                    | SystemMsg::Relocate(_)
+                    | SystemMsg::AntiEntropyProbe(_),
+                ..
+            } => ANTIENTROPY_MSG_PRIORITY,
+
+            // Join responses
+            MsgType::System {
+                msg: SystemMsg::JoinResponse(_) | SystemMsg::JoinAsRelocatedResponse(_),
+                ..
+            } => JOIN_RESPONSE_PRIORITY,
+
+            // Inter-node comms for joining, relocating etc.
+            MsgType::System {
+                msg:
+                    SystemMsg::Relocate(_)
                     | SystemMsg::JoinRequest(_)
                     | SystemMsg::JoinAsRelocatedRequest(_)
                     | SystemMsg::Propose { .. }
                     | SystemMsg::StartConnectivityTest(_),
                 ..
-            } => INFRASTRUCTURE_MSG_PRIORITY,
+            } => JOIN_RELOCATE_MSG_PRIORITY,
+
+            // Inter-node comms for dysfunction detection
+            MsgType::System {
+                msg: SystemMsg::NodeEvent(NodeEvent::SuspiciousNodesDetected(_)),
+                ..
+            } => DYSFUNCTION_MSG_PRIORITY,
+
+            // Inter-node comms for backpressure
+            MsgType::System {
+                msg: SystemMsg::BackPressure(_),
+                ..
+            } => BACKPRESSURE_MSG_PRIORITY,
 
             // Inter-node comms related to processing client requests
             MsgType::System {
                 msg:
                     SystemMsg::NodeCmd(_)
-                    | SystemMsg::NodeEvent(_)
+                    | SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData { .. })
                     | SystemMsg::NodeQuery(_)
                     | SystemMsg::NodeQueryResponse { .. }
                     | SystemMsg::NodeMsgError { .. },
                 ..
             } => NODE_DATA_MSG_PRIORITY,
 
-            // Client<->node service comms
+            // Client <-> node service comms
             MsgType::Service {
                 msg: ServiceMsg::Cmd(_),
                 ..

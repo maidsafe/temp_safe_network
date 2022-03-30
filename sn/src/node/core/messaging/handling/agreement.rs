@@ -182,7 +182,7 @@ impl Node {
         // containing the relocation details.
         if node_state.is_relocated() {
             cmds.push(
-                self.send_relocate(node_state.peer().clone(), signed_node_state)
+                self.send_relocate(*node_state.peer(), signed_node_state)
                     .await?,
             );
         }

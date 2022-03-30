@@ -11,19 +11,21 @@ use super::Cmd;
 use crate::elder_count;
 use crate::messaging::{system::SystemMsg, MsgKind, WireMsg};
 use crate::node::{
-    core::{Node, Proposal, SendStatus},
+    core::{DeliveryStatus, Node, Proposal},
     messages::WireMsgUtils,
     Error, Result,
 };
 use crate::types::{log_markers::LogMarker, Peer};
 
+use itertools::Itertools;
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
 use tokio::{sync::watch, time};
 use tracing::Instrument;
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
-const CLEANUP_INTERVAL: Duration = Duration::from_secs(60);
+const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(120);
+const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(60);
 
 // A command/subcommand id e.g. "963111461", "963111461.0"
 type CmdId = String;
@@ -143,18 +145,22 @@ impl Dispatcher {
         info!("Starting cleaning up network links");
         let _handle = tokio::spawn(async move {
             let dispatcher = self.clone();
-            let mut interval = tokio::time::interval(CLEANUP_INTERVAL);
+            let mut interval = tokio::time::interval(LINK_CLEANUP_INTERVAL);
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+            let _ = interval.tick().await;
 
             loop {
-                let _instant = interval.tick().await;
+                let _ = interval.tick().await;
                 let cmd = Cmd::CleanupPeerLinks;
                 if let Err(e) = dispatcher
                     .clone()
                     .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
                     .await
                 {
-                    error!("Error sending a cleaning up unused PeerLinks: {:?}", e);
+                    error!(
+                        "Error requesting a cleaning up of unused PeerLinks: {:?}",
+                        e
+                    );
                 }
             }
         });
@@ -163,7 +169,7 @@ impl Dispatcher {
         info!("Starting dysfunction checking");
         let _handle = tokio::spawn(async move {
             let dispatcher = self.clone();
-            let mut interval = tokio::time::interval(CLEANUP_INTERVAL);
+            let mut interval = tokio::time::interval(DYSFUNCTION_CHECK_INTERVAL);
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
             loop {
@@ -283,23 +289,26 @@ impl Dispatcher {
         match cmd {
             Cmd::CleanupPeerLinks => {
                 let linked_peers = self.node.comm.linked_peers().await;
-                let section_members = self.node.list_section_members().await;
 
                 if linked_peers.len() < elder_count() {
                     return Ok(vec![]);
                 }
 
-                for (name, addr) in linked_peers.clone() {
-                    if !section_members.contains(&name) {
-                        // not in our section
-                        let peer = Peer::new(name, addr);
+                self.node.comm.remove_expired().await;
 
-                        // this will cleanup all adults too.
-                        // but we can reestablish conns there happily, so not soo much a bother.
+                let sections = self.node.network_knowledge().prefix_map().all();
+                let network_peers = sections
+                    .iter()
+                    .flat_map(|info| info.elders_vec())
+                    .collect_vec();
+
+                for peer in linked_peers.clone() {
+                    if !network_peers.contains(&peer) {
+                        // not among known peers in the network
                         if !self.node.pending_data_queries_contains_client(&peer).await
-                            && !self.node.comm.peer_is_connected(&peer).await
+                            && !self.node.comm.is_connected(&peer).await
                         {
-                            trace!("{peer:?} not waiting on queries and not in the section, so lets unlink them");
+                            trace!("{peer:?} not waiting on queries and not in the network, so lets unlink them");
                             self.node.comm.unlink_peer(&peer).await;
                         }
                     }
@@ -492,11 +501,13 @@ impl Dispatcher {
             .await?;
 
         match status {
-            SendStatus::MinDeliveryGroupSizeReached(failed_recipients)
-            | SendStatus::MinDeliveryGroupSizeFailed(failed_recipients) => Ok(failed_recipients
-                .into_iter()
-                .map(Cmd::HandlePeerLost)
-                .collect()),
+            DeliveryStatus::MinDeliveryGroupSizeReached(failed_recipients)
+            | DeliveryStatus::MinDeliveryGroupSizeFailed(failed_recipients) => {
+                Ok(failed_recipients
+                    .into_iter()
+                    .map(Cmd::HandlePeerLost)
+                    .collect())
+            }
             _ => Ok(vec![]),
         }
         .map_err(|e: Error| e)

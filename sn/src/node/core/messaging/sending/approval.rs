@@ -13,7 +13,7 @@ use crate::types::log_markers::LogMarker;
 impl Node {
     // Send `NodeApproval` to a joining node which makes it a section member
     pub(crate) async fn send_node_approval(&self, node_state: SectionAuth<NodeState>) -> Vec<Cmd> {
-        let peer = node_state.peer().clone();
+        let peer = *node_state.peer();
         let prefix = self.network_knowledge.prefix().await;
         info!("Our section with {:?} has approved peer {}.", prefix, peer,);
 
@@ -30,10 +30,7 @@ impl Node {
 
         let dst_section_pk = self.network_knowledge.section_key().await;
         trace!("{}", LogMarker::SendNodeApproval);
-        match self
-            .send_direct_msg(peer.clone(), node_msg, dst_section_pk)
-            .await
-        {
+        match self.send_direct_msg(peer, node_msg, dst_section_pk).await {
             Ok(cmd) => vec![cmd],
             Err(err) => {
                 error!("Failed to send join approval to node {}: {:?}", peer, err);

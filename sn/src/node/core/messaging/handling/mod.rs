@@ -59,12 +59,20 @@ impl Node {
         let mut cmds = vec![];
 
         // Apply backpressure if needed.
-        if let Some(load_report) = self.comm.check_strain(&sender.addr()).await {
+        if let Some(load_report) = self.comm.tolerated_msgs_per_s(&sender).await {
             let msg_src = wire_msg.msg_kind().src();
             if !msg_src.is_end_user() {
-                cmds.push(Cmd::SignOutgoingSystemMsg {
-                    msg: SystemMsg::BackPressure(load_report),
-                    dst: msg_src.to_dst(),
+                trace!("Sending BackPressure: {}", load_report);
+                let src_section_pk = self.network_knowledge().section_key().await;
+
+                cmds.push(Cmd::SendMsg {
+                    wire_msg: WireMsg::single_src(
+                        &*self.info.read().await,
+                        msg_src.to_dst(),
+                        SystemMsg::BackPressure(load_report),
+                        src_section_pk,
+                    )?,
+                    recipients: vec![sender],
                 })
             }
         }
@@ -418,10 +426,15 @@ impl Node {
                 trace!("Received Probe message from {}: {:?}", sender, msg_id);
                 Ok(vec![])
             }
-            SystemMsg::BackPressure(load_report) => {
-                trace!("Handling msg: BackPressure from {}: {:?}", sender, msg_id);
+            SystemMsg::BackPressure(msgs_per_s) => {
+                trace!(
+                    "Handling msg: BackPressure with requested {} msgs/s, from {}: {:?}",
+                    msgs_per_s,
+                    sender,
+                    msg_id
+                );
                 // TODO: Factor in med/long term backpressure into general node liveness calculations
-                self.comm.regulate(sender.addr(), load_report).await;
+                self.comm.regulate(&sender, msgs_per_s).await;
                 Ok(vec![])
             }
             // The AcceptedOnlineShare for relocation will be received here.
@@ -713,7 +726,7 @@ impl Node {
                 );
                 debug!("{}", LogMarker::DeviantsDetected);
 
-                return self.republish_data_for_suspicious_nodes(suspects).await;
+                return self.replicate_data_of_suspicious_nodes(suspects).await;
             }
             SystemMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
                 info!("ReplicateData MsgId: {:?}", msg_id);
@@ -1061,17 +1074,23 @@ impl Node {
         cmds
     }
 
-    async fn republish_data_for_suspicious_nodes(
+    async fn replicate_data_of_suspicious_nodes(
         &self,
         suspects: BTreeSet<XorName>,
     ) -> Result<Vec<Cmd>> {
-        debug!("Republishing data for suspect nodes : {suspects:?}");
+        debug!("Replicating data of suspect nodes : {suspects:?}");
         let our_adults = self
             .network_knowledge
             .adults()
             .await
             .iter()
-            .map(|peer| peer.name())
+            .filter_map(|peer| {
+                if suspects.contains(&peer.name()) {
+                    None
+                } else {
+                    Some(peer.name())
+                }
+            })
             .collect::<BTreeSet<XorName>>();
 
         self.reorganize_data(BTreeSet::new(), suspects, our_adults)

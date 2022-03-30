@@ -106,7 +106,7 @@ impl Session {
             )?;
 
             cmds.push(Cmd::SendMsg {
-                recipients: vec![peer.clone()],
+                recipients: vec![*peer],
                 wire_msg,
             });
         } else {
@@ -167,14 +167,14 @@ impl Session {
         self.elder_candidates
             .elders()
             .enumerate()
-            .filter_map(|(index, peer)| (index != self.participant_index).then(|| peer.clone()))
+            .filter_map(|(index, peer)| (index != self.participant_index).then(|| *peer))
             .collect()
     }
 
     fn peers(&self) -> BTreeMap<XorName, Peer> {
         self.elder_candidates
             .elders()
-            .map(|peer| (peer.name(), peer.clone()))
+            .map(|peer| (peer.name(), *peer))
             .collect()
     }
 
@@ -231,7 +231,7 @@ impl Session {
                 );
 
                 cmds.push(Cmd::SendMsg {
-                    recipients: vec![peer.clone()],
+                    recipients: vec![*peer],
                     wire_msg,
                 });
             } else {

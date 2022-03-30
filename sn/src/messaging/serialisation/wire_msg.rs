@@ -35,7 +35,7 @@ pub struct WireMsg {
     /// Extra debug info if the relevant feature is enabled.
     // This is behind a feature because it's potentially expensive to carry around the message as
     // well as its serialization.
-    #[cfg(feature = "unstable-wiremsg-debuginfo")]
+    #[cfg(feature = "test-utils")]
     pub(crate) payload_debug: Option<std::sync::Arc<dyn std::fmt::Debug + Send + Sync>>,
 }
 
@@ -71,7 +71,7 @@ impl WireMsg {
         Ok(Self {
             header: WireMsgHeader::new(msg_id, msg_kind, dst_location),
             payload,
-            #[cfg(feature = "unstable-wiremsg-debuginfo")]
+            #[cfg(feature = "test-utils")]
             payload_debug: None,
         })
     }
@@ -86,7 +86,7 @@ impl WireMsg {
         Ok(Self {
             header,
             payload,
-            #[cfg(feature = "unstable-wiremsg-debuginfo")]
+            #[cfg(feature = "test-utils")]
             payload_debug: None,
         })
     }
@@ -233,7 +233,7 @@ impl WireMsg {
         Self::serialize_msg_payload(&msg).and_then(|payload| AuthorityProof::verify(auth, &payload))
     }
 
-    #[cfg(feature = "unstable-wiremsg-debuginfo")]
+    #[cfg(feature = "test-utils")]
     pub(crate) fn set_payload_debug(
         // take ownership for ergonomics in `cfg(...)` blocks
         mut self,

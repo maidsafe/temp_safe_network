@@ -9,7 +9,6 @@
 use crate::{
     operations::auth_and_connect::connect,
     operations::config::{Config, SnLaunchToolNetworkLauncher},
-    shell,
     subcommands::{
         cat::cat_commander,
         config::config_commander,
@@ -43,7 +42,7 @@ const SN_CLI_QUERY_TIMEOUT: &str = "SN_CLI_QUERY_TIMEOUT";
 pub struct CmdArgs {
     /// subcommands
     #[structopt(subcommand)]
-    pub cmd: Option<SubCommands>,
+    pub cmd: SubCommands,
     /// Output data serialisation: [json, jsoncompact, yaml]
     #[structopt(short = "o", long = "output", global(true))]
     output_fmt: Option<OutputFmt>,
@@ -62,42 +61,28 @@ pub struct CmdArgs {
 }
 
 pub async fn run() -> Result<()> {
-    let mut safe = Safe::dry_runner(None);
-    run_with(None, &mut safe).await
-}
-
-pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> {
     // Let's first get all the arguments passed in, either as function's args, or CLI args
-    let args = match cmd_args {
-        None => CmdArgs::from_args(),
-        Some(cmd_args) => CmdArgs::from_iter_safe(cmd_args)?,
-    };
+    let args = CmdArgs::from_args();
 
-    let prev_base = safe.xorurl_base;
+    let mut safe = Safe::dry_runner(None);
     if let Some(base) = args.xorurl_base {
         safe.xorurl_base = base;
     }
 
     let output_fmt = if args.output_json {
         OutputFmt::Json
+    } else if let Some(fmt) = args.output_fmt {
+        fmt
     } else {
-        match args.output_fmt {
-            Some(fmt) => fmt,
-            None => OutputFmt::Pretty,
-        }
+        OutputFmt::Pretty
     };
-
-    // Set dry run mode in Safe instance as per arg provide
-    safe.dry_run_mode = args.dry;
 
     debug!("Processing command: {:?}", args);
 
     let result = match args.cmd {
-        Some(SubCommands::Config { cmd }) => config_commander(cmd, &mut get_config().await?).await,
-        Some(SubCommands::Networks { cmd }) => {
-            networks_commander(cmd, &mut get_config().await?).await
-        }
-        Some(SubCommands::Update { no_confirm }) => {
+        SubCommands::Config { cmd } => config_commander(cmd, &mut get_config().await?).await,
+        SubCommands::Networks { cmd } => networks_commander(cmd, &mut get_config().await?).await,
+        SubCommands::Update { no_confirm } => {
             // We run this command in a separate thread to overcome a conflict with
             // the self_update crate as it seems to be creating its own runtime.
             // The use of the move keyword is required for the closure to take ownership of
@@ -110,18 +95,18 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
                 .join()
                 .map_err(|err| eyre!("Failed to run self update: {:?}", err))?
         }
-        Some(SubCommands::Setup(cmd)) => setup_commander(cmd, output_fmt),
-        Some(SubCommands::Node { cmd }) => {
+        SubCommands::Setup(cmd) => setup_commander(cmd, output_fmt),
+        SubCommands::Node { cmd } => {
             let mut launcher = Box::new(SnLaunchToolNetworkLauncher::default());
             node_commander(cmd, &mut get_config().await?, &mut launcher).await
         }
-        Some(SubCommands::Keys(cmd)) => key_commander(cmd, output_fmt, safe).await,
-        Some(SubCommands::Xorurl {
+        SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, &safe).await,
+        SubCommands::Xorurl {
             cmd,
             location,
             recursive,
             follow_links,
-        }) => {
+        } => {
             if let Some(cmd) = cmd {
                 xorurl_commander(cmd, output_fmt, safe.xorurl_base).await
             } else {
@@ -135,12 +120,14 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
                 .await
             }
         }
-        Some(other) => {
+        other => {
+            // Set dry run mode in Safe instance as per arg provide
+            safe.dry_run_mode = args.dry;
             // We treat these commands separatelly since we use the credentials if they are
             // available to connect to the network with them (unless dry-run was set),
             // otherwise the connection created will be with read-only access and some
             // of these commands will fail if they require write access.
-            if !safe.dry_run_mode && !safe.is_connected() {
+            if !safe.dry_run_mode {
                 let timeout_secs: u64 = match env::var(SN_CLI_QUERY_TIMEOUT) {
                     Ok(timeout) => timeout.parse::<u64>().map_err(|_| {
                         eyre!(
@@ -152,21 +139,24 @@ pub async fn run_with(cmd_args: Option<&[&str]>, safe: &mut Safe) -> Result<()> 
                     Err(_) => DEFAULT_OPERATION_TIMEOUT_SECS,
                 };
 
-                connect(safe, get_config().await?, Duration::from_secs(timeout_secs)).await?;
+                connect(
+                    &mut safe,
+                    get_config().await?,
+                    Duration::from_secs(timeout_secs),
+                )
+                .await?;
             }
 
             match other {
-                SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, safe).await,
-                SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, safe).await,
-                SubCommands::Files(cmd) => files_commander(cmd, output_fmt, safe).await,
-                SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, safe).await,
+                SubCommands::Cat(cmd) => cat_commander(cmd, output_fmt, &safe).await,
+                SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, &safe).await,
+                SubCommands::Files(cmd) => files_commander(cmd, output_fmt, &safe).await,
+                SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, &safe).await,
                 _ => Err(eyre!("Unknown safe subcommand")),
             }
         }
-        None => shell::shell_run(), // then enter in interactive shell
     };
 
-    safe.xorurl_base = prev_base;
     result
 }
 

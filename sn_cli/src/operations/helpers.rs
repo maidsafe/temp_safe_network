@@ -165,10 +165,12 @@ fn set_exec_perms(file_path: PathBuf) -> Result<()> {
 
 /// Gets the version number from the full version number string.
 ///
-/// The `release_version` input is in the form "0.51.6-0.46.2-0.39.1", which is the safe_network,
-/// sn_api, sn_cli versions, respectively. This function will return the safe_network part.
+/// The `release_version` input is in the form "0.1.1-0.51.6-0.46.2-0.39.1", which is the
+/// sn_dysfunction, safe_network, sn_api, sn_cli versions, respectively. This function will return
+/// the safe_network part.
 fn get_version_from_release_version(release_version: &str) -> Result<String> {
     let mut parts = release_version.split('-');
+    parts.next();
     let version = parts
         .next()
         .ok_or_else(|| {

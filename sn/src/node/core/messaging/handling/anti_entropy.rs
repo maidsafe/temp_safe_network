@@ -87,7 +87,7 @@ impl Node {
                 section_signed,
                 proof_chain,
                 bounced_msg,
-                sender.clone(),
+                sender,
             )
             .await?;
 
@@ -138,7 +138,8 @@ impl Node {
             .sorted_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()))
             .peekable()
             .peek()
-            .map(|elder| (*elder).clone());
+            .copied()
+            .copied();
 
         let to_resend = self
             .update_network_knowledge(
@@ -146,7 +147,7 @@ impl Node {
                 section_signed,
                 section_chain,
                 bounced_msg,
-                sender.clone(),
+                sender,
             )
             .await?;
 
@@ -276,7 +277,7 @@ impl Node {
                 tokio::time::sleep(sleep_time).await;
             }
         } else {
-            let _res = ae_backoff_guard.insert((peer.clone(), ExponentialBackoff::default()));
+            let _res = ae_backoff_guard.insert((*peer, ExponentialBackoff::default()));
         }
     }
 
@@ -352,7 +353,7 @@ impl Node {
                     trace!("{}", LogMarker::AeSendRedirect);
 
                     return Ok(Some(Cmd::SendMsg {
-                        recipients: vec![sender.clone()],
+                        recipients: vec![*sender],
                         wire_msg,
                     }));
                 }
@@ -444,7 +445,7 @@ impl Node {
         )?;
 
         Ok(Some(Cmd::SendMsg {
-            recipients: vec![sender.clone()],
+            recipients: vec![*sender],
             wire_msg,
         }))
     }

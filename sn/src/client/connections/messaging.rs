@@ -536,7 +536,7 @@ impl Session {
         let targets_count = at_least_one_correct_elder(); // stored at Adults, so only 1 correctly functioning Elder need to relay
 
         // any SAP that does not hold elders_count() is indicative of a broken network (after genesis)
-        if elders.len() < elder_count() {
+        if elders.len() < targets_count {
             error!("Insufficient knowledge to send to {:?}", dst_address);
             return Err(Error::InsufficientElderKnowledge {
                 connections: elders.len(),
@@ -578,15 +578,10 @@ pub(super) async fn send_msg(
         let peer_name = peer.name();
 
         let task_handle: JoinHandle<(XorName, Result<()>)> = tokio::spawn(async move {
-            let link = session.peer_links.get_or_create(&peer.id()).await;
+            let link = session.peer_links.get_or_create(&peer).await;
 
             let listen = |conn, incoming_msgs| {
-                Session::spawn_msg_listener_thread(
-                    session.clone(),
-                    peer.clone(),
-                    conn,
-                    incoming_msgs,
-                );
+                Session::spawn_msg_listener_thread(session.clone(), peer, conn, incoming_msgs);
             };
 
             let mut retries = 0;
