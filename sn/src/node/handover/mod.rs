@@ -10,4 +10,4 @@ pub(crate) mod errors;
 pub(crate) mod handover_consensus;
 
 pub(crate) use handover_consensus::{Handover, SapCandidate};
-pub(crate) use errors::Error;
+pub use errors::Error;

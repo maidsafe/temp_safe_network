@@ -17,7 +17,7 @@ pub(crate) type Result<T, E = Error> = result::Result<T, E>;
 /// Errors that can occur in handover consensus
 #[derive(Error, Debug)]
 #[non_exhaustive]
-pub(crate) enum Error {
+pub enum Error {
     /// Received an invalid section prefix when checking handover candidate's section prefix
     /// The candidate's section prefix is supposed to be identical to ours for a handover
     #[error("Invalid Section Prefix For Handover Candidate")]
