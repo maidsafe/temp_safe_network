@@ -22,6 +22,9 @@ pub enum LogMarker {
     NewPrefix,
     AeSendUpdateToSiblings,
     AgreementOfOnline,
+    // Handover
+    HandoverConsensusTrigger,
+    HandoverMsgToBeHandled,
     // Malice
     DeviantsDetected,
     ProposeOffline,
