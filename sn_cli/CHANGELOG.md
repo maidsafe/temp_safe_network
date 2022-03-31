@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.51.1 (2022-03-31)
+
+### Bug Fixes
+
+ - <csr-id-b11bcde72e391ffb4e8f50f10f95c3fcb460357a/> node install command to use correct version
+   With the addition on the dysfunction crate, this introduced a new version number into the tag name.
+   The parsing had to be updated for this.
+   
+   I've also re-enabled the test that would have caught this. It shouldn't be as much of a problem with
+   nextest, which has the ability to retry tests. I've seen the rate limited stuff passing ok on
+   retries. If we see it fail, we can disable it again.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 5 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - node install command to use correct version ([`b11bcde`](https://github.com/maidsafe/safe_network/commit/b11bcde72e391ffb4e8f50f10f95c3fcb460357a))
+    - remove CLI interactive mode (shell) ([`08b023d`](https://github.com/maidsafe/safe_network/commit/08b023d38c06b50b6c373c2faa91013cb6ad1c38))
+</details>
+
 ## v0.51.0 (2022-03-25)
 
 ### New Features (BREAKING)
@@ -28,9 +60,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release over the course of 1 calendar day.
- - 2 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits contributed to the release over the course of 1 calendar day.
+ - 3 days passed between releases.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -40,6 +72,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.58.8/sn_api-0.58.0/sn_cli-0.51.0 ([`907c7d3`](https://github.com/maidsafe/safe_network/commit/907c7d3ef4f65df5566627938154dfca1e2fdc05))
     - update deps ([`90712c9`](https://github.com/maidsafe/safe_network/commit/90712c91368b4d88537acc65a3ccc5478fe38d2c))
     - deps, remove ~ restriction on major versioned deps ([`6b83f38`](https://github.com/maidsafe/safe_network/commit/6b83f38f17c241c00b70480a18a47b04d9a51ee1))
     - upgrade to new version of qjsonrpc ([`eaeca42`](https://github.com/maidsafe/safe_network/commit/eaeca4223c4e35884bfd1129832b890e70b6ef5e))

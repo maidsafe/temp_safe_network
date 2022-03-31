@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.58.10 (2022-03-29)
+## v0.58.10 (2022-03-31)
 
 ### New Features
 
@@ -17,14 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-bd488cbc9d24324bec730f85bdcebccaec2e75c4/> exclude suspects from current
  - <csr-id-bbd6a2370a809a4d23a1df0a813cac2809e06690/> bump node suspicion event prio
  - <csr-id-63c5deae1a4c31c681c019846da95105c0ef7733/> improve success rate
+ - <csr-id-14725d0353d797b9437033781e8ff295a7eacc34/> allow update message pass through
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release over the course of 1 calendar day.
- - 3 days passed between releases.
- - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 11 commits contributed to the release over the course of 2 calendar days.
+ - 4 days passed between releases.
+ - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -34,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - only log SendSus once per batch ([`03258b3`](https://github.com/maidsafe/safe_network/commit/03258b3777644de7799e9563df35afc5e8531be2))
+    - run 40mb test as normal ([`c45f6e3`](https://github.com/maidsafe/safe_network/commit/c45f6e362257ba9378547a8f1fd508a5e680cb0a))
+    - allow update message pass through ([`14725d0`](https://github.com/maidsafe/safe_network/commit/14725d0353d797b9437033781e8ff295a7eacc34))
+    - chore(release): ([`391c546`](https://github.com/maidsafe/safe_network/commit/391c546158135cbd3b2c9e5a1a64e58a1bb8e392))
     - exclude suspects from current ([`bd488cb`](https://github.com/maidsafe/safe_network/commit/bd488cbc9d24324bec730f85bdcebccaec2e75c4))
     - debug promotion, rename workflow ([`c8f4eed`](https://github.com/maidsafe/safe_network/commit/c8f4eed0406253cc4c253292bc82e7320fdcbf70))
     - bump node suspicion event prio ([`bbd6a23`](https://github.com/maidsafe/safe_network/commit/bbd6a2370a809a4d23a1df0a813cac2809e06690))
