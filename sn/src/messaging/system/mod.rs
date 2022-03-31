@@ -24,10 +24,12 @@ pub use signed::{KeyedSig, SigShare};
 pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
 
 use crate::messaging::{EndUser, MsgId, SectionAuthorityProvider};
+use crate::node::SapCandidate;
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
+use sn_consensus::SignedVote;
 use std::{
     collections::{BTreeMap, BTreeSet},
     net::SocketAddr,
@@ -165,6 +167,8 @@ pub enum SystemMsg {
     /// Sent to the current elders by the DKG participants when at least majority of them observe
     /// a DKG failure.
     DkgFailureAgreement(DkgFailureSigSet),
+    /// Section handover consensus vote message
+    HandoverVote(SignedVote<SapCandidate>),
     /// Message containing a single `Proposal` to be aggregated in the proposal aggregator.
     Propose {
         /// The content of the proposal

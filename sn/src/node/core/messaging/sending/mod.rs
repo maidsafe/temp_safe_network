@@ -9,6 +9,7 @@
 mod anti_entropy;
 mod approval;
 mod dkg_start;
+mod handover;
 mod proposal;
 mod services;
 mod system;

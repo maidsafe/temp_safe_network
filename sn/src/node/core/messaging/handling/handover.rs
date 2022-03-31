@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,8 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub(crate) mod errors;
-pub(crate) mod handover_consensus;
+use crate::node::{api::cmds::Cmd, core::Node, handover::SapCandidate};
+use sn_consensus::{SignedVote, VoteResponse};
 
-pub use errors::Error;
-pub use handover_consensus::{Handover, SapCandidate};
+impl Node {
+    pub(crate) async fn handle_handover_msg(&self, msg: SignedVote<SapCandidate>) -> Vec<Cmd> {
+        vec![]
+    }
+}

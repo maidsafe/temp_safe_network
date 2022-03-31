@@ -9,6 +9,7 @@
 mod agreement;
 mod anti_entropy;
 mod dkg;
+mod handover;
 mod join;
 mod proposals;
 mod relocation;
@@ -586,6 +587,7 @@ impl Node {
                 trace!("Handling msg: Dkg-FailureAgreement from {}", sender);
                 self.handle_dkg_failure_agreement(&src_name, &sig_set).await
             }
+            SystemMsg::HandoverVote(vote) => Ok(self.handle_handover_msg(vote).await),
             SystemMsg::JoinRequest(join_request) => {
                 trace!("Handling msg: JoinRequest from {}", sender);
                 self.handle_join_request(sender, *join_request).await

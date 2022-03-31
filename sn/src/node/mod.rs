@@ -31,7 +31,7 @@ use std::{
     sync::Arc,
 };
 
-pub(crate) use handover::Handover;
+pub(crate) use handover::{Handover, SapCandidate};
 
 pub use self::{
     api::{
