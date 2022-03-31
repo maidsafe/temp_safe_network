@@ -31,6 +31,8 @@ use std::{
     sync::Arc,
 };
 
+pub(crate) use handover::Handover;
+
 pub use self::{
     api::{
         event::{Elders, Event, MessageReceived, NodeElderChange},

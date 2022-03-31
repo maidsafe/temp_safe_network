@@ -29,8 +29,9 @@ use self::{data::DataStorage, split_barrier::SplitBarrier};
 use super::{
     api::cmds::Cmd,
     dkg::DkgVoter,
-    network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider},
+    network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider, SectionAuthorityProvider},
     Elders, Event, NodeElderChange, NodeInfo,
+    handover::Handover,
 };
 
 use crate::messaging::{
@@ -120,6 +121,10 @@ pub(crate) struct Node {
     dkg_voter: DkgVoter,
     relocate_state: Arc<RwLock<Option<Box<JoiningAsRelocated>>>>,
     // ======================== Elder only ========================
+    // Section handover state (Some for Elders, None for others)
+    pub(crate) elder_handover: Arc<RwLock<Option<Handover>>>,
+    /// A mapping to SAPs keyed by the membership generation their DKG was triggered in
+    pub(crate) pending_split_sap_candidates: Arc<RwLock<BTreeMap<u64, SectionAuthorityProvider>>>,
     joins_allowed: Arc<RwLock<bool>>,
     current_joins_semaphore: Arc<Semaphore>,
     // Trackers
@@ -144,7 +149,7 @@ impl Node {
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
     ) -> Result<Self> {
-        let section_keys_provider = SectionKeysProvider::new(section_key_share).await;
+        let section_keys_provider = SectionKeysProvider::new(section_key_share.clone()).await;
 
         // make sure the Node has the correct local addr as Comm
         info.addr = comm.our_connection_info();
@@ -166,6 +171,19 @@ impl Node {
             node_dysfunction_detector
         );
 
+        // create handover
+        let handover = if let Some(key) = section_key_share {
+            let secret_key = (key.index as u8, key.secret_key_share);
+            let elders = key.public_key_set;
+            let n_elders = network_knowledge.elders().await.len();
+            let section_prefix = network_knowledge.prefix().await;
+
+            let handover_data = Handover::from(secret_key, elders, n_elders, section_prefix);
+            Some(handover_data)
+        } else {
+            None
+        };
+
         Ok(Self {
             comm,
             info: Arc::new(RwLock::new(info)),
@@ -178,6 +196,8 @@ impl Node {
             dkg_voter: DkgVoter::default(),
             relocate_state: Arc::new(RwLock::new(None)),
             event_tx,
+            elder_handover: Arc::new(RwLock::new(handover)),
+            pending_split_sap_candidates: Arc::new(RwLock::new(BTreeMap::new())),
             joins_allowed: Arc::new(RwLock::new(true)),
             current_joins_semaphore: Arc::new(Semaphore::new(CONCURRENT_JOINS)),
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
