@@ -20,7 +20,7 @@ impl Node {
     #[instrument(skip(self), level = "trace")]
     async fn handle_vote(
         &self,
-        handover_state: Handover,
+        handover_state: &mut Handover,
         signed_vote: SignedVote<Vec<SectionAuthorityProvider>>,
     ) -> Vec<Cmd> {
         match handover_state.handle_signed_vote(signed_vote.clone()) {

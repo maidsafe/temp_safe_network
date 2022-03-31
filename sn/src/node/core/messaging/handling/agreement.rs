@@ -24,6 +24,7 @@ impl Node {
     pub(crate) async fn handle_section_info_agreement(
         &self,
         section_auth: SectionAuthorityProvider,
+        membership_gen: u64,
         sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
         // check if section matches our prefix

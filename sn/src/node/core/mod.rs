@@ -118,7 +118,9 @@ pub(crate) struct Node {
 
     // Section handover state (Some for Elders, None for others)
     pub(crate) elder_handover: Arc<RwLock<Option<Handover>>>,  // Elder only
-    pub(crate) pending_split_sap_candidates: Arc<RwLock<BTreeSet<SectionAuthorityProvider>>>, // Elder only
+
+    /// A mapping to SAPs keyed by the membership generation their DKG was triggered in
+    pub(crate) pending_split_sap_candidates: Arc<RwLock<BTreeMap<u64, SectionAuthorityProvider>>>, // Elder only
 
     joins_allowed: Arc<RwLock<bool>>,        // Elder only
     current_joins_semaphore: Arc<Semaphore>, // Elder only

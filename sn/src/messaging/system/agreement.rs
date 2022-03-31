@@ -25,6 +25,8 @@ pub struct DkgSessionId {
     pub hash: Digest256,
     /// The generation, as in the length of the section chain main branch.
     pub generation: u64,
+    /// The membership generation
+    pub membership_gen: u64,
 }
 
 impl DkgSessionId {
@@ -90,7 +92,8 @@ pub enum Proposal {
     ///
     /// It signals the completion of a DKG by the elder candidates to the current elders.
     /// This proposal is then signed by the newly generated section key.
-    SectionInfo(SectionAuthorityProvider),
+    /// It contains the membership generation at which this SAP was initially proposed.
+    SectionInfo(SectionAuthorityProvider, u64),
     /// Proposal to change the elders (and possibly the prefix) of our section.
     /// NOTE: the `SectionAuthorityProvider` is already signed with the new key. This proposal is only to signs the
     /// new key with the current key. That way, when it aggregates, we obtain all the following

@@ -26,7 +26,7 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         let src_prefix = elder_candidates.prefix();
         let generation = self.network_knowledge.chain_len().await;
-        let session_id = DkgSessionId::new(&elder_candidates, generation);
+        let session_id = DkgSessionId::new(&elder_candidates, generation); // NB TODO!! we probably need membership generation here as well
 
         // Send DKG start to all candidates
         let recipients: Vec<_> = elder_candidates.elders().cloned().collect();
