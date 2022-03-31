@@ -17,6 +17,7 @@ mod core;
 mod dkg;
 mod ed25519;
 mod error;
+mod handover;
 mod logging;
 mod messages;
 mod network_knowledge;
