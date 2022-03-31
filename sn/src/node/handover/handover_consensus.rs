@@ -1,5 +1,6 @@
 use bls::{PublicKeySet, SecretKeyShare};
 use core::fmt::Debug;
+use serde::{Deserialize, Serialize};
 use tracing::info;
 use xor_name::Prefix;
 
@@ -7,19 +8,17 @@ use sn_consensus::consensus::{Consensus, VoteResponse};
 use sn_consensus::vote::{Ballot, SignedVote, Vote};
 use sn_consensus::NodeId;
 
-use crate::node::SectionAuthorityProvider;
 use super::errors::{Error, Result};
+use crate::node::SectionAuthorityProvider;
 
-use serde::Serialize;
-
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Serialize)]
-pub(crate) enum SapCandidate {
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Serialize, Deserialize)]
+pub enum SapCandidate {
     ElderHandover(SectionAuthorityProvider),
     SectionSplit(SectionAuthorityProvider, SectionAuthorityProvider),
 }
 
-#[derive(Debug)]
-pub(crate) struct Handover {
+#[derive(Debug, Clone)]
+pub struct Handover {
     pub(crate) consensus: Consensus<SapCandidate>,
     pub(crate) section_prefix: Prefix,
 }
@@ -71,7 +70,10 @@ impl Handover {
         self.consensus.id()
     }
 
-    pub(crate) fn handle_signed_vote(&mut self, signed_vote: SignedVote<SapCandidate>) -> Result<VoteResponse<SapCandidate>> {
+    pub(crate) fn handle_signed_vote(
+        &mut self,
+        signed_vote: SignedVote<SapCandidate>,
+    ) -> Result<VoteResponse<SapCandidate>> {
         self.validate_proposals(&signed_vote)?;
 
         Ok(self.consensus.handle_signed_vote(signed_vote)?)
@@ -81,7 +83,10 @@ impl Handover {
         Ok(self.consensus.sign_vote(vote)?)
     }
 
-    pub(crate) fn cast_vote(&mut self, signed_vote: SignedVote<SapCandidate>) -> Result<SignedVote<SapCandidate>> {
+    pub(crate) fn cast_vote(
+        &mut self,
+        signed_vote: SignedVote<SapCandidate>,
+    ) -> Result<SignedVote<SapCandidate>> {
         Ok(self.consensus.cast_vote(signed_vote)?)
     }
 
@@ -122,7 +127,7 @@ impl Handover {
                 } else {
                     Err(Error::InvalidSectionPrefixForCandidate)
                 }
-            },
+            }
             SapCandidate::SectionSplit(sap1, sap2) => {
                 self.check_candidates_validity(&sap1)?;
                 self.check_candidates_validity(&sap2)?;
@@ -131,15 +136,16 @@ impl Handover {
                 let p1 = sap1.prefix();
                 let p2 = sap2.prefix();
                 if p1.is_extension_of(our_p)
-                && p2.is_extension_of(our_p)
-                && p1.bit_count() == our_p.bit_count() + 1
-                && p2.bit_count() == our_p.bit_count() + 1
-                && p1 != p2 {
+                    && p2.is_extension_of(our_p)
+                    && p1.bit_count() == our_p.bit_count() + 1
+                    && p2.bit_count() == our_p.bit_count() + 1
+                    && p1 != p2
+                {
                     Ok(())
                 } else {
                     Err(Error::InvalidSectionPrefixForSplitCandidates)
                 }
-            },
+            }
         }
     }
 }

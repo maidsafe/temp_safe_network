@@ -115,8 +115,8 @@ pub(crate) struct Node {
     relocate_state: Arc<RwLock<Option<Box<JoiningAsRelocated>>>>,
     // ======================== Elder only ========================
     pub(crate) membership: Arc<RwLock<Option<Membership>>>,
-    // Section handover state (Some for Elders, None for others)
-    pub(crate) elder_handover: Arc<RwLock<Option<Handover>>>,
+    // Section handover consensus state (Some for Elders, None for others)
+    pub(crate) handover_voting: Arc<RwLock<Option<Handover>>>,
     /// A mapping to SAPs keyed by the membership generation their DKG was triggered in
     pub(crate) pending_split_sap_candidates: Arc<RwLock<BTreeMap<u64, SectionAuthorityProvider>>>,
     joins_allowed: Arc<RwLock<bool>>,
@@ -214,7 +214,7 @@ impl Node {
             dkg_voter: DkgVoter::default(),
             relocate_state: Arc::new(RwLock::new(None)),
             event_tx,
-            elder_handover: Arc::new(RwLock::new(handover)),
+            handover_voting: Arc::new(RwLock::new(handover)),
             pending_split_sap_candidates: Arc::new(RwLock::new(BTreeMap::new())),
             joins_allowed: Arc::new(RwLock::new(true)),
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),

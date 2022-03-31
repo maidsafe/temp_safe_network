@@ -61,6 +61,16 @@ impl serde::Serialize for SectionAuthorityProvider {
     }
 }
 
+impl<'de> serde::Deserialize<'de> for SectionAuthorityProvider {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        // Deserialize as `SectionAuthorityProviderMsg`
+        Ok(SectionAuthorityProviderMsg::deserialize(deserializer)?.into_state())
+    }
+}
+
 impl SectionAuthorityProvider {
     /// Creates a new `SectionAuthorityProvider` with the given members, prefix and public keyset.
     pub(crate) fn new<E, M>(elders: E, prefix: Prefix, members: M, pk_set: PublicKeySet) -> Self
