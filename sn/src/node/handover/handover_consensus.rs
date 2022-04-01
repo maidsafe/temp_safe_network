@@ -8,17 +8,18 @@ use sn_consensus::consensus::{Consensus, VoteResponse};
 use sn_consensus::vote::{Ballot, SignedVote, Vote};
 use sn_consensus::NodeId;
 
+use crate::messaging::system::SectionAuth;
 use super::errors::{Error, Result};
 use crate::node::SectionAuthorityProvider;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Serialize, Deserialize)]
 pub enum SapCandidate {
-    ElderHandover(SectionAuthorityProvider),
-    SectionSplit(SectionAuthorityProvider, SectionAuthorityProvider),
+    ElderHandover(SectionAuth<SectionAuthorityProvider>),
+    SectionSplit(SectionAuth<SectionAuthorityProvider>, SectionAuth<SectionAuthorityProvider>),
 }
 
 #[derive(Debug, Clone)]
-pub struct Handover {
+pub(crate) struct Handover {
     pub(crate) consensus: Consensus<SapCandidate>,
     pub(crate) section_prefix: Prefix,
 }
@@ -107,7 +108,7 @@ impl Handover {
             .try_for_each(|prop| self.validate_proposal(prop))
     }
 
-    pub(crate) fn check_candidates_validity(&self, sap: &SectionAuthorityProvider) -> Result<()> {
+    pub(crate) fn check_candidates_validity(&self, sap: &SectionAuth<SectionAuthorityProvider>) -> Result<()> {
         // check that the candidates are the oldest in their membership gen
         // NB TODO check that the sap is valid (either latest candidates or in recent history)
         if true {
