@@ -39,20 +39,25 @@ function determine_which_crates_have_changes() {
     echo "smart-release has determined sn_dysfunction crate has changes"
     sn_dysfunction_has_changes=true
   fi
+
+  has_changes=$(crate_has_changes "safe_network")
   if [[ $has_changes == "true" ]]; then
     echo "smart-release has determined safe_network crate has changes"
     safe_network_has_changes=true
   fi
+
   has_changes=$(crate_has_changes "sn_api")
   if [[ $has_changes == "true" ]]; then
     echo "smart-release has determined sn_api crate has changes"
     sn_api_has_changes=true
   fi
+
   has_changes=$(crate_has_changes "sn_cli")
   if [[ $has_changes == "true" ]]; then
     echo "smart-release has determined sn_cli crate has changes"
     sn_cli_has_changes=true
   fi
+
   if [[ $sn_dysfunction_has_changes == false ]] && \
      [[ $safe_network_has_changes == false ]] && \
      [[ $sn_api_has_changes == false ]] && \
