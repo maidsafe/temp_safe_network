@@ -8,11 +8,15 @@
 
 use tracing::warn;
 use sn_consensus::SignedVote;
+use std::collections::BTreeSet;
 
-use crate::messaging::system::{NodeState as NodeStateMsg, SystemMsg};
+use crate::messaging::system::SystemMsg;
 use crate::node::{
-    api::cmds::Cmd, core::Node, handover::SapCandidate, network_knowledge::NodeState, Result,
+    api::cmds::Cmd, core::Node, handover::SapCandidate, Result, core::Proposal,
 };
+use crate::types::log_markers::LogMarker;
+use crate::messaging::system::SectionAuth;
+use crate::node::SectionAuthorityProvider;
 
 impl Node {
     /// Make a handover consensus proposal vote for a sap candidate
@@ -23,6 +27,7 @@ impl Node {
                 let mut vs = handover_voting_state.clone();
                 let vote = vs.propose(sap_candidates)?;
                 *wlock = Some(vs);
+                debug!(">>> {}: {:?}", LogMarker::HandoverConsensusTrigger, &vote);
                 Ok(self.broadcast_handover_vote_msg(vote).await)
             },
             None => {
@@ -47,5 +52,47 @@ impl Node {
                 vec![]
             }
         }
+    }
+
+    /// Broadcast the decision of the terminated handover consensus by proposing the NewElders list
+    /// for last confirmation and signature by the current elders
+    #[instrument(skip(self), level = "trace")]
+    pub(crate) async fn broadcast_handover_decision(&self, candidates_sap: SapCandidate) -> Vec<Cmd> {
+        match candidates_sap {
+            SapCandidate::ElderHandover(sap) => {
+                // NB TODO make sure this error has to be swallowed
+                self.propose_new_elders(sap).await.unwrap_or_else(|e| {error!("Failed to propose new elders {}", e); vec![]})
+            },
+            SapCandidate::SectionSplit(sap1, sap2) => {
+                let mut prop1 = self.propose_new_elders(sap1).await.unwrap_or_else(|e| {error!("Failed to propose new elders {}", e); vec![]});
+                let mut prop2 = self.propose_new_elders(sap2).await.unwrap_or_else(|e| {error!("Failed to propose new elders {}", e); vec![]});
+                prop1.append(&mut prop2);
+                prop1
+            },
+        }
+    }
+
+    /// Helper function to propose a NewElders list to sign from a SAP
+    async fn propose_new_elders(&self, sap: SectionAuth<SectionAuthorityProvider>) -> Result<Vec<Cmd>> {
+        let saps_candidates = self
+            .network_knowledge
+            .promote_and_demote_elders(&self.info.read().await.name(), &BTreeSet::new())
+            .await;
+
+        if !saps_candidates.contains(&sap.elder_candidates()) {
+            // candidates_sap out of date, ignore.
+            return Ok(vec![]);
+        }
+
+        // Send the `NewElders` proposal to all of the to-be-Elders so it's aggregated by them.
+        let proposal = Proposal::NewElders(sap);
+        let proposal_recipients = saps_candidates
+            .iter()
+            .flat_map(|info| info.elders())
+            .cloned()
+            .collect();
+
+        self.send_proposal(proposal_recipients, proposal)
+        .await
     }
 }
