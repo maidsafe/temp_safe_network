@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.58.11 (2022-04-01)
+
+### New Features
+
+ - <csr-id-951d1bd87490ad8b3c3747cba952424416da013f/> watch status of individual msgs
+ - <csr-id-20c33249fceea1c3d085de048f13388187a77ea5/> individual send rates
+
+### Bug Fixes
+
+ - <csr-id-14725d0353d797b9437033781e8ff295a7eacc34/> allow update message pass through
+ - <csr-id-bd488cbc9d24324bec730f85bdcebccaec2e75c4/> exclude suspects from current
+ - <csr-id-bbd6a2370a809a4d23a1df0a813cac2809e06690/> bump node suspicion event prio
+ - <csr-id-63c5deae1a4c31c681c019846da95105c0ef7733/> improve success rate
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 12 commits contributed to the release over the course of 2 calendar days.
+ - 5 days passed between releases.
+ - 11 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_cli-0.51.1 ([`0a71914`](https://github.com/maidsafe/safe_network/commit/0a719147ae567b41ba2fcbf4c3c0b44e6d1955d1))
+    - only log SendSus once per batch ([`03258b3`](https://github.com/maidsafe/safe_network/commit/03258b3777644de7799e9563df35afc5e8531be2))
+    - run 40mb test as normal ([`c45f6e3`](https://github.com/maidsafe/safe_network/commit/c45f6e362257ba9378547a8f1fd508a5e680cb0a))
+    - allow update message pass through ([`14725d0`](https://github.com/maidsafe/safe_network/commit/14725d0353d797b9437033781e8ff295a7eacc34))
+    - chore(release): ([`391c546`](https://github.com/maidsafe/safe_network/commit/391c546158135cbd3b2c9e5a1a64e58a1bb8e392))
+    - exclude suspects from current ([`bd488cb`](https://github.com/maidsafe/safe_network/commit/bd488cbc9d24324bec730f85bdcebccaec2e75c4))
+    - debug promotion, rename workflow ([`c8f4eed`](https://github.com/maidsafe/safe_network/commit/c8f4eed0406253cc4c253292bc82e7320fdcbf70))
+    - bump node suspicion event prio ([`bbd6a23`](https://github.com/maidsafe/safe_network/commit/bbd6a2370a809a4d23a1df0a813cac2809e06690))
+    - improve success rate ([`63c5dea`](https://github.com/maidsafe/safe_network/commit/63c5deae1a4c31c681c019846da95105c0ef7733))
+    - watch status of individual msgs ([`951d1bd`](https://github.com/maidsafe/safe_network/commit/951d1bd87490ad8b3c3747cba952424416da013f))
+    - individual send rates ([`20c3324`](https://github.com/maidsafe/safe_network/commit/20c33249fceea1c3d085de048f13388187a77ea5))
+    - use msgs per s ([`3dac350`](https://github.com/maidsafe/safe_network/commit/3dac350598f863fc3d66669c9f8789db51573b96))
+</details>
+
 ## v0.58.10 (2022-03-31)
 
 ### New Features
@@ -18,35 +62,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-bbd6a2370a809a4d23a1df0a813cac2809e06690/> bump node suspicion event prio
  - <csr-id-63c5deae1a4c31c681c019846da95105c0ef7733/> improve success rate
  - <csr-id-14725d0353d797b9437033781e8ff295a7eacc34/> allow update message pass through
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 11 commits contributed to the release over the course of 2 calendar days.
- - 4 days passed between releases.
- - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - only log SendSus once per batch ([`03258b3`](https://github.com/maidsafe/safe_network/commit/03258b3777644de7799e9563df35afc5e8531be2))
-    - run 40mb test as normal ([`c45f6e3`](https://github.com/maidsafe/safe_network/commit/c45f6e362257ba9378547a8f1fd508a5e680cb0a))
-    - allow update message pass through ([`14725d0`](https://github.com/maidsafe/safe_network/commit/14725d0353d797b9437033781e8ff295a7eacc34))
-    - chore(release): ([`391c546`](https://github.com/maidsafe/safe_network/commit/391c546158135cbd3b2c9e5a1a64e58a1bb8e392))
-    - exclude suspects from current ([`bd488cb`](https://github.com/maidsafe/safe_network/commit/bd488cbc9d24324bec730f85bdcebccaec2e75c4))
-    - debug promotion, rename workflow ([`c8f4eed`](https://github.com/maidsafe/safe_network/commit/c8f4eed0406253cc4c253292bc82e7320fdcbf70))
-    - bump node suspicion event prio ([`bbd6a23`](https://github.com/maidsafe/safe_network/commit/bbd6a2370a809a4d23a1df0a813cac2809e06690))
-    - improve success rate ([`63c5dea`](https://github.com/maidsafe/safe_network/commit/63c5deae1a4c31c681c019846da95105c0ef7733))
-    - watch status of individual msgs ([`951d1bd`](https://github.com/maidsafe/safe_network/commit/951d1bd87490ad8b3c3747cba952424416da013f))
-    - individual send rates ([`20c3324`](https://github.com/maidsafe/safe_network/commit/20c33249fceea1c3d085de048f13388187a77ea5))
-    - use msgs per s ([`3dac350`](https://github.com/maidsafe/safe_network/commit/3dac350598f863fc3d66669c9f8789db51573b96))
-</details>
 
 ## v0.58.9 (2022-03-26)
 
