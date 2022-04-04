@@ -11,9 +11,9 @@ use crate::node::{
     api::cmds::Cmd,
     core::{relocation::ChurnId, Node, Proposal},
     dkg::SectionAuthUtils,
+    handover::SapCandidate,
     network_knowledge::{NodeState, SectionAuthorityProvider},
     Event, Result, MIN_ADULT_AGE,
-    handover::SapCandidate,
 };
 use crate::types::log_markers::LogMarker;
 
@@ -164,7 +164,9 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         // check if section matches our prefix
         let matches_prefix = section_auth.prefix() == self.network_knowledge.prefix().await;
-        let is_extension_prefix = section_auth.prefix().is_extension_of(&self.network_knowledge.prefix().await);
+        let is_extension_prefix = section_auth
+            .prefix()
+            .is_extension_of(&self.network_knowledge.prefix().await);
         if !matches_prefix && !is_extension_prefix {
             // Other section. We shouln't be receiving or updating a SAP for
             // a remote section here, that is done with a AE msg response.
@@ -172,7 +174,7 @@ impl Node {
                 "Ignoring Proposal::SectionInfo since prefix doesn't match ours: {:?}",
                 section_auth
             );
-            return Ok(vec![])
+            return Ok(vec![]);
         }
         debug!(
             "Updating section info for our prefix: {:?}",
@@ -199,8 +201,13 @@ impl Node {
         // handle regular elder handover (1 to 1)
         // trigger handover consensus among elders
         if matches_prefix {
-            debug!("Propose elder handover to: {:?}", signed_section_auth.prefix());
-            return self.propose_handover_consensus(SapCandidate::ElderHandover(signed_section_auth)).await
+            debug!(
+                "Propose elder handover to: {:?}",
+                signed_section_auth.prefix()
+            );
+            return self
+                .propose_handover_consensus(SapCandidate::ElderHandover(signed_section_auth))
+                .await;
         }
 
         // manage pending split SAP candidates
@@ -213,8 +220,16 @@ impl Node {
 
         // handle section split (1 to 2)
         if let [(sap1, _sig1), (sap2, _sig2)] = chosen_candidates.as_slice() {
-            debug!("Propose section split handover to: {:?} {:?}", sap1.prefix(), sap2.prefix());
-            self.propose_handover_consensus(SapCandidate::SectionSplit(sap1.to_owned(), sap2.to_owned())).await
+            debug!(
+                "Propose section split handover to: {:?} {:?}",
+                sap1.prefix(),
+                sap2.prefix()
+            );
+            self.propose_handover_consensus(SapCandidate::SectionSplit(
+                sap1.to_owned(),
+                sap2.to_owned(),
+            ))
+            .await
         } else {
             debug!("Waiting for more split handover candidates");
             Ok(vec![])
