@@ -111,7 +111,7 @@ impl Handover {
     pub(crate) fn check_candidates_validity(&self, sap: &SectionAuth<SectionAuthorityProvider>) -> Result<()> {
         // check that the candidates are the oldest in their membership gen
         // NB TODO check that the sap is valid (either latest candidates or in recent history)
-        if true {
+        if sap == sap {
             Ok(())
         } else {
             Err(Error::InvalidSapCandidates)
