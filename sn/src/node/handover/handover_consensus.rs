@@ -8,14 +8,18 @@ use sn_consensus::consensus::{Consensus, VoteResponse};
 use sn_consensus::vote::{Ballot, SignedVote, Vote};
 use sn_consensus::NodeId;
 
-use crate::messaging::system::SectionAuth;
 use super::errors::{Error, Result};
+use crate::messaging::system::SectionAuth;
 use crate::node::SectionAuthorityProvider;
 
+#[allow(clippy::large_enum_variant)]
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Serialize, Deserialize)]
 pub enum SapCandidate {
     ElderHandover(SectionAuth<SectionAuthorityProvider>),
-    SectionSplit(SectionAuth<SectionAuthorityProvider>, SectionAuth<SectionAuthorityProvider>),
+    SectionSplit(
+        SectionAuth<SectionAuthorityProvider>,
+        SectionAuth<SectionAuthorityProvider>,
+    ),
 }
 
 #[derive(Debug, Clone)]
@@ -51,21 +55,22 @@ impl Handover {
         self.cast_vote(signed_vote)
     }
 
-    // Get someone up to speed on our view of the current votes
-    pub(crate) fn anti_entropy(&self) -> Result<Vec<SignedVote<SapCandidate>>> {
-        info!("[HDVR] anti-entropy from {:?}", self.id());
-
-        if let Some(decision) = self.consensus.decision.as_ref() {
-            let vote = self.consensus.build_super_majority_vote(
-                decision.votes.clone(),
-                decision.faults.clone(),
-                0,
-            )?;
-            Ok(vec![vote])
-        } else {
-            Ok(self.consensus.votes.values().cloned().collect())
-        }
-    }
+    // NB TODO do we need anti-entropy for handover? How do we trigger it?
+    // // Get someone up to speed on our view of the current votes
+    // pub(crate) fn anti_entropy(&self) -> Result<Vec<SignedVote<SapCandidate>>> {
+    //     info!("[HDVR] anti-entropy from {:?}", self.id());
+    //
+    //     if let Some(decision) = self.consensus.decision.as_ref() {
+    //         let vote = self.consensus.build_super_majority_vote(
+    //             decision.votes.clone(),
+    //             decision.faults.clone(),
+    //             0,
+    //         )?;
+    //         Ok(vec![vote])
+    //     } else {
+    //         Ok(self.consensus.votes.values().cloned().collect())
+    //     }
+    // }
 
     pub(crate) fn id(&self) -> NodeId {
         self.consensus.id()
@@ -75,6 +80,7 @@ impl Handover {
         &mut self,
         signed_vote: SignedVote<SapCandidate>,
     ) -> Result<VoteResponse<SapCandidate>> {
+        info!("[HDVR] {:?} handling vote: {:?}", self.id(), signed_vote);
         self.validate_proposals(&signed_vote)?;
 
         Ok(self.consensus.handle_signed_vote(signed_vote)?)
@@ -108,10 +114,13 @@ impl Handover {
             .try_for_each(|prop| self.validate_proposal(prop))
     }
 
-    pub(crate) fn check_candidates_validity(&self, sap: &SectionAuth<SectionAuthorityProvider>) -> Result<()> {
+    pub(crate) fn check_candidates_validity(
+        &self,
+        _sap: &SectionAuth<SectionAuthorityProvider>,
+    ) -> Result<()> {
         // check that the candidates are the oldest in their membership gen
         // NB TODO check that the sap is valid (either latest candidates or in recent history)
-        if sap == sap {
+        if true {
             Ok(())
         } else {
             Err(Error::InvalidSapCandidates)

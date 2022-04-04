@@ -8,8 +8,8 @@
 
 use sn_consensus::{SignedVote, VoteResponse};
 
-use crate::node::{api::cmds::Cmd, core::Node};
 use crate::node::handover::{Handover, SapCandidate};
+use crate::node::{api::cmds::Cmd, core::Node};
 use crate::types::log_markers::LogMarker;
 
 impl Node {
@@ -27,18 +27,18 @@ impl Node {
                     signed_vote
                 );
                 self.broadcast_handover_vote_msg(signed_vote).await
-            },
+            }
             Ok(VoteResponse::WaitingForMoreVotes) => {
                 trace!(
                     ">>> Handover Vote msg successfully handled, awaiting for more votes: {:?}",
                     signed_vote
                 );
                 vec![]
-            },
+            }
             Err(err) => {
                 error!(">>> Failed to handle handover Vote msg: {:?}", err);
                 vec![]
-            },
+            }
         }
     }
 
@@ -47,7 +47,11 @@ impl Node {
         &self,
         signed_vote: SignedVote<SapCandidate>,
     ) -> Vec<Cmd> {
-        debug!(">>> {}: {:?}", LogMarker::HandoverMsgToBeHandled, signed_vote);
+        debug!(
+            ">>> {}: {:?}",
+            LogMarker::HandoverMsgToBeHandled,
+            signed_vote
+        );
 
         let mut wlock = self.handover_voting.write().await;
         match &*wlock {
@@ -62,11 +66,11 @@ impl Node {
                 }
                 *wlock = Some(state);
                 cmds
-            },
+            }
             None => {
                 trace!(">>> Non-elder node unexpectedly received handover Vote msg, ignoring...");
                 vec![]
-            },
+            }
         }
     }
 }

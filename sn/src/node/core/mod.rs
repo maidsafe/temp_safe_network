@@ -30,9 +30,7 @@ use super::{
     api::cmds::Cmd,
     dkg::DkgVoter,
     handover::Handover,
-    network_knowledge::{
-        NetworkKnowledge, SectionKeyShare, SectionKeysProvider,
-    },
+    network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider},
     Elders, Event, NodeElderChange, NodeInfo,
 };
 

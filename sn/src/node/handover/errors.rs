@@ -40,5 +40,5 @@ pub enum Error {
 
     /// Consensus related errors and faults
     #[error("Consensus Error: {0}")]
-    ConsensusError(#[from] ConsensusError),
+    ConsensusFault(#[from] ConsensusError),
 }
