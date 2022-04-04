@@ -526,6 +526,7 @@ impl Node {
                     .await
             }
             SystemMsg::MembershipVote(vote) => self.handle_membership_vote(sender, vote).await,
+            SystemMsg::MembershipAE(gen) => self.handle_membership_anti_entropy(sender, gen).await,
             SystemMsg::Propose {
                 proposal,
                 sig_share,

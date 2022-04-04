@@ -111,7 +111,8 @@ impl MsgType {
                     | SystemMsg::JoinAsRelocatedRequest(_)
                     | SystemMsg::Propose { .. }
                     | SystemMsg::StartConnectivityTest(_)
-                    | SystemMsg::MembershipVote(_),
+                    | SystemMsg::MembershipVote(_)
+                    | SystemMsg::MembershipAE(_),
                 ..
             } => JOIN_RELOCATE_MSG_PRIORITY,
 

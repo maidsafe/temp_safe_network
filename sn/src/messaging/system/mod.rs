@@ -19,12 +19,12 @@ pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use node_msgs::{NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse};
 pub use node_state::{MembershipState, NodeState, RelocateDetails};
 pub use signed::{KeyedSig, SigShare};
-use sn_consensus::SignedVote;
 
 /// List of peers of a section
 pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
 
 use crate::messaging::{EndUser, MsgId, SectionAuthorityProvider};
+use crate::node::membership::{Generation, SignedVote};
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;
@@ -93,6 +93,8 @@ pub enum SystemMsg {
     Relocate(SectionAuth<NodeState>),
     /// Membership Vote
     MembershipVote(SignedVote<NodeState>),
+    /// Membership Anti-Entropy request
+    MembershipAE(Generation),
     /// Sent from a bootstrapping peer to the section requesting to join as a new member
     JoinRequest(Box<JoinRequest>),
     /// Response to a `JoinRequest`

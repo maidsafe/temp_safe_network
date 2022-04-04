@@ -18,7 +18,7 @@ mod dkg;
 mod ed25519;
 mod error;
 mod logging;
-mod membership;
+pub(crate) mod membership;
 mod messages;
 mod network_knowledge;
 

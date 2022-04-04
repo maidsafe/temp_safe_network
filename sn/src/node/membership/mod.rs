@@ -4,14 +4,13 @@ use bls_dkg::{PublicKeySet, SecretKeyShare};
 use core::fmt::Debug;
 use xor_name::{Prefix, XorName};
 
-use sn_consensus::{
-    Ballot, Consensus, Decision, Error, NodeId, Result, SignedVote, Vote, VoteResponse,
-};
+use sn_consensus::{Ballot, Consensus, Decision, Error, NodeId, Result, Vote};
+pub(crate) use sn_consensus::{SignedVote, VoteResponse};
 
 use super::{recommended_section_size, split, MIN_ADULT_AGE};
 use crate::messaging::system::{MembershipState, NodeState};
 
-type Generation = u64;
+pub(crate) type Generation = u64;
 
 #[derive(Debug, Clone)]
 pub(crate) struct Membership {
@@ -34,6 +33,10 @@ impl Membership {
             gen: 0,
             history: BTreeMap::default(),
         }
+    }
+
+    pub(crate) fn generation(&self) -> Generation {
+        self.gen
     }
 
     pub(crate) fn voters_public_key_set(&self) -> &PublicKeySet {
@@ -140,10 +143,7 @@ impl Membership {
         self.cast_vote(signed_vote)
     }
 
-    #[allow(dead_code)]
     pub(crate) fn anti_entropy(&self, from_gen: Generation) -> Result<Vec<SignedVote<NodeState>>> {
-        info!("[MBR] anti-entropy from gen {}", from_gen);
-
         let mut msgs = self
             .history
             .iter() // history is a BTreeSet, .iter() is ordered by generation
@@ -155,6 +155,13 @@ impl Membership {
 
         // include the current in-progres votes as well.
         msgs.extend(self.consensus.votes.values().cloned());
+
+        info!(
+            "Membership - anti-entropy from gen {}..{}: {} msgs",
+            from_gen,
+            self.gen,
+            msgs.len()
+        );
 
         Ok(msgs)
     }
@@ -212,7 +219,13 @@ impl Membership {
         prefix: &Prefix,
     ) -> Result<bool> {
         // ensure we have a consensus instance for this votes generations
-        let _ = self.consensus_at_gen(signed_vote.vote.gen)?;
+        if self.consensus_at_gen(signed_vote.vote.gen).is_err() {
+            error!(
+                "Membership - dropping signed vote from invalid gen {:?}",
+                signed_vote.vote.gen
+            );
+            return Ok(false);
+        }
 
         for proposal in signed_vote.proposals() {
             if !self.validate_node_state(proposal, signed_vote.vote.gen, prefix)? {
@@ -234,7 +247,6 @@ impl Membership {
 
         match split(prefix, members) {
             Some((zeros, ones)) => {
-                dbg!((prefix, zeros.len(), ones.len()));
                 match joining_name.bit(prefix.bit_count() as u8) {
                     // joining node would be part of the `ones` child section
                     true => ones.len() < split_section_size_cap,
@@ -290,6 +302,10 @@ impl Membership {
         prefix: &Prefix,
     ) -> Result<bool> {
         let name = node_state.name;
+        info!(
+            "Membership - validating node state for {name}, state {:?}",
+            node_state.state
+        );
 
         if !prefix.matches(&node_state.name) {
             warn!("Membership - rejecting node {name}, name doesn't match our prefix {prefix:?}");
