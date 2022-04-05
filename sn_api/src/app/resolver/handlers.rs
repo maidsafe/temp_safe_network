@@ -15,7 +15,6 @@ use crate::app::{
 use crate::{Error, Result};
 use bytes::Bytes;
 use log::{debug, warn};
-use safe_network::types::BytesAddress;
 use std::collections::BTreeSet;
 
 impl Safe {
@@ -254,8 +253,7 @@ impl Safe {
         };
 
         let data = if retrieve_data {
-            self.get_bytes(BytesAddress::Public(input_url.xorname()), range)
-                .await?
+            self.fetch_data(input_url, range).await?
         } else {
             Bytes::new()
         };
