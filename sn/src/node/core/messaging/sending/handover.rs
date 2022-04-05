@@ -55,8 +55,8 @@ impl Node {
         }
     }
 
-    /// Broadcast the decision of the terminated handover consensus by proposing the NewElders list
-    /// for last confirmation and signature by the current elders
+    /// Broadcast the decision of the terminated handover consensus by proposing the NewElders SAP
+    /// for signature by the current elders
     #[instrument(skip(self), level = "trace")]
     pub(crate) async fn broadcast_handover_decision(
         &self,
@@ -66,17 +66,17 @@ impl Node {
             SapCandidate::ElderHandover(sap) => {
                 // NB TODO make sure this error has to be swallowed
                 self.propose_new_elders(sap).await.unwrap_or_else(|e| {
-                    error!("Failed to propose new elders {}", e);
+                    error!("Failed to propose new elders: {}", e);
                     vec![]
                 })
             }
             SapCandidate::SectionSplit(sap1, sap2) => {
                 let mut prop1 = self.propose_new_elders(sap1).await.unwrap_or_else(|e| {
-                    error!("Failed to propose new elders {}", e);
+                    error!("Failed to propose new elders: {}", e);
                     vec![]
                 });
                 let mut prop2 = self.propose_new_elders(sap2).await.unwrap_or_else(|e| {
-                    error!("Failed to propose new elders {}", e);
+                    error!("Failed to propose new elders: {}", e);
                     vec![]
                 });
                 prop1.append(&mut prop2);

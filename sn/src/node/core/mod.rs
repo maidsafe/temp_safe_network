@@ -528,6 +528,29 @@ impl Node {
         Ok(())
     }
 
+    async fn initialize_handover(&self) -> Result<()> {
+        let key = self
+             .section_keys_provider
+             .key_share(&self.network_knowledge.section_key().await)
+             .await?;
+         let n_elders = self
+             .network_knowledge
+             .authority_provider()
+             .await
+             .elder_count();
+         let section_prefix = self.network_knowledge.prefix().await;
+
+         let mut handover_voting = self.handover_voting.write().await;
+         *handover_voting = Some(Handover::from(
+             (key.index as u8, key.secret_key_share),
+             key.public_key_set,
+             n_elders,
+             section_prefix,
+         ));
+
+         Ok(())
+     }
+
     async fn initialize_elder_state(&self) -> Result<()> {
         let sap = self
             .network_knowledge
@@ -536,7 +559,7 @@ impl Node {
             .value
             .to_msg();
         self.initialize_membership(sap).await?;
-        // TODO: self.initialize_handover(sap).await?;
+        self.initialize_handover(sap).await?;
         Ok(())
     }
 
@@ -578,6 +601,12 @@ impl Node {
                         self.promote_and_demote_elders_except(&BTreeSet::new())
                             .await?,
                     );
+
+                    // NB TODO make sure this in only called once (after handover)
+                    // and that it cannot interfere with the handover voting process as it resets the handover state completely
+                    // NB TODO we should keep a copy of old handover states (since they contain valuable information like who is faulty)
+                    // NB TODO non-elders should clear their handover_voting field and put None
+                    self.initialize_handover().await?;
 
                     // Whenever there is an elders change, casting a round of joins_allowed
                     // proposals to sync.
