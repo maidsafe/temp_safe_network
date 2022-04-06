@@ -292,15 +292,16 @@ impl NetworkKnowledge {
                 let mut we_have_a_share_of_this_key = false;
 
                 // lets find out if we should be an elder after the change
-                let mut we_are_an_adult = !self.is_elder(our_name).await;
+                let we_are_an_adult = !self.is_elder(our_name).await;
 
                 // check we should not be _becoming_ an elder
-                if we_are_an_adult {
-                    let we_should_become_an_elder = provided_sap.contains_elder(our_name);
-                    we_are_an_adult = we_should_become_an_elder
-                }
+                let we_should_become_an_elder = if we_are_an_adult {
+                    provided_sap.contains_elder(our_name)
+                } else {
+                    true
+                };
 
-                if !we_are_an_adult {
+                if !we_are_an_adult || we_should_become_an_elder {
                     we_have_a_share_of_this_key = section_keys_provider
                         .key_share(&signed_sap.section_key())
                         .await
@@ -308,12 +309,14 @@ impl NetworkKnowledge {
                 }
 
                 trace!(
-                    "we_are_an_adult: {we_are_an_adult},we_have_a_share_of_this_key{we_have_a_share_of_this_key}"
+                    "we_are_an_adult: {we_are_an_adult},we_have_a_share_of_this_key: {we_have_a_share_of_this_key}"
                 );
 
                 // if we're an adult, we accept the validated sap
                 // if we have a keyshare, we're an eder and we shoud continue with this validated sap
-                let switch_to_new_sap = we_are_an_adult || we_have_a_share_of_this_key;
+                // if we are an elder candidate, only switch to the new sap when have the key share
+                let switch_to_new_sap =
+                    we_have_a_share_of_this_key || (we_are_an_adult && !we_should_become_an_elder);
 
                 trace!(
                     "update_knowledge_if_valid: will switch_to_new_sap {:?}",
