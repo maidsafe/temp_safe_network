@@ -669,7 +669,10 @@ mod read_current_node_config {
 mod add_network {
     use super::{Config, NetworkInfo};
     use assert_fs::prelude::*;
-    use color_eyre::{eyre::eyre, Result};
+    use color_eyre::{
+        eyre::{bail, eyre},
+        Result,
+    };
     use predicates::prelude::*;
     use std::collections::BTreeSet;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -786,7 +789,7 @@ mod add_network {
         assert_eq!(network_name, "new_network");
         match network_info {
             NetworkInfo::NodeConfig(_) => {
-                eyre!("node config doesn't apply to this test");
+                bail!("node config doesn't apply to this test");
             }
             NetworkInfo::ConnInfoLocation(path) => {
                 assert_eq!(*path, node_config_file.path().display().to_string());
@@ -893,7 +896,7 @@ mod add_network {
         assert_eq!(network_name, "new_network");
         match network_info {
             NetworkInfo::NodeConfig(_) => {
-                eyre!("node config doesn't apply to this test");
+                bail!("node config doesn't apply to this test");
             }
             NetworkInfo::ConnInfoLocation(url) => {
                 assert_eq!(*url, String::from(url));
@@ -974,7 +977,7 @@ mod add_network {
                 assert_eq!(hex::encode(public_key.to_bytes()), genesis_key);
             }
             NetworkInfo::ConnInfoLocation(_) => {
-                eyre!("connection info doesn't apply to this test");
+                bail!("connection info doesn't apply to this test");
             }
         }
 
@@ -1050,7 +1053,7 @@ mod add_network {
                 assert_eq!(hex::encode(public_key.to_bytes()), genesis_key);
             }
             NetworkInfo::ConnInfoLocation(_) => {
-                eyre!("connection info doesn't apply to this test");
+                bail!("connection info doesn't apply to this test");
             }
         }
 

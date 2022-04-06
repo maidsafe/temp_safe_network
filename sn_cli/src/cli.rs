@@ -20,6 +20,7 @@ use crate::{
         nrs::nrs_commander,
         setup::setup_commander,
         update::update_commander,
+        wallet::wallet_commander,
         xorurl::{xorurl_commander, xorurl_of_files},
         OutputFmt, SubCommands,
     },
@@ -152,6 +153,7 @@ pub async fn run() -> Result<()> {
                 SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, &safe).await,
                 SubCommands::Files(cmd) => files_commander(cmd, output_fmt, &safe).await,
                 SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, &safe).await,
+                SubCommands::Wallet(cmd) => wallet_commander(cmd, output_fmt, &safe).await,
                 _ => Err(eyre!("Unknown safe subcommand")),
             }
         }

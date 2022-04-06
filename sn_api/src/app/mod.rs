@@ -14,6 +14,7 @@ pub mod multimap;
 pub mod nrs;
 pub mod register;
 pub mod resolver;
+pub mod wallet;
 
 pub use crate::safeurl::*;
 pub use consts::DEFAULT_XORURL_BASE;
