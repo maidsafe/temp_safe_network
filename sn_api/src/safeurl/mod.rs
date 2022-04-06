@@ -1854,7 +1854,7 @@ mod tests {
             "safe://hnyydy iixsfrqix9aoqg97jebuzc6748uc8rykhdd5hjrtg5o4xso9jmggbqh",
         )
         .expect_err(msg);
-        println!("{:#?}", result);
+
         match result {
             Error::InvalidInput(e) => assert!(e.contains("The URL cannot contain whitespace")),
             _ => bail!(wrong_err),

@@ -19,6 +19,7 @@ pub mod nrs;
 pub mod safe_id;
 pub mod setup;
 pub mod update;
+pub mod wallet;
 pub mod xorurl;
 
 use structopt::{clap::AppSettings, StructOpt};
@@ -114,6 +115,13 @@ pub enum SubCommands {
     )]
     /// Manage keys on the SAFE Network
     Keys(keys::KeysSubCommands),
+    #[structopt(
+        name = "wallet",
+        no_version,
+        global_settings(&[AppSettings::DisableVersion]),
+    )]
+    /// Manage wallets on the SAFE Network
+    Wallet(wallet::WalletSubCommands),
     /// Obtain the XOR-URL of data without uploading it to the network, or decode XOR-URLs
     Xorurl {
         /// subcommands
