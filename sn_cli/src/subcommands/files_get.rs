@@ -687,7 +687,7 @@ fn create_dir_all(dir_path: &Path) -> Result<()> {
 pub async fn files_get(safe: &Safe, url: &str, range: Range) -> Result<Vec<u8>> {
     match SafeUrl::from_url(url)?.data_type() {
         DataType::File => {
-            let bytes = safe.files_get_public(url, range).await?;
+            let bytes = safe.files_get(url, range).await?;
             Ok(bytes.chunk().to_vec())
         }
         _ => Err(eyre!("URL target is not immutable data")),

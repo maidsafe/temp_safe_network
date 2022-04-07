@@ -208,7 +208,7 @@ impl Safe {
 
         // Using the FilesMap XOR-URL we can now fetch the FilesMap and deserialise it
         let files_map_url = SafeUrl::from_xorurl(files_map_xorurl)?;
-        let serialised_files_map = self.fetch_public_data(&files_map_url, None).await?;
+        let serialised_files_map = self.fetch_data(&files_map_url, None).await?;
         let files_map = serde_json::from_slice(serialised_files_map.chunk()).map_err(|err| {
             Error::ContentError(format!(
                 "Couldn't deserialise the FilesMap stored in the FilesContainer: {:?}",
@@ -608,6 +608,25 @@ impl Safe {
         bytes: Bytes,
         media_type: Option<&str>,
     ) -> Result<XorUrl> {
+        self.store_bytes(bytes, media_type, Scope::Public).await
+    }
+
+    /// Store a private file
+    pub async fn store_private_bytes(
+        &self,
+        bytes: Bytes,
+        media_type: Option<&str>,
+    ) -> Result<XorUrl> {
+        self.store_bytes(bytes, media_type, Scope::Private).await
+    }
+
+    // Private helper to store a public/private file
+    async fn store_bytes(
+        &self,
+        bytes: Bytes,
+        media_type: Option<&str>,
+        scope: Scope,
+    ) -> Result<XorUrl> {
         let content_type = media_type.map_or_else(
             || Ok(ContentType::Raw),
             |media_type_str| {
@@ -627,11 +646,11 @@ impl Safe {
                 "Calculating network address for {} bytes of data",
                 bytes.len()
             );
-            Client::calculate_address(bytes, Scope::Public)?
+            Client::calculate_address(bytes, scope)?
         } else {
             debug!("Storing {} bytes of data", bytes.len());
             let client = self.get_safe_client()?;
-            let (address, _) = client.upload_and_verify(bytes, Scope::Public).await?;
+            let (address, _) = client.upload_and_verify(bytes, scope).await?;
             address
         };
         let xorurl = SafeUrl::encode_bytes(address, content_type, self.xorurl_base)?;
@@ -655,30 +674,30 @@ impl Safe {
     ///     assert_eq!(received_data, data);
     /// # });
     /// ```
-    pub async fn files_get_public(&self, url: &str, range: Range) -> Result<Bytes> {
+    pub async fn files_get(&self, url: &str, range: Range) -> Result<Bytes> {
         // TODO: do we want ownership from other PKs yet?
         let safe_url = self.parse_and_resolve_url(url).await?;
-        self.fetch_public_data(&safe_url, range).await
+        self.fetch_data(&safe_url, range).await
     }
 
-    /// Fetch an file from a SafeUrl without performing any type of URL resolution
-    pub(crate) async fn fetch_public_data(
-        &self,
-        safe_url: &SafeUrl,
-        range: Range,
-    ) -> Result<Bytes> {
-        match safe_url.data_type() {
-            DataType::File => {
+    /// Fetch a file from a SafeUrl without performing any type of URL resolution
+    pub(crate) async fn fetch_data(&self, safe_url: &SafeUrl, range: Range) -> Result<Bytes> {
+        match (safe_url.data_type(), safe_url.scope()) {
+            (DataType::File, Scope::Public) => {
                 self.get_bytes(BytesAddress::Public(safe_url.xorname()), range)
                     .await
             }
-            other => {
+            (DataType::File, Scope::Private) => {
+                self.get_bytes(BytesAddress::Private(safe_url.xorname()), range)
+                    .await
+            }
+            (other, _) => {
                 return Err(Error::ContentError(format!("{}", other)));
             }
         }
     }
 
-    pub async fn get_bytes(&self, address: BytesAddress, range: Range) -> Result<Bytes> {
+    async fn get_bytes(&self, address: BytesAddress, range: Range) -> Result<Bytes> {
         debug!("Attempting to fetch data from {:?}", address.name());
         let client = self.get_safe_client()?;
         let data = if let Some((start, end)) = range {
@@ -1334,7 +1353,7 @@ mod tests {
             .store_public_bytes(Bytes::from(random_content.to_owned()), None)
             .await?;
 
-        let retrieved = retry_loop!(safe.files_get_public(&file_xorurl, None));
+        let retrieved = retry_loop!(safe.files_get(&file_xorurl, None));
         assert_eq!(retrieved, random_content.as_bytes());
 
         Ok(())
