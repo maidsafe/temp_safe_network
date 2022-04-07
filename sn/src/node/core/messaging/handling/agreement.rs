@@ -149,8 +149,10 @@ impl Node {
         sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
+        // return Ok(cmds);
         let signature = sig.signature.clone();
 
+        // cmds.extend(self.propose_membership_change(node_state.to_msg()).await?);
         let signed_node_state = SectionAuth {
             value: node_state.clone(),
             sig,

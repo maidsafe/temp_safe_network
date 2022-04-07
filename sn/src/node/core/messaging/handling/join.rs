@@ -25,28 +25,6 @@ const FIRST_SECTION_MIN_ELDER_AGE: u8 = 90;
 
 // Message handling
 impl Node {
-    async fn propose_membership_join(&self, node_state: NodeState) -> Result<Vec<Cmd>> {
-        info!("Proposing membership join");
-        let prefix = self.network_knowledge.prefix().await;
-        if let Some(membership) = self.membership.write().await.as_mut() {
-            let membership_vote = match membership.propose(node_state, &prefix) {
-                Ok(vote) => vote,
-                Err(e) => {
-                    error!("Error while proposing node join: {e:?}");
-                    return Ok(vec![]);
-                }
-            };
-
-            let cmds = self
-                .send_msg_to_our_elders(SystemMsg::MembershipVote(membership_vote))
-                .await?;
-            Ok(vec![cmds])
-        } else {
-            error!("Failed to propose membership join, no membership instance");
-            Ok(vec![])
-        }
-    }
-
     pub(crate) async fn handle_join_request(
         &self,
         peer: Peer,
@@ -70,7 +48,7 @@ impl Node {
                 state: MembershipState::Joined,
                 previous_name: None,
             };
-            return self.propose_membership_join(node_state).await;
+            return self.propose_membership_change(node_state).await;
         }
 
         let our_section_key = self.network_knowledge.section_key().await;
@@ -282,18 +260,6 @@ impl Node {
             return Ok(vec![]);
         }
 
-        if self
-            .network_knowledge
-            .is_relocated_to_our_section(&relocate_details.previous_name)
-            .await
-        {
-            debug!(
-                "Ignoring JoinAsRelocatedRequest from {} - original node {:?} already relocated to us.",
-                peer, relocate_details.previous_name
-            );
-            return Ok(vec![]);
-        }
-
         // Finally do reachability check
         if self.comm.is_reachable(&peer.addr()).await.is_err() {
             let node_msg = SystemMsg::JoinAsRelocatedResponse(Box::new(
@@ -308,7 +274,7 @@ impl Node {
             ]);
         };
 
-        self.propose_membership_join(join_request.relocate_proof.value)
+        self.propose_membership_change(join_request.relocate_proof.value)
             .await
     }
 }

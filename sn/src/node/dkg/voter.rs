@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
+use crate::{messaging::{
     system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
     DstLocation, WireMsg,
-};
+}, node::network_knowledge::NodeState};
 use crate::node::{
     api::cmds::Cmd,
     dkg::session::Session,
@@ -63,6 +63,7 @@ impl DkgVoter {
         session_id: DkgSessionId,
         elder_candidates: ElderCandidates,
         section_pk: BlsPublicKey,
+	bootstrap_members: BTreeSet<NodeState>
     ) -> Result<Vec<Cmd>> {
         if self.sessions.contains_key(&session_id) {
             trace!(
@@ -91,13 +92,14 @@ impl DkgVoter {
             let section_auth = SectionAuthorityProvider::from_elder_candidates(
                 elder_candidates,
                 secret_key_set.public_keys(),
+		bootstrap_members
             );
             return Ok(vec![Cmd::HandleDkgOutcome {
                 section_auth,
                 outcome: SectionKeyShare {
                     public_key_set: secret_key_set.public_keys(),
                     index: participant_index,
-                    secret_key_share: secret_key_set.secret_key_share(0),
+                    secret_key_share: secret_key_set.secret_key_share(0u64),
                 },
             }]);
         }
@@ -113,8 +115,9 @@ impl DkgVoter {
                     key_gen,
                     elder_candidates,
                     participant_index,
+		    bootstrap_members,
                     timer_token: 0,
-                    failures: DkgFailureSigSet::default(),
+                    failures: DkgFailureSigSet::from(session_id.clone()),
                     complete: false,
                 };
 
@@ -127,7 +130,7 @@ impl DkgVoter {
                     warn!("DKG already in progress for {:?}", session_id);
                     return Ok(vec![]);
                 } else {
-                    let _prev = self.sessions.insert(session_id, session);
+                    let _prev = self.sessions.insert(session_id.clone(), session);
                 }
 
                 // Remove unneeded old sessions.
@@ -190,7 +193,7 @@ impl DkgVoter {
             );
 
             let node_msg = SystemMsg::DkgSessionUnknown {
-                session_id: *session_id,
+                session_id: session_id.clone(),
                 message,
             };
             let wire_msg = WireMsg::single_src(
@@ -233,13 +236,13 @@ impl DkgVoter {
     pub(crate) async fn handle_dkg_history(
         &self,
         node: &NodeInfo,
-        session_id: DkgSessionId,
+        session_id: &DkgSessionId,
         message_history: Vec<DkgMessage>,
         sender: XorName,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
         if let Some(mut session) = self.sessions.get_mut(&session_id) {
-            session.handle_dkg_history(node, session_id, message_history, section_pk)
+            session.handle_dkg_history(node, &session_id, message_history, section_pk)
         } else {
             warn!(
                 "Recieved DKG message cache from {} without an active DKG session: {:?}",

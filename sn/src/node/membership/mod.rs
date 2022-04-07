@@ -183,10 +183,19 @@ impl Membership {
         let vote_gen = signed_vote.vote.gen;
 
         let consensus = self.consensus_at_gen_mut(vote_gen)?;
+
+        info!(
+            "Membership - accepted signed vote from voter {:?}",
+            signed_vote.voter
+        );
         let vote_response = consensus.handle_signed_vote(signed_vote)?;
 
         if let Some(decision) = consensus.decision.clone() {
             if vote_gen == self.gen + 1 {
+                info!(
+                    "Membership - decided {:?}",
+                    BTreeSet::from_iter(decision.proposals.keys())
+                );
                 let next_consensus = Consensus::from(
                     self.consensus.secret_key.clone(),
                     self.consensus.elders.clone(),
@@ -247,6 +256,11 @@ impl Membership {
 
         match split(prefix, members) {
             Some((zeros, ones)) => {
+                info!(
+                    "Membership - Section {prefix:?} would split into {} zero and {} one nodes",
+                    zeros.len(),
+                    ones.len()
+                );
                 match joining_name.bit(prefix.bit_count() as u8) {
                     // joining node would be part of the `ones` child section
                     true => ones.len() < split_section_size_cap,
@@ -269,13 +283,22 @@ impl Membership {
         }
     }
 
+    fn is_relocated_to_our_section(&self, name: &XorName) -> bool {
+        self.history
+            .values()
+            .flat_map(|(decision, _)| decision.proposals.keys())
+            .any(|node_state| {
+                node_state.clone().into_state().previous_name().as_ref() == Some(name)
+            })
+    }
+
     fn validate_relocation_details(&self, node_state: &NodeState, prefix: &Prefix) -> bool {
         let name = node_state.name;
         if let MembershipState::Relocated(details) = &node_state.state {
             let dest = details.dst;
 
             if !prefix.matches(&dest) {
-                debug!(
+                info!(
 		    "Membership - Ignoring relocate request from {name} - {dest} doesn't match our prefix {prefix:?}."
 		);
                 return false;
@@ -285,9 +308,15 @@ impl Membership {
             let age = details.age;
             let state_age = node_state.age();
             if age != state_age {
-                debug!(
-		    "Membership - Ignoring JoinAsRelocatedRequest from {name} - relocation age ({age}) doesn't match peer's age ({state_age})."
+                info!(
+		    "Membership - Ignoring relocation req from {name} - relocation age ({age}) doesn't match peer's age ({state_age})."
 		);
+                return false;
+            }
+
+            let prev_name = &details.previous_name;
+            if self.is_relocated_to_our_section(prev_name) {
+                info!("Membership - Ignoring relocation req from {name} - original node {prev_name:?} already relocated to us.");
                 return false;
             }
         }
