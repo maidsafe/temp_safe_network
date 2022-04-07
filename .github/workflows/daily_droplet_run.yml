@@ -157,6 +157,16 @@ jobs:
           ssh-secret-key: ${{ secrets.SSH_SECRET_KEY  }}
           node-count: ${{ github.event.inputs.node-count || 15 }}
           node-path: /tmp/sn_node
+      # The other jobs in the workflow have the testnet launch as a dependency, but they go ahead
+      # even if this job fails. It would be better if the whole workflow is abandoned if we don't
+      # have a testnet to run the tests against.
+      - name: cancel workflow if testnet launch fails
+        uses: vishnudxb/cancel-workflow@v1.2
+        if: failure()
+        with:
+          repo: octocat/hello-world
+          workflow_id: ${{ github.run_id }}
+          access_token: ${{ github.token }}
 
   client:
     name: client tests
