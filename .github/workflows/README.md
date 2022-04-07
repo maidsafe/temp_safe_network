@@ -48,3 +48,58 @@ For Windows, the process is similar, but requires some additional setup.
 - Use `self-hosted-windows` in the `runs-on` field.
 - Use lionel1704/toolchain instead of actions-rs/toolchain. (until https://github.com/actions-rs/core/pull/216 is resolved)
 - Add `shell: bash` to job steps with `run: ...` (Powershell is used by default so notations like `&&` and `./some_binary` are not supported.
+
+## Adding New Crates to the Release Process
+
+When a new crate is added to the workspace, it will either require publishing, or it will be an
+internal crate. If it's the former, the crate will need to be incorporated into the release process.
+To do so, follow these steps:
+
+* Perform the first publish of the new crate manually:
+    - Create the first CHANGELOG.md for the crate by copying one of the other ones: just put a
+      manual entry at the top and delete all the other content from the file you copied.
+    - Make sure the new crate has a README.md, even if it just has one sentence in it. You can't
+      publish without it.
+    - Run `cd <crate_name> && cargo publish --dry-run` to make sure the crate would be eligible for
+      publishing. If it has any errors, fix them until you can get the dry run to pass.
+    - Create a PR to merge in the new crate along with the new CHANGELOG and README.
+    - Get that PR merged into `main`.
+    - Tag the `main` branch using `crate_name-version_number`, e.g., `sn_dysfunction-0.1.0` and push
+      that tag.
+    - Run `cd <crate_name> && cargo publish` from `main`.
+* If the new crate is a binary we want to release:
+    - Update the `Makefile` as follows:
+        + Update the `gha-build-x86_64-unknown-linux-musl` target to include the new binary
+        + Update the `release-build` target to include the new binary
+        + Create new `x-package-version-artifacts-for-release` target for the new binary
+    - Update the `gh_release` job in the `release.yml` workflow:
+        + Update the step to call the new packaging target along with the other ones
+        + Add new steps for uploading the new binary to S3 by copying the other ones
+* Output the version info for the new crate by updating `output_versioning_info.sh`. Update all the
+  functions to include the new crate in the same fashion as the other ones.
+* Include the crate in version bumping by updating `bump_version.sh`. Update all the functions to
+  include the new crate in the same fashion as the other ones.
+* Include the crate in the CHANGELOG for the Github Release:
+    - Update `get_release_description.sh`:
+        + Add a changelog section for the new crate.
+        + If the crate is a binary:
+            + Include the new checksums
+            + Extend the script to pass the version number of the new binary and update the call to
+              the script in the `gh_release` job
+    - Update `insert_changelog_entry.py` to include the new crate in the same fashion as the other
+      ones.
+    - Update the `gh_release` job to add the new version number when `insert_changelog_entry.py`
+      is called.
+* Include the crate in the publishing process by adding a new `publish_x` job to the `release.yml`
+  workflow. Copy one of the other jobs. Note that order is significant in the publishing process. If
+  the crate being added has dependencies, the new job must run after the dependent crates have been
+  published. Any crate with dependencies uses the `publish_crate.sh` script to check if the
+  dependent crate has been published on crates.io. Make sure you update your newly added job to
+  reference the correct dependent crate. No changes should be required for the publishing script
+  itself.
+
+Unfortunately it's quite hard to test the changes without actually running the release process, so
+it will probably take a few commits and release cycles before it works properly.
+
+The initial manual publish is required for getting `smart-release` to work properly with the newly
+added crate.
