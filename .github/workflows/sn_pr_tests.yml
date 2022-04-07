@@ -144,10 +144,22 @@ jobs:
           test-run-name: unit-tests-${{ matrix.os }}
           profile: ci
           junit-path: junit.xml
+          package: sn_interface
+          release: true
+          features: test-utils
+          filters: "messaging prefix_map types"
+
+      - name: Run node unit tests
+        timeout-minutes: 15
+        uses: jacderida/cargo-nextest@main
+        with:
+          test-run-name: unit-tests-${{ matrix.os }}
+          profile: ci
+          junit-path: junit.xml
           package: safe_network
           release: true
           features: test-utils
-          filters: "dbs messaging node prefix_map routing types"
+          filters: "dbs node routing"
 
       - name: Run CLI unit tests
         uses: jacderida/cargo-nextest@main
