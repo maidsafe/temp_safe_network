@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId};
+use crate::messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, NodeState};
 use crate::node::{
     ed25519::{self, Digest256, Keypair, Verifier},
     network_knowledge::ElderCandidates,
@@ -16,12 +16,13 @@ use std::collections::BTreeSet;
 use tiny_keccak::{Hasher, Sha3};
 use xor_name::XorName;
 
+// TODO: remove all of these traits
 pub(crate) trait DkgSessionIdUtils {
-    fn new(elder_candidates: &ElderCandidates, generation: u64) -> Self;
+    fn new(elder_candidates: &ElderCandidates, generation: u64, bootstrap_members: BTreeSet<NodeState>) -> Self;
 }
 
 impl DkgSessionIdUtils for DkgSessionId {
-    fn new(elder_candidates: &ElderCandidates, generation: u64) -> Self {
+    fn new(elder_candidates: &ElderCandidates, generation: u64, bootstrap_members: BTreeSet<NodeState>) -> Self {
         // Calculate the hash without involving serialization to avoid having to return `Result`.
         let mut hasher = Sha3::v256();
         let mut hash = Digest256::default();
@@ -34,7 +35,7 @@ impl DkgSessionIdUtils for DkgSessionId {
         hasher.update(&elder_candidates.prefix().bit_count().to_le_bytes());
         hasher.finalize(&mut hash);
 
-        Self { hash, generation }
+        Self { hash, generation, bootstrap_members }
     }
 }
 
@@ -42,7 +43,7 @@ pub(crate) trait DkgFailureSigUtils {
     fn new(
         keypair: &Keypair,
         failed_participants: &BTreeSet<XorName>,
-        dkg_key: &DkgSessionId,
+        dkg_key: DkgSessionId,
     ) -> Self;
 
     fn verify(&self, dkg_key: &DkgSessionId, failed_participants: &BTreeSet<XorName>) -> bool;
@@ -52,11 +53,12 @@ impl DkgFailureSigUtils for DkgFailureSig {
     fn new(
         keypair: &Keypair,
         failed_participants: &BTreeSet<XorName>,
-        dkg_key: &DkgSessionId,
+        session_id: DkgSessionId,
     ) -> Self {
         DkgFailureSig {
             public_key: keypair.public,
-            signature: ed25519::sign(&hashed_failure(dkg_key, failed_participants), keypair),
+            signature: ed25519::sign(&hashed_failure(&session_id, failed_participants), keypair),
+	    session_id
         }
     }
 
@@ -71,7 +73,7 @@ pub(crate) trait DkgFailureSigSetUtils {
 
     fn has_agreement(&self, elder_candidates: &ElderCandidates) -> bool;
 
-    fn verify(&self, elder_candidates: &ElderCandidates, generation: u64) -> bool;
+    fn verify(&self, elder_candidates: &ElderCandidates, generation: u64, bootstrap_members: BTreeSet<NodeState>) -> bool;
 }
 
 impl DkgFailureSigSetUtils for DkgFailureSigSet {
@@ -99,9 +101,9 @@ impl DkgFailureSigSetUtils for DkgFailureSigSet {
         has_failure_agreement(elder_candidates.len(), self.sigs.len())
     }
 
-    fn verify(&self, elder_candidates: &ElderCandidates, generation: u64) -> bool {
+    fn verify(&self, elder_candidates: &ElderCandidates, generation: u64, bootstrap_members: BTreeSet<NodeState>) -> bool {
         let hash = hashed_failure(
-            &DkgSessionId::new(elder_candidates, generation),
+            &DkgSessionId::new(elder_candidates, generation, bootstrap_members),
             &self.failed_participants,
         );
         let votes = self

@@ -72,6 +72,9 @@ impl Node {
             .retain(|existing_session_id, _| {
                 existing_session_id.generation >= session_id.generation
             });
+	let bootstrap_members = BTreeSet::from_iter(
+	    session_id.bootstrap_members.iter().cloned().map(|state_msg| state_msg.into_state())
+	);
         let cmds = self
             .dkg_voter
             .start(
@@ -79,6 +82,7 @@ impl Node {
                 session_id,
                 elder_candidates,
                 self.network_knowledge().section_key().await,
+		bootstrap_members
             )
             .await?;
         Ok(cmds)
@@ -139,7 +143,7 @@ impl Node {
 
     pub(crate) async fn handle_dkg_retry(
         &self,
-        session_id: DkgSessionId,
+        session_id: &DkgSessionId,
         message_history: Vec<DkgMessage>,
         message: DkgMessage,
         sender: Peer,
@@ -157,7 +161,7 @@ impl Node {
             .dkg_voter
             .handle_dkg_history(
                 &self.info.read().await.clone(),
-                session_id,
+                &session_id,
                 message_history,
                 sender.name(),
                 section_key,
@@ -209,7 +213,7 @@ impl Node {
             .promote_and_demote_elders(&self.info.read().await.name(), &BTreeSet::new())
             .await
             .into_iter()
-            .find(|elder_candidates| failure_set.verify(elder_candidates, generation))
+            .find(|elder_candidates| failure_set.verify(elder_candidates, generation, bootstrap_members))
         {
             elder_candidates
         } else {

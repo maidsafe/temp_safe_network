@@ -6,10 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
+use std::collections::BTreeSet;
+
+use crate::{messaging::{
     system::{DkgSessionId, SystemMsg},
     DstLocation, WireMsg,
-};
+}, node::membership::Generation};
 use crate::node::{
     api::cmds::Cmd, core::Node, dkg::DkgSessionIdUtils, messages::WireMsgUtils,
     network_knowledge::ElderCandidates, Result,
@@ -23,10 +25,19 @@ impl Node {
     pub(crate) async fn send_dkg_start(
         &self,
         elder_candidates: ElderCandidates,
+	membership_generation: Generation,
     ) -> Result<Vec<Cmd>> {
         let src_prefix = elder_candidates.prefix();
         let generation = self.network_knowledge.chain_len().await;
-        let session_id = DkgSessionId::new(&elder_candidates, generation);
+	let bootstrap_members = if let Some(m) = self.membership.read().await.as_ref() {
+	    // TODO: remove the unwrap
+	    BTreeSet::from_iter(m.section_node_states(membership_generation).unwrap().into_values())
+	} else {
+	    error!("DKG - no membership instance to read bootstrap members for");
+	    return Ok(vec![]);
+	};
+
+        let session_id = DkgSessionId::new(&elder_candidates, generation, bootstrap_members);
 
         // Send DKG start to all candidates
         let recipients: Vec<_> = elder_candidates.elders().cloned().collect();

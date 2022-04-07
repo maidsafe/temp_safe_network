@@ -17,6 +17,8 @@ use std::{
 };
 use xor_name::{Prefix, XorName};
 
+use super::system::NodeState;
+
 /// Details of section authority.
 ///
 /// A new `SectionAuthorityProvider` is created whenever the elders change, due to an elder being
@@ -29,6 +31,8 @@ pub struct SectionAuthorityProvider {
     pub public_key_set: PublicKeySet,
     /// The section's complete set of elders as a map from their name to their socket address.
     pub elders: BTreeMap<XorName, SocketAddr>,
+    /// The section members at the time of this elder churn.
+    pub members: BTreeMap<XorName, NodeState>,
 }
 
 impl Borrow<Prefix> for SectionAuthorityProvider {

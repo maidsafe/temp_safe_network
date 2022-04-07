@@ -759,7 +759,7 @@ fn create_first_section_authority_provider(
     peer: Peer,
 ) -> Result<SectionAuth<SectionAuthorityProvider>> {
     let section_auth =
-        SectionAuthorityProvider::new(iter::once(peer), Prefix::default(), pk_set.clone());
+        SectionAuthorityProvider::new(iter::once(peer), Prefix::default(), pk_set.clone(), vec![]);
     let sig = create_first_sig(pk_set, sk_share, &section_auth)?;
     Ok(SectionAuth::new(section_auth, sig))
 }

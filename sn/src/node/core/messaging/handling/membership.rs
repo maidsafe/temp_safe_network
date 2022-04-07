@@ -16,12 +16,40 @@ use std::vec;
 
 // Message handling
 impl Node {
+    pub(crate) async fn propose_membership_change(
+        &self,
+        node_state: NodeState,
+    ) -> Result<Vec<Cmd>> {
+        info!(
+            "Proposing membership change: {} - {:?}",
+            node_state.name, node_state.state
+        );
+        let prefix = self.network_knowledge.prefix().await;
+        if let Some(membership) = self.membership.write().await.as_mut() {
+            let membership_vote = match membership.propose(node_state, &prefix) {
+                Ok(vote) => vote,
+                Err(e) => {
+                    error!("Membership - Error while proposing change: {e:?}");
+                    return Ok(vec![]);
+                }
+            };
+
+            let cmds = self
+                .send_msg_to_our_elders(SystemMsg::MembershipVote(membership_vote))
+                .await?;
+            Ok(vec![cmds])
+        } else {
+            error!("Membership - Failed to propose membership change, no membership instance");
+            Ok(vec![])
+        }
+    }
+
     pub(crate) async fn handle_membership_vote(
         &self,
         peer: Peer,
         signed_vote: SignedVote<NodeState>,
     ) -> Result<Vec<Cmd>> {
-        debug!("Received membership vote {:?} from {}", signed_vote, peer);
+        debug!("Membership - Received vote {signed_vote:?} from {peer}");
 
         let cmds = if let Some(membership) = self.membership.write().await.as_mut() {
             let mut cmds = match membership
@@ -35,7 +63,7 @@ impl Node {
                 }
                 Ok(VoteResponse::WaitingForMoreVotes) => vec![],
                 Err(e) => {
-                    error!("Membership - Error while processing vote {:?}", e);
+                    error!("Membership - Error while processing vote {e:?}, requesting AE");
                     // We hit an error while processing this vote, perhaps we are missing information.
                     // We'll send a membership AE request to see if they can help us catch up.
                     let sap = self.network_knowledge.authority_provider().await;

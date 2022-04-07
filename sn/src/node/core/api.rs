@@ -193,12 +193,13 @@ impl Node {
         let our_name = self.info.read().await.name();
 
         debug!("{}", LogMarker::TriggeringPromotionAndDemotion);
+	// TODO: move `promote_and_demote_elders` to Membership
         for elder_candidates in self
             .network_knowledge
             .promote_and_demote_elders(&our_name, excluded_names)
             .await
         {
-            cmds.extend(self.send_dkg_start(elder_candidates).await?);
+            cmds.extend(self.send_dkg_start(elder_candidates, ).await?);
         }
 
         Ok(cmds)

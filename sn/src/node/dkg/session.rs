@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
+use crate::{messaging::{
     system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
     DstLocation, WireMsg,
-};
+}, node::network_knowledge::NodeState};
 use crate::node::{
     api::cmds::{next_timer_token, Cmd},
     dkg::dkg_msgs_utils::{DkgFailureSigSetUtils, DkgFailureSigUtils},
@@ -39,6 +39,7 @@ const DKG_PROGRESS_INTERVAL: Duration = Duration::from_secs(6);
 pub(crate) struct Session {
     pub(crate) elder_candidates: ElderCandidates,
     pub(crate) participant_index: usize,
+    pub(crate) bootstrap_members: BTreeSet<NodeState>,
     pub(crate) key_gen: KeyGen,
     pub(crate) timer_token: u64,
     pub(crate) failures: DkgFailureSigSet,
@@ -342,6 +343,7 @@ impl Session {
         let section_auth = SectionAuthorityProvider::from_elder_candidates(
             self.elder_candidates.clone(),
             outcome.public_key_set.clone(),
+	    self.bootstrap_members.clone()
         );
 
         let outcome = SectionKeyShare {
@@ -363,14 +365,14 @@ impl Session {
         failed_participants: BTreeSet<XorName>,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
-        let sig = DkgFailureSig::new(&node.keypair, &failed_participants, session_id);
+        let sig = DkgFailureSig::new(&node.keypair, &failed_participants, session_id.clone());
 
         if !self.failures.insert(sig, &failed_participants) {
             return Ok(vec![]);
         }
 
         let cmds = self
-            .check_failure_agreement()
+            .check_failure_agreement(session_id)
             .into_iter()
             .chain(iter::once({
                 let node_msg = SystemMsg::DkgFailureObservation {
@@ -419,7 +421,7 @@ impl Session {
             return None;
         }
 
-        self.check_failure_agreement()
+        self.check_failure_agreement(session_id)
     }
 
     pub(crate) fn get_cached_msgs(&self) -> Vec<DkgMessage> {
@@ -429,7 +431,7 @@ impl Session {
     pub(crate) fn handle_dkg_history(
         &mut self,
         node: &NodeInfo,
-        session_id: DkgSessionId,
+        session_id: &DkgSessionId,
         msg_history: Vec<DkgMessage>,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
@@ -456,11 +458,11 @@ impl Session {
         Ok(cmds)
     }
 
-    fn check_failure_agreement(&mut self) -> Option<Cmd> {
+    fn check_failure_agreement(&mut self, session_id: &DkgSessionId) -> Option<Cmd> {
         if self.failures.has_agreement(&self.elder_candidates) {
             self.complete = true;
 
-            Some(Cmd::HandleDkgFailure(mem::take(&mut self.failures)))
+            Some(Cmd::HandleDkgFailure(mem::replace(&mut self.failures, DkgFailureSigSet::from(session_id.clone()))))
         } else {
             None
         }

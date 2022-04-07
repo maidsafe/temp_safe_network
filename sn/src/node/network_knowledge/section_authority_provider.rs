@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::ElderCandidates;
+use super::{ElderCandidates, NodeState};
 
 use crate::messaging::{
     system::SectionAuth, SectionAuthorityProvider as SectionAuthorityProviderMsg,
@@ -30,6 +30,7 @@ pub struct SectionAuthorityProvider {
     prefix: Prefix,
     public_key_set: PublicKeySet,
     elders: BTreeSet<Peer>,
+    members: BTreeSet<NodeState>,
 }
 
 impl Display for SectionAuthorityProvider {
@@ -61,14 +62,16 @@ impl serde::Serialize for SectionAuthorityProvider {
 
 impl SectionAuthorityProvider {
     /// Creates a new `SectionAuthorityProvider` with the given members, prefix and public keyset.
-    pub(crate) fn new<I>(elders: I, prefix: Prefix, pk_set: PublicKeySet) -> Self
+    pub(crate) fn new<I, J>(elders: I, prefix: Prefix, pk_set: PublicKeySet, members: J) -> Self
     where
         I: IntoIterator<Item = Peer>,
+        J: IntoIterator<Item = NodeState>,
     {
         Self {
             prefix,
             public_key_set: pk_set,
             elders: elders.into_iter().collect(),
+            members: members.into_iter().collect(),
         }
     }
 
@@ -76,12 +79,14 @@ impl SectionAuthorityProvider {
     pub(crate) fn from_elder_candidates(
         elder_candidates: ElderCandidates,
         pk_set: PublicKeySet,
+        members: impl IntoIterator<Item = NodeState>,
     ) -> SectionAuthorityProvider {
-        SectionAuthorityProvider {
-            prefix: elder_candidates.prefix(),
-            public_key_set: pk_set,
-            elders: elder_candidates.elders().cloned().collect(),
-        }
+        SectionAuthorityProvider::new(
+            elder_candidates.elders().cloned(),
+            elder_candidates.prefix(),
+            pk_set,
+            members,
+        )
     }
 
     pub(crate) fn prefix(&self) -> Prefix {
@@ -141,6 +146,11 @@ impl SectionAuthorityProvider {
                 .iter()
                 .map(|elder| (elder.name(), elder.addr()))
                 .collect(),
+            members: self
+                .members
+                .iter()
+                .map(|state| (state.name(), state.to_msg()))
+                .collect(),
         }
     }
 }
@@ -156,15 +166,16 @@ impl SectionAuth<SectionAuthorityProvider> {
 
 impl SectionAuthorityProviderMsg {
     pub(crate) fn into_state(self) -> SectionAuthorityProvider {
-        SectionAuthorityProvider {
-            prefix: self.prefix,
-            public_key_set: self.public_key_set,
-            elders: self
-                .elders
+        SectionAuthorityProvider::new(
+            self.elders
                 .into_iter()
-                .map(|(name, value)| Peer::new(name, value))
-                .collect(),
-        }
+                .map(|(name, value)| Peer::new(name, value)),
+            self.prefix,
+            self.public_key_set,
+            self.members
+                .into_iter()
+                .map(|(_name, state)| state.into_state()),
+        )
     }
 }
 
@@ -230,6 +241,7 @@ pub(crate) mod test_utils {
         let section_auth = SectionAuthorityProvider::from_elder_candidates(
             ElderCandidates::new(prefix, elders),
             secret_key_set.public_keys(),
+	    vec![],
         );
 
         (section_auth, nodes, secret_key_set)
