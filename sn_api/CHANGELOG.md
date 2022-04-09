@@ -5,7 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.58.1 (2022-04-09)
+
+### Bug Fixes
+
+ - <csr-id-4303aec7813f235234022be43e2b3adb4528da57/> files API to use the Scope encoded in the input Urls
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release over the course of 2 calendar days.
+ - 14 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - files API to use the Scope encoded in the input Urls ([`4303aec`](https://github.com/maidsafe/safe_network/commit/4303aec7813f235234022be43e2b3adb4528da57))
+</details>
+
 ## v0.58.0 (2022-03-25)
+
+### Chore
+
+ - <csr-id-907c7d3ef4f65df5566627938154dfca1e2fdc05/> safe_network-0.58.8/sn_api-0.58.0/sn_cli-0.51.0
+ - <csr-id-90712c91368b4d88537acc65a3ccc5478fe38d2c/> update deps
+ - <csr-id-6e897d0bc93256f5ab72350c9774f9a33937da1b/> remove retry_loop! from nrs tests
+ - <csr-id-453b246c002f9e964896876c254e6c31f1f6045d/> refactor NodeQueryResponse handling at elder
+ - <csr-id-6b83f38f17c241c00b70480a18a47b04d9a51ee1/> deps, remove ~ restriction on major versioned deps
+   tilde w/ a major version restricts us to path udpats only.
+   we want caret, which is implicit frm v 1
 
 ### Bug Fixes
 
@@ -43,9 +78,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 6 commits contributed to the release over the course of 1 calendar day.
- - 2 days passed between releases.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 7 commits contributed to the release over the course of 1 calendar day.
+ - 3 days passed between releases.
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -55,6 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.58.8/sn_api-0.58.0/sn_cli-0.51.0 ([`907c7d3`](https://github.com/maidsafe/safe_network/commit/907c7d3ef4f65df5566627938154dfca1e2fdc05))
     - update deps ([`90712c9`](https://github.com/maidsafe/safe_network/commit/90712c91368b4d88537acc65a3ccc5478fe38d2c))
     - Improve query handling, keep peers on DataNotFound ([`a45a3bd`](https://github.com/maidsafe/safe_network/commit/a45a3bda7044f07b6ecd99569ec4c043330d7160))
     - remove retry_loop! from nrs tests ([`6e897d0`](https://github.com/maidsafe/safe_network/commit/6e897d0bc93256f5ab72350c9774f9a33937da1b))
@@ -64,6 +100,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.57.3 (2022-03-22)
+
+### Chore
+
+ - <csr-id-a6e2e0c5eec5c2e88842d18167128991b76ecbe8/> safe_network-0.58.7/sn_api-0.57.3/sn_cli-0.50.5
+ - <csr-id-d3989bdd95129999996e58736ec2553242697f2c/> bump bls_dkg, self_encryption, xor_name
+   This is a step towards integrating sn_dbc into safe_network.
 
 ### Commit Statistics
 
@@ -87,6 +129,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.57.2 (2022-03-17)
 
+### Chore
+
+ - <csr-id-a741d930b906054d09f1311ddcf35479aa1aa3ee/> safe_network-0.58.6/sn_api-0.57.2
+ - <csr-id-6ca81812df56858c789353383e018fcee8b4c297/> tidy up some new test/clippy issues
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -108,6 +155,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.57.1 (2022-02-27)
+
+### Chore
+
+ - <csr-id-634010fd79ce1487abbff5adf3d15da59709dd95/> safe_network-0.58.2/sn_api-0.57.1/sn_cli-0.50.2
+ - <csr-id-705995ef67b3d4c45c95689c4a675e1063467ec9/> changes to appease clippy 1.59
+ - <csr-id-f95ef3d1cdc5d588e99c343470b8f45aedda70b4/> more dep updates
+ - <csr-id-d5e6f462615de830cd9c27dba49a34ba2da13b81/> more general dep updates
+ - <csr-id-7b4672dfb6ae305221018e7eab090deabe4d6739/> update multibase to be inline across codebase
 
 ### Bug Fixes
 
@@ -140,6 +195,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.57.0 (2022-02-17)
 
+### Chore
+
+ - <csr-id-149665a53c00f62be0e8c8ec340b951a06346848/> safe_network-0.58.0/sn_api-0.57.0/sn_cli-0.50.0
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -160,6 +219,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.56.0 (2022-02-12)
+
+### Refactor
+
+ - <csr-id-f558b5c60df64dd349158a327bec945321937cf3/> make nrs url validation private
+   We made URL validation public to share code during NRS resolution, but there's no need for
+   validation during resolution because the URLs have already been validated at the point of
+   association.
+   
+   Also fix some clippy warnings.
+
+### Other
+
+ - <csr-id-b9ceb229091ca29f5dcc675d66a0d9ff46a60427/> update nrs tests to use helper
+   The helper was moved into the test_helpers module and renamed to TestDataFilesContainer, since this
+   seems more accurate.
+   
+   A test was added for retrieving a topname link. This is arguably covered by the `nrs_associate`
+   tests, but I think it's good to have this test to call it out as functionality we don't want to
+   break.
+
+### Chore
+
+ - <csr-id-a398c4f8d72828db0fc8c6d5825ead62ba85db64/> safe_network-0.57.0/sn_api-0.56.0/sn_cli-0.49.0
 
 ### New Features
 
@@ -226,6 +308,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.55.0 (2022-02-08)
 
+### Chore
+
+ - <csr-id-3f75bf8da770a6167c396080b3ad8b54cfeb27e2/> safe_network-0.56.0/sn_api-0.55.0/sn_cli-0.48.0
+ - <csr-id-471d910f2b6d8952569c3dc4b2dd31fe7aa30dfa/> improve acronym consistency
+
 ### Bug Fixes
 
  - <csr-id-e867b1f5aa290823e77eff95f0846f00d7c0416c/> CLI shell was creating a new Safe API instance, and connecting to the net, for every command
@@ -253,6 +340,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.54.1 (2022-02-04)
+
+### Chore
+
+ - <csr-id-86975f228f31303597a707e158005e44c86de1cc/> safe_network-0.55.3/sn_api-0.54.1/sn_cli-0.47.1
 
 ### New Features
 
@@ -284,6 +375,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.54.0 (2022-02-01)
+
+### Refactor
+
+ - <csr-id-889e0d99a6f096329e875c812a29ec165e61f5ae/> nrs map fetch and rename multimap
+   The `MultimapKeyValues` type alias was renamed to `Multimap` to make it easier to work with. Some
+   functions were also renamed to the same effect, e.g., `fetch_multimap_values` -> `fetch_multimap`.
+   
+   The function for retrieving the NRS map was also refactored. Some aspects were broken down into
+   smaller functions to reduce some complex if/else cases. Things were also setup for the version in
+   the last entry in the Multimap to be collected. This is going to be used with the returned
+   NrsMapContainer, to facilitate returning links to immutable content, which doesn't have a version.
+   Currently the code isn't setup to support that scenario.
+
+### Chore
+
+ - <csr-id-2ec86e28246031084d603768ffa1fddf320a10a2/> safe_network-0.55.1/sn_api-0.54.0/sn_cli-0.47.0
 
 ### New Features
 
@@ -338,6 +445,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.53.0 (2022-01-28)
 
+### Refactor
+
+ - <csr-id-9af70e7785c9329d8262de99bda68c4ad79d5154/> remove get_target_url function
+   This function contained an unnecessary check to see if the `safe://` prefix wasn't present in top
+   name or public names, which we wouldn't expect it to be. I'm not sure what I was thinking with this.
+   
+   Also made some more readability changes based on PR feedback.
+ - <csr-id-58bf678793cbf474751c7bccc80e08fe3cd2d192/> subname -> public name
+   Since we're now storing the full public name in the NRS map, the key should be referred to as the
+   public name rather than the subname. Error messages were also updated.
+ - <csr-id-a58f6c5019e73ffbfa0f29965aa0fa62b026ece7/> remove url sanitisation from api
+   The `Safe::parse_url` function was removed from the API. This function 'sanitised' a URL by applying
+   a `safe://` prefix to a URL string if the caller hadn't specified it.
+   
+   Initially, it was done to tidy up NRS code that was calling this function, but the same code was
+   also calling a private function `parse_url` was making use of, so effectively the code was being
+   called twice. More generally, we decided callers of the API should be responsible for passing a
+   valid URL.
+   
+   The function was being called by various other parts of the API and also in the CLI, so these were
+   changed to call `SafeUrl::from_url` directly.
+   
+   Some code was added to CLI commands to apply the `safe://` prefix if the user omitted it, so no
+   functionality  was broken. A few test cases were added to cover it. A couple of NRS test cases for
+   validating URLs were also removed as they no longer apply. This behaviour may actually have been
+   incorrect in the first place.
+   
+   Also apply various clippy fixes.
+
+### Other
+
+ - <csr-id-effc6fa5a035f8d88b7537eca304e4b0d6de29a3/> rework nrs tests and provide more coverage
+   Added more coverage for code paths that weren't being tested:
+   * `nrs_create` duplicate topname
+   * `nrs_associate` with non-versioned files container link
+   * `nrs_associate` with non-versioned NRS map container link
+   * `nrs_associate` with register link
+   * `nrs_associate` with invalid URL
+   
+   Some NRS tests were reworked as follows:
+   * Make them single purpose. Some tests were testing a few things, which makes it a bit harder to
+     identify what's failed.
+   * Trim down. Some tests had assertions and setup that didn't seem quite relevant, like checking and
+     assigning versions.
+   * Test `nrs_associate` without calling `nrs_add`. This muddies the water a little bit because
+     `nrs_add` calls associate.
+   * Separate `nrs_associate` tests for topnames and subnames.
+
+### Chore
+
+ - <csr-id-366eee25f4b982d5a20d90168368a1aa14aa3181/> safe_network-0.55.0/sn_api-0.53.0/sn_cli-0.46.0
+
 ### New Features
 
  - <csr-id-3d73dd03a7a6913a248e5cca7d714f8b8e4c0d01/> retrieve immutable content via nrs
@@ -388,6 +547,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.52.0 (2022-01-22)
 
+### Refactor
+
+ - <csr-id-3b5ce194213a7090ee83c02b0043700cda230796/> remove one layer of indirection
+
+### Chore
+
+ - <csr-id-0190f0305980bdaee30f9f2ab5eb5510149916db/> safe_network-0.54.0/sn_api-0.52.0/sn_cli-0.45.0
+ - <csr-id-3dc23278c6a4fabc250b27f4312f5c51f0f271a4/> update remaining places
+ - <csr-id-20f416cb7d0960a1d8d6f167a1ad1eed33ed6a7b/> update from MIT/BSD3 to GPL3
+ - <csr-id-7a7752f830785ec39d301e751dc75f228d43d595/> update year on files modified 2022
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -415,6 +585,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.51.0 (2022-01-20)
+
+### Chore
+
+ - <csr-id-923930acb3769cfa7047954a1fee1853ec9e3062/> safe_network-0.53.0/sn_api-0.51.0/sn_cli-0.44.0
+ - <csr-id-57749b7d0671423fe205447bc84d9f8bfc99f54b/> solving new clippy findings
+ - <csr-id-941b83f3960c84cfee86a8c818233fbbc403c189/> fix additional wrongly setup test cases
 
 ### Bug Fixes
 
@@ -452,6 +628,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.50.6 (2022-01-06)
 
+### Refactor
+
+ - <csr-id-9c9a537ad12cc809540df321297c8552c52a8648/> ties up the loose ends in unified data flow
+
+### Chore
+
+ - <csr-id-155ee032ee56cbbb34928f2d14529273ccb69559/> safe_network-0.52.13/sn_api-0.50.6
+ - <csr-id-7b0cd4d183a9f82d1d78dbb56572e5bf36714a0a/> safe_network-0.52.10
+ - <csr-id-bf16c5ea7051386064233443921438cbbd79d907/> log EntryHash human readable
+
 ### Bug Fixes
 
  - <csr-id-e18c88019d37ab4f7618dde1a90e19ddf94db1c7/> VersioinHash use Display for encode
@@ -482,6 +668,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.50.5 (2022-01-06)
 
+### Chore
+
+ - <csr-id-99d012ef529df78ef4c84f5e6ea99d3a77414797/> safe_network-0.52.11/sn_api-0.50.5/sn_cli-0.43.2
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -503,6 +693,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.50.4 (2022-01-04)
+
+### Chore
+
+ - <csr-id-a64c7e0414b77f545cb8cdbf64af0fb7212d1f2e/> safe_network-0.52.9/sn_api-0.50.4
+ - <csr-id-4f29c285a0b48220df1f1c6c52c4b487350eae08/> safe_network-0.52.12
+ - <csr-id-bebdae9d52d03bd13b679ee19446452990d1e2cf/> rename dest to dst
+ - <csr-id-ab8109cf5aede62596abfdeb813a019d03201f96/> revert change of fn name
+ - <csr-id-5214d5e7f84a3c1cf213097a5d55bfb293f03324/> safe_network-0.52.8
 
 ### Commit Statistics
 
@@ -529,6 +727,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.50.3 (2022-01-04)
 
+### Refactor
+
+ - <csr-id-c790077bebca691f974000278d5525f4b011b8a7/> rename blob to file
+
+### Chore
+
+ - <csr-id-5f7000c5ec5895fb3f4c4a17a74ada52bb873fc7/> sn_api-0.50.3
+ - <csr-id-ab00eca916d6ed8a0a137004a6b9fd24e7217a70/> safe_network-0.52.5
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -550,6 +757,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.50.2 (2022-01-04)
+
+### Chore
+
+ - <csr-id-0a70425fb314de4c165da54fdc29a127ae900d81/> safe_network-0.52.6/sn_api-0.50.2
+ - <csr-id-292466119e2d99c36043e7f2247b1bde9ec9ced9/> safe_network-0.52.3
 
 ### Commit Statistics
 
@@ -573,6 +785,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.50.1 (2022-01-04)
 
+### Chore
+
+ - <csr-id-4bb2adf52efdac6187fffc299018bf13f3398e14/> safe_network-0.52.4/sn_api-0.50.1
+ - <csr-id-40d1844e0b28578e8b8c6b270151dbb86961a766/> safe_network-0.52.7
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -594,7 +811,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.50.0 (2022-01-03)
 
-### refactor (BREAKING)
+### Chore
+
+ - <csr-id-ee86dc7ab1781731d3be19f9d7f414f157a91edb/> sn_api-0.50.0/sn_cli-0.43.0
+ - <csr-id-d490127b17d53a7648f9e97aae690b232188b034/> safe_network-0.52.2
+
+### Refactor (BREAKING)
 
  - <csr-id-715a154fe7448cd18decd0a666ae11fb02eadedb/> remove dry-run as arg from all APIs and make it a Safe instance mode
 
@@ -619,6 +841,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.49.0 (2022-01-03)
+
+### Chore
+
+ - <csr-id-4f600e179bfbf6ac018876cca6f7fc193f5b5f1e/> sn_api-0.49.0/sn_cli-0.42.0
 
 ### Bug Fixes (BREAKING)
 
@@ -646,6 +872,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.48.0 (2022-01-03)
 
+### Chore
+
+ - <csr-id-e38925e07d69432db310fc8ec9803200ea964ab2/> safe_network-0.52.1/sn_api-0.48.0/sn_cli-0.41.0
+ - <csr-id-f1bb1909f3fb506c1b7ec9b660ad533b7b8b9044/> minor refactor and changes to CLI report errors
+
 ### Bug Fixes
 
  - <csr-id-19e8f70c3f4369fae3a80d5de5e56161c5fa0258/> enable logging from api tests; resolve one failing test
@@ -656,7 +887,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-4adaeaff4f07871840397adc3371ec8b3436e7ce/> change files APIs to accept std::Path for path args rather than only &str
    - Changed the files_container_create API to now create just an empty FilesContainer
 
-### refactor (BREAKING)
+### Refactor (BREAKING)
 
  - <csr-id-ff1dd477aaea2a4dda6c9c15b5822b1b3a7514b7/> ProcessedFiles redefined on more specific data types instead of simply Strings
 
@@ -686,11 +917,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.47.0 (2021-12-22)
 
+### Other
+
+ - <csr-id-1d1487f1c8e8f3e33df626af1ff027eea653f84c/> calm down the retry loop tests
+
+### Chore
+
+ - <csr-id-6b59ad852f89f033caf2b3c7dfcfa3019f8129e8/> safe_network-0.52.0/sn_api-0.47.0/sn_cli-0.40.0
+ - <csr-id-c76c3ab638188cba38911f037829c209fcc45fc3/> safe_network-0.51.7
+ - <csr-id-79b2d0a3f52de0335323773936dee9bdbe12a0cf/> safe_network-0.51.6
+ - <csr-id-45df3d71cc4b3185602b9d27b8cb0f5bf65a4b43/> safe_network-0.51.5
+
 ### New Features
 
  - <csr-id-1078e59be3a58ffedcd3c1460385b4bf00f18f6b/> use upload_and_verify by default in safe_client
 
-### refactor (BREAKING)
+### Refactor (BREAKING)
 
  - <csr-id-1188ed58eed443b4b8c65b591376f2f9a21acc0d/> minor refactor to error types definitions
 
@@ -721,6 +963,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.46.2 (2021-12-16)
 
+### Chore
+
+ - <csr-id-6df94b1d1fb017c9b02e566ca22a518f885397c8/> sn_api-0.46.2
+ - <csr-id-17d7906656bec401d6b39cc3551141112a3d77c4/> safe_network-0.51.4
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -742,6 +989,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.46.1 (2021-12-16)
 
+### Chore
+
+ - <csr-id-9be440b36db07e1c04ab688b44ef91e4a56ed576/> safe_network-0.51.3/sn_api-0.46.1
+ - <csr-id-595541b83284a5c5b60fbc00e47b1146117d7613/> safe_network-0.51.2
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -762,6 +1014,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.46.0 (2021-12-16)
+
+### Test
+
+ - <csr-id-edb8de8b4d923e97d68eed40a7953f38461b0281/> adding a test for retrieving Blob with range over data length
+
+### Chore
+
+ - <csr-id-634a8f9f307598c51305067444514b43c85f196d/> sn_api-0.46.0
+ - <csr-id-dcbb67fc699d7cb1f3a2c4632bcb8a5738916091/> safe_network-0.51.1
+ - <csr-id-c685838d8f9c10b0f4e7541fe201862bb84e8555/> safe_network-0.51.0
+ - <csr-id-653f653a775a101679904ab75c8012a72dfdedfb/> safe_network-0.50.0
+ - <csr-id-36ca20e606899ecbdea24d845c34ba11ab889cf7/> safe_network-0.49.3
+ - <csr-id-d30aa0cb7440b9f3a44fefc3b6b9f7855480958c/> fmt
+ - <csr-id-62d747969b739172910aabca6fcb273d2827fc8a/> safe_network-0.49.2
+ - <csr-id-69ae8c20e91dd9959ebfa5456efdf9c218a9d66f/> safe_network-0.49.1
+ - <csr-id-6f5516d8bb677462ea6def46aa65a1094767d68c/> safe_network-0.49.0
 
 ### New Features (BREAKING)
 
@@ -797,6 +1065,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.44.0 (2021-12-10)
+
+### Test
+
+ - <csr-id-2b7c72c3f87f34051ea301250d1af258f9d310cb/> adapting test_files_container_remove_path test to new behavior
+
+### Refactor
+
+ - <csr-id-bb7abce7330a432884e80baa2aa158409e9734d0/> refactoring files API tests
+   - Also removing Url resolver recursive implementation (in favor of an iteration) since it's memory-wise
+     inneficient creating new Vec for each resolution step and not providing any benefits.
+   - Removing the restriction in files API which was preventing input Urls to contain a version/hash.
+
+### Chore
+
+ - <csr-id-9eff03598ba09aa339180d7ecd57b50174180095/> safe_network-0.48.0
+ - <csr-id-85709655b0ce38246515658b956aa9b8f67cb55a/> safe_network-0.47.0
+ - <csr-id-66dc0682edb53c64a0660b3622bdc1a646114dee/> re-enable fetch API tests to run in CI
+ - <csr-id-b5e9dcc5b13b1eda711d4760d9feb8dc929a0c43/> safe_network-0.46.6
+ - <csr-id-1120c99868a0a97e8e25a7611fea31838fe9f6f6/> fmt
+ - <csr-id-9afcb8b2776c39de1925742ccb19e36e9f3fec55/> fmt clippy
+ - <csr-id-05f6d98cf21f0158f4b5161484c7c15a0561b6f4/> clippy tidyup for rust 1.57
+ - <csr-id-86577846e845c110c49e15c95c6bd5595db51773/> safe_network-0.46.5
+ - <csr-id-de3051e7e809a8f75507c54f3cf053a4244fdf19/> safe_network-0.46.4
+ - <csr-id-69e9be2a1567bfa211af7e9d7595381d9a0a3b38/> safe_network-0.46.3
+ - <csr-id-260eaabd2d1b0c26dec9febc963929e65d7ec912/> safe_network-0.46.2
+ - <csr-id-bf55f9b7e3b96319de4423e19333bf3b16fd1c78/> safe_network-0.46.1
+ - <csr-id-8ea94983b37b1d559358a62d6ca075b97c193f0d/> safe_network-0.46.0
+ - <csr-id-a7e058536ae6ae27228bd2254ea6465c5eface35/> safe_network-0.45.0
+ - <csr-id-aaab10b3a5a44d9ec844757c71ac091016f51fd1/> safe_network-0.44.5
+ - <csr-id-984c5f83e3f4d889dc4e0583b09571e540357cf9/> safe_network-0.44.4
+ - <csr-id-ec3dd4991535bb22235e2d1d413dd93489b8aedf/> safe_network-0.44.3
+ - <csr-id-51b0f0068c9a279da9a1edf45509cf80a90e663d/> safe_network-0.44.2
+ - <csr-id-14c84c9db23557626e4889eff0ff403a574dccad/> safe_network-0.44.1
+ - <csr-id-75a4b537573d4e5e8767e38fa7d1b1126dffe148/> safe_network-0.44.0
+ - <csr-id-c78f4703a970e8b7466b091ad331d0f2233aa9a3/> safe_network-0.43.0
 
 ### New Features
 
@@ -873,6 +1176,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.43.0 (2021-11-25)
 
+### Chore
+
+ - <csr-id-ca21d1e97fcd28ca351887636affffff78e3aeb3/> safe_network-0.42.0/sn_api-0.43.0
+
 ### New Features (BREAKING)
 
  - <csr-id-3fe9d7a6624fe5503f80395f6ed11426b131d3b1/> move Url to sn_api
@@ -897,6 +1204,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.42.0 (2021-11-25)
+
+### Chore
+
+ - <csr-id-8b8a3616673405005d77868dc397bd7542ab3ea7/> safe_network-0.41.4/sn_api-0.42.0
+ - <csr-id-4b72bfc9a6c3a0db4821e7ebf1f4b5daa7cc56d1/> safe_network-0.41.3
 
 ### New Features (BREAKING)
 
@@ -923,6 +1235,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.41.0 (2021-11-24)
 
+### Chore
+
+ - <csr-id-df25e4920c570771f6813ca03da02f6dfc8e59fb/> sn_api-0.41.0
+
 ### New Features (BREAKING)
 
  - <csr-id-11750ed18391c7e8cb112d4a34a19f15eedaed1d/> propagate registers (with vec u8 instead of Url) change to sn_api
@@ -948,6 +1264,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.40.1 (2021-11-24)
 
+### Other
+
+ - <csr-id-d8ec5a81ae566e8d7068592e01cff4e808b1cad1/> revert "chore(release): safe_network-0.42.0/sn_api-0.41.0"
+   This reverts commit 63432eb2e528401ae67da8eea0c82837ab42fc18.
+   
+   This release was duplicating everything that was in 0.41.0, probably because the tags weren't
+   correct.
+
+### Chore
+
+ - <csr-id-a973039178af33b859d421cf36571de49cceff17/> safe_network-0.41.2/sn_api-0.40.1
+ - <csr-id-62aa668d5777058ae617f8952cfcb62be002abf3/> safe_network-0.41.1
+ - <csr-id-63432eb2e528401ae67da8eea0c82837ab42fc18/> safe_network-0.42.0/sn_api-0.41.0
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -970,6 +1300,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.40.0 (2021-11-23)
+
+### Chore
+
+ - <csr-id-14fdaa6537619483e94424ead5751d5ab41c8a01/> safe_network-0.41.0
 
 ### Commit Statistics
 
@@ -1065,6 +1399,227 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-60cc59ce18406609f36a37861afa920b96dcac99/> adapt test
 
+
+### Test
+
+ - <csr-id-6f0501699b0d0620a7c9d2b013944f90884ca1c3/> adding first set of tests for Multimap API
+ - <csr-id-6a8a173acf96d98d00548659b4641488f5fec2ee/> init logger in sn_api tests
+ - <csr-id-7d00d0ad089924915aa2bf564b5b925825aa4880/> add a simple example app which uploads a file using the API
+ - <csr-id-472df87678c07624d6163b8105f110cd22e4e3c9/> connect to port 12000 by default in local testnets
+ - <csr-id-7fb6bd96a8bdaaee64592b5dc02596b9f6220165/> adapt wallet tests and minor refactoring
+ - <csr-id-774694795114dc392db5219393fa63f204fcc905/> adapt tests to new transfer costs and minor refactor to transfers errors handling
+ - <csr-id-e3235b0329c74b20092278c628a2115d50e206d7/> minor adjustments on cli test utilities
+
+### Style
+
+ - <csr-id-a4b7d9ba415831308c5ec6d902722843715a2d97/> fix styling by cargo fmt
+
+### Refactor
+
+ - <csr-id-86910340897256bb4df77b6edaa0f2c9584d6dce/> update cli to use new nrs api
+   There are changes here to update the NRS command handlers to use the new API for NRS, and other
+   smaller changes for referencing types that had been moved to new modules. This commit also restores
+   a function, `get_map_summary`, that was deleted from the `NrsMap` struct. The CLI `cat` and `dog`
+   commands still relied on this functionality, so it's been provided as a placeholder for now, just to
+   get the CLI to compile.
+   
+   At this point, the NRS test suite is not passing, because there have been some behavioural changes
+   as part of the refactor. Unfortunately, because of the state of the rest of the network just now,
+   it's hard to isolate these specific changes to get the tests passing again, as other functionality
+   like the `cat` command appear to be broken just now too.
+   
+   I think it's worth committing this as it is now, with the CLI compiling, then we can come back and
+   address the other issues that will get the test suite passing again.
+ - <csr-id-c0ac51ae4bf4dbd9df3dd39700887df439eec4f6/> nrs and resolver
+ - <csr-id-5780fd1d6ba480cb775fd66e53e41f02d97b3a94/> moving out safe_url mod as a standalone sn_url crate
+ - <csr-id-afd5422945fd1fc4ac509713e72471076ea4aee0/> re-organising files, nrs and xorurl files into their own mod folders
+ - <csr-id-a6107accfc6950b4beb2dcb84dfaa3c0e18bbd5d/> reorganise files module
+ - <csr-id-d910e8607c8898bb8d8ccb0c824d8a5401a2c938/> use get_sequence_entry
+ - <csr-id-c2c6716d29e56f387776202dad94ddda9b8fe2b2/> migrating to use anyhow for CLI errors and use thiserror for sn_api error types
+ - <csr-id-f6f07349a7524304b3d6b1c22db65d77be519f4c/> return anyhow::Result/Error from all CLI tests
+ - <csr-id-e692becbbf09e2500284cb1507916fac56149f02/> remove Error::Unexpected and Error::Unknown errors from API
+ - <csr-id-ae026bb9ce91b1373b8b300c41bfef0c3f295c7a/> properly serialise key pairs in CLI commands output
+ - <csr-id-f9e07293ea1f8cd5e4428d95a299ba06c0f30a20/> minor reorganisation to cli test scripts
+ - <csr-id-5ac36cc64566561f4d442058c91b9857622e6f26/> minor renamings in authd status report with new terminology
+ - <csr-id-b916d7bdc83e9a02fd29e9cbd6623fc922066a6c/> populate each keypair generated for authorised apps with testcoins
+ - <csr-id-b6eddcbf5d272e6a4430cfd6488f5236bef92a5d/> adapt to latest sn-client api changes and further simplification of auth messages
+ - <csr-id-e814ff3b8c58ae7741938a1c73a22c87ed602883/> simplify authd messages format and serialisation
+
+### Other
+
+ - <csr-id-3da9b26f467cb8c468ffb0a319559a5a0f60e86e/> fix api tests.
+   Removes retry_loop as it's no longer needed for general queries, clients retry in the core lib.
+   
+   Set the query timeout correctly and so reduces test time.
+   Removes api_tests TEST_AUTH setting to a cli dependency auth variable which may not exist and isn't needed. Falls back to random keys.
+ - <csr-id-3703819c7f0da220c8ff21169ca1e8161a20157b/> update actions workflows for workspace refactor
+   Now that we have multiple crates in the same repository, if we only want to do things when subsets
+   of the source tree have been modified (e.g. only one crate particular crate has changed), it does
+   make the CI situation a bit more cumbersome. We need to make much more frequent use the path filter
+   action and only do things if certain files have been changed.
+   
+   It's also useful for the workflows to indicate the crate they relate to, so they've been renamed or
+   added to accommodate that.
+   
+   Certain things have been moved to the level of the workspace because with these, you can't really
+   discriminate based on the crate that's changed.
+   
+   An unused dependency for sn_api was also taken out here.
+ - <csr-id-d0134e870bb097e095e1c8a33e607cf7994e6491/> update actions workflows for workspace refactor
+   Now that we have multiple crates in the same repository, if we only want to do things when subsets
+   of the source tree have been modified (e.g. only one crate particular crate has changed), it does
+   make the CI situation a bit more cumbersome. We need to make much more frequent use the path filter
+   action and only do things if certain files have been changed.
+   
+   It's also useful for the workflows to indicate the crate they relate to, so they've been renamed or
+   added to accommodate that.
+   
+   Certain things have been moved to the level of the workspace because with these, you can't really
+   discriminate based on the crate that's changed.
+   
+   An unused dependency for sn_api was also taken out here.
+ - <csr-id-712d9a4e72f62725a0b0ac5526bc68abe8ca503f/> adding a README.md file for sn_api crate with a description of the current APIs
+ - <csr-id-67b746f607501511c38fe752f64119a12985ab72/> fix all clippy issues after updating to rust 1.49
+ - <csr-id-40bcd0f46dad6177b0052b73393d7789fd559b33/> updates and enhancements to the User Guide, and to some commands help messages
+ - <csr-id-e107e1314957053db2d71357450cac65cba52a68/> updating CLI User Guide
+ - <csr-id-4db2c27badcccac6d7368566ee6f483613c3aa93/> fix proptest regex
+ - <csr-id-cfc35809120cdf2144c8df5dc509eb316bcb0068/> update pass/phrase derivation proptest
+ - <csr-id-9272bb55edf690ccd33de5904530e7ff8036c0fe/> add login/creation seedable pk tests
+
+### Chore
+
+ - <csr-id-70015730c3e08881f803e9ce59be7ca16185ae11/> safe_network v0.40.0/sn_api v0.39.0
+ - <csr-id-ab00cf08d217654c57449437348b73576a65e89f/> safe_network v0.39.0
+ - <csr-id-213cb39be8fbfdf614f3eb6248b14fe161927a14/> update bls_dkg and blsttc to 0.7 and 0.3.4 respectively
+ - <csr-id-cbdf0236f7cd241e7addb1afe75ed5e5cfac00ab/> safe_network v0.38.0
+ - <csr-id-abfe7378604a74119accd7b9f86bef5682b0784a/> add env var for client query timeout
+   rename ClientConfig
+ - <csr-id-d9c35b79a6d0aa787e627b747e665d96bb110c13/> enable tests
+ - <csr-id-fc10d037d64efc86796f1b1c6f255a4c7f91d3e1/> bump rust edition
+   The few breaking changes in this edition did not affect us.
+ - <csr-id-407efd15e0b4854864b83ccdb7d2c3adbb0a02e2/> appease clippy
+ - <csr-id-442c1bdd3f9c22424aa9642d71d4016c868b0b58/> switch from `chrono` to `time`
+   Due to the active security advisory against chrono (RUSTSEC-2020-0159)
+   is makes sense to switch to a library that is not affected (though we
+   are not using the affected APIs in `chrono`).
+ - <csr-id-0387123114ff6ae42920577706497319c8a888cb/> upgrade `tracing-appender` and `tracing-subscriber`
+   These new versions have dropped their dependence on `chrono`, which has
+   an active security advisory against it (RUSTSEC-2020-0159) which seems
+   unlikely to be resolved.
+   
+   `chrono` is still being pulled in by `qp2p` (via `rcgen`), `sn_api`, and
+   `sn_launch_tool`. This will be fixed in future commits.
+ - <csr-id-225432908839359800d301d9e5aa8274e4652ee1/> move safe_network code into sn directory
+   Due to the fact that we're now using multiple crates, the safe_network code is moved into the `sn`
+   directory.
+   
+   A Cargo.toml is added to the root directory to establish this repository as a workspace, currently
+   with 2 members, sn and sn_api. If you now run a `cargo build` at the root directory, it will build
+   both of these crates.
+   
+   The Github Actions workflows that were brought in from the `sn_api` merge were also removed here.
+ - <csr-id-2b5d17740ca74fc379cab89cb95683e200589148/> move sn_api code into an sn_api directory
+   The initial merge of the `sn_api` repository put the code for `sn_api` into the `src` directory at
+   the root of the repository, which has merged it in alongside the code for `safe_network`. We now
+   create an `sn_api` directory at the root of the repository and move the `sn_api` code in here. This
+   completely isolates the code for `sn_api` in its own crate, with the same Cargo.toml from the old
+   repository.
+   
+   As things are, the crate builds fine.
+ - <csr-id-01183625d7a1a60b652b1a295a908fa8ba04f6f7/> upgrade sn_api to use 0.36.x of safe_network
+   The only code breaking change here was that the `Config::new` function had been extended to use a
+   new `query_timeout` parameter. For now, the API is opting not to pass a value for this optional
+   parameter.
+   
+   Also remove unused dependency `async-trait`.
+ - <csr-id-335f9dcfc4588624728b4b10c576953d51a08e1a/> various renamings and changes matching PR comments
+ - <csr-id-49d04e1414bf517cc76ebe2c6b86e0b3dd48e47a/> fmt
+ - <csr-id-91e1f0cefe1eb6a6d70e0df3d4d3b6f97e76ecef/> update sn_client to 0.54.4
+ - <csr-id-7ceab22ae72535159db7fbfdc5832b1aea891388/> minor changes to rebase with master
+ - <csr-id-ce56a3504c8f27bfeb13bdf9051c2e91409230ea/> removing unused files
+ - <csr-id-0d4755ed64a65c223bad253d9d7a03980ec12e8d/> update sn_client and sn_data_types to latest
+ - <csr-id-b9bae620533559c5671075fb7a3fe576fe14431f/> fixing files and NRS APIs tests
+ - <csr-id-d77859a8138de0ddcd6b121b928efe13e0254e81/> upgrade tokio to v1.3.0 and quinn to v0.10.1
+ - <csr-id-6cf56022cd6beec4254d0b1667c4d654f87e6a5a/> re-enabling wallet APIs tests in CI
+ - <csr-id-4518154481dbd3aeb397353d4ec296ea98ee3e9a/> re-enabling xorurl & keys APIs tests in CI
+ - <csr-id-590c4c634046ab655a84093c2ed60e8289415d44/> re-enabling sequence & fetch APIs tests in CI
+ - <csr-id-a09c4c26230b0cf60d7d792d89f0e275f2b64bc2/> remove unused utility function
+ - <csr-id-de482a5611333d069076d7da1b7c5a6017db65eb/> adding a step to check for unused dependencies
+ - <csr-id-e3c6da38f92c354c560bd6b555d76f698779ebcf/> upgrade sn_client to v0.46.12 and most of all dependencies to their latest published version
+ - <csr-id-6f672547ee9a55b241aa6004b353d6919fb0e8cb/> Remove unused ed25519 dependency
+ - <csr-id-792bce8dd94192f17c51d6a1c0b63c7c214ad7c3/> update tiny-keccak from 1.5.0 to 2.0.2
+   keyword was used interchangeably with passphrase so remove keyword.
+   pin was used interchangeably with salt so remove pin.
+   passphrase, password ordering is always the same (alphabetical).
+ - <csr-id-b61e83716cce00c0ba02f3d50bf060cfc095051a/> upgrade sn_client to v0.46.9 and solve clippy issues
+ - <csr-id-6d909431d6a7164a06f2322d188c1d4764e5d0b8/> set bootstrapping contacts for api-tests
+ - <csr-id-43c675ee514aa73fb5192717dae58c97587521e7/> provide bootstrapping contacts list to sn_client as required by new sn_client API
+ - <csr-id-f0bef9e5e79381abf27eec7fae28f4ce0fecb370/> upgrading sn_client to v0.46.2
+ - <csr-id-4ba83c720fabcace7a2859ad308be5922a6597c0/> changes to remove any use of Arc for keypairs and secret keys
+ - <csr-id-b38d840320d65b09ce85db9074f7b7a9487f83df/> update sn_client and dts
+ - <csr-id-b04c1ca2090a32c423ffe2c23ac22be9f5ebbcf3/> Money -> Token
+ - <csr-id-2dff02dc71bc3574763906c8592d32bde64337c9/> do not attempt to retry fetching a Sequence entry if not found the first time
+ - <csr-id-5ba32bd9a86e9c44cf3d59f54be899dc3e2ca861/> minor logging improvements and upgrade sn_client to v0.44.16
+ - <csr-id-4f89812ed5ca3394d2cd7b93e3c79aac2929d11d/> upgrade sn_client to v0.44.15
+ - <csr-id-6e4ea368fdcedb10042b5d8dc94ab02eece47003/> minor change to error returned when parsing pk from hex
+ - <csr-id-84260fc32473c9a84f5c3e6fd54564a865f9d7fe/> minor enhancement to logs when instantiating safe client
+ - <csr-id-77e1c693735760cf1c24c9a4552c9104e52cada0/> temporarily disable running tests in CI
+ - <csr-id-422547f9081de77538f2241c727ac55b00e1e48b/> remove unwrap instances from prod and test code
+ - <csr-id-7b6445a5b9903b1704c45759878bced097bcb82c/> update credentials location
+ - <csr-id-b261640cebdaf4f7fb1b9c13e911bf82bb46f33a/> fmt
+ - <csr-id-274de45a63122c9685617c97272deb603dd9a15b/> simplify loop on err
+ - <csr-id-f9c19faa33db0fb76d392d8cbcd7d910131fedb2/> tidying up some logs
+ - <csr-id-e892a99f2feb0c36204cfff103b13ca2e5e96388/> unwrap_or_else -> _or_ for empty funcs
+ - <csr-id-9c3adffd0889f045ac19110072a194072d294705/> fix lint issues
+ - <csr-id-eb88c0cc1a8e7a21d7af4004c1e1a0a49297f22c/> unused variable `address`
+ - <csr-id-19ca515ac84d8cf5d99c4b2cba25561248597f13/> generate_random_ed_keypair
+ - <csr-id-52c8c8d7d2f5a5f9c7d2862bcf3fca1902048695/> update sn_client
+ - <csr-id-eb2364c77d6e755d6e184735e50db366faf266d2/> clippy
+ - <csr-id-0e6ffb0a3c216d891e6a60ac162d733d2fa28690/> reliably derives seed
+ - <csr-id-2de7f66f3f732b9dae55dad50f15888513b5a125/> clippy
+ - <csr-id-b5a6d8115ad3975a17dd973430480adf6c483490/> setting up for no ClientId
+   Remove PublicId refs too as data_type has had this removed
+ - <csr-id-29a978f3047464ad8014817e331218372b53c06c/> Batch of changes for sk handling
+ - <csr-id-77805418d129cb2924dc35b6a88f704771ef6e5c/> dep updates for dt and client
+ - <csr-id-dfabea0a26f97f420f47ba314cae0882aae47dca/> converting to more generic data types for keypair sk pk
+   W/ updated client and data_types deps
+ - <csr-id-34ef8e8c31de6e013d3539a0ec595b32f9301194/> small tidy
+ - <csr-id-106407e8125cc003794ba6249158aa1a655d3357/> clippy
+ - <csr-id-c56e26502ee44af179bfa65c8a194a2190b16842/> remove merge added file
+ - <csr-id-e0a4de8de20e5023b83256d39beca19f759ba129/> clippy
+ - <csr-id-5f8d61cf41eb547c13b65d2030beefd235b75820/> update to reference renamed sn_client
+ - <csr-id-4905fae6259063411c5e4ef5fd2afb531980630c/> tidying up
+ - <csr-id-ee05ed31cb12d8e1d8bac7569beec90db52a5840/> update to reference renamed sn_node crate/repo
+ - <csr-id-b99e7dee3e72e703b47888e3ff03d2baa933b408/> fix merge bugs and readd some shell completion logic
+ - <csr-id-e389ab24f2186fc515b115e736a06d20756ae031/> rename artifacts and paths to match new naming convention
+   safe-cli --> sn_cli
+   safe-authd --> sn_authd
+   safe-ffi --> sn_ffi
+ - <csr-id-d3d04e36b8fb52ce070aecc2b1f77eb158983427/> reenabling more transfer funcs
+ - <csr-id-d5c1cd2808f9844b06b846ec10dfe05146137023/> further ffi cleanup
+ - <csr-id-8f309dada1517afa10c263a52f5597429f764890/> update safe-cmd-test-utilities name to
+ - <csr-id-8b9b481df5d124857abb02158739a6ded8f02af7/> remove mock/ffi builds + files
+ - <csr-id-6f2dd39d783812a9b3abd774b6bebd4cde2d5a1e/> update jsonrpc-quic crate name to qjsonrpc
+ - <csr-id-08f5fec47809bbf0aea61a939dfb3c909043703f/> upgrade multibase to v0.8.0
+ - <csr-id-95200df5f310911294ee72153d10d13f2e4fb737/> tests updated for wallet changes
+ - <csr-id-019370cfd0ace44c656caf45c17248f2a547dbbf/> update safe-authd crate name to sn_authd
+ - <csr-id-873fe29ac9042b7ad28a29630d2c048bde3a7634/> reenable wallet apis
+ - <csr-id-9e191132a4281c53bd4872a756888234adfc0e2a/> reenabling map
+ - <csr-id-cb66e8f5a89872d018e48311738d96173ae8274c/> update safe-api repo/crate name to sn_api
+   Have not changed the S3 bucket names.
+   Also included renaming SAFE to Safe in any documentation as I came
+   across it.
+   Cargo fmt fixes included.
+ - <csr-id-4320a059224ef6018f7fc067f4a40a6534beeebb/> sn_client updated
+ - <csr-id-426158fcbb6d7c1fe44755c138bba1ac825a0a0c/> use dirs_next for dir finding
+ - <csr-id-0b17fddbe3418531df1d03a82d4eb510b819b811/> clippy
+ - <csr-id-532aed1ed8e6b3957627ff2cc2f9d10d87fe3cb2/> getting tests compiling
+ - <csr-id-5a1cd2790b159e35c734dfb1fe64a43ea4409dfc/> reenabling some authd functionality
+ - <csr-id-0a5c18d115820f7124050bc0a246503b5cc63fd9/> reenabling some money apis
+ - <csr-id-b863e7eb299472b0c9dbd633b1b892cc221efb46/> sn_data_type updates
+ - <csr-id-371e7f00e6463063c99beb9823d8684355359d2a/> use core
+ - <csr-id-4466c48a3fcec76f6c90cf6fcf1f28b177978c90/> safe_nd -> sn_data_types
+ - <csr-id-1e4c47aed1aeed3488e370ab0c33a7b5519e40f5/> initial tweaks for app / auth changes
 
 ### New Features (BREAKING)
 

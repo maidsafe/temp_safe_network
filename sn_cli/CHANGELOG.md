@@ -4,7 +4,44 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.51.2 (2022-04-09)
+
+### Bug Fixes
+
+ - <csr-id-4303aec7813f235234022be43e2b3adb4528da57/> files API to use the Scope encoded in the input Urls
+
+### Other
+
+ - <csr-id-487efa4d38fecc0c8071ee38b39f9a3e402a3d5b/> disable node install test
+   Sadly, this test is subject to rate limiting and sometimes fails, even with retries. It's not worth
+   having the nightly release fail because of this test, so I'm just disabling it again.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release over the course of 2 calendar days.
+ - 8 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - disable node install test ([`487efa4`](https://github.com/maidsafe/safe_network/commit/487efa4d38fecc0c8071ee38b39f9a3e402a3d5b))
+    - files API to use the Scope encoded in the input Urls ([`4303aec`](https://github.com/maidsafe/safe_network/commit/4303aec7813f235234022be43e2b3adb4528da57))
+</details>
+
 ## v0.51.1 (2022-03-31)
+
+### Chore
+
+ - <csr-id-0a719147ae567b41ba2fcbf4c3c0b44e6d1955d1/> sn_cli-0.51.1
+ - <csr-id-08b023d38c06b50b6c373c2faa91013cb6ad1c38/> remove CLI interactive mode (shell)
 
 ### Bug Fixes
 
@@ -20,9 +57,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 3 commits contributed to the release over the course of 1 calendar day.
  - 5 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -32,11 +69,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_cli-0.51.1 ([`0a71914`](https://github.com/maidsafe/safe_network/commit/0a719147ae567b41ba2fcbf4c3c0b44e6d1955d1))
     - node install command to use correct version ([`b11bcde`](https://github.com/maidsafe/safe_network/commit/b11bcde72e391ffb4e8f50f10f95c3fcb460357a))
     - remove CLI interactive mode (shell) ([`08b023d`](https://github.com/maidsafe/safe_network/commit/08b023d38c06b50b6c373c2faa91013cb6ad1c38))
 </details>
 
 ## v0.51.0 (2022-03-25)
+
+### Chore
+
+ - <csr-id-907c7d3ef4f65df5566627938154dfca1e2fdc05/> safe_network-0.58.8/sn_api-0.58.0/sn_cli-0.51.0
+ - <csr-id-90712c91368b4d88537acc65a3ccc5478fe38d2c/> update deps
+ - <csr-id-6b83f38f17c241c00b70480a18a47b04d9a51ee1/> deps, remove ~ restriction on major versioned deps
+   tilde w/ a major version restricts us to path udpats only.
+   we want caret, which is implicit frm v 1
 
 ### New Features (BREAKING)
 
@@ -80,6 +126,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.50.5 (2022-03-22)
 
+### Chore
+
+ - <csr-id-a6e2e0c5eec5c2e88842d18167128991b76ecbe8/> safe_network-0.58.7/sn_api-0.57.3/sn_cli-0.50.5
+ - <csr-id-d3989bdd95129999996e58736ec2553242697f2c/> bump bls_dkg, self_encryption, xor_name
+   This is a step towards integrating sn_dbc into safe_network.
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -102,6 +154,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.50.4 (2022-03-04)
 
+### Other
+
+ - <csr-id-8f44eabd288cd23435bef6e646b981b881fb104b/> use nextest as test runner
+   The PR tests have been changed to use Nextest to perform the test runs. Nextest can produce test
+   reports in the popular Junit format, which means we can publish the test results along with the PR.
+   Since it was tedious to copy and upload the reports as artifacts, this was encapsulated in a custom
+   `cargo-nextest` action.
+   
+   To support publishing test results from forks, the publish occurs in another workflow. See the
+
+### Chore
+
+ - <csr-id-7cf7fd675beec5e7aa122f0f127402b636e659b7/> safe_network-0.58.4/sn_cli-0.50.4
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -123,6 +189,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.50.3 (2022-03-01)
+
+### Chore
+
+ - <csr-id-51b3d75fc7389de647f6df230bff32e8c7d7267c/> safe_network-0.58.3/sn_cli-0.50.3
 
 ### Bug Fixes
 
@@ -150,6 +220,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.50.2 (2022-02-27)
 
+### Other
+
+ - <csr-id-a2677491d8e3d2e42045e596b9e36b36250d4c28/> ignore bad cli test for now
+   Changes needed post pretty-table->comfy transition
+
+### Chore
+
+ - <csr-id-634010fd79ce1487abbff5adf3d15da59709dd95/> safe_network-0.58.2/sn_api-0.57.1/sn_cli-0.50.2
+ - <csr-id-705995ef67b3d4c45c95689c4a675e1063467ec9/> changes to appease clippy 1.59
+ - <csr-id-f95ef3d1cdc5d588e99c343470b8f45aedda70b4/> more dep updates
+ - <csr-id-3b9f8d3b4565a5fc26c821f0b517cc463d7e6ca3/> remove outdated prettytable, use comfy-table in sn_cli
+ - <csr-id-7b4672dfb6ae305221018e7eab090deabe4d6739/> update multibase to be inline across codebase
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -176,6 +259,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.50.1 (2022-02-23)
+
+### Chore
+
+ - <csr-id-fc074ab28d3c8c011016e6598cf840fc38026418/> sn_cli-0.50.1
 
 ### Documentation
 
@@ -213,6 +300,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.50.0 (2022-02-17)
 
+### Chore
+
+ - <csr-id-149665a53c00f62be0e8c8ec340b951a06346848/> safe_network-0.58.0/sn_api-0.57.0/sn_cli-0.50.0
+ - <csr-id-499db88b4e3fb57671a069f36aa3a71c945fb2fd/> powershell install script for cli
+   Provide a Powershell install script for Windows users. This removes the requirement for using Git
+   Bash or other Linux emulation to setup the CLI.
+   
+   The install process is:
+   * Download and install the Visual C++ Redistributable
+   * Create the `%USERPROFILE%\.safe\cli` directory
+   * Add `%USERPROFILE%\.safe\cli` to the user `PATH` variable
+   * Download and unpack the latest version of `safe` to `%USERPROFILE%\.safe\cli`
+   
+   A few points worth noting. First, the script can run without admin access, but the VC++ install
+   requires that, so it will elevate to admin to run that. Second, the script is idempotent, so it will
+   run OK, if, e.g., VC++ is already installed. Third, the addition of the `PATH` variable
+   unfortunately requires users to start a new Powershell session. Finally, if VC++ was installed, that
+   requires a machine restart. The script informs users of either of those, and they are only required
+   the first time.
+   
+   I tested it on a minimal Windows installation on a VM, before the VC++ prerequisite had been
+   installed. It worked as intended in this setup. A test was added to the nightly run.
+   
+   The README was updated to provide the user with instructions for running the script.
+
 ### New Features
 
  - <csr-id-d56ba3f8972d8d16e73608c80e159af5f2cccd04/> have the keys command to run in dry-run mode since it doesn't need a connection
@@ -240,6 +352,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.49.1 (2022-02-15)
 
+### Chore
+
+ - <csr-id-07dc30b281f3c67cb5598aaaf72ba5c668353bf7/> safe_network-0.57.1/sn_cli-0.49.1
+ - <csr-id-6e40898eb9ff007f60ddc5ea946318773fb90e55/> sudo based installation for cli
+   Give users the option to run the CLI installer as sudo.
+   
+   In this case, the CLI will be installed to /usr/local/bin, which is very common for installations on
+   Linux. That location is almost always already on PATH, even in minimal setups. This removes the need
+   for modifying any of the user's shell configurations, which some users don't like. I've also
+   personally dealt with users who had a problem when the installer wasn't modifying their shell
+   configuration correctly.
+   
+   Some simple installer tests were added to the nightly configuration and the README was also updated
+   with new instructions, which included fixing an invalid link to the install script.
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -261,6 +388,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.49.0 (2022-02-12)
+
+### Refactor
+
+ - <csr-id-f558b5c60df64dd349158a327bec945321937cf3/> make nrs url validation private
+   We made URL validation public to share code during NRS resolution, but there's no need for
+   validation during resolution because the URLs have already been validated at the point of
+   association.
+   
+   Also fix some clippy warnings.
+
+### Other
+
+ - <csr-id-2fcbfc0347769ea41e0b9243bfb32e7104899a11/> fix xorurl cmds tests and enable them to run in CI
+
+### Chore
+
+ - <csr-id-a398c4f8d72828db0fc8c6d5825ead62ba85db64/> safe_network-0.57.0/sn_api-0.56.0/sn_cli-0.49.0
 
 ### New Features
 
@@ -321,6 +465,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.48.0 (2022-02-08)
 
+### Chore
+
+ - <csr-id-3f75bf8da770a6167c396080b3ad8b54cfeb27e2/> safe_network-0.56.0/sn_api-0.55.0/sn_cli-0.48.0
+
 ### Bug Fixes
 
  - <csr-id-e867b1f5aa290823e77eff95f0846f00d7c0416c/> CLI shell was creating a new Safe API instance, and connecting to the net, for every command
@@ -348,6 +496,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.47.1 (2022-02-04)
 
+### Chore
+
+ - <csr-id-86975f228f31303597a707e158005e44c86de1cc/> safe_network-0.55.3/sn_api-0.54.1/sn_cli-0.47.1
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -369,6 +521,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.47.0 (2022-02-01)
+
+### Chore
+
+ - <csr-id-2ec86e28246031084d603768ffa1fddf320a10a2/> safe_network-0.55.1/sn_api-0.54.0/sn_cli-0.47.0
 
 ### New Features
 
@@ -422,6 +578,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.46.0 (2022-01-28)
 
+### Refactor
+
+ - <csr-id-9af70e7785c9329d8262de99bda68c4ad79d5154/> remove get_target_url function
+   This function contained an unnecessary check to see if the `safe://` prefix wasn't present in top
+   name or public names, which we wouldn't expect it to be. I'm not sure what I was thinking with this.
+   
+   Also made some more readability changes based on PR feedback.
+ - <csr-id-a58f6c5019e73ffbfa0f29965aa0fa62b026ece7/> remove url sanitisation from api
+   The `Safe::parse_url` function was removed from the API. This function 'sanitised' a URL by applying
+   a `safe://` prefix to a URL string if the caller hadn't specified it.
+   
+   Initially, it was done to tidy up NRS code that was calling this function, but the same code was
+   also calling a private function `parse_url` was making use of, so effectively the code was being
+   called twice. More generally, we decided callers of the API should be responsible for passing a
+   valid URL.
+   
+   The function was being called by various other parts of the API and also in the CLI, so these were
+   changed to call `SafeUrl::from_url` directly.
+   
+   Some code was added to CLI commands to apply the `safe://` prefix if the user omitted it, so no
+   functionality  was broken. A few test cases were added to cover it. A couple of NRS test cases for
+   validating URLs were also removed as they no longer apply. This behaviour may actually have been
+   incorrect in the first place.
+   
+   Also apply various clippy fixes.
+
+### Chore
+
+ - <csr-id-366eee25f4b982d5a20d90168368a1aa14aa3181/> safe_network-0.55.0/sn_api-0.53.0/sn_cli-0.46.0
+
 ### New Features
 
  - <csr-id-3d73dd03a7a6913a248e5cca7d714f8b8e4c0d01/> retrieve immutable content via nrs
@@ -463,6 +649,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.45.0 (2022-01-22)
 
+### Refactor
+
+ - <csr-id-3b5ce194213a7090ee83c02b0043700cda230796/> remove one layer of indirection
+
+### Chore
+
+ - <csr-id-0190f0305980bdaee30f9f2ab5eb5510149916db/> safe_network-0.54.0/sn_api-0.52.0/sn_cli-0.45.0
+ - <csr-id-3dc23278c6a4fabc250b27f4312f5c51f0f271a4/> update remaining places
+ - <csr-id-20f416cb7d0960a1d8d6f167a1ad1eed33ed6a7b/> update from MIT/BSD3 to GPL3
+ - <csr-id-7a7752f830785ec39d301e751dc75f228d43d595/> update year on files modified 2022
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -490,6 +687,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.44.0 (2022-01-20)
+
+### Other
+
+ - <csr-id-ad2e30cf52cd8be01c00353d722ea1107c43a641/> nightly release run
+   Sets up a release build to run nightly. It runs as follows:
+   * Build the node binary using the latest code
+   * Launch the testnet on Digital Ocean using our custom action
+   * Run the client tests against the testnet
+   * Run the API tests against the testnet
+   * Run the CLI tests against the testnet
+   * Kill the testnet
+   * Bump any version numbers and push a new release commit to `main`
+   
+   The push to `main` should then trigger the release workflow, which will run as usual.
+   
+   A few noteworthy points:
+   * In theory, the testnet custom action can build the node on a large Digital Ocean VM, but I found
+     it unreliable.
+   * The 3 test suites _could_ run in parallel, but for now they run sequentially.
+   * All test suites get the opportunity to run, even if the previous one fails.
+   * If any suite fails, the testnet is killed and no version bumping occurs.
+   
+   There were also a couple of changes related to CLI tests:
+   * Change the `files tree` test to not use hard coded sizes for files. One of the test data files had
+     been changed, and it also appeared to be the case that you could get a different file size if you
+     uploaded files from Windows.
+   * Set the ignore attribute on the `node install` latest version test. This test uses the Github API
+     to get the latest version, and there appeared to be rate limiting issues, despite the fact that we
+     would only make 3 calls for the entire test suite.
+
+### Chore
+
+ - <csr-id-923930acb3769cfa7047954a1fee1853ec9e3062/> safe_network-0.53.0/sn_api-0.51.0/sn_cli-0.44.0
+ - <csr-id-57749b7d0671423fe205447bc84d9f8bfc99f54b/> solving new clippy findings
 
 ### Documentation
 
@@ -537,6 +768,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.43.2 (2022-01-06)
 
+### Chore
+
+ - <csr-id-99d012ef529df78ef4c84f5e6ea99d3a77414797/> safe_network-0.52.11/sn_api-0.50.5/sn_cli-0.43.2
+ - <csr-id-155ee032ee56cbbb34928f2d14529273ccb69559/> safe_network-0.52.13/sn_api-0.50.6
+ - <csr-id-a64c7e0414b77f545cb8cdbf64af0fb7212d1f2e/> safe_network-0.52.9/sn_api-0.50.4
+
 ### Documentation
 
  - <csr-id-0f44890b8d5cd7055a790f70cdf6d167532ada05/> reintroduce the `files sync` command
@@ -581,6 +818,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.43.1 (2022-01-04)
 
+### Refactor
+
+ - <csr-id-c790077bebca691f974000278d5525f4b011b8a7/> rename blob to file
+
+### Chore
+
+ - <csr-id-db515397771f117b3bf095e1a4afb897eb4acafe/> sn_cli-0.43.1
+ - <csr-id-bebdae9d52d03bd13b679ee19446452990d1e2cf/> rename dest to dst
+ - <csr-id-5f7000c5ec5895fb3f4c4a17a74ada52bb873fc7/> sn_api-0.50.3
+ - <csr-id-4bb2adf52efdac6187fffc299018bf13f3398e14/> safe_network-0.52.4/sn_api-0.50.1
+ - <csr-id-0a70425fb314de4c165da54fdc29a127ae900d81/> safe_network-0.52.6/sn_api-0.50.2
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -606,7 +855,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.43.0 (2022-01-03)
 
-### refactor (BREAKING)
+### Chore
+
+ - <csr-id-ee86dc7ab1781731d3be19f9d7f414f157a91edb/> sn_api-0.50.0/sn_cli-0.43.0
+
+### Refactor (BREAKING)
 
  - <csr-id-715a154fe7448cd18decd0a666ae11fb02eadedb/> remove dry-run as arg from all APIs and make it a Safe instance mode
 
@@ -630,6 +883,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.42.0 (2022-01-03)
+
+### Chore
+
+ - <csr-id-4f600e179bfbf6ac018876cca6f7fc193f5b5f1e/> sn_api-0.49.0/sn_cli-0.42.0
 
 ### Bug Fixes (BREAKING)
 
@@ -656,6 +913,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.41.0 (2022-01-03)
+
+### Chore
+
+ - <csr-id-e38925e07d69432db310fc8ec9803200ea964ab2/> safe_network-0.52.1/sn_api-0.48.0/sn_cli-0.41.0
+ - <csr-id-f1bb1909f3fb506c1b7ec9b660ad533b7b8b9044/> minor refactor and changes to CLI report errors
 
 ### Documentation
 
@@ -687,7 +949,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - <csr-id-4adaeaff4f07871840397adc3371ec8b3436e7ce/> change files APIs to accept std::Path for path args rather than only &str
    - Changed the files_container_create API to now create just an empty FilesContainer
 
-### refactor (BREAKING)
+### Refactor (BREAKING)
 
  - <csr-id-ff1dd477aaea2a4dda6c9c15b5822b1b3a7514b7/> ProcessedFiles redefined on more specific data types instead of simply Strings
 
@@ -716,6 +978,52 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.40.0 (2021-12-22)
+
+### Refactor
+
+ - <csr-id-dffcd4e3dd07f99dd3a4f4330637cab9380db9c3/> use s3 as download source for sn_node
+   Now that we've restructured the release process such that one release has all crates, it makes it
+   more difficult and awkward to install specific versions of any of the binaries, when Github Releases
+   are the source of the download. This is because you can't query Github releases to search for the
+   version number of one component. If you want to get a particular version of something by a
+   convention (like say the tag name on the release), you need to know the version number for each of
+   the 3 components.
+   
+   Here the `node install` command is changed to use the Github API to get the latest version, but once
+   the version is obtained, we download the binary from S3. This is so we can also support downloading
+   specific versions. Using the S3 bucket, we can do this by convention, based on the version number
+   and the target platform. It happens to be the case that the self update crate provides some
+   functions for querying the API and also downloading and extracting a binary from a compressed tar
+   archive, so we're still making use of that crate here.
+
+### Chore
+
+ - <csr-id-6b59ad852f89f033caf2b3c7dfcfa3019f8129e8/> safe_network-0.52.0/sn_api-0.47.0/sn_cli-0.40.0
+ - <csr-id-f6ffbdb5d999f84e3531a6dcd9dcdbacefd50d18/> sn_cli-v0.39.2
+   This was a manually generated commit, because smart-release didn't detect any changes in the sn_cli
+   crate.
+ - <csr-id-d201f7e3480a8a12f488e2a54886cca942904a18/> re-introduce version arg for cli install script
+   The release process has been modified to upload all our releases to S3, so we can re-introduce the
+   `--version` argument for installing specific versions. If the user supplies a version, we can get
+   that from S3. Otherwise, we'll get the latest version from Github Releases.
+   
+   Also run a `cargo fmt` after a rebase with some conflicts.
+ - <csr-id-f59ec2c6da30b13fc2606d2834fad108a56c3621/> remove `self-update` feature from `node install`
+   This feature should really never have been applied to `node install`, since self update for the node
+   occurs on the node binary itself. We only want to disable self update for the CLI and we still want
+   the `node install` feature.
+   
+   This means that the `self-update` feature itself isn't actually tied to the `self_update` crate,
+   which will still be used, because parts of its functionality are used for the `node install`
+   command.
+   
+   It will now just disable the CLI itself from updating, which a separate concern from the `node`
+   command.
+   
+   This also fixes a little mistake with the tag_name for the release not being assigned correctly.
+ - <csr-id-b6f0c3f193e8116bcd08126b949eb1a2e9b5aaa5/> replacing calls to unwrap() and expect(...) with proper Result handling
+ - <csr-id-8aeca3dffdf92341d34e1f6856160cff57cf0d6a/> re-enable CLI tests in CI
+ - <csr-id-7dce30c10262573362e6f60c284a51696de36d01/> reduce default query timeout for cli
 
 ### Commit Statistics
 
@@ -752,6 +1060,12 @@ This is a manually generated changelog, as `smart-release` seemed to have some i
 
 ## v0.39.1 (2021-12-16)
 
+### Chore
+
+ - <csr-id-943166ab6d88266909ec6cd8a8e98bbbf21ec18d/> sn_cli-0.39.1
+ - <csr-id-6df94b1d1fb017c9b02e566ca22a518f885397c8/> sn_api-0.46.2
+ - <csr-id-9be440b36db07e1c04ab688b44ef91e4a56ed576/> safe_network-0.51.3/sn_api-0.46.1
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -775,6 +1089,101 @@ This is a manually generated changelog, as `smart-release` seemed to have some i
 ## v0.39.0 (2021-12-16)
 
 This is a manual changelog entry. Subsequent CLI releases will use the automated changelog generated by `smart-release`.
+
+### Refactor
+
+ - <csr-id-8d402e8b2255edf139e3c3507e6597e581719ad4/> build asset download url in cli
+   The asset download URL is being incorrectly assigned in the `self_update` crate. As per the previous
+   commit, we're trying to resolve this upstream, but don't know how long it will take.
+   
+   Instead, we use a temporary workaround, which is our own code to determine the download URL. We are
+   still `self_update` to download and extract the release archives. When the issue is fixed, we can
+   remove this code.
+   
+   As part of this work, I added some integration tests for the `node install` command and tidied up
+   some of its documentation. These tests will run in the CLI test suite. To enable better testing, an
+   environment variable was added to specify the location of the CLI's config directory; we don't need
+   to expose this as an option to users, though it would be there if we wanted to.
+
+### Other
+
+ - <csr-id-1a8bbb7ebe4737f931cec259dc7863b84531f2c3/> disable self update feature in sn_cli
+   Due to moving everything into one repository, the self update feature isn't working at the moment.
+   We will need to revisit and fix it. For now, I'm just disabling the feature from the release build
+   of the CLI.
+   
+   Also fix a clippy warning that ideally should have been done on the last commit.
+ - <csr-id-45f1f02bbdb61e7c698f1f6a5a62fb63ed01aae3/> update use of nrs in other areas
+   I've been able to remove the `ignore` attributes to re-enable tests in other categories that were
+   using NRS. The `files sync` issue still hasn't been addressed yet.
+   
+   The following test updates were made:
+   
+   * calling_safe_cat_xorurl_with_version: this test was ignored because of the `files sync` issue, but I
+     believe it was better to reduce the scope of this test to check that `cat` works with a versioned
+     url, rather than testing the versioning system itself.
+   * calling_safe_cat_nrsurl_with_version: likewise, the scope of this test was reduced and thus the
+     `files sync` issue didn't apply any more.
+ - <csr-id-ffea442b710f0051483523297968c9bcbc81419b/> remove previous nrs tests
+   To me, these tests were lacking a clear purpose and they didn't map directly onto any of the
+   commands. They should now be made obsolete by the new tests, which map to specific commands and
+   scenarios.
+ - <csr-id-db98472ad8af2a61aa8edf594119ed6b7a92d3ad/> add coverage for `nrs remove` command
+   There are no behavioural changes in the command, but there was a little bit of code refactoring and
+   some improved user experience by way of error messages and suggestions.
+   
+   We need to come back and revisit some odd behaviour with this command, related to removing topnames
+   and attempting to remove subnames that don't exist.
+
+### Chore
+
+ - <csr-id-ae44ebbf46a72bf1897f8c6004466290f8425db7/> sn_cli-v0.39.0
+   This release is being performed 'manually' so that the first sn_cli crate can be published to
+   crates.io. From that point forward, `smart-release` should hopefully be able to pick up the changes
+   in the CLI.
+   
+   The changelog entry here is a manual one that's been done from memory, so it may well be missing
+   certain things. Moving forward, the changelog will be generated automatically.
+ - <csr-id-634a8f9f307598c51305067444514b43c85f196d/> sn_api-0.46.0
+ - <csr-id-b09f8307fd1047eb92d2cfe1a6ed38731f6e09e2/> remove use of `indicatif` crate
+   This was another crate that was using a git reference. It provides progress bars and other
+   mechanisms for updating terminal user interfaces with progress on long running tasks. We were using
+   this crate to display some progress bars during the `files get` command.
+   
+   Obviously, removing the crate means we no longer have the progress bars in the UI, but we already
+   had a text-based mechanism for displaying progress, so for the time being, we can fall back on this.
+   We can look at other progress bar crates or refactor `files get` to work in parallel.
+   
+   The main crate used a design that made use of threads for handling the display and update of
+   multiple progress bars, but our code for `files get` is synchronous. The forked crate was used
+   because it had a mechanism for updating the display in a single-threaded manner.
+   
+   Removing this crate now means we should be able to get `sn_cli` published, which I would argue is
+   currently of higher priority.
+ - <csr-id-e52a0c063f747e0be1525f07f8f759f4b9d042a7/> add recursion limit for clippy
+ - <csr-id-855f3042859dd641231135de618520050861c348/> use versioned self update crate
+   Currently the `self_update` crate has an issue whereby the wrong download URL is assigned to assets
+   on the Github release. We've fixed this issue on our own fork of the crate, and we're currently
+   speaking to the owner to try and get it merged in, but there could potentially be an indefinite
+   amount of time in getting that merged and a new version of that crate released.
+   
+   In the mean time, we really need to get a release of `sn_cli`, but with our new release process, we
+   can't do so without having a it published on crates.io. Therefore, this commit is reverting back to
+   the versioned `self_update` crate that has the problem in it, but the next commit will provide some
+   temporary code to work around the URL problem.
+   
+   As part of the work here, I've made a few changes to ensure that the CLI can actually build if the
+   `self-update` feature is switched off, and I also removed an optional dependency on the `reqwest`
+   crate, which was tied to the `self-update` feature. The reason for this is because there's some code
+   in one of the `networks` commands that can download a network config from a remote location, and we
+   need to make an HTTP request for that. I realise `reqwest` may be a large dependency, but in my
+   view, it doesn't make sense to tie this code to the `self-update` feature, since the `networks`
+   commands have no relation to `self_update`.
+ - <csr-id-6f5516d8bb677462ea6def46aa65a1094767d68c/> safe_network-0.49.0
+ - <csr-id-735a68a45aa264a5462642f4fb1e26f05bdf28ca/> address feedback from pr
+   * Remove use of unwrap on topname parsing and put the duplicated code in a function
+   * Refer to 'url' rather than 'XorUrl'
+ - <csr-id-58632a27d271140fc4d777f25a76b0daea582426/> minor improvement to client log msgs related to configured timeouts
 
 ### New Features
 
@@ -852,6 +1261,209 @@ data they're trying to store and retrieve.
 This was tested against v0.33.12 of `safe_network`.
 
 * update cli for 0.38.x of sn_api ([487e0ab](https://github.com/maidsafe/sn_cli/commit/487e0ab1a5af333377b3743cafb74b7551846621))
+
+### Test
+
+ - <csr-id-6f0501699b0d0620a7c9d2b013944f90884ca1c3/> adding first set of tests for Multimap API
+ - <csr-id-7fb6bd96a8bdaaee64592b5dc02596b9f6220165/> adapt wallet tests and minor refactoring
+ - <csr-id-774694795114dc392db5219393fa63f204fcc905/> adapt tests to new transfer costs and minor refactor to transfers errors handling
+
+### Refactor
+
+ - <csr-id-578d9054c668dcf5871cdac26f2c16aa5df13d58/> parse different output from `nrs create`
+   This command now returns a `Url`, along with a tuple of 3 strings. The strings are:
+   * a "+" sign to indicate the addition of new content
+   * the NRS name that was created
+   * the Safe URL the entry points to
+   
+   The test helper function that parses the output of the command was updated to return these types and
+   any callers were updated to use a `Url` directly. Previously, the caller was expecting the Url back
+   as a `String`, and most were then creating a `Url` from that `String`, so this cuts the
+   intermediate step.
+ - <csr-id-25ad76bc374e461c1df786def45ca79bd1f7484a/> unit test node run-baby-fleming command
+   I wanted to extend the `run-baby-fleming` command to add a new network to the networks list, but
+   before doing so, I looked into providing test coverage to the node commands. Currently there are no
+   integration tests for these commands. The `node` commands don't really depend on having an existing
+   network, so they are much more susceptible to being unit tested.
+   
+   The one barrier to unit testing was the fact that the command uses `sn_launch_tool` from the `sn`
+   crate, and this actually launches nodes. The solution was to introduce a `NetworkLauncher` trait and
+   provide a fake implementation of this trait for use in the unit tests. We use the fake launcher to
+   assert that the `sn_launch_tool` is called in the correct fashion. The concrete implementation for
+   use with the application was simply just a little wrapper around `sn_launch_tool`.
+   
+   As part of this refactor, the `run-baby-fleming` command is changed as follows:
+   * The `node_path` argument was renamed to `node_dir_path`, to be clearer about the fact that this
+     option is expected to be a directory path and not a file path.
+   * The `test` flag argument was removed, as we're not using the authentication service just now.
+   * The `verbose` flag argument was removed, as it only applied to the authentication service test,
+     which was removed.
+   
+   Due to the authentication service no longer being in use, the code related to performing a test
+   using the service was removed.
+   
+   The unit tests provided here should give coverage for all the scenarios in `run-baby-fleming`.
+ - <csr-id-86910340897256bb4df77b6edaa0f2c9584d6dce/> update cli to use new nrs api
+   There are changes here to update the NRS command handlers to use the new API for NRS, and other
+   smaller changes for referencing types that had been moved to new modules. This commit also restores
+   a function, `get_map_summary`, that was deleted from the `NrsMap` struct. The CLI `cat` and `dog`
+   commands still relied on this functionality, so it's been provided as a placeholder for now, just to
+   get the CLI to compile.
+   
+   At this point, the NRS test suite is not passing, because there have been some behavioural changes
+   as part of the refactor. Unfortunately, because of the state of the rest of the network just now,
+   it's hard to isolate these specific changes to get the tests passing again, as other functionality
+   like the `cat` command appear to be broken just now too.
+   
+   I think it's worth committing this as it is now, with the CLI compiling, then we can come back and
+   address the other issues that will get the test suite passing again.
+ - <csr-id-5780fd1d6ba480cb775fd66e53e41f02d97b3a94/> moving out safe_url mod as a standalone sn_url crate
+ - <csr-id-afd5422945fd1fc4ac509713e72471076ea4aee0/> re-organising files, nrs and xorurl files into their own mod folders
+ - <csr-id-318f6942ac1cd40391b283349bcfa959586422b5/> Adds bin-version subcommand to node & auth, removes -V for all subcommands
+ - <csr-id-cd57437baf74af370c07d2be6dd9cd51be6d5f52/> group all config related functions in Config struct with methods
+ - <csr-id-c2c6716d29e56f387776202dad94ddda9b8fe2b2/> migrating to use anyhow for CLI errors and use thiserror for sn_api error types
+ - <csr-id-88a26d3af44b751d04bbfdddd6fa305bea736939/> don't attempt to read authd credentials from env vars if --config was passed
+ - <csr-id-f6f07349a7524304b3d6b1c22db65d77be519f4c/> return anyhow::Result/Error from all CLI tests
+ - <csr-id-e692becbbf09e2500284cb1507916fac56149f02/> remove Error::Unexpected and Error::Unknown errors from API
+ - <csr-id-ae026bb9ce91b1373b8b300c41bfef0c3f295c7a/> properly serialise key pairs in CLI commands output
+ - <csr-id-f9e07293ea1f8cd5e4428d95a299ba06c0f30a20/> minor reorganisation to cli test scripts
+ - <csr-id-5ac36cc64566561f4d442058c91b9857622e6f26/> minor renamings in authd status report with new terminology
+ - <csr-id-b6eddcbf5d272e6a4430cfd6488f5236bef92a5d/> adapt to latest sn-client api changes and further simplification of auth messages
+ - <csr-id-e814ff3b8c58ae7741938a1c73a22c87ed602883/> simplify authd messages format and serialisation
+
+### Other
+
+ - <csr-id-256c504e49121fa0550ae1bcff33f22b8efc78df/> cross platform support for cli unit tests
+   On Windows, some tests were failing due to issues with file paths and around URL parsing.
+   
+   For the files tests, it was because strings were being compared rather than `Path` structs.
+   
+   For the URL related failures, somewhat strangely, on Windows, the `parse` function on the `url`
+   crate returned an `Ok` result if you gave it a file path, which it doesn't do on Linux. A quick
+   solution was to test the URL for a host.
+ - <csr-id-ae19a45f58bf8d107eea8560af17801d2f619626/> ignore for bugs that have been identified
+   There are various tests that are ignored here, where genuine bugs or behavioural changes have been
+   identified. These need to be investigated and fixed. Wherever an ignore has been used, a short piece
+   of text has been applied to state the issue.
+   
+   The reason for ignoring them was to see whether the rest of the test suite could run with
+   consistency, to see if the frequency of intermittent errors had reduced. We will be looking into
+   each of the issues shortly, and as they are fixed, the ignore attributes can be removed.
+ - <csr-id-06fda580250745abbd8a6a12bab19c05a61f5615/> minor changes for out of date tests
+   A few things were changed here:
+   * Use correct method to parse output from `nrs create` commands.
+   * Update expectations for minor changes in error messages.
+   * Change a couple of tests to not use JSON output, which also seems to have some minor changes.
+   * Test data references
+   
+   For some of these things, like the error messages, it was easier to just have the tests change
+   rather than the code, since the differences were so minor.
+ - <csr-id-d8ec5a81ae566e8d7068592e01cff4e808b1cad1/> revert "chore(release): safe_network-0.42.0/sn_api-0.41.0"
+   This reverts commit 63432eb2e528401ae67da8eea0c82837ab42fc18.
+   
+   This release was duplicating everything that was in 0.41.0, probably because the tags weren't
+   correct.
+ - <csr-id-a4e6bb9646521585e2d166fcbc072f43740d1000/> update S3 connection info URL
+ - <csr-id-304a16d443a0347e50e0868057486d1067a37b4a/> add details about the new networks set command
+ - <csr-id-67b746f607501511c38fe752f64119a12985ab72/> fix all clippy issues after updating to rust 1.49
+ - <csr-id-40bcd0f46dad6177b0052b73393d7789fd559b33/> updates and enhancements to the User Guide, and to some commands help messages
+ - <csr-id-e107e1314957053db2d71357450cac65cba52a68/> updating CLI User Guide
+
+### Chore
+
+ - <csr-id-05f6d98cf21f0158f4b5161484c7c15a0561b6f4/> clippy tidyup for rust 1.57
+ - <csr-id-3f77429e8bd659a5b2e7aa377437fac1b3d709c0/> unify skip port forwarding arguments
+   We decided to rename the `--skip-igd` argument to `--skip-auto-port-forwarding`. I had initially
+   renamed the arguments on the CLI and `sn_launch_tool` to `--disable-port-forwarding`, but it turned
+   out that wasn't a completely accurate description of what's happening.
+   
+   We are now uniformly referring to this argument as `--skip-auto-port-forwarding`, which is quite an
+   accurate description, as it skips (but not disables) the software-based port forwarding, leaving you
+   to 'manually' setup port forwarding on your router, if need be.
+   
+   Also fixed some clippy warnings.
+ - <csr-id-c78f4703a970e8b7466b091ad331d0f2233aa9a3/> safe_network-0.43.0
+ - <csr-id-ca21d1e97fcd28ca351887636affffff78e3aeb3/> safe_network-0.42.0/sn_api-0.43.0
+ - <csr-id-8b8a3616673405005d77868dc397bd7542ab3ea7/> safe_network-0.41.4/sn_api-0.42.0
+ - <csr-id-df25e4920c570771f6813ca03da02f6dfc8e59fb/> sn_api-0.41.0
+ - <csr-id-a973039178af33b859d421cf36571de49cceff17/> safe_network-0.41.2/sn_api-0.40.1
+ - <csr-id-63432eb2e528401ae67da8eea0c82837ab42fc18/> safe_network-0.42.0/sn_api-0.41.0
+ - <csr-id-14fdaa6537619483e94424ead5751d5ab41c8a01/> safe_network-0.41.0
+ - <csr-id-70015730c3e08881f803e9ce59be7ca16185ae11/> safe_network v0.40.0/sn_api v0.39.0
+ - <csr-id-213cb39be8fbfdf614f3eb6248b14fe161927a14/> update bls_dkg and blsttc to 0.7 and 0.3.4 respectively
+ - <csr-id-6f5e0a767a1c8519abdf06d42c7c958a812011ec/> update sn_api reference style
+   This way of referencing seems to be required for `smart-release`.
+   
+   Also took the opportunity to fix the indentation on the other references, as there appeared to be no
+   reason for them to be indented.
+ - <csr-id-fc10d037d64efc86796f1b1c6f255a4c7f91d3e1/> bump rust edition
+   The few breaking changes in this edition did not affect us.
+ - <csr-id-4f788a31ae7b4a2d602b5141946deacffef64a60/> improve test names
+ - <csr-id-1fbfc0444882d2b950be9eca70df2118606db9c3/> remove unused dependencies
+ - <csr-id-407efd15e0b4854864b83ccdb7d2c3adbb0a02e2/> appease clippy
+ - <csr-id-a3e0b805af544205e82ac0c6d2a6e2ed1c55011f/> move cli code into sn_cli crate directory
+   The first step after the initial merge was to reorganise some directories:
+   
+   * The cli code was moved from the top level `src` to the `sn_cli` crate directory
+   * The test data and related directories were moved to the `resources` directory
+   * The test scripts were also moved to the `resources` directory
+   
+   The CLI integration tests were updated to refer to the new test data locations. Most of the test
+   suite is now passing, but some NRS related tests weren't working, so these were marked as ignored.
+   These failures look to be due to some of the recent changes in the NRS refactor and will probably be
+   quite straight forward to fix. However, I'm going to address these after this merge.
+ - <csr-id-0d4755ed64a65c223bad253d9d7a03980ec12e8d/> update sn_client and sn_data_types to latest
+ - <csr-id-d77859a8138de0ddcd6b121b928efe13e0254e81/> upgrade tokio to v1.3.0 and quinn to v0.10.1
+ - <csr-id-de482a5611333d069076d7da1b7c5a6017db65eb/> adding a step to check for unused dependencies
+ - <csr-id-e3c6da38f92c354c560bd6b555d76f698779ebcf/> upgrade sn_client to v0.46.12 and most of all dependencies to their latest published version
+ - <csr-id-644c1e0d7b2bf346937aa5baf35adab58a49d39e/> adds clippy exception for unused result on windows
+ - <csr-id-792bce8dd94192f17c51d6a1c0b63c7c214ad7c3/> update tiny-keccak from 1.5.0 to 2.0.2
+   keyword was used interchangeably with passphrase so remove keyword.
+   pin was used interchangeably with salt so remove pin.
+   passphrase, password ordering is always the same (alphabetical).
+ - <csr-id-b61e83716cce00c0ba02f3d50bf060cfc095051a/> upgrade sn_client to v0.46.9 and solve clippy issues
+ - <csr-id-43c675ee514aa73fb5192717dae58c97587521e7/> provide bootstrapping contacts list to sn_client as required by new sn_client API
+ - <csr-id-4ba83c720fabcace7a2859ad308be5922a6597c0/> changes to remove any use of Arc for keypairs and secret keys
+ - <csr-id-b38d840320d65b09ce85db9074f7b7a9487f83df/> update sn_client and dts
+ - <csr-id-2dff02dc71bc3574763906c8592d32bde64337c9/> do not attempt to retry fetching a Sequence entry if not found the first time
+ - <csr-id-a46ae886bb041ff46fc69a812f7dad65517dc7f4/> update launch tool dep
+ - <csr-id-4f89812ed5ca3394d2cd7b93e3c79aac2929d11d/> upgrade sn_client to v0.44.15
+ - <csr-id-7ec5ed71eac3def72967a16f45607ff4f8e03c0a/> update CI/CD to produce musl binary
+   Currently building gnu binary for Linux, switching to musl for greater compatibility.
+ - <csr-id-6e4ea368fdcedb10042b5d8dc94ab02eece47003/> minor change to error returned when parsing pk from hex
+ - <csr-id-422547f9081de77538f2241c727ac55b00e1e48b/> remove unwrap instances from prod and test code
+ - <csr-id-7b6445a5b9903b1704c45759878bced097bcb82c/> update credentials location
+ - <csr-id-9c3adffd0889f045ac19110072a194072d294705/> fix lint issues
+ - <csr-id-d19d57a2f369cb79fe5ac0c755f57b4005535540/> fix typos and clarify posix vs fuse in readme
+ - <csr-id-b5a6d8115ad3975a17dd973430480adf6c483490/> setting up for no ClientId
+   Remove PublicId refs too as data_type has had this removed
+ - <csr-id-29a978f3047464ad8014817e331218372b53c06c/> Batch of changes for sk handling
+ - <csr-id-dfabea0a26f97f420f47ba314cae0882aae47dca/> converting to more generic data types for keypair sk pk
+   W/ updated client and data_types deps
+ - <csr-id-106407e8125cc003794ba6249158aa1a655d3357/> clippy
+ - <csr-id-4905fae6259063411c5e4ef5fd2afb531980630c/> tidying up
+ - <csr-id-ee05ed31cb12d8e1d8bac7569beec90db52a5840/> update to reference renamed sn_node crate/repo
+ - <csr-id-b99e7dee3e72e703b47888e3ff03d2baa933b408/> fix merge bugs and readd some shell completion logic
+ - <csr-id-96511403687f23516658f1a4fab1b6c6ab3fab45/> update to reference renamed sn_app
+ - <csr-id-e389ab24f2186fc515b115e736a06d20756ae031/> rename artifacts and paths to match new naming convention
+   safe-cli --> sn_cli
+   safe-authd --> sn_authd
+   safe-ffi --> sn_ffi
+ - <csr-id-67e6ce1190ec1def43d4d2437456d985b5c07642/> update s3 bucket name to sn-api
+   Note that s3 do not allow '_' in bucket names, hence the '-'
+   separator.
+ - <csr-id-d5c1cd2808f9844b06b846ec10dfe05146137023/> further ffi cleanup
+ - <csr-id-8f309dada1517afa10c263a52f5597429f764890/> update safe-cmd-test-utilities name to
+ - <csr-id-8b9b481df5d124857abb02158739a6ded8f02af7/> remove mock/ffi builds + files
+ - <csr-id-019370cfd0ace44c656caf45c17248f2a547dbbf/> update safe-authd crate name to sn_authd
+ - <csr-id-873fe29ac9042b7ad28a29630d2c048bde3a7634/> reenable wallet apis
+ - <csr-id-70c67c749c504ddd552aba6663109d2b1839082a/> update safe-cli crate name to sn_cli
+ - <csr-id-426158fcbb6d7c1fe44755c138bba1ac825a0a0c/> use dirs_next for dir finding
+ - <csr-id-532aed1ed8e6b3957627ff2cc2f9d10d87fe3cb2/> getting tests compiling
+ - <csr-id-5a1cd2790b159e35c734dfb1fe64a43ea4409dfc/> reenabling some authd functionality
+ - <csr-id-0a5c18d115820f7124050bc0a246503b5cc63fd9/> reenabling some money apis
+ - <csr-id-b863e7eb299472b0c9dbd633b1b892cc221efb46/> sn_data_type updates
+ - <csr-id-4466c48a3fcec76f6c90cf6fcf1f28b177978c90/> safe_nd -> sn_data_types
 
 ### Bug Fixes (BREAKING)
 
