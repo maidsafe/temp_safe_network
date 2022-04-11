@@ -200,7 +200,7 @@ impl Safe {
                 format!("Failed to obtain file map for path: {}, on FileContainer at: {}, because: {:?}",
                 &path,
                 input_url,
-                e.to_string()),
+                e),
             ))?;
 
             // try to gather file link and metadata for a file

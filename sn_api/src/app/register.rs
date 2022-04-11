@@ -10,6 +10,7 @@ pub use safe_network::types::register::{Entry, EntryHash};
 
 use crate::safeurl::{ContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe};
+use safe_network::messaging::data::Error as ErrorMsg;
 
 use log::debug;
 use rand::Rng;
@@ -122,16 +123,23 @@ impl Safe {
                 debug!("No version so take latest entry from Register at: {}", url);
                 let address = self.get_register_address(url)?;
                 let client = self.get_safe_client()?;
-                client.read_register(address).await.map_err(|err| {
-                    if let ClientError::NetworkDataError(SafeNdError::NoSuchEntry) = err {
-                        Error::EmptyContent(format!("Empty Register found at {:?}", address))
-                    } else {
-                        Error::NetDataError(format!(
-                            "Failed to read latest value from Register data: {:?}",
-                            err
-                        ))
-                    }
-                })
+                match client.read_register(address).await {
+                    Ok(entry) => Ok(entry),
+                    Err(ClientError::NetworkDataError(SafeNdError::NoSuchEntry)) => Err(
+                        Error::EmptyContent(format!("Empty Register found at \"{}\"", url)),
+                    ),
+                    Err(ClientError::ErrorMsg {
+                        source: ErrorMsg::AccessDenied(_),
+                        ..
+                    }) => Err(Error::AccessDenied(format!(
+                        "Couldn't read entry from Register found at \"{}\"",
+                        url
+                    ))),
+                    Err(err) => Err(Error::NetDataError(format!(
+                        "Failed to read latest value from Register data: {:?}",
+                        err
+                    ))),
+                }
             }
         };
 

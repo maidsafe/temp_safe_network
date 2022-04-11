@@ -90,8 +90,7 @@ impl Node {
             recipients
         );
 
-        Ok(self
-            .send_messages_to_all_nodes_or_directly_handle_for_accumulation(recipients, wire_msg)
-            .await?)
+        self.send_messages_to_all_nodes_or_directly_handle_for_accumulation(recipients, wire_msg)
+            .await
     }
 }
