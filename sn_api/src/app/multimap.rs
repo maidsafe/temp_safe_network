@@ -167,6 +167,12 @@ impl Safe {
                 "No Multimap found at \"{}\"",
                 safeurl
             ))),
+            Err(Error::AccessDenied(_)) => {
+                return Err(Error::AccessDenied(format!(
+                    "Couldn't read Multimap found at \"{}\"",
+                    safeurl
+                )))
+            }
             other => other,
         }?;
 

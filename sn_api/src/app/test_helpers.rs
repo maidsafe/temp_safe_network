@@ -111,6 +111,15 @@ pub async fn new_safe_instance() -> Result<Safe> {
     Ok(safe)
 }
 
+// Instantiate a Safe instance with read-only access
+pub async fn new_read_only_safe_instance() -> Result<Safe> {
+    init_logger();
+    let bootstrap_contacts = get_bootstrap_contacts()?;
+    let safe = Safe::connected(bootstrap_contacts, None, None, None, None).await?;
+
+    Ok(safe)
+}
+
 // Create a random NRS name
 pub fn random_nrs_name() -> String {
     thread_rng().sample_iter(&Alphanumeric).take(15).collect()
