@@ -196,12 +196,12 @@ impl Safe {
             );
             (files_map, None, None)
         } else {
-            let files_map_for_path = files::file_map_for_path(files_map, &path).map_err(|e| Error::ContentError(
-                format!("Failed to obtain file map for path: {}, on FileContainer at: {}, because: {:?}",
-                &path,
-                input_url,
-                e),
-            ))?;
+            let files_map_for_path = files::file_map_for_path(files_map, &path).map_err(|e| {
+                Error::ContentError(format!(
+                    "Failed to obtain file map for path: {}, on FileContainer at: {}, because: {}",
+                    &path, input_url, e
+                ))
+            })?;
 
             // try to gather file link and metadata for a file
             let (link, metadata) = files::get_file_link_and_metadata(&files_map_for_path, &path)

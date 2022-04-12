@@ -12,7 +12,7 @@ use super::{
 };
 use color_eyre::{eyre::WrapErr, Result};
 use comfy_table::Table;
-use sn_api::{resolver::SafeData, ContentType, Safe, SafeUrl};
+use sn_api::{resolver::SafeData, Safe};
 use std::io::{self, Write};
 use structopt::StructOpt;
 use tokio::time::{sleep, Duration};
@@ -104,19 +104,8 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
         SafeData::SafeKey { .. } => {
             println!("No content to show since the URL targets a SafeKey. Use the 'dog' command to obtain additional information about the targeted SafeKey.");
         }
-        SafeData::Multimap { xorurl, data, .. } => {
-            let safeurl = SafeUrl::from_xorurl(xorurl)?;
-            if safeurl.content_type() == ContentType::Wallet {
-                println!("WALLET: {:?}", data);
-                for (_entry_hash, (name, dbc)) in data {
-                    let name = std::str::from_utf8(name)?;
-                    println!("name: {}, dbc: {:?}", name, dbc);
-                }
-            } else {
-                println!("Type of content not supported yet by 'cat' command.")
-            }
-        }
-        SafeData::PrivateRegister { .. }
+        SafeData::Multimap { .. }
+        | SafeData::PrivateRegister { .. }
         | SafeData::NrsEntry { .. }
         | SafeData::PublicRegister { .. } => {
             println!("Type of content not supported yet by 'cat' command.")
