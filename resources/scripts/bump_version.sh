@@ -5,9 +5,10 @@ commit_message=""
 sn_version=""
 sn_api_version=""
 sn_cli_version=""
-safe_network_has_changes=false
-sn_api_has_changes=false
-sn_cli_has_changes=false
+sn_dysfunction_has_changes="false"
+safe_network_has_changes="false"
+sn_api_has_changes="false"
+sn_cli_has_changes="false"
 
 function perform_smart_release_dry_run() {
   echo "Performing dry run for smart-release..."
@@ -37,31 +38,31 @@ function determine_which_crates_have_changes() {
   has_changes=$(crate_has_changes "sn_dysfunction")
   if [[ $has_changes == "true" ]]; then
     echo "smart-release has determined sn_dysfunction crate has changes"
-    sn_dysfunction_has_changes=true
+    sn_dysfunction_has_changes="true"
   fi
 
   has_changes=$(crate_has_changes "safe_network")
   if [[ $has_changes == "true" ]]; then
     echo "smart-release has determined safe_network crate has changes"
-    safe_network_has_changes=true
+    safe_network_has_changes="true"
   fi
 
   has_changes=$(crate_has_changes "sn_api")
   if [[ $has_changes == "true" ]]; then
     echo "smart-release has determined sn_api crate has changes"
-    sn_api_has_changes=true
+    sn_api_has_changes="true"
   fi
 
   has_changes=$(crate_has_changes "sn_cli")
   if [[ $has_changes == "true" ]]; then
     echo "smart-release has determined sn_cli crate has changes"
-    sn_cli_has_changes=true
+    sn_cli_has_changes="true"
   fi
 
-  if [[ $sn_dysfunction_has_changes == false ]] && \
-     [[ $safe_network_has_changes == false ]] && \
-     [[ $sn_api_has_changes == false ]] && \
-     [[ $sn_cli_has_changes == false ]]; then
+  if [[ $sn_dysfunction_has_changes == "false" ]] && \
+     [[ $safe_network_has_changes == "false" ]] && \
+     [[ $sn_api_has_changes == "false" ]] && \
+     [[ $sn_cli_has_changes == "false" ]]; then
        echo "smart-release detected no changes in any crates. Exiting."
        exit 0
   fi
