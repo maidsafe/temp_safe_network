@@ -338,25 +338,25 @@ impl Node {
 
     async fn initialize_handover(&self) -> Result<()> {
         let key = self
-             .section_keys_provider
-             .key_share(&self.network_knowledge.section_key().await)
-             .await?;
-         let n_elders = self
-             .network_knowledge
-             .authority_provider()
-             .await
-             .elder_count();
-         let section_prefix = self.network_knowledge.prefix().await;
+            .section_keys_provider
+            .key_share(&self.network_knowledge.section_key().await)
+            .await?;
+        let n_elders = self
+            .network_knowledge
+            .authority_provider()
+            .await
+            .elder_count();
+        let section_prefix = self.network_knowledge.prefix().await;
 
-         let mut handover_voting = self.handover_voting.write().await;
-         *handover_voting = Some(Handover::from(
-             (key.index as u8, key.secret_key_share),
-             key.public_key_set,
-             n_elders,
-             section_prefix,
-         ));
+        let mut handover_voting = self.handover_voting.write().await;
+        *handover_voting = Some(Handover::from(
+            (key.index as u8, key.secret_key_share),
+            key.public_key_set,
+            n_elders,
+            section_prefix,
+        ));
 
-         Ok(())
+        Ok(())
     }
 
     /// Generate cmds and fire events based upon any node state changes.

@@ -59,7 +59,11 @@ impl Node {
                 let mut state = handover_state.clone();
                 let mut cmds = self.handle_vote(&mut state, signed_vote).await;
                 if let Some(candidates_sap) = state.consensus_value() {
-                    debug!(">>> {}: {:?}", LogMarker::HandoverConsensusTermination, candidates_sap);
+                    debug!(
+                        ">>> {}: {:?}",
+                        LogMarker::HandoverConsensusTermination,
+                        candidates_sap
+                    );
                     // NB TOTO make sure error has to be swallowed
                     let bcast_cmds = self.broadcast_handover_decision(candidates_sap).await;
                     cmds.extend(bcast_cmds);
