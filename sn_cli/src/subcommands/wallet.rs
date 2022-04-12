@@ -18,11 +18,7 @@ use structopt::StructOpt;
 pub enum WalletSubCommands {
     #[structopt(name = "create")]
     /// Create a new Wallet
-    Create {
-        /// Preload with a DBC
-        #[structopt(long = "preload")]
-        preload: Option<String>,
-    },
+    Create {},
     #[structopt(name = "balance")]
     /// Query a Wallet's total balance
     Balance {
@@ -60,7 +56,7 @@ pub async fn wallet_commander(
     safe: &Safe,
 ) -> Result<()> {
     match cmd {
-        WalletSubCommands::Create { preload: _ } => {
+        WalletSubCommands::Create {} => {
             // Create wallet
             let wallet_xorurl = safe.wallet_create().await?;
 
@@ -107,7 +103,7 @@ pub async fn wallet_commander(
                     the_name, target
                 );
             } else {
-                println!("{}", target);
+                println!("{}", serialise_output(&(target, the_name), output_fmt));
             }
 
             Ok(())
