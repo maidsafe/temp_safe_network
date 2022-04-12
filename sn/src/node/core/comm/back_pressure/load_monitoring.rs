@@ -21,11 +21,12 @@ pub(crate) const INITIAL_MSGS_PER_S: f64 = 100.0;
 
 const ONE_MINUTE_AS_SECONDS: u64 = 60;
 
-const SAMPLING_INTERVAL_ONE: Duration = Duration::from_secs(ONE_MINUTE_AS_SECONDS);
-const SAMPLING_INTERVAL_FIVE: Duration = Duration::from_secs(5 * ONE_MINUTE_AS_SECONDS);
-const SAMPLING_INTERVAL_FIFTEEN: Duration = Duration::from_secs(15 * ONE_MINUTE_AS_SECONDS);
+pub(crate) const SAMPLING_INTERVAL_ONE: Duration = Duration::from_secs(ONE_MINUTE_AS_SECONDS);
+pub(crate) const SAMPLING_INTERVAL_FIVE: Duration = Duration::from_secs(5 * ONE_MINUTE_AS_SECONDS);
+pub(crate) const SAMPLING_INTERVAL_FIFTEEN: Duration =
+    Duration::from_secs(15 * ONE_MINUTE_AS_SECONDS);
 
-const INITIAL_MSGS_PER_MINUTE: f64 = ONE_MINUTE_AS_SECONDS as f64 * INITIAL_MSGS_PER_S; // unit: msgs per minute
+pub(crate) const INITIAL_MSGS_PER_MINUTE: f64 = ONE_MINUTE_AS_SECONDS as f64 * INITIAL_MSGS_PER_S; // unit: msgs per minute
 const MAX_CPU_LOAD: f64 = 0.8; // unit: percent
 const DEFAULT_LOAD_PER_MSG: f64 = MAX_CPU_LOAD / INITIAL_MSGS_PER_S; // unit: percent-seconds per msg
 
@@ -35,10 +36,10 @@ const ORDER: Ordering = Ordering::SeqCst;
 
 #[derive(Clone)]
 pub(crate) struct LoadMonitoring {
-    system: Arc<RwLock<System>>,
-    load_sample: Arc<RwLock<LoadAvg>>,
-    msg_samples: BTreeMap<Duration, MsgCount>,
-    msgs_per_s: BTreeMap<Duration, Arc<RwLock<f64>>>,
+    pub(crate) system: Arc<RwLock<System>>,
+    pub(crate) load_sample: Arc<RwLock<LoadAvg>>,
+    pub(crate) msg_samples: BTreeMap<Duration, MsgCount>,
+    pub(crate) msgs_per_s: BTreeMap<Duration, Arc<RwLock<f64>>>,
 }
 
 /// We have background tasks which update values at specific intervals,
@@ -185,7 +186,7 @@ fn normalize(load: LoadAvg) -> LoadAvg {
 }
 
 #[derive(Clone)]
-struct MsgCount {
+pub(crate) struct MsgCount {
     running: Arc<AtomicUsize>,
     snapshot: Arc<AtomicUsize>,
 }
