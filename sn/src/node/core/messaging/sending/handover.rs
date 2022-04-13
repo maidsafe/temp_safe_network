@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use sn_consensus::SignedVote;
-use std::collections::BTreeSet;
 use tracing::warn;
 
 use crate::messaging::system::SectionAuth;
@@ -86,26 +85,13 @@ impl Node {
     }
 
     /// Helper function to propose a NewElders list to sign from a SAP
+    /// Send the `NewElders` proposal to all of the to-be-Elders so it's aggregated by them.
     async fn propose_new_elders(
         &self,
         sap: SectionAuth<SectionAuthorityProvider>,
     ) -> Result<Vec<Cmd>> {
-        let dkg_sessions = self.promote_and_demote_elders(&BTreeSet::new()).await;
-        let agreeing_elders = BTreeSet::from_iter(sap.elders().cloned());
-        if dkg_sessions
-            .iter()
-            .all(|session| !session.elder_peers().eq(agreeing_elders.iter()))
-        {
-            // candidates sap out of date, ignore.
-            return Ok(vec![]);
-        }
-
-        // Send the `NewElders` proposal to all of the to-be-Elders so it's aggregated by them.
+        let proposal_recipients = sap.elders_vec();
         let proposal = Proposal::NewElders(sap);
-        let proposal_recipients = dkg_sessions
-            .iter()
-            .flat_map(|session| session.elder_peers())
-            .collect();
         self.send_proposal(proposal_recipients, proposal).await
     }
 }

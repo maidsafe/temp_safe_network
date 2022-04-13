@@ -617,6 +617,7 @@ impl Node {
                 }
 
                 self.print_network_stats().await;
+                self.log_section_stats().await;
             }
 
             if new.is_elder || old.is_elder {
