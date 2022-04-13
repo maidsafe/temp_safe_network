@@ -3769,6 +3769,7 @@ dependencies = [
  "dashmap",
  "eyre",
  "itertools 0.10.3",
+ "proptest",
  "rand 0.8.5",
  "thiserror",
  "tokio",
