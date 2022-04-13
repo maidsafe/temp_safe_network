@@ -7,10 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use eyre::Result;
-use safe_network::{
-    client::{utils::test_utils::read_network_conn_info, Client, ClientConfig},
-    types::{utils::random_bytes, Scope},
-};
+use safe_network::client::{utils::test_utils::read_network_conn_info, Client, ClientConfig};
+use sn_interface::types::{utils::random_bytes, Scope};
 use std::time::Duration;
 use tokio::time::sleep;
 

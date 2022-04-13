@@ -12,10 +12,8 @@
 use tokio::time::{sleep, Duration, Instant};
 use tracing::{debug, warn};
 
-use safe_network::{
-    client::{Client, ClientConfig, Error, Result},
-    types::{utils::random_bytes, BytesAddress, Scope},
-};
+use safe_network::client::{Client, ClientConfig, Error, Result};
+use sn_interface::types::{utils::random_bytes, BytesAddress, Scope};
 use tiny_keccak::{Hasher, Sha3};
 
 #[cfg(feature = "test-utils")]
