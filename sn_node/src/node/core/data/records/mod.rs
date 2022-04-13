@@ -19,6 +19,7 @@ use crate::node::{
 use dashmap::DashSet;
 use itertools::Itertools;
 use sn_interface::data_copy_count;
+use sn_dysfunction::IssueType;
 use sn_interface::messaging::{
     data::{CmdError, DataQuery, MetadataExchange, StorageLevel},
     system::{NodeCmd, NodeQuery, SystemMsg},
@@ -105,8 +106,12 @@ impl Node {
             for target in &targets {
                 trace!("adding pending req for {target:?} in dysfunction tracking");
                 self.dysfunction_tracking
-                    .add_a_pending_request_operation(*target, operation_id)
-                    .await;
+                    .track_issue(
+                        *target,
+                        IssueType::PendingRequestOperation,
+                        Some(operation_id),
+                    )
+                    .await?;
             }
 
             trace!("Adding to pending data queries");
@@ -148,7 +153,7 @@ impl Node {
         self.capacity.retain_members_only(&members).await;
 
         // stop tracking liveness of absent holders
-        self.dysfunction_tracking.retain_members_only(members);
+        let _ = self.dysfunction_tracking.retain_members_only(members).await;
 
         Ok(())
     }
@@ -158,7 +163,7 @@ impl Node {
         info!("Adding new Adult: {adult} to trackers");
         self.capacity.add_new_adult(adult).await;
 
-        self.dysfunction_tracking.add_new_node(adult);
+        let _ = self.dysfunction_tracking.add_new_node(adult).await;
     }
 
     /// Set storage level of a given node.

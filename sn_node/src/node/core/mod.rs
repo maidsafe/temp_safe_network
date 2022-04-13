@@ -53,7 +53,6 @@ use sn_interface::messaging::{
 use sn_interface::types::{log_markers::LogMarker, Cache, Peer};
 
 use crate::UsedSpace;
-use sn_interface::elder_count;
 use sn_interface::network_knowledge::utils::compare_and_write_prefix_map_to_disk;
 
 use backoff::ExponentialBackoff;
@@ -61,7 +60,7 @@ use dashmap::DashSet;
 use data::Capacity;
 use itertools::Itertools;
 use resource_proof::ResourceProof;
-use sn_dysfunction::{DysfunctionDetection, DysfunctionSeverity};
+use sn_dysfunction::{DysfunctionDetection, DysfunctionSeverity, IssueType};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     path::PathBuf,
@@ -192,7 +191,6 @@ impl Node {
                 .iter()
                 .map(|peer| peer.name())
                 .collect::<Vec<XorName>>(),
-            elder_count(),
         );
         info!(
             "DysfunctionDetection check: {:?}",
@@ -324,7 +322,7 @@ impl Node {
     /// Log a communication problem
     pub(crate) async fn log_comm_issue(&self, name: XorName) -> Result<()> {
         self.dysfunction_tracking
-            .track_comm_issue(name)
+            .track_issue(name, IssueType::Communication, None)
             .await
             .map_err(Error::from)
     }

@@ -51,16 +51,15 @@ mod operations;
 
 use xor_name::XorName;
 
+use crate::error::Result;
 use dashmap::DashMap;
-use itertools::Itertools;
 use std::collections::{BTreeSet, VecDeque};
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
 
-pub use detection::DysfunctionSeverity;
-
-pub use error::Error;
+pub use crate::error::Error;
+pub use detection::{DysfunctionSeverity, IssueType};
 
 /// Some reproducible xorname derived from the operation. This is a permanent reference needed for logging all dysfunction.
 type NodeIdentifier = XorName;
@@ -75,100 +74,106 @@ pub(crate) type TimedTracker = Arc<DashMap<NodeIdentifier, Arc<RwLock<VecDeque<I
 /// Dysfunctional node tracking. Allows various potential issues to be tracked and weighted,
 /// with unresposive or suspect nodes being noted on request, against which action can then be taken.
 pub struct DysfunctionDetection {
-    neighbour_count: usize,
-    communication_issues: TimedTracker,
-    knowledge_issues: TimedTracker,
-    unfulfilled_ops: Arc<DashMap<NodeIdentifier, Arc<RwLock<Vec<OperationId>>>>>, // OperationId = [u8; 32]
-    closest_nodes_to: Arc<DashMap<XorName, Vec<XorName>>>,
+    /// The communication issues logged against a node, along with a timestamp.
+    pub communication_issues: TimedTracker,
+    /// The knowledge issues logged against a node, along with a timestamp.
+    pub knowledge_issues: TimedTracker,
+    /// The unfulfilled pending request operation issues logged against a node, along with an
+    /// operation ID.
+    pub unfulfilled_ops: Arc<DashMap<NodeIdentifier, Arc<RwLock<Vec<OperationId>>>>>, // OperationId = [u8; 32]
+    adults: Arc<RwLock<Vec<XorName>>>,
 }
 
 impl DysfunctionDetection {
-    /// Set up a new Dysfunctional Node Tracker, averaging over a given neighbour count
-    pub fn new(our_adults: Vec<NodeIdentifier>, neighbour_count: usize) -> Self {
-        let closest_nodes_to = DashMap::new();
-
-        for adult in our_adults.iter() {
-            let closest_nodes = our_adults
-                .iter()
-                .filter(|&key| key != adult)
-                .sorted_by(|lhs, rhs| adult.cmp_distance(lhs, rhs))
-                .take(neighbour_count)
-                .cloned()
-                .collect::<Vec<_>>();
-            let _old_entry = closest_nodes_to.insert(*adult, closest_nodes);
-        }
+    /// Set up a new Dysfunctional Node Tracker.
+    pub fn new(our_adults: Vec<NodeIdentifier>) -> Self {
         Self {
-            neighbour_count,
             communication_issues: Arc::new(DashMap::new()),
             knowledge_issues: Arc::new(DashMap::new()),
             unfulfilled_ops: Arc::new(DashMap::new()),
-            closest_nodes_to: Arc::new(closest_nodes_to),
+            adults: Arc::new(RwLock::new(our_adults)),
         }
     }
 
+    /// Adds an issue to the dysfunction tracker.
+    ///
+    /// The `op_id` only applies when adding an operational issue.
+    pub async fn track_issue(
+        &self,
+        node_id: NodeIdentifier,
+        issue_type: IssueType,
+        op_id: Option<[u8; 32]>,
+    ) -> Result<()> {
+        debug!("Adding a new issue to the dysfunction tracker: {issue_type:?}");
+        match issue_type {
+            IssueType::Communication => {
+                if op_id.is_some() {
+                    return Err(Error::UnusedOpIdSupplied(
+                        "An operation ID only applies to pending unfulfilled requests.".to_string(),
+                    ));
+                }
+                let mut entry = self.communication_issues.entry(node_id).or_default();
+                let mut queue = entry.value_mut().write().await;
+                queue.push_back(Instant::now());
+            }
+            IssueType::Knowledge => {
+                if op_id.is_some() {
+                    return Err(Error::UnusedOpIdSupplied(
+                        "An operation ID only applies to pending unfulfilled requests.".to_string(),
+                    ));
+                }
+                let mut entry = self.knowledge_issues.entry(node_id).or_default();
+                let mut queue = entry.value_mut().write().await;
+                queue.push_back(Instant::now());
+            }
+            IssueType::PendingRequestOperation => {
+                let entry = self.unfulfilled_ops.entry(node_id).or_default();
+                let v = entry.value();
+                let op_id = op_id.ok_or_else(|| {
+                    Error::OpIdNotSupplied(
+                        "An operation ID must be supplied for a pending request operation."
+                            .to_string(),
+                    )
+                })?;
+                debug!("New issue has associated operation ID: {op_id:#?}");
+                v.write().await.push(op_id);
+            }
+        }
+        Ok(())
+    }
+
     /// List all current tracked nodes
-    pub fn current_nodes(&self) -> Vec<XorName> {
-        self.closest_nodes_to
+    pub async fn current_nodes(&self) -> Vec<XorName> {
+        self.adults
+            .read()
+            .await
             .iter()
-            .map(|entry| *entry.key())
+            .copied()
             .collect::<Vec<XorName>>()
     }
 
     /// Add a new node to the tracker and recompute closest nodes.
-    pub fn add_new_node(&self, adult: XorName) {
+    pub async fn add_new_node(&self, adult: XorName) {
         debug!("Adding new adult:{adult} to DysfunctionDetection tracker");
-
-        let our_adults: Vec<_> = self
-            .closest_nodes_to
-            .iter()
-            .map(|entry| *entry.key())
-            .collect();
-
-        let closest_nodes = our_adults
-            .iter()
-            .filter(|&key| key != &adult)
-            .sorted_by(|lhs, rhs| adult.cmp_distance(lhs, rhs))
-            .take(self.neighbour_count)
-            .cloned()
-            .collect::<Vec<_>>();
-
-        trace!("Closest nodes to {adult}:{closest_nodes:?}");
-
-        if let Some(_old_entry) = self.closest_nodes_to.insert(adult, closest_nodes) {
-            warn!("Throwing old dysfunction tracker for Adult {adult}:{_old_entry:?}");
-        }
-
-        self.recompute_closest_nodes();
+        self.adults.write().await.push(adult);
     }
 
-    /// Removes any tracked nodes not present in the passed `current_members`
-    pub fn retain_members_only(&self, current_members: BTreeSet<XorName>) {
-        let all_keys: Vec<_> = self.current_nodes();
-
-        for key in &all_keys {
-            if !current_members.contains(key) {
-                let _prev = self.communication_issues.remove(key);
-                let _prev = self.unfulfilled_ops.remove(key);
-                let _prev = self.closest_nodes_to.remove(key);
-            }
+    /// Removes tracked nodes not present in `current_members`.
+    ///
+    /// Tracked issues related to nodes that were removed will also be removed.
+    pub async fn retain_members_only(&self, current_members: BTreeSet<XorName>) {
+        let mut nodes = self.adults.write().await;
+        let nodes_being_removed = nodes
+            .iter()
+            .filter(|x| !current_members.contains(x))
+            .copied()
+            .collect::<Vec<XorName>>();
+        nodes.retain(|x| current_members.contains(x));
+        for node in nodes_being_removed.iter() {
+            let _ = self.communication_issues.remove(node);
+            let _ = self.knowledge_issues.remove(node);
+            let _ = self.unfulfilled_ops.remove(node);
         }
-
-        self.recompute_closest_nodes();
-    }
-
-    /// Recalculates the closest nodes
-    fn recompute_closest_nodes(&self) {
-        let all_known_nodes: Vec<_> = self.current_nodes();
-
-        self.closest_nodes_to.alter_all(|name, _| {
-            all_known_nodes
-                .iter()
-                .filter(|&key| key != name)
-                .sorted_by(|lhs, rhs| name.cmp_distance(lhs, rhs))
-                .take(self.neighbour_count)
-                .copied()
-                .collect::<Vec<_>>()
-        });
     }
 }
 
@@ -186,7 +191,7 @@ pub(crate) fn get_mean_of(data: &[f32]) -> Option<f32> {
 
 #[cfg(test)]
 mod tests {
-    use super::DysfunctionDetection;
+    use super::{DysfunctionDetection, IssueType};
 
     use eyre::Error;
     use std::collections::BTreeSet;
@@ -194,8 +199,6 @@ mod tests {
     use xor_name::{rand::random as random_xorname, XorName};
 
     type Result<T, E = Error> = std::result::Result<T, E>;
-
-    pub(crate) static ELDER_COUNT: usize = 7;
 
     static INIT: Once = Once::new();
 
@@ -214,95 +217,175 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn dysfunction_retain_members() -> Result<()> {
+    async fn retain_members_should_remove_other_adults() -> Result<()> {
         let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let dysfunctional_detection = DysfunctionDetection::new(adults.clone(), ELDER_COUNT);
+        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let nodes_to_retain = adults[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
 
-        let live_adults = adults[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
+        let _ = dysfunctional_detection
+            .retain_members_only(nodes_to_retain.clone())
+            .await;
 
-        dysfunctional_detection.retain_members_only(live_adults.clone());
-
-        let all_known_nodes: Vec<_> = dysfunctional_detection.current_nodes();
-
-        for member in all_known_nodes {
-            assert!(live_adults.contains(&member));
+        let current_nodes = dysfunctional_detection.current_nodes().await;
+        assert_eq!(current_nodes.len(), 5);
+        for member in current_nodes {
+            assert!(nodes_to_retain.contains(&member));
         }
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn dysfunction_compute_closest() -> Result<()> {
-        // Adults with prefix 0
-        let mut adults0 = (0..10)
-            .map(|_| xor_name::rand::random::<XorName>().with_bit(0, false))
-            .collect::<Vec<XorName>>();
+    async fn retain_members_should_remove_issues_relating_to_nodes_not_retained() -> Result<()> {
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
 
-        // Adults with prefix 1
-        let mut adults1 = (0..10)
-            .map(|_| xor_name::rand::random::<XorName>().with_bit(0, true))
-            .collect::<Vec<XorName>>();
-
-        // Whole set of Adults
-        let mut all_adults = vec![];
-        all_adults.extend(adults0.clone());
-        all_adults.extend(adults1.clone());
-
-        let dysfunctional_detection = DysfunctionDetection::new(all_adults, ELDER_COUNT);
-
-        for entry in dysfunctional_detection.closest_nodes_to.iter() {
-            let (node, neighbours) = entry.pair();
-
-            // Assert all the neigbours fall under the correct set
-            if node.bit(0) {
-                for neigbour in neighbours {
-                    assert!(adults1.contains(neigbour))
-                }
-            } else {
-                for neigbour in neighbours {
-                    assert!(adults0.contains(neigbour))
-                }
-            }
+        // Track some issues for nodes that are going to be removed.
+        for adult in adults.iter().take(3) {
+            let _ = dysfunctional_detection
+                .track_issue(*adult, IssueType::Communication, None)
+                .await;
+            let _ = dysfunctional_detection
+                .track_issue(*adult, IssueType::Knowledge, None)
+                .await;
+            let _ = dysfunctional_detection
+                .track_issue(*adult, IssueType::PendingRequestOperation, None)
+                .await;
         }
 
-        // Add 5 new adults for each 0 and 1 prefix
-        let new_adults0 = (0..5)
-            .map(|_| xor_name::rand::random::<XorName>().with_bit(0, false))
-            .collect::<Vec<XorName>>();
+        // Track some issues for nodes that will be retained.
+        let _ = dysfunctional_detection
+            .track_issue(adults[5], IssueType::Communication, None)
+            .await;
+        let _ = dysfunctional_detection
+            .track_issue(adults[6], IssueType::Knowledge, None)
+            .await;
+        let _ = dysfunctional_detection
+            .track_issue(adults[7], IssueType::PendingRequestOperation, None)
+            .await;
 
-        let new_adults1 = (0..5)
-            .map(|_| xor_name::rand::random::<XorName>().with_bit(0, true))
-            .collect::<Vec<XorName>>();
+        let nodes_to_retain = adults[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
 
-        let mut new_adults = vec![];
-        new_adults.extend(new_adults0.clone());
-        new_adults.extend(new_adults1.clone());
+        let _ = dysfunctional_detection
+            .retain_members_only(nodes_to_retain.clone())
+            .await;
 
-        // Add them to the larger set
-        adults0.extend(new_adults0);
-        adults1.extend(new_adults1);
+        assert_eq!(dysfunctional_detection.communication_issues.len(), 1);
+        assert_eq!(dysfunctional_detection.knowledge_issues.len(), 1);
+        assert_eq!(dysfunctional_detection.unfulfilled_ops.len(), 1);
 
-        // Add all of them to the dysfunction tracker
-        for new_adult in new_adults {
-            dysfunctional_detection.add_new_node(new_adult);
-        }
+        Ok(())
+    }
 
-        // Check if the recomputed nodes all fall within their respective sets
-        for entry in dysfunctional_detection.closest_nodes_to.iter() {
-            let (node, neighbours) = entry.pair();
+    #[tokio::test]
+    async fn track_issue_should_add_a_comm_issue() -> Result<()> {
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
 
-            // Assert all the neighbours fall under the correct set
-            if node.bit(0) {
-                for neigbour in neighbours {
-                    assert!(adults1.contains(neigbour))
-                }
-            } else {
-                for neigbour in neighbours {
-                    assert!(adults0.contains(neigbour))
-                }
-            }
-        }
+        dysfunctional_detection
+            .track_issue(adults[0], IssueType::Communication, None)
+            .await?;
 
+        assert_eq!(dysfunctional_detection.communication_issues.len(), 1);
+        assert_eq!(dysfunctional_detection.knowledge_issues.len(), 0);
+        assert_eq!(dysfunctional_detection.unfulfilled_ops.len(), 0);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn track_issue_should_return_error_when_adding_a_comm_issue_with_op_id() -> Result<()> {
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+
+        let result = dysfunctional_detection
+            .track_issue(adults[0], IssueType::Communication, Some([1; 32]))
+            .await;
+
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "An operation ID only applies to pending unfulfilled requests."
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn track_issue_should_add_a_knowledge_issue() -> Result<()> {
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+
+        dysfunctional_detection
+            .track_issue(adults[0], IssueType::Knowledge, None)
+            .await?;
+
+        assert_eq!(dysfunctional_detection.knowledge_issues.len(), 1);
+        assert_eq!(dysfunctional_detection.communication_issues.len(), 0);
+        assert_eq!(dysfunctional_detection.unfulfilled_ops.len(), 0);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn track_issue_should_return_error_when_adding_a_knowledge_issue_with_op_id() -> Result<()>
+    {
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+
+        let result = dysfunctional_detection
+            .track_issue(adults[0], IssueType::Knowledge, Some([1; 32]))
+            .await;
+
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "An operation ID only applies to pending unfulfilled requests."
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn track_issue_should_add_a_pending_op_issue() -> Result<()> {
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+
+        dysfunctional_detection
+            .track_issue(adults[0], IssueType::PendingRequestOperation, Some([1; 32]))
+            .await?;
+
+        assert_eq!(dysfunctional_detection.unfulfilled_ops.len(), 1);
+        assert_eq!(dysfunctional_detection.knowledge_issues.len(), 0);
+        assert_eq!(dysfunctional_detection.communication_issues.len(), 0);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn track_issue_should_return_error_when_adding_pending_op_issue_without_op_id(
+    ) -> Result<()> {
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+
+        let result = dysfunctional_detection
+            .track_issue(adults[0], IssueType::PendingRequestOperation, None)
+            .await;
+
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "An operation ID must be supplied for a pending request operation."
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn add_new_node_should_track_new_node() -> Result<()> {
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+
+        let new_adult = random_xorname();
+        let _ = dysfunctional_detection.add_new_node(new_adult).await;
+
+        let current_nodes = dysfunctional_detection.current_nodes().await;
+
+        assert_eq!(current_nodes.len(), 11);
         Ok(())
     }
 }

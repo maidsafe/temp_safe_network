@@ -39,6 +39,7 @@ use sn_interface::types::{log_markers::LogMarker, Peer, PublicKey};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
+use sn_dysfunction::IssueType;
 use std::collections::BTreeSet;
 use tokio::time::Duration;
 use xor_name::XorName;
@@ -165,7 +166,7 @@ impl Node {
                                     if known_elders.contains(&sender.name()) {
                                         // we track a dysfunction against our elder here
                                         self.dysfunction_tracking
-                                            .track_knowledge_issue(sender.name())
+                                            .track_issue(sender.name(), IssueType::Knowledge, None)
                                             .await
                                             .map_err(Error::from)?;
                                     }

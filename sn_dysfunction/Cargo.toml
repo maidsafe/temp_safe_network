@@ -10,10 +10,8 @@ readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
 version = "0.1.1"
 
-
 [features]
 default = []
-
 
 [dependencies]
 xor_name = "4.0.1"
@@ -30,6 +28,7 @@ features = ["sync"]
 
 [dev-dependencies]
 tracing-subscriber = { version = "0.3.1", features = ["env-filter", "json"] }
+proptest = "~1.0.0"
 
 [dev-dependencies.tokio]
 version = "1.17.0"
