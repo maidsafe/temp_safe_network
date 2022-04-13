@@ -22,7 +22,10 @@ pub(crate) mod membership;
 mod messages;
 mod network_knowledge;
 
-use crate::types::{Peer, PublicKey};
+use crate::{
+    messaging::system::NodeState,
+    types::{Peer, PublicKey},
+};
 
 use ed25519_dalek::Keypair;
 use std::{
@@ -85,6 +88,47 @@ pub(crate) fn split(
         .partition(|name| name.bit(decision_index));
 
     Some((zero, one))
+}
+
+/// Returns the nodes that should be candidates to become the next elders, sorted by names.
+pub(crate) fn elder_candidates(
+    candidates: impl IntoIterator<Item = NodeState>,
+    current_elders: &SectionAuthorityProvider,
+) -> BTreeSet<NodeState> {
+    use itertools::Itertools;
+    use std::cmp::Ordering;
+
+    // Compare candidates for the next elders. The one comparing `Less` wins.
+    fn cmp_elder_candidates(
+        lhs: &NodeState,
+        rhs: &NodeState,
+        current_elders: &SectionAuthorityProvider,
+    ) -> Ordering {
+        // Older nodes are preferred. In case of a tie, prefer current elders. If still a tie, break
+        // it comparing by the signed signatures because it's impossible for a node to predict its
+        // signature and therefore game its chances of promotion.
+        rhs.age()
+            .cmp(&lhs.age())
+            .then_with(|| {
+                let lhs_is_elder = current_elders.contains_elder(&lhs.name);
+                let rhs_is_elder = current_elders.contains_elder(&rhs.name);
+
+                match (lhs_is_elder, rhs_is_elder) {
+                    (true, false) => Ordering::Less,
+                    (false, true) => Ordering::Greater,
+                    _ => Ordering::Equal,
+                }
+            })
+            .then_with(|| lhs.name.cmp(&rhs.name))
+        // TODO: replace name cmp above with sig cmp.
+        // .then_with(|| lhs.sig.signature.cmp(&rhs.sig.signature))
+    }
+
+    candidates
+        .into_iter()
+        .sorted_by(|lhs, rhs| cmp_elder_candidates(lhs, rhs, current_elders))
+        .take(crate::elder_count())
+        .collect()
 }
 
 /// Information and state of our node

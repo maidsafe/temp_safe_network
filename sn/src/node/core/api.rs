@@ -175,13 +175,6 @@ impl Node {
         Ok(Some(cmd))
     }
 
-    // Generate a new section info based on the current set of members and if it differs from the
-    // current elders, trigger a DKG.
-    pub(crate) async fn promote_and_demote_elders(&self) -> Result<Vec<Cmd>> {
-        self.promote_and_demote_elders_except(&BTreeSet::new())
-            .await
-    }
-
     // Generate a new section info based on the current set of members, but
     // excluding the ones in the provided list. And if the outcome list of candidates
     // differs from the current elders, trigger a DKG.
@@ -189,17 +182,11 @@ impl Node {
         &self,
         excluded_names: &BTreeSet<XorName>,
     ) -> Result<Vec<Cmd>> {
-        let mut cmds = vec![];
-        let our_name = self.info.read().await.name();
-
         debug!("{}", LogMarker::TriggeringPromotionAndDemotion);
-	// TODO: move `promote_and_demote_elders` to Membership
-        for elder_candidates in self
-            .network_knowledge
-            .promote_and_demote_elders(&our_name, excluded_names)
-            .await
-        {
-            cmds.extend(self.send_dkg_start(elder_candidates, ).await?);
+        let mut cmds = vec![];
+        // TODO: move `promote_and_demote_elders` to Membership
+        for session_id in self.promote_and_demote_elders(excluded_names).await {
+            cmds.extend(self.send_dkg_start(session_id).await?);
         }
 
         Ok(cmds)

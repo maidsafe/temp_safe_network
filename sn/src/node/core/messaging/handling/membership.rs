@@ -29,7 +29,7 @@ impl Node {
             let membership_vote = match membership.propose(node_state, &prefix) {
                 Ok(vote) => vote,
                 Err(e) => {
-                    error!("Membership - Error while proposing change: {e:?}");
+                    warn!("Membership - failed to propose change: {e:?}");
                     return Ok(vec![]);
                 }
             };
@@ -50,11 +50,10 @@ impl Node {
         signed_vote: SignedVote<NodeState>,
     ) -> Result<Vec<Cmd>> {
         debug!("Membership - Received vote {signed_vote:?} from {peer}");
+        let prefix = self.network_knowledge.prefix().await;
 
         let cmds = if let Some(membership) = self.membership.write().await.as_mut() {
-            let mut cmds = match membership
-                .handle_signed_vote(signed_vote, &self.network_knowledge.prefix().await)
-            {
+            let mut cmds = match membership.handle_signed_vote(signed_vote, &prefix) {
                 Ok(VoteResponse::Broadcast(response_vote)) => {
                     vec![
                         self.send_msg_to_our_elders(SystemMsg::MembershipVote(response_vote))
@@ -68,7 +67,7 @@ impl Node {
                     // We'll send a membership AE request to see if they can help us catch up.
                     let sap = self.network_knowledge.authority_provider().await;
                     let dst_section_pk = sap.section_key();
-                    let section_name = sap.prefix().name();
+                    let section_name = prefix.name();
                     let msg = SystemMsg::MembershipAE(membership.generation());
                     let cmd = self
                         .send_direct_msg_to_nodes(vec![peer], msg, section_name, dst_section_pk)

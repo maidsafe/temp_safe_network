@@ -28,7 +28,7 @@ use crate::messaging::{
 };
 use crate::node::{
     api::cmds::Cmd,
-    core::{DkgSessionInfo, Node, DATA_QUERY_LIMIT},
+    core::{Node, DATA_QUERY_LIMIT},
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     network_knowledge::NetworkKnowledge,
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
@@ -547,26 +547,20 @@ impl Node {
                 )
                 .await
             }
-            SystemMsg::DkgStart {
-                session_id,
-                prefix,
-                elders,
-            } => {
+            SystemMsg::DkgStart(session_id) => {
                 trace!("Handling msg: Dkg-Start {:?} from {}", session_id, sender);
-                if !elders.contains_key(&self.info.read().await.name()) {
+                let our_name = self.info.read().await.name();
+                if !session_id.contains_elder(our_name) {
                     return Ok(vec![]);
                 }
                 if let NodeMsgAuthority::Section(authority) = msg_authority {
-                    let _existing = self.dkg_sessions.write().await.insert(
-                        session_id,
-                        DkgSessionInfo {
-                            prefix,
-                            elders: elders.clone(),
-                            authority,
-                        },
-                    );
+                    let _existing = self
+                        .dkg_sessions
+                        .write()
+                        .await
+                        .insert(session_id.hash(), (session_id.clone(), authority));
                 }
-                self.handle_dkg_start(session_id, prefix, elders).await
+                self.handle_dkg_start(session_id).await
             }
             SystemMsg::DkgMessage {
                 session_id,
@@ -605,7 +599,7 @@ impl Node {
                 message,
                 session_id,
             } => {
-                self.handle_dkg_retry(session_id, message_history, message, sender)
+                self.handle_dkg_retry(&session_id, message_history, message, sender)
                     .await
             }
             SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {
@@ -882,25 +876,22 @@ impl Node {
                 session_id,
                 message,
             } => {
-                if let Some(session_info) = self.dkg_sessions.read().await.get(&session_id).cloned()
+                if let Some((session_id, section_auth)) = self
+                    .dkg_sessions
+                    .read()
+                    .await
+                    .get(&session_id.hash())
+                    .cloned()
                 {
-                    let DkgSessionInfo {
-                        prefix,
-                        elders,
-                        authority: section_auth,
-                    } = session_info;
                     let message_cache = self.dkg_voter.get_cached_msgs(&session_id);
                     trace!(
-                        "Sending DkgSessionInfo {{ {:?}, elders {:?}, ... }} to {}",
+                        "Sending DkgSessionInfo {{ {:?}, ... }} to {}",
                         &session_id,
-                        elders,
                         &sender
                     );
 
                     let node_msg = SystemMsg::DkgSessionInfo {
                         session_id,
-                        elders,
-                        prefix,
                         section_auth,
                         message_cache,
                         message,
@@ -927,19 +918,14 @@ impl Node {
             }
             SystemMsg::DkgSessionInfo {
                 session_id,
-                prefix,
-                elders,
                 message_cache,
                 section_auth,
                 message,
             } => {
                 let mut cmds = vec![];
                 // Reconstruct the original DKG start message and verify the section signature
-                let payload = WireMsg::serialize_msg_payload(&SystemMsg::DkgStart {
-                    session_id,
-                    prefix,
-                    elders: elders.clone(),
-                })?;
+                let payload =
+                    WireMsg::serialize_msg_payload(&SystemMsg::DkgStart(session_id.clone()))?;
                 let auth = section_auth.clone().into_inner();
                 if self.network_knowledge.section_key().await == auth.sig.public_key {
                     if let Err(err) = AuthorityProof::verify(auth, payload) {
@@ -956,19 +942,16 @@ impl Node {
                     let chain = self.network_knowledge().section_chain().await;
                     warn!("Chain: {:?}", chain);
                     return Ok(cmds);
-                }
-                let _existing = self.dkg_sessions.write().await.insert(
-                    session_id,
-                    DkgSessionInfo {
-                        prefix,
-                        elders: elders.clone(),
-                        authority: section_auth,
-                    },
-                );
-                trace!("DkgSessionInfo handling {:?} - {:?}", session_id, elders);
-                cmds.extend(self.handle_dkg_start(session_id, prefix, elders).await?);
+                };
+                let _existing = self
+                    .dkg_sessions
+                    .write()
+                    .await
+                    .insert(session_id.hash(), (session_id.clone(), section_auth));
+                trace!("DkgSessionInfo handling {:?}", session_id);
+                cmds.extend(self.handle_dkg_start(session_id.clone()).await?);
                 cmds.extend(
-                    self.handle_dkg_retry(session_id, message_cache, message, sender)
+                    self.handle_dkg_retry(&session_id, message_cache, message, sender)
                         .await?,
                 );
                 Ok(cmds)

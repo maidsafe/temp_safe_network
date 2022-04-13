@@ -80,10 +80,20 @@ impl Membership {
         }
     }
 
-    pub(crate) fn section_node_states(
-        &self,
-        gen: Generation,
-    ) -> Result<BTreeMap<XorName, NodeState>> {
+    pub(crate) fn is_leaving_section(&self, node: &NodeState, our_prefix: Prefix) -> bool {
+        // TODO: ideally this logic is combined with the logic in self.section_members() for deciding if a node is leaving
+        match &node.state {
+            MembershipState::Joined => false,
+            MembershipState::Left => true,
+            MembershipState::Relocated(r) => !our_prefix.matches(&r.dst),
+        }
+    }
+
+    pub(crate) fn current_section_members(&self) -> BTreeMap<XorName, NodeState> {
+        self.section_members(self.gen).unwrap()
+    }
+
+    pub(crate) fn section_members(&self, gen: Generation) -> Result<BTreeMap<XorName, NodeState>> {
         let mut members =
             BTreeMap::from_iter(self.bootstrap_members.iter().cloned().map(|n| (n.name, n)));
 
@@ -352,7 +362,7 @@ impl Membership {
             return Ok(false);
         }
 
-        let members = self.section_node_states(gen - 1)?;
+        let members = self.section_members(gen - 1)?;
         let is_valid = match node_state.state {
             MembershipState::Joined | MembershipState::Relocated(_) => {
                 if members.contains_key(&node_state.name) {

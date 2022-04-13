@@ -13,10 +13,7 @@ mod session;
 pub(crate) mod test_utils;
 mod voter;
 
-pub(crate) use self::{
-    dkg_msgs_utils::{DkgFailureSigSetUtils, DkgSessionIdUtils},
-    voter::DkgVoter,
-};
+pub(crate) use self::{dkg_msgs_utils::DkgFailureSigSetUtils, voter::DkgVoter};
 pub(crate) use crate::messaging::system::{KeyedSig, SigShare};
 pub use section_signed::SectionAuthUtils;
 use serde::Serialize;
