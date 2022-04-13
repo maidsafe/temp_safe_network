@@ -354,7 +354,8 @@ fn calling_cat_symlinks_resolve_infinite_loop() -> Result<()> {
 
     safeurl.set_path("/sub/infinite_loop");
     let output = safe_cmd_stderr(["cat", &safeurl.to_string()], Some(1))?;
-    assert!(output.contains("ContentNotFound: Too many levels of symbolic links"));
+    assert!(output.contains("ContentNotFound"));
+    assert!(output.contains("Too many levels of symbolic links"));
 
     Ok(())
 }
@@ -417,7 +418,8 @@ fn calling_cat_symlinks_resolve_dir_outside() -> Result<()> {
 
     safeurl.set_path("/dir_outside");
     let output = safe_cmd_stderr(["cat", &safeurl.to_string()], Some(1))?;
-    assert!(output.contains("ContentNotFound: Cannot ascend beyond root directory"));
+    assert!(output.contains("ContentNotFound"));
+    assert!(output.contains("Cannot ascend beyond root directory"));
 
     Ok(())
 }
