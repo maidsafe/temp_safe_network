@@ -10,6 +10,7 @@ mod agreement;
 mod anti_entropy;
 mod dkg;
 mod join;
+mod left;
 mod membership;
 mod proposals;
 mod relocation;

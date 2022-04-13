@@ -340,6 +340,11 @@ impl Dispatcher {
                     .handle_online_agreement(auth.value.into_state(), auth.sig)
                     .await
             }
+            Cmd::HandleNodeLeft(auth) => {
+                self.node
+                    .handle_node_left(auth.value.into_state(), auth.sig)
+                    .await
+            }
             Cmd::HandleNewEldersAgreement { proposal, sig } => match proposal {
                 Proposal::NewElders(section_auth) => {
                     self.node
