@@ -57,8 +57,8 @@ jobs:
       #   run: ./resources/scripts/wait_for_nodes_to_join.sh
       #   timeout-minutes: 10
 
-      - name: Bench safe_network
-        run: cargo bench -p safe_network --features=test-utils
+      # - name: Bench safe_network
+      #   run: cargo bench -p safe_network --features=test-utils
 
       - name: Stop the network on fail
         if: failure()
