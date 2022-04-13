@@ -24,18 +24,15 @@ pub use signed::{KeyedSig, SigShare};
 pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
 
 use crate::messaging::{EndUser, MsgId, SectionAuthorityProvider};
-use crate::node::membership::{Generation, SignedVote};
+use crate::node::membership::Generation;
 use crate::node::SapCandidate;
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use sn_consensus::SignedVote;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    net::SocketAddr,
-};
-use xor_name::{Prefix, XorName};
+use std::collections::BTreeSet;
+use xor_name::XorName;
 
 use super::authority::SectionAuth as SectionAuthProof;
 use super::AuthorityProof;

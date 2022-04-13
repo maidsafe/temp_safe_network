@@ -32,16 +32,16 @@ use super::{
     ed25519::Digest256,
     handover::Handover,
     membership::Membership,
-    network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider, SectionAuthorityProvider},
+    network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider},
     Elders, Event, NodeElderChange, NodeInfo,
-    handover::Handover,
 };
 
 use crate::messaging::{
     data::OperationId,
     signature_aggregator::SignatureAggregator,
     system::{DkgSessionId, NodeEvent, NodeState, SystemMsg},
-    AuthorityProof, DstLocation, SectionAuth, SectionAuthorityProvider,
+    AuthorityProof, DstLocation, SectionAuth,
+    SectionAuthorityProvider as SectionAuthorityProviderMsg,
 };
 use crate::node::error::{Error, Result};
 use crate::types::{
@@ -510,7 +510,7 @@ impl Node {
         }
     }
 
-    async fn initialize_membership(&self, sap: SectionAuthorityProvider) -> Result<()> {
+    async fn initialize_membership(&self, sap: SectionAuthorityProviderMsg) -> Result<()> {
         let key = self
             .section_keys_provider
             .key_share(&self.network_knowledge.section_key().await)
@@ -530,26 +530,26 @@ impl Node {
 
     async fn initialize_handover(&self) -> Result<()> {
         let key = self
-             .section_keys_provider
-             .key_share(&self.network_knowledge.section_key().await)
-             .await?;
-         let n_elders = self
-             .network_knowledge
-             .authority_provider()
-             .await
-             .elder_count();
-         let section_prefix = self.network_knowledge.prefix().await;
+            .section_keys_provider
+            .key_share(&self.network_knowledge.section_key().await)
+            .await?;
+        let n_elders = self
+            .network_knowledge
+            .authority_provider()
+            .await
+            .elder_count();
+        let section_prefix = self.network_knowledge.prefix().await;
 
-         let mut handover_voting = self.handover_voting.write().await;
-         *handover_voting = Some(Handover::from(
-             (key.index as u8, key.secret_key_share),
-             key.public_key_set,
-             n_elders,
-             section_prefix,
-         ));
+        let mut handover_voting = self.handover_voting.write().await;
+        *handover_voting = Some(Handover::from(
+            (key.index as u8, key.secret_key_share),
+            key.public_key_set,
+            n_elders,
+            section_prefix,
+        ));
 
-         Ok(())
-     }
+        Ok(())
+    }
 
     async fn initialize_elder_state(&self) -> Result<()> {
         let sap = self
@@ -559,7 +559,7 @@ impl Node {
             .value
             .to_msg();
         self.initialize_membership(sap).await?;
-        self.initialize_handover(sap).await?;
+        self.initialize_handover().await?;
         Ok(())
     }
 

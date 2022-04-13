@@ -90,24 +90,22 @@ impl Node {
         &self,
         sap: SectionAuth<SectionAuthorityProvider>,
     ) -> Result<Vec<Cmd>> {
-        let saps_candidates = self
-            .network_knowledge
-            .promote_and_demote_elders(&self.info.read().await.name(), &BTreeSet::new())
-            .await;
-
-        if !saps_candidates.contains(&sap.elder_candidates()) {
-            // candidates_sap out of date, ignore.
+        let dkg_sessions = self.promote_and_demote_elders(&BTreeSet::new()).await;
+        let agreeing_elders = BTreeSet::from_iter(sap.elders().cloned());
+        if dkg_sessions
+            .iter()
+            .all(|session| !session.elder_peers().eq(agreeing_elders.iter()))
+        {
+            // candidates sap out of date, ignore.
             return Ok(vec![]);
         }
 
         // Send the `NewElders` proposal to all of the to-be-Elders so it's aggregated by them.
         let proposal = Proposal::NewElders(sap);
-        let proposal_recipients = saps_candidates
+        let proposal_recipients = dkg_sessions
             .iter()
-            .flat_map(|info| info.elders())
-            .cloned()
+            .flat_map(|session| session.elder_peers())
             .collect();
-
         self.send_proposal(proposal_recipients, proposal).await
     }
 }
