@@ -226,11 +226,11 @@ impl Node {
         sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
         // check if section matches our prefix
-        let matches_prefix = section_auth.prefix() == self.network_knowledge.prefix().await;
+        let equal_prefix = section_auth.prefix() == self.network_knowledge.prefix().await;
         let is_extension_prefix = section_auth
             .prefix()
             .is_extension_of(&self.network_knowledge.prefix().await);
-        if !matches_prefix && !is_extension_prefix {
+        if !equal_prefix && !is_extension_prefix {
             // Other section. We shouln't be receiving or updating a SAP for
             // a remote section here, that is done with a AE msg response.
             debug!(
@@ -257,7 +257,7 @@ impl Node {
 
         // handle regular elder handover (1 to 1)
         // trigger handover consensus among elders
-        if matches_prefix {
+        if equal_prefix {
             debug!(
                 "Propose elder handover to: {:?}",
                 signed_section_auth.prefix()
