@@ -91,10 +91,17 @@ impl Node {
                         public_key: membership.voters_public_key_set().public_key(),
                         signature: signature.clone(),
                     };
-                    cmds.push(Cmd::HandleNewNodeOnline(SectionAuth {
-                        value: state.clone(),
-                        sig,
-                    }));
+                    if membership.is_leaving_section(state, prefix) {
+                        cmds.push(Cmd::HandleNodeLeft(SectionAuth {
+                            value: state.clone(),
+                            sig,
+                        }));
+                    } else {
+                        cmds.push(Cmd::HandleNewNodeOnline(SectionAuth {
+                            value: state.clone(),
+                            sig,
+                        }));
+                    }
                 }
             }
 

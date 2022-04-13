@@ -49,6 +49,8 @@ pub(crate) enum Cmd {
     HandleAgreement { proposal: Proposal, sig: KeyedSig },
     /// Handle a new Node joining agreement.
     HandleNewNodeOnline(SectionAuth<NodeState>),
+    /// Handle a new Node joining agreement.
+    HandleNodeLeft(SectionAuth<NodeState>),
     /// Handle agree on elders. This blocks node message processing until complete.
     HandleNewEldersAgreement { proposal: Proposal, sig: KeyedSig },
     /// Handle the outcome of a DKG session where we are one of the participants (that is, one of
@@ -106,6 +108,7 @@ impl fmt::Display for Cmd {
             Cmd::HandleAgreement { .. } => write!(f, "HandleAgreement"),
             Cmd::HandleNewEldersAgreement { .. } => write!(f, "HandleNewEldersAgreement"),
             Cmd::HandleNewNodeOnline(_) => write!(f, "HandleNewNodeOnline"),
+            Cmd::HandleNodeLeft(_) => write!(f, "HandleNodeLeft"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Cmd::HandleDkgFailure(_) => write!(f, "HandleDkgFailure"),
             #[cfg(not(feature = "test-utils"))]
