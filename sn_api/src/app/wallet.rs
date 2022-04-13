@@ -10,8 +10,8 @@ use crate::safeurl::{ContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe};
 use bytes::Bytes;
 use log::{debug, warn};
-use sn_interface::types::Token;
 pub use sn_dbc::Dbc;
+use sn_interface::types::Token;
 use std::collections::{BTreeMap, BTreeSet};
 
 // Type tag used for the Wallet
