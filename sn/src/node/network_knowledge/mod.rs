@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod elder_candidates;
 mod section_peers;
 
 pub(super) mod node_state;
@@ -18,14 +17,12 @@ pub(crate) use self::section_authority_provider::test_utils;
 
 pub(super) use self::section_keys::{SectionKeyShare, SectionKeysProvider};
 
-pub(crate) use elder_candidates::ElderCandidates;
 pub(crate) use node_state::NodeState;
 pub(crate) use section_authority_provider::SectionAuthorityProvider;
 
-use crate::elder_count;
 use crate::messaging::system::{KeyedSig, SectionAuth, SectionPeers as SectionPeersMsg};
-use crate::node::{dkg::SectionAuthUtils, recommended_section_size, Error, Result};
-use crate::types::{log_markers::LogMarker, prefix_map::NetworkPrefixMap, Peer};
+use crate::node::{dkg::SectionAuthUtils, Error, Result};
+use crate::types::{prefix_map::NetworkPrefixMap, Peer};
 
 use bls::PublicKey as BlsPublicKey;
 use section_peers::SectionPeers;
@@ -538,54 +535,6 @@ impl NetworkKnowledge {
         self.signed_sap.read().await.clone()
     }
 
-    /// Generate a new section info(s) based on the current set of members,
-    /// excluding any member matching a name in the provided `excluded_names` set.
-    /// Returns a set of candidate SectionAuthorityProviders.
-    pub(super) async fn promote_and_demote_elders(
-        &self,
-        our_name: &XorName,
-        excluded_names: &BTreeSet<XorName>,
-    ) -> Vec<ElderCandidates> {
-        if let Some((our_elder_candidates, other_elder_candidates)) =
-            self.try_split(our_name, excluded_names).await
-        {
-            return vec![our_elder_candidates, other_elder_candidates];
-        }
-
-        // Candidates for elders out of all the nodes in the section, even out of the
-        // relocating nodes if there would not be enough instead.
-        let sap = self.authority_provider().await;
-        let expected_peers =
-            self.section_peers
-                .elder_candidates(elder_count(), &sap, excluded_names, None);
-        info!(
-            ">>>> ELDER CANDIDATES {}: {:?}",
-            expected_peers.len(),
-            expected_peers
-        );
-        let expected_names: BTreeSet<_> = expected_peers.iter().map(Peer::name).collect();
-        let current_names: BTreeSet<_> = sap.names();
-
-        if expected_names == current_names {
-            vec![]
-        } else if expected_names.len() < crate::node::supermajority(current_names.len()) {
-            warn!("ignore attempt to reduce the number of elders too much");
-            vec![]
-        } else if expected_names.len() < current_names.len() {
-            // Could be due to the newly promoted elder doesn't have enough knowledge of
-            // existing members.
-            warn!("Ignore attempt to shrink the elders");
-            trace!("current_names  {:?}", current_names);
-            trace!("expected_names {:?}", expected_names);
-            trace!("excluded_names {:?}", excluded_names);
-            trace!("section_peers {:?}", self.section_peers);
-            vec![]
-        } else {
-            let elder_candidates = ElderCandidates::new(sap.prefix(), expected_peers);
-            vec![elder_candidates]
-        }
-    }
-
     /// Prefix of our section.
     pub(super) async fn prefix(&self) -> Prefix {
         self.signed_sap.read().await.prefix()
@@ -651,104 +600,12 @@ impl NetworkKnowledge {
         self.section_peers.is_member(name)
     }
 
-    /// Returns whether the given peer is already relocated to our section.
-    pub(crate) async fn is_relocated_to_our_section(&self, name: &XorName) -> bool {
-        self.section_peers.is_relocated_to_our_section(name)
-    }
-
     pub(super) async fn find_member_by_addr(&self, addr: &SocketAddr) -> Option<Peer> {
         self.section_peers
             .members()
             .into_iter()
             .find(|info| info.addr() == *addr)
             .map(|info| *info.peer())
-    }
-
-    // Tries to split our section.
-    // If we have enough nodes for both subsections, returns the SectionAuthorityProviders
-    // of the two subsections. Otherwise returns `None`.
-    async fn try_split(
-        &self,
-        our_name: &XorName,
-        excluded_names: &BTreeSet<XorName>,
-    ) -> Option<(ElderCandidates, ElderCandidates)> {
-        trace!("{}", LogMarker::SplitAttempt);
-        if self.authority_provider().await.elder_count() < elder_count() {
-            trace!("No attempt to split as our section does not have enough elders.");
-            return None;
-        }
-
-        let (prefix_next_bit, our_new_size, sibling_new_size) =
-            self.get_split_info(our_name, excluded_names).await?;
-
-        debug!(
-            "Upon section split attempt: our section size {:?}, theirs {:?}",
-            our_new_size, sibling_new_size
-        );
-
-        let sap = self.authority_provider().await;
-
-        let our_prefix = self.prefix().await.pushed(prefix_next_bit);
-        let our_elders = self.section_peers.elder_candidates(
-            elder_count(),
-            &sap,
-            excluded_names,
-            Some(&our_prefix),
-        );
-
-        let other_prefix = self.prefix().await.pushed(!prefix_next_bit);
-        let other_elders = self.section_peers.elder_candidates(
-            elder_count(),
-            &sap,
-            excluded_names,
-            Some(&other_prefix),
-        );
-
-        let our_elder_candidates = ElderCandidates::new(our_prefix, our_elders);
-        let other_elder_candidates = ElderCandidates::new(other_prefix, other_elders);
-
-        Some((our_elder_candidates, other_elder_candidates))
-    }
-
-    pub(crate) async fn get_split_info(
-        &self,
-        our_name: &XorName,
-        excluded_names: &BTreeSet<XorName>,
-    ) -> Option<(bool, usize, usize)> {
-        let prefix = self.prefix().await;
-
-        assert!(prefix.matches(our_name));
-
-        let split_candidates = self
-            .section_peers
-            .members()
-            .into_iter()
-            .map(|auth| auth.value.name())
-            .filter(|name| !excluded_names.contains(name));
-
-        let (zero, one) = match super::split(&prefix, split_candidates) {
-            Some(s) => s,
-            None => return None,
-        };
-
-        let prefix_next_bit = our_name.bit(prefix.bit_count() as u8);
-
-        let (our_new_size, sibling_new_size) = if prefix_next_bit {
-            // we are in the `one` section
-            (one.len(), zero.len())
-        } else {
-            // we are in the `zero` section
-            (zero.len(), one.len())
-        };
-
-        // If none of the two new sections would contain enough entries, return `None`.
-        if our_new_size < recommended_section_size()
-            || sibling_new_size < recommended_section_size()
-        {
-            return None;
-        }
-
-        Some((prefix_next_bit, our_new_size, sibling_new_size))
     }
 }
 
@@ -758,8 +615,12 @@ fn create_first_section_authority_provider(
     sk_share: &bls::SecretKeyShare,
     peer: Peer,
 ) -> Result<SectionAuth<SectionAuthorityProvider>> {
-    let section_auth =
-        SectionAuthorityProvider::new(iter::once(peer), Prefix::default(), pk_set.clone(), vec![]);
+    let section_auth = SectionAuthorityProvider::new(
+        iter::once(peer),
+        Prefix::default(),
+        [NodeState::joined(peer, None)],
+        pk_set.clone(),
+    );
     let sig = create_first_sig(pk_set, sk_share, &section_auth)?;
     Ok(SectionAuth::new(section_auth, sig))
 }

@@ -7,13 +7,11 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::system::{MembershipState, SectionAuth};
-use crate::node::network_knowledge::{NodeState, SectionAuthorityProvider};
-use crate::types::Peer;
+use crate::node::network_knowledge::NodeState;
 
 use dashmap::{mapref::entry::Entry, DashMap};
-use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
-use std::{cmp::Ordering, collections::BTreeSet, sync::Arc};
+use std::{collections::BTreeSet, sync::Arc};
 use xor_name::{Prefix, XorName};
 
 // Number of Elder churn events before a Left/Relocated member
@@ -54,20 +52,6 @@ impl SectionPeers {
         self.members.get(name).is_some()
     }
 
-    /// Returns whether the given peer is already relocated to our section.
-    pub(super) fn is_relocated_to_our_section(&self, name: &XorName) -> bool {
-        let is_previous_name_of_member = self.members.iter().any(|entry| {
-            let (_, state) = entry.pair();
-            state.previous_name() == Some(*name)
-        });
-
-        is_previous_name_of_member
-            || self.archive.iter().any(|entry| {
-                let (_, state) = entry.pair();
-                state.previous_name() == Some(*name)
-            })
-    }
-
     /// Get section signed `NodeState` for the member with the given name.
     pub(super) fn is_either_member_or_archived(
         &self,
@@ -78,30 +62,6 @@ impl SectionPeers {
         } else {
             self.archive.get(name).map(|state| state.value().clone())
         }
-    }
-
-    /// Returns the nodes that should be candidates to become the next elders, sorted by names.
-    pub(super) fn elder_candidates(
-        &self,
-        elder_size: usize,
-        current_elders: &SectionAuthorityProvider,
-        excluded_names: &BTreeSet<XorName>,
-        prefix: Option<&Prefix>,
-    ) -> Vec<Peer> {
-        self.members
-            .iter()
-            .filter(|entry| {
-                let (name, _) = entry.pair();
-                prefix.map_or_else(|| true, |p| p.matches(name)) && !excluded_names.contains(name)
-            })
-            .map(|entry| {
-                let (_, node_state) = entry.pair();
-                node_state.clone()
-            })
-            .sorted_by(|lhs, rhs| cmp_elder_candidates(lhs, rhs, current_elders))
-            .take(elder_size)
-            .map(|node_state| *node_state.peer())
-            .collect()
     }
 
     /// Update a member of our section.
@@ -170,28 +130,4 @@ impl SectionPeers {
         self.archive
             .retain(|_, node_state| last_section_keys.has_key(&node_state.sig.public_key))
     }
-}
-
-// Compare candidates for the next elders. The one comparing `Less` wins.
-fn cmp_elder_candidates(
-    lhs: &SectionAuth<NodeState>,
-    rhs: &SectionAuth<NodeState>,
-    current_elders: &SectionAuthorityProvider,
-) -> Ordering {
-    // Older nodes are preferred. In case of a tie, prefer current elders. If still a tie, break
-    // it comparing by the signed signatures because it's impossible for a node to predict its
-    // signature and therefore game its chances of promotion.
-    rhs.age()
-        .cmp(&lhs.age())
-        .then_with(|| {
-            let lhs_is_elder = current_elders.contains_elder(&lhs.name());
-            let rhs_is_elder = current_elders.contains_elder(&rhs.name());
-
-            match (lhs_is_elder, rhs_is_elder) {
-                (true, false) => Ordering::Less,
-                (false, true) => Ordering::Greater,
-                _ => Ordering::Equal,
-            }
-        })
-        .then_with(|| lhs.sig.signature.cmp(&rhs.sig.signature))
 }

@@ -351,6 +351,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let section_auth = SectionAuthorityProvider::new(
         nodes.iter().map(NodeInfo::peer),
         Prefix::default(),
+        nodes.iter().map(|n| NodeState::joined(n.peer(), None)),
         sk_set.public_keys(),
     );
     let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
@@ -415,9 +416,9 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
         let actual_elder_candidates = match wire_msg.into_msg() {
             Ok(MsgType::System {
-                msg: SystemMsg::DkgStart { elders, .. },
+                msg: SystemMsg::DkgStart(session),
                 ..
-            }) => elders.into_iter().map(|(name, addr)| Peer::new(name, addr)),
+            }) => session.elders,
             _ => continue,
         };
         itertools::assert_equal(actual_elder_candidates, expected_new_elders.clone());

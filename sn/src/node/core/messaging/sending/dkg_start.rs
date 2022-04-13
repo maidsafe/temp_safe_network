@@ -6,62 +6,35 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::collections::BTreeSet;
-
-use crate::{messaging::{
+use crate::messaging::{
     system::{DkgSessionId, SystemMsg},
     DstLocation, WireMsg,
-}, node::membership::Generation};
-use crate::node::{
-    api::cmds::Cmd, core::Node, dkg::DkgSessionIdUtils, messages::WireMsgUtils,
-    network_knowledge::ElderCandidates, Result,
 };
+use crate::node::{api::cmds::Cmd, core::Node, messages::WireMsgUtils, Result};
 use crate::types::Peer;
 
 use xor_name::XorName;
 
 impl Node {
     /// Send a `DkgStart` message to the provided set of candidates
-    pub(crate) async fn send_dkg_start(
-        &self,
-        elder_candidates: ElderCandidates,
-	membership_generation: Generation,
-    ) -> Result<Vec<Cmd>> {
-        let src_prefix = elder_candidates.prefix();
-        let generation = self.network_knowledge.chain_len().await;
-	let bootstrap_members = if let Some(m) = self.membership.read().await.as_ref() {
-	    // TODO: remove the unwrap
-	    BTreeSet::from_iter(m.section_node_states(membership_generation).unwrap().into_values())
-	} else {
-	    error!("DKG - no membership instance to read bootstrap members for");
-	    return Ok(vec![]);
-	};
-
-        let session_id = DkgSessionId::new(&elder_candidates, generation, bootstrap_members);
-
+    pub(crate) async fn send_dkg_start(&self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
         // Send DKG start to all candidates
-        let recipients: Vec<_> = elder_candidates.elders().cloned().collect();
+        let recipients = Vec::from_iter(session_id.elder_peers());
 
         trace!(
             "Send DkgStart for {:?} with {:?} to {:?}",
-            elder_candidates,
+            session_id.elders,
             session_id,
             recipients
         );
 
-        let node_msg = SystemMsg::DkgStart {
-            session_id,
-            prefix: elder_candidates.prefix(),
-            elders: elder_candidates
-                .elders()
-                .map(|peer| (peer.name(), peer.addr()))
-                .collect(),
-        };
+        let prefix = session_id.prefix;
+        let node_msg = SystemMsg::DkgStart(session_id);
         let section_pk = self.network_knowledge.section_key().await;
         self.send_msg_for_dst_accumulation(
-            src_prefix.name(),
+            prefix.name(),
             DstLocation::Section {
-                name: src_prefix.name(),
+                name: prefix.name(),
                 section_pk,
             },
             node_msg,

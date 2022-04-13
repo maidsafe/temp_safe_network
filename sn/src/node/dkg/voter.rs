@@ -6,16 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{messaging::{
+use crate::messaging::{
     system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
     DstLocation, WireMsg,
-}, node::network_knowledge::NodeState};
+};
 use crate::node::{
     api::cmds::Cmd,
     dkg::session::Session,
-    ed25519,
+    ed25519::{self, Digest256},
     messages::WireMsgUtils,
-    network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
+    network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     supermajority, NodeInfo, Result,
 };
 use crate::types::Peer;
@@ -44,7 +44,7 @@ use xor_name::XorName;
 /// is currently not a responsibility of this module.
 #[derive(Clone)]
 pub(crate) struct DkgVoter {
-    sessions: Arc<DashMap<DkgSessionId, Session>>,
+    sessions: Arc<DashMap<Digest256, Session>>,
 }
 
 impl Default for DkgVoter {
@@ -61,38 +61,27 @@ impl DkgVoter {
         &self,
         node: &NodeInfo,
         session_id: DkgSessionId,
-        elder_candidates: ElderCandidates,
         section_pk: BlsPublicKey,
-	bootstrap_members: BTreeSet<NodeState>
     ) -> Result<Vec<Cmd>> {
-        if self.sessions.contains_key(&session_id) {
-            trace!(
-                "DKG already in progress for {:?} - {:?}",
-                session_id,
-                elder_candidates
-            );
+        if self.sessions.contains_key(&session_id.hash()) {
+            trace!("DKG already in progress for {session_id:?}");
             return Ok(vec![]);
         }
 
         let name = ed25519::name(&node.keypair.public);
-        let participant_index =
-            if let Some(index) = elder_candidates.names().position(|n| n == name) {
-                index
-            } else {
-                error!(
-                    "DKG failed to start for {:?}: {} is not a participant",
-                    elder_candidates, name
-                );
-                return Ok(vec![]);
-            };
+        let participant_index = if let Some(index) = session_id.elder_index(name) {
+            index
+        } else {
+            error!("DKG failed to start for {session_id:?}: {name} is not a participant");
+            return Ok(vec![]);
+        };
 
         // Special case: only one participant.
-        if elder_candidates.len() == 1 {
+        if session_id.elders.len() == 1 {
             let secret_key_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
-            let section_auth = SectionAuthorityProvider::from_elder_candidates(
-                elder_candidates,
+            let section_auth = SectionAuthorityProvider::from_dkg_session(
+                session_id.clone(),
                 secret_key_set.public_keys(),
-		bootstrap_members
             );
             return Ok(vec![Cmd::HandleDkgOutcome {
                 section_auth,
@@ -104,45 +93,44 @@ impl DkgVoter {
             }]);
         }
 
-        let threshold = supermajority(elder_candidates.len()) - 1;
-        let participants = elder_candidates.names().collect();
+        let threshold = supermajority(session_id.elders.len()) - 1;
+        let participants = session_id.elder_names().collect();
 
         match KeyGen::initialize(name, threshold, participants) {
             Ok((key_gen, messages)) => {
-                trace!("DKG starting for {:?}", elder_candidates);
+                trace!("DKG starting for {session_id:?}");
 
                 let mut session = Session {
                     key_gen,
-                    elder_candidates,
+                    session_id: session_id.clone(),
                     participant_index,
-		    bootstrap_members,
                     timer_token: 0,
                     failures: DkgFailureSigSet::from(session_id.clone()),
                     complete: false,
                 };
 
                 let mut cmds = vec![];
-                cmds.extend(session.broadcast(node, &session_id, messages, section_pk)?);
+                cmds.extend(session.broadcast(node, messages, section_pk)?);
 
                 // This is to avoid the case that between the above existence check
                 // and the insertion, there is another thread created and updated the session.
-                if self.sessions.contains_key(&session_id) {
+                if self.sessions.contains_key(&session_id.hash()) {
                     warn!("DKG already in progress for {:?}", session_id);
                     return Ok(vec![]);
                 } else {
-                    let _prev = self.sessions.insert(session_id.clone(), session);
+                    let _prev = self.sessions.insert(session_id.hash(), session);
                 }
 
                 // Remove unneeded old sessions.
-                self.sessions.retain(|existing_session_id, _| {
-                    existing_session_id.generation >= session_id.generation
+                self.sessions.retain(|_, existing_session| {
+                    existing_session.session_id.generation >= session_id.generation
                 });
 
                 Ok(cmds)
             }
             Err(error) => {
                 // TODO: return a separate error here.
-                error!("DKG failed to start for {:?}: {}", elder_candidates, error);
+                error!("DKG failed to start for {session_id:?}: {error}");
                 Ok(vec![])
             }
         }
@@ -159,8 +147,8 @@ impl DkgVoter {
             let session = ref_mut_multi.value();
             session.timer_token() == timer_token
         }) {
-            let (session_id, session) = ref_mut_multi.pair_mut();
-            session.handle_timeout(node, session_id, section_pk)
+            let (_, session) = ref_mut_multi.pair_mut();
+            session.handle_timeout(node, section_pk)
         } else {
             Ok(vec![])
         }
@@ -177,14 +165,8 @@ impl DkgVoter {
     ) -> Result<Vec<Cmd>> {
         let mut cmds = Vec::new();
 
-        if let Some(mut session) = self.sessions.get_mut(session_id) {
-            cmds.extend(session.process_msg(
-                node,
-                sender.name(),
-                session_id,
-                message,
-                section_pk,
-            )?)
+        if let Some(mut session) = self.sessions.get_mut(&session_id.hash()) {
+            cmds.extend(session.process_msg(node, sender.name(), message, section_pk)?)
         } else {
             trace!(
                 "Sending DkgSessionUnknown {{ {:?} }} to {}",
@@ -220,13 +202,14 @@ impl DkgVoter {
         failed_participants: &BTreeSet<XorName>,
         signed: DkgFailureSig,
     ) -> Option<Cmd> {
+        let hash = session_id.hash();
         self.sessions
-            .get_mut(session_id)?
+            .get_mut(&hash)?
             .process_failure(session_id, failed_participants, signed)
     }
 
     pub(crate) fn get_cached_msgs(&self, session_id: &DkgSessionId) -> Vec<DkgMessage> {
-        if let Some(session) = self.sessions.get_mut(session_id) {
+        if let Some(session) = self.sessions.get_mut(&session_id.hash()) {
             session.get_cached_msgs()
         } else {
             Vec::new()
@@ -241,8 +224,8 @@ impl DkgVoter {
         sender: XorName,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
-        if let Some(mut session) = self.sessions.get_mut(&session_id) {
-            session.handle_dkg_history(node, &session_id, message_history, section_pk)
+        if let Some(mut session) = self.sessions.get_mut(&session_id.hash()) {
+            session.handle_dkg_history(node, message_history, section_pk)
         } else {
             warn!(
                 "Recieved DKG message cache from {} without an active DKG session: {:?}",

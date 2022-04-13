@@ -15,26 +15,18 @@ use crate::node::{
     core::{Node, Proposal},
     dkg::DkgFailureSigSetUtils,
     messages::WireMsgUtils,
-    network_knowledge::{ElderCandidates, SectionAuthorityProvider, SectionKeyShare},
+    network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     Error, Result,
 };
 use crate::types::{log_markers::LogMarker, Peer};
 
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    net::SocketAddr,
-};
-use xor_name::{Prefix, XorName};
+use std::collections::BTreeSet;
+use xor_name::XorName;
 
 impl Node {
-    pub(crate) async fn handle_dkg_start(
-        &self,
-        session_id: DkgSessionId,
-        prefix: Prefix,
-        elders: BTreeMap<XorName, SocketAddr>,
-    ) -> Result<Vec<Cmd>> {
+    pub(crate) async fn handle_dkg_start(&self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
         let current_generation = self.network_knowledge.chain_len().await;
         if session_id.generation < current_generation {
             trace!("Skipping DkgStart for older generation: {:?}", &session_id);
@@ -43,46 +35,39 @@ impl Node {
         let section_auth = self.network_knowledge().authority_provider().await;
 
         let mut peers = vec![];
-        for (name, addr) in elders.into_iter() {
+        for peer in session_id.elder_peers() {
             // Reuse known peers from network_knowledge, in order to preserve connections
             let peer = if let Some(elder) = section_auth
-                .get_elder(&name)
-                .filter(|elder| elder.addr() == addr)
+                .get_elder(&peer.name())
+                .filter(|elder| elder.addr() == peer.addr())
             {
                 *elder
-            } else if let Some(peer) = self.network_knowledge().find_member_by_addr(&addr).await {
+            } else if let Some(peer) = self
+                .network_knowledge()
+                .find_member_by_addr(&peer.addr())
+                .await
+            {
                 peer
             } else {
-                Peer::new(name, addr)
+                peer
             };
 
             peers.push(peer);
         }
 
-        let elder_candidates = ElderCandidates::new(prefix, peers);
-
-        trace!(
-            "Received DkgStart for {:?} - {:?}",
-            session_id,
-            elder_candidates
-        );
+        trace!("Received DkgStart for {:?}", session_id);
         self.dkg_sessions
             .write()
             .await
-            .retain(|existing_session_id, _| {
+            .retain(|_, (existing_session_id, _)| {
                 existing_session_id.generation >= session_id.generation
             });
-	let bootstrap_members = BTreeSet::from_iter(
-	    session_id.bootstrap_members.iter().cloned().map(|state_msg| state_msg.into_state())
-	);
         let cmds = self
             .dkg_voter
             .start(
                 &self.info.read().await.clone(),
                 session_id,
-                elder_candidates,
                 self.network_knowledge().section_key().await,
-		bootstrap_members
             )
             .await?;
         Ok(cmds)
@@ -208,14 +193,13 @@ impl Node {
 
         let generation = self.network_knowledge.chain_len().await;
 
-        let elder_candidates = if let Some(elder_candidates) = self
-            .network_knowledge
-            .promote_and_demote_elders(&self.info.read().await.name(), &BTreeSet::new())
+        let dkg_session = if let Some(dkg_session) = self
+            .promote_and_demote_elders(&BTreeSet::new())
             .await
             .into_iter()
-            .find(|elder_candidates| failure_set.verify(elder_candidates, generation, bootstrap_members))
+            .find(|session_id| failure_set.verify(session_id))
         {
-            elder_candidates
+            dkg_session
         } else {
             trace!("Ignore DKG failure agreement with invalid signeds or outdated participants",);
             return Ok(vec![]);
@@ -228,7 +212,7 @@ impl Node {
             trace!(
                 "Received DKG failure agreement, propose offline for failed participants: {:?} , DKG generation({}), candidates: {:?}",
                 failure_set.failed_participants,
-                generation, elder_candidates
+                generation, dkg_session
             );
             cmds.extend(
                 self.cast_offline_proposals(&failure_set.failed_participants)
@@ -238,7 +222,7 @@ impl Node {
 
         trace!(
             "Received DKG failure agreement, we will restart with candidates: {:?} except failed participants: {:?}",
-            elder_candidates, failure_set.failed_participants
+            dkg_session, failure_set.failed_participants
         );
 
         cmds.extend(

@@ -29,11 +29,8 @@ use bls_dkg::key_gen::message::Message as DkgMessage;
 use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    net::SocketAddr,
-};
-use xor_name::{Prefix, XorName};
+use std::collections::BTreeSet;
+use xor_name::XorName;
 
 use super::authority::SectionAuth as SectionAuthProof;
 use super::AuthorityProof;
@@ -104,14 +101,7 @@ pub enum SystemMsg {
     /// Response to a `JoinAsRelocatedRequest`
     JoinAsRelocatedResponse(Box<JoinAsRelocatedResponse>),
     /// Sent to the new elder candidates to start the DKG process.
-    DkgStart {
-        /// The identifier of the DKG session to start.
-        session_id: DkgSessionId,
-        /// The section prefix. It matches all the members' names.
-        prefix: Prefix,
-        /// The section's complete set of elders as a map from their name to their socket address.
-        elders: BTreeMap<XorName, SocketAddr>,
-    },
+    DkgStart(DkgSessionId),
     /// Message sent when a DKG session has not started
     DkgSessionUnknown {
         /// The identifier of the DKG session this message is for.
@@ -123,10 +113,6 @@ pub enum SystemMsg {
     DkgSessionInfo {
         /// The identifier of the DKG session to start.
         session_id: DkgSessionId,
-        /// The section prefix. It matches all the members' names.
-        prefix: Prefix,
-        /// The section's complete set of elders as a map from their name to their socket address.
-        elders: BTreeMap<XorName, SocketAddr>,
         /// Section authority for the DKG start message
         section_auth: AuthorityProof<SectionAuthProof>,
         /// Messages processed in the session so far

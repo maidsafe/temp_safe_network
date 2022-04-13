@@ -29,6 +29,7 @@ use self::{data::DataStorage, split_barrier::SplitBarrier};
 use super::{
     api::cmds::Cmd,
     dkg::DkgVoter,
+    ed25519::Digest256,
     membership::Membership,
     network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider},
     Elders, Event, NodeElderChange, NodeInfo,
@@ -37,8 +38,8 @@ use super::{
 use crate::messaging::{
     data::OperationId,
     signature_aggregator::SignatureAggregator,
-    system::{DkgSessionId, NodeEvent, SystemMsg},
-    AuthorityProof, DstLocation, SectionAuth,
+    system::{DkgSessionId, NodeEvent, NodeState, SystemMsg},
+    AuthorityProof, DstLocation, SectionAuth, SectionAuthorityProvider,
 };
 use crate::node::error::{Error, Result};
 use crate::types::{
@@ -54,7 +55,6 @@ use resource_proof::ResourceProof;
 use sn_dysfunction::{DysfunctionDetection, DysfunctionSeverity};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
-    net::SocketAddr,
     path::PathBuf,
     sync::Arc,
     time::Duration,
@@ -91,13 +91,6 @@ pub(crate) const MAX_WAITING_PEERS_PER_QUERY: usize = 100;
 pub(crate) type AeBackoffCache =
     Arc<RwLock<LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>>>;
 
-#[derive(Clone)]
-pub(crate) struct DkgSessionInfo {
-    pub(crate) prefix: Prefix,
-    pub(crate) elders: BTreeMap<XorName, SocketAddr>,
-    pub(crate) authority: AuthorityProof<SectionAuth>,
-}
-
 // Core state + logic of a node.
 pub(crate) struct Node {
     pub(super) event_tx: mpsc::Sender<Event>,
@@ -116,7 +109,7 @@ pub(crate) struct Node {
     proposal_aggregator: SignatureAggregator,
     // DKG/Split/Churn modules
     split_barrier: Arc<RwLock<SplitBarrier>>,
-    dkg_sessions: Arc<RwLock<HashMap<DkgSessionId, DkgSessionInfo>>>,
+    dkg_sessions: Arc<RwLock<HashMap<Digest256, (DkgSessionId, AuthorityProof<SectionAuth>)>>>,
     dkg_voter: DkgVoter,
     relocate_state: Arc<RwLock<Option<Box<JoiningAsRelocated>>>>,
     // ======================== Elder only ========================
@@ -344,42 +337,188 @@ impl Node {
         }
     }
 
-    async fn initialize_membership(&self) -> Result<()> {
+    pub(crate) async fn get_split_info(
+        &self,
+        prefix: Prefix,
+    ) -> Option<(BTreeSet<NodeState>, BTreeSet<NodeState>)> {
+        let members = self
+            .membership
+            .read()
+            .await
+            .as_ref()?
+            .current_section_members();
+
+        // TODO: super::split(..) should return (BTreeSet<NodeState>, BTreeSet<NodeState>)
+        //       instead of (BTreeSet<XorName>, BTreeSet<XorName>);
+        let (zero, one) = super::split(&prefix, members.keys().copied())?;
+
+        // If none of the two new sections would contain enough entries, return `None`.
+        let split_threshold = super::recommended_section_size();
+        if zero.len() < split_threshold || one.len() < split_threshold {
+            return None;
+        }
+
+        Some((
+            BTreeSet::from_iter(zero.into_iter().map(|n| members[&n].clone())),
+            BTreeSet::from_iter(one.into_iter().map(|n| members[&n].clone())),
+        ))
+    }
+
+    // Tries to split our section.
+    // If we have enough nodes for both subsections, returns the SectionAuthorityProviders
+    // of the two subsections. Otherwise returns `None`.
+    async fn try_split(
+        &self,
+        excluded_names: &BTreeSet<XorName>,
+    ) -> Option<(DkgSessionId, DkgSessionId)> {
+        trace!("{}", LogMarker::SplitAttempt);
+        let prefix = self.network_knowledge.prefix().await;
+
+        let (zero, one) = self.get_split_info(prefix).await?;
+        debug!(
+            "Upon section split attempt, section size: zero {:?}, one {:?}",
+            zero.len(),
+            one.len()
+        );
+
+        let sap = self.network_knowledge.authority_provider().await;
+
+        let zero_prefix = prefix.pushed(false);
+        let zero_elders = super::elder_candidates(
+            zero.iter()
+                .cloned()
+                .filter(|name| !excluded_names.contains(&name.name)),
+            &sap,
+        );
+
+        let one_prefix = prefix.pushed(true);
+        let one_elders = super::elder_candidates(
+            one.iter()
+                .cloned()
+                .filter(|name| !excluded_names.contains(&name.name)),
+            &sap,
+        );
+
+        let generation = self.network_knowledge.chain_len().await;
+
+        let zero_id = DkgSessionId {
+            prefix: zero_prefix,
+            elders: BTreeMap::from_iter(zero_elders.iter().map(|node| (node.name, node.addr))),
+            generation,
+            bootstrap_members: zero,
+        };
+        let one_id = DkgSessionId {
+            prefix: one_prefix,
+            elders: BTreeMap::from_iter(one_elders.iter().map(|node| (node.name, node.addr))),
+            generation,
+            bootstrap_members: one,
+        };
+
+        Some((zero_id, one_id))
+    }
+
+    /// Generate a new section info(s) based on the current set of members,
+    /// excluding any member matching a name in the provided `excluded_names` set.
+    /// Returns a set of candidate SectionAuthorityProviders.
+    pub(super) async fn promote_and_demote_elders(
+        &self,
+        excluded_names: &BTreeSet<XorName>,
+    ) -> Vec<DkgSessionId> {
+        if let Some((zero_dkg_id, one_dkg_id)) = self.try_split(excluded_names).await {
+            info!("Splitting {:?} {:?}", zero_dkg_id, one_dkg_id);
+            return vec![zero_dkg_id, one_dkg_id];
+        }
+
+        // Candidates for elders out of all the nodes in the section, even out of the
+        // relocating nodes if there would not be enough instead.
+        let sap = self.network_knowledge.authority_provider().await;
+
+        let members = if let Some(m) = self.membership.read().await.as_ref() {
+            m.current_section_members()
+        } else {
+            error!(
+                "attempted to promote and demote elders when we don't have a membership instance"
+            );
+            return vec![];
+        };
+
+        let elder_candidates = super::elder_candidates(
+            members
+                .values()
+                .cloned()
+                .filter(|node| !excluded_names.contains(&node.name)),
+            &sap,
+        );
+        let current_elders = BTreeSet::from_iter(sap.elders().copied());
+
+        info!(
+            ">>>> ELDER CANDIDATES {}: {:?}",
+            elder_candidates.len(),
+            elder_candidates
+        );
+
+        if elder_candidates
+            .iter()
+            .map(NodeState::peer)
+            .eq(current_elders.iter())
+        {
+            vec![]
+        } else if elder_candidates.len() < crate::node::supermajority(current_elders.len()) {
+            warn!("ignore attempt to reduce the number of elders too much");
+            vec![]
+        } else if elder_candidates.len() < current_elders.len() {
+            // TODO: this special case doesn't seem valid to me, what if the section shrinks to below the elder size.
+            // Could be due to the newly promoted elder doesn't have enough knowledge of
+            // existing members.
+            warn!("Ignore attempt to shrink the elders");
+            trace!("current_names  {:?}", current_elders);
+            trace!("expected_names {:?}", elder_candidates);
+            trace!("excluded_names {:?}", excluded_names);
+            trace!("section_peers {:?}", members);
+            vec![]
+        } else {
+            let generation = self.network_knowledge.chain_len().await;
+            let session_id = DkgSessionId {
+                prefix: sap.prefix(),
+                elders: BTreeMap::from_iter(
+                    elder_candidates
+                        .into_iter()
+                        .map(|node| (node.name, node.addr)),
+                ),
+                generation,
+                bootstrap_members: BTreeSet::from_iter(members.into_values()),
+            };
+            vec![session_id]
+        }
+    }
+
+    async fn initialize_membership(&self, sap: SectionAuthorityProvider) -> Result<()> {
         let key = self
             .section_keys_provider
             .key_share(&self.network_knowledge.section_key().await)
             .await?;
-
-        let n_elders = self
-            .network_knowledge
-            .authority_provider()
-            .await
-            .elder_count();
-
-        // TODO: the bootstrap members should come from handover
-        let bootstrap_members = BTreeSet::from_iter(
-            self.network_knowledge
-                .section_signed_members()
-                .await
-                .into_iter()
-                .map(|section_auth| section_auth.value.to_msg()),
-        );
 
         let mut membership = self.membership.write().await;
 
         *membership = Some(Membership::from(
             (key.index as u8, key.secret_key_share),
             key.public_key_set,
-            n_elders,
-            bootstrap_members,
+            sap.elders.len(),
+            BTreeSet::from_iter(sap.members.into_values()),
         ));
 
         Ok(())
     }
 
     async fn initialize_elder_state(&self) -> Result<()> {
-        self.initialize_membership().await?;
-        // TODO: self.initialize_handover().await?;
+        let sap = self
+            .network_knowledge
+            .section_signed_authority_provider()
+            .await
+            .value
+            .to_msg();
+        self.initialize_membership(sap).await?;
+        // TODO: self.initialize_handover(sap).await?;
         Ok(())
     }
 
@@ -417,7 +556,10 @@ impl Node {
                     // The section-key has changed, we are now able to function as an elder.
                     self.initialize_elder_state().await?;
 
-                    cmds.extend(self.promote_and_demote_elders().await?);
+                    cmds.extend(
+                        self.promote_and_demote_elders_except(&BTreeSet::new())
+                            .await?,
+                    );
 
                     // Whenever there is an elders change, casting a round of joins_allowed
                     // proposals to sync.
@@ -555,13 +697,28 @@ impl Node {
 
     pub(super) async fn log_section_stats(&self) {
         let adults = self.network_knowledge.adults().await.len();
+
         let elders = self
             .network_knowledge
             .authority_provider()
             .await
             .elder_count();
+
+        let membership_adults = self
+            .membership
+            .read()
+            .await
+            .as_ref()
+            .unwrap()
+            .current_section_members()
+            .len()
+            - elders;
+
         let prefix = self.network_knowledge.prefix().await;
-        debug!("{:?}: {:?} Elders, {:?} Adults.", prefix, elders, adults);
+        debug!(
+            "{:?}: {:?} Elders, {:?}~{:?} Adults.",
+            prefix, elders, adults, membership_adults
+        );
     }
 }
 

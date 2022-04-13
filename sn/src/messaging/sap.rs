@@ -19,6 +19,9 @@ use xor_name::{Prefix, XorName};
 
 use super::system::NodeState;
 
+// TODO: we need to maintain a list of nodes who have previosly been members of this section (archived nodes)
+//       currently, only the final members of the section are preserved on the SAP.
+
 /// Details of section authority.
 ///
 /// A new `SectionAuthorityProvider` is created whenever the elders change, due to an elder being

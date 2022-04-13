@@ -690,6 +690,7 @@ mod tests {
                         prefix: Prefix::default(),
                         public_key_set: new_pk_set.clone(),
                         elders: new_bootstrap_addrs.clone(),
+                        members: BTreeMap::new(),
                     },
                 ))),
                 &bootstrap_node,
@@ -779,6 +780,7 @@ mod tests {
                         prefix: Prefix::default(),
                         public_key_set: new_pk_set.clone(),
                         elders: BTreeMap::new(),
+                        members: BTreeMap::new(),
                     },
                 ))),
                 &bootstrap_node,
@@ -786,7 +788,7 @@ mod tests {
             )?;
             task::yield_now().await;
 
-            let addrs = (0..elder_count())
+            let addrs: BTreeMap<XorName, SocketAddr> = (0..elder_count())
                 .map(|_| (xor_name::rand::random(), gen_addr()))
                 .collect();
 
@@ -796,7 +798,8 @@ mod tests {
                     SectionAuthorityProviderMsg {
                         prefix: Prefix::default(),
                         public_key_set: new_pk_set.clone(),
-                        elders: addrs,
+                        elders: addrs.clone(),
+                        members: BTreeMap::new(),
                     },
                 ))),
                 &bootstrap_node,

@@ -121,15 +121,13 @@ impl Node {
                 .await?,
         );
 
-        let result = self.promote_and_demote_elders().await?;
+        let result = self
+            .promote_and_demote_elders_except(&BTreeSet::default())
+            .await?;
+
         if result.is_empty() {
-            // Send AE-Update to Adults of our section
-            let our_adults = self.network_knowledge.adults().await;
-            let our_section_pk = self.network_knowledge.section_key().await;
-            cmds.extend(
-                self.send_ae_update_to_nodes(our_adults, &our_prefix, our_section_pk)
-                    .await,
-            );
+            // Send AE-Update to our section
+            cmds.extend(self.send_ae_update_to_our_section().await);
         }
 
         cmds.extend(result);
@@ -239,21 +237,26 @@ impl Node {
             );
 
             let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
-            let saps_candidates = self
-                .network_knowledge
-                .promote_and_demote_elders(&self.info.read().await.name(), &BTreeSet::new())
-                .await;
+            // TODO: on dkg-failure, we may have tried to re-start DKG with some
+            //       elders excluded, this check here uses the empty set for the
+            //       excluded_candidates which would prevent a dkg-retry from
+            //       succeeding.
+            // TODO: we should run `self.promote_and_demote_elders()` on membership decision
+            let dkg_sessions = self.promote_and_demote_elders(&BTreeSet::new()).await;
 
-            if !saps_candidates.contains(&signed_section_auth.elder_candidates()) {
+            let agreeing_elders = BTreeSet::from_iter(signed_section_auth.elders().cloned());
+            if dkg_sessions
+                .iter()
+                .all(|session| !session.elder_peers().eq(agreeing_elders.iter()))
+            {
                 // SectionInfo out of date, ignore.
                 return Ok(vec![]);
-            }
+            };
 
             // Send the `OurElder` proposal to all of the to-be-Elders so it's aggregated by them.
-            let proposal_recipients = saps_candidates
+            let proposal_recipients = dkg_sessions
                 .iter()
-                .flat_map(|info| info.elders())
-                .cloned()
+                .flat_map(|session| session.elder_peers())
                 .collect();
 
             self.send_proposal(
