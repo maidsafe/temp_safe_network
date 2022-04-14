@@ -470,11 +470,12 @@ mod tests {
     use super::*;
 
     use crate::elder_count;
-    use crate::messaging::system::MembershipState;
+    use crate::messaging::system::{MembershipState, NodeState};
     use crate::messaging::MsgType;
+    use crate::node::dkg::dkg_msgs_utils::DkgSessionIdUtils;
     use crate::node::{
-        dkg::voter::DkgVoter, dkg::DkgSessionIdUtils, ed25519,
-        network_knowledge::test_utils::gen_addr, NodeInfo, MIN_ADULT_AGE,
+        dkg::voter::DkgVoter, ed25519, network_knowledge::test_utils::gen_addr, NodeInfo,
+        MIN_ADULT_AGE,
     };
 
     use assert_matches::assert_matches;
@@ -497,7 +498,7 @@ mod tests {
             ed25519::gen_keypair(&prefix.range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
-        let elder_candidates = BTreeSet::from_iter([node.peer()]);
+        let elder_candidates = BTreeMap::from_iter([(node.name(), node.addr)]);
         let bootstrap_members = BTreeSet::from_iter([NodeState {
             name: node.peer().name(),
             addr: node.peer().addr(),
@@ -532,7 +533,7 @@ mod tests {
 
         let session_id = DkgSessionId::new(
             Prefix::default(),
-            BTreeSet::from_iter(nodes.iter().map(NodeInfo::peer)),
+            BTreeMap::from_iter(nodes.iter().map(|n| (n.name(), n.addr))),
             0,
             BTreeSet::from_iter(
                 nodes
@@ -628,7 +629,7 @@ mod tests {
                             },
                         ..
                     } => {
-                        assert_eq!(session_id, *expected_dkg_key);
+                        assert_eq!(session_id.hash(), expected_dkg_key.hash());
                         Ok(recipients
                             .into_iter()
                             .map(|peer| (peer.addr(), message.clone()))
