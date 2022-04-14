@@ -5,12 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.58.13 (2022-04-14)
+
+### Chore
+
+ - <csr-id-7b8ce1c9d980015768a300ac99d07f69cc1f5ae3/> remove unused sn_interface deps
+ - <csr-id-bc6d861706e57d6cc80bfde2b876ba9ce57efb09/> fix bench types dep -> sn_interface
+ - <csr-id-8494a01d9be3dddc0d0f4c2c37cdc4d6c3e54521/> split put messaging and types into top level crate
+
+### Other
+
+ - <csr-id-b62ad80298eb4b3e2f9810d20dd553aaf802408b/> add test-utils feat to bench
+
+### Test
+
+ - <csr-id-86ce41ca31508dbaf2de56fc81e1ca3146f863dc/> adding more unit tests to wallet APIs
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release.
+ - 5 days passed between releases.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - remove unused sn_interface deps ([`7b8ce1c`](https://github.com/maidsafe/safe_network/commit/7b8ce1c9d980015768a300ac99d07f69cc1f5ae3))
+    - fix bench types dep -> sn_interface ([`bc6d861`](https://github.com/maidsafe/safe_network/commit/bc6d861706e57d6cc80bfde2b876ba9ce57efb09))
+    - add test-utils feat to bench ([`b62ad80`](https://github.com/maidsafe/safe_network/commit/b62ad80298eb4b3e2f9810d20dd553aaf802408b))
+    - split put messaging and types into top level crate ([`8494a01`](https://github.com/maidsafe/safe_network/commit/8494a01d9be3dddc0d0f4c2c37cdc4d6c3e54521))
+    - adding more unit tests to wallet APIs ([`86ce41c`](https://github.com/maidsafe/safe_network/commit/86ce41ca31508dbaf2de56fc81e1ca3146f863dc))
+</details>
+
 ## v0.58.12 (2022-04-09)
+
+<csr-id-0a719147ae567b41ba2fcbf4c3c0b44e6d1955d1/>
+<csr-id-03258b3777644de7799e9563df35afc5e8531be2/>
+<csr-id-c8f4eed0406253cc4c253292bc82e7320fdcbf70/>
+<csr-id-3dac350598f863fc3d66669c9f8789db51573b96/>
+<csr-id-c45f6e362257ba9378547a8f1fd508a5e680cb0a/>
 
 ### Chore
 
  - <csr-id-0a719147ae567b41ba2fcbf4c3c0b44e6d1955d1/> sn_cli-0.51.1
  - <csr-id-03258b3777644de7799e9563df35afc5e8531be2/> only log SendSus once per batch
+
+### Chore
+
+ - <csr-id-c4e3de1d9715c6e3618a763fa857feca4258248f/> safe_network-0.58.12/sn_api-0.58.1/sn_cli-0.51.2
 
 ### New Features
 
@@ -41,9 +90,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 14 commits contributed to the release over the course of 11 calendar days.
- - 13 days passed between releases.
- - 12 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 15 commits contributed to the release over the course of 11 calendar days.
+ - 14 days passed between releases.
+ - 13 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -53,6 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.58.12/sn_api-0.58.1/sn_cli-0.51.2 ([`c4e3de1`](https://github.com/maidsafe/safe_network/commit/c4e3de1d9715c6e3618a763fa857feca4258248f))
     - adult shall update to new SAP ([`351450e`](https://github.com/maidsafe/safe_network/commit/351450ec6794d7933fd2b29359f820e87c0486db))
     - chore(release): ([`2d97a6d`](https://github.com/maidsafe/safe_network/commit/2d97a6da04b4811aa859e5b747126510430d4e2f))
     - sn_cli-0.51.1 ([`0a71914`](https://github.com/maidsafe/safe_network/commit/0a719147ae567b41ba2fcbf4c3c0b44e6d1955d1))
@@ -99,6 +149,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.58.9 (2022-03-26)
 
+<csr-id-b471b5c9f539933dd12de7af3473d2b0f61d7f28/>
+<csr-id-c0806e384d99b94480e8f8e0322a6f5a6bd3636a/>
+<csr-id-dabdc555d70be79b910c5fe2b2647ca85f2319f9/>
+
 ### Chore
 
  - <csr-id-b471b5c9f539933dd12de7af3473d2b0f61d7f28/> sn_dysfunction-/safe_network-0.58.9
@@ -127,6 +181,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.58.8 (2022-03-25)
+
+<csr-id-aa82ab7d691cca3990ece4e56d75cd63fda2fe15/>
+<csr-id-196b32f348d3f5ce2a63c24877acb1a0a7f449e3/>
+<csr-id-907c7d3ef4f65df5566627938154dfca1e2fdc05/>
+<csr-id-90712c91368b4d88537acc65a3ccc5478fe38d2c/>
+<csr-id-51d534d39caf3a4c029f7d1a9c87a3edf3192b2f/>
+<csr-id-b239e6b38a99afda7a945a51d3f6e00841730a8f/>
+<csr-id-aafb6d2a458fc4e2dc94ea3a08cb519fe52bc131/>
+<csr-id-6e897d0bc93256f5ab72350c9774f9a33937da1b/>
+<csr-id-224079f66832c0a914fd20af4fc2f9e90dc9c9c9/>
+<csr-id-453b246c002f9e964896876c254e6c31f1f6045d/>
+<csr-id-0cad4c981dbdf9eee58fc28b4637f136b817c384/>
+<csr-id-43489f6170ce13ea05148a52422fbff6bdb91f19/>
+<csr-id-1ea4b4413fee11fde2b69086caeb69cc191fe277/>
+<csr-id-2ac9edab88602fa2aeb148baf6566cab876dc2af/>
+<csr-id-e4a7c564180cb3b81601950c4f7623dfcdcd7650/>
+<csr-id-80c2ea0c2863ba8cc3500a1880337285e40fdf4c/>
+<csr-id-a49ea81658b15280c23e93b1945f67aeb43a5962/>
+<csr-id-6b83f38f17c241c00b70480a18a47b04d9a51ee1/>
 
 ### Other
 
@@ -244,6 +317,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.58.7 (2022-03-22)
 
+<csr-id-a6e2e0c5eec5c2e88842d18167128991b76ecbe8/>
+<csr-id-d3989bdd95129999996e58736ec2553242697f2c/>
+
 ### Chore
 
  - <csr-id-a6e2e0c5eec5c2e88842d18167128991b76ecbe8/> safe_network-0.58.7/sn_api-0.57.3/sn_cli-0.50.5
@@ -271,6 +347,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.58.6 (2022-03-17)
+
+<csr-id-a741d930b906054d09f1311ddcf35479aa1aa3ee/>
+<csr-id-20c057c72fdcacc0bcda6da1f97eb6fab1a0cf4c/>
 
 ### Chore
 
@@ -305,6 +384,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.58.5 (2022-03-09)
+
+<csr-id-df330fa0de1e334e55863828fb743131ab629a18/>
+<csr-id-784870abfdd5620da6839e7fd7df80702e0f3afa/>
+<csr-id-df398e1017221c0027542b597c8f7c38c1828723/>
+<csr-id-8c3bcc2bb64063e646d368d90fff98420ab22dce/>
 
 ### Other
 
@@ -348,6 +432,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.58.4 (2022-03-04)
+
+<csr-id-96bf83f8635004fa23e6b5b870cac27bd5b42332/>
+<csr-id-98a0eb988ab819ffce4727a9b823709efdc18dab/>
+<csr-id-bf7de428cd1e091ef2a6e616c07fd6596d711992/>
+<csr-id-ba0a26db12823bd2de51a4c75c5e7c4875c8f3f5/>
+<csr-id-94d58d565d9a6870e334bb2ca249f26ac3f8a327/>
+<csr-id-7cf7fd675beec5e7aa122f0f127402b636e659b7/>
+<csr-id-43a42657ff18409dd83bba03135cd013c1298dc3/>
+<csr-id-7cb5ffd03f9bfce6ebe74f66dcabddef661cf94d/>
+<csr-id-000fc62a87dac3cd41bb6ced59596635f056ff29/>
+<csr-id-0ff76c44aeddedd765fa4933c0841539feabaae5/>
+<csr-id-6970533f288ff867a702d3dbc5424314b3639674/>
 
 ### Test
 
@@ -424,6 +520,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.58.3 (2022-03-01)
 
+<csr-id-a3a2bbfbaf3be846a1c1f22a74aee2f961341685/>
+<csr-id-51b3d75fc7389de647f6df230bff32e8c7d7267c/>
+
 ### Other
 
  - <csr-id-a3a2bbfbaf3be846a1c1f22a74aee2f961341685/> use split example to start network for e2e-split run
@@ -455,6 +554,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.58.2 (2022-02-27)
+
+<csr-id-d8c57e082b52196cc538271bc25a88e3efd2a97c/>
+<csr-id-634010fd79ce1487abbff5adf3d15da59709dd95/>
+<csr-id-85e513670aa61f8acb3e3302ee4b39763ade036e/>
+<csr-id-705995ef67b3d4c45c95689c4a675e1063467ec9/>
+<csr-id-f8bfe9efe68593ceb4f968a6d2a396c431ad6429/>
+<csr-id-61068aaf3e9cd1c7513b58c073c55004697fdf6f/>
+<csr-id-ea2ba0afa036b6abab35db9a76488d052e7682d6/>
+<csr-id-912a2f8d2da4159fcf40567666b3b14024e8c0da/>
+<csr-id-d5e6f462615de830cd9c27dba49a34ba2da13b81/>
+<csr-id-35a46f06e6233aff25d03350abaefacbe57ad25c/>
+<csr-id-fc074ab28d3c8c011016e6598cf840fc38026418/>
+<csr-id-b44ac353e254d8d67996c3185dc40e5e99c0e4c7/>
+<csr-id-222742f7c57a4b451af354d33015974d0d7a3561/>
+<csr-id-c086db96c09a77c43777783f614ca6a43eff7cdd/>
 
 ### Other
 
@@ -535,6 +649,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.58.1 (2022-02-20)
 
+<csr-id-ea0387b43233f95d10f19d403d289f272f42336f/>
+
 ### Chore
 
  - <csr-id-ea0387b43233f95d10f19d403d289f272f42336f/> safe_network-0.58.1
@@ -564,6 +680,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.58.0 (2022-02-17)
+
+<csr-id-7b213d7bb1eaf208f35fc4c0c3f4a71a1da5aca3/>
+<csr-id-149665a53c00f62be0e8c8ec340b951a06346848/>
+<csr-id-9fb73957fbba99929911296305bfd66dbaa4d15a/>
+<csr-id-3a427eb33dd0a81f8dc77521a88eba2112bec778/>
+<csr-id-c184c49cd9d71e657a4b5349940eb23810749132/>
+<csr-id-ceaf43916dfac62213ea23bde35c3f931cdd8c37/>
+<csr-id-b161e038bf30e0a50a7103eaad80ef2368b6689d/>
+<csr-id-7e15db2de4d99d84126e7087d838047bae7a009b/>
+<csr-id-bd19e9e6eae4ce6068e1bee2d89528d36fce5329/>
+<csr-id-a56399864e18f2b2de7ba033497c5bbbe3e5394e/>
 
 ### Refactor
 
@@ -631,6 +758,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.57.1 (2022-02-15)
 
+<csr-id-07dc30b281f3c67cb5598aaaf72ba5c668353bf7/>
+<csr-id-03cf556d1b73565d520e2c5b82ab1482b076e639/>
+<csr-id-7068445cad25b0273c841c5072055833df9b8229/>
+<csr-id-d3dd663cfd6f3d0b0943ff49b1eed8c6b37d6263/>
+<csr-id-5fe289271fb0da28935b0b578928687be0dc4665/>
+<csr-id-d6e788221f332c3ff3a22eec39af428eebf5e75f/>
+<csr-id-283ff34f03dbf783b2299a3c7eb7a183c1e3c0a6/>
+<csr-id-e9e249a674d4a64078a519b7e20baf6f0759c1c9/>
+
 ### Chore
 
  - <csr-id-07dc30b281f3c67cb5598aaaf72ba5c668353bf7/> safe_network-0.57.1/sn_cli-0.49.1
@@ -669,6 +805,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.57.0 (2022-02-12)
+
+<csr-id-a398c4f8d72828db0fc8c6d5825ead62ba85db64/>
+<csr-id-8f580200ba5b8b67f36977fb59d6d48e7613e176/>
+<csr-id-1f57e30a206998a03b2201f4b57b372ebe9ae828/>
+<csr-id-1dfb651e72f38743645afbbee62c7e6e7fbb0fb2/>
+<csr-id-5869662a29c4bd8dfe0d7bf07a30f10d89b450ad/>
+<csr-id-74fc4ddf31af51e0036eb164e6b5c4f0864bd08c/>
 
 ### Chore
 
@@ -772,6 +915,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.56.0 (2022-02-08)
 
+<csr-id-3f75bf8da770a6167c396080b3ad8b54cfeb27e2/>
+<csr-id-471d910f2b6d8952569c3dc4b2dd31fe7aa30dfa/>
+<csr-id-f1e0e4564c2b581352f6dc6a0ba32259452494c5/>
+
 ### Chore
 
  - <csr-id-3f75bf8da770a6167c396080b3ad8b54cfeb27e2/> safe_network-0.56.0/sn_api-0.55.0/sn_cli-0.48.0
@@ -805,6 +952,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.55.5 (2022-02-07)
+
+<csr-id-d56f3c7c0bfc7bd6d045eb80a68a885615e73115/>
+<csr-id-473e4b0ca27767f4e1326629670f43ff5de5bc86/>
+<csr-id-dab972dccdf968e706f0c7599154e188dc74bf48/>
 
 ### Chore
 
@@ -842,6 +993,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.55.4 (2022-02-05)
 
+<csr-id-a0e9c52951e81018249a3bcf3b6300b3ad592136/>
+<csr-id-1c78a27d31bb6530274d4ac5cecbce817fad5313/>
+
 ### Chore
 
  - <csr-id-a0e9c52951e81018249a3bcf3b6300b3ad592136/> safe_network-0.55.4
@@ -877,6 +1031,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.55.3 (2022-02-04)
+
+<csr-id-86975f228f31303597a707e158005e44c86de1cc/>
+<csr-id-064a7ed00ca84edd5b5f86640ae868c1cb202590/>
 
 ### Chore
 
@@ -924,6 +1081,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.55.2 (2022-02-02)
 
+<csr-id-b1d35af9c2ae6cb386c6726a432c02b9d44973c2/>
+<csr-id-637ec03f9922e5d3dd0c8703eba5019256f4ec06/>
+<csr-id-d42b34d54adfc16b7947fa5728fcde80ad4f49c7/>
+<csr-id-7cd63377de16dd2962961f2dd936df3276fe8d6d/>
+<csr-id-f73e00cc67fae6090b9c991ac4e06999ea28f22e/>
+<csr-id-0c4c7d8c973bdb1e1d055798c17be2065f0334e2/>
+<csr-id-2479daea6b05c7b680bf6062407f507ad8692d57/>
+<csr-id-7f01106c8266abec07c9522cb69e4fbbb493f386/>
+
 ### Refactor
 
  - <csr-id-b1d35af9c2ae6cb386c6726a432c02b9d44973c2/> use the churn signature for deciding both the destination and members to relocate
@@ -967,6 +1133,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.55.1 (2022-02-01)
+
+<csr-id-25259b221120c8c9258ffdfae8883c65ead38677/>
+<csr-id-2ec86e28246031084d603768ffa1fddf320a10a2/>
+<csr-id-81298bb8ce1d93d7a418ff340d866fc00d9f60a4/>
+<csr-id-fa6014e581f52615971701572a1635dfde922fb6/>
 
 ### Test
 
@@ -1025,6 +1196,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.55.0 (2022-01-28)
 
+<csr-id-c52de7a75ce4bbf872b215a14258b5e7778bfb34/>
+<csr-id-366eee25f4b982d5a20d90168368a1aa14aa3181/>
+<csr-id-2cc7323ec8b62f89f2e4247c5d6ab56f78eda2ce/>
+<csr-id-2746cff087fd33aff523bc2df07a3462d05c6de1/>
+<csr-id-fa6014e581f52615971701572a1635dfde922fb6/>
+
 ### Refactor
 
  - <csr-id-c52de7a75ce4bbf872b215a14258b5e7778bfb34/> keep section Left/Relocated members in a separate archive container
@@ -1075,6 +1252,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.54.2 (2022-01-25)
+
+<csr-id-77d45d7498facb18a611a8edcf608a3c0ff0b2c8/>
+<csr-id-9d3a164efa7f38b7eeafc3936160458871956f5b/>
+<csr-id-90cdbce964c8fd293d85b9a28f1b0d2d2a046b08/>
+<csr-id-99df748624a36e1d2457cb81f74e8cd8accb8633/>
 
 ### Other
 
@@ -1131,6 +1313,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.54.1 (2022-01-24)
 
+<csr-id-5a90ec673edcb36ae954b0af6144bae7d8243cd7/>
+<csr-id-1ff0ab735994f8cbfae6abd58fea0e71a90f742c/>
+
 ### Chore
 
  - <csr-id-5a90ec673edcb36ae954b0af6144bae7d8243cd7/> safe_network-0.54.1
@@ -1166,6 +1351,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.54.0 (2022-01-22)
 
 <csr-id-8f58c5d900ce00d90bf7421f34122f4ca5ff5601/>
+<csr-id-3b5ce194213a7090ee83c02b0043700cda230796/>
+<csr-id-d84ac520676b83f39d5cf356e89ac3ec2d6478cc/>
+<csr-id-0190f0305980bdaee30f9f2ab5eb5510149916db/>
+<csr-id-d59999adcecd36380ed3a6855fdedfbef8107914/>
+<csr-id-4e517a1fd57e63a3b5381ecd0cdf9db4f762e03f/>
+<csr-id-3dc23278c6a4fabc250b27f4312f5c51f0f271a4/>
+<csr-id-274cc12ca37da5ff536a7b4ab59f803546ccefe9/>
+<csr-id-1b3c0eb4443cff3f4575164907a7a1fbf92cebe2/>
+<csr-id-d96ded11ca74e75dde3dcc0d0b865712895d3dcc/>
+<csr-id-7a7752f830785ec39d301e751dc75f228d43d595/>
+<csr-id-959e909d8c61230ea143702858cb7b4c42caffbf/>
 
 ### chore (BREAKING)
 
@@ -1285,6 +1481,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.53.0 (2022-01-20)
 
 <csr-id-8f58c5d900ce00d90bf7421f34122f4ca5ff5601/>
+<csr-id-37d2522619e49212572aa37034e0ba1857679dc7/>
+<csr-id-565711d4bc58f18181d279e5f29d9adb3acb051a/>
+<csr-id-4eef4d3a9356d6a0724c0c670809e8d9fd1f11c0/>
+<csr-id-c222370b52befaedebe895fcf7feb2c1da99aeaa/>
+<csr-id-a018022e4eb298a9a66513c770c0edc1b415a886/>
+<csr-id-893df83ec9a1c4231f09b4e7bad9c15ef2944036/>
+<csr-id-08cde8586e018e19df6b35270bd999f45d30596e/>
+<csr-id-fdda641b3874c425616352daf7db7429219bb858/>
+<csr-id-923930acb3769cfa7047954a1fee1853ec9e3062/>
+<csr-id-82f39977ec965429269a31639ce83be9749b5d80/>
+<csr-id-b06bc6eb0fd210b6abc9039d1f20ab8d93befc16/>
+<csr-id-f7f59369d09a4d25a94328d031f00cc61b187eed/>
+<csr-id-96a955e5b124db3250c3d0fd09926cec10322632/>
+<csr-id-57749b7d0671423fe205447bc84d9f8bfc99f54b/>
+<csr-id-252f81e155dce2b8d774c8999b730e763674d93f/>
+<csr-id-40b00cbd899c72889439b9f94b34b173ff3af837/>
+<csr-id-941b83f3960c84cfee86a8c818233fbbc403c189/>
+<csr-id-56bed01344ca5ec74a49c2a41116ef76fb33e3b4/>
+<csr-id-026458c6afa9848bb58a694da6ae4b81196b8f19/>
+<csr-id-f22e4dce22492079170cbaeb8c29b3911faaf89a/>
 
 ### Documentation
 
@@ -1455,6 +1671,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.52.13 (2022-01-06)
 
+<csr-id-155ee032ee56cbbb34928f2d14529273ccb69559/>
+
 ### Chore
 
  - <csr-id-155ee032ee56cbbb34928f2d14529273ccb69559/> safe_network-0.52.13/sn_api-0.50.6
@@ -1482,6 +1700,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.52.12 (2022-01-06)
+
+<csr-id-81282318ae2da1793e66f28f0c8b3c0b2272a529/>
+<csr-id-7928ce6411d237078f7ed3ba83823f438f3a991f/>
+<csr-id-f1afc5933dc782bc6a7840cd12cebb32a189a5df/>
+<csr-id-4f29c285a0b48220df1f1c6c52c4b487350eae08/>
+<csr-id-db515397771f117b3bf095e1a4afb897eb4acafe/>
+<csr-id-bebdae9d52d03bd13b679ee19446452990d1e2cf/>
 
 ### Refactor
 
@@ -1544,6 +1769,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.52.11 (2022-01-06)
 
+<csr-id-99d012ef529df78ef4c84f5e6ea99d3a77414797/>
+
 ### Chore
 
  - <csr-id-99d012ef529df78ef4c84f5e6ea99d3a77414797/> safe_network-0.52.11/sn_api-0.50.5/sn_cli-0.43.2
@@ -1582,6 +1809,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.52.10 (2022-01-05)
+
+<csr-id-9c9a537ad12cc809540df321297c8552c52a8648/>
+<csr-id-7b0cd4d183a9f82d1d78dbb56572e5bf36714a0a/>
+<csr-id-233e64af3b2af63bbba06ba8f43d0a7becece913/>
+<csr-id-9f1bd81b269ec06fd5d379ab4b07f18f814da865/>
+<csr-id-bf16c5ea7051386064233443921438cbbd79d907/>
+<csr-id-012e91a60e01cd2ce9155d5c56045f211865ff2c/>
 
 ### Refactor
 
@@ -1634,6 +1868,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.52.9 (2022-01-04)
 
+<csr-id-a64c7e0414b77f545cb8cdbf64af0fb7212d1f2e/>
+
 ### Chore
 
  - <csr-id-a64c7e0414b77f545cb8cdbf64af0fb7212d1f2e/> safe_network-0.52.9/sn_api-0.50.4
@@ -1667,6 +1903,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.52.8 (2022-01-04)
+
+<csr-id-c790077bebca691f974000278d5525f4b011b8a7/>
+<csr-id-5214d5e7f84a3c1cf213097a5d55bfb293f03324/>
+<csr-id-6ccb792c18481ffd8218cd7c27b28d8a10d1f528/>
 
 ### Refactor
 
@@ -1719,6 +1959,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.52.7 (2022-01-04)
 
+<csr-id-da3bbe16084b71ec42343035087848c8f6996ec4/>
+<csr-id-b35d0ccd0305e3e87a9070bc2a57287dbe6b2633/>
+<csr-id-2ebd1b4fcab47bc86980860379891bb041ff2aa4/>
+<csr-id-40d1844e0b28578e8b8c6b270151dbb86961a766/>
+<csr-id-bd0382fef77947935584418ee91720001f5f269c/>
+
 ### Refactor
 
  - <csr-id-da3bbe16084b71ec42343035087848c8f6996ec4/> record it in an atomic usize
@@ -1768,6 +2014,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.52.6 (2022-01-04)
+
+<csr-id-838c495c8858b85c693da1a3e45baafa57ba03ea/>
+<csr-id-36ba7d5e85e304d6d0ff3210429923beed77d25b/>
+<csr-id-0a70425fb314de4c165da54fdc29a127ae900d81/>
+<csr-id-1caad35e0e744e50b2bd15dda8dbd3adbacb87c7/>
+<csr-id-78e41a3d8387f9b53bfd5e078ae7aa44fe1ea6d4/>
+<csr-id-04ee3e74e5573f903be29cd89416ce9e5758cf00/>
+<csr-id-a9913a0f7140d302fcaf24264fc1982f2ad3d06b/>
+<csr-id-97171142548772a466188f2e6d9f24072f28640d/>
+<csr-id-a7e7908537d63e4071323a59cbbd036edcff41ab/>
+<csr-id-18cee44f08aa4f83ad477cc82a29525e9d339e0c/>
+<csr-id-1d19c02668dfa3739a350b15c7310daec93d9837/>
+<csr-id-2492ea84e9fcba5d19022e171ec6b60c341ee59b/>
+<csr-id-8884f9453a859bd63b378337aab326889d153768/>
+<csr-id-690b24f14c3183640d04d048c2a7f4ac79f6e6c7/>
+<csr-id-3b3a38130bd6943b7c53b1cf74321d89dd4af1da/>
+<csr-id-8effd08c16cfd2e0715ee0d00092e267f72a8cf0/>
 
 ### Refactor
 
@@ -1868,6 +2131,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.52.5 (2022-01-04)
 
+<csr-id-ab00eca916d6ed8a0a137004a6b9fd24e7217a70/>
+
 ### Chore
 
  - <csr-id-ab00eca916d6ed8a0a137004a6b9fd24e7217a70/> safe_network-0.52.5
@@ -1897,6 +2162,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.52.4 (2022-01-04)
+
+<csr-id-4bb2adf52efdac6187fffc299018bf13f3398e14/>
+<csr-id-0a5fca96af4d2627b842591775e77c09201ed655/>
+<csr-id-3af8ddbee91f3403b86914d352a970e366d1fa40/>
 
 ### Chore
 
@@ -1950,6 +2219,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.52.3 (2022-01-03)
 
+<csr-id-6b9b1590bce9423130210007ddd6e9c14b51819d/>
+<csr-id-be8989971c68ac5aee43380223000a1f400252fc/>
+<csr-id-292466119e2d99c36043e7f2247b1bde9ec9ced9/>
+<csr-id-d54c955aa768ab08ef8193b7e36cb96822bc6cb8/>
+<csr-id-72f79d46fc56fdda9215f8a9d6f95bcdf323a66f/>
+<csr-id-e9a9cc1096e025d88f19390ad6ba7398f71bc800/>
+
 ### Refactor
 
  - <csr-id-6b9b1590bce9423130210007ddd6e9c14b51819d/> do not check if space available
@@ -1999,6 +2275,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.52.2 (2022-01-03)
 
+<csr-id-d490127b17d53a7648f9e97aae690b232188b034/>
+<csr-id-9d7e6843701465a13de7b528768273bad02e920e/>
+<csr-id-e9a9cc1096e025d88f19390ad6ba7398f71bc800/>
+
 ### Chore
 
  - <csr-id-d490127b17d53a7648f9e97aae690b232188b034/> safe_network-0.52.2
@@ -2028,6 +2308,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.52.1 (2022-01-03)
+
+<csr-id-e38925e07d69432db310fc8ec9803200ea964ab2/>
+<csr-id-36dbea03d879c07f922be36a124ad8d44c3c2d0e/>
+<csr-id-48ef44e9db01d74119a2b1c9f7e7dae4ce988c57/>
+<csr-id-619d142de8999d536e41ac5fe402a94d934689fb/>
 
 ### Chore
 
@@ -2065,6 +2350,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.52.0 (2021-12-22)
 
+<csr-id-6b59ad852f89f033caf2b3c7dfcfa3019f8129e8/>
+<csr-id-1188ed58eed443b4b8c65b591376f2f9a21acc0d/>
+
 ### Chore
 
  - <csr-id-6b59ad852f89f033caf2b3c7dfcfa3019f8129e8/> safe_network-0.52.0/sn_api-0.47.0/sn_cli-0.40.0
@@ -2098,6 +2386,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.51.7 (2021-12-20)
+
+<csr-id-c76c3ab638188cba38911f037829c209fcc45fc3/>
+<csr-id-07e19b53cd8eaa777f4c83369d2ee1076c75fe4f/>
+<csr-id-069013b032b7fd8d8a58ca0d75f6ea357abf5593/>
 
 ### Chore
 
@@ -2133,6 +2425,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.51.6 (2021-12-17)
 
+<csr-id-79b2d0a3f52de0335323773936dee9bdbe12a0cf/>
+
 ### Chore
 
  - <csr-id-79b2d0a3f52de0335323773936dee9bdbe12a0cf/> safe_network-0.51.6
@@ -2165,6 +2459,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.51.5 (2021-12-16)
+
+<csr-id-45df3d71cc4b3185602b9d27b8cb0f5bf65a4b43/>
+<csr-id-9cf7c72a94386f2cbe6f803be970c6debfbcb99b/>
 
 ### Chore
 
@@ -2202,6 +2499,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.51.4 (2021-12-16)
 
+<csr-id-17d7906656bec401d6b39cc3551141112a3d77c4/>
+
 ### Chore
 
  - <csr-id-17d7906656bec401d6b39cc3551141112a3d77c4/> safe_network-0.51.4
@@ -2234,6 +2533,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.51.3 (2021-12-16)
+
+<csr-id-92cdb53391652651bfe9a47c5a0261ba10f38148/>
+<csr-id-9be440b36db07e1c04ab688b44ef91e4a56ed576/>
 
 ### Refactor
 
@@ -2269,6 +2571,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.51.2 (2021-12-16)
 
+<csr-id-595541b83284a5c5b60fbc00e47b1146117d7613/>
+<csr-id-f522d9aad0071cd3b47b1a3e4c178b0100ec71d6/>
+
 ### Chore
 
  - <csr-id-595541b83284a5c5b60fbc00e47b1146117d7613/> safe_network-0.51.2
@@ -2294,6 +2599,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.51.1 (2021-12-15)
+
+<csr-id-dcbb67fc699d7cb1f3a2c4632bcb8a5738916091/>
+<csr-id-e52a0c063f747e0be1525f07f8f759f4b9d042a7/>
+<csr-id-df87fcf42c46dc28e6926394c120fbf2c715e54a/>
 
 ### Chore
 
@@ -2329,6 +2638,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.51.0 (2021-12-15)
 
+<csr-id-c685838d8f9c10b0f4e7541fe201862bb84e8555/>
+<csr-id-7c34940401b0115105d9b818b9f93c39d7669eed/>
+
 ### Chore
 
  - <csr-id-c685838d8f9c10b0f4e7541fe201862bb84e8555/> safe_network-0.51.0
@@ -2362,6 +2674,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.50.0 (2021-12-14)
 
+<csr-id-653f653a775a101679904ab75c8012a72dfdedfb/>
+
 ### Chore
 
  - <csr-id-653f653a775a101679904ab75c8012a72dfdedfb/> safe_network-0.50.0
@@ -2391,6 +2705,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.49.3 (2021-12-14)
 
+<csr-id-edb8de8b4d923e97d68eed40a7953f38461b0281/>
+<csr-id-36ca20e606899ecbdea24d845c34ba11ab889cf7/>
+
 ### Test
 
  - <csr-id-edb8de8b4d923e97d68eed40a7953f38461b0281/> adding a test for retrieving Blob with range over data length
@@ -2419,6 +2736,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.49.2 (2021-12-14)
+
+<csr-id-62d747969b739172910aabca6fcb273d2827fc8a/>
+<csr-id-dd50d1d860aa4ca60b6c0d5a525b45d88ddf432e/>
 
 ### Chore
 
@@ -2454,6 +2774,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.49.1 (2021-12-13)
+
+<csr-id-69ae8c20e91dd9959ebfa5456efdf9c218a9d66f/>
+<csr-id-2e7bc0b782da6231f54edc440fa555fa754d294c/>
 
 ### Chore
 
@@ -2494,6 +2817,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.49.0 (2021-12-13)
 
 <csr-id-88c78e8129e5092bd120d0fc6c9696673550be9d/>
+<csr-id-6f5516d8bb677462ea6def46aa65a1094767d68c/>
+<csr-id-1a81c8f04f947d2b83d3cd726c00ad66927f5225/>
+<csr-id-a569474a8be9c11ab73ec7ad1ad157f69827b4d3/>
 
 ### New Features
 
@@ -2540,6 +2866,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.48.0 (2021-12-10)
+
+<csr-id-7eda2760da82b3079d5eee2f97e2d15ac8da0d57/>
+<csr-id-9eff03598ba09aa339180d7ecd57b50174180095/>
+<csr-id-58632a27d271140fc4d777f25a76b0daea582426/>
+<csr-id-0d4343c8fa56749d3ec9390e298d1d6384573a67/>
+<csr-id-85709655b0ce38246515658b956aa9b8f67cb55a/>
 
 ### Test
 
@@ -2611,6 +2943,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.46.6 (2021-12-07)
 
+<csr-id-b5e9dcc5b13b1eda711d4760d9feb8dc929a0c43/>
+<csr-id-05f6d98cf21f0158f4b5161484c7c15a0561b6f4/>
+
 ### Chore
 
  - <csr-id-b5e9dcc5b13b1eda711d4760d9feb8dc929a0c43/> safe_network-0.46.6
@@ -2649,6 +2984,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.46.5 (2021-12-02)
 
+<csr-id-86577846e845c110c49e15c95c6bd5595db51773/>
+
 ### Chore
 
  - <csr-id-86577846e845c110c49e15c95c6bd5595db51773/> safe_network-0.46.5
@@ -2681,6 +3018,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.46.4 (2021-12-02)
 
+<csr-id-de3051e7e809a8f75507c54f3cf053a4244fdf19/>
+
 ### Chore
 
  - <csr-id-de3051e7e809a8f75507c54f3cf053a4244fdf19/> safe_network-0.46.4
@@ -2710,6 +3049,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.46.3 (2021-12-02)
+
+<csr-id-69e9be2a1567bfa211af7e9d7595381d9a0a3b38/>
 
 ### Chore
 
@@ -2746,6 +3087,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.46.2 (2021-12-01)
+
+<csr-id-260eaabd2d1b0c26dec9febc963929e65d7ec912/>
+<csr-id-b4f0306fb945cce096de7f68c3cf6ece6905786d/>
+<csr-id-204f927220c8bd1829ac89feaed1c48a8034e80b/>
+<csr-id-2ef8e45f53ff6925e56321ed0ebc922d2d4dd9b9/>
+<csr-id-1eea84476294c1dbfbfe72fe0e9acdb997762595/>
 
 ### Chore
 
@@ -2794,6 +3141,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.46.1 (2021-12-01)
 
+<csr-id-bf55f9b7e3b96319de4423e19333bf3b16fd1c78/>
+
 ### Chore
 
  - <csr-id-bf55f9b7e3b96319de4423e19333bf3b16fd1c78/> safe_network-0.46.1
@@ -2826,6 +3175,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.46.0 (2021-12-01)
 
 <csr-id-f3d3ab2b059040ff08b6239c8a6583c64eac160e/>
+<csr-id-8ea94983b37b1d559358a62d6ca075b97c193f0d/>
+<csr-id-3f77429e8bd659a5b2e7aa377437fac1b3d709c0/>
+<csr-id-a7e058536ae6ae27228bd2254ea6465c5eface35/>
 
 ### New Features
 
@@ -2888,6 +3240,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.44.5 (2021-11-30)
 
+<csr-id-d364a7e364827b2d71f196a9f897b7d613bbab94/>
+<csr-id-0da3c99785e026075214b7cfa7933f64420aa00f/>
+<csr-id-aaab10b3a5a44d9ec844757c71ac091016f51fd1/>
+<csr-id-9deb9e7e2ae5d909eeb745e9021cf7660ed55dc3/>
+
 ### Other
 
  - <csr-id-d364a7e364827b2d71f196a9f897b7d613bbab94/> only check split count for health check for now
@@ -2923,6 +3280,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.44.4 (2021-11-30)
+
+<csr-id-984c5f83e3f4d889dc4e0583b09571e540357cf9/>
+<csr-id-e841ae0cf3caf852e8a48b559dcffb64b7fcecad/>
 
 ### Chore
 
@@ -2963,6 +3323,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.44.3 (2021-11-30)
+
+<csr-id-ec3dd4991535bb22235e2d1d413dd93489b8aedf/>
+<csr-id-9885536afe337bf109e3ab18eec054100bf3fd82/>
+<csr-id-cf67a374ae5aa5a9f95d39357fdbd937eb5e1a1a/>
 
 ### Chore
 
@@ -3011,6 +3375,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.44.2 (2021-11-30)
 
+<csr-id-51b0f0068c9a279da9a1edf45509cf80a90e663d/>
+<csr-id-a3c5ef63f37ec0d2f98d45176e27da7de31baabc/>
+
 ### Chore
 
  - <csr-id-51b0f0068c9a279da9a1edf45509cf80a90e663d/> safe_network-0.44.2
@@ -3041,6 +3408,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.44.1 (2021-11-29)
+
+<csr-id-14c84c9db23557626e4889eff0ff403a574dccad/>
+<csr-id-10e135b4f77dcd30de99eb7bc370ba1e15bbd148/>
 
 ### Chore
 
@@ -3077,6 +3447,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.44.0 (2021-11-26)
+
+<csr-id-75a4b537573d4e5e8767e38fa7d1b1126dffe148/>
 
 ### Chore
 
@@ -3125,6 +3497,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.43.0 (2021-11-26)
+
+<csr-id-0f2786483016adb2f44199cd4e5bf55e8c54adc3/>
+<csr-id-ee6431e9509dd5b02ec2eca4c10ea17c7dddcfc9/>
+<csr-id-d73deebbf94e65898d29455d6d4ed951ca59b814/>
+<csr-id-3fa2957fe4f4a1f14b9001e101270dec4e386c14/>
+<csr-id-612f8437429d4d9852f54fa0e297b059b8e86827/>
+<csr-id-0ab3c35e424e60ffbed0edf8c1f71da48daa0978/>
+<csr-id-c7b9d748b12e6d1e23d2a2972f2553af50343b22/>
+<csr-id-d85d896ceaa68785797b1c525ae8653ef26f2708/>
+<csr-id-1c5929bcc0638e8ff05dd495b3cedfdeff7540aa/>
+<csr-id-e6df2ec1d2c8ab02bdaa95ed4c3288cfc0e532cc/>
+<csr-id-ddd3726a0a2a131ae7c05a4190edb8bdc7fa3665/>
+<csr-id-52a39b4c41b09ec33c60bc09c55fc63484e524cf/>
+<csr-id-f69c0e319b639b678b46b73724a77ed7172cfec3/>
+<csr-id-7ae741f93f39c437618bde150458eedd7663b512/>
+<csr-id-c78f4703a970e8b7466b091ad331d0f2233aa9a3/>
+<csr-id-2003e34cc26c450486151fa1df74ffea61c8c9ae/>
+<csr-id-c051e02afdcbd2c21deec19b1baebfb8293d515c/>
+<csr-id-016b7d47f708308490c1883db4ba239fc2add59b/>
+<csr-id-580f2e26baf787bdee64c093a03ae9470668619d/>
+<csr-id-da39113a7f97f6881643e66a48e19f2e06368e8d/>
 
 ### Refactor
 
@@ -3278,6 +3671,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.42.0 (2021-11-25)
 
+<csr-id-ca21d1e97fcd28ca351887636affffff78e3aeb3/>
+<csr-id-bad083332fdcc3a0bc3c3f13628c00315f1b2519/>
+
 ### Chore
 
  - <csr-id-ca21d1e97fcd28ca351887636affffff78e3aeb3/> safe_network-0.42.0/sn_api-0.43.0
@@ -3313,6 +3709,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.41.4 (2021-11-25)
 
+<csr-id-8b8a3616673405005d77868dc397bd7542ab3ea7/>
+
 ### Chore
 
  - <csr-id-8b8a3616673405005d77868dc397bd7542ab3ea7/> safe_network-0.41.4/sn_api-0.42.0
@@ -3342,6 +3740,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.41.3 (2021-11-24)
+
+<csr-id-4b72bfc9a6c3a0db4821e7ebf1f4b5daa7cc56d1/>
+<csr-id-df25e4920c570771f6813ca03da02f6dfc8e59fb/>
+<csr-id-9d657249f3d0391e7c3bbeae6f81909993802cc7/>
 
 ### Chore
 
@@ -3375,6 +3777,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.41.2 (2021-11-24)
+
+<csr-id-bf0488d239fc52ce03c1f380ae0986810d753007/>
+<csr-id-aca0fb7a451ffc25c6e34479cc9201fef42796be/>
+<csr-id-c34c28dd8776196a6c1c475b7f3ec3be709c0b6d/>
+<csr-id-a973039178af33b859d421cf36571de49cceff17/>
 
 ### Refactor
 
@@ -3424,6 +3831,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.41.1 (2021-11-23)
+
+<csr-id-b456f2f610ea57e5d8a4811fbca5a26175434645/>
+<csr-id-950a4eece1a11f70b2aef71cc11404603bb2ec5c/>
+<csr-id-f73364efa66718b92e04f24d4546c1e248198ce8/>
+<csr-id-ad1617f96954a810898484e5b00b5b8b12495f4e/>
+<csr-id-d8ec5a81ae566e8d7068592e01cff4e808b1cad1/>
+<csr-id-62aa668d5777058ae617f8952cfcb62be002abf3/>
+<csr-id-63432eb2e528401ae67da8eea0c82837ab42fc18/>
+<csr-id-7a875a88c911b5a9db59a55b81c94b995e2b95ae/>
+<csr-id-5514d9c06ee400e983a258ba2eb37bff1abf0dd0/>
+<csr-id-1848189aa780f2f6aabddb3564b816c72f9bee6e/>
 
 ### Refactor
 
@@ -3507,6 +3925,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.41.0 (2021-11-23)
+
+<csr-id-b1297f2e42cdd7f7945c9fd5b4012086f8298b85/>
+<csr-id-680f9431bc75efea455dd7c6985e41c11740dc3e/>
+<csr-id-eb0291082e49d1114c853b214f55b8a25e18d1e1/>
+<csr-id-93bffbf1343621a8d5187649d1bb6d2a81cba793/>
+<csr-id-1268fb6e46e4ba061ba7f724917371d8e0db0092/>
+<csr-id-b70a1053adc267780215636dd80a759c45d533d5/>
+<csr-id-1d62fcefd5d44ef0df84b8126ba88de1127bd2bd/>
+<csr-id-20c1d7bf22907a44be2cc9585dd2ac55dd2985bf/>
+<csr-id-182c4db4531c77fa6c67b8267cd7895b49f26ae1/>
+<csr-id-02f1325c18779ff02e6bb7d903fda4519ca87231/>
+<csr-id-1bf17662ecae4e1f3e9969ac03a8f543f57f2cd0/>
+<csr-id-90f2979a5bcb7f8e1786b5bdd868793d2fe924b4/>
+<csr-id-14328b3d5b2579e4f038624c2353ec36c45fa9ed/>
+<csr-id-4f5e84da96d7277dfc4e385ff03edf6c1d84991e/>
+<csr-id-14fdaa6537619483e94424ead5751d5ab41c8a01/>
+<csr-id-dbdda1392325e8a08a6a28988208769552d5e543/>
+<csr-id-e8e44fb69dae7fe1cae3bbf39f7b03a90df44dd7/>
+<csr-id-86c83bedf061b285b0d4f3effb54cc89a9fbd84d/>
+<csr-id-590bfea538bb78fd20bb9574c3ea9ed6dcceced0/>
+<csr-id-85f2b5fd2adbf1f57e184c9e687fd14929b911e7/>
+<csr-id-14c6ab95da62a144a798665ade6da626fb5ee6f2/>
+<csr-id-30d220c180c7586de56282fafe52b54c8b619860/>
+<csr-id-6c0209187797bb27fa1529dd2f0ee8116975a02d/>
+<csr-id-a328d70720a795b62ac05a68454abf1034e97b9d/>
+<csr-id-a98cc810409a4ccc78e3c7a36b38b5f00cfcb23a/>
+<csr-id-da1fe8dda6325e05b4d976d2b77d084c06d98cb0/>
+<csr-id-078f45148af2da8d1690490720ef5f95555d42cd/>
+<csr-id-4c9b20ee58be9ca3579c7d1f4edd09452d59d38c/>
+<csr-id-49d3a298be19a46dcb6232ee8087c9bf0381db23/>
+<csr-id-cdc31cb44af8b6dc2393a0f15c98c0be364db6ff/>
+<csr-id-bc717073fde5fef59cbbe670ab6b7a9d66253d3b/>
+<csr-id-189aeb6941d277f94e47ade0e851696206aaa146/>
+<csr-id-9d5baf83c630e597407e5c5d4a47fc7f34805696/>
+<csr-id-9aaccb8784afd03454cd69f599dc2b7822ca130c/>
+<csr-id-8f1cc32b87a9e333f32399020339dd41e2d0b049/>
+<csr-id-1fbc9b24d14460c6a88a064297c3a327ca9182aa/>
+<csr-id-4e7da0aeddba7287c1556ca318d9cdd8459000d2/>
+<csr-id-456c022ddf66af5f991e6aca2240d2ab73f8241d/>
+<csr-id-ccb7efda1ee0c6303ac537ca9edd4b6c5cfcc5f2/>
+<csr-id-d55978b38c9f69c0e31b335909ca650758c522c1/>
+<csr-id-9a149113d6ffa4d4e5564ad8ba274117a4522685/>
+<csr-id-f8de28a8e040439fcf83f217261facb934cacd51/>
+<csr-id-231bde07064d6597867b5668a1e5ff319de3a202/>
+<csr-id-3b7091bd8b45fc5bbfa6f1714ec56e123d76c647/>
+<csr-id-3b4e2e33285f4b1a53bd52b147dc85c570ed2f6e/>
+<csr-id-345033abe74a86c212e3b38fc0f6b655216b63b0/>
+<csr-id-4a1349c5e99fdc45c038afdd2dac24486ee625ea/>
+<csr-id-d6732833db0bb13d8414f99758e8767ab8ab2bdd/>
+<csr-id-d75e5c65d04c60dca477cca4e704308198cfd6cf/>
 
 ### Refactor
 
@@ -3790,6 +4258,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.40.0 (2021-11-15)
 
+<csr-id-1389ffa00762e126047a206abc475599c277930c/>
+<csr-id-70015730c3e08881f803e9ce59be7ca16185ae11/>
+<csr-id-ee165d41ca40be378423394b6422570d1d47727c/>
+<csr-id-00acf0c0d8a65bdd5355ba909d73e74729a27044/>
+<csr-id-7d5d5e11fef39a6dc1b89c972e42772db807374c/>
+<csr-id-855b8ff87217e92a5f7d55fb78ab73c9d81f75a2/>
+<csr-id-23b8a08e97fa415b9216caac5da18cb97ede980f/>
+
 ### Refactor
 
  - <csr-id-1389ffa00762e126047a206abc475599c277930c/> retry on connection loss of reused connection
@@ -3899,6 +4375,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.39.0 (2021-11-12)
+
+<csr-id-0a5027cd9b2c62833ccf70e2bcca5ab22625a840/>
+<csr-id-645047b231eaf69f1299dee22ff2079feb7f5a95/>
+<csr-id-0e2b01bb7e9c32f0bc5c1c6fd616acfcc5c45020/>
+<csr-id-ab00cf08d217654c57449437348b73576a65e89f/>
+<csr-id-5a3b70e9721fcdfdd809d2a6bd85968446b4e9a3/>
+<csr-id-08629e583a03852d9f02b0e7ff66a829e3056d9b/>
+<csr-id-5a81d874cf8040ff81a602bc8c5707a4ba6c64ff/>
+<csr-id-8aa27b01f8043e98953971d1623aaf8b07d1596e/>
+<csr-id-48a7d0062f259b362eb745e1bd59e77df514f1b8/>
+<csr-id-008f36317f440579fe952325ccb97c9b5a547165/>
+<csr-id-213cb39be8fbfdf614f3eb6248b14fe161927a14/>
+<csr-id-ee165d41ca40be378423394b6422570d1d47727c/>
+<csr-id-00acf0c0d8a65bdd5355ba909d73e74729a27044/>
+<csr-id-7d5d5e11fef39a6dc1b89c972e42772db807374c/>
+<csr-id-855b8ff87217e92a5f7d55fb78ab73c9d81f75a2/>
+<csr-id-23b8a08e97fa415b9216caac5da18cb97ede980f/>
 
 ### Refactor
 
@@ -4030,6 +4523,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v0.38.0 (2021-11-10)
 
+<csr-id-1568adb28a2a6a3cdf8a9737e098a5ea7bb2c419/>
+<csr-id-cbdf0236f7cd241e7addb1afe75ed5e5cfac00ab/>
+<csr-id-a7968dd17927e346b3d32bb5971ed6457aea6606/>
+
 ### Refactor
 
  - <csr-id-1568adb28a2a6a3cdf8a9737e098a5ea7bb2c419/> insert a connected peer for outgoing connections
@@ -4120,6 +4617,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.37.0 (2021-11-09)
+
+<csr-id-1b7f5d6e198eb286034e12eed3fa4fc63b927e0f/>
+<csr-id-9581fcf27765752f6b556d632e8396e93d0f15e0/>
+<csr-id-a03d2cef55665759ddfeb40972676c87b17ccfa8/>
+<csr-id-bde3cd5eac75cc41a3a9ffefb091584273575f68/>
+<csr-id-e24763e604e6a25ee1b211af6cf3cdd388ec0978/>
+<csr-id-7d5212a2b916a8e540403346e0770cee1a446884/>
+<csr-id-109843c67ffd4ac4675cdfe56d7fcdaf97664007/>
+<csr-id-6bb5e64b3b0eb518719581278551272ae8f2b2ed/>
+<csr-id-e47e9ecb0c7f23209a9c1eb58c248fdf2facfd4a/>
+<csr-id-3b728b65a07a33019e06dd6f3da9fd334e6da9e1/>
+<csr-id-87c62d39d240afc01118135bc18d22fe23fc421c/>
+<csr-id-d7972da6abd3001e75019bf72aae6a98919ed1db/>
+<csr-id-49e2d14a1c5f8fd83aa4b9a5abe67e23fca9f966/>
+<csr-id-5326de5f658dfe75d1f5c44224d8623123848b08/>
+<csr-id-9a3cffc52589e8adf6dac75ae6aab4c184118648/>
+<csr-id-c2df9db2fe9e99450cc16060ff034289ab683783/>
+<csr-id-2fc2f0e6fbb5f7b05e61281e90992053ef5f0f5d/>
+<csr-id-432e36de012695c6c5e20bd704dc184db9c5c4d6/>
+<csr-id-9cc16296db7241819e17dd2673c7b3cb9fe2ead8/>
+<csr-id-c49f9a16c9e0912bf581a2afef22ac4806898ade/>
+<csr-id-9cd2d37dafb95a2765d5c7801a7bb0c58286c47c/>
+<csr-id-b719b74abdd1cd84b3813ec7046f4fdf99cde6a2/>
+<csr-id-3703819c7f0da220c8ff21169ca1e8161a20157b/>
+<csr-id-d0134e870bb097e095e1c8a33e607cf7994e6491/>
+<csr-id-b66444c7d7a10c9a26db30fe5ce8e91984031624/>
+<csr-id-c5aae59a4eac6c3285bc45845433d23fc96d155f/>
+<csr-id-723618d0e3ad77eb26a3c698f9545490166b7ee0/>
+<csr-id-80ce4ca9376b99037b9377425c477ea3a7493e54/>
+<csr-id-616c024f2280fc99de063026756a9c938f78b885/>
+<csr-id-cf5a041742844b8b3d5e71c3e895018367b76013/>
+<csr-id-ed6d2f09c12b72446f0f55ecacb5fc4f35278575/>
+<csr-id-9350f273a5afec88120fe79fe85ceaf8027d691e/>
+<csr-id-a54c4426caccf71d28b2697094135892ec4a5e16/>
+<csr-id-8eedb660461b13b236545643fa21868eb6613826/>
+<csr-id-abfe7378604a74119accd7b9f86bef5682b0784a/>
+<csr-id-0399a9e76547a03f1e3902aec30ecbd57ed437c7/>
+<csr-id-23f53a339a5fe0d2f2e5d415bfc01e646a81a5c8/>
+<csr-id-5232bf51c738197339ac70ee4f46adee4fa87179/>
+<csr-id-f9cd39b6d3b1877fa0f3fa73bd6e3a796cae3b08/>
+<csr-id-208abdd108654ab83e8bee763793201e6f7b5eb2/>
+<csr-id-fc10d037d64efc86796f1b1c6f255a4c7f91d3e1/>
+<csr-id-12c673e7f52ed1c4cbe15c14fe6eb4e68b986e18/>
+<csr-id-9d27749bc7d59ee499980044f57eab86d2e63d04/>
+<csr-id-aaa0af4d1685c65a3c166070a590c10e9fd54765/>
+<csr-id-73b405d1228244a2b984e1294d5e8542f8691cef/>
+<csr-id-0c9c1f2edd9e872b9ba1642ac50f59a63f68b488/>
+<csr-id-9bdd68f313b3b7881cb39db02026184bbab0bfb0/>
+<csr-id-8b7b66450349b669e023539e92c77f9a3b830948/>
+<csr-id-7fc29f8187a29c2eeff8bbb5e09f068414bb8b93/>
+<csr-id-4415c9b1d166f7e53032a0100d829e8581255a1e/>
+<csr-id-8eb1877effb8cf0bfc8986c23d49d727500087dd/>
+<csr-id-0b8413998f018d7d577f2248e36e21f6c2744116/>
+<csr-id-aaa6903e612178ce59481b2e81fe3bd0d1cc2617/>
+<csr-id-2651423c61b160841557d279c9b706abdaab4cdf/>
+<csr-id-20461a84dbc0fc373b184a3982a79affad0544f6/>
+<csr-id-6a8f5a1f41e5a0f4c0cce6914d4b330b68f5e5d8/>
+<csr-id-da70738ff0e24827b749a970f466f3983b70442c/>
+<csr-id-7ddf2f850441e6596133ab7a596eb766380008c3/>
+<csr-id-0387123114ff6ae42920577706497319c8a888cb/>
+<csr-id-aa17309092211e8d1ba36d4aaf50c4677a461594/>
+<csr-id-225432908839359800d301d9e5aa8274e4652ee1/>
+<csr-id-7b430a54f50846a8475cec804bc24552043558b7/>
+<csr-id-fe62ad9f590f151dd20a6832dfab81d34fc9c020/>
+<csr-id-9e3cb4e7e4dc3d1b8fa23455151de60d5ea03d4d/>
+<csr-id-37aec09a555d428c730cdd982d06cf5cb58b60b1/>
+<csr-id-810fe0797a4f23a6bb2586d901ccac9272a9beb2/>
+<csr-id-ca074b92b31add1ad6d0db50f2ba3b3d1ae25d5a/>
+<csr-id-993d564f0ad5d8cac8d9a32b8c6c8d1dd00c3fd9/>
+<csr-id-fd8e8f3fb22f8592a45db33e75f237ef22cd1f5b/>
+<csr-id-c1c2bcac021dda4bf18a4d80ad2f86370d56efa7/>
+<csr-id-e2727b91c836619dadf2e464ee7c57b338427f22/>
+<csr-id-148140f1d932e6c4b30122ebcca3450ab6c84544/>
+<csr-id-61dec0fd90b4df6b0695a7ba46da86999d199d4a/>
+<csr-id-49c76d13a91474038bd8cb005959a37a7d4c6603/>
+<csr-id-c5d2e31a5f0cea381bb60dc1f896dbbda5038506/>
+<csr-id-0cb790f5c3712e357f685bfb88cd237c5b5f76c5/>
+<csr-id-b3ce84012e6cdf4c87d6d4a3137ab6506264e949/>
+<csr-id-ecf0bc9a9736167edb15db7ff4e3cf5dc388dd22/>
 
 ### Test
 

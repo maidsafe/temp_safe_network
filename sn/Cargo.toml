@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "safe_network"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
-version = "0.58.12"
+version = "0.58.13"
 
 [[bench]]
 name = "upload_bytes"
@@ -69,7 +69,7 @@ resource_proof = "1.0.38"
 rmp-serde = "1.0.0"
 secured_linked_list = "~0.5.0"
 self_encryption = "~0.27.4"
-sn_interface = { path = "../sn_interface", version = "^0.1.0" }
+sn_interface = { path = "../sn_interface", version = "^0.1.1" }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_bytes = "~0.11.5"
 serde_json = "1.0.53"
