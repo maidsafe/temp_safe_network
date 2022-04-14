@@ -16,6 +16,10 @@ fi
 read -r -d '' release_description << 'EOF'
 Command line interface for the Safe Network. Refer to [Safe CLI User Guide](https://github.com/maidsafe/sn_cli/blob/master/README.md) for detailed instructions.
 
+## Safe Network Interface Changelog
+
+__SN_INTERFACE_CHANGELOG_TEXT__
+
 ## Safe Node Dysfunction Changelog
 
 __SN_DYSFUNCTION_CHANGELOG_TEXT__
