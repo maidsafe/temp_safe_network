@@ -618,6 +618,10 @@ impl Node {
 
                 self.print_network_stats().await;
                 self.log_section_stats().await;
+            } else {
+                // if not elder
+                let mut handover_voting = self.handover_voting.write().await;
+                *handover_voting = None;
             }
 
             if new.is_elder || old.is_elder {

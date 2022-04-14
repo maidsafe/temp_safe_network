@@ -11,7 +11,7 @@ use crate::messaging::{
     DstLocation, WireMsg,
 };
 use crate::node::{api::cmds::Cmd, core::Node, messages::WireMsgUtils, Result};
-use crate::types::Peer;
+use crate::types::{Peer, log_markers::LogMarker};
 
 use xor_name::XorName;
 
@@ -22,7 +22,8 @@ impl Node {
         let recipients = Vec::from_iter(session_id.elder_peers());
 
         trace!(
-            "Send DkgStart for {:?} with {:?} to {:?}",
+            "{} for {:?} with {:?} to {:?}",
+            LogMarker::SendDkgStart,
             session_id.elders,
             session_id,
             recipients

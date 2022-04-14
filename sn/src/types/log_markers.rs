@@ -57,6 +57,7 @@ pub enum LogMarker {
     CmdProcessEnd,
     CmdProcessingError,
     // DKG + Promotion
+    SendDkgStart,
     PromotedToElder,
     DemotedFromElder,
     DkgSendFailureObservation,
