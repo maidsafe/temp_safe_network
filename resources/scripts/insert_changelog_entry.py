@@ -25,7 +25,7 @@ def insert_changelog_entry(entry, pattern):
     with open("release_description.md", "w") as file:
         file.write(release_description)
 
-def main(sn_dysfunction_version, sn_version, sn_api_version, sn_cli_version):
+def main(sn_interface_version, sn_dysfunction_version, sn_version, sn_api_version, sn_cli_version):
     if sn_interface_version:
         sn_changelog_entry = get_changelog_entry("sn_interface/CHANGELOG.md", sn_interface_version)
         insert_changelog_entry(sn_changelog_entry, "__SN_INTERFACE_CHANGELOG_TEXT__")

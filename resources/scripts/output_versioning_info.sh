@@ -2,7 +2,7 @@
 
 function build_release_name() {
   gh_release_name="Safe Node Dysfunction v$sn_dysfunction_version/"
-  gh_release_name="Safe Network Interface v$sn_interface_version/"
+  gh_release_name="${gh_release_name}Safe Network Interface v$sn_interface_version/"
   gh_release_name="${gh_release_name}Safe Network v$sn_version/"
   gh_release_name="${gh_release_name}Safe API v$sn_api_version/"
   gh_release_name="${gh_release_name}Safe CLI v$sn_cli_version"
@@ -10,7 +10,7 @@ function build_release_name() {
 
 function build_release_tag_name() {
   gh_release_tag_name="$sn_interface_version-"
-  gh_release_tag_name="$sn_dysfunction_version-"
+  gh_release_tag_name="${gh_release_tag_name}$sn_dysfunction_version-"
   gh_release_tag_name="${gh_release_tag_name}$sn_version-"
   gh_release_tag_name="${gh_release_tag_name}$sn_api_version-"
   gh_release_tag_name="${gh_release_tag_name}$sn_cli_version"
