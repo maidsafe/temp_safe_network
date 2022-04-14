@@ -30,11 +30,11 @@
 use color_eyre::{Section, SectionExt};
 use eyre::{eyre, Result, WrapErr};
 use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
-use safe_network::node::{add_connection_info, set_connection_info, Config, Error, NodeApi};
+use sn_node::node::{add_connection_info, set_connection_info, Config, Error, NodeApi};
 
-#[cfg(not(feature = "tokio-console"))]
-use safe_network::LogFormatter;
 use self_update::{cargo_crate_version, Status};
+#[cfg(not(feature = "tokio-console"))]
+use sn_node::LogFormatter;
 use std::{fmt::Debug, fs::File, io, path::Path};
 use std::{io::Write, process::exit};
 use structopt::{clap, StructOpt};

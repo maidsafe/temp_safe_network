@@ -8,10 +8,7 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use eyre::Result;
-use sn_client::{
-    utils::test_utils::read_network_conn_info,
-    Client, ClientConfig, Error,
-};
+use sn_client::{utils::test_utils::read_network_conn_info, Client, ClientConfig, Error};
 use sn_interface::types::utils::random_bytes;
 use sn_interface::types::Scope;
 use tokio::runtime::Runtime;

@@ -2,7 +2,7 @@
 
 sn_version=$1
 if [[ -z "$sn_version" ]]; then
-    echo "You must supply a version number for safe_network"
+    echo "You must supply a version number for sn_node"
     exit 1
 fi
 

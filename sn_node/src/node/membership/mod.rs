@@ -67,7 +67,7 @@ pub(crate) fn elder_candidates(
     candidates
         .into_iter()
         .sorted_by(|lhs, rhs| cmp_elder_candidates(lhs, rhs, current_elders))
-        .take(crate::elder_count())
+        .take(sn_interface::elder_count())
         .collect()
 }
 

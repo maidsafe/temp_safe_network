@@ -165,10 +165,10 @@ All commands have a `--help` argument, which lists and describes arguments, opti
 
 Sometimes it can also be useful to increase the level of output from the CLI. It may look like it isn't doing anything when it's actually retrying or waiting on something. More verbose output can help with identifying potential issues. You can control the output using the `RUST_LOG` environment variable. Here's an example:
 ```
-export RUST_LOG=safe=debug,sn_api=debug,safe_network=debug
+export RUST_LOG=safe=debug,sn_api=debug,sn_node=debug
 ```
 
-Logging is available from 3 sources: `safe`, `sn_api` and `safe_network`. Possible values for levels are `info`, `debug` and `trace`, each of those increasing in detail. You can try varying these to get the level you want.
+Logging is available from 3 sources: `safe`, `sn_api` and `sn_node`. Possible values for levels are `info`, `debug` and `trace`, each of those increasing in detail. You can try varying these to get the level you want.
 
 If you experience the CLI taking a long time to respond, you can try decreasing its timeout duration. This is controlled using the `SN_CLI_QUERY_TIMEOUT` environment variable. The units of this variable is in seconds. So for example, you may try `export SN_CLI_QUERY_TIMEOUT=30`.
 
