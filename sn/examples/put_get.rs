@@ -12,7 +12,7 @@
 use tokio::time::{sleep, Duration, Instant};
 use tracing::{debug, warn};
 
-use safe_network::client::{Client, ClientConfig, Error, Result};
+use sn_client::{Client, ClientConfig, Error, Result};
 use sn_interface::types::{utils::random_bytes, BytesAddress, Scope};
 use tiny_keccak::{Hasher, Sha3};
 

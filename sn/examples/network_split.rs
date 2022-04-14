@@ -23,7 +23,7 @@ use tracing::{debug, info};
 use tiny_keccak::{Hasher, Sha3};
 
 use eyre::{eyre, Context, Result};
-use safe_network::client::{utils::test_utils::read_network_conn_info, Client, ClientConfig};
+use sn_client::{utils::test_utils::read_network_conn_info, Client, ClientConfig};
 
 use sn_interface::types::{utils::random_bytes, BytesAddress, Scope};
 

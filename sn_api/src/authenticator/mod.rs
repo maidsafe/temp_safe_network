@@ -13,8 +13,8 @@ use crate::{
 use hmac::Hmac;
 use rand::rngs::StdRng;
 use rand_core::SeedableRng;
-use safe_network::client::client_api::Client;
 use sha3::Sha3_256;
+use sn_client::api::Client;
 use sn_interface::types::{Keypair, RegisterAddress};
 use std::{
     collections::HashSet,

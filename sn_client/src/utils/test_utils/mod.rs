@@ -9,7 +9,7 @@
 #[cfg(test)]
 mod test_client;
 
-use crate::client::Error;
+use crate::Error;
 use backoff::ExponentialBackoff;
 use dirs_next::home_dir;
 use eyre::{eyre, Context, Result};

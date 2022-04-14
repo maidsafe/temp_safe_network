@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::data_copy_count;
 use crate::node::{api::cmds::Cmd, core::Node, Result};
+use sn_interface::data_copy_count;
 use sn_interface::messaging::{
     data::{CmdError, DataCmd, DataQuery, Error as ErrorMsg, ServiceMsg},
     system::{NodeQueryResponse, SystemMsg},

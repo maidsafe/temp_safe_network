@@ -13,6 +13,7 @@ pub mod prefix_map;
 pub mod section_authority_provider;
 pub mod section_keys;
 mod section_peers;
+pub mod utils;
 
 #[cfg(feature = "test-utils")]
 pub use self::section_authority_provider::test_utils;

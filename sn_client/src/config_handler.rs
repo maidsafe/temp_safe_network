@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::client::{Error, Result};
+use crate::{Error, Result};
 use qp2p::Config as QuicP2pConfig;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -195,7 +195,7 @@ fn project_dirs() -> Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::client::utils::test_utils::init_test_logger;
+    use crate::utils::test_utils::init_test_logger;
     use bincode::serialize;
     use eyre::Result;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};

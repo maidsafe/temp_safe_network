@@ -14,7 +14,7 @@ use sn_interface::messaging::data::Error as ErrorMsg;
 
 use log::debug;
 use rand::Rng;
-use safe_network::client::Error as ClientError;
+use sn_client::Error as ClientError;
 use sn_interface::types::{
     register::{Policy, PrivatePermissions, PrivatePolicy, PublicPermissions, PublicPolicy, User},
     DataAddress, Error as SafeNdError, RegisterAddress, Scope,

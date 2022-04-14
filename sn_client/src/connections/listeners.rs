@@ -8,20 +8,20 @@
 
 use super::Session;
 
-use crate::at_least_one_correct_elder;
-use crate::client::{
+use crate::{
     connections::{
         messaging::{send_msg, NUM_OF_ELDERS_SUBSET_FOR_QUERIES},
         PendingCmdAcks,
     },
     Error, Result,
 };
-use crate::utils::compare_and_write_prefix_map_to_disk;
+use sn_interface::at_least_one_correct_elder;
 use sn_interface::messaging::{
     data::{CmdError, ServiceMsg},
     system::{KeyedSig, SectionAuth, SystemMsg},
     AuthorityProof, DstLocation, MsgId, MsgKind, MsgType, ServiceAuth, WireMsg,
 };
+use sn_interface::network_knowledge::utils::compare_and_write_prefix_map_to_disk;
 use sn_interface::network_knowledge::SectionAuthorityProvider;
 use sn_interface::types::{log_markers::LogMarker, Peer};
 

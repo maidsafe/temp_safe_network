@@ -8,7 +8,7 @@
 
 use super::Client;
 
-use crate::client::Error;
+use crate::Error;
 use sn_interface::messaging::data::{
     CreateRegister, DataCmd, DataQuery, DeleteRegister, EditRegister, QueryResponse, RegisterCmd,
     RegisterQuery, SignedRegisterCreate, SignedRegisterDelete, SignedRegisterEdit,
@@ -277,13 +277,13 @@ fn section_auth() -> sn_interface::messaging::SectionAuth {
 
 #[cfg(test)]
 mod tests {
-    use crate::client::{
+    use crate::retry_loop_for_pattern;
+    use crate::{
         utils::test_utils::{
             create_test_client, create_test_client_with, gen_ed_keypair, init_test_logger,
         },
         Error,
     };
-    use crate::retry_loop_for_pattern;
     use eyre::{bail, eyre, Result};
     use rand::Rng;
     use sn_interface::messaging::data::Error as ErrorMsg;

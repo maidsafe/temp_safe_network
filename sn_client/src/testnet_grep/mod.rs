@@ -143,7 +143,7 @@ pub(crate) fn search_testnet(pattern: &LogMarker) -> Result<Matches, Error> {
 }
 
 /// Search the local-test-network dir for matches.
-pub(crate) fn search_testnet_results_per_node(
+pub fn search_testnet_results_per_node(
     pattern: String,
 ) -> Result<BTreeMap<String, Matches>, Error> {
     let the_path = get_testnet_path()?;

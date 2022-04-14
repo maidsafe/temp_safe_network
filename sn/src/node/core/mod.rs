@@ -52,8 +52,9 @@ use sn_interface::messaging::{
 };
 use sn_interface::types::{log_markers::LogMarker, Cache, Peer};
 
-use crate::utils::compare_and_write_prefix_map_to_disk;
-use crate::{elder_count, UsedSpace};
+use crate::UsedSpace;
+use sn_interface::elder_count;
+use sn_interface::network_knowledge::utils::compare_and_write_prefix_map_to_disk;
 
 use backoff::ExponentialBackoff;
 use dashmap::DashSet;
@@ -81,7 +82,7 @@ const BACKOFF_CACHE_LIMIT: usize = 100;
 // the query cannot reply immediately. For now, they stash a reference to the client `Peer` in
 // `Core::pending_data_queries`, which is a cache with duration-based expiry.
 // TODO: The value chosen here is shorter than the default client timeout (see
-// `crate::client::SN_CLIENT_QUERY_TIMEOUT`), but the timeout is configurable. Ideally this would be
+// `use sn_client::SN_CLIENT_QUERY_TIMEOUT`), but the timeout is configurable. Ideally this would be
 // based on liveness properties (e.g. the timeout should be dynamic based on the responsiveness of
 // the section).
 const DATA_QUERY_TIMEOUT: Duration = Duration::from_secs(15);

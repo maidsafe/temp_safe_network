@@ -17,3 +17,45 @@ pub mod types;
 
 #[macro_use]
 extern crate tracing;
+
+pub use network_knowledge::elder_count;
+
+/// Number of copies of a chunk
+const DEFAULT_DATA_COPY_COUNT: usize = 4;
+
+// const SN_ELDER_COUNT: &str = "SN_ELDER_COUNT";
+const SN_DATA_COPY_COUNT: &str = "SN_DATA_COPY_COUNT";
+
+/// Max number of faulty Elders is assumed to be less than 1/3.
+/// So it's no more than 2 with 7 Elders.
+pub fn max_num_faulty_elders() -> usize {
+    elder_count() / 3
+}
+
+/// The least number of Elders to select, to be "guaranteed" one correctly functioning Elder.
+/// This number will be 3 with 7 Elders.
+pub fn at_least_one_correct_elder() -> usize {
+    max_num_faulty_elders() + 1
+}
+
+/// Get the expected chunk copy count for our network.
+/// Defaults to DEFAULT_DATA_COPY_COUNT, but can be overridden by the env var SN_DATA_COPY_COUNT.
+pub fn data_copy_count() -> usize {
+    // if we have an env var for this, lets override
+    match std::env::var(SN_DATA_COPY_COUNT) {
+        Ok(count) => match count.parse() {
+            Ok(count) => {
+                warn!(
+                    "data_copy_count countout set from env var SN_DATA_COPY_COUNT: {:?}",
+                    SN_DATA_COPY_COUNT
+                );
+                count
+            }
+            Err(error) => {
+                warn!("There was an error parsing {:?} env var. DEFAULT_DATA_COPY_COUNT will be used: {:?}", SN_DATA_COPY_COUNT, error);
+                DEFAULT_DATA_COPY_COUNT
+            }
+        },
+        Err(_) => DEFAULT_DATA_COPY_COUNT,
+    }
+}

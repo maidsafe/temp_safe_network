@@ -10,7 +10,7 @@ mod pac_man;
 
 pub(crate) use pac_man::{encrypt_large, to_chunk, DataMapLevel};
 
-use crate::client::{Error, Result};
+use crate::{Error, Result};
 
 use bytes::Bytes;
 use self_encryption::MIN_ENCRYPTABLE_BYTES;

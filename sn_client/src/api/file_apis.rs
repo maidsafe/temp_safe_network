@@ -10,7 +10,7 @@ use super::{
     data::{encrypt_large, to_chunk, LargeFile, SmallFile},
     Client,
 };
-use crate::client::{client_api::data::DataMapLevel, utils::encryption, Error, Result};
+use crate::{api::data::DataMapLevel, utils::encryption, Error, Result};
 use sn_interface::messaging::data::{DataCmd, DataQuery, QueryResponse};
 use sn_interface::types::{BytesAddress, Chunk, ChunkAddress, Encryption, PublicKey, Scope};
 
@@ -376,9 +376,9 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use crate::client::utils::test_utils::create_test_client_with;
-    use crate::client::{
-        client_api::file_apis::LargeFile,
+    use crate::utils::test_utils::create_test_client_with;
+    use crate::{
+        api::file_apis::LargeFile,
         utils::test_utils::{create_test_client, init_test_logger},
         Client,
     };
@@ -401,8 +401,8 @@ mod tests {
         let keypair = Keypair::new_ed25519(&mut OsRng);
         let file = random_bytes(LARGE_FILE_SIZE_MIN);
 
-        use crate::client::client_api::data::encrypt_large;
-        use crate::client::utils::encryption;
+        use crate::api::data::encrypt_large;
+        use crate::utils::encryption;
         let owner = encryption(Scope::Private, keypair.public_key());
         let (first_address, mut first_chunks) = encrypt_large(file.clone(), owner.as_ref())?;
 

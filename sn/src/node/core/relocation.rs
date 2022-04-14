@@ -8,7 +8,7 @@
 
 //! Relocation related types and utilities.
 
-use crate::elder_count;
+use sn_interface::elder_count;
 use sn_interface::messaging::system::RelocateDetails;
 use sn_interface::network_knowledge::{recommended_section_size, NetworkKnowledge, NodeState};
 use sn_interface::types::{keys::ed25519, Peer};

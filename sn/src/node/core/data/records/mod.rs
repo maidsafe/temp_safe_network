@@ -10,17 +10,15 @@ mod capacity;
 
 pub(crate) use self::capacity::{Capacity, MIN_LEVEL_WHEN_FULL};
 
-use crate::{
-    data_copy_count,
-    node::{
-        core::{Cmd, Node, Prefix, MAX_WAITING_PEERS_PER_QUERY},
-        error::convert_to_error_msg,
-        messages::WireMsgUtils,
-        Error, Result,
-    },
+use crate::node::{
+    core::{Cmd, Node, Prefix, MAX_WAITING_PEERS_PER_QUERY},
+    error::convert_to_error_msg,
+    messages::WireMsgUtils,
+    Error, Result,
 };
 use dashmap::DashSet;
 use itertools::Itertools;
+use sn_interface::data_copy_count;
 use sn_interface::messaging::{
     data::{CmdError, DataQuery, MetadataExchange, StorageLevel},
     system::{NodeCmd, NodeQuery, SystemMsg},
