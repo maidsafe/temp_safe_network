@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "sn",
+    "sn_node",
     "sn_api",
     "sn_client",
     "sn_cli",
