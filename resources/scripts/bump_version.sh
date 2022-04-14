@@ -105,10 +105,10 @@ function generate_new_commit_message() {
   commit_message="chore(release): "
 
   if [[ $sn_interface_has_changes == true ]]; then
-    commit_message="${commit_message}sn_interface-${sn_interface}/"
+    commit_message="${commit_message}sn_interface-${sn_interface_version}/"
   fi
   if [[ $sn_dysfunction_has_changes == true ]]; then
-    commit_message="${commit_message}sn_dysfunction-${sn_dysfunction}/"
+    commit_message="${commit_message}sn_dysfunction-${sn_dysfunction_version}/"
   fi
   if [[ $safe_network_has_changes == true ]]; then
     commit_message="${commit_message}safe_network-${sn_version}/"
