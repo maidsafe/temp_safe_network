@@ -87,6 +87,12 @@ pub(crate) const DATA_QUERY_LIMIT: usize = 100;
 // per query we can have this many peers, so the total peers waiting can be QUERY_LIMIT * MAX_WAITING_PEERS_PER_QUERY
 pub(crate) const MAX_WAITING_PEERS_PER_QUERY: usize = 100;
 
+#[derive(Debug, Clone)]
+pub(crate) struct DkgSessionInfo {
+    pub(crate) session_id: DkgSessionId,
+    pub(crate) authority: AuthorityProof<SectionAuth>,
+}
+
 // Store up to 100 in use backoffs
 pub(crate) type AeBackoffCache =
     Arc<RwLock<LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>>>;
@@ -109,7 +115,7 @@ pub(crate) struct Node {
     proposal_aggregator: SignatureAggregator,
     // DKG/Split/Churn modules
     split_barrier: Arc<RwLock<SplitBarrier>>,
-    dkg_sessions: Arc<RwLock<HashMap<Digest256, (DkgSessionId, AuthorityProof<SectionAuth>)>>>,
+    dkg_sessions: Arc<RwLock<HashMap<Digest256, DkgSessionInfo>>>,
     dkg_voter: DkgVoter,
     relocate_state: Arc<RwLock<Option<Box<JoiningAsRelocated>>>>,
     // ======================== Elder only ========================

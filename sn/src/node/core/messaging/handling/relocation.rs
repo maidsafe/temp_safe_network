@@ -85,9 +85,8 @@ impl Node {
             relocate_details.age
         );
 
-        Ok(self
-            .propose(Proposal::Offline(node_state.relocate(relocate_details)))
-            .await?)
+        self.propose(Proposal::Offline(node_state.relocate(relocate_details)))
+            .await
     }
 
     pub(crate) async fn handle_relocate(

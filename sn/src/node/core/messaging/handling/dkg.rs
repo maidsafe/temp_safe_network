@@ -59,8 +59,8 @@ impl Node {
         self.dkg_sessions
             .write()
             .await
-            .retain(|_, (existing_session_id, _)| {
-                existing_session_id.generation >= session_id.generation
+            .retain(|_, existing_session_info| {
+                existing_session_info.session_id.generation >= session_id.generation
             });
         let cmds = self
             .dkg_voter
@@ -146,7 +146,7 @@ impl Node {
             .dkg_voter
             .handle_dkg_history(
                 &self.info.read().await.clone(),
-                &session_id,
+                session_id,
                 message_history,
                 sender.name(),
                 section_key,
@@ -158,7 +158,7 @@ impl Node {
                 .process_msg(
                     sender,
                     &self.info.read().await.clone(),
-                    &session_id,
+                    session_id,
                     message,
                     section_key,
                 )

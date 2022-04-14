@@ -127,11 +127,6 @@ impl SectionAuthorityProvider {
         self.elders.iter().map(Peer::addr).collect()
     }
 
-    #[cfg(test)]
-    pub(crate) fn bootstrap_members(&self) -> &BTreeSet<NodeState> {
-        &self.members
-    }
-
     /// Key of the section.
     pub fn section_key(&self) -> PublicKey {
         self.public_key_set.public_key()

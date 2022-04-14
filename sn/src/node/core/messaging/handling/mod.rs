@@ -27,6 +27,7 @@ use crate::messaging::{
     system::{JoinResponse, NodeCmd, NodeEvent, NodeQuery, SystemMsg},
     AuthorityProof, DstLocation, MsgId, MsgType, NodeMsgAuthority, SectionAuth, WireMsg,
 };
+use crate::node::core::DkgSessionInfo;
 use crate::node::{
     api::cmds::Cmd,
     core::{Node, DATA_QUERY_LIMIT},
@@ -555,11 +556,13 @@ impl Node {
                     return Ok(vec![]);
                 }
                 if let NodeMsgAuthority::Section(authority) = msg_authority {
-                    let _existing = self
-                        .dkg_sessions
-                        .write()
-                        .await
-                        .insert(session_id.hash(), (session_id.clone(), authority));
+                    let _existing = self.dkg_sessions.write().await.insert(
+                        session_id.hash(),
+                        DkgSessionInfo {
+                            session_id: session_id.clone(),
+                            authority,
+                        },
+                    );
                 }
                 self.handle_dkg_start(session_id).await
             }
@@ -877,23 +880,23 @@ impl Node {
                 session_id,
                 message,
             } => {
-                if let Some((session_id, section_auth)) = self
+                if let Some(session_info) = self
                     .dkg_sessions
                     .read()
                     .await
                     .get(&session_id.hash())
                     .cloned()
                 {
-                    let message_cache = self.dkg_voter.get_cached_msgs(&session_id);
+                    let message_cache = self.dkg_voter.get_cached_msgs(&session_info.session_id);
                     trace!(
                         "Sending DkgSessionInfo {{ {:?}, ... }} to {}",
-                        &session_id,
+                        &session_info.session_id,
                         &sender
                     );
 
                     let node_msg = SystemMsg::DkgSessionInfo {
                         session_id,
-                        section_auth,
+                        section_auth: session_info.authority,
                         message_cache,
                         message,
                     };
@@ -944,11 +947,13 @@ impl Node {
                     warn!("Chain: {:?}", chain);
                     return Ok(cmds);
                 };
-                let _existing = self
-                    .dkg_sessions
-                    .write()
-                    .await
-                    .insert(session_id.hash(), (session_id.clone(), section_auth));
+                let _existing = self.dkg_sessions.write().await.insert(
+                    session_id.hash(),
+                    DkgSessionInfo {
+                        session_id: session_id.clone(),
+                        authority: section_auth,
+                    },
+                );
                 trace!("DkgSessionInfo handling {:?}", session_id);
                 cmds.extend(self.handle_dkg_start(session_id.clone()).await?);
                 cmds.extend(
