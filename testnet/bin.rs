@@ -124,7 +124,7 @@ async fn main() -> Result<()> {
         if !cmd_args.flame {
             Command::new("cargo")
                 .args(build_args.clone())
-                .current_dir("sn")
+                .current_dir("sn_node")
                 // .env("RUST_LOG", "debug")
                 // .env("RUST_BACKTRACE", "1")
                 .stdout(Stdio::inherit())

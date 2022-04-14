@@ -38,7 +38,7 @@ async fn main() -> Result<(), Report> {
             )
             .suggestion(
                 "Please try another filter.\
-                  Example: RUST_LOG=safe=debug,sn_api=debug,safe_network=debug",
+                  Example: RUST_LOG=safe=debug,sn_api=debug,sn_node=debug",
             )
         })?;
         tracing_subscriber::fmt()

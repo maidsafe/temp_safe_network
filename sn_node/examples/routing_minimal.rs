@@ -35,7 +35,7 @@
 
 use eyre::Result;
 use futures::future::join_all;
-use safe_network::node::{
+use sn_node::node::{
     create_test_max_capacity_and_root_storage, Config, Event, EventStream, NodeApi,
 };
 use std::{

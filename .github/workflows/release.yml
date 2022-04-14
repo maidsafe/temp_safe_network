@@ -276,7 +276,7 @@ jobs:
         run: |
           commit_message="${{ github.event.head_commit.message }}"
           if [[ $commit_message == *"safe_network"* ]]; then
-            # The safe_network crate is dependent on sn_dysfunction and sn_interface and sometimes the new version
+            # The sn_node crate is dependent on sn_dysfunction and sn_interface and sometimes the new version
             # doesn't become available on crates.io immediately, so this script will use a retry
             # loop.
             ./resources/scripts/publish_crate.sh \

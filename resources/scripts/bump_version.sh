@@ -2,12 +2,12 @@
 
 dry_run_output=""
 commit_message=""
-sn_version=""
+sn_node_version=""
 sn_api_version=""
 sn_cli_version=""
 sn_dysfunction_has_changes="false"
 sn_interface_has_changes="false"
-safe_network_has_changes="false"
+sn_node_has_changes="false"
 sn_api_has_changes="false"
 sn_cli_has_changes="false"
 
@@ -20,7 +20,7 @@ function perform_smart_release_dry_run() {
     --no-changelog-preview \
     --allow-fully-generated-changelogs \
     --no-changelog-github-release \
-    "sn_interface" "sn_dysfunction" "safe_network" "sn_api" "sn_cli" 2>&1)
+    "sn_interface" "sn_dysfunction" "sn_node" "sn_api" "sn_cli" 2>&1)
   echo "Dry run output for smart-release:"
   echo $dry_run_output
 }
@@ -48,10 +48,10 @@ function determine_which_crates_have_changes() {
     sn_interface_has_changes="true"
   fi
 
-  has_changes=$(crate_has_changes "safe_network")
+  has_changes=$(crate_has_changes "sn_node")
   if [[ $has_changes == "true" ]]; then
-    echo "smart-release has determined safe_network crate has changes"
-    safe_network_has_changes="true"
+    echo "smart-release has determined sn_node crate has changes"
+    sn_node_has_changes="true"
   fi
 
   has_changes=$(crate_has_changes "sn_api")
@@ -68,7 +68,7 @@ function determine_which_crates_have_changes() {
 
   if [[ $sn_dysfunction_has_changes == "false" ]] && \
      [[ $sn_interface_has_changes == "false" ]] && \
-     [[ $safe_network_has_changes == "false" ]] && \
+     [[ $sn_node_has_changes == "false" ]] && \
      [[ $sn_api_has_changes == "false" ]] && \
      [[ $sn_cli_has_changes == "false" ]]; then
        echo "smart-release detected no changes in any crates. Exiting."
@@ -86,7 +86,7 @@ function generate_version_bump_commit() {
     --allow-fully-generated-changelogs \
     --no-changelog-github-release \
     --execute \
-    "sn_interface" "sn_dysfunction" "safe_network" "sn_api" "sn_cli"
+    "sn_interface" "sn_dysfunction" "sn_node" "sn_api" "sn_cli"
   exit_code=$?
   if [[ $exit_code -ne 0 ]]; then
     echo "smart-release did not run successfully. Exiting with failure code."
@@ -99,7 +99,7 @@ function generate_new_commit_message() {
     grep "^version" < sn_interface/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
   sn_dysfunction_version=$( \
     grep "^version" < sn_dysfunction/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
-  sn_version=$(grep "^version" < sn/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+  sn_node_version=$(grep "^version" < sn/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
   sn_api_version=$(grep "^version" < sn_api/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
   sn_cli_version=$(grep "^version" < sn_cli/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
   commit_message="chore(release): "
@@ -110,8 +110,8 @@ function generate_new_commit_message() {
   if [[ $sn_dysfunction_has_changes == "true" ]]; then
     commit_message="${commit_message}sn_dysfunction-${sn_dysfunction_version}/"
   fi
-  if [[ $safe_network_has_changes == "true" ]]; then
-    commit_message="${commit_message}safe_network-${sn_version}/"
+  if [[ $sn_node_has_changes == "true" ]]; then
+    commit_message="${commit_message}sn_node-${sn_node_version}/"
   fi
   if [[ $sn_api_has_changes == "true" ]]; then
     commit_message="${commit_message}sn_api-${sn_api_version}/"
@@ -136,7 +136,7 @@ function amend_tags() {
   if [[ $sn_dysfunction_has_changes == "true" ]]; then
     git tag "sn_dysfunction-v${sn_dysfunction_version}" -f
   fi
-  if [[ $safe_network_has_changes == "true" ]]; then git tag "safe_network-v${sn_version}" -f; fi
+  if [[ $safe_network_has_changes == "true" ]]; then git tag "sn_node-v${sn_node_version}" -f; fi
   if [[ $sn_api_has_changes == "true" ]]; then git tag "sn_api-v${sn_api_version}" -f; fi
   if [[ $sn_cli_has_changes == "true" ]]; then git tag "sn_cli-v${sn_cli_version}" -f; fi
 }

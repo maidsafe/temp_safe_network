@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use eyre::Result;
-use safe_network::node::Config;
+use sn_node::node::Config;
 use std::time::Duration;
 use structopt::StructOpt;
 use tokio::{fs::remove_file, io};
