@@ -52,6 +52,11 @@ impl Membership {
         !self.consensus.votes.is_empty()
     }
 
+    #[cfg(test)]
+    pub(crate) fn force_bootstrap(&mut self, state: NodeState) {
+        let _ = self.bootstrap_members.insert(state);
+    }
+
     fn consensus_at_gen(&self, gen: Generation) -> Result<&Consensus<NodeState>> {
         if gen == self.gen + 1 {
             Ok(&self.consensus)

@@ -342,18 +342,16 @@ async fn handle_agreement_on_online() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
+    init_test_logger();
     let sk_set = SecretKeySet::random();
     let chain = SecuredLinkedList::new(sk_set.secret_key().public_key());
 
     // Creates nodes where everybody has age 6 except one has 5.
     let mut nodes: Vec<_> = gen_sorted_nodes(&Prefix::default(), elder_count(), true);
-
-    let section_auth = SectionAuthorityProvider::new(
-        nodes.iter().map(NodeInfo::peer),
-        Prefix::default(),
-        nodes.iter().map(|n| NodeState::joined(n.peer(), None)),
-        sk_set.public_keys(),
-    );
+    let members = nodes.iter().map(|n| NodeState::joined(n.peer(), None));
+    let elders = nodes.iter().map(NodeInfo::peer);
+    let section_auth =
+        SectionAuthorityProvider::new(elders, Prefix::default(), members, sk_set.public_keys());
     let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
     let section = NetworkKnowledge::new(*chain.root_key(), chain, signed_sap, None)?;
@@ -396,6 +394,16 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
 
     let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
 
+    // Force this node to join
+    dispatcher
+        .node
+        .membership
+        .write()
+        .await
+        .as_mut()
+        .unwrap()
+        .force_bootstrap(node_state.to_msg());
+
     let cmds = dispatcher
         .process_cmd(Cmd::HandleNewNodeOnline(auth), "cmd-id")
         .await?;
@@ -419,9 +427,16 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 msg: SystemMsg::DkgStart(session),
                 ..
             }) => session.elders,
+            Ok(MsgType::System { msg, .. }) => {
+                println!("msg {msg:?}");
+                continue;
+            }
             _ => continue,
         };
-        itertools::assert_equal(actual_elder_candidates, expected_new_elders.clone());
+        itertools::assert_equal(
+            actual_elder_candidates,
+            expected_new_elders.iter().map(|p| (p.name(), p.addr())),
+        );
 
         let expected_dkg_start_recipients: Vec<_> = expected_new_elders
             .iter()
@@ -657,7 +672,6 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let (event_tx, _event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = nodes.remove(0);
-    let node_name = node.name();
     let node = Node::new(
         create_comm().await?,
         node,
@@ -674,65 +688,20 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let proposal = Proposal::Offline(remove_node_state.clone());
     let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
-    let cmds = dispatcher
+    let _ = dispatcher
         .process_cmd(Cmd::HandleAgreement { proposal, sig }, "cmd-id")
         .await?;
 
-    // Verify we sent a `DkgStart` message with the expected participants.
-    let mut dkg_start_sent = false;
+    // Verify we initiated a membership churn
 
-    for cmd in cmds {
-        let (recipients, wire_msg) = match cmd {
-            Cmd::SendMsg {
-                recipients,
-                wire_msg,
-                ..
-            } => (recipients, wire_msg),
-            _ => continue,
-        };
-
-        let actual_elder_candidates = match wire_msg.into_msg() {
-            Ok(MsgType::System {
-                msg: SystemMsg::DkgStart { elders, .. },
-                ..
-            }) => elders.into_iter().map(|(name, addr)| Peer::new(name, addr)),
-            _ => continue,
-        };
-
-        let expected_new_elders: BTreeSet<_> = section_auth
-            .elders()
-            .filter(|peer| peer != &remove_peer)
-            .chain(iter::once(&existing_peer))
-            .cloned()
-            .collect();
-        itertools::assert_equal(actual_elder_candidates, expected_new_elders.clone());
-
-        let expected_dkg_start_recipients: Vec<_> = expected_new_elders
-            .into_iter()
-            .filter(|peer| peer.name() != node_name)
-            .collect();
-
-        assert_eq!(recipients, expected_dkg_start_recipients);
-
-        dkg_start_sent = true;
-    }
-
-    assert!(dkg_start_sent);
-
-    assert!(!dispatcher
-        .node
-        .network_knowledge()
-        .section_members()
-        .await
-        .contains(&remove_node_state));
-
-    // The removed peer is still our elder because we haven't yet processed the section update.
     assert!(dispatcher
         .node
-        .network_knowledge()
-        .authority_provider()
+        .membership
+        .read()
         .await
-        .contains_elder(&remove_peer.name()));
+        .as_ref()
+        .unwrap()
+        .is_churn_in_progress());
 
     Ok(())
 }
@@ -754,6 +723,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let pk0 = sk0.public_key();
 
     let (old_sap, mut nodes, sk_set1) = create_section_auth();
+    let members = BTreeSet::from_iter(nodes.iter().map(|n| NodeState::joined(n.peer(), None)));
     let pk1 = sk_set1.secret_key().public_key();
     let pk1_signature = sk0.sign(bincode::serialize(&pk1)?);
 
@@ -798,7 +768,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         .chain(vec![new_peer]);
 
     let new_sap =
-        SectionAuthorityProvider::new(new_elders, old_sap.prefix(), sk_set2.public_keys());
+        SectionAuthorityProvider::new(new_elders, old_sap.prefix(), members, sk_set2.public_keys());
     let new_section_elders: BTreeSet<_> = new_sap.names();
     let signed_new_sap = section_signed(sk2, new_sap.clone())?;
 
@@ -1112,12 +1082,19 @@ async fn handle_elders_update() -> Result<()> {
     let adult_peer = create_peer(MIN_ADULT_AGE);
     let promoted_peer = create_peer(MIN_ADULT_AGE + 2);
 
+    let members = BTreeSet::from_iter(
+        [info.peer(), adult_peer, promoted_peer]
+            .into_iter()
+            .map(|p| NodeState::joined(p, None)),
+    );
+
     let sk_set0 = SecretKeySet::random();
     let pk0 = sk_set0.secret_key().public_key();
 
     let sap0 = SectionAuthorityProvider::new(
         iter::once(info.peer()).chain(other_elder_peers.clone()),
         Prefix::default(),
+        members.clone(),
         sk_set0.public_keys(),
     );
 
@@ -1141,6 +1118,7 @@ async fn handle_elders_update() -> Result<()> {
             .chain(other_elder_peers.clone())
             .chain(iter::once(promoted_peer)),
         Prefix::default(),
+        members,
         sk_set1.public_keys(),
     );
     let elder_names1: BTreeSet<_> = sap1.names();
@@ -1254,11 +1232,21 @@ async fn handle_demote_during_split() -> Result<()> {
     // This peer is a prefix-0 post-split elder.
     let peer_c = create_peer_in_prefix(&prefix0, MIN_ADULT_AGE);
 
+    let members = BTreeSet::from_iter(
+        peers_a
+            .iter()
+            .chain(peers_b.iter())
+            .copied()
+            .chain([info.peer(), peer_c])
+            .map(|peer| NodeState::joined(peer, None)),
+    );
+
     // Create the pre-split section
     let sk_set_v0 = SecretKeySet::random();
     let section_auth_v0 = SectionAuthorityProvider::new(
         iter::once(info.peer()).chain(peers_a.iter().cloned()),
         Prefix::default(),
+        members.clone(),
         sk_set_v0.public_keys(),
     );
     let (section, section_key_share) = create_section(&sk_set_v0, &section_auth_v0).await?;
@@ -1315,6 +1303,7 @@ async fn handle_demote_during_split() -> Result<()> {
     let section_auth = SectionAuthorityProvider::new(
         peers_a.iter().cloned().chain(iter::once(peer_c)),
         prefix0,
+        members.clone(),
         sk_set_v1_p0.public_keys(),
     );
 
@@ -1325,8 +1314,12 @@ async fn handle_demote_during_split() -> Result<()> {
     assert_matches!(&cmds[..], &[]);
 
     // Handle agreement on `NewElders` for prefix-1.
-    let section_auth =
-        SectionAuthorityProvider::new(peers_b.iter().cloned(), prefix1, sk_set_v1_p1.public_keys());
+    let section_auth = SectionAuthorityProvider::new(
+        peers_b.iter().cloned(),
+        prefix1,
+        members,
+        sk_set_v1_p1.public_keys(),
+    );
 
     let signed_sap = section_signed(sk_set_v1_p1.secret_key(), section_auth)?;
     let cmd = create_our_elders_cmd(signed_sap)?;
