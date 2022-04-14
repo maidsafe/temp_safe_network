@@ -85,7 +85,7 @@ mod testnet_grep;
 mod tests {
     use crate::testnet_grep::search_testnet_results_per_node;
     use eyre::Result;
-    pub use sn_interface::network_knowledge::elder_count;
+    use sn_interface::network_knowledge::elder_count;
     use sn_interface::types::log_markers::LogMarker;
 
     // Check that with one split we have 14 elders.
@@ -95,6 +95,7 @@ mod tests {
     async fn split_network_assert_health_check() -> Result<()> {
         let promoted_to_elder_nodes =
             search_testnet_results_per_node(LogMarker::PromotedToElder.to_string())?.len();
+        
         let prefix1_prior_elder_nodes = search_testnet_results_per_node(format!(
             r"{}: Prefix\(1\)",
             LogMarker::StillElderAfterSplit

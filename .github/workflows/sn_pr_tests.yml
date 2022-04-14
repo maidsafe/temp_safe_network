@@ -105,7 +105,7 @@ jobs:
 
       - name: Publish Dry Run
         if: steps.sn_changes.outputs.src == 'true'
-        run: cd sn && cargo publish --dry-run
+        run: cd sn_node && cargo publish --dry-run
 
   unit:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -137,7 +137,7 @@ jobs:
         run: cargo test --no-run --release --features=test-utils
         working-directory: sn
 
-      - name: Run unit tests
+      - name: Run sn_interface unit tests
         timeout-minutes: 15
         uses: jacderida/cargo-nextest@main
         with:
@@ -156,7 +156,7 @@ jobs:
           test-run-name: unit-tests-${{ matrix.os }}
           profile: ci
           junit-path: junit.xml
-          package: safe_network
+          package: sn_node
           release: true
           features: test-utils
           filters: "dbs node routing"
@@ -220,11 +220,11 @@ jobs:
         run: choco install ripgrep
 
       - name: Build sn bins
-        run: cd sn && cargo build --release --features=test-utils --bins
+        run: cd sn_node && cargo build --release --features=test-utils --bins
         timeout-minutes: 60
 
-      - name: Build all safe_network tests
-        run: cd sn && cargo test --no-run --release --features=test-utils
+      - name: Build all sn_node tests
+        run: cd sn_node && cargo test --no-run --release --features=test-utils
         timeout-minutes: 60
 
       - name: Build testnet
@@ -239,7 +239,7 @@ jobs:
         run: ./target/release/testnet
         id: section-startup
         env:
-          RUST_LOG: "safe_network,sn_api,sn_node=trace"
+          RUST_LOG: "sn_node,sn_api,sn_node=trace"
 
       - name: Print Network Log Stats at start
         shell: bash
@@ -262,10 +262,9 @@ jobs:
           test-run-name: e2e-client-${{ matrix.os }}
           profile: ci
           junit-path: junit.xml
-          package: safe_network
+          package: sn_client
           release: true
           features: test-utils
-          filters: client
           test-threads: 2
         timeout-minutes: 25
 
@@ -275,7 +274,7 @@ jobs:
           test-run-name: e2e-ae-${{ matrix.os }}
           profile: ci
           junit-path: junit.xml
-          package: safe_network
+          package: sn_client
           release: true
           features: test-utils
           filters: ae_checks
@@ -287,7 +286,7 @@ jobs:
       - name: Run example app for file API against local network
         timeout-minutes: 10
         shell: bash
-        run: cd sn && cargo run  --release  --features=test-utils --example client_files
+        run: cd sn_node && cargo run  --release  --features=test-utils --example client_files
 
       - name: Are nodes still running...?
         shell: bash
@@ -356,11 +355,11 @@ jobs:
         run: sudo apt-get -y install ripgrep
 
       - name: Build sn bins
-        run: cd sn && cargo build --release --features=test-utils --bins
+        run: cd sn_node && cargo build --release --features=test-utils --bins
         timeout-minutes: 60
 
-      - name: Build all safe_network tests
-        run: cd sn && cargo test --no-run --release --features=test-utils
+      - name: Build all sn_node tests
+        run: cd sn_node && cargo test --no-run --release --features=test-utils
         timeout-minutes: 60
 
       - name: Build testnet
@@ -377,7 +376,7 @@ jobs:
         shell: bash
         run: cargo run --release --features=test-utils --example network_split
         env:
-          RUST_LOG: "safe_network=trace"
+          RUST_LOG: "sn_node=trace"
 
 
       # - name: Start the network
@@ -409,10 +408,9 @@ jobs:
           test-run-name: e2e-split-client-self-hosted-ubuntu
           profile: ci
           junit-path: junit.xml
-          package: safe_network
+          package: sn_client
           release: true
           features: test-utils
-          filters: client
           test-threads: 2
         timeout-minutes: 25
 
@@ -422,7 +420,7 @@ jobs:
           test-run-name: e2e-split-ae-self-hosted-ubuntu
           profile: ci
           junit-path: junit.xml
-          package: safe_network
+          package: sn_client
           release: true
           features: test-utils
           filters: ae_checks
@@ -434,7 +432,7 @@ jobs:
       - name: Run example app for file API against local network
         timeout-minutes: 10
         shell: bash
-        run: cd sn && cargo run  --release  --features=test-utils --example client_files
+        run: cd sn_node && cargo run  --release  --features=test-utils --example client_files
 
       - name: Are nodes still running...?
         shell: bash
@@ -503,7 +501,7 @@ jobs:
         run: choco install ripgrep
 
       - name: Build sn bins
-        run: cd sn && cargo build --release --features=test-utils --bins
+        run: cd sn_node && cargo build --release --features=test-utils --bins
         timeout-minutes: 60
 
       - name: Build testnet
@@ -521,7 +519,7 @@ jobs:
         run: ./target/release/testnet
         id: section-startup
         env:
-          RUST_LOG: "safe_network,sn_api,sn_node=trace"
+          RUST_LOG: "sn_node,sn_api,sn_node=trace"
 
       - name: Print Network Log Stats at start
         shell: bash
@@ -628,7 +626,7 @@ jobs:
         run: choco install ripgrep
 
       - name: Build sn bins
-        run: cd sn && cargo build --release --features=test-utils --bins
+        run: cd sn_node && cargo build --release --features=test-utils --bins
         timeout-minutes: 60
 
       - name: Build testnet
@@ -643,7 +641,7 @@ jobs:
         run: ./target/release/testnet
         id: section-startup
         env:
-          RUST_LOG: "safe_network,sn_api,sn_node=trace"
+          RUST_LOG: "sn_node,sn_api,sn_node=trace"
 
       - name: Print Network Log Stats at start
         shell: bash

@@ -16,7 +16,7 @@ use std::collections::HashSet;
 use tokio::time;
 use utils::*;
 use xor_name::XOR_NAME_LEN;
-use crate::elder_count;
+use sn_interface::elder_count;
 
 /*
 #[tokio::test(flavor = "multi_thread")]

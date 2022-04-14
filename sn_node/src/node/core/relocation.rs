@@ -164,7 +164,7 @@ fn trailing_zeros(bytes: &[u8]) -> u32 {
 mod tests {
     use super::*;
 
-    use crate::elder_count;
+    use sn_interface::elder_count;
     use sn_interface::network_knowledge::test_utils::section_signed;
     #[cfg(feature = "test-utils")]
     use sn_interface::types::SecretKeySet;

@@ -20,7 +20,7 @@ use crate::node::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     Error, Event, Result as RoutingResult,
 };
-use crate::{elder_count, init_test_logger};
+use crate::init_test_logger;
 use sn_interface::messaging::{
     system::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState,
@@ -29,6 +29,7 @@ use sn_interface::messaging::{
     AuthorityProof, DstLocation, MsgId, MsgKind, MsgType, NodeAuth,
     SectionAuth as MsgKindSectionAuth, WireMsg,
 };
+use sn_interface::elder_count;
 #[cfg(feature = "test-utils")]
 use sn_interface::network_knowledge::test_utils::*;
 use sn_interface::network_knowledge::test_utils::{prove, section_signed};
