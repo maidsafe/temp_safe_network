@@ -24,7 +24,6 @@ use sn_consensus::{Generation, SignedVote};
 /// List of peers of a section
 pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
 
-use crate::membership::{Generation, SignedVote};
 use crate::messaging::{EndUser, MsgId, SectionAuthorityProvider};
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use bytes::Bytes;
