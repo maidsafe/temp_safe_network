@@ -45,7 +45,7 @@ function determine_which_crates_have_changes() {
   has_changes=$(crate_has_changes "sn_interface")
   if [[ $has_changes == "true" ]]; then
     echo "smart-release has determined sn_interface crate has changes"
-    sn_dysfunction_has_changes="true"
+    sn_interface_has_changes="true"
   fi
 
   has_changes=$(crate_has_changes "safe_network")
@@ -104,19 +104,19 @@ function generate_new_commit_message() {
   sn_cli_version=$(grep "^version" < sn_cli/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
   commit_message="chore(release): "
 
-  if [[ $sn_interface_has_changes == true ]]; then
+  if [[ $sn_interface_has_changes == "true" ]]; then
     commit_message="${commit_message}sn_interface-${sn_interface_version}/"
   fi
-  if [[ $sn_dysfunction_has_changes == true ]]; then
+  if [[ $sn_dysfunction_has_changes == "true" ]]; then
     commit_message="${commit_message}sn_dysfunction-${sn_dysfunction_version}/"
   fi
-  if [[ $safe_network_has_changes == true ]]; then
+  if [[ $safe_network_has_changes == "true" ]]; then
     commit_message="${commit_message}safe_network-${sn_version}/"
   fi
-  if [[ $sn_api_has_changes == true ]]; then
+  if [[ $sn_api_has_changes == "true" ]]; then
     commit_message="${commit_message}sn_api-${sn_api_version}/"
   fi
-  if [[ $sn_cli_has_changes == true ]]; then
+  if [[ $sn_cli_has_changes == "true" ]]; then
     commit_message="${commit_message}sn_cli-${sn_cli_version}/"
   fi
   commit_message=${commit_message::-1} # strip off any trailing '/'
@@ -130,15 +130,15 @@ function amend_version_bump_commit() {
 }
 
 function amend_tags() {
-  if [[ $sn_interface_has_changes == true ]]; then
+  if [[ $sn_interface_has_changes == "true" ]]; then
     git tag "sn_interface-v${sn_interface_version}" -f
   fi
-  if [[ $sn_dysfunction_has_changes == true ]]; then
+  if [[ $sn_dysfunction_has_changes == "true" ]]; then
     git tag "sn_dysfunction-v${sn_dysfunction_version}" -f
   fi
-  if [[ $safe_network_has_changes == true ]]; then git tag "safe_network-v${sn_version}" -f; fi
-  if [[ $sn_api_has_changes == true ]]; then git tag "sn_api-v${sn_api_version}" -f; fi
-  if [[ $sn_cli_has_changes == true ]]; then git tag "sn_cli-v${sn_cli_version}" -f; fi
+  if [[ $safe_network_has_changes == "true" ]]; then git tag "safe_network-v${sn_version}" -f; fi
+  if [[ $sn_api_has_changes == "true" ]]; then git tag "sn_api-v${sn_api_version}" -f; fi
+  if [[ $sn_cli_has_changes == "true" ]]; then git tag "sn_cli-v${sn_cli_version}" -f; fi
 }
 
 perform_smart_release_dry_run
