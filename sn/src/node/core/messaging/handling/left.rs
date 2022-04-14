@@ -1,15 +1,14 @@
 use std::collections::BTreeSet;
 
-use crate::{
-    messaging::system::SectionAuth,
-    node::{
-        api::cmds::Cmd,
-        core::{relocation::ChurnId, Node},
-        dkg::KeyedSig,
-        network_knowledge::NodeState,
-        Result,
-    },
+use sn_interface::{
+    messaging::system::{KeyedSig, SectionAuth},
+    network_knowledge::NodeState,
     types::log_markers::LogMarker,
+};
+
+use crate::node::{
+    api::cmds::Cmd,
+    core::{relocation::ChurnId, Node, Result},
 };
 
 impl Node {

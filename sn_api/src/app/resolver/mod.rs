@@ -232,9 +232,7 @@ impl Safe {
                 )
                 .await
             }
-            ContentType::Wallet { .. } => Err(Error::EmptyContent(
-                "Temporarily disabled feature".to_string(),
-            )),
+            ContentType::Wallet { .. } => self.resolve_multimap(input_url, retrieve_data).await,
         }
     }
 }
@@ -250,7 +248,7 @@ mod tests {
     use anyhow::{anyhow, bail, Context, Result};
     use bytes::Bytes;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
-    use safe_network::types::DataAddress;
+    use sn_interface::types::DataAddress;
     use std::io::Read;
 
     #[tokio::test]
@@ -489,8 +487,6 @@ mod tests {
         let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
         let public_name = format!("file.{site_name}");
         safe.nrs_add(&public_name, &safe_url).await?;
-
-        println!("NRS ADDED");
 
         let content = safe.fetch(&format!("safe://{public_name}"), None).await?;
         assert!(

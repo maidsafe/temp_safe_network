@@ -9,12 +9,9 @@
 //! Relocation related types and utilities.
 
 use crate::elder_count;
-use crate::messaging::system::RelocateDetails;
-use crate::node::{
-    ed25519,
-    network_knowledge::{NetworkKnowledge, NodeState},
-    recommended_section_size, Peer,
-};
+use sn_interface::messaging::system::RelocateDetails;
+use sn_interface::network_knowledge::{recommended_section_size, NetworkKnowledge, NodeState};
+use sn_interface::types::{keys::ed25519, Peer};
 
 use ed25519_dalek::{Signature, Verifier};
 use std::{
@@ -168,16 +165,16 @@ mod tests {
     use super::*;
 
     use crate::elder_count;
-    use crate::node::{
-        api::tests::SecretKeySet, dkg::test_utils::section_signed,
-        network_knowledge::SectionAuthorityProvider, MIN_ADULT_AGE,
-    };
+    use sn_interface::network_knowledge::test_utils::section_signed;
+    #[cfg(feature = "test-utils")]
+    use sn_interface::types::SecretKeySet;
 
     use eyre::Result;
     use itertools::Itertools;
     use proptest::{collection::SizeRange, prelude::*};
     use rand::{rngs::SmallRng, Rng, SeedableRng};
     use secured_linked_list::SecuredLinkedList;
+    use sn_interface::network_knowledge::{SectionAuthorityProvider, MIN_ADULT_AGE};
     use std::net::SocketAddr;
     use xor_name::{Prefix, XOR_NAME_LEN};
 

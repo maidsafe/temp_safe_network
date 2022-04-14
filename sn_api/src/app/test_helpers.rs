@@ -9,7 +9,7 @@
 use crate::{ipc::NodeConfig, Safe, SafeUrl};
 use anyhow::{anyhow, bail, Context, Result};
 use rand::{distributions::Alphanumeric, rngs::OsRng, thread_rng, Rng};
-use safe_network::types::{Keypair, PublicKey};
+use sn_interface::types::{Keypair, PublicKey};
 use std::{
     collections::{BTreeSet, HashMap},
     env::var,
@@ -107,6 +107,15 @@ pub async fn new_safe_instance() -> Result<Safe> {
 
     let bootstrap_contacts = get_bootstrap_contacts()?;
     let safe = Safe::connected(bootstrap_contacts, Some(credentials), None, None, None).await?;
+
+    Ok(safe)
+}
+
+// Instantiate a Safe instance with read-only access
+pub async fn new_read_only_safe_instance() -> Result<Safe> {
+    init_logger();
+    let bootstrap_contacts = get_bootstrap_contacts()?;
+    let safe = Safe::connected(bootstrap_contacts, None, None, None, None).await?;
 
     Ok(safe)
 }

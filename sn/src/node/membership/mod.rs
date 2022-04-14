@@ -2,15 +2,74 @@ use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
 use bls_dkg::{PublicKeySet, SecretKeyShare};
 use core::fmt::Debug;
+use sn_interface::{
+    messaging::system::{MembershipState, NodeState},
+    network_knowledge::{recommended_section_size, SectionAuthorityProvider, MIN_ADULT_AGE},
+};
 use xor_name::{Prefix, XorName};
 
-use sn_consensus::{Ballot, Consensus, Decision, Error, NodeId, Result, Vote};
-pub(crate) use sn_consensus::{SignedVote, VoteResponse};
+use sn_consensus::{
+    Ballot, Consensus, Decision, Error, Generation, NodeId, Result, SignedVote, Vote, VoteResponse,
+};
 
-use super::{recommended_section_size, split, MIN_ADULT_AGE};
-use crate::messaging::system::{MembershipState, NodeState};
+pub(crate) fn split(
+    prefix: &Prefix,
+    nodes: impl IntoIterator<Item = XorName>,
+) -> Option<(BTreeSet<XorName>, BTreeSet<XorName>)> {
+    let decision_index: u8 = if let Ok(idx) = prefix.bit_count().try_into() {
+        idx
+    } else {
+        return None;
+    };
 
-pub(crate) type Generation = u64;
+    let (one, zero) = nodes
+        .into_iter()
+        .filter(|name| prefix.matches(name))
+        .partition(|name| name.bit(decision_index));
+
+    Some((zero, one))
+}
+
+/// Returns the nodes that should be candidates to become the next elders, sorted by names.
+pub(crate) fn elder_candidates(
+    candidates: impl IntoIterator<Item = NodeState>,
+    current_elders: &SectionAuthorityProvider,
+) -> BTreeSet<NodeState> {
+    use itertools::Itertools;
+    use std::cmp::Ordering;
+
+    // Compare candidates for the next elders. The one comparing `Less` wins.
+    fn cmp_elder_candidates(
+        lhs: &NodeState,
+        rhs: &NodeState,
+        current_elders: &SectionAuthorityProvider,
+    ) -> Ordering {
+        // Older nodes are preferred. In case of a tie, prefer current elders. If still a tie, break
+        // it comparing by the signed signatures because it's impossible for a node to predict its
+        // signature and therefore game its chances of promotion.
+        rhs.age()
+            .cmp(&lhs.age())
+            .then_with(|| {
+                let lhs_is_elder = current_elders.contains_elder(&lhs.name);
+                let rhs_is_elder = current_elders.contains_elder(&rhs.name);
+
+                match (lhs_is_elder, rhs_is_elder) {
+                    (true, false) => Ordering::Less,
+                    (false, true) => Ordering::Greater,
+                    _ => Ordering::Equal,
+                }
+            })
+            .then_with(|| lhs.name.cmp(&rhs.name))
+        // TODO: replace name cmp above with sig cmp.
+        // .then_with(|| lhs.sig.signature.cmp(&rhs.sig.signature))
+    }
+
+    candidates
+        .into_iter()
+        .sorted_by(|lhs, rhs| cmp_elder_candidates(lhs, rhs, current_elders))
+        .take(crate::elder_count())
+        .collect()
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct Membership {

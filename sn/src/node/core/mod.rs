@@ -25,26 +25,34 @@ pub(crate) use proposal::Proposal;
 pub(crate) use relocation::{check as relocation_check, ChurnId};
 
 use self::{data::DataStorage, split_barrier::SplitBarrier};
+use sn_interface::{
+    network_knowledge::{
+        recommended_section_size, supermajority, NetworkKnowledge, NodeInfo, SectionKeyShare,
+        SectionKeysProvider,
+    },
+    types::keys::ed25519::Digest256,
+};
 
 use super::{
     api::cmds::Cmd,
     dkg::DkgVoter,
-    ed25519::Digest256,
-    membership::Membership,
-    network_knowledge::{NetworkKnowledge, SectionKeyShare, SectionKeysProvider},
-    Elders, Event, NodeElderChange, NodeInfo,
+    membership::{split, Membership},
+    Elders, Event, NodeElderChange,
 };
 
-use crate::messaging::{
+use crate::node::{
+    error::{Error, Result},
+    membership::elder_candidates,
+};
+use sn_interface::messaging::{
     data::OperationId,
     signature_aggregator::SignatureAggregator,
     system::{DkgSessionId, NodeEvent, NodeState, SystemMsg},
     AuthorityProof, DstLocation, SectionAuth, SectionAuthorityProvider,
 };
-use crate::node::error::{Error, Result};
-use crate::types::{
-    log_markers::LogMarker, utils::compare_and_write_prefix_map_to_disk, Cache, Peer,
-};
+use sn_interface::types::{log_markers::LogMarker, Cache, Peer};
+
+use crate::utils::compare_and_write_prefix_map_to_disk;
 use crate::{elder_count, UsedSpace};
 
 use backoff::ExponentialBackoff;
@@ -356,10 +364,10 @@ impl Node {
 
         // TODO: super::split(..) should return (BTreeSet<NodeState>, BTreeSet<NodeState>)
         //       instead of (BTreeSet<XorName>, BTreeSet<XorName>);
-        let (zero, one) = super::split(&prefix, members.keys().copied())?;
+        let (zero, one) = split(&prefix, members.keys().copied())?;
 
         // If none of the two new sections would contain enough entries, return `None`.
-        let split_threshold = super::recommended_section_size();
+        let split_threshold = recommended_section_size();
         if zero.len() < split_threshold || one.len() < split_threshold {
             return None;
         }
@@ -390,7 +398,7 @@ impl Node {
         let sap = self.network_knowledge.authority_provider().await;
 
         let zero_prefix = prefix.pushed(false);
-        let zero_elders = super::elder_candidates(
+        let zero_elders = elder_candidates(
             zero.iter()
                 .cloned()
                 .filter(|name| !excluded_names.contains(&name.name)),
@@ -398,7 +406,7 @@ impl Node {
         );
 
         let one_prefix = prefix.pushed(true);
-        let one_elders = super::elder_candidates(
+        let one_elders = elder_candidates(
             one.iter()
                 .cloned()
                 .filter(|name| !excluded_names.contains(&name.name)),
@@ -448,7 +456,7 @@ impl Node {
             return vec![];
         };
 
-        let elder_candidates = super::elder_candidates(
+        let elder_candidates = elder_candidates(
             members
                 .values()
                 .cloned()
@@ -469,7 +477,7 @@ impl Node {
             .eq(current_elders.iter())
         {
             vec![]
-        } else if elder_candidates.len() < crate::node::supermajority(current_elders.len()) {
+        } else if elder_candidates.len() < supermajority(current_elders.len()) {
             warn!("ignore attempt to reduce the number of elders too much");
             vec![]
         } else if elder_candidates.len() < current_elders.len() {

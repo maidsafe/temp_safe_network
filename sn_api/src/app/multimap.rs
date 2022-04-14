@@ -13,7 +13,7 @@ use crate::{Error, Result, Safe};
 
 use log::debug;
 use rand::Rng;
-use safe_network::types::DataAddress;
+use sn_interface::types::DataAddress;
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -93,7 +93,7 @@ impl Safe {
             DataAddress::Register(reg_address) => reg_address,
             other => {
                 return Err(Error::InvalidXorUrl(format!(
-                    "The multimap url {} has an {:?} address.\
+                    "The Multimap Url {} has an {:?} address.\
                     To insert an entry into a multimap, the address must be a register address.",
                     multimap_url, other
                 )))
@@ -167,6 +167,12 @@ impl Safe {
                 "No Multimap found at \"{}\"",
                 safeurl
             ))),
+            Err(Error::AccessDenied(_)) => {
+                return Err(Error::AccessDenied(format!(
+                    "Couldn't read Multimap found at \"{}\"",
+                    safeurl
+                )))
+            }
             other => other,
         }?;
 
@@ -180,6 +186,7 @@ impl Safe {
             let key_val = Self::decode_multimap_entry(entry)?;
             multimap.insert((*hash, key_val));
         }
+
         Ok(multimap)
     }
 

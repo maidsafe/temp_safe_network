@@ -15,25 +15,13 @@ mod api;
 
 mod core;
 mod dkg;
-mod ed25519;
+// mod ed25519;
 mod error;
 mod logging;
 pub(crate) mod membership;
 mod messages;
-mod network_knowledge;
 
-use crate::{
-    messaging::system::NodeState,
-    types::{Peer, PublicKey},
-};
-
-use ed25519_dalek::Keypair;
-use std::{
-    collections::BTreeSet,
-    fmt::{self, Display, Formatter},
-    net::SocketAddr,
-    sync::Arc,
-};
+use sn_interface::types::Peer;
 
 pub use self::{
     api::{
@@ -42,132 +30,18 @@ pub use self::{
         NodeApi,
     },
     cfg::config_handler::{add_connection_info, set_connection_info, Config},
-    dkg::SectionAuthUtils,
     error::{Error, Result},
-    network_knowledge::node_state::{FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE},
 };
 pub use qp2p::{Config as NetworkConfig, SendStream};
+pub use sn_interface::network_knowledge::{
+    FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+};
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
 
-#[cfg(any(test, feature = "test-utils"))]
+#[cfg(feature = "test-utils")]
 pub use test_utils::*;
 
-#[cfg(test)]
-pub(crate) use dkg::test_utils::section_signed;
-#[cfg(test)]
-pub(crate) use network_knowledge::test_utils::gen_section_authority_provider;
-
-pub(crate) use self::{core::MIN_LEVEL_WHEN_FULL, network_knowledge::SectionAuthorityProvider};
-
-/// Recommended section size.
-/// The section will keep adding nodes when requested by the upper layers, until it can split.
-/// A split happens if both post-split sections would have at least this number of nodes.
-pub(crate) fn recommended_section_size() -> usize {
-    2 * crate::elder_count()
-}
-
-/// SuperMajority of a given group (i.e. > 2/3)
-#[inline]
-pub(crate) const fn supermajority(group_size: usize) -> usize {
-    1 + group_size * 2 / 3
-}
-
-pub(crate) fn split(
-    prefix: &Prefix,
-    nodes: impl IntoIterator<Item = XorName>,
-) -> Option<(BTreeSet<XorName>, BTreeSet<XorName>)> {
-    let decision_index: u8 = if let Ok(idx) = prefix.bit_count().try_into() {
-        idx
-    } else {
-        return None;
-    };
-
-    let (one, zero) = nodes
-        .into_iter()
-        .filter(|name| prefix.matches(name))
-        .partition(|name| name.bit(decision_index));
-
-    Some((zero, one))
-}
-
-/// Returns the nodes that should be candidates to become the next elders, sorted by names.
-pub(crate) fn elder_candidates(
-    candidates: impl IntoIterator<Item = NodeState>,
-    current_elders: &SectionAuthorityProvider,
-) -> BTreeSet<NodeState> {
-    use itertools::Itertools;
-    use std::cmp::Ordering;
-
-    // Compare candidates for the next elders. The one comparing `Less` wins.
-    fn cmp_elder_candidates(
-        lhs: &NodeState,
-        rhs: &NodeState,
-        current_elders: &SectionAuthorityProvider,
-    ) -> Ordering {
-        // Older nodes are preferred. In case of a tie, prefer current elders. If still a tie, break
-        // it comparing by the signed signatures because it's impossible for a node to predict its
-        // signature and therefore game its chances of promotion.
-        rhs.age()
-            .cmp(&lhs.age())
-            .then_with(|| {
-                let lhs_is_elder = current_elders.contains_elder(&lhs.name);
-                let rhs_is_elder = current_elders.contains_elder(&rhs.name);
-
-                match (lhs_is_elder, rhs_is_elder) {
-                    (true, false) => Ordering::Less,
-                    (false, true) => Ordering::Greater,
-                    _ => Ordering::Equal,
-                }
-            })
-            .then_with(|| lhs.name.cmp(&rhs.name))
-        // TODO: replace name cmp above with sig cmp.
-        // .then_with(|| lhs.sig.signature.cmp(&rhs.sig.signature))
-    }
-
-    candidates
-        .into_iter()
-        .sorted_by(|lhs, rhs| cmp_elder_candidates(lhs, rhs, current_elders))
-        .take(crate::elder_count())
-        .collect()
-}
-
-/// Information and state of our node
-#[derive(Clone, custom_debug::Debug)]
-pub(crate) struct NodeInfo {
-    // Keep the secret key in Arc to allow Clone while also preventing multiple copies to exist in
-    // memory which might be insecure.
-    #[debug(skip)]
-    pub(crate) keypair: Arc<Keypair>,
-    pub(crate) addr: SocketAddr,
-}
-
-impl NodeInfo {
-    pub(crate) fn new(keypair: Keypair, addr: SocketAddr) -> Self {
-        Self {
-            keypair: Arc::new(keypair),
-            addr,
-        }
-    }
-
-    pub(crate) fn peer(&self) -> Peer {
-        Peer::new(self.name(), self.addr)
-    }
-
-    pub(crate) fn name(&self) -> XorName {
-        XorName::from(PublicKey::from(self.keypair.public))
-    }
-
-    // Last byte of the name represents the age.
-    pub(crate) fn age(&self) -> u8 {
-        self.name()[XOR_NAME_LEN - 1]
-    }
-}
-
-impl Display for NodeInfo {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{}", self.name())
-    }
-}
+pub(crate) use self::core::MIN_LEVEL_WHEN_FULL;
 
 #[cfg(any(test, feature = "test-utils"))]
 mod test_utils {
@@ -185,35 +59,5 @@ mod test_utils {
         let storage_dir = Path::new(root_dir.path()).join(random_filename);
 
         Ok((TEST_MAX_CAPACITY, storage_dir))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::supermajority;
-    use proptest::prelude::*;
-
-    #[test]
-    fn supermajority_of_small_group() {
-        assert_eq!(supermajority(0), 1);
-        assert_eq!(supermajority(1), 1);
-        assert_eq!(supermajority(2), 2);
-        assert_eq!(supermajority(3), 3);
-        assert_eq!(supermajority(4), 3);
-        assert_eq!(supermajority(5), 4);
-        assert_eq!(supermajority(6), 5);
-        assert_eq!(supermajority(7), 5);
-        assert_eq!(supermajority(8), 6);
-        assert_eq!(supermajority(9), 7);
-    }
-
-    proptest! {
-        #[test]
-        fn proptest_supermajority(a in 0usize..10000) {
-            let n = 3 * a;
-            assert_eq!(supermajority(n),     2 * a + 1);
-            assert_eq!(supermajority(n + 1), 2 * a + 1);
-            assert_eq!(supermajority(n + 2), 2 * a + 2);
-        }
     }
 }

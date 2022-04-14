@@ -6,12 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
+use crate::node::{api::cmds::Cmd, core::Node, messages::WireMsgUtils, Result};
+use sn_interface::messaging::{
     system::{DkgSessionId, SystemMsg},
     DstLocation, WireMsg,
 };
-use crate::node::{api::cmds::Cmd, core::Node, messages::WireMsgUtils, Result};
-use crate::types::Peer;
+use sn_interface::types::Peer;
 
 use xor_name::XorName;
 

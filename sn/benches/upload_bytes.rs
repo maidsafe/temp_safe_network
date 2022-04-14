@@ -8,14 +8,12 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use eyre::Result;
-use safe_network::types::Scope;
-use safe_network::{
-    client::{
-        utils::test_utils::{read_network_conn_info, run_w_backoff_delayed},
-        Client, ClientConfig, Error,
-    },
-    types::utils::random_bytes,
+use safe_network::client::{
+    utils::test_utils::{read_network_conn_info, run_w_backoff_delayed},
+    Client, ClientConfig, Error,
 };
+use sn_interface::types::utils::random_bytes;
+use sn_interface::types::Scope;
 use tokio::runtime::Runtime;
 
 /// This bench requires a network already set up

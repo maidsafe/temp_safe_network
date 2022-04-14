@@ -23,10 +23,9 @@ use tracing::{debug, info};
 use tiny_keccak::{Hasher, Sha3};
 
 use eyre::{eyre, Context, Result};
-use safe_network::{
-    client::{utils::test_utils::read_network_conn_info, Client, ClientConfig},
-    types::{utils::random_bytes, BytesAddress, Scope},
-};
+use safe_network::client::{utils::test_utils::read_network_conn_info, Client, ClientConfig};
+
+use sn_interface::types::{utils::random_bytes, BytesAddress, Scope};
 
 #[cfg(not(target_os = "windows"))]
 const SAFE_NODE_EXECUTABLE: &str = "sn_node";

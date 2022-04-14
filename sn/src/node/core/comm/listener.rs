@@ -8,8 +8,8 @@
 
 use super::MsgEvent;
 
-use crate::messaging::WireMsg;
-use crate::types::{log_markers::LogMarker, Peer};
+use sn_interface::messaging::WireMsg;
+use sn_interface::types::{log_markers::LogMarker, Peer};
 
 use qp2p::ConnectionIncoming;
 use tokio::sync::mpsc;

@@ -86,6 +86,7 @@ impl Safe {
             .multimap_insert(&url.to_string(), entry, current_versions)
             .await?;
         set_nrs_url_props(&mut url, entry_hash)?;
+
         Ok(url)
     }
 
