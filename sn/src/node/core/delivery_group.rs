@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::elder_count;
 use crate::node::{Error, Result};
+use sn_interface::elder_count;
 use sn_interface::messaging::DstLocation;
 use sn_interface::network_knowledge::{supermajority, NetworkKnowledge};
 use sn_interface::types::Peer;

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Client;
-use crate::client::Error;
+use crate::Error;
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
 use sn_interface::messaging::{

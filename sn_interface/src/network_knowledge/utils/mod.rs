@@ -6,15 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use sn_interface::network_knowledge::prefix_map::NetworkPrefixMap;
-use sn_interface::types::{Error, Result};
+use crate::network_knowledge::prefix_map::NetworkPrefixMap;
+use crate::types::{Error, Result};
 use std::path::Path;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-pub(crate) async fn compare_and_write_prefix_map_to_disk(
-    prefix_map: &NetworkPrefixMap,
-) -> Result<()> {
+pub async fn compare_and_write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap) -> Result<()> {
     // Open or create `$User/.safe/prefix_maps` dir
     let prefix_map_dir = dirs_next::home_dir()
         .ok_or_else(|| Error::DirectoryHandling("Could not read '.safe' directory".to_string()))?
@@ -60,7 +58,7 @@ pub(crate) async fn compare_and_write_prefix_map_to_disk(
     Ok(())
 }
 
-pub(crate) async fn read_prefix_map_from_disk(path: &Path) -> Result<NetworkPrefixMap> {
+pub async fn read_prefix_map_from_disk(path: &Path) -> Result<NetworkPrefixMap> {
     // Read NetworkPrefixMap from disk if present else create a new one
     match File::open(path).await {
         Ok(mut prefix_map_file) => {

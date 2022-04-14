@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::Client;
-use crate::client::{connections::QueryResult, errors::Error};
+use crate::{connections::QueryResult, errors::Error};
 use bytes::Bytes;
 use rand::Rng;
 use sn_interface::messaging::{

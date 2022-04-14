@@ -2,6 +2,7 @@
 members = [
     "sn",
     "sn_api",
+    "sn_client",
     "sn_cli",
     "sn_dysfunction",
     "sn_cmd_test_utilities",

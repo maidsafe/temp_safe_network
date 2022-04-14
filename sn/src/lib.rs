@@ -41,20 +41,11 @@
 #[macro_use]
 extern crate tracing;
 
-pub mod client;
 mod dbs;
-
-#[cfg(test)]
-/// Helpers for analysis of testnet logs
-mod testnet_grep;
-
-pub use sn_interface::network_knowledge::elder_count;
 
 pub use dbs::UsedSpace;
 
 pub mod node;
-
-mod utils;
 
 use tracing_core::{Event, Subscriber};
 use tracing_subscriber::{
@@ -66,69 +57,7 @@ use tracing_subscriber::{
     registry::LookupSpan,
 };
 
-// /// Number of elders per section.
-// pub(crate) const DEFAULT_ELDER_COUNT: usize = 7;
-/// Number of copies of a chunk
-pub(crate) const DEFAULT_DATA_COPY_COUNT: usize = 4;
-
-// const SN_ELDER_COUNT: &str = "SN_ELDER_COUNT";
-const SN_DATA_COPY_COUNT: &str = "SN_DATA_COPY_COUNT";
-
-/// Max number of faulty Elders is assumed to be less than 1/3.
-/// So it's no more than 2 with 7 Elders.
-pub(crate) fn max_num_faulty_elders() -> usize {
-    elder_count() / 3
-}
-
-/// The least number of Elders to select, to be "guaranteed" one correctly functioning Elder.
-/// This number will be 3 with 7 Elders.
-pub(crate) fn at_least_one_correct_elder() -> usize {
-    max_num_faulty_elders() + 1
-}
-
-// /// Get the expected elder count for our network.
-// /// Defaults to DEFAULT_ELDER_COUNT, but can be overridden by the env var SN_ELDER_COUNT.
-// pub(crate) fn elder_count() -> usize {
-//     // if we have an env var for this, lets override
-//     match std::env::var(SN_ELDER_COUNT) {
-//         Ok(count) => match count.parse() {
-//             Ok(count) => {
-//                 warn!(
-//                     "ELDER_COUNT count set from env var SN_ELDER_COUNT: {:?}",
-//                     SN_ELDER_COUNT
-//                 );
-//                 count
-//             }
-//             Err(error) => {
-//                 warn!("There was an error parsing {:?} env var. DEFAULT_ELDER_COUNT will be used: {:?}", SN_ELDER_COUNT, error);
-//                 DEFAULT_ELDER_COUNT
-//             }
-//         },
-//         Err(_) => DEFAULT_ELDER_COUNT,
-//     }
-// }
-
-/// Get the expected chunk copy count for our network.
-/// Defaults to DEFAULT_DATA_COPY_COUNT, but can be overridden by the env var SN_DATA_COPY_COUNT.
-pub(crate) fn data_copy_count() -> usize {
-    // if we have an env var for this, lets override
-    match std::env::var(SN_DATA_COPY_COUNT) {
-        Ok(count) => match count.parse() {
-            Ok(count) => {
-                warn!(
-                    "data_copy_count countout set from env var SN_DATA_COPY_COUNT: {:?}",
-                    SN_DATA_COPY_COUNT
-                );
-                count
-            }
-            Err(error) => {
-                warn!("There was an error parsing {:?} env var. DEFAULT_DATA_COPY_COUNT will be used: {:?}", SN_DATA_COPY_COUNT, error);
-                DEFAULT_DATA_COPY_COUNT
-            }
-        },
-        Err(_) => DEFAULT_DATA_COPY_COUNT,
-    }
-}
+// pub(crate) use sn_interface::{data_copy_count, at_least_one_correct_elder, max_num_faulty_elders}
 
 #[cfg(any(test, feature = "test-utils"))]
 use std::sync::Once;
@@ -224,80 +153,4 @@ pub fn init_test_logger() {
             .event_format(LogFormatter::default())
             .try_init().unwrap_or_else(|_| println!("Error initializing logger"));
     });
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::elder_count;
-    use crate::testnet_grep::search_testnet_results_per_node;
-    use eyre::Result;
-    use sn_interface::types::log_markers::LogMarker;
-
-    // Check that with one split we have 14 elders.
-    // This is intended to be run, just after split, in order to confirm splits are functioning correctly
-    #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "Testnet network_assert_ tests should be excluded from normal tests runs, they need to be run in sequence to ensure validity of checks"]
-    async fn split_network_assert_health_check() -> Result<()> {
-        let promoted_to_elder_nodes =
-            search_testnet_results_per_node(LogMarker::PromotedToElder.to_string())?.len();
-        let prefix1_prior_elder_nodes = search_testnet_results_per_node(format!(
-            r"{}: Prefix\(1\)",
-            LogMarker::StillElderAfterSplit
-        ))?
-        .len();
-        let prefix1_new_elder_nodes = search_testnet_results_per_node(format!(
-            r"{}: Prefix\(1\)",
-            LogMarker::PromotedToElder
-        ))?
-        .len();
-        let prefix0_prior_elder_nodes = search_testnet_results_per_node(format!(
-            r"{}: Prefix\(0\)",
-            LogMarker::StillElderAfterSplit
-        ))?
-        .len();
-        let prefix0_new_elder_nodes = search_testnet_results_per_node(format!(
-            r"{}: Prefix\(0\)",
-            LogMarker::PromotedToElder
-        ))?
-        .len();
-
-        let split_count =
-            search_testnet_results_per_node(LogMarker::SplitSuccess.to_string())?.len();
-
-        let desired_elder_count = elder_count();
-        println!("Found splits: {:?}", split_count);
-        println!(
-            "Desired elder_count() per section: {:?}",
-            desired_elder_count
-        );
-        println!("Promoted to elder so far: {:?}", promoted_to_elder_nodes);
-
-        let total_elders = prefix0_prior_elder_nodes
-            + prefix0_new_elder_nodes
-            + prefix1_new_elder_nodes
-            + prefix1_prior_elder_nodes;
-        println!("Found elders: {:?}", total_elders);
-
-        println!(
-            "Found prefix_0_prior_elders: {:?}",
-            prefix0_prior_elder_nodes
-        );
-        println!("Found prefix_0_new_elders: {:?}", prefix0_new_elder_nodes);
-
-        println!(
-            "Found prefix_1_prior_elders: {:?}",
-            prefix1_prior_elder_nodes
-        );
-        println!("Found prefix_1_new_elders: {:?}", prefix1_new_elder_nodes);
-
-        // assert!(prefix0_new_elder_nodes + prefix0_prior_elder_nodes >= desired_elder_count);
-        // assert!(prefix1_prior_elder_nodes + prefix1_new_elder_nodes >= desired_elder_count);
-
-        // // we're not discounting demotions at the moment, so just more than 14 is fine
-        // assert!(total_elders >= 2 * desired_elder_count);
-
-        assert!(split_count >= desired_elder_count);
-
-        Ok(())
-    }
 }

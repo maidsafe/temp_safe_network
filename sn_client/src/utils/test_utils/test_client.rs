@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::read_network_conn_info;
-use crate::client::{Client, ClientConfig};
+use crate::{Client, ClientConfig};
 use eyre::Result;
 use sn_interface::types::Keypair;
 use std::{sync::Once, time::Duration};

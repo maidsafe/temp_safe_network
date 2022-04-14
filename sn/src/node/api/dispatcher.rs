@@ -8,12 +8,12 @@
 
 use super::Cmd;
 
-use crate::elder_count;
 use crate::node::{
     core::{DeliveryStatus, Node, Proposal},
     messages::WireMsgUtils,
     Error, Result,
 };
+use sn_interface::elder_count;
 use sn_interface::messaging::{system::SystemMsg, MsgKind, WireMsg};
 use sn_interface::types::{log_markers::LogMarker, Peer};
 
