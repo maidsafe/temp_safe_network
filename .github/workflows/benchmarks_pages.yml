@@ -20,7 +20,7 @@ env:
 
 jobs:
   benchmark:
-    name: Performance regression check
+    name: Run and log benchmark results on gh-pages
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2

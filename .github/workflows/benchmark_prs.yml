@@ -11,7 +11,7 @@ env:
 jobs:
   benchmarks:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Run Benchmarks
+    name: Run performance regression check
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
