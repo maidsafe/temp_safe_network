@@ -97,6 +97,13 @@ To do so, follow these steps:
   dependent crate has been published on crates.io. Make sure you update your newly added job to
   reference the correct dependent crate. No changes should be required for the publishing script
   itself.
+* Update the `node install` command to select the correct version number for `sn_node`. Since the GH
+  release tag name has the versions of all the crates in it, the correct version number has to be
+  selected during the command. Update these:
+    - Update `get_version_from_release_version` `sn_cli/src/operations/helpers.rs` to select the
+      correct version number.
+    - Update `get_version_from_release_version` `sn_cmd_test_utilities/src/lib.rs` to select the
+      correct version number.
 
 Unfortunately it's quite hard to test the changes without actually running the release process, so
 it will probably take a few commits and release cycles before it works properly.
