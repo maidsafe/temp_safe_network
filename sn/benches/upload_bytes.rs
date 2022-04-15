@@ -38,8 +38,6 @@ async fn upload_only(size: usize) -> Result<(), Error> {
     let client = Client::new(config, bootstrap_nodes, None).await?;
     let address = client.upload(bytes.clone(), Scope::Public).await?;
 
-    assert_eq!(received_bytes, bytes);
-
     Ok(())
 }
 
@@ -80,7 +78,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     // only upload
     group.bench_function("upload 3072b", |b| {
         b.to_async(&runtime).iter(|| async {
-            match upload(3072).await {
+            match upload_only(3072).await {
                 Ok(_) => {}
                 Err(error) => println!("3072b upload bench failed with {:?}", error),
             }
@@ -88,7 +86,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
     group.bench_function("upload 1mb", |b| {
         b.to_async(&runtime).iter(|| async {
-            match upload(1024 * 1024).await {
+            match upload_only(1024 * 1024).await {
                 Ok(_) => {}
                 Err(error) => println!("1mb upload bench failed with {:?}", error),
             }
@@ -96,7 +94,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
     group.bench_function("upload 10mb", |b| {
         b.to_async(&runtime).iter(|| async {
-            match upload(1024 * 1024 * 10).await {
+            match upload_only(1024 * 1024 * 10).await {
                 Ok(_) => {}
                 Err(error) => println!("10mb upload bench failed with {:?}", error),
             }
