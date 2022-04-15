@@ -6,12 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
+use crate::node::{api::cmds::Cmd, core::Node, messages::WireMsgUtils, Result};
+use sn_interface::messaging::{
     system::{DkgSessionId, SystemMsg},
     DstLocation, WireMsg,
 };
-use crate::node::{api::cmds::Cmd, core::Node, messages::WireMsgUtils, Result};
-use crate::types::{Peer, log_markers::LogMarker};
+use sn_interface::types::log_markers::LogMarker;
+use sn_interface::types::Peer;
 
 use xor_name::XorName;
 
@@ -75,8 +76,7 @@ impl Node {
             recipients
         );
 
-        Ok(self
-            .send_messages_to_all_nodes_or_directly_handle_for_accumulation(recipients, wire_msg)
-            .await?)
+        self.send_messages_to_all_nodes_or_directly_handle_for_accumulation(recipients, wire_msg)
+            .await
     }
 }

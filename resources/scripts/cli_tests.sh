@@ -22,5 +22,6 @@ cargo test --release --test cli_files -- --test-threads=1 || ((exit++))
 cargo test --release --test cli_files_get -- --test-threads=1 || ((exit++))
 cargo test --release --test cli_keys || ((exit++))
 cargo test --release --test cli_nrs -- --test-threads=1 || ((exit++))
+cargo test --release --test cli_wallet -- --test-threads=1 || ((exit++))
 
 exit $exit

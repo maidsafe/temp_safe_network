@@ -8,9 +8,10 @@
 
 use sn_consensus::{SignedVote, VoteResponse};
 
-use crate::node::handover::{Handover, SapCandidate};
+use crate::node::handover::Handover;
 use crate::node::{api::cmds::Cmd, core::Node};
-use crate::types::log_markers::LogMarker;
+use sn_interface::network_knowledge::SapCandidate;
+use sn_interface::types::log_markers::LogMarker;
 
 impl Node {
     /// helper to handle a handover vote

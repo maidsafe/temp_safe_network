@@ -9,11 +9,11 @@
 use sn_consensus::SignedVote;
 use tracing::warn;
 
-use crate::messaging::system::SectionAuth;
-use crate::messaging::system::SystemMsg;
-use crate::node::SectionAuthorityProvider;
-use crate::node::{api::cmds::Cmd, core::Node, core::Proposal, handover::SapCandidate, Result};
-use crate::types::log_markers::LogMarker;
+use crate::node::{api::cmds::Cmd, core::Node, core::Proposal, Result};
+use sn_interface::messaging::system::SectionAuth;
+use sn_interface::messaging::system::SystemMsg;
+use sn_interface::network_knowledge::{SapCandidate, SectionAuthorityProvider};
+use sn_interface::types::log_markers::LogMarker;
 
 impl Node {
     /// Make a handover consensus proposal vote for a sap candidate

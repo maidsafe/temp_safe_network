@@ -12,7 +12,7 @@ pub mod util {
     use color_eyre::{eyre::eyre, eyre::WrapErr, Help, Result};
     use multibase::{encode, Base};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
-    use sn_api::{files::ProcessedFiles, resolver::SafeData, Keypair, SafeUrl};
+    use sn_api::{files::ProcessedFiles, resolver::SafeData, SafeUrl};
     use std::path::Path;
     use std::{collections::BTreeMap, env, fs, process};
     use tiny_keccak::{Hasher, Sha3};
@@ -320,7 +320,7 @@ pub mod util {
             .map_err(|_| eyre!("Failed to parse output of `safe nrs register`: {}", output))
     }
 
-    pub fn parse_wallet_create_output(output: &str) -> Result<(String, String, Option<Keypair>)> {
+    pub fn parse_wallet_create_output(output: &str) -> Result<String> {
         serde_json::from_str(output)
             .map_err(|_| eyre!("Failed to parse output of `safe wallet create`: {}", output))
     }

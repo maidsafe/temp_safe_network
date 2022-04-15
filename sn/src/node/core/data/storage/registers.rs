@@ -9,7 +9,7 @@
 use crate::dbs::{
     convert_to_error_msg, Error, EventStore, LruCache, Result, UsedSpace, SLED_FLUSH_TIME_MS,
 };
-use crate::messaging::{
+use sn_interface::messaging::{
     data::{
         CreateRegister, DeleteRegister, EditRegister, ExtendRegister, OperationId, RegisterCmd,
         RegisterQuery, RegisterStoreExport, ReplicatedRegisterLog, SignedRegisterCreate,
@@ -18,7 +18,7 @@ use crate::messaging::{
     system::NodeQueryResponse,
     SectionAuth, VerifyAuthority,
 };
-use crate::types::{
+use sn_interface::types::{
     register::{Action, EntryHash, Register, User},
     DataAddress, RegisterAddress as Address,
 };
@@ -710,20 +710,16 @@ impl Display for RegisterStorage {
 mod test {
     use super::RegisterStorage;
 
-    use crate::messaging::SectionAuth;
     use crate::node::{Error, Result};
-    use crate::types::register::{EntryHash, PrivatePolicy};
-    use crate::types::DataAddress;
-    use crate::types::{register::User, Keypair};
     use crate::UsedSpace;
-    use crate::{
-        messaging::{
-            data::{CreateRegister, RegisterCmd, RegisterQuery, SignedRegisterCreate},
-            system::NodeQueryResponse,
-            ServiceAuth,
-        },
-        types::register::{Policy, PublicPolicy},
+    use sn_interface::messaging::{
+        data::{CreateRegister, RegisterCmd, RegisterQuery, SignedRegisterCreate},
+        system::NodeQueryResponse,
+        SectionAuth, ServiceAuth,
     };
+    use sn_interface::types::register::{EntryHash, Policy, PrivatePolicy, PublicPolicy};
+    use sn_interface::types::DataAddress;
+    use sn_interface::types::{register::User, Keypair};
 
     use rand::rngs::OsRng;
     use rand::Rng;
@@ -826,7 +822,7 @@ mod test {
             .read(&RegisterQuery::Get(cmd.dst_address()), authority)
             .await;
 
-        use crate::messaging::data::Error as MsgError;
+        use sn_interface::messaging::data::Error as MsgError;
 
         match res {
             NodeQueryResponse::GetRegister((Ok(_), _)) => panic!("Was not removed!"),
@@ -907,7 +903,7 @@ mod test {
             .await;
         match res {
             NodeQueryResponse::GetRegisterEntry((Err(e), _)) => {
-                assert_eq!(e, crate::messaging::data::Error::NoSuchEntry)
+                assert_eq!(e, sn_interface::messaging::data::Error::NoSuchEntry)
             }
             NodeQueryResponse::GetRegisterEntry((Ok(entry), _)) => {
                 panic!("Should not exist any entry for random hash! {:?}", entry)
@@ -941,7 +937,7 @@ mod test {
             .await;
         match res {
             NodeQueryResponse::GetRegisterUserPermissions((Err(e), _)) => {
-                assert_eq!(e, crate::messaging::data::Error::NoSuchEntry)
+                assert_eq!(e, sn_interface::messaging::data::Error::NoSuchEntry)
             }
             NodeQueryResponse::GetRegisterUserPermissions((Ok(perms), _)) => panic!(
                 "Should not exist any permissions for random user! {:?}",
@@ -1007,7 +1003,7 @@ mod test {
     }
 
     fn section_auth() -> SectionAuth {
-        use crate::messaging::system::KeyedSig;
+        use sn_interface::messaging::system::KeyedSig;
 
         let sk = bls::SecretKey::random();
         let public_key = sk.public_key();
@@ -1018,7 +1014,7 @@ mod test {
             signature,
         };
         SectionAuth {
-            src_name: crate::types::PublicKey::Bls(public_key).into(),
+            src_name: sn_interface::types::PublicKey::Bls(public_key).into(),
             sig,
         }
     }

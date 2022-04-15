@@ -1,6 +1,5 @@
 use bls::{PublicKeySet, SecretKeyShare};
 use core::fmt::Debug;
-use serde::{Deserialize, Serialize};
 use tracing::info;
 use xor_name::Prefix;
 
@@ -9,18 +8,10 @@ use sn_consensus::vote::{Ballot, SignedVote, Vote};
 use sn_consensus::NodeId;
 
 use super::errors::{Error, Result};
-use crate::messaging::system::SectionAuth;
-use crate::node::SectionAuthorityProvider;
 
-#[allow(clippy::large_enum_variant)]
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Serialize, Deserialize)]
-pub enum SapCandidate {
-    ElderHandover(SectionAuth<SectionAuthorityProvider>),
-    SectionSplit(
-        SectionAuth<SectionAuthorityProvider>,
-        SectionAuth<SectionAuthorityProvider>,
-    ),
-}
+use sn_interface::messaging::system::SectionAuth;
+use sn_interface::network_knowledge::SapCandidate;
+use sn_interface::network_knowledge::SectionAuthorityProvider;
 
 #[derive(Debug, Clone)]
 pub(crate) struct Handover {

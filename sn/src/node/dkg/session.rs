@@ -6,19 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
-    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
-    DstLocation, WireMsg,
-};
 use crate::node::{
     api::cmds::{next_timer_token, Cmd},
     dkg::dkg_msgs_utils::{DkgFailureSigSetUtils, DkgFailureSigUtils},
-    ed25519,
     messages::WireMsgUtils,
-    network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
-    NodeInfo, Result,
+    Result,
 };
-use crate::types::{log_markers::LogMarker, Peer, PublicKey};
+use sn_interface::messaging::{
+    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
+    DstLocation, WireMsg,
+};
+use sn_interface::network_knowledge::{NodeInfo, SectionAuthorityProvider, SectionKeyShare};
+use sn_interface::types::{keys::ed25519, log_markers::LogMarker, Peer, PublicKey};
 
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{
@@ -468,24 +467,27 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use crate::elder_count;
-    use crate::messaging::system::MembershipState;
-    use crate::messaging::MsgType;
-    use crate::node::{
-        dkg::voter::DkgVoter, dkg::DkgSessionIdUtils, ed25519,
-        network_knowledge::test_utils::gen_addr, NodeInfo, MIN_ADULT_AGE,
-    };
+    use crate::node::dkg::voter::DkgVoter;
+    use sn_interface::messaging::system::{MembershipState, NodeState};
+    use sn_interface::messaging::MsgType;
+    #[cfg(feature = "test-utils")]
+    use sn_interface::network_knowledge::test_utils::gen_addr;
+    use sn_interface::network_knowledge::{NodeInfo, MIN_ADULT_AGE};
+
+    #[cfg(feature = "test-utils")]
+    use sn_interface::types::keys::ed25519::{self, proptesting::arbitrary_keypair};
 
     use assert_matches::assert_matches;
     use eyre::{bail, ContextCompat, Result};
     use itertools::Itertools;
     use proptest::{collection::SizeRange, prelude::*};
-    use rand::{rngs::SmallRng, SeedableRng};
+    use rand::{rngs::SmallRng, Rng, SeedableRng};
     use std::{collections::HashMap, net::SocketAddr};
     use xor_name::Prefix;
 
     #[tokio::test]
+    #[cfg(feature = "test-utils")]
     async fn single_participant() -> Result<()> {
         // If there is only one participant, the DKG should complete immediately.
 
@@ -497,14 +499,19 @@ mod tests {
             ed25519::gen_keypair(&prefix.range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
-        let elder_candidates = BTreeSet::from_iter([node.peer()]);
+        let elders = BTreeMap::from_iter([(node.name(), node.addr)]);
         let bootstrap_members = BTreeSet::from_iter([NodeState {
             name: node.peer().name(),
             addr: node.peer().addr(),
             state: MembershipState::Joined,
             previous_name: None,
         }]);
-        let session_id = DkgSessionId::new(prefix, elder_candidates, 0, bootstrap_members);
+        let session_id = DkgSessionId {
+            prefix,
+            elders,
+            generation: 0,
+            bootstrap_members,
+        };
 
         let cmds = voter.start(&node, session_id, section_pk).await?;
         assert_matches!(&cmds[..], &[Cmd::HandleDkgOutcome { .. }]);
@@ -517,6 +524,7 @@ mod tests {
         // Expect the session to successfully complete without timed transitions.
         // NOTE: `seed` is for seeding the rng that randomizes the message order.
         #[test]
+        #[cfg(feature = "test-utils")]
         fn proptest_full_participation(nodes in arbitrary_elder_nodes(), seed in any::<u64>()) {
             if let Err(error) = proptest_full_participation_impl(nodes, seed) {
                 panic!("{}", error);
@@ -530,16 +538,16 @@ mod tests {
         let section_pk = bls::SecretKey::random().public_key();
         let mut messages = Vec::new();
 
-        let session_id = DkgSessionId::new(
-            Prefix::default(),
-            BTreeSet::from_iter(nodes.iter().map(NodeInfo::peer)),
-            0,
-            BTreeSet::from_iter(
+        let session_id = DkgSessionId {
+            prefix: Prefix::default(),
+            elders: BTreeMap::from_iter(nodes.iter().map(|n| (n.name(), n.addr))),
+            generation: 0,
+            bootstrap_members: BTreeSet::from_iter(
                 nodes
                     .iter()
                     .map(|n| NodeState::joined(n.name(), n.addr, None)),
             ),
-        );
+        };
 
         let mut actors: HashMap<_, _> = nodes
             .into_iter()
@@ -628,7 +636,7 @@ mod tests {
                             },
                         ..
                     } => {
-                        assert_eq!(session_id, *expected_dkg_key);
+                        assert_eq!(session_id.hash(), expected_dkg_key.hash());
                         Ok(recipients
                             .into_iter()
                             .map(|peer| (peer.addr(), message.clone()))
@@ -652,11 +660,13 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "test-utils")]
     fn arbitrary_elder_nodes() -> impl Strategy<Value = Vec<NodeInfo>> {
         arbitrary_unique_nodes(2..=elder_count())
     }
 
     // Generate Vec<Node> where no two nodes have the same name.
+    #[cfg(feature = "test-utils")]
     pub(crate) fn arbitrary_unique_nodes(
         count: impl Into<SizeRange>,
     ) -> impl Strategy<Value = Vec<NodeInfo>> {
@@ -670,11 +680,9 @@ mod tests {
         })
     }
 
+    #[cfg(feature = "test-utils")]
     fn arbitrary_node() -> impl Strategy<Value = NodeInfo> {
-        (
-            ed25519::test_utils::arbitrary_keypair(),
-            any::<SocketAddr>(),
-        )
+        (arbitrary_keypair(), any::<SocketAddr>())
             .prop_map(|(keypair, addr)| NodeInfo::new(keypair, addr))
     }
 }

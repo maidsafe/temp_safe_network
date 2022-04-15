@@ -6,21 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub use safe_network::types::register::{Entry, EntryHash};
+pub use sn_interface::types::register::{Entry, EntryHash};
 
 use crate::safeurl::{ContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe};
+use sn_interface::messaging::data::Error as ErrorMsg;
 
 use log::debug;
 use rand::Rng;
-use safe_network::{
-    client::Error as ClientError,
-    types::{
-        register::{
-            Policy, PrivatePermissions, PrivatePolicy, PublicPermissions, PublicPolicy, User,
-        },
-        DataAddress, Error as SafeNdError, RegisterAddress, Scope,
-    },
+use safe_network::client::Error as ClientError;
+use sn_interface::types::{
+    register::{Policy, PrivatePermissions, PrivatePolicy, PublicPermissions, PublicPolicy, User},
+    DataAddress, Error as SafeNdError, RegisterAddress, Scope,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use tracing::info;
@@ -122,16 +119,23 @@ impl Safe {
                 debug!("No version so take latest entry from Register at: {}", url);
                 let address = self.get_register_address(url)?;
                 let client = self.get_safe_client()?;
-                client.read_register(address).await.map_err(|err| {
-                    if let ClientError::NetworkDataError(SafeNdError::NoSuchEntry) = err {
-                        Error::EmptyContent(format!("Empty Register found at {:?}", address))
-                    } else {
-                        Error::NetDataError(format!(
-                            "Failed to read latest value from Register data: {:?}",
-                            err
-                        ))
-                    }
-                })
+                match client.read_register(address).await {
+                    Ok(entry) => Ok(entry),
+                    Err(ClientError::NetworkDataError(SafeNdError::NoSuchEntry)) => Err(
+                        Error::EmptyContent(format!("Empty Register found at \"{}\"", url)),
+                    ),
+                    Err(ClientError::ErrorMsg {
+                        source: ErrorMsg::AccessDenied(_),
+                        ..
+                    }) => Err(Error::AccessDenied(format!(
+                        "Couldn't read entry from Register found at \"{}\"",
+                        url
+                    ))),
+                    Err(err) => Err(Error::NetDataError(format!(
+                        "Failed to read latest value from Register data: {:?}",
+                        err
+                    ))),
+                }
             }
         };
 
@@ -167,7 +171,7 @@ impl Safe {
             .await
             .map_err(|err| {
                 if let ClientError::ErrorMsg {
-                    source: safe_network::messaging::data::Error::NoSuchEntry,
+                    source: sn_interface::messaging::data::Error::NoSuchEntry,
                     ..
                 } = err
                 {

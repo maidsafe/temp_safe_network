@@ -22,20 +22,20 @@ mod update_section;
 pub(crate) use proposals::handle_proposal;
 
 use crate::dbs::Error as DbError;
-use crate::messaging::{
-    data::{ServiceMsg, StorageLevel},
-    signature_aggregator::Error as AggregatorError,
-    system::{JoinResponse, NodeCmd, NodeEvent, NodeQuery, SystemMsg},
-    AuthorityProof, DstLocation, MsgId, MsgType, NodeMsgAuthority, SectionAuth, WireMsg,
-};
 use crate::node::{
     api::cmds::Cmd,
-    core::{Node, DATA_QUERY_LIMIT},
+    core::{DkgSessionInfo, Node, Proposal as CoreProposal, DATA_QUERY_LIMIT},
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
-    network_knowledge::NetworkKnowledge,
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
 };
-use crate::types::{log_markers::LogMarker, Peer, PublicKey};
+use sn_interface::messaging::{
+    data::{ServiceMsg, StorageLevel},
+    signature_aggregator::Error as AggregatorError,
+    system::{JoinResponse, NodeCmd, NodeEvent, NodeQuery, Proposal as ProposalMsg, SystemMsg},
+    AuthorityProof, DstLocation, MsgId, MsgType, NodeMsgAuthority, SectionAuth, WireMsg,
+};
+use sn_interface::network_knowledge::NetworkKnowledge;
+use sn_interface::types::{log_markers::LogMarker, Peer, PublicKey};
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -540,9 +540,19 @@ impl Node {
 
                 trace!("Handling msg: Propose from {}: {:?}", sender, msg_id);
 
+                // lets convert our message into a usable proposal for core
+                let core_proposal = match proposal {
+                    ProposalMsg::Offline(node_state) => {
+                        CoreProposal::Offline(node_state.into_state())
+                    }
+                    ProposalMsg::SectionInfo(sap) => CoreProposal::SectionInfo(sap.into_state()),
+                    ProposalMsg::NewElders(sap) => CoreProposal::NewElders(sap.into_authed_state()),
+                    ProposalMsg::JoinsAllowed(allowed) => CoreProposal::JoinsAllowed(allowed),
+                };
+
                 handle_proposal(
                     msg_id,
-                    proposal.into_state(),
+                    core_proposal,
                     sig_share,
                     sender,
                     &self.network_knowledge,
@@ -557,11 +567,13 @@ impl Node {
                     return Ok(vec![]);
                 }
                 if let NodeMsgAuthority::Section(authority) = msg_authority {
-                    let _existing = self
-                        .dkg_sessions
-                        .write()
-                        .await
-                        .insert(session_id.hash(), (session_id.clone(), authority));
+                    let _existing = self.dkg_sessions.write().await.insert(
+                        session_id.hash(),
+                        DkgSessionInfo {
+                            session_id: session_id.clone(),
+                            authority,
+                        },
+                    );
                 }
                 self.handle_dkg_start(session_id).await
             }
@@ -730,7 +742,7 @@ impl Node {
                     let section_pk = self.section_key_by_name(&sender.name()).await;
                     let src_section_pk = self.network_knowledge().section_key().await;
                     let our_info = &*self.info.read().await;
-                    let dst = crate::messaging::DstLocation::Node {
+                    let dst = sn_interface::messaging::DstLocation::Node {
                         name: sender.name(),
                         section_pk,
                     };
@@ -797,7 +809,7 @@ impl Node {
 
                         cmds.push(Cmd::SignOutgoingSystemMsg {
                             msg: SystemMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)),
-                            dst: crate::messaging::DstLocation::Node {
+                            dst: sn_interface::messaging::DstLocation::Node {
                                 name: sender.name(),
                                 section_pk: self.section_key_by_name(&sender.name()).await,
                             },
@@ -879,23 +891,23 @@ impl Node {
                 session_id,
                 message,
             } => {
-                if let Some((session_id, section_auth)) = self
+                if let Some(session_info) = self
                     .dkg_sessions
                     .read()
                     .await
                     .get(&session_id.hash())
                     .cloned()
                 {
-                    let message_cache = self.dkg_voter.get_cached_msgs(&session_id);
+                    let message_cache = self.dkg_voter.get_cached_msgs(&session_info.session_id);
                     trace!(
                         "Sending DkgSessionInfo {{ {:?}, ... }} to {}",
-                        &session_id,
+                        &session_info.session_id,
                         &sender
                     );
 
                     let node_msg = SystemMsg::DkgSessionInfo {
                         session_id,
-                        section_auth,
+                        section_auth: session_info.authority,
                         message_cache,
                         message,
                     };
@@ -946,11 +958,13 @@ impl Node {
                     warn!("Chain: {:?}", chain);
                     return Ok(cmds);
                 };
-                let _existing = self
-                    .dkg_sessions
-                    .write()
-                    .await
-                    .insert(session_id.hash(), (session_id.clone(), section_auth));
+                let _existing = self.dkg_sessions.write().await.insert(
+                    session_id.hash(),
+                    DkgSessionInfo {
+                        session_id: session_id.clone(),
+                        authority: section_auth,
+                    },
+                );
                 trace!("DkgSessionInfo handling {:?}", session_id);
                 cmds.extend(self.handle_dkg_start(session_id.clone()).await?);
                 cmds.extend(

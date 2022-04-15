@@ -8,8 +8,8 @@
 
 use super::Link;
 
-use crate::messaging::MsgId;
 use crate::node::{Error, Result};
+use sn_interface::messaging::MsgId;
 
 use bytes::Bytes;
 use custom_debug::Debug;

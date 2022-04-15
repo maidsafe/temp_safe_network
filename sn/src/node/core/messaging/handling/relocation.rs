@@ -7,9 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::elder_count;
-use crate::messaging::system::{
-    MembershipState, NodeState as NodeStateMsg, RelocateDetails, SectionAuth,
-};
 use crate::node::{
     api::cmds::Cmd,
     core::{
@@ -17,10 +14,13 @@ use crate::node::{
         relocation::{find_nodes_to_relocate, ChurnId, RelocateDetailsUtils},
         Node, Proposal,
     },
-    network_knowledge::NodeState,
     Event, Result,
 };
-use crate::types::log_markers::LogMarker;
+use sn_interface::messaging::system::{
+    MembershipState, NodeState as NodeStateMsg, RelocateDetails, SectionAuth,
+};
+use sn_interface::network_knowledge::NodeState;
+use sn_interface::types::log_markers::LogMarker;
 
 use std::collections::BTreeSet;
 use xor_name::XorName;
@@ -85,9 +85,8 @@ impl Node {
             relocate_details.age
         );
 
-        Ok(self
-            .propose(Proposal::Offline(node_state.relocate(relocate_details)))
-            .await?)
+        self.propose(Proposal::Offline(node_state.relocate(relocate_details)))
+            .await
     }
 
     pub(crate) async fn handle_relocate(

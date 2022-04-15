@@ -35,7 +35,7 @@ required-features = ["test-utils"]
 default = []
 chaos = []
 unstable-wiremsg-debuginfo = []
-test-utils = []
+test-utils = ["sn_interface/test-utils", "sn_interface/proptest"]
 # Needs to be built with RUSTFLAGS="--cfg tokio_unstable"
 tokio-console = ["console-subscriber"]
 
@@ -43,7 +43,7 @@ tokio-console = ["console-subscriber"]
 base64 = "~0.13.0"
 bincode = "1.3.1"
 bls = { package = "blsttc", version = "3.1.0" }
-bls_dkg = "0.9.2"
+bls_dkg = "~0.9.2"
 bytes = { version = "1.0.1", features = ["serde"] }
 color-eyre = "~0.6.0"
 console-subscriber = { version = "~0.1.0", optional = true }
@@ -55,7 +55,7 @@ ed25519 = { version = "1.2.0", features = ["serde_bytes"] }
 ed25519-dalek = { version = "1.0.0", features = ["serde"] }
 eyre = "~0.6.5"
 futures = "~0.3.13"
-hex = "0.4.3"
+hex = "~0.4.3"
 hex_fmt = "~0.3.0"
 itertools = "~0.10.0"
 lazy_static = "1"
@@ -68,7 +68,8 @@ rayon = "1.5.1"
 resource_proof = "1.0.38"
 rmp-serde = "1.0.0"
 secured_linked_list = "~0.5.0"
-self_encryption = "0.27.4"
+self_encryption = "~0.27.4"
+sn_interface = { path = "../sn_interface", version = "^0.1.0" }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_bytes = "~0.11.5"
 serde_json = "1.0.53"
@@ -90,7 +91,7 @@ url = "2.2.0"
 walkdir = "2"
 xor_name = "4.0.1"
 file-rotate = "~0.6.0"
-sn_dysfunction = { path = "../sn_dysfunction", version = "^0.1.1" }
+sn_dysfunction = { path = "../sn_dysfunction", version = "~0.1.1" }
 sn_consensus = "1.16.0"
 
 [dependencies.backoff]
@@ -108,9 +109,9 @@ features = ["fs", "io-util", "macros", "rt", "rt-multi-thread", "sync"]
 
 [dev-dependencies]
 assert_matches = "1.3"
-criterion = { version = "0.3", features = ["async_tokio"] }
+criterion = { version = "~0.3", features = ["async_tokio"] }
 ctor = "~0.1.20"
-proptest = "~0.10.1"
+proptest = "1.0.0"
 rand = { version = "~0.7.3", features = ["small_rng"] }
 rand_xorshift = "~0.2.0"
 termcolor="1.1.2"

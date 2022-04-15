@@ -6,19 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{
-    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
-    DstLocation, WireMsg,
-};
 use crate::node::{
     api::cmds::Cmd,
     core::{Node, Proposal},
     dkg::DkgFailureSigSetUtils,
     messages::WireMsgUtils,
-    network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     Error, Result,
 };
-use crate::types::{log_markers::LogMarker, Peer};
+use sn_interface::messaging::{
+    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
+    DstLocation, WireMsg,
+};
+use sn_interface::network_knowledge::{SectionAuthorityProvider, SectionKeyShare};
+use sn_interface::types::{log_markers::LogMarker, Peer};
 
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
@@ -59,8 +59,8 @@ impl Node {
         self.dkg_sessions
             .write()
             .await
-            .retain(|_, (existing_session_id, _)| {
-                existing_session_id.generation >= session_id.generation
+            .retain(|_, existing_session_info| {
+                existing_session_info.session_id.generation >= session_id.generation
             });
         let cmds = self
             .dkg_voter
@@ -146,7 +146,7 @@ impl Node {
             .dkg_voter
             .handle_dkg_history(
                 &self.info.read().await.clone(),
-                &session_id,
+                session_id,
                 message_history,
                 sender.name(),
                 section_key,
@@ -158,7 +158,7 @@ impl Node {
                 .process_msg(
                     sender,
                     &self.info.read().await.clone(),
-                    &session_id,
+                    session_id,
                     message,
                     section_key,
                 )

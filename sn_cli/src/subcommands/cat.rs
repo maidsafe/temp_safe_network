@@ -105,9 +105,11 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
             println!("No content to show since the URL targets a SafeKey. Use the 'dog' command to obtain additional information about the targeted SafeKey.");
         }
         SafeData::Multimap { .. }
-        | SafeData::NrsEntry { .. }
         | SafeData::PrivateRegister { .. }
-        | SafeData::PublicRegister { .. } => unimplemented!(),
+        | SafeData::NrsEntry { .. }
+        | SafeData::PublicRegister { .. } => {
+            println!("Type of content not supported yet by 'cat' command.")
+        }
     }
 
     Ok(())

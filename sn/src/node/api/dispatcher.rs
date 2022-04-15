@@ -9,13 +9,13 @@
 use super::Cmd;
 
 use crate::elder_count;
-use crate::messaging::{system::SystemMsg, MsgKind, WireMsg};
 use crate::node::{
     core::{DeliveryStatus, Node, Proposal},
     messages::WireMsgUtils,
     Error, Result,
 };
-use crate::types::{log_markers::LogMarker, Peer};
+use sn_interface::messaging::{system::SystemMsg, MsgKind, WireMsg};
+use sn_interface::types::{log_markers::LogMarker, Peer};
 
 use itertools::Itertools;
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
