@@ -99,6 +99,9 @@ jobs:
         if: failure()
         run: tail $HOME/.safe/node/local-test-network/*/*.log*
 
+      - name: Remove git hooks so gh-pages git commits will work
+        run: rm -rf ./git/hooks/pre-commit
+
       #################################
       ### Log any regression alerts ###
       #################################
