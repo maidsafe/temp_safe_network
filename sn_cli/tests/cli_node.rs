@@ -19,7 +19,7 @@ pub(crate) const SN_NODE_BIN_NAME: &str = "sn_node";
 pub(crate) const SN_NODE_BIN_NAME: &str = "sn_node.exe";
 
 #[test]
-#[ignore = "this test gets subject to rate limiting even with retries"]
+#[ignore = "this test gets subject to rate limiting so even with retries it's susceptible to failure"]
 fn node_install_should_install_the_latest_version() -> Result<()> {
     let temp_dir = assert_fs::TempDir::new()?;
     let safe_dir = temp_dir.child(".safe");
