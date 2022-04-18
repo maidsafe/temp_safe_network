@@ -710,29 +710,25 @@ impl Node {
     }
 
     pub(super) async fn log_section_stats(&self) {
-        let adults = self.network_knowledge.adults().await.len();
+        if let Some(m) = self.membership.read().await.as_ref() {
+            let adults = self.network_knowledge.adults().await.len();
 
-        let elders = self
-            .network_knowledge
-            .authority_provider()
-            .await
-            .elder_count();
+            let elders = self
+                .network_knowledge
+                .authority_provider()
+                .await
+                .elder_count();
 
-        let membership_adults = self
-            .membership
-            .read()
-            .await
-            .as_ref()
-            .unwrap()
-            .current_section_members()
-            .len()
-            - elders;
+            let membership_adults = m.current_section_members().len() - elders;
+            let prefix = self.network_knowledge.prefix().await;
 
-        let prefix = self.network_knowledge.prefix().await;
-        debug!(
-            "{:?}: {:?} Elders, {:?}~{:?} Adults.",
-            prefix, elders, adults, membership_adults
-        );
+            debug!(
+                "{:?}: {:?} Elders, {:?}~{:?} Adults.",
+                prefix, elders, adults, membership_adults
+            );
+        } else {
+            debug!("log_section_stats: No membership instance");
+        };
     }
 }
 

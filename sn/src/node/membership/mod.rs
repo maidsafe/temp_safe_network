@@ -154,7 +154,7 @@ impl Membership {
     }
 
     pub(crate) fn current_section_members(&self) -> BTreeMap<XorName, NodeState> {
-        self.section_members(self.gen).unwrap()
+        self.section_members(self.gen).unwrap_or_default()
     }
 
     pub(crate) fn section_members(&self, gen: Generation) -> Result<BTreeMap<XorName, NodeState>> {
