@@ -57,7 +57,7 @@ jobs:
         with:
           filters: |
             src:
-              - 'sn/src/**'
+              - 'sn_node/src/**'
               - 'sn_api/src/**'
               - 'sn_cli/src/**'
 
@@ -93,19 +93,36 @@ jobs:
         id: sn_changes
         with:
           filters: |
-            src:
-              - 'sn/src/**'
+            node:
+              - 'sn_node/src/**'
+            client:
+              - 'sn_client/src/**'
+            dysfunction:
+              - 'sn_dysfunction/src/**'
+            interface:
+              - 'sn_interface/src/**'
 
       - uses: actions-rs/toolchain@v1
-        if: steps.sn_changes.outputs.src == 'true'
         with:
           profile: minimal
           toolchain: stable
           override: true
 
-      - name: Publish Dry Run
-        if: steps.sn_changes.outputs.src == 'true'
+      - name: Node Publish Dry Run
+        if: steps.sn_changes.outputs.node == 'true'
         run: cd sn_node && cargo publish --dry-run
+
+      - name: Client Publish Dry Run
+        if: steps.sn_changes.outputs.client == 'true'
+        run: cd sn_client && cargo publish --dry-run
+
+      - name: Dysfunction Publish Dry Run
+        if: steps.sn_changes.outputs.dysfunction == 'true'
+        run: cd sn_dysfunction && cargo publish --dry-run
+
+      - name: Interface Publish Dry Run
+        if: steps.sn_changes.outputs.interface == 'true'
+        run: cd sn_interface && cargo publish --dry-run
 
   unit:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
