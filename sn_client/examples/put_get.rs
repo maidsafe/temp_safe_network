@@ -17,12 +17,12 @@ use sn_interface::types::{utils::random_bytes, BytesAddress, Scope};
 use tiny_keccak::{Hasher, Sha3};
 
 #[cfg(feature = "test-utils")]
-use sn_node::{client::utils::test_utils::read_network_conn_info, init_test_logger};
+use sn_client::utils::test_utils::read_network_conn_info;
 
 #[cfg(feature = "test-utils")]
 #[tokio::main]
 async fn main() -> Result<()> {
-    init_test_logger();
+    sn_client::init_test_logger();
 
     #[cfg(feature = "test-utils")]
     run_chunk_soak().await?;

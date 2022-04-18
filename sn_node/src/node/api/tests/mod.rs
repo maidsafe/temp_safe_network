@@ -11,6 +11,7 @@
 use super::{Cmd, Comm, Dispatcher};
 
 use crate::dbs::UsedSpace;
+use crate::init_test_logger;
 use crate::node::{
     core::{
         relocation_check, ChurnId, MsgEvent, Node, Proposal, RESOURCE_PROOF_DATA_SIZE,
@@ -20,7 +21,7 @@ use crate::node::{
     messages::{NodeMsgAuthorityUtils, WireMsgUtils},
     Error, Event, Result as RoutingResult,
 };
-use crate::init_test_logger;
+use sn_interface::elder_count;
 use sn_interface::messaging::{
     system::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState,
@@ -29,7 +30,6 @@ use sn_interface::messaging::{
     AuthorityProof, DstLocation, MsgId, MsgKind, MsgType, NodeAuth,
     SectionAuth as MsgKindSectionAuth, WireMsg,
 };
-use sn_interface::elder_count;
 #[cfg(feature = "test-utils")]
 use sn_interface::network_knowledge::test_utils::*;
 use sn_interface::network_knowledge::test_utils::{prove, section_signed};
