@@ -10,26 +10,19 @@ readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
 version = "0.1.0"
 
-# [[bench]]
-# name = "upload_bytes"
-# harness = false
-# required-features = ["test-utils"]
+[[bench]]
+name = "upload_bytes"
+harness = false
+required-features = ["test-utils"]
 
-# [[example]]
-# name = "client_files"
-# required-features = ["test-utils"]
+[[example]]
+name = "client_files"
+required-features = ["test-utils"]
 
-# [[example]]
-# name = "network_split"
-# required-features = ["test-utils"]
+[[example]]
+name = "network_split"
+required-features = ["test-utils"]
 
-# [[example]]
-# name = "routing_minimal"
-# required-features = ["test-utils"]
-
-# [[example]]
-# name = "routing_stress"
-# required-features = ["test-utils"]
 
 [features]
 default = []

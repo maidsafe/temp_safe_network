@@ -510,9 +510,9 @@ mod tests {
     use sn_interface::network_knowledge::{test_utils::*, NodeState};
 
     use crate::init_test_logger;
+    use sn_interface::elder_count;
     use sn_interface::messaging::SectionAuthorityProvider as SectionAuthorityProviderMsg;
     use sn_interface::types::PublicKey;
-    use sn_interface::elder_count;
 
     use assert_matches::assert_matches;
     use eyre::{eyre, Error, Result};

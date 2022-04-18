@@ -489,10 +489,10 @@ impl Node {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sn_interface::elder_count;
     use crate::node::{
         api::tests::create_comm, create_test_max_capacity_and_root_storage, MIN_ADULT_AGE,
     };
+    use sn_interface::elder_count;
     use sn_interface::network_knowledge::test_utils::section_signed;
 
     use crate::UsedSpace;
