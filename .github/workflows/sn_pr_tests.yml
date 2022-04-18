@@ -27,7 +27,6 @@ jobs:
       - e2e-split
       - unit
       - checks
-      - test-publish
       - lint
       - upload_event_file
     runs-on: ubuntu-latest
