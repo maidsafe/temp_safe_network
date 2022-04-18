@@ -2664,26 +2664,6 @@ dependencies = [
 
 [[package]]
 name = "proptest"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12e6c80c1139113c28ee4670dc50cc42915228b51f56a9e407f0ec60f966646f"
-dependencies = [
- "bit-set",
- "bitflags",
- "byteorder",
- "lazy_static",
- "num-traits",
- "quick-error 1.2.3",
- "rand 0.7.3",
- "rand_chacha 0.2.2",
- "rand_xorshift 0.2.0",
- "regex-syntax",
- "rusty-fork",
- "tempfile",
-]
-
-[[package]]
-name = "proptest"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e0d9cc07f18492d879586c92b485def06bc850da3118075cd45d50e9c95b0e5"
@@ -3295,7 +3275,7 @@ checksum = "73b4b750c782965c211b42f022f59af1fbceabdd026623714f104152f1ec149f"
 
 [[package]]
 name = "safe_network"
-version = "0.58.12"
+version = "0.58.13"
 dependencies = [
  "assert_matches",
  "backoff 0.4.0",
@@ -3326,7 +3306,7 @@ dependencies = [
  "multibase",
  "num_cpus",
  "priority-queue",
- "proptest 1.0.0",
+ "proptest",
  "qp2p",
  "rand 0.7.3",
  "rand_xorshift 0.2.0",
@@ -3656,7 +3636,7 @@ checksum = "f2dd574626839106c320a323308629dcb1acfc96e32a8cba364ddc61ac23ee83"
 
 [[package]]
 name = "sn_api"
-version = "0.58.1"
+version = "0.58.2"
 dependencies = [
  "anyhow",
  "assert_matches",
@@ -3675,7 +3655,7 @@ dependencies = [
  "mime_guess",
  "multibase",
  "pbkdf2",
- "proptest 0.10.1",
+ "proptest",
  "qjsonrpc",
  "rand 0.7.3",
  "rand_core 0.5.1",
@@ -3702,7 +3682,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.51.2"
+version = "0.51.3"
 dependencies = [
  "ansi_term 0.12.1",
  "assert_cmd",
@@ -3810,7 +3790,7 @@ dependencies = [
 
 [[package]]
 name = "sn_interface"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "backoff 0.4.0",
  "base64 0.13.0",
@@ -3834,7 +3814,7 @@ dependencies = [
  "multibase",
  "num_cpus",
  "priority-queue",
- "proptest 1.0.0",
+ "proptest",
  "qp2p",
  "rand 0.7.3",
  "rand_xorshift 0.2.0",
