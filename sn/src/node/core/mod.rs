@@ -722,10 +722,7 @@ impl Node {
             let membership_adults = m.current_section_members().len() - elders;
             let prefix = self.network_knowledge.prefix().await;
 
-            debug!(
-                "{:?}: {:?} Elders, {:?}~{:?} Adults.",
-                prefix, elders, adults, membership_adults
-            );
+            debug!("{prefix:?}: {elders} Elders, {adults}~{membership_adults} Adults.");
         } else {
             debug!("log_section_stats: No membership instance");
         };

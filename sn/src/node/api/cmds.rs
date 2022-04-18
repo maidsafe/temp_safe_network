@@ -46,7 +46,7 @@ pub(crate) enum Cmd {
     HandleAgreement { proposal: Proposal, sig: KeyedSig },
     /// Handle a new Node joining agreement.
     HandleNewNodeOnline(SectionAuth<NodeState>),
-    /// Handle a new Node joining agreement.
+    /// Handle a Node leaving agreement.
     HandleNodeLeft(SectionAuth<NodeState>),
     /// Handle agree on elders. This blocks node message processing until complete.
     HandleNewEldersAgreement { proposal: Proposal, sig: KeyedSig },

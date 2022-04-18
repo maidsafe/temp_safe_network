@@ -178,15 +178,14 @@ impl Node {
             //       elders excluded, this check here uses the empty set for the
             //       excluded_candidates which would prevent a dkg-retry from
             //       succeeding.
-            // TODO: we should run `self.promote_and_demote_elders()` on membership decision
             let dkg_sessions = self.promote_and_demote_elders(&BTreeSet::new()).await;
 
-            let agreeing_elders = BTreeSet::from_iter(signed_section_auth.elders().cloned());
+            let agreeing_elders = BTreeSet::from_iter(signed_section_auth.names());
             if dkg_sessions
                 .iter()
-                .all(|session| !session.elder_peers().eq(agreeing_elders.iter()))
+                .all(|session| !session.elder_names().eq(agreeing_elders.iter().copied()))
             {
-                // SectionInfo out of date, ignore.
+                warn!("SectionInfo out of date, ignore");
                 return Ok(vec![]);
             };
 
