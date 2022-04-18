@@ -152,7 +152,6 @@ jobs:
       - name: Build all test targets
         # all = all crates in workspace, lib/bins targets, with these features...
         run: cargo test --no-run --release --features=test-utils
-        working-directory: sn
 
       - name: Run sn_interface unit tests
         timeout-minutes: 15
