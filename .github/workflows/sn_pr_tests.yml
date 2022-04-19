@@ -406,7 +406,7 @@ jobs:
       - name: Run example app for file API against local network
         timeout-minutes: 10
         shell: bash
-        run: cd sn_node && cargo run  --release  --features=test-utils --example client_files
+        run: cd sn_client && cargo run  --release  --features=test-utils --example client_files
 
       - name: Are nodes still running...?
         shell: bash
