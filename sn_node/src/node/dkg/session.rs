@@ -467,8 +467,8 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sn_interface::elder_count;
     use crate::node::dkg::voter::DkgVoter;
+    use sn_interface::elder_count;
     use sn_interface::messaging::system::{MembershipState, NodeState};
     use sn_interface::messaging::MsgType;
     #[cfg(feature = "test-utils")]

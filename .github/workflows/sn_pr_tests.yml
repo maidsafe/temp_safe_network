@@ -81,47 +81,6 @@ jobs:
         if: steps.sn_changes.outputs.src == 'true'
         run: cargo clippy --all-targets --all-features
 
-  test-publish:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Test Publish
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - uses: dorny/paths-filter@v2
-        id: sn_changes
-        with:
-          filters: |
-            node:
-              - 'sn_node/src/**'
-            client:
-              - 'sn_client/src/**'
-            dysfunction:
-              - 'sn_dysfunction/src/**'
-            interface:
-              - 'sn_interface/src/**'
-
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      - name: Node Publish Dry Run
-        if: steps.sn_changes.outputs.node == 'true'
-        run: cd sn_node && cargo publish --dry-run
-
-      - name: Client Publish Dry Run
-        if: steps.sn_changes.outputs.client == 'true'
-        run: cd sn_client && cargo publish --dry-run
-
-      - name: Dysfunction Publish Dry Run
-        if: steps.sn_changes.outputs.dysfunction == 'true'
-        run: cd sn_dysfunction && cargo publish --dry-run
-
-      - name: Interface Publish Dry Run
-        if: steps.sn_changes.outputs.interface == 'true'
-        run: cd sn_interface && cargo publish --dry-run
 
   unit:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
