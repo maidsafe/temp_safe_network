@@ -91,9 +91,9 @@ jobs:
       ########################
 
       - name: Bench safe network
-        # Criterion outputs the actual bench results to stderr "|& tee putput.txt" takes stderr,
+        # Criterion outputs the actual bench results to stderr "2>&1 tee putput.txt" takes stderr,
         # passes to tee which displays it in the terminal and writes to output.txt
-        run: cargo criterion --features=test-utils -p sn_client --output-format bencher |& tee output.txt
+        run: cargo criterion --features=test-utils -p sn_client --output-format bencher 2>&1 | tee output.txt
 
       #################################
       ### Log any regression alerts ###
