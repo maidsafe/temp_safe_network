@@ -127,6 +127,62 @@ impl DysfunctionDetection {
         Ok(())
     }
 
+    /// Removes a pending_operation from the node liveness records
+    pub async fn request_operation_fulfilled(
+        &self,
+        node_id: &NodeIdentifier,
+        operation_id: OperationId,
+    ) -> bool {
+        trace!(
+            "Attempting to remove pending_operation {:?} op: {:?}",
+            node_id,
+            operation_id
+        );
+        let mut has_removed = false;
+
+        if let Some(entry) = self.unfulfilled_ops.get(node_id) {
+            let v = entry.value();
+
+            // only remove the first instance from the vec
+            v.write().await.retain(|x| {
+                if has_removed || x != &operation_id {
+                    true
+                } else {
+                    has_removed = true;
+                    false
+                }
+            });
+            if has_removed {
+                trace!(
+                    "Pending operation removed for node: {:?} op: {:?}",
+                    node_id,
+                    operation_id
+                );
+            } else {
+                trace!(
+                    "No Pending operation found for node: {:?} op: {:?}",
+                    node_id,
+                    operation_id
+                );
+            }
+        }
+        has_removed
+    }
+
+    /// Gets the unfulfilled operation IDs for a given node.
+    ///
+    /// This is for convenience, to wrap reading the concurrent data structure that stores the
+    /// values.
+    ///
+    /// If there are no unfulfilled operations tracked, an empty list will be returned.
+    pub async fn get_unfulfilled_ops(&self, adult: XorName) -> Vec<OperationId> {
+        if let Some(entry) = self.unfulfilled_ops.get(&adult) {
+            let val = entry.value().read().await;
+            return val.iter().copied().collect::<Vec<OperationId>>();
+        }
+        Vec::new()
+    }
+
     /// List all current tracked nodes
     pub async fn current_nodes(&self) -> Vec<XorName> {
         self.adults
@@ -336,6 +392,127 @@ mod tests {
         let current_nodes = dysfunctional_detection.current_nodes().await;
 
         assert_eq!(current_nodes.len(), 11);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn get_unfulfilled_ops_should_return_op_ids() -> Result<()> {
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+
+        dysfunctional_detection
+            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([1; 32])))
+            .await?;
+        dysfunctional_detection
+            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([2; 32])))
+            .await?;
+        dysfunctional_detection
+            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([3; 32])))
+            .await?;
+
+        let op_ids = dysfunctional_detection.get_unfulfilled_ops(adults[0]).await;
+
+        assert_eq!(3, op_ids.len());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn get_unfulfilled_ops_should_return_empty_list_for_node_with_no_ops() -> Result<()> {
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+
+        dysfunctional_detection
+            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([1; 32])))
+            .await?;
+        dysfunctional_detection
+            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([2; 32])))
+            .await?;
+        dysfunctional_detection
+            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([3; 32])))
+            .await?;
+
+        let op_ids = dysfunctional_detection.get_unfulfilled_ops(adults[1]).await;
+
+        assert_eq!(0, op_ids.len());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn request_operation_fulfilled_should_remove_pending_op() -> Result<()> {
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let op_id = [2; 32];
+
+        dysfunctional_detection
+            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([1; 32])))
+            .await?;
+        dysfunctional_detection
+            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([2; 32])))
+            .await?;
+        dysfunctional_detection
+            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([3; 32])))
+            .await?;
+
+        let has_removed = dysfunctional_detection
+            .request_operation_fulfilled(&adults[0], op_id)
+            .await;
+
+        assert!(has_removed);
+        let op_ids = dysfunctional_detection.get_unfulfilled_ops(adults[0]).await;
+        assert_eq!(2, op_ids.len());
+        assert_eq!([1; 32], op_ids[0]);
+        assert_eq!([3; 32], op_ids[1]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn request_operation_fulfilled_should_return_false_for_node_with_no_ops() -> Result<()> {
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let op_id = [2; 32];
+
+        dysfunctional_detection
+            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([1; 32])))
+            .await?;
+        dysfunctional_detection
+            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([2; 32])))
+            .await?;
+        dysfunctional_detection
+            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([3; 32])))
+            .await?;
+
+        let has_removed = dysfunctional_detection
+            .request_operation_fulfilled(&adults[1], op_id)
+            .await;
+
+        assert!(!has_removed);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn request_operation_fulfilled_should_return_false_when_op_id_not_tracked() -> Result<()>
+    {
+        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let op_id = [4; 32];
+
+        dysfunctional_detection
+            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([1; 32])))
+            .await?;
+        dysfunctional_detection
+            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([2; 32])))
+            .await?;
+        dysfunctional_detection
+            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([3; 32])))
+            .await?;
+
+        let has_removed = dysfunctional_detection
+            .request_operation_fulfilled(&adults[1], op_id)
+            .await;
+
+        assert!(!has_removed);
+        let op_ids = dysfunctional_detection.get_unfulfilled_ops(adults[0]).await;
+        assert_eq!(3, op_ids.len());
         Ok(())
     }
 }
