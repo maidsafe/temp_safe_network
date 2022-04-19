@@ -58,6 +58,7 @@ impl Node {
         let mut cmds = vec![];
 
         // Apply backpressure if needed.
+        #[cfg(feature = "back-pressure")]
         if let Some(load_report) = self.comm.tolerated_msgs_per_s(&sender).await {
             let msg_src = wire_msg.msg_kind().src();
             if !msg_src.is_end_user() {
@@ -425,6 +426,7 @@ impl Node {
                 trace!("Received Probe message from {}: {:?}", sender, msg_id);
                 Ok(vec![])
             }
+            #[cfg(feature = "back-pressure")]
             SystemMsg::BackPressure(msgs_per_s) => {
                 trace!(
                     "Handling msg: BackPressure with requested {} msgs/s, from {}: {:?}",

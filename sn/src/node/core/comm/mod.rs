@@ -6,12 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+#[cfg(feature = "back-pressure")]
 mod back_pressure;
+
 mod link;
 mod listener;
 mod peer_session;
 
+#[cfg(feature = "back-pressure")]
 use self::back_pressure::BackPressure;
+
 use self::link::Link;
 use self::listener::{ListenerEvent, MsgListener};
 use self::peer_session::{PeerSession, SendWatcher};
@@ -40,6 +44,7 @@ use tokio::{
 pub(crate) struct Comm {
     our_endpoint: Endpoint,
     msg_listener: MsgListener,
+    #[cfg(feature = "back-pressure")]
     back_pressure: BackPressure,
     sessions: Arc<RwLock<BTreeMap<Peer, PeerSession>>>,
 }
@@ -139,11 +144,13 @@ impl Comm {
         sessions.keys().into_iter().cloned().collect()
     }
 
+    #[cfg(feature = "back-pressure")]
     /// Returns our caller-specific tolerated msgs per s, if the value has changed significantly.
     pub(crate) async fn tolerated_msgs_per_s(&self, caller: &Peer) -> Option<f64> {
         self.back_pressure.tolerated_msgs_per_s(caller).await
     }
 
+    #[cfg(feature = "back-pressure")]
     /// Regulates comms with the specified peer
     /// according to the tolerated msgs per s provided by it.
     pub(crate) async fn regulate(&self, peer: &Peer, msgs_per_s: f64) {
@@ -524,26 +531,35 @@ fn setup_comms(
 
 #[tracing::instrument(skip_all)]
 fn setup(our_endpoint: Endpoint, receive_msg: mpsc::Sender<MsgEvent>) -> (Comm, MsgListener) {
+    #[cfg(feature = "back-pressure")]
     let back_pressure = BackPressure::new();
+
     let (add_connection, conn_receiver) = mpsc::channel(100);
+    #[cfg(feature = "back-pressure")]
     let (count_msg, msg_counter) = mpsc::channel(1000);
+    #[cfg(not(feature = "back-pressure"))]
+    let (count_msg, _msg_counter) = mpsc::channel(1000);
 
     let msg_listener = MsgListener::new(add_connection, receive_msg, count_msg);
 
     let comm = Comm {
         our_endpoint,
         msg_listener: msg_listener.clone(),
+        #[cfg(feature = "back-pressure")]
         back_pressure: back_pressure.clone(),
         sessions: Arc::new(RwLock::new(BTreeMap::new())),
     };
 
+    #[cfg(feature = "back-pressure")]
     let _ = task::spawn(count_msgs(back_pressure, msg_counter));
+
     let _ = task::spawn(receive_conns(comm.clone(), conn_receiver));
 
     (comm, msg_listener)
 }
 
 #[tracing::instrument(skip_all)]
+#[cfg(feature = "back-pressure")]
 async fn count_msgs(back_pressure: BackPressure, mut msg_counter: mpsc::Receiver<()>) {
     debug!("Entered msg counting listener loop.");
     while let Some(()) = msg_counter.recv().await {

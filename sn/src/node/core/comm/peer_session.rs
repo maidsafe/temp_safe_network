@@ -114,6 +114,7 @@ impl PeerSession {
         Ok(watcher)
     }
 
+    #[cfg(feature = "back-pressure")]
     pub(crate) async fn update_send_rate(&self, peer_desired_rate: f64) {
         *self.peer_desired_rate.write().await = peer_desired_rate;
     }
