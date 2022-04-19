@@ -3768,8 +3768,7 @@ version = "0.1.1"
 dependencies = [
  "dashmap",
  "eyre",
- "itertools 0.10.3",
- "proptest 1.0.0",
+ "proptest",
  "rand 0.8.5",
  "thiserror",
  "tokio",

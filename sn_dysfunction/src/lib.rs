@@ -43,11 +43,8 @@
 #[macro_use]
 extern crate tracing;
 
-mod connections;
 mod detection;
 mod error;
-mod network_knowledge;
-mod operations;
 
 use xor_name::XorName;
 
