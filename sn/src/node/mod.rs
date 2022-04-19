@@ -18,6 +18,7 @@ mod dkg;
 // mod ed25519;
 mod error;
 mod logging;
+pub(crate) mod membership;
 mod messages;
 
 use sn_interface::types::Peer;

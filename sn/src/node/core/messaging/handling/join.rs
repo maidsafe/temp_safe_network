@@ -10,11 +10,11 @@ use crate::elder_count;
 use crate::node::{
     api::cmds::Cmd,
     core::{relocation::RelocateDetailsUtils, Node},
-    Error, Result,
+    Result,
 };
 use sn_interface::messaging::system::{
     JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
-    JoinResponse, MembershipState, SystemMsg,
+    JoinResponse, MembershipState, NodeState, SystemMsg,
 };
 use sn_interface::network_knowledge::{SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE};
 use sn_interface::types::{log_markers::LogMarker, Peer};
@@ -33,43 +33,24 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         debug!("Received {:?} from {}", join_request, peer);
 
-        // To avoid existing elders hanving different view of section members,
-        // JoinRequest for resource_proofing and aggregated NodeState
-        // shall be handled immediately without any semaphore or age check.
-
-        // If the joining node has aggregated shares from enough elders,
-        // verify the produced auth and accept it into the network.
-        if let Some(response) = join_request.aggregated {
-            if response.verify(&self.section_chain().await) {
-                info!("Handling Online agreement of {:?}", peer);
-                return Ok(vec![Cmd::HandleNewNodeOnline(response)]);
-            }
-        }
-
         // Require resource signed if joining as a new node.
         if let Some(response) = join_request.resource_proof_response {
             if !self
                 .validate_resource_proof_response(&peer.name(), response)
                 .await
             {
-                debug!(
-                    "Ignoring JoinRequest from {} - invalid resource signed response",
-                    peer
-                );
+                debug!("Ignoring JoinRequest from {peer} - invalid resource signed response");
                 return Ok(vec![]);
-            } else {
-                return Ok(vec![Cmd::SendAcceptedOnlineShare {
-                    peer,
-                    previous_name: None,
-                }]);
             }
-        }
 
-        let _permit = self
-            .current_joins_semaphore
-            .acquire()
-            .await
-            .map_err(|_| Error::PermitAcquisitionFailed)?;
+            let node_state = NodeState {
+                name: peer.name(),
+                addr: peer.addr(),
+                state: MembershipState::Joined,
+                previous_name: None,
+            };
+            return self.propose_membership_change(node_state).await;
+        }
 
         let our_section_key = self.network_knowledge.section_key().await;
         let section_key_matches = join_request.section_key == our_section_key;
@@ -86,21 +67,9 @@ impl Node {
             return Ok(vec![]);
         }
 
-        // Check if we already have this peer in our section
-        if self.network_knowledge.is_section_member(&peer.name()).await {
-            debug!(
-                "Ignoring JoinRequest from {} - already member of our section.",
-                peer
-            );
-            return Ok(vec![]);
-        }
-
         let our_prefix = self.network_knowledge.prefix().await;
         if !our_prefix.matches(&peer.name()) {
-            debug!(
-                "Redirecting JoinRequest from {} - name doesn't match our prefix {:?}.",
-                peer, our_prefix
-            );
+            debug!("Redirecting JoinRequest from {peer} - name doesn't match our prefix {our_prefix:?}.");
 
             let retry_sap = self.matching_section(&peer.name()).await?;
 
@@ -241,24 +210,14 @@ impl Node {
         join_request: JoinAsRelocatedRequest,
         known_keys: Vec<BlsPublicKey>,
     ) -> Result<Vec<Cmd>> {
-        let _permit = self
-            .current_joins_semaphore
-            .acquire()
-            .await
-            .map_err(|_| Error::PermitAcquisitionFailed)?;
-
-        debug!(
-            "Received JoinAsRelocatedRequest {:?} from {}",
-            join_request, peer
-        );
+        debug!("Received JoinAsRelocatedRequest {join_request:?} from {peer}",);
 
         let our_prefix = self.network_knowledge.prefix().await;
         if !our_prefix.matches(&peer.name())
             || join_request.section_key != self.network_knowledge.section_key().await
         {
             debug!(
-                "JoinAsRelocatedRequest from {} - name doesn't match our prefix {:?}.",
-                peer, our_prefix
+                "JoinAsRelocatedRequest from {peer} - name doesn't match our prefix {our_prefix:?}."
             );
 
             let node_msg =
@@ -268,84 +227,37 @@ impl Node {
 
             trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);
 
-            trace!("Sending {:?} to {}", node_msg, peer);
+            trace!("Sending {node_msg:?} to {peer}");
             return Ok(vec![
                 self.send_direct_msg(peer, node_msg, self.network_knowledge.section_key().await)
                     .await?,
             ]);
         }
 
-        if self.network_knowledge.is_section_member(&peer.name()).await {
-            debug!(
-                "Ignoring JoinAsRelocatedRequest from {} - already member of our section.",
-                peer
-            );
-            return Ok(vec![]);
-        }
-
         let relocate_details = if let MembershipState::Relocated(ref details) =
             join_request.relocate_proof.value.state
         {
             // Check for signatures and trust of the relocate_proof
-            let is_valid_sig = join_request.relocate_proof.self_verify();
-            let is_key_unknown = !known_keys
-                .iter()
-                .any(|key| *key == join_request.relocate_proof.sig.public_key);
-
-            if !is_valid_sig || is_key_unknown {
-                debug!(
-                    "Ignoring JoinAsRelocatedRequest from {} - invalid signature or untrusted src.",
-                    peer
-                );
+            if !join_request.relocate_proof.self_verify() {
+                debug!("Ignoring JoinAsRelocatedRequest from {peer} - invalid sig.");
+                return Ok(vec![]);
+            }
+            if !known_keys.contains(&join_request.relocate_proof.sig.public_key) {
+                debug!("Ignoring JoinAsRelocatedRequest from {peer} - untrusted src.");
                 return Ok(vec![]);
             }
 
             details
         } else {
             debug!(
-                "Ignoring JoinAsRelocatedRequest from {} with invalid relocate proof state: {:?}",
-                peer, join_request.relocate_proof.value.state
+                "Ignoring JoinAsRelocatedRequest from {peer} with invalid relocate proof state: {:?}",
+                join_request.relocate_proof.value.state
             );
             return Ok(vec![]);
         };
 
         if !relocate_details.verify_identity(&peer.name(), &join_request.signature_over_new_name) {
-            debug!(
-                "Ignoring JoinAsRelocatedRequest from {} - invalid node name signature.",
-                peer
-            );
-            return Ok(vec![]);
-        }
-
-        let prefix = self.network_knowledge.prefix().await;
-        if !prefix.matches(&relocate_details.dst) {
-            debug!(
-                "Ignoring JoinAsRelocatedRequest from {} - destination {} doesn't match \
-                         our prefix {:?}.",
-                peer, relocate_details.dst, prefix
-            );
-            return Ok(vec![]);
-        }
-
-        // Requires the node name matches the age.
-        let age = relocate_details.age;
-        if age != peer.age() {
-            debug!(
-                "Ignoring JoinAsRelocatedRequest from {} - relocation age ({}) doesn't match peer's age ({}).",
-                peer, age, peer.age(),
-            );
-            return Ok(vec![]);
-        }
-
-        if self
-            .network_knowledge
-            .is_relocated_to_our_section(&relocate_details.previous_name)
-            .await
-        {
-            debug!(
-                "Ignoring JoinAsRelocatedRequest from {} - original node {:?} already relocated to us.",
-                peer, relocate_details.previous_name
-            );
+            debug!("Ignoring JoinAsRelocatedRequest from {peer} - invalid node name signature.");
             return Ok(vec![]);
         }
 
@@ -363,9 +275,7 @@ impl Node {
             ]);
         };
 
-        Ok(vec![Cmd::SendAcceptedOnlineShare {
-            peer,
-            previous_name: Some(relocate_details.previous_name),
-        }])
+        self.propose_membership_change(join_request.relocate_proof.value)
+            .await
     }
 }

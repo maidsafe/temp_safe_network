@@ -7,34 +7,79 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{KeyedSig, NodeState};
-use crate::messaging::SectionAuthorityProvider;
+use crate::{messaging::SectionAuthorityProvider, types::Peer};
 use ed25519_dalek::{PublicKey, Signature};
-use hex_fmt::HexFmt;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, collections::BTreeSet, fmt, ops::Deref};
+use std::{
+    borrow::Borrow,
+    collections::{BTreeMap, BTreeSet},
+    net::SocketAddr,
+    ops::Deref,
+};
+use tiny_keccak::{Hasher, Sha3};
 use xor_name::{Prefix, XorName};
 
 /// SHA3-256 hash digest.
 type Digest256 = [u8; 32];
 
 /// Unique identifier of a DKG session.
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, custom_debug::Debug)]
+#[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize, custom_debug::Debug)]
 pub struct DkgSessionId {
-    /// A hash of the peers and prefix of the specific session.
-    #[debug(with = "Self::fmt_hash")]
-    pub hash: Digest256,
+    /// Prefix of the session we are elder candidates for
+    pub prefix: Prefix,
+    /// Other Elders in this dkg session
+    pub elders: BTreeMap<XorName, SocketAddr>,
     /// The generation, as in the length of the section chain main branch.
     pub generation: u64,
+    /// The bootstrap members for the next Membership instance.
+    pub bootstrap_members: BTreeSet<NodeState>,
 }
 
 impl DkgSessionId {
-    fn fmt_hash(hash: &Digest256, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:0.10}", HexFmt(hash))
+    pub fn hash(&self) -> Digest256 {
+        let mut hasher = Sha3::v256();
+        self.hash_update(&mut hasher);
+        let mut hash = Digest256::default();
+        hasher.finalize(&mut hash);
+        hash
+    }
+
+    pub fn hash_update(&self, hasher: &mut Sha3) {
+        hasher.update(&self.prefix.name());
+
+        for elder in self.elder_names() {
+            hasher.update(&elder);
+        }
+
+        hasher.update(&self.generation.to_le_bytes());
+
+        for member in self.bootstrap_members.iter() {
+            hasher.update(&member.name);
+        }
+    }
+
+    pub fn elder_names(&self) -> impl Iterator<Item = XorName> + '_ {
+        self.elders.keys().copied()
+    }
+
+    pub fn elder_peers(&self) -> impl Iterator<Item = Peer> + '_ {
+        self.elders
+            .iter()
+            .map(|(name, addr)| Peer::new(*name, *addr))
+    }
+
+    pub fn elder_index(&self, elder: XorName) -> Option<usize> {
+        self.elder_names().sorted().position(|p| p == elder)
+    }
+
+    pub fn contains_elder(&self, elder: XorName) -> bool {
+        self.elder_names().any(|e| e == elder)
     }
 }
 
 /// One signed failure for a DKG round by a given PublicKey
-#[derive(Copy, Clone, Eq, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 pub struct DkgFailureSig {
     #[allow(missing_docs)]
     #[debug(with = "crate::types::PublicKey::fmt_ed25519")]
@@ -42,15 +87,29 @@ pub struct DkgFailureSig {
     #[allow(missing_docs)]
     #[debug(with = "crate::types::Signature::fmt_ed25519")]
     pub signature: Signature,
+    #[allow(missing_docs)]
+    pub session_id: DkgSessionId,
 }
 
 /// Dkg failure info for a round
-#[derive(Default, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct DkgFailureSigSet {
     #[allow(missing_docs)]
     pub sigs: Vec<DkgFailureSig>,
     #[allow(missing_docs)]
     pub failed_participants: BTreeSet<XorName>,
+    #[allow(missing_docs)]
+    pub session_id: DkgSessionId,
+}
+
+impl From<DkgSessionId> for DkgFailureSigSet {
+    fn from(session_id: DkgSessionId) -> Self {
+        Self {
+            session_id,
+            sigs: Default::default(),
+            failed_participants: Default::default(),
+        }
+    }
 }
 
 /// A value together with the signature that it was agreed on by the majority of the section elders.

@@ -217,6 +217,7 @@ mod tests {
                 .take(elder_count())
                 .cloned(),
             Prefix::default(),
+            peers.iter().map(|p| NodeState::joined(*p, None)),
             sk_set.public_keys(),
         );
         let section_auth = section_signed(sk, section_auth)?;

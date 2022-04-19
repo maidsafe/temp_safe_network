@@ -16,9 +16,7 @@ use sn_interface::messaging::{
     system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
     DstLocation, WireMsg,
 };
-use sn_interface::network_knowledge::{
-    ElderCandidates, NodeInfo, SectionAuthorityProvider, SectionKeyShare,
-};
+use sn_interface::network_knowledge::{NodeInfo, SectionAuthorityProvider, SectionKeyShare};
 use sn_interface::types::{keys::ed25519, log_markers::LogMarker, Peer, PublicKey};
 
 use bls::PublicKey as BlsPublicKey;
@@ -38,7 +36,7 @@ const DKG_PROGRESS_INTERVAL: Duration = Duration::from_secs(6);
 
 // Data for a DKG participant.
 pub(crate) struct Session {
-    pub(crate) elder_candidates: ElderCandidates,
+    pub(crate) session_id: DkgSessionId,
     pub(crate) participant_index: usize,
     pub(crate) key_gen: KeyGen,
     pub(crate) timer_token: u64,
@@ -67,7 +65,6 @@ impl Session {
         &mut self,
         node: &NodeInfo,
         message: DkgMessage,
-        session_id: &DkgSessionId,
         sender: XorName,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
@@ -93,7 +90,7 @@ impl Session {
                 message
             );
             let node_msg = SystemMsg::DkgNotReady {
-                session_id: *session_id,
+                session_id: self.session_id.clone(),
                 message,
             };
             let wire_msg = WireMsg::single_src(
@@ -113,7 +110,7 @@ impl Session {
         } else {
             warn!(
                 "Failed to fetch peer of {:?} among {:?}",
-                target, self.elder_candidates
+                target, self.session_id
             );
         }
         Ok(cmds)
@@ -123,7 +120,6 @@ impl Session {
         &mut self,
         node: &NodeInfo,
         sender: XorName,
-        session_id: &DkgSessionId,
         message: DkgMessage,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
@@ -137,24 +133,20 @@ impl Session {
                 // Only a valid DkgMessage, which results in some responses, shall reset the ticker.
                 let add_reset_timer = !responses.is_empty();
 
-                cmds.extend(self.broadcast(node, session_id, responses, section_pk)?);
+                cmds.extend(self.broadcast(node, responses, section_pk)?);
 
                 if add_reset_timer {
                     cmds.push(self.reset_timer());
                 }
-                cmds.extend(self.check(node, session_id, section_pk)?);
+                cmds.extend(self.check(node, section_pk)?);
             }
             Err(DkgError::UnexpectedPhase { expected, actual })
                 if is_dkg_behind(expected, actual) =>
             {
-                cmds.extend(
-                    self.send_dkg_not_ready(node, message, session_id, sender, section_pk)?,
-                );
+                cmds.extend(self.send_dkg_not_ready(node, message, sender, section_pk)?);
             }
             Err(DkgError::MissingPart) => {
-                cmds.extend(
-                    self.send_dkg_not_ready(node, message, session_id, sender, section_pk)?,
-                );
+                cmds.extend(self.send_dkg_not_ready(node, message, sender, section_pk)?);
             }
             Err(error) => {
                 error!("Error processing DKG message: {:?}", error);
@@ -165,24 +157,23 @@ impl Session {
     }
 
     fn recipients(&self) -> Vec<Peer> {
-        self.elder_candidates
-            .elders()
+        self.session_id
+            .elder_peers()
             .enumerate()
-            .filter_map(|(index, peer)| (index != self.participant_index).then(|| *peer))
+            .filter_map(|(index, peer)| (index != self.participant_index).then(|| peer))
             .collect()
     }
 
     fn peers(&self) -> BTreeMap<XorName, Peer> {
-        self.elder_candidates
-            .elders()
-            .map(|peer| (peer.name(), *peer))
+        self.session_id
+            .elder_peers()
+            .map(|p| (p.name(), p))
             .collect()
     }
 
     pub(crate) fn broadcast(
         &mut self,
         node: &NodeInfo,
-        session_id: &DkgSessionId,
         messages: Vec<MessageAndTarget>,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
@@ -197,22 +188,22 @@ impl Session {
         let peers = self.peers();
         for (target, message) in messages {
             if target == node.name() {
-                match self.process_msg(node, node.name(), session_id, message.clone(), section_pk) {
+                match self.process_msg(node, node.name(), message.clone(), section_pk) {
                     Ok(result) => cmds.extend(result),
                     Err(err) => error!(
                         "Within session {:?}, failed to process DkgMessage {:?} with error {:?}",
-                        session_id, message, err
+                        self.session_id, message, err
                     ),
                 }
             } else if let Some(peer) = peers.get(&target) {
                 trace!(
                     "DKG sending {:?} - {:?} to {:?}",
                     message,
-                    session_id,
+                    self.session_id,
                     target
                 );
                 let node_msg = SystemMsg::DkgMessage {
-                    session_id: *session_id,
+                    session_id: self.session_id.clone(),
                     message: message.clone(),
                 };
                 let wire_msg = WireMsg::single_src(
@@ -246,41 +237,39 @@ impl Session {
     pub(crate) fn handle_timeout(
         &mut self,
         node: &NodeInfo,
-        session_id: &DkgSessionId,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
         if self.complete {
             return Ok(vec![]);
         }
 
-        trace!("DKG progressing for {:?}", self.elder_candidates);
+        trace!("DKG progressing for {:?}", self.session_id);
 
         match self.key_gen.timed_phase_transition(&mut rand::thread_rng()) {
             Ok(messages) => {
                 let mut cmds = vec![];
-                cmds.extend(self.broadcast(node, session_id, messages, section_pk)?);
+                cmds.extend(self.broadcast(node, messages, section_pk)?);
                 cmds.push(self.reset_timer());
-                cmds.extend(self.check(node, session_id, section_pk)?);
+                cmds.extend(self.check(node, section_pk)?);
                 Ok(cmds)
             }
             Err(error) => {
-                trace!("DKG failed for {:?}: {}", self.elder_candidates, error);
+                trace!("DKG failed for {:?}: {}", self.session_id, error);
                 let failed_participants = self.key_gen.possible_blockers();
 
-                self.report_failure(node, session_id, failed_participants, section_pk)
+                self.report_failure(node, failed_participants, section_pk)
             }
         }
     }
 
     // Check whether a key generator is finalized to give a DKG outcome.
-    fn check(
-        &mut self,
-        node: &NodeInfo,
-        session_id: &DkgSessionId,
-        section_pk: BlsPublicKey,
-    ) -> Result<Vec<Cmd>> {
+    fn check(&mut self, node: &NodeInfo, section_pk: BlsPublicKey) -> Result<Vec<Cmd>> {
         if self.complete {
-            trace!("{} {:?}", LogMarker::DkgSessionAlreadyCompleted, session_id);
+            trace!(
+                "{} {:?}",
+                LogMarker::DkgSessionAlreadyCompleted,
+                self.session_id
+            );
             return Ok(vec![]);
         }
 
@@ -299,21 +288,21 @@ impl Session {
         if !participants
             .iter()
             .copied()
-            .eq(self.elder_candidates.names())
+            .eq(self.session_id.elder_names())
         {
             trace!(
                 "DKG failed due to unexpected participants for {:?}: {:?}",
-                self.elder_candidates,
+                self.session_id,
                 participants.iter().format(", ")
             );
 
             let failed_participants: BTreeSet<_> = self
-                .elder_candidates
-                .names()
+                .session_id
+                .elder_names()
                 .filter(|elder| !participants.contains(elder))
                 .collect();
 
-            return self.report_failure(node, session_id, failed_participants, section_pk);
+            return self.report_failure(node, failed_participants, section_pk);
         }
 
         // Corrupted DKG outcome. This can happen when a DKG session is restarted using the same set
@@ -327,21 +316,21 @@ impl Session {
         {
             trace!(
                 "DKG failed due to corrupted outcome for {:?}",
-                self.elder_candidates
+                self.session_id
             );
-            return self.report_failure(node, session_id, BTreeSet::new(), section_pk);
+            return self.report_failure(node, BTreeSet::new(), section_pk);
         }
 
         trace!(
             "{} {:?}: {:?}",
             LogMarker::DkgSessionComplete,
-            self.elder_candidates,
+            self.session_id,
             outcome.public_key_set.public_key()
         );
 
         self.complete = true;
-        let section_auth = SectionAuthorityProvider::from_elder_candidates(
-            self.elder_candidates.clone(),
+        let section_auth = SectionAuthorityProvider::from_dkg_session(
+            self.session_id.clone(),
             outcome.public_key_set.clone(),
         );
 
@@ -360,13 +349,12 @@ impl Session {
     fn report_failure(
         &mut self,
         node: &NodeInfo,
-        session_id: &DkgSessionId,
         failed_participants: BTreeSet<XorName>,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
-        let sig = DkgFailureSig::new(&node.keypair, &failed_participants, session_id);
+        let sig = DkgFailureSig::new(&node.keypair, &failed_participants, self.session_id.clone());
 
-        if !self.failures.insert(sig, &failed_participants) {
+        if !self.failures.insert(sig.clone(), &failed_participants) {
             return Ok(vec![]);
         }
 
@@ -375,7 +363,7 @@ impl Session {
             .into_iter()
             .chain(iter::once({
                 let node_msg = SystemMsg::DkgFailureObservation {
-                    session_id: *session_id,
+                    session_id: self.session_id.clone(),
                     sig,
                     failed_participants,
                 };
@@ -405,10 +393,8 @@ impl Session {
         failed_participants: &BTreeSet<XorName>,
         signed: DkgFailureSig,
     ) -> Option<Cmd> {
-        if !self
-            .elder_candidates
-            .contains(&ed25519::name(&signed.public_key))
-        {
+        let signer = ed25519::name(&signed.public_key);
+        if !self.session_id.contains_elder(signer) {
             return None;
         }
 
@@ -430,7 +416,6 @@ impl Session {
     pub(crate) fn handle_dkg_history(
         &mut self,
         node: &NodeInfo,
-        session_id: DkgSessionId,
         msg_history: Vec<DkgMessage>,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
@@ -440,12 +425,12 @@ impl Session {
             .handle_pre_session_messages(&mut rand::thread_rng(), msg_history);
         let add_reset_timer = !responses.is_empty();
 
-        cmds.extend(self.broadcast(node, &session_id, responses, section_pk)?);
+        cmds.extend(self.broadcast(node, responses, section_pk)?);
 
         if add_reset_timer {
             cmds.push(self.reset_timer());
         }
-        cmds.extend(self.check(node, &session_id, section_pk)?);
+        cmds.extend(self.check(node, section_pk)?);
 
         if !unhandleable.is_empty() {
             trace!(
@@ -458,10 +443,13 @@ impl Session {
     }
 
     fn check_failure_agreement(&mut self) -> Option<Cmd> {
-        if self.failures.has_agreement(&self.elder_candidates) {
+        if self.failures.has_agreement(&self.session_id) {
             self.complete = true;
 
-            Some(Cmd::HandleDkgFailure(mem::take(&mut self.failures)))
+            Some(Cmd::HandleDkgFailure(mem::replace(
+                &mut self.failures,
+                DkgFailureSigSet::from(self.session_id.clone()),
+            )))
         } else {
             None
         }
@@ -480,10 +468,12 @@ impl Session {
 mod tests {
     use super::*;
     use crate::elder_count;
-    use crate::node::{dkg::voter::DkgVoter, dkg::DkgSessionIdUtils};
+    use crate::node::dkg::voter::DkgVoter;
+    use sn_interface::messaging::system::{MembershipState, NodeState};
     use sn_interface::messaging::MsgType;
     #[cfg(feature = "test-utils")]
-    use sn_interface::network_knowledge::{test_utils::gen_addr, NodeInfo, MIN_ADULT_AGE};
+    use sn_interface::network_knowledge::test_utils::gen_addr;
+    use sn_interface::network_knowledge::{NodeInfo, MIN_ADULT_AGE};
 
     #[cfg(feature = "test-utils")]
     use sn_interface::types::keys::ed25519::{self, proptesting::arbitrary_keypair};
@@ -493,26 +483,37 @@ mod tests {
     use itertools::Itertools;
     use proptest::{collection::SizeRange, prelude::*};
     use rand::{rngs::SmallRng, Rng, SeedableRng};
-    use std::{collections::HashMap, iter, net::SocketAddr};
+    use std::{collections::HashMap, net::SocketAddr};
     use xor_name::Prefix;
 
     #[tokio::test]
+    #[cfg(feature = "test-utils")]
     async fn single_participant() -> Result<()> {
         // If there is only one participant, the DKG should complete immediately.
 
         let voter = DkgVoter::default();
         let section_pk = bls::SecretKey::random().public_key();
+        let prefix = Prefix::default();
 
         let node = NodeInfo::new(
-            ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE),
+            ed25519::gen_keypair(&prefix.range_inclusive(), MIN_ADULT_AGE),
             gen_addr(),
         );
-        let elder_candidates = ElderCandidates::new(Prefix::default(), iter::once(node.peer()));
-        let session_id = DkgSessionId::new(&elder_candidates, 0);
+        let elders = BTreeMap::from_iter([(node.name(), node.addr)]);
+        let bootstrap_members = BTreeSet::from_iter([NodeState {
+            name: node.peer().name(),
+            addr: node.peer().addr(),
+            state: MembershipState::Joined,
+            previous_name: None,
+        }]);
+        let session_id = DkgSessionId {
+            prefix,
+            elders,
+            generation: 0,
+            bootstrap_members,
+        };
 
-        let cmds = voter
-            .start(&node, session_id, elder_candidates, section_pk)
-            .await?;
+        let cmds = voter.start(&node, session_id, section_pk).await?;
         assert_matches!(&cmds[..], &[Cmd::HandleDkgOutcome { .. }]);
 
         Ok(())
@@ -523,6 +524,7 @@ mod tests {
         // Expect the session to successfully complete without timed transitions.
         // NOTE: `seed` is for seeding the rng that randomizes the message order.
         #[test]
+        #[cfg(feature = "test-utils")]
         fn proptest_full_participation(nodes in arbitrary_elder_nodes(), seed in any::<u64>()) {
             if let Err(error) = proptest_full_participation_impl(nodes, seed) {
                 panic!("{}", error);
@@ -536,9 +538,16 @@ mod tests {
         let section_pk = bls::SecretKey::random().public_key();
         let mut messages = Vec::new();
 
-        let elder_candidates =
-            ElderCandidates::new(Prefix::default(), nodes.iter().map(NodeInfo::peer));
-        let session_id = DkgSessionId::new(&elder_candidates, 0);
+        let session_id = DkgSessionId {
+            prefix: Prefix::default(),
+            elders: BTreeMap::from_iter(nodes.iter().map(|n| (n.name(), n.addr))),
+            generation: 0,
+            bootstrap_members: BTreeSet::from_iter(
+                nodes
+                    .iter()
+                    .map(|n| NodeState::joined(n.name(), n.addr, None)),
+            ),
+        };
 
         let mut actors: HashMap<_, _> = nodes
             .into_iter()
@@ -548,8 +557,7 @@ mod tests {
         for actor in actors.values_mut() {
             let cmds = futures::executor::block_on(actor.voter.start(
                 &actor.node,
-                session_id,
-                elder_candidates.clone(),
+                session_id.clone(),
                 section_pk,
             ))?;
 
@@ -628,7 +636,7 @@ mod tests {
                             },
                         ..
                     } => {
-                        assert_eq!(session_id, *expected_dkg_key);
+                        assert_eq!(session_id.hash(), expected_dkg_key.hash());
                         Ok(recipients
                             .into_iter()
                             .map(|peer| (peer.addr(), message.clone()))
@@ -652,11 +660,13 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "test-utils")]
     fn arbitrary_elder_nodes() -> impl Strategy<Value = Vec<NodeInfo>> {
         arbitrary_unique_nodes(2..=elder_count())
     }
 
     // Generate Vec<Node> where no two nodes have the same name.
+    #[cfg(feature = "test-utils")]
     pub(crate) fn arbitrary_unique_nodes(
         count: impl Into<SizeRange>,
     ) -> impl Strategy<Value = Vec<NodeInfo>> {

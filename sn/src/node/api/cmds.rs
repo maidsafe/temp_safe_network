@@ -46,6 +46,8 @@ pub(crate) enum Cmd {
     HandleAgreement { proposal: Proposal, sig: KeyedSig },
     /// Handle a new Node joining agreement.
     HandleNewNodeOnline(SectionAuth<NodeState>),
+    /// Handle a Node leaving agreement.
+    HandleNodeLeft(SectionAuth<NodeState>),
     /// Handle agree on elders. This blocks node message processing until complete.
     HandleNewEldersAgreement { proposal: Proposal, sig: KeyedSig },
     /// Handle the outcome of a DKG session where we are one of the participants (that is, one of
@@ -79,12 +81,6 @@ pub(crate) enum Cmd {
     /// Schedule a timeout after the given duration. When the timeout expires, a `HandleTimeout`
     /// cmd is raised. The token is used to identify the timeout.
     ScheduleTimeout { duration: Duration, token: u64 },
-    /// Test peer's connectivity
-    SendAcceptedOnlineShare {
-        peer: Peer,
-        // Previous name if relocated.
-        previous_name: Option<XorName>,
-    },
     /// Proposes peers as offline
     ProposeOffline(BTreeSet<XorName>),
     /// Send a signal to all Elders to
@@ -109,6 +105,7 @@ impl fmt::Display for Cmd {
             Cmd::HandleAgreement { .. } => write!(f, "HandleAgreement"),
             Cmd::HandleNewEldersAgreement { .. } => write!(f, "HandleNewEldersAgreement"),
             Cmd::HandleNewNodeOnline(_) => write!(f, "HandleNewNodeOnline"),
+            Cmd::HandleNodeLeft(_) => write!(f, "HandleNodeLeft"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Cmd::HandleDkgFailure(_) => write!(f, "HandleDkgFailure"),
             #[cfg(not(feature = "test-utils"))]
@@ -129,7 +126,6 @@ impl fmt::Display for Cmd {
             Cmd::SendMsgDeliveryGroup { wire_msg, .. } => {
                 write!(f, "SendMsgDeliveryGroup {:?}", wire_msg.msg_id())
             }
-            Cmd::SendAcceptedOnlineShare { .. } => write!(f, "SendAcceptedOnlineShare"),
             Cmd::ProposeOffline(_) => write!(f, "ProposeOffline"),
             Cmd::StartConnectivityTest(_) => write!(f, "StartConnectivityTest"),
             Cmd::TestConnectivity(_) => write!(f, "TestConnectivity"),

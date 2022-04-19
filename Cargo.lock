@@ -3321,6 +3321,7 @@ dependencies = [
  "serde_json",
  "signature",
  "sled",
+ "sn_consensus",
  "sn_dysfunction",
  "sn_interface",
  "sn_launch_tool",
@@ -3745,6 +3746,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "sn_consensus"
+version = "1.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c2cd6526c1cf5ab2926afebaa4c5b660bb5914382704c42c5c9e07a4f5ed4e3"
+dependencies = [
+ "bincode",
+ "blsttc 3.4.0",
+ "log",
+ "rand 0.7.3",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "sn_dbc"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3812,6 +3827,7 @@ dependencies = [
  "serde_json",
  "signature",
  "sled",
+ "sn_consensus",
  "strum",
  "strum_macros",
  "tempfile",

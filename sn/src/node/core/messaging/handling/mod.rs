@@ -10,6 +10,8 @@ mod agreement;
 mod anti_entropy;
 mod dkg;
 mod join;
+mod left;
+mod membership;
 mod proposals;
 mod relocation;
 mod resource_proof;
@@ -28,10 +30,7 @@ use crate::node::{
 use sn_interface::messaging::{
     data::{ServiceMsg, StorageLevel},
     signature_aggregator::Error as AggregatorError,
-    system::{
-        JoinRequest, JoinResponse, NodeCmd, NodeEvent, NodeQuery, Proposal as ProposalMsg,
-        SectionAuth as SystemSectionAuth, SystemMsg,
-    },
+    system::{JoinResponse, NodeCmd, NodeEvent, NodeQuery, Proposal as ProposalMsg, SystemMsg},
     AuthorityProof, DstLocation, MsgId, MsgType, NodeMsgAuthority, SectionAuth, WireMsg,
 };
 use sn_interface::network_knowledge::NetworkKnowledge;
@@ -59,6 +58,7 @@ impl Node {
         let mut cmds = vec![];
 
         // Apply backpressure if needed.
+        #[cfg(feature = "back-pressure")]
         if let Some(load_report) = self.comm.tolerated_msgs_per_s(&sender).await {
             let msg_src = wire_msg.msg_kind().src();
             if !msg_src.is_end_user() {
@@ -426,6 +426,7 @@ impl Node {
                 trace!("Received Probe message from {}: {:?}", sender, msg_id);
                 Ok(vec![])
             }
+            #[cfg(feature = "back-pressure")]
             SystemMsg::BackPressure(msgs_per_s) => {
                 trace!(
                     "Handling msg: BackPressure with requested {} msgs/s, from {}: {:?}",
@@ -440,144 +441,70 @@ impl Node {
             // The AcceptedOnlineShare for relocation will be received here.
             SystemMsg::JoinResponse(join_response) => {
                 match *join_response {
-                    JoinResponse::ApprovalShare {
-                        node_state,
-                        sig_share,
+                    JoinResponse::Approval {
+                        section_auth,
                         section_chain,
-                        members,
                         ..
                     } => {
-                        let serialized_details = bincode::serialize(&node_state)?;
-
                         info!(
                             "Relocation: Aggregating received ApprovalShare from {:?}",
                             sender
                         );
-                        match self
-                            .proposal_aggregator
-                            .add(&serialized_details, sig_share.clone())
-                            .await
+                        info!("Relocation: Successfully aggregated ApprovalShares for joining the network");
+
+                        if let Some(ref mut joining_as_relocated) =
+                            *self.relocate_state.write().await
                         {
-                            Ok(sig) => {
-                                info!("Relocation: Successfully aggregated ApprovalShares for joining the network");
-                                let mut cmds = vec![];
+                            let new_node = joining_as_relocated.node.clone();
+                            let new_name = new_node.name();
+                            let previous_name = self.info.read().await.name();
+                            let new_keypair = new_node.keypair.clone();
 
-                                if let Some(ref mut joining_as_relocated) =
-                                    *self.relocate_state.write().await
-                                {
-                                    let new_node = joining_as_relocated.node.clone();
-                                    let new_name = new_node.name();
-                                    let previous_name = self.info.read().await.name();
-                                    let new_keypair = new_node.keypair.clone();
+                            info!(
+                                "Relocation: switching from {:?} to {:?}",
+                                previous_name, new_name
+                            );
 
-                                    info!(
-                                        "Relocation: switching from {:?} to {:?}",
-                                        previous_name, new_name
-                                    );
+                            let genesis_key = *self.network_knowledge.genesis_key();
+                            let prefix_map = self.network_knowledge.prefix_map().clone();
 
-                                    let genesis_key = *self.network_knowledge.genesis_key();
-                                    let prefix_map = self.network_knowledge.prefix_map().clone();
+                            let recipients = section_auth.value.elders.clone();
 
-                                    let (recipients, signed_sap) = if let Ok(sap) =
-                                        self.network_knowledge.section_by_name(&new_name)
-                                    {
-                                        if let Some(signed_sap) =
-                                            prefix_map.get_signed(&sap.prefix())
-                                        {
-                                            (sap.elders().cloned().collect(), signed_sap)
-                                        } else {
-                                            warn!(
-                                                "Relocation: cannot find signed_sap for {:?}",
-                                                sap.prefix()
-                                            );
-                                            return Ok(vec![]);
-                                        }
-                                    } else {
-                                        warn!("Relocation: cannot find recipients to send aggregated JoinApproval");
-                                        return Ok(vec![]);
-                                    };
+                            let new_network_knowledge = NetworkKnowledge::new(
+                                genesis_key,
+                                section_chain,
+                                section_auth.into_authed_state(),
+                                Some(prefix_map),
+                            )?;
 
-                                    let new_network_knowledge = NetworkKnowledge::new(
-                                        genesis_key,
-                                        section_chain,
-                                        signed_sap,
-                                        Some(prefix_map),
-                                    )?;
-                                    let _ = new_network_knowledge.merge_members(
-                                        members
-                                            .into_iter()
-                                            .map(|member| member.into_authed_state())
-                                            .collect(),
-                                    );
+                            // TODO: confirm whether carry out the switch immediately here
+                            //       or still using the cmd pattern.
+                            //       As the sending of the JoinRequest as notification
+                            //       may require the `node` to be switched to new already.
 
-                                    // TODO: confirm whether carry out the switch immediately here
-                                    //       or still using the cmd pattern.
-                                    //       As the sending of the JoinRequest as notification
-                                    //       may require the `node` to be switched to new already.
+                            self.relocate(new_node, new_network_knowledge).await?;
 
-                                    self.relocate(new_node, new_network_knowledge).await?;
+                            trace!(
+                                "Relocation: Sending aggregated JoinRequest to {:?}",
+                                recipients
+                            );
 
-                                    let section_key = sig_share.public_key_set.public_key();
-                                    let auth = SystemSectionAuth {
-                                        value: node_state,
-                                        sig,
-                                    };
-                                    let join_req = JoinRequest {
-                                        section_key,
-                                        resource_proof_response: None,
-                                        aggregated: Some(auth),
-                                    };
+                            self.send_event(Event::Relocated {
+                                previous_name,
+                                new_keypair,
+                            })
+                            .await;
 
-                                    trace!(
-                                        "Relocation: Sending aggregated JoinRequest to {:?}",
-                                        recipients
-                                    );
-                                    // Resend the JoinRequest now that
-                                    // we have collected enough ApprovalShares from the Elders
-                                    let node_msg = SystemMsg::JoinRequest(Box::new(join_req));
-                                    let wire_msg = WireMsg::single_src(
-                                        &self.info.read().await.clone(),
-                                        DstLocation::Section {
-                                            name: new_name,
-                                            section_pk: section_key,
-                                        },
-                                        node_msg,
-                                        section_key,
-                                    )?;
-                                    cmds.push(Cmd::SendMsg {
-                                        recipients,
-                                        wire_msg,
-                                    });
-
-                                    self.send_event(Event::Relocated {
-                                        previous_name,
-                                        new_keypair,
-                                    })
-                                    .await;
-
-                                    trace!("{}", LogMarker::RelocateEnd);
-                                } else {
-                                    warn!("Relocation:  self.relocate_state is not in Progress");
-                                    return Ok(vec![]);
-                                }
-
-                                Ok(cmds)
-                            }
-                            Err(AggregatorError::NotEnoughShares) => Ok(vec![]),
-                            error => {
-                                warn!(
-                                    "Relocation: Error received as part of signature aggregation during join: {:?}",
-                                    error
-                                );
-                                Ok(vec![])
-                            }
+                            trace!("{}", LogMarker::RelocateEnd);
+                        } else {
+                            warn!("Relocation:  self.relocate_state is not in Progress");
+                            return Ok(vec![]);
                         }
+
+                        Ok(vec![])
                     }
                     _ => {
-                        debug!(
-                            "Relocation: Ignoring unexpected join response message: {:?}",
-                            join_response
-                        );
+                        debug!("Relocation: Ignoring unexpected join response message: {join_response:?}");
                         Ok(vec![])
                     }
                 }
@@ -601,6 +528,8 @@ impl Node {
                 self.handle_join_as_relocated_request(sender, *join_request, known_keys)
                     .await
             }
+            SystemMsg::MembershipVote(vote) => self.handle_membership_vote(sender, vote).await,
+            SystemMsg::MembershipAE(gen) => self.handle_membership_anti_entropy(sender, gen).await,
             SystemMsg::Propose {
                 proposal,
                 sig_share,
@@ -631,26 +560,22 @@ impl Node {
                 )
                 .await
             }
-            SystemMsg::DkgStart {
-                session_id,
-                prefix,
-                elders,
-            } => {
+            SystemMsg::DkgStart(session_id) => {
                 trace!("Handling msg: Dkg-Start {:?} from {}", session_id, sender);
-                if !elders.contains_key(&self.info.read().await.name()) {
+                let our_name = self.info.read().await.name();
+                if !session_id.contains_elder(our_name) {
                     return Ok(vec![]);
                 }
                 if let NodeMsgAuthority::Section(authority) = msg_authority {
                     let _existing = self.dkg_sessions.write().await.insert(
-                        session_id,
+                        session_id.hash(),
                         DkgSessionInfo {
-                            prefix,
-                            elders: elders.clone(),
+                            session_id: session_id.clone(),
                             authority,
                         },
                     );
                 }
-                self.handle_dkg_start(session_id, prefix, elders).await
+                self.handle_dkg_start(session_id).await
             }
             SystemMsg::DkgMessage {
                 session_id,
@@ -689,7 +614,7 @@ impl Node {
                 message,
                 session_id,
             } => {
-                self.handle_dkg_retry(session_id, message_history, message, sender)
+                self.handle_dkg_retry(&session_id, message_history, message, sender)
                     .await
             }
             SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {
@@ -966,26 +891,23 @@ impl Node {
                 session_id,
                 message,
             } => {
-                if let Some(session_info) = self.dkg_sessions.read().await.get(&session_id).cloned()
+                if let Some(session_info) = self
+                    .dkg_sessions
+                    .read()
+                    .await
+                    .get(&session_id.hash())
+                    .cloned()
                 {
-                    let DkgSessionInfo {
-                        prefix,
-                        elders,
-                        authority: section_auth,
-                    } = session_info;
-                    let message_cache = self.dkg_voter.get_cached_msgs(&session_id);
+                    let message_cache = self.dkg_voter.get_cached_msgs(&session_info.session_id);
                     trace!(
-                        "Sending DkgSessionInfo {{ {:?}, elders {:?}, ... }} to {}",
-                        &session_id,
-                        elders,
+                        "Sending DkgSessionInfo {{ {:?}, ... }} to {}",
+                        &session_info.session_id,
                         &sender
                     );
 
                     let node_msg = SystemMsg::DkgSessionInfo {
                         session_id,
-                        elders,
-                        prefix,
-                        section_auth,
+                        section_auth: session_info.authority,
                         message_cache,
                         message,
                     };
@@ -1011,19 +933,14 @@ impl Node {
             }
             SystemMsg::DkgSessionInfo {
                 session_id,
-                prefix,
-                elders,
                 message_cache,
                 section_auth,
                 message,
             } => {
                 let mut cmds = vec![];
                 // Reconstruct the original DKG start message and verify the section signature
-                let payload = WireMsg::serialize_msg_payload(&SystemMsg::DkgStart {
-                    session_id,
-                    prefix,
-                    elders: elders.clone(),
-                })?;
+                let payload =
+                    WireMsg::serialize_msg_payload(&SystemMsg::DkgStart(session_id.clone()))?;
                 let auth = section_auth.clone().into_inner();
                 if self.network_knowledge.section_key().await == auth.sig.public_key {
                     if let Err(err) = AuthorityProof::verify(auth, payload) {
@@ -1040,19 +957,18 @@ impl Node {
                     let chain = self.network_knowledge().section_chain().await;
                     warn!("Chain: {:?}", chain);
                     return Ok(cmds);
-                }
+                };
                 let _existing = self.dkg_sessions.write().await.insert(
-                    session_id,
+                    session_id.hash(),
                     DkgSessionInfo {
-                        prefix,
-                        elders: elders.clone(),
+                        session_id: session_id.clone(),
                         authority: section_auth,
                     },
                 );
-                trace!("DkgSessionInfo handling {:?} - {:?}", session_id, elders);
-                cmds.extend(self.handle_dkg_start(session_id, prefix, elders).await?);
+                trace!("DkgSessionInfo handling {:?}", session_id);
+                cmds.extend(self.handle_dkg_start(session_id.clone()).await?);
                 cmds.extend(
-                    self.handle_dkg_retry(session_id, message_cache, message, sender)
+                    self.handle_dkg_retry(&session_id, message_cache, message, sender)
                         .await?,
                 );
                 Ok(cmds)
