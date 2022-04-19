@@ -35,21 +35,21 @@ impl Node {
         let section_auth = self.network_knowledge().authority_provider().await;
 
         let mut peers = vec![];
-        for peer in session_id.elder_peers() {
+        for session_peer in session_id.elder_peers() {
             // Reuse known peers from network_knowledge, in order to preserve connections
             let peer = if let Some(elder) = section_auth
-                .get_elder(&peer.name())
-                .filter(|elder| elder.addr() == peer.addr())
+                .get_elder(&session_peer.name())
+                .filter(|elder| elder.addr() == session_peer.addr())
             {
                 *elder
             } else if let Some(peer) = self
                 .network_knowledge()
-                .find_member_by_addr(&peer.addr())
+                .find_member_by_addr(&session_peer.addr())
                 .await
             {
                 peer
             } else {
-                peer
+                session_peer
             };
 
             peers.push(peer);
