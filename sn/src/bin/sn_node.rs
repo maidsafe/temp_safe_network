@@ -48,7 +48,7 @@ use tracing_subscriber::filter::EnvFilter;
 
 #[cfg(not(feature = "tokio-console"))]
 const MODULE_NAME: &str = "safe_network";
-const BOOTSTRAP_RETRY_TIME: u64 = 3; // in minutes
+const BOOTSTRAP_RETRY_TIME_SEC: u64 = 60;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -261,12 +261,9 @@ async fn run_node() -> Result<()> {
     );
     info!("\n\n{}\n{}", message, "=".repeat(message.len()));
 
-    let log = format!(
-        "The network is not accepting nodes right now. Retrying after {} minutes",
-        BOOTSTRAP_RETRY_TIME
-    );
+    let log = format!("The network is not accepting nodes right now. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds");
 
-    let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME * 60);
+    let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
     let (node, mut event_stream) = loop {
         match NodeApi::new(&config, bootstrap_retry_duration).await {
             Ok(result) => break result,
@@ -301,7 +298,7 @@ async fn run_node() -> Result<()> {
                 exit(1);
             }
             Err(Error::JoinTimeout) => {
-                let message = format!("Encountered a timeout while trying to join the network. Retrying after {} minutes.", BOOTSTRAP_RETRY_TIME);
+                let message = format!("Encountered a timeout while trying to join the network. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds.");
                 println!("{}", &message);
                 error!("{}", &message);
             }

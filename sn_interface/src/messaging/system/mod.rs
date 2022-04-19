@@ -19,6 +19,7 @@ pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use node_msgs::{NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse};
 pub use node_state::{MembershipState, NodeState, RelocateDetails};
 pub use signed::{KeyedSig, SigShare};
+use sn_consensus::{Generation, SignedVote};
 
 /// List of peers of a section
 pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
@@ -28,11 +29,8 @@ use bls_dkg::key_gen::message::Message as DkgMessage;
 use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    net::SocketAddr,
-};
-use xor_name::{Prefix, XorName};
+use std::collections::BTreeSet;
+use xor_name::XorName;
 
 use super::authority::SectionAuth as SectionAuthProof;
 use super::AuthorityProof;
@@ -85,11 +83,16 @@ pub enum SystemMsg {
     },
     /// Probes the network by sending a message to a random dst triggering an AE flow.
     AntiEntropyProbe(XorName),
+    #[cfg(feature = "back-pressure")]
     /// Sent when a msg-consuming node wants to update a msg-producing node on the number of msgs per s it wants to receive.
     /// It tells the node to adjust msg sending rate according to the provided value in this msg.
     BackPressure(f64),
     /// Send from a section to the node to be immediately relocated.
     Relocate(SectionAuth<NodeState>),
+    /// Membership Vote
+    MembershipVote(SignedVote<NodeState>),
+    /// Membership Anti-Entropy request
+    MembershipAE(Generation),
     /// Sent from a bootstrapping peer to the section requesting to join as a new member
     JoinRequest(Box<JoinRequest>),
     /// Response to a `JoinRequest`
@@ -99,14 +102,7 @@ pub enum SystemMsg {
     /// Response to a `JoinAsRelocatedRequest`
     JoinAsRelocatedResponse(Box<JoinAsRelocatedResponse>),
     /// Sent to the new elder candidates to start the DKG process.
-    DkgStart {
-        /// The identifier of the DKG session to start.
-        session_id: DkgSessionId,
-        /// The section prefix. It matches all the members' names.
-        prefix: Prefix,
-        /// The section's complete set of elders as a map from their name to their socket address.
-        elders: BTreeMap<XorName, SocketAddr>,
-    },
+    DkgStart(DkgSessionId),
     /// Message sent when a DKG session has not started
     DkgSessionUnknown {
         /// The identifier of the DKG session this message is for.
@@ -118,10 +114,6 @@ pub enum SystemMsg {
     DkgSessionInfo {
         /// The identifier of the DKG session to start.
         session_id: DkgSessionId,
-        /// The section prefix. It matches all the members' names.
-        prefix: Prefix,
-        /// The section's complete set of elders as a map from their name to their socket address.
-        elders: BTreeMap<XorName, SocketAddr>,
         /// Section authority for the DKG start message
         section_auth: AuthorityProof<SectionAuthProof>,
         /// Messages processed in the session so far

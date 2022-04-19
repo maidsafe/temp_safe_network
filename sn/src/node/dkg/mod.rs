@@ -6,12 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod dkg_msgs_utils;
+pub(crate) mod dkg_msgs_utils;
 mod session;
 mod voter;
 
-pub(crate) use self::{
-    dkg_msgs_utils::{DkgFailureSigSetUtils, DkgSessionIdUtils},
-    voter::DkgVoter,
-};
+pub(crate) use self::{dkg_msgs_utils::DkgFailureSigSetUtils, voter::DkgVoter};
 pub(crate) use sn_interface::messaging::system::{KeyedSig, SigShare};

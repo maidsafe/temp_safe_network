@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use xor_name::{XorName, XOR_NAME_LEN};
 
+use crate::types::Peer;
+
 /// Information about a member of our section.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub struct NodeState {
@@ -25,6 +27,21 @@ pub struct NodeState {
 }
 
 impl NodeState {
+    /// Build a NodeState in the Joined state.
+    pub fn joined(name: XorName, addr: SocketAddr, previous_name: Option<XorName>) -> Self {
+        Self {
+            name,
+            addr,
+            state: MembershipState::Joined,
+            previous_name,
+        }
+    }
+
+    /// Returns the peer struct for this node.
+    pub fn peer(&self) -> Peer {
+        Peer::new(self.name, self.addr)
+    }
+
     /// Returns the age.
     pub fn age(&self) -> u8 {
         self.name[XOR_NAME_LEN - 1]

@@ -14,14 +14,11 @@ use crate::node::{
     Event,
 };
 use crate::UsedSpace;
-use sn_interface::messaging::{
-    system::{JoinResponse, MembershipState, NodeState, SigShare, SystemMsg},
-    WireMsg,
-};
+use sn_interface::messaging::WireMsg;
 use sn_interface::network_knowledge::{
     NetworkKnowledge, NodeInfo, SectionAuthorityProvider, SectionKeyShare,
 };
-use sn_interface::types::{log_markers::LogMarker, Peer};
+use sn_interface::types::log_markers::LogMarker;
 
 use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf};
@@ -94,18 +91,6 @@ impl Node {
     /// Returns connection info of this node.
     pub(crate) fn our_connection_info(&self) -> SocketAddr {
         self.comm.our_connection_info()
-    }
-
-    /// Tries to sign with the secret corresponding to the provided BLS public key
-    pub(crate) async fn sign_with_section_key_share(
-        &self,
-        data: &[u8],
-        public_key: &bls::PublicKey,
-    ) -> Result<(usize, bls::SignatureShare)> {
-        self.section_keys_provider
-            .sign_with(data, public_key)
-            .await
-            .map_err(Error::from)
     }
 
     /// Returns the current BLS public key set
@@ -197,13 +182,6 @@ impl Node {
         Ok(Some(cmd))
     }
 
-    // Generate a new section info based on the current set of members and if it differs from the
-    // current elders, trigger a DKG.
-    pub(crate) async fn promote_and_demote_elders(&self) -> Result<Vec<Cmd>> {
-        self.promote_and_demote_elders_except(&BTreeSet::new())
-            .await
-    }
-
     // Generate a new section info based on the current set of members, but
     // excluding the ones in the provided list. And if the outcome list of candidates
     // differs from the current elders, trigger a DKG.
@@ -211,69 +189,13 @@ impl Node {
         &self,
         excluded_names: &BTreeSet<XorName>,
     ) -> Result<Vec<Cmd>> {
-        let mut cmds = vec![];
-        let our_name = self.info.read().await.name();
-
         debug!("{}", LogMarker::TriggeringPromotionAndDemotion);
-        for elder_candidates in self
-            .network_knowledge
-            .promote_and_demote_elders(&our_name, excluded_names)
-            .await
-        {
-            cmds.extend(self.send_dkg_start(elder_candidates).await?);
+        let mut cmds = vec![];
+        // TODO: move `promote_and_demote_elders` to Membership
+        for session_id in self.promote_and_demote_elders(excluded_names).await {
+            cmds.extend(self.send_dkg_start(session_id).await?);
         }
 
         Ok(cmds)
-    }
-
-    pub(crate) async fn send_accepted_online_share(
-        &self,
-        peer: Peer,
-        previous_name: Option<XorName>,
-    ) -> Result<Vec<Cmd>> {
-        let public_key_set = self.public_key_set().await?;
-        let section_key = public_key_set.public_key();
-
-        let node_state = NodeState {
-            name: peer.name(),
-            addr: peer.addr(),
-            state: MembershipState::Joined,
-            previous_name,
-        };
-        let serialized_details = bincode::serialize(&node_state)?;
-        let (index, signature_share) = self
-            .sign_with_section_key_share(&serialized_details, &section_key)
-            .await?;
-
-        let sig_share = SigShare {
-            public_key_set,
-            index,
-            signature_share,
-        };
-
-        let members = self
-            .network_knowledge
-            .section_signed_members()
-            .await
-            .into_iter()
-            .map(|itr| itr.into_authed_msg())
-            .collect();
-        let signed_sap = self
-            .network_knowledge
-            .section_signed_authority_provider()
-            .await;
-
-        let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::ApprovalShare {
-            node_state,
-            sig_share,
-            section_auth: signed_sap.value.to_msg(),
-            section_signed: signed_sap.sig,
-            section_chain: self.network_knowledge.section_chain().await,
-            members,
-        }));
-
-        Ok(vec![
-            self.send_direct_msg(peer, node_msg, section_key).await?,
-        ])
     }
 }

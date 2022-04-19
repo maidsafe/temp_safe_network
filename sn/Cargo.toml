@@ -34,6 +34,7 @@ required-features = ["test-utils"]
 [features]
 default = []
 chaos = []
+back-pressure = ["sn_interface/back-pressure"]
 unstable-wiremsg-debuginfo = []
 test-utils = ["sn_interface/test-utils", "sn_interface/proptest"]
 # Needs to be built with RUSTFLAGS="--cfg tokio_unstable"
@@ -92,6 +93,7 @@ walkdir = "2"
 xor_name = "4.0.1"
 file-rotate = "~0.6.0"
 sn_dysfunction = { path = "../sn_dysfunction", version = "~0.1.1" }
+sn_consensus = "1.16.0"
 
 [dependencies.backoff]
 version = "~0.4.0"

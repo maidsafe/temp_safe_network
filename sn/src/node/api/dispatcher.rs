@@ -340,6 +340,11 @@ impl Dispatcher {
                     .handle_online_agreement(auth.value.into_state(), auth.sig)
                     .await
             }
+            Cmd::HandleNodeLeft(auth) => {
+                self.node
+                    .handle_node_left(auth.value.into_state(), auth.sig)
+                    .await
+            }
             Cmd::HandleNewEldersAgreement { proposal, sig } => match proposal {
                 Proposal::NewElders(section_auth) => {
                     self.node
@@ -386,14 +391,6 @@ impl Dispatcher {
                 .await
                 .into_iter()
                 .collect()),
-            Cmd::SendAcceptedOnlineShare {
-                peer,
-                previous_name,
-            } => {
-                self.node
-                    .send_accepted_online_share(peer, previous_name)
-                    .await
-            }
             Cmd::ProposeOffline(names) => self.node.cast_offline_proposals(&names).await,
             Cmd::StartConnectivityTest(name) => Ok(vec![
                 self.node

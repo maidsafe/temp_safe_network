@@ -121,15 +121,13 @@ impl Node {
                 .await?,
         );
 
-        let result = self.promote_and_demote_elders().await?;
+        let result = self
+            .promote_and_demote_elders_except(&BTreeSet::default())
+            .await?;
+
         if result.is_empty() {
-            // Send AE-Update to Adults of our section
-            let our_adults = self.network_knowledge.adults().await;
-            let our_section_pk = self.network_knowledge.section_key().await;
-            cmds.extend(
-                self.send_ae_update_to_nodes(our_adults, &our_prefix, our_section_pk)
-                    .await,
-            );
+            // Send AE-Update to our section
+            cmds.extend(self.send_ae_update_to_our_section().await);
         }
 
         cmds.extend(result);
@@ -148,74 +146,13 @@ impl Node {
         node_state: NodeState,
         sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
-        let mut cmds = vec![];
-        let signature = sig.signature.clone();
-
-        let signed_node_state = SectionAuth {
-            value: node_state.clone(),
-            sig,
-        };
-
-        if !self
-            .network_knowledge
-            .update_member(signed_node_state.clone())
-            .await
-        {
-            info!(
-                "{}: {} at {}",
-                LogMarker::IgnoredNodeAsOffline,
-                node_state.name(),
-                node_state.addr()
-            );
-            return Ok(cmds);
-        }
-
         info!(
-            "{}: {} at {}",
-            LogMarker::AcceptedNodeAsOffline,
+            "Agreement - proposing membership change with node offline: {} at {}",
             node_state.name(),
             node_state.addr()
         );
 
-        // If this is an Offline agreement where the new node state is Relocated,
-        // we then need to send the Relocate msg to the peer attaching the signed NodeState
-        // containing the relocation details.
-        if node_state.is_relocated() {
-            cmds.push(
-                self.send_relocate(*node_state.peer(), signed_node_state)
-                    .await?,
-            );
-        }
-
-        let churn_id = ChurnId(signature.to_bytes().to_vec());
-        cmds.extend(self.relocate_peers(churn_id, BTreeSet::default()).await?);
-
-        let result = self.promote_and_demote_elders().await?;
-        if result.is_empty() {
-            // Send AE-Update to Adults of our section
-            let our_adults = self.network_knowledge.adults().await;
-            let our_prefix = self.network_knowledge.prefix().await;
-            let our_section_pk = self.network_knowledge.section_key().await;
-            cmds.extend(
-                self.send_ae_update_to_nodes(our_adults, &our_prefix, our_section_pk)
-                    .await,
-            );
-        }
-
-        cmds.extend(result);
-
-        self.liveness_retain_only(
-            self.network_knowledge
-                .adults()
-                .await
-                .iter()
-                .map(|peer| peer.name())
-                .collect(),
-        )
-        .await?;
-        *self.joins_allowed.write().await = true;
-
-        Ok(cmds)
+        self.propose_membership_change(node_state.to_msg()).await
     }
 
     #[instrument(skip(self), level = "trace")]
@@ -237,21 +174,25 @@ impl Node {
             );
 
             let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
-            let saps_candidates = self
-                .network_knowledge
-                .promote_and_demote_elders(&self.info.read().await.name(), &BTreeSet::new())
-                .await;
+            // TODO: on dkg-failure, we may have tried to re-start DKG with some
+            //       elders excluded, this check here uses the empty set for the
+            //       excluded_candidates which would prevent a dkg-retry from
+            //       succeeding.
+            let dkg_sessions = self.promote_and_demote_elders(&BTreeSet::new()).await;
 
-            if !saps_candidates.contains(&signed_section_auth.elder_candidates()) {
-                // SectionInfo out of date, ignore.
+            let agreeing_elders = BTreeSet::from_iter(signed_section_auth.names());
+            if dkg_sessions
+                .iter()
+                .all(|session| !session.elder_names().eq(agreeing_elders.iter().copied()))
+            {
+                warn!("SectionInfo out of date, ignore");
                 return Ok(vec![]);
-            }
+            };
 
             // Send the `OurElder` proposal to all of the to-be-Elders so it's aggregated by them.
-            let proposal_recipients = saps_candidates
+            let proposal_recipients = dkg_sessions
                 .iter()
-                .flat_map(|info| info.elders())
-                .cloned()
+                .flat_map(|session| session.elder_peers())
                 .collect();
 
             self.send_proposal(
