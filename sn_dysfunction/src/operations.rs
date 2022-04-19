@@ -6,52 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{DysfunctionDetection, NodeIdentifier, OperationId};
-
-impl DysfunctionDetection {
-    /// Removes a pending_operation from the node liveness records
-    pub async fn request_operation_fulfilled(
-        &self,
-        node_id: &NodeIdentifier,
-        operation_id: OperationId,
-    ) -> bool {
-        trace!(
-            "Attempting to remove pending_operation {:?} op: {:?}",
-            node_id,
-            operation_id
-        );
-        let mut has_removed = false;
-
-        if let Some(entry) = self.unfulfilled_ops.get(node_id) {
-            let v = entry.value();
-
-            // only remove the first instance from the vec
-            v.write().await.retain(|x| {
-                if has_removed || x != &operation_id {
-                    true
-                } else {
-                    has_removed = true;
-                    false
-                }
-            });
-            if has_removed {
-                trace!(
-                    "Pending operation removed for node: {:?} op: {:?}",
-                    node_id,
-                    operation_id
-                );
-            } else {
-                trace!(
-                    "No Pending operation found for node: {:?} op: {:?}",
-                    node_id,
-                    operation_id
-                );
-            }
-        }
-        has_removed
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::tests::init_test_logger;
