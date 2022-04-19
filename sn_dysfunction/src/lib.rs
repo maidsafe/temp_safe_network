@@ -98,35 +98,20 @@ impl DysfunctionDetection {
     /// Adds an issue to the dysfunction tracker.
     ///
     /// The `op_id` only applies when adding an operational issue.
-    pub async fn track_issue(
-        &self,
-        node_id: NodeIdentifier,
-        issue_type: IssueType,
-        op_id: Option<[u8; 32]>,
-    ) -> Result<()> {
+    pub async fn track_issue(&self, node_id: NodeIdentifier, issue_type: IssueType) -> Result<()> {
         debug!("Adding a new issue to the dysfunction tracker: {issue_type:?}");
         match issue_type {
             IssueType::Communication => {
-                if op_id.is_some() {
-                    return Err(Error::UnusedOpIdSupplied(
-                        "An operation ID only applies to pending unfulfilled requests.".to_string(),
-                    ));
-                }
                 let mut entry = self.communication_issues.entry(node_id).or_default();
                 let mut queue = entry.value_mut().write().await;
                 queue.push_back(Instant::now());
             }
             IssueType::Knowledge => {
-                if op_id.is_some() {
-                    return Err(Error::UnusedOpIdSupplied(
-                        "An operation ID only applies to pending unfulfilled requests.".to_string(),
-                    ));
-                }
                 let mut entry = self.knowledge_issues.entry(node_id).or_default();
                 let mut queue = entry.value_mut().write().await;
                 queue.push_back(Instant::now());
             }
-            IssueType::PendingRequestOperation => {
+            IssueType::PendingRequestOperation(op_id) => {
                 let entry = self.unfulfilled_ops.entry(node_id).or_default();
                 let v = entry.value();
                 let op_id = op_id.ok_or_else(|| {
@@ -243,25 +228,25 @@ mod tests {
         // Track some issues for nodes that are going to be removed.
         for adult in adults.iter().take(3) {
             let _ = dysfunctional_detection
-                .track_issue(*adult, IssueType::Communication, None)
+                .track_issue(*adult, IssueType::Communication)
                 .await;
             let _ = dysfunctional_detection
-                .track_issue(*adult, IssueType::Knowledge, None)
+                .track_issue(*adult, IssueType::Knowledge)
                 .await;
             let _ = dysfunctional_detection
-                .track_issue(*adult, IssueType::PendingRequestOperation, None)
+                .track_issue(*adult, IssueType::PendingRequestOperation(Some([1; 32])))
                 .await;
         }
 
         // Track some issues for nodes that will be retained.
         let _ = dysfunctional_detection
-            .track_issue(adults[5], IssueType::Communication, None)
+            .track_issue(adults[5], IssueType::Communication)
             .await;
         let _ = dysfunctional_detection
-            .track_issue(adults[6], IssueType::Knowledge, None)
+            .track_issue(adults[6], IssueType::Knowledge)
             .await;
         let _ = dysfunctional_detection
-            .track_issue(adults[7], IssueType::PendingRequestOperation, None)
+            .track_issue(adults[7], IssueType::PendingRequestOperation(Some([1; 32])))
             .await;
 
         let nodes_to_retain = adults[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
@@ -283,7 +268,7 @@ mod tests {
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
 
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::Communication, None)
+            .track_issue(adults[0], IssueType::Communication)
             .await?;
 
         assert_eq!(dysfunctional_detection.communication_issues.len(), 1);
@@ -293,29 +278,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn track_issue_should_return_error_when_adding_a_comm_issue_with_op_id() -> Result<()> {
-        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
-
-        let result = dysfunctional_detection
-            .track_issue(adults[0], IssueType::Communication, Some([1; 32]))
-            .await;
-
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "An operation ID only applies to pending unfulfilled requests."
-        );
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn track_issue_should_add_a_knowledge_issue() -> Result<()> {
         let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
 
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::Knowledge, None)
+            .track_issue(adults[0], IssueType::Knowledge)
             .await?;
 
         assert_eq!(dysfunctional_detection.knowledge_issues.len(), 1);
@@ -325,30 +293,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn track_issue_should_return_error_when_adding_a_knowledge_issue_with_op_id() -> Result<()>
-    {
-        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
-
-        let result = dysfunctional_detection
-            .track_issue(adults[0], IssueType::Knowledge, Some([1; 32]))
-            .await;
-
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "An operation ID only applies to pending unfulfilled requests."
-        );
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn track_issue_should_add_a_pending_op_issue() -> Result<()> {
         let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
 
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation, Some([1; 32]))
+            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([1; 32])))
             .await?;
 
         assert_eq!(dysfunctional_detection.unfulfilled_ops.len(), 1);
@@ -364,7 +314,7 @@ mod tests {
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
 
         let result = dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation, None)
+            .track_issue(adults[0], IssueType::PendingRequestOperation(None))
             .await;
 
         assert!(result.is_err());

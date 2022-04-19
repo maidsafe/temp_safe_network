@@ -31,7 +31,7 @@ mod tests {
         for adult in &adults {
             for _ in 0..NORMAL_KNOWLEDGE_ISSUES {
                 dysfunctional_detection
-                    .track_issue(*adult, IssueType::Knowledge, None)
+                    .track_issue(*adult, IssueType::Knowledge)
                     .await?;
             }
         }
@@ -74,7 +74,7 @@ mod tests {
         // Add just one knowledge issue...
         for _ in 0..1 {
             dysfunctional_detection
-                .track_issue(new_adult, IssueType::Knowledge, None)
+                .track_issue(new_adult, IssueType::Knowledge)
                 .await?;
         }
 
@@ -117,7 +117,7 @@ mod tests {
         for adult in &adults {
             for _ in 0..NORMAL_KNOWLEDGE_ISSUES {
                 dysfunctional_detection
-                    .track_issue(*adult, IssueType::Knowledge, None)
+                    .track_issue(*adult, IssueType::Knowledge)
                     .await?;
             }
         }
@@ -126,7 +126,7 @@ mod tests {
         let _ = dysfunctional_detection.add_new_node(new_adult).await;
         for _ in 0..SUSPECT_KNOWLEDGE_ISSUES {
             dysfunctional_detection
-                .track_issue(new_adult, IssueType::Knowledge, None)
+                .track_issue(new_adult, IssueType::Knowledge)
                 .await?;
         }
 
@@ -154,7 +154,7 @@ mod tests {
 
         for _ in 0..DYSFUNCTIONAL_KNOWLEDGE_ISSUES - SUSPECT_KNOWLEDGE_ISSUES {
             dysfunctional_detection
-                .track_issue(new_adult, IssueType::Knowledge, None)
+                .track_issue(new_adult, IssueType::Knowledge)
                 .await?;
         }
 

@@ -79,8 +79,7 @@ mod tests {
                 let _ = dysfunctional_detection
                     .track_issue(
                         *adult,
-                        IssueType::PendingRequestOperation,
-                        get_random_operation_id(),
+                        IssueType::PendingRequestOperation(get_random_operation_id()),
                     )
                     .await;
             }
@@ -118,8 +117,7 @@ mod tests {
                 let _ = dysfunctional_detection
                     .track_issue(
                         *adult,
-                        IssueType::PendingRequestOperation,
-                        get_random_operation_id(),
+                        IssueType::PendingRequestOperation(get_random_operation_id()),
                     )
                     .await;
             }
@@ -131,8 +129,7 @@ mod tests {
             let _ = dysfunctional_detection
                 .track_issue(
                     new_adult,
-                    IssueType::PendingRequestOperation,
-                    get_random_operation_id(),
+                    IssueType::PendingRequestOperation(get_random_operation_id()),
                 )
                 .await;
         }
@@ -157,8 +154,7 @@ mod tests {
             let _ = dysfunctional_detection
                 .track_issue(
                     new_adult,
-                    IssueType::PendingRequestOperation,
-                    get_random_operation_id(),
+                    IssueType::PendingRequestOperation(get_random_operation_id()),
                 )
                 .await;
         }
