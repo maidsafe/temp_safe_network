@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{error::Result, get_mean_of, DysfunctionDetection};
+use crate::{error::Result, get_mean_of, DysfunctionDetection, OperationId};
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
@@ -30,7 +30,7 @@ pub enum IssueType {
     /// Represents a knowledge issue to be tracked by Dysfunction Detection.
     Knowledge,
     /// Represents a pending request operation issue to be tracked by Dysfunction Detection.
-    PendingRequestOperation,
+    PendingRequestOperation(Option<OperationId>),
 }
 
 #[derive(Debug)]
@@ -88,7 +88,7 @@ impl DysfunctionDetection {
                 self.calculate_node_score(
                     node,
                     adults.clone(),
-                    &IssueType::PendingRequestOperation,
+                    &IssueType::PendingRequestOperation(None),
                 )
                 .await,
             );
@@ -141,7 +141,7 @@ impl DysfunctionDetection {
                 };
                 count
             }
-            IssueType::PendingRequestOperation => {
+            IssueType::PendingRequestOperation(_) => {
                 let count = if let Some(entry) = self.unfulfilled_ops.get(node) {
                     entry.value().read().await.len()
                 } else {
@@ -245,7 +245,7 @@ mod tests {
         prop_oneof![
             Just(IssueType::Communication),
             Just(IssueType::Knowledge),
-            Just(IssueType::PendingRequestOperation),
+            (any::<[u8; 32]>()).prop_map(|x| IssueType::PendingRequestOperation(Some(x)))
         ]
     }
 
@@ -257,17 +257,9 @@ mod tests {
             Runtime::new().unwrap().block_on(async {
                 let adults = (0..adult_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
                 let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
-                let op_id = match issue_type {
-                    IssueType::Communication | IssueType::Knowledge => {
-                        None
-                    },
-                    IssueType::PendingRequestOperation => {
-                        Some([1; 32])
-                    }
-                };
                 for _ in 0..5 {
                     let _ = dysfunctional_detection.track_issue(
-                        adults[0], issue_type.clone(), op_id).await;
+                        adults[0], issue_type.clone()).await;
                 }
 
                 let score_results = dysfunctional_detection
@@ -280,7 +272,7 @@ mod tests {
                     IssueType::Knowledge => {
                         assert_eq!(score_results.knowledge_scores.len(), adult_count);
                     },
-                    IssueType::PendingRequestOperation => {
+                    IssueType::PendingRequestOperation(_) => {
                         assert_eq!(score_results.op_scores.len(), adult_count);
                     },
                 }
@@ -294,17 +286,9 @@ mod tests {
             Runtime::new().unwrap().block_on(async {
                 let adults = (0..adult_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
                 let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
-                let op_id = match issue_type {
-                    IssueType::Communication | IssueType::Knowledge => {
-                        None
-                    },
-                    IssueType::PendingRequestOperation => {
-                        Some([1; 32])
-                    }
-                };
                 for _ in 0..issue_count {
                     let _ = dysfunctional_detection.track_issue(
-                        adults[0], issue_type.clone(), op_id).await;
+                        adults[0], issue_type.clone()).await;
                 }
 
                 let score_results = dysfunctional_detection
@@ -317,7 +301,7 @@ mod tests {
                     IssueType::Knowledge => {
                         score_results.knowledge_scores
                     },
-                    IssueType::PendingRequestOperation => {
+                    IssueType::PendingRequestOperation(_) => {
                         score_results.op_scores
                     },
                 };
@@ -340,18 +324,10 @@ mod tests {
             Runtime::new().unwrap().block_on(async {
                 let adults = (0..adult_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
                 let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
-                let op_id = match issue_type {
-                    IssueType::Communication | IssueType::Knowledge => {
-                        None
-                    },
-                    IssueType::PendingRequestOperation => {
-                        Some([1; 32])
-                    }
-                };
                 for adult in adults.iter() {
                     for _ in 0..issue_count {
                         let _ = dysfunctional_detection.track_issue(
-                            *adult, issue_type.clone(), op_id).await;
+                            *adult, issue_type.clone()).await;
                     }
                 }
 
@@ -365,7 +341,7 @@ mod tests {
                     IssueType::Knowledge => {
                         score_results.knowledge_scores
                     },
-                    IssueType::PendingRequestOperation => {
+                    IssueType::PendingRequestOperation(_) => {
                         score_results.op_scores
                     },
                 };

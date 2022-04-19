@@ -31,7 +31,7 @@ mod tests {
         for adult in &adults {
             for _ in 0..NORMAL_CONNECTION_PROBLEM_COUNT {
                 dysfunctional_detection
-                    .track_issue(*adult, IssueType::Communication, None)
+                    .track_issue(*adult, IssueType::Communication)
                     .await?;
             }
         }
@@ -68,7 +68,7 @@ mod tests {
         for adult in &adults {
             for _ in 0..NORMAL_CONNECTION_PROBLEM_COUNT {
                 dysfunctional_detection
-                    .track_issue(*adult, IssueType::Communication, None)
+                    .track_issue(*adult, IssueType::Communication)
                     .await?;
             }
         }
@@ -77,7 +77,7 @@ mod tests {
         let _ = dysfunctional_detection.add_new_node(new_adult).await;
         for _ in 0..SUSPECT_CONNECTION_PROBLEM_COUNT {
             dysfunctional_detection
-                .track_issue(new_adult, IssueType::Communication, None)
+                .track_issue(new_adult, IssueType::Communication)
                 .await?;
         }
 
@@ -104,7 +104,7 @@ mod tests {
 
         for _ in 0..DYSFUNCTIONAL_CONNECTION_PROBLEM_COUNT - SUSPECT_CONNECTION_PROBLEM_COUNT {
             dysfunctional_detection
-                .track_issue(new_adult, IssueType::Communication, None)
+                .track_issue(new_adult, IssueType::Communication)
                 .await?;
         }
 

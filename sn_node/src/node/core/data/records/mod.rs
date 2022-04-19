@@ -18,8 +18,8 @@ use crate::node::{
 };
 use dashmap::DashSet;
 use itertools::Itertools;
-use sn_interface::data_copy_count;
 use sn_dysfunction::IssueType;
+use sn_interface::data_copy_count;
 use sn_interface::messaging::{
     data::{CmdError, DataQuery, MetadataExchange, StorageLevel},
     system::{NodeCmd, NodeQuery, SystemMsg},
@@ -108,8 +108,7 @@ impl Node {
                 self.dysfunction_tracking
                     .track_issue(
                         *target,
-                        IssueType::PendingRequestOperation,
-                        Some(operation_id),
+                        IssueType::PendingRequestOperation(Some(operation_id)),
                     )
                     .await?;
             }

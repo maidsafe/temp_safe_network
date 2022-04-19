@@ -166,7 +166,7 @@ impl Node {
                                     if known_elders.contains(&sender.name()) {
                                         // we track a dysfunction against our elder here
                                         self.dysfunction_tracking
-                                            .track_issue(sender.name(), IssueType::Knowledge, None)
+                                            .track_issue(sender.name(), IssueType::Knowledge)
                                             .await
                                             .map_err(Error::from)?;
                                     }

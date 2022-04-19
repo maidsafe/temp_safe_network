@@ -322,7 +322,7 @@ impl Node {
     /// Log a communication problem
     pub(crate) async fn log_comm_issue(&self, name: XorName) -> Result<()> {
         self.dysfunction_tracking
-            .track_issue(name, IssueType::Communication, None)
+            .track_issue(name, IssueType::Communication)
             .await
             .map_err(Error::from)
     }
