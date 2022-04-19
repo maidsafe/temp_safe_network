@@ -5,7 +5,7 @@
 
 ## Compatability
 
-`sn_node`: 0.42.X
+`sn_node`: 0.58.X
 
 ## Overview
 
