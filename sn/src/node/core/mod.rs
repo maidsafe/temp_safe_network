@@ -379,7 +379,7 @@ impl Node {
     }
 
     // Tries to split our section.
-    // If we have enough nodes for both subsections, returns the SectionAuthorityProviders
+    // If we have enough nodes for both subsections, returns the DkgSessionId's
     // of the two subsections. Otherwise returns `None`.
     async fn try_split(
         &self,
@@ -433,7 +433,7 @@ impl Node {
 
     /// Generate a new section info(s) based on the current set of members,
     /// excluding any member matching a name in the provided `excluded_names` set.
-    /// Returns a set of candidate SectionAuthorityProviders.
+    /// Returns a set of candidate DkgSessionId's.
     pub(super) async fn promote_and_demote_elders(
         &self,
         excluded_names: &BTreeSet<XorName>,
