@@ -111,7 +111,7 @@ jobs:
         # all = all crates in workspace, lib/bins targets, with these features...
         run: cargo test --no-run --release --features=test-utils
 
-      - name: Run sn_interface unit tests
+      - name: Run sn_interface tests
         timeout-minutes: 15
         uses: jacderida/cargo-nextest@main
         with:
