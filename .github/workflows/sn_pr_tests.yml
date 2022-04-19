@@ -107,12 +107,8 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}-unit
 
-      - name: Build all test targets
-        # all = all crates in workspace, lib/bins targets, with these features...
-        run: cargo test --no-run --release --features=test-utils
-
       - name: Run sn_interface tests
-        timeout-minutes: 15
+        timeout-minutes: 25
         uses: jacderida/cargo-nextest@main
         with:
           test-run-name: unit-tests-${{ matrix.os }}
@@ -123,8 +119,18 @@ jobs:
           features: test-utils
           filters: "messaging prefix_map types"
 
+      - name: Run sn_dysfunction unit tests
+        timeout-minutes: 5
+        uses: jacderida/cargo-nextest@main
+        with:
+          test-run-name: dysfunction-unit-tests-${{ matrix.os }}
+          profile: ci
+          junit-path: junit.xml
+          package: sn_dysfunction
+          release: true
+
       - name: Run node unit tests
-        timeout-minutes: 15
+        timeout-minutes: 25
         uses: jacderida/cargo-nextest@main
         with:
           test-run-name: unit-tests-${{ matrix.os }}
@@ -144,16 +150,6 @@ jobs:
           junit-path: junit.xml
           package: sn_cli
           bin: safe
-          release: true
-
-      - name: Run sn_dysfunction unit tests
-        timeout-minutes: 5
-        uses: jacderida/cargo-nextest@main
-        with:
-          test-run-name: dysfunction-unit-tests-${{ matrix.os }}
-          profile: ci
-          junit-path: junit.xml
-          package: sn_dysfunction
           release: true
 
   e2e:
@@ -195,10 +191,6 @@ jobs:
 
       - name: Build sn bins
         run: cd sn_node && cargo build --release --features=test-utils --bins
-        timeout-minutes: 60
-
-      - name: Build all sn_node tests
-        run: cd sn_node && cargo test --no-run --release --features=test-utils
         timeout-minutes: 60
 
       - name: Build testnet
@@ -332,10 +324,6 @@ jobs:
         run: cd sn_node && cargo build --release --features=test-utils --bins
         timeout-minutes: 60
 
-      - name: Build all sn_node tests
-        run: cd sn_node && cargo test --no-run --release --features=test-utils
-        timeout-minutes: 60
-
       - name: Build testnet
         run: cargo build  --release --bin testnet
         timeout-minutes: 60
@@ -350,12 +338,8 @@ jobs:
         shell: bash
         run: cargo run --release --features=test-utils --example network_split
         env:
-          RUST_LOG: "sn_node=trace"
+          RUST_LOG: "sn_node,sn_client=trace"
 
-
-      # - name: Start the network
-      #   run: ./target/release/testnet
-      #   id: section-startup
 
       - name: Print Network Log Stats at start
         shell: bash
@@ -485,9 +469,6 @@ jobs:
       - name: Build log_cmds_inspector
         run: cargo build  --release --bin log_cmds_inspector
         timeout-minutes: 60
-
-      - name: Build all sn_api tests
-        run: cargo test --no-run -p sn_api --release --lib
 
       - name: Start the network
         run: ./target/release/testnet
@@ -626,9 +607,6 @@ jobs:
         shell: bash
         run: ./resources/scripts/wait_for_nodes_to_join.sh
         timeout-minutes: 10
-
-      - name: Build all CLI tests
-        run: cargo test --no-run -p sn_cli --release
 
       - name: Generate keys for test run
         run: cargo run --package sn_cli --release -- keys create --for-cli
