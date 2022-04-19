@@ -34,7 +34,7 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node";
 const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
 const NODES_DIR: &str = "local-test-network";
-const INTERVAL: &str = "5";
+const INTERVAL: &str = "10000";
 const RUST_LOG: &str = "RUST_LOG";
 const ADDITIONAL_NODES_TO_SPLIT: u64 = 15;
 
@@ -126,9 +126,6 @@ pub async fn run_split() -> Result<()> {
         .parse::<u64>()
         .context("Error parsing Interval argument")?;
 
-    // start with 11 nodes
-    let start_node_count = 11;
-
     debug!("Running testnet with args: {:?}", sn_launch_tool_args);
 
     // We can now call the tool with the args
@@ -139,7 +136,7 @@ pub async fn run_split() -> Result<()> {
         .wrap_err("Error starting the testnet")?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
-    let interval_duration = Duration::from_secs(interval_as_int * start_node_count);
+    let interval_duration = Duration::from_millis(*interval_as_int);
     sleep(interval_duration).await;
     println!("Done sleeping....");
 
@@ -155,7 +152,6 @@ pub async fn run_split() -> Result<()> {
     // Now we add more nodes
     // ======================
 
-    let additional_node_count = ADDITIONAL_NODES_TO_SPLIT;
     let additional_node_count_str = &ADDITIONAL_NODES_TO_SPLIT.to_string();
 
     sn_launch_tool_args.push("--add");
@@ -171,7 +167,7 @@ pub async fn run_split() -> Result<()> {
         .wrap_err("Error adding nodes to the testnet")?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
-    let interval_duration = Duration::from_secs(interval_as_int * additional_node_count);
+    let interval_duration = Duration::from_millis(*interval_as_int);
 
     sleep(interval_duration).await;
 
