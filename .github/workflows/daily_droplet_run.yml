@@ -211,7 +211,7 @@ jobs:
           test-run-name: nightly-e2e-client-${{ matrix.os }}
           profile: ci
           junit-path: junit.xml
-          package: safe_network
+          package: sn_client
           release: true
           features: test-utils
           filters: client
