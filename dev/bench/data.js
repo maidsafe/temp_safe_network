@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1650449647074,
+  "lastUpdate": 1650460484601,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -461,6 +461,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4828642227,
             "range": "± 946193061",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "joshuef@gmail.com",
+            "name": "Josh Wilson",
+            "username": "joshuef"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "190f90bab927ba8269607a2686468ec7e80c303c",
+          "message": "ci: droplet run now uses sn_client instead of safe_network package for client tests",
+          "timestamp": "2022-04-20T14:47:46+02:00",
+          "tree_id": "92bae442d7d9041bf47e0119e558ea238b683f12",
+          "url": "https://github.com/maidsafe/safe_network/commit/190f90bab927ba8269607a2686468ec7e80c303c"
+        },
+        "date": 1650460483549,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10502987626,
+            "range": "± 6775973770",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3993618652,
+            "range": "± 1651674915",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 8776262617,
+            "range": "± 6046328090",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 7702590074,
+            "range": "± 1841441627",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3145666264,
+            "range": "± 735370358",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4583993027,
+            "range": "± 1273275020",
             "unit": "ns/iter"
           }
         ]
