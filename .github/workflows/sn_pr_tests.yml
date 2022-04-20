@@ -139,6 +139,10 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}-unit
 
+      - name: Build all test targets
+       # all = all crates in workspace, lib/bins targets, with these features...
+        run: cargo test --no-run --release --features=test-utils -p sn_interface -p sn_dysfunction -p sn_node
+
       - name: Run sn_interface tests
         timeout-minutes: 25
         uses: jacderida/cargo-nextest@main
@@ -162,7 +166,7 @@ jobs:
           release: true
 
       - name: Run node unit tests
-        timeout-minutes: 25
+        timeout-minutes: 15
         uses: jacderida/cargo-nextest@main
         with:
           test-run-name: unit-tests-${{ matrix.os }}
