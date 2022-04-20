@@ -62,26 +62,6 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
 
-        // Apply backpressure if needed.
-        #[cfg(feature = "back-pressure")]
-        if let Some(load_report) = self.comm.tolerated_msgs_per_s(&sender).await {
-            let msg_src = wire_msg.msg_kind().src();
-            if !msg_src.is_end_user() {
-                trace!("Sending BackPressure: {}", load_report);
-                let src_section_pk = self.network_knowledge().section_key().await;
-
-                cmds.push(Cmd::SendMsg {
-                    wire_msg: WireMsg::single_src(
-                        &*self.info.read().await,
-                        msg_src.to_dst(),
-                        SystemMsg::BackPressure(load_report),
-                        src_section_pk,
-                    )?,
-                    recipients: vec![sender],
-                })
-            }
-        }
-
         // Deserialize the payload of the incoming message
         let msg_id = wire_msg.msg_id();
         // payload needed for aggregation

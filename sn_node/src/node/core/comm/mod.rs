@@ -146,8 +146,9 @@ impl Comm {
 
     #[cfg(feature = "back-pressure")]
     /// Returns our caller-specific tolerated msgs per s, if the value has changed significantly.
-    pub(crate) async fn tolerated_msgs_per_s(&self, caller: &Peer) -> Option<f64> {
-        self.back_pressure.tolerated_msgs_per_s(caller).await
+    pub(crate) async fn tolerated_msgs_per_s(&self) -> Option<f64> {
+        let sessions = self.sessions.read().await.len();
+        self.back_pressure.tolerated_msgs_per_s(sessions).await
     }
 
     #[cfg(feature = "back-pressure")]
