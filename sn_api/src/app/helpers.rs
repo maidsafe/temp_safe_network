@@ -44,9 +44,9 @@ pub fn parse_tokens_amount(amount_str: &str) -> Result<Token> {
                 Error::InvalidAmount(format!("Invalid tokens amount '{}', the minimum possible amount is one nano token (0.000000001)", amount_str))
             }
             SafeNdError::FailedToParse(msg) => {
-                Error::InvalidAmount(format!("Invalid tokens amount '{}' ({})", amount_str, msg))
+                Error::InvalidAmount(format!("Invalid tokens amount '{}': {}", amount_str, msg))
             },
-            _ => Error::InvalidAmount(format!("Invalid tokens amount '{}'", amount_str)),
+            other_err => Error::InvalidAmount(format!("Invalid tokens amount '{}': {:?}", amount_str, other_err)),
         }
     })
 }

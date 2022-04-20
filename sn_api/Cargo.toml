@@ -47,14 +47,14 @@ xor_name = "4.0.1"
 
   [dependencies.bls]
   package = "blsttc"
-  version = "3.1.0"
+  version = "3.4.0"
 
   [dependencies.bytes]
   version = "1.0.1"
   features = [ "serde" ]
 
   [dependencies.sn_dbc]
-  version = "3.0.0"
+  version = "3.1.0"
   features = [ "serdes" ]
 
   [dependencies.ed25519-dalek]

@@ -6,11 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+pub use sn_dbc::Dbc;
+
+use super::helpers::parse_tokens_amount;
+use super::register::EntryHash;
 use crate::safeurl::{ContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe};
 use bytes::Bytes;
 use log::{debug, warn};
-pub use sn_dbc::Dbc;
+use sn_dbc::{rng, Owner, OwnerOnce, TransactionBuilder};
 use sn_interface::types::Token;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -19,7 +23,7 @@ const WALLET_TYPE_TAG: u64 = 1_000;
 
 /// Set of spendable DBC's mapped to their friendly name
 /// as defined/chosen by the user when depositing DBC's into a Wallet.
-pub type WalletSpendableDbcs = BTreeMap<String, Dbc>;
+pub type WalletSpendableDbcs = BTreeMap<String, (Dbc, EntryHash)>;
 
 impl Safe {
     /// Create an empty Wallet on Safe and return its XOR-URL
@@ -48,28 +52,18 @@ impl Safe {
             return Err(Error::InvalidInput("Only bearer DBC's are supported at this point by the Wallet. Please deposit a bearer DBC's.".to_string()));
         }
 
+        // TODO: check the input DBCs were spent and all other sort of verifications,
+        // perhaps all optional, and we may want a separate API to also do these verifications
+        // for the user to perform them without depositing the DBC into a Wallet.
+
+        let safeurl = self.parse_and_resolve_url(wallet_url).await?;
+
         let spendable_name = match spendable_name {
             Some(name) => name.to_string(),
             None => hex::encode(dbc.hash()),
         };
 
-        let dbc_bytes = Bytes::from(rmp_serde::to_vec_named(&dbc).map_err(|err| {
-            Error::Serialisation(format!(
-                "Failed to serialise DBC to insert it into the Wallet: {:?}",
-                err
-            ))
-        })?);
-
-        let safeurl = self.parse_and_resolve_url(wallet_url).await?.to_string();
-        let dbc_xorurl = self.store_private_bytes(dbc_bytes, None).await?;
-
-        let entry = (spendable_name.clone().into_bytes(), dbc_xorurl.into_bytes());
-        let _entry_hash = self
-            .multimap_insert(
-                &safeurl,
-                entry,
-                BTreeSet::default(), // TODO: provide root to replace if DBC already exists ??
-            )
+        self.insert_dbc_into_wallet(&safeurl, dbc, spendable_name.clone())
             .await?;
 
         debug!(
@@ -82,8 +76,8 @@ impl Safe {
 
     /// Fetch a Wallet from a Url performing all type of URL resolution required.
     /// Return the set of spendable DBCs found in the Wallet.
-    pub async fn wallet_get(&self, url: &str) -> Result<WalletSpendableDbcs> {
-        let safeurl = self.parse_and_resolve_url(url).await?;
+    pub async fn wallet_get(&self, wallet_url: &str) -> Result<WalletSpendableDbcs> {
+        let safeurl = self.parse_and_resolve_url(wallet_url).await?;
         debug!("Wallet URL was parsed and resolved to: {}", safeurl);
         self.fetch_wallet(&safeurl).await
     }
@@ -113,7 +107,7 @@ impl Safe {
         };
 
         let mut balances = WalletSpendableDbcs::default();
-        for (_entry_hash, (key, value)) in entries.iter() {
+        for (entry_hash, (key, value)) in entries.iter() {
             let xorurl_str = std::str::from_utf8(value)?;
             let dbc_xorurl = SafeUrl::from_xorurl(xorurl_str)?;
             let dbc_bytes = self.fetch_data(&dbc_xorurl, None).await?;
@@ -127,7 +121,7 @@ impl Safe {
             };
 
             let spendable_name = std::str::from_utf8(key)?.to_string();
-            balances.insert(spendable_name, dbc);
+            balances.insert(spendable_name, (dbc, *entry_hash));
         }
 
         Ok(balances)
@@ -143,7 +137,7 @@ impl Safe {
 
         // Iterate through the DBCs adding up the amounts
         let mut total_balance = Token::from_nano(0);
-        for (name, dbc) in balances.iter() {
+        for (name, (dbc, _)) in balances.iter() {
             debug!("Checking spendable balance named: {}", name);
 
             let balance = match dbc.amount_secrets_bearer() {
@@ -169,15 +163,175 @@ impl Safe {
         Ok(total_balance.to_string())
     }
 
-    /// Reissue a DBC from a Wallet returning the output DBC, and automatically depositing
+    /// Reissue a Bearer-DBC from a Wallet returning the output DBC, and automatically depositing
     /// the change DBC into the source wallet.
-    pub async fn wallet_reissue(
+    /// Spent DBCs are marked as removed from the source Wallet, but since all entries are kept in
+    /// the history of the Wallet, they can still be retrieved eventually if desired by the user.
+    pub async fn wallet_reissue(&self, wallet_url: &str, amount: &str) -> Result<Dbc> {
+        debug!(
+            "Reissuing Bearer-DBCs from Wallet at {}, for an amount of {} tokens",
+            wallet_url, amount
+        );
+
+        // Parse and validate the output amount is valid
+        let output_amount = parse_tokens_amount(amount)?;
+        if output_amount.as_nano() == 0 {
+            return Err(Error::InvalidAmount(
+                "Output amount to reissue needs to be larger than zero (0).".to_string(),
+            ));
+        }
+
+        // Resolve Wallet URL and obtain the list of spendable DBCs that can be used in this Tx
+        let safeurl = self.parse_and_resolve_url(wallet_url).await?;
+        let spendable_dbcs = self.fetch_wallet(&safeurl).await?;
+
+        // We'll combine one or more input DBCs and reissue:
+        // - one output DBC for the recipient,
+        // - and a second DBC for the change, which will be stored in the source Wallet.
+        let mut input_dbcs_to_spend = Vec::<Dbc>::new();
+        let mut input_dbcs_entries_hash = BTreeSet::<EntryHash>::new();
+        let mut total_input_amount = 0;
+        let mut change_amount = output_amount;
+        for (name, (dbc, entry_hash)) in spendable_dbcs.into_iter() {
+            let dbc_balance = match dbc.amount_secrets_bearer() {
+                Ok(amount_secrets) => Token::from_nano(amount_secrets.amount()),
+                Err(err) => {
+                    warn!("Ignoring input DBC found in Wallet (entry: {}) due to error in revealing secret amount: {:?}", name, err);
+                    continue;
+                }
+            };
+
+            // Add this DBC as input to be spent
+            input_dbcs_to_spend.push(dbc);
+            input_dbcs_entries_hash.insert(entry_hash);
+            total_input_amount += dbc_balance.as_nano();
+
+            // If we've already combined input DBCs for the total output amount, then stop
+            match change_amount.checked_sub(dbc_balance) {
+                Some(pending_output) => {
+                    change_amount = pending_output;
+                    if change_amount.as_nano() == 0 {
+                        break;
+                    }
+                }
+                None => {
+                    change_amount =
+                        Token::from_nano(dbc_balance.as_nano() - change_amount.as_nano());
+                    break;
+                }
+            }
+        }
+
+        // Make sure total input amount gathered with input DBCs are enough for the output amount
+        if total_input_amount < output_amount.as_nano() {
+            return Err(Error::NotEnoughBalance(
+                Token::from_nano(total_input_amount).to_string(),
+            ));
+        }
+
+        // We can now reissue the output DBCs
+        let (output_dbc, change_dbc) = self
+            .reissue_dbcs(input_dbcs_to_spend, output_amount, change_amount)
+            .await?;
+
+        if let Some(change_dbc) = change_dbc {
+            self.insert_dbc_into_wallet(&safeurl, &change_dbc, "change-dbc".to_string())
+                .await?;
+        }
+
+        // (virtually) remove input DBCs in the source Wallet
+        self.multimap_remove(&safeurl.to_string(), input_dbcs_entries_hash)
+            .await?;
+
+        Ok(output_dbc)
+    }
+
+    // Private helper to insert a DBC into the Wallet's underlying Multimap
+    async fn insert_dbc_into_wallet(
         &self,
-        _wallet_url: &str,
-        _amount: &str,
-        _recipient: &str,
-    ) -> Result<Dbc> {
-        unimplemented!();
+        safeurl: &SafeUrl,
+        dbc: &Dbc,
+        spendable_name: String,
+    ) -> Result<()> {
+        if !dbc.is_bearer() {
+            return Err(Error::InvalidInput("Only bearer DBC's are supported at this point by the Wallet. Please deposit a bearer DBC's.".to_string()));
+        }
+
+        let dbc_bytes = Bytes::from(rmp_serde::to_vec_named(dbc).map_err(|err| {
+            Error::Serialisation(format!(
+                "Failed to serialise DBC to insert it into the Wallet: {:?}",
+                err
+            ))
+        })?);
+
+        let dbc_xorurl = self.store_private_bytes(dbc_bytes, None).await?;
+
+        let entry = (spendable_name.into_bytes(), dbc_xorurl.into_bytes());
+        let _entry_hash = self
+            .multimap_insert(&safeurl.to_string(), entry, BTreeSet::default())
+            .await?;
+
+        Ok(())
+    }
+
+    // Private helper to reissue DBCs using the sn_dbc API,
+    // and logging the spent input DBCs on the network.
+    // Return the output DBC, and the change DBC if there is one.
+    async fn reissue_dbcs(
+        &self,
+        input_dbcs: Vec<Dbc>,
+        output_amount: Token,
+        change_amount: Token,
+    ) -> Result<(Dbc, Option<Dbc>)> {
+        // TODO: support for non-bearer DBCs, and allow to provide a recipient's pk
+        let recipient_owner = Owner::from_random_secret_key(&mut rng::thread_rng());
+        let owneronce = OwnerOnce::from_owner_base(recipient_owner, &mut rng::thread_rng());
+
+        // TODO: enable the use ot decoys
+        let mut tx_builder = TransactionBuilder::default()
+            .set_decoys_per_input(0)
+            .set_require_all_decoys(false)
+            .add_inputs_dbc_bearer(input_dbcs.iter())?
+            .add_output_by_amount(output_amount.as_nano(), owneronce);
+
+        // If there is a change, issue the change DBC
+        let change_owner = Owner::from_random_secret_key(&mut rng::thread_rng());
+        let change_owneronce = OwnerOnce::from_owner_base(change_owner, &mut rng::thread_rng());
+        if change_amount.as_nano() > 0 {
+            tx_builder =
+                tx_builder.add_output_by_amount(change_amount.as_nano(), change_owneronce.clone());
+        }
+
+        let dbc_builder = tx_builder.build(&mut rng::thread_rng())?;
+
+        // Build the output DBCs
+        /*
+        // TODO: spend all the input DBCs, collecting the spent proof for each of them:
+        //   let _spent_proof_share = self.spend_dbc(input_dbcs).await?;
+        //   dbc_builder = dbc_builder.add_spent_proof_share(spent_proof_share);
+        //
+        // TODO: perform the verification of the transaction and spentproofs before building DBCs.
+         */
+
+        let dbcs = dbc_builder.build_without_verifying()?;
+
+        let mut output_dbc = None;
+        let mut change_dbc = None;
+        for (dbc, owneronce, _) in dbcs {
+            // If there is a change DBC store it in the source Wallet
+            if change_owneronce == owneronce && change_amount.as_nano() > 0 {
+                change_dbc = Some(dbc);
+            } else {
+                output_dbc = Some(dbc);
+            }
+        }
+
+        match output_dbc {
+            None => Err(Error::DbcReissueError(
+                "Unexpectedly failed to generate output DBC. No balance were spent from the Wallet.".to_string(),
+            )),
+            Some(dbc) => Ok((dbc, change_dbc)),
+        }
     }
 }
 
@@ -185,7 +339,7 @@ impl Safe {
 mod tests {
     use super::*;
     use crate::app::test_helpers::{new_read_only_safe_instance, new_safe_instance};
-    use anyhow::{anyhow, Result};
+    use anyhow::{anyhow, bail, Result};
 
     // TODO: allow to set an amount and SK to generate a DBC with,
     // instead of deserialising a hard-coded serialised DBC.
@@ -292,7 +446,7 @@ mod tests {
 
         let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
 
-        let dbc1_read = wallet_balances
+        let (dbc1_read, _) = wallet_balances
             .get("my-first-dbc")
             .ok_or_else(|| anyhow!("Couldn't read first DBC from fetched wallet"))?;
         assert_eq!(dbc1_read.owner_base(), dbc1.owner_base());
@@ -301,7 +455,7 @@ mod tests {
             .map_err(|err| anyhow!("Couldn't read balance from first DBC fetched: {:?}", err))?;
         assert_eq!(balance1.amount(), 1_530_000_000);
 
-        let dbc2_read = wallet_balances
+        let (dbc2_read, _) = wallet_balances
             .get("my-second-dbc")
             .ok_or_else(|| anyhow!("Couldn't read second DBC from fetched wallet"))?;
         assert_eq!(dbc2_read.owner_base(), dbc2.owner_base());
@@ -358,6 +512,91 @@ mod tests {
         // Now check the Wallet can still be read and the corrupted entry is ignored
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
         assert_eq!(current_balance, "1.530000000");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wallet_reissue() -> Result<()> {
+        let safe = new_safe_instance().await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+
+        let dbc = new_dbc(DBC_WITH_1_530_000_000)?;
+        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc)
+            .await?;
+        let dbc = new_dbc(DBC_WITH_12_230_000_000)?;
+        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-2"), &dbc)
+            .await?;
+
+        let output_dbc = safe.wallet_reissue(&wallet_xorurl, "2.35").await?;
+
+        let output_balance = output_dbc
+            .amount_secrets_bearer()
+            .map_err(|err| anyhow!("Couldn't read balance from output DBC: {:?}", err))?;
+        assert_eq!(output_balance.amount(), 2_350_000_000);
+
+        let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
+        assert_eq!(current_balance, "11.410000000");
+
+        let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
+
+        assert_eq!(wallet_balances.len(), 1);
+
+        let (change_dbc_read, _) = wallet_balances
+            .get("change-dbc")
+            .ok_or_else(|| anyhow!("Couldn't read change DBC from fetched wallet"))?;
+        let change = change_dbc_read
+            .amount_secrets_bearer()
+            .map_err(|err| anyhow!("Couldn't read balance from change DBC fetched: {:?}", err))?;
+        assert_eq!(change.amount(), 11_410_000_000);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wallet_not_enough_balance() -> Result<()> {
+        let safe = new_safe_instance().await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+
+        match safe.wallet_reissue(&wallet_xorurl, "2.55").await {
+            Err(Error::NotEnoughBalance(msg)) => {
+                assert_eq!(msg, "0.000000000");
+            }
+            Err(err) => bail!("Error returned is not the expected: {:?}", err),
+            Ok(_) => bail!("Wallet reissue succeeded unexpectedly".to_string()),
+        }
+
+        let dbc = new_dbc(DBC_WITH_1_530_000_000)?;
+        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc"), &dbc)
+            .await?;
+
+        match safe.wallet_reissue(&wallet_xorurl, "2.55").await {
+            Err(Error::NotEnoughBalance(msg)) => {
+                assert_eq!(msg, "1.530000000");
+                Ok(())
+            }
+            Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
+            Ok(_) => Err(anyhow!("Wallet reissue succeeded unexpectedly".to_string())),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_wallet_deposit_reissued_dbc() -> Result<()> {
+        let safe = new_safe_instance().await?;
+        let wallet1_xorurl = safe.wallet_create().await?;
+        let wallet2_xorurl = safe.wallet_create().await?;
+
+        let dbc = new_dbc(DBC_WITH_1_530_000_000)?;
+        safe.wallet_deposit(&wallet1_xorurl, Some("deposited-dbc"), &dbc)
+            .await?;
+
+        let output_dbc = safe.wallet_reissue(&wallet1_xorurl, "0.25").await?;
+
+        safe.wallet_deposit(&wallet2_xorurl, Some("reissued-dbc"), &output_dbc)
+            .await?;
+
+        let balance = safe.wallet_balance(&wallet2_xorurl).await?;
+        assert_eq!(balance, "0.250000000");
 
         Ok(())
     }
