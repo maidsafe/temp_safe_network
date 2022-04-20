@@ -44,9 +44,6 @@ pub enum WalletSubCommands {
         /// Source Wallet URL
         #[structopt(long = "from")]
         from: String,
-        /// The receiving SafeKey URL or public key, otherwise pulled from stdin if not provided
-        #[structopt(long = "to")]
-        to: Option<String>,
     },
 }
 
@@ -91,6 +88,7 @@ pub async fn wallet_commander(
             let mut dbc_str =
                 hex::decode(dbc).map_err(|err| eyre!("Couldn't hex-decode DBC: {:?}", err))?;
 
+            // TODO: use MsgPack instead of bincode
             dbc_str.reverse();
             let dbc = bincode::deserialize(&dbc_str)
                 .map_err(|err| eyre!("Couldn't deserialise DBC: {:?}", err))?;
@@ -108,18 +106,23 @@ pub async fn wallet_commander(
 
             Ok(())
         }
-        WalletSubCommands::Reissue { amount, from, to } => {
-            let destination = get_from_arg_or_stdin(
-                to,
-                Some("...awaiting destination Wallet/SafeKey URL, or public key, from STDIN stream..."),
-            )?;
+        WalletSubCommands::Reissue { amount, from } => {
+            let dbc = safe.wallet_reissue(&from, &amount).await?;
 
-            let dbc = safe.wallet_reissue(&from, &amount, &destination).await?;
+            // TODO: use MsgPack instead of bincode
+            let mut serialised_dbc = bincode::serialize(&dbc)
+                .map_err(|err| eyre!("Couldn't serialise DBC: {:?}", err))?;
+            serialised_dbc.reverse();
+
+            let dbc_hex = hex::encode(serialised_dbc);
 
             if OutputFmt::Pretty == output_fmt {
-                println!("Success. Reissued DBC: {:?}", dbc);
+                println!("Success. Reissued DBC with {} safecoins:", amount);
+                println!("-------- DBC DATA --------");
+                println!("{}", dbc_hex);
+                println!("--------------------------");
             } else {
-                println!("{:?}", dbc)
+                println!("{}", dbc_hex);
             }
 
             Ok(())

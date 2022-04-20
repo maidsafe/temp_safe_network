@@ -76,3 +76,93 @@ fn calling_safe_wallet_balance() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn calling_safe_wallet_reissue() -> Result<()> {
+    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--name",
+            "my-first-dbc",
+            &wallet_xorurl,
+            DBC_WITH_12_230_000_000,
+        ],
+        Some(0),
+    )?;
+
+    safe_cmd(
+        ["wallet", "reissue", "7.15", "--from", &wallet_xorurl],
+        Some(0),
+    )?
+    .assert()
+    .stdout(predicate::str::contains(
+        "Success. Reissued DBC with 7.15 safecoins",
+    ))
+    .success();
+
+    safe_cmd(["wallet", "balance", &wallet_xorurl], Some(0))?
+        .assert()
+        .stdout(format!(
+            "Wallet at \"{}\" has a total balance of 5.080000000 safecoins\n",
+            wallet_xorurl
+        ))
+        .success();
+
+    Ok(())
+}
+
+#[test]
+fn calling_safe_wallet_deposit_reissued() -> Result<()> {
+    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--name",
+            "my-first-dbc",
+            &wallet_xorurl,
+            DBC_WITH_12_230_000_000,
+        ],
+        Some(0),
+    )?;
+
+    let reissued_dbc = safe_cmd_stdout(
+        [
+            "wallet",
+            "reissue",
+            "1.33",
+            "--json",
+            "--from",
+            &wallet_xorurl,
+        ],
+        Some(0),
+    )?;
+
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--name",
+            "reissued-dbc",
+            &wallet_xorurl,
+            &reissued_dbc,
+        ],
+        Some(0),
+    )?;
+
+    safe_cmd(["wallet", "balance", &wallet_xorurl], Some(0))?
+        .assert()
+        .stdout(format!(
+            "Wallet at \"{}\" has a total balance of 12.230000000 safecoins\n",
+            wallet_xorurl
+        ))
+        .success();
+
+    Ok(())
+}

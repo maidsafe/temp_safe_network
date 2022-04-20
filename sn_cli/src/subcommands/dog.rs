@@ -132,7 +132,9 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe)
                 }
                 SafeData::Multimap { .. }
                 | SafeData::PrivateRegister { .. }
-                | SafeData::PublicRegister { .. } => unimplemented!(),
+                | SafeData::PublicRegister { .. } => {
+                    println!("Type of content not supported yet by 'dog' command.")
+                }
             }
         }
         println!();
