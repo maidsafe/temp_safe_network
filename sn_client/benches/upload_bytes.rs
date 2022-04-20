@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion, SamplingMode};
 use eyre::Result;
 use sn_client::{utils::test_utils::read_network_conn_info, Client, ClientConfig, Error};
 use sn_interface::types::utils::random_bytes;
@@ -43,7 +43,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("upload-sampling");
     // measure over around 9s in general
     group.measurement_time(std::time::Duration::from_secs(90));
-
+    group.sampling_mode(SamplingMode::Flat);
     let runtime = Runtime::new().unwrap();
     group.sample_size(10);
 
