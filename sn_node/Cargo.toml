@@ -19,7 +19,7 @@ name = "routing_stress"
 required-features = ["test-utils"]
 
 [features]
-default = []
+default = ["back-pressure"]
 chaos = []
 back-pressure = ["sn_interface/back-pressure"]
 unstable-wiremsg-debuginfo = []
