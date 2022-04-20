@@ -23,6 +23,8 @@ jobs:
     if: ${{ success() }}
     # github jobs that need to have passed for bors to give the all clear
     needs:
+      - cargo-udeps
+      - cargo-deny
       - e2e
       - e2e-split
       - unit
@@ -33,6 +35,36 @@ jobs:
     steps:
       - name: CI succeeded
         run: exit 0
+
+  cargo-udeps:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Unused dependency check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+
+      - name: Run cargo-udeps
+        uses: aig787/cargo-udeps-action@v1
+        with:
+          version: 'latest'
+          args: '--all-targets --features test-utils'
+
+  cargo-deny:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - shell: bash
+      run: wget https://raw.githubusercontent.com/maidsafe/QA/master/misc-scripts/deny.toml
+
+    - uses: EmbarkStudios/cargo-deny-action@v1
+
 
   lint:
       runs-on: ubuntu-latest
