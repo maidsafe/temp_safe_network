@@ -9,7 +9,7 @@
 use super::ipc::IpcError;
 use super::nrs::NrsMap;
 use super::safeurl::{Error as UrlError, SafeUrl, XorUrl};
-use safe_network::client::Error as ClientError;
+use sn_client::Error as ClientError;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;

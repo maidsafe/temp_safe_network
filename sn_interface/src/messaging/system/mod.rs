@@ -84,6 +84,7 @@ pub enum SystemMsg {
     },
     /// Probes the network by sending a message to a random dst triggering an AE flow.
     AntiEntropyProbe(XorName),
+    #[cfg(feature = "back-pressure")]
     /// Sent when a msg-consuming node wants to update a msg-producing node on the number of msgs per s it wants to receive.
     /// It tells the node to adjust msg sending rate according to the provided value in this msg.
     BackPressure(f64),

@@ -1,0 +1,118 @@
+name: Benchmark Page Generation
+
+# Do not run this workflow on pull request since this workflow has permission to modify contents.
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  # deployments permission to deploy GitHub pages website
+  deployments: write
+  # contents permission to update benchmark contents in gh-pages branch
+  contents: write
+
+env:
+  CARGO_INCREMENTAL: '0'
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: "-D warnings"
+  NODE_COUNT: 15
+
+jobs:
+  benchmark:
+    name: Run and log benchmark results on gh-pages
+    # right now only ubuntu, running on multiple systems would require many pushes...\
+    # perhaps this can be done with one consolidation action in the future, pulling down all results and pushing
+    # once to the branch..
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        id: toolchain
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v1
+        with:
+          cache-on-failure: true
+
+      - run: cargo install cargo-criterion
+
+      - name: ubuntu install ripgrep
+        run: sudo apt-get -y install ripgrep
+
+      - name: Build sn_node bins
+        run: cd sn_node && cargo build --release --bins
+        timeout-minutes: 60
+
+      - name: Build testnet
+        run: cargo build  --release --bin testnet
+        timeout-minutes: 60
+
+      - name: Build log_cmds_inspector
+        run: cargo build  --release --bin log_cmds_inspector
+        timeout-minutes: 60
+
+      - name: Start the network
+        run: ./target/release/testnet
+        id: section-startup
+        env:
+          RUST_LOG: "sn_node=trace"
+
+      - name: Print Network Log Stats at start
+        shell: bash
+        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+
+      - name: Wait for all nodes to join
+        shell: bash
+        run: ./resources/scripts/wait_for_nodes_to_join.sh
+        timeout-minutes: 10
+
+      - name: Print Network Log Stats after nodes joined
+        shell: bash
+        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+
+
+      ########################
+      ### Benchmark itself ###
+      ########################
+
+      - name: Bench sn_node
+        shell: bash
+        # Criterion outputs the actual bench results to stderr " 2>&1 | tee putput.txt" takes stderr,
+        # passes to tee which displays it in the terminal and writes to output.txt
+        run: cargo criterion --features=test-utils -p sn_client --output-format bencher  2>&1 | tee output.txt
+
+      - name: Stop the network on fail
+        shell: bash
+        if: failure()
+        run: safe node killall || true && safe auth stop || true
+
+      - name: Failure logs
+        shell: bash
+        if: failure()
+        run: tail $HOME/.safe/node/local-test-network/*/*.log*
+
+      - name: Remove git hooks so gh-pages git commits will work
+        shell: bash
+        run: rm -rf .git/hooks/pre-commit
+
+      #################################
+      ### Log any regression alerts ###
+      #################################
+
+      # gh-pages branch is updated and pushed automatically with extracted benchmark data
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Safe Network Benchmarks
+          tool: 'cargo'
+          output-file-path: output.txt
+          # Access token to deploy GitHub Pages branch
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Push and deploy GitHub pages branch automatically
+          auto-push: true
+

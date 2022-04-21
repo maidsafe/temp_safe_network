@@ -2,7 +2,7 @@
 
 sn_version=$1
 if [[ -z "$sn_version" ]]; then
-    echo "You must supply a version number for safe_network"
+    echo "You must supply a version number for sn_node"
     exit 1
 fi
 
@@ -15,6 +15,10 @@ fi
 # The single quotes around EOF is to stop attempted variable and backtick expansion.
 read -r -d '' release_description << 'EOF'
 Command line interface for the Safe Network. Refer to [Safe CLI User Guide](https://github.com/maidsafe/sn_cli/blob/master/README.md) for detailed instructions.
+
+## Safe Network Interface Changelog
+
+__SN_INTERFACE_CHANGELOG_TEXT__
 
 ## Safe Node Dysfunction Changelog
 

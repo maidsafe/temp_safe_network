@@ -4,7 +4,44 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.51.3 (2022-04-14)
+
+### New Features
+
+ - <csr-id-842c77a5fe1c4f13e9a9f37b3b5dea974c0f5a82/> adding first set of basic wallet APIs and CLI commands
+
+### Other
+
+ - <csr-id-a6dd3dfc5d60ef5f8591e3b4628d477e4801f7a7/> fix error message parsing after crate refactors
+
+### Test
+
+ - <csr-id-2c557b5d5b5e21882ea3bf1cf904103576363603/> adding CLI tests for Wallet commands
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 5 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - fix error message parsing after crate refactors ([`a6dd3df`](https://github.com/maidsafe/safe_network/commit/a6dd3dfc5d60ef5f8591e3b4628d477e4801f7a7))
+    - adding CLI tests for Wallet commands ([`2c557b5`](https://github.com/maidsafe/safe_network/commit/2c557b5d5b5e21882ea3bf1cf904103576363603))
+    - adding first set of basic wallet APIs and CLI commands ([`842c77a`](https://github.com/maidsafe/safe_network/commit/842c77a5fe1c4f13e9a9f37b3b5dea974c0f5a82))
+</details>
+
 ## v0.51.2 (2022-04-09)
+
+<csr-id-487efa4d38fecc0c8071ee38b39f9a3e402a3d5b/>
 
 ### Bug Fixes
 
@@ -16,13 +53,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
    Sadly, this test is subject to rate limiting and sometimes fails, even with retries. It's not worth
    having the nightly release fail because of this test, so I'm just disabling it again.
 
+### Chore
+
+ - <csr-id-c4e3de1d9715c6e3618a763fa857feca4258248f/> safe_network-0.58.12/sn_api-0.58.1/sn_cli-0.51.2
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release over the course of 2 calendar days.
- - 8 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release over the course of 2 calendar days.
+ - 9 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -32,11 +73,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - safe_network-0.58.12/sn_api-0.58.1/sn_cli-0.51.2 ([`c4e3de1`](https://github.com/maidsafe/safe_network/commit/c4e3de1d9715c6e3618a763fa857feca4258248f))
     - disable node install test ([`487efa4`](https://github.com/maidsafe/safe_network/commit/487efa4d38fecc0c8071ee38b39f9a3e402a3d5b))
     - files API to use the Scope encoded in the input Urls ([`4303aec`](https://github.com/maidsafe/safe_network/commit/4303aec7813f235234022be43e2b3adb4528da57))
 </details>
 
 ## v0.51.1 (2022-03-31)
+
+<csr-id-0a719147ae567b41ba2fcbf4c3c0b44e6d1955d1/>
+<csr-id-08b023d38c06b50b6c373c2faa91013cb6ad1c38/>
 
 ### Chore
 
@@ -75,6 +120,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.51.0 (2022-03-25)
+
+<csr-id-907c7d3ef4f65df5566627938154dfca1e2fdc05/>
+<csr-id-90712c91368b4d88537acc65a3ccc5478fe38d2c/>
+<csr-id-6b83f38f17c241c00b70480a18a47b04d9a51ee1/>
 
 ### Chore
 
@@ -126,6 +175,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.50.5 (2022-03-22)
 
+<csr-id-a6e2e0c5eec5c2e88842d18167128991b76ecbe8/>
+<csr-id-d3989bdd95129999996e58736ec2553242697f2c/>
+
 ### Chore
 
  - <csr-id-a6e2e0c5eec5c2e88842d18167128991b76ecbe8/> safe_network-0.58.7/sn_api-0.57.3/sn_cli-0.50.5
@@ -153,6 +205,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.50.4 (2022-03-04)
+
+<csr-id-8f44eabd288cd23435bef6e646b981b881fb104b/>
+<csr-id-7cf7fd675beec5e7aa122f0f127402b636e659b7/>
 
 ### Other
 
@@ -190,6 +245,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.50.3 (2022-03-01)
 
+<csr-id-51b3d75fc7389de647f6df230bff32e8c7d7267c/>
+
 ### Chore
 
  - <csr-id-51b3d75fc7389de647f6df230bff32e8c7d7267c/> safe_network-0.58.3/sn_cli-0.50.3
@@ -219,6 +276,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.50.2 (2022-02-27)
+
+<csr-id-a2677491d8e3d2e42045e596b9e36b36250d4c28/>
+<csr-id-634010fd79ce1487abbff5adf3d15da59709dd95/>
+<csr-id-705995ef67b3d4c45c95689c4a675e1063467ec9/>
+<csr-id-f95ef3d1cdc5d588e99c343470b8f45aedda70b4/>
+<csr-id-3b9f8d3b4565a5fc26c821f0b517cc463d7e6ca3/>
+<csr-id-7b4672dfb6ae305221018e7eab090deabe4d6739/>
 
 ### Other
 
@@ -260,6 +324,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.50.1 (2022-02-23)
 
+<csr-id-fc074ab28d3c8c011016e6598cf840fc38026418/>
+
 ### Chore
 
  - <csr-id-fc074ab28d3c8c011016e6598cf840fc38026418/> sn_cli-0.50.1
@@ -299,6 +365,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.50.0 (2022-02-17)
+
+<csr-id-149665a53c00f62be0e8c8ec340b951a06346848/>
+<csr-id-499db88b4e3fb57671a069f36aa3a71c945fb2fd/>
 
 ### Chore
 
@@ -352,6 +421,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.49.1 (2022-02-15)
 
+<csr-id-07dc30b281f3c67cb5598aaaf72ba5c668353bf7/>
+<csr-id-6e40898eb9ff007f60ddc5ea946318773fb90e55/>
+
 ### Chore
 
  - <csr-id-07dc30b281f3c67cb5598aaaf72ba5c668353bf7/> safe_network-0.57.1/sn_cli-0.49.1
@@ -388,6 +460,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.49.0 (2022-02-12)
+
+<csr-id-f558b5c60df64dd349158a327bec945321937cf3/>
+<csr-id-2fcbfc0347769ea41e0b9243bfb32e7104899a11/>
+<csr-id-a398c4f8d72828db0fc8c6d5825ead62ba85db64/>
 
 ### Refactor
 
@@ -465,6 +541,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.48.0 (2022-02-08)
 
+<csr-id-3f75bf8da770a6167c396080b3ad8b54cfeb27e2/>
+
 ### Chore
 
  - <csr-id-3f75bf8da770a6167c396080b3ad8b54cfeb27e2/> safe_network-0.56.0/sn_api-0.55.0/sn_cli-0.48.0
@@ -496,6 +574,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.47.1 (2022-02-04)
 
+<csr-id-86975f228f31303597a707e158005e44c86de1cc/>
+
 ### Chore
 
  - <csr-id-86975f228f31303597a707e158005e44c86de1cc/> safe_network-0.55.3/sn_api-0.54.1/sn_cli-0.47.1
@@ -521,6 +601,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.47.0 (2022-02-01)
+
+<csr-id-2ec86e28246031084d603768ffa1fddf320a10a2/>
 
 ### Chore
 
@@ -577,6 +659,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.46.0 (2022-01-28)
+
+<csr-id-9af70e7785c9329d8262de99bda68c4ad79d5154/>
+<csr-id-a58f6c5019e73ffbfa0f29965aa0fa62b026ece7/>
+<csr-id-366eee25f4b982d5a20d90168368a1aa14aa3181/>
 
 ### Refactor
 
@@ -649,6 +735,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.45.0 (2022-01-22)
 
+<csr-id-3b5ce194213a7090ee83c02b0043700cda230796/>
+<csr-id-0190f0305980bdaee30f9f2ab5eb5510149916db/>
+<csr-id-3dc23278c6a4fabc250b27f4312f5c51f0f271a4/>
+<csr-id-20f416cb7d0960a1d8d6f167a1ad1eed33ed6a7b/>
+<csr-id-7a7752f830785ec39d301e751dc75f228d43d595/>
+
 ### Refactor
 
  - <csr-id-3b5ce194213a7090ee83c02b0043700cda230796/> remove one layer of indirection
@@ -687,6 +779,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.44.0 (2022-01-20)
+
+<csr-id-ad2e30cf52cd8be01c00353d722ea1107c43a641/>
+<csr-id-923930acb3769cfa7047954a1fee1853ec9e3062/>
+<csr-id-57749b7d0671423fe205447bc84d9f8bfc99f54b/>
 
 ### Other
 
@@ -768,6 +864,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.43.2 (2022-01-06)
 
+<csr-id-99d012ef529df78ef4c84f5e6ea99d3a77414797/>
+<csr-id-155ee032ee56cbbb34928f2d14529273ccb69559/>
+<csr-id-a64c7e0414b77f545cb8cdbf64af0fb7212d1f2e/>
+
 ### Chore
 
  - <csr-id-99d012ef529df78ef4c84f5e6ea99d3a77414797/> safe_network-0.52.11/sn_api-0.50.5/sn_cli-0.43.2
@@ -818,6 +918,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.43.1 (2022-01-04)
 
+<csr-id-c790077bebca691f974000278d5525f4b011b8a7/>
+<csr-id-db515397771f117b3bf095e1a4afb897eb4acafe/>
+<csr-id-bebdae9d52d03bd13b679ee19446452990d1e2cf/>
+<csr-id-5f7000c5ec5895fb3f4c4a17a74ada52bb873fc7/>
+<csr-id-4bb2adf52efdac6187fffc299018bf13f3398e14/>
+<csr-id-0a70425fb314de4c165da54fdc29a127ae900d81/>
+
 ### Refactor
 
  - <csr-id-c790077bebca691f974000278d5525f4b011b8a7/> rename blob to file
@@ -855,6 +962,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## v0.43.0 (2022-01-03)
 
+<csr-id-ee86dc7ab1781731d3be19f9d7f414f157a91edb/>
+<csr-id-715a154fe7448cd18decd0a666ae11fb02eadedb/>
+
 ### Chore
 
  - <csr-id-ee86dc7ab1781731d3be19f9d7f414f157a91edb/> sn_api-0.50.0/sn_cli-0.43.0
@@ -883,6 +993,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.42.0 (2022-01-03)
+
+<csr-id-4f600e179bfbf6ac018876cca6f7fc193f5b5f1e/>
 
 ### Chore
 
@@ -913,6 +1025,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.41.0 (2022-01-03)
+
+<csr-id-e38925e07d69432db310fc8ec9803200ea964ab2/>
+<csr-id-f1bb1909f3fb506c1b7ec9b660ad533b7b8b9044/>
+<csr-id-ff1dd477aaea2a4dda6c9c15b5822b1b3a7514b7/>
 
 ### Chore
 
@@ -978,6 +1094,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.40.0 (2021-12-22)
+
+<csr-id-dffcd4e3dd07f99dd3a4f4330637cab9380db9c3/>
+<csr-id-6b59ad852f89f033caf2b3c7dfcfa3019f8129e8/>
+<csr-id-f6ffbdb5d999f84e3531a6dcd9dcdbacefd50d18/>
+<csr-id-d201f7e3480a8a12f488e2a54886cca942904a18/>
+<csr-id-f59ec2c6da30b13fc2606d2834fad108a56c3621/>
+<csr-id-b6f0c3f193e8116bcd08126b949eb1a2e9b5aaa5/>
+<csr-id-8aeca3dffdf92341d34e1f6856160cff57cf0d6a/>
+<csr-id-7dce30c10262573362e6f60c284a51696de36d01/>
 
 ### Refactor
 
@@ -1060,6 +1185,10 @@ This is a manually generated changelog, as `smart-release` seemed to have some i
 
 ## v0.39.1 (2021-12-16)
 
+<csr-id-943166ab6d88266909ec6cd8a8e98bbbf21ec18d/>
+<csr-id-6df94b1d1fb017c9b02e566ca22a518f885397c8/>
+<csr-id-9be440b36db07e1c04ab688b44ef91e4a56ed576/>
+
 ### Chore
 
  - <csr-id-943166ab6d88266909ec6cd8a8e98bbbf21ec18d/> sn_cli-0.39.1
@@ -1087,6 +1216,20 @@ This is a manually generated changelog, as `smart-release` seemed to have some i
 </details>
 
 ## v0.39.0 (2021-12-16)
+
+<csr-id-8d402e8b2255edf139e3c3507e6597e581719ad4/>
+<csr-id-1a8bbb7ebe4737f931cec259dc7863b84531f2c3/>
+<csr-id-45f1f02bbdb61e7c698f1f6a5a62fb63ed01aae3/>
+<csr-id-ffea442b710f0051483523297968c9bcbc81419b/>
+<csr-id-db98472ad8af2a61aa8edf594119ed6b7a92d3ad/>
+<csr-id-ae44ebbf46a72bf1897f8c6004466290f8425db7/>
+<csr-id-634a8f9f307598c51305067444514b43c85f196d/>
+<csr-id-b09f8307fd1047eb92d2cfe1a6ed38731f6e09e2/>
+<csr-id-e52a0c063f747e0be1525f07f8f759f4b9d042a7/>
+<csr-id-855f3042859dd641231135de618520050861c348/>
+<csr-id-6f5516d8bb677462ea6def46aa65a1094767d68c/>
+<csr-id-735a68a45aa264a5462642f4fb1e26f05bdf28ca/>
+<csr-id-58632a27d271140fc4d777f25a76b0daea582426/>
 
 This is a manual changelog entry. Subsequent CLI releases will use the automated changelog generated by `smart-release`.
 
@@ -1249,6 +1392,92 @@ This is a manual changelog entry. Subsequent CLI releases will use the automated
 ## v0.38.0 (2021-12-08)
 
 <csr-id-f3d3ab2b059040ff08b6239c8a6583c64eac160e/>
+<csr-id-6f0501699b0d0620a7c9d2b013944f90884ca1c3/>
+<csr-id-7fb6bd96a8bdaaee64592b5dc02596b9f6220165/>
+<csr-id-774694795114dc392db5219393fa63f204fcc905/>
+<csr-id-578d9054c668dcf5871cdac26f2c16aa5df13d58/>
+<csr-id-25ad76bc374e461c1df786def45ca79bd1f7484a/>
+<csr-id-86910340897256bb4df77b6edaa0f2c9584d6dce/>
+<csr-id-5780fd1d6ba480cb775fd66e53e41f02d97b3a94/>
+<csr-id-afd5422945fd1fc4ac509713e72471076ea4aee0/>
+<csr-id-318f6942ac1cd40391b283349bcfa959586422b5/>
+<csr-id-cd57437baf74af370c07d2be6dd9cd51be6d5f52/>
+<csr-id-c2c6716d29e56f387776202dad94ddda9b8fe2b2/>
+<csr-id-88a26d3af44b751d04bbfdddd6fa305bea736939/>
+<csr-id-f6f07349a7524304b3d6b1c22db65d77be519f4c/>
+<csr-id-e692becbbf09e2500284cb1507916fac56149f02/>
+<csr-id-ae026bb9ce91b1373b8b300c41bfef0c3f295c7a/>
+<csr-id-f9e07293ea1f8cd5e4428d95a299ba06c0f30a20/>
+<csr-id-5ac36cc64566561f4d442058c91b9857622e6f26/>
+<csr-id-b6eddcbf5d272e6a4430cfd6488f5236bef92a5d/>
+<csr-id-e814ff3b8c58ae7741938a1c73a22c87ed602883/>
+<csr-id-256c504e49121fa0550ae1bcff33f22b8efc78df/>
+<csr-id-ae19a45f58bf8d107eea8560af17801d2f619626/>
+<csr-id-06fda580250745abbd8a6a12bab19c05a61f5615/>
+<csr-id-d8ec5a81ae566e8d7068592e01cff4e808b1cad1/>
+<csr-id-a4e6bb9646521585e2d166fcbc072f43740d1000/>
+<csr-id-304a16d443a0347e50e0868057486d1067a37b4a/>
+<csr-id-67b746f607501511c38fe752f64119a12985ab72/>
+<csr-id-40bcd0f46dad6177b0052b73393d7789fd559b33/>
+<csr-id-e107e1314957053db2d71357450cac65cba52a68/>
+<csr-id-05f6d98cf21f0158f4b5161484c7c15a0561b6f4/>
+<csr-id-3f77429e8bd659a5b2e7aa377437fac1b3d709c0/>
+<csr-id-c78f4703a970e8b7466b091ad331d0f2233aa9a3/>
+<csr-id-ca21d1e97fcd28ca351887636affffff78e3aeb3/>
+<csr-id-8b8a3616673405005d77868dc397bd7542ab3ea7/>
+<csr-id-df25e4920c570771f6813ca03da02f6dfc8e59fb/>
+<csr-id-a973039178af33b859d421cf36571de49cceff17/>
+<csr-id-63432eb2e528401ae67da8eea0c82837ab42fc18/>
+<csr-id-14fdaa6537619483e94424ead5751d5ab41c8a01/>
+<csr-id-70015730c3e08881f803e9ce59be7ca16185ae11/>
+<csr-id-213cb39be8fbfdf614f3eb6248b14fe161927a14/>
+<csr-id-6f5e0a767a1c8519abdf06d42c7c958a812011ec/>
+<csr-id-fc10d037d64efc86796f1b1c6f255a4c7f91d3e1/>
+<csr-id-4f788a31ae7b4a2d602b5141946deacffef64a60/>
+<csr-id-1fbfc0444882d2b950be9eca70df2118606db9c3/>
+<csr-id-407efd15e0b4854864b83ccdb7d2c3adbb0a02e2/>
+<csr-id-a3e0b805af544205e82ac0c6d2a6e2ed1c55011f/>
+<csr-id-0d4755ed64a65c223bad253d9d7a03980ec12e8d/>
+<csr-id-d77859a8138de0ddcd6b121b928efe13e0254e81/>
+<csr-id-de482a5611333d069076d7da1b7c5a6017db65eb/>
+<csr-id-e3c6da38f92c354c560bd6b555d76f698779ebcf/>
+<csr-id-644c1e0d7b2bf346937aa5baf35adab58a49d39e/>
+<csr-id-792bce8dd94192f17c51d6a1c0b63c7c214ad7c3/>
+<csr-id-b61e83716cce00c0ba02f3d50bf060cfc095051a/>
+<csr-id-43c675ee514aa73fb5192717dae58c97587521e7/>
+<csr-id-4ba83c720fabcace7a2859ad308be5922a6597c0/>
+<csr-id-b38d840320d65b09ce85db9074f7b7a9487f83df/>
+<csr-id-2dff02dc71bc3574763906c8592d32bde64337c9/>
+<csr-id-a46ae886bb041ff46fc69a812f7dad65517dc7f4/>
+<csr-id-4f89812ed5ca3394d2cd7b93e3c79aac2929d11d/>
+<csr-id-7ec5ed71eac3def72967a16f45607ff4f8e03c0a/>
+<csr-id-6e4ea368fdcedb10042b5d8dc94ab02eece47003/>
+<csr-id-422547f9081de77538f2241c727ac55b00e1e48b/>
+<csr-id-7b6445a5b9903b1704c45759878bced097bcb82c/>
+<csr-id-9c3adffd0889f045ac19110072a194072d294705/>
+<csr-id-d19d57a2f369cb79fe5ac0c755f57b4005535540/>
+<csr-id-b5a6d8115ad3975a17dd973430480adf6c483490/>
+<csr-id-29a978f3047464ad8014817e331218372b53c06c/>
+<csr-id-dfabea0a26f97f420f47ba314cae0882aae47dca/>
+<csr-id-106407e8125cc003794ba6249158aa1a655d3357/>
+<csr-id-4905fae6259063411c5e4ef5fd2afb531980630c/>
+<csr-id-ee05ed31cb12d8e1d8bac7569beec90db52a5840/>
+<csr-id-b99e7dee3e72e703b47888e3ff03d2baa933b408/>
+<csr-id-96511403687f23516658f1a4fab1b6c6ab3fab45/>
+<csr-id-e389ab24f2186fc515b115e736a06d20756ae031/>
+<csr-id-67e6ce1190ec1def43d4d2437456d985b5c07642/>
+<csr-id-d5c1cd2808f9844b06b846ec10dfe05146137023/>
+<csr-id-8f309dada1517afa10c263a52f5597429f764890/>
+<csr-id-8b9b481df5d124857abb02158739a6ded8f02af7/>
+<csr-id-019370cfd0ace44c656caf45c17248f2a547dbbf/>
+<csr-id-873fe29ac9042b7ad28a29630d2c048bde3a7634/>
+<csr-id-70c67c749c504ddd552aba6663109d2b1839082a/>
+<csr-id-426158fcbb6d7c1fe44755c138bba1ac825a0a0c/>
+<csr-id-532aed1ed8e6b3957627ff2cc2f9d10d87fe3cb2/>
+<csr-id-5a1cd2790b159e35c734dfb1fe64a43ea4409dfc/>
+<csr-id-0a5c18d115820f7124050bc0a246503b5cc63fd9/>
+<csr-id-b863e7eb299472b0c9dbd633b1b892cc221efb46/>
+<csr-id-4466c48a3fcec76f6c90cf6fcf1f28b177978c90/>
 
 ### ⚠ BREAKING CHANGES
 

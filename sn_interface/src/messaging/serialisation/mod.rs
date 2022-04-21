@@ -21,6 +21,7 @@ pub(crate) const JOIN_RESPONSE_PRIORITY: i32 = 6;
 pub(crate) const JOIN_RELOCATE_MSG_PRIORITY: i32 = 4;
 // reporting dysfunction is somewhat critical, so not super low
 pub(crate) const DYSFUNCTION_MSG_PRIORITY: i32 = 2;
+#[cfg(feature = "back-pressure")]
 // reporting backpressure isn't time critical, so fairly low
 pub(crate) const BACKPRESSURE_MSG_PRIORITY: i32 = 0;
 // not maintaining network structure, so can wait
@@ -123,6 +124,7 @@ impl MsgType {
                 ..
             } => DYSFUNCTION_MSG_PRIORITY,
 
+            #[cfg(feature = "back-pressure")]
             // Inter-node comms for backpressure
             MsgType::System {
                 msg: SystemMsg::BackPressure(_),

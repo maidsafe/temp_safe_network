@@ -23,17 +23,48 @@ jobs:
     if: ${{ success() }}
     # github jobs that need to have passed for bors to give the all clear
     needs:
+      - cargo-udeps
+      - cargo-deny
       - e2e
       - e2e-split
       - unit
       - checks
-      - test-publish
       - lint
       - upload_event_file
     runs-on: ubuntu-latest
     steps:
       - name: CI succeeded
         run: exit 0
+
+  cargo-udeps:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    name: Unused dependency check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+
+      - name: Run cargo-udeps
+        uses: aig787/cargo-udeps-action@v1
+        with:
+          version: 'latest'
+          args: '--all-targets --features test-utils'
+
+  cargo-deny:
+    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - shell: bash
+      run: wget https://raw.githubusercontent.com/maidsafe/QA/master/misc-scripts/deny.toml
+
+    - uses: EmbarkStudios/cargo-deny-action@v1
+
 
   lint:
       runs-on: ubuntu-latest
@@ -57,7 +88,7 @@ jobs:
         with:
           filters: |
             src:
-              - 'sn/src/**'
+              - 'sn_node/src/**'
               - 'sn_api/src/**'
               - 'sn_cli/src/**'
 
@@ -82,30 +113,6 @@ jobs:
         if: steps.sn_changes.outputs.src == 'true'
         run: cargo clippy --all-targets --all-features
 
-  test-publish:
-    if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
-    name: Test Publish
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-
-      - uses: dorny/paths-filter@v2
-        id: sn_changes
-        with:
-          filters: |
-            src:
-              - 'sn/src/**'
-
-      - uses: actions-rs/toolchain@v1
-        if: steps.sn_changes.outputs.src == 'true'
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      - name: Publish Dry Run
-        if: steps.sn_changes.outputs.src == 'true'
-        run: cd sn && cargo publish --dry-run
 
   unit:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -133,12 +140,11 @@ jobs:
           sharedKey: ${{github.run_id}}-unit
 
       - name: Build all test targets
-        # all = all crates in workspace, lib/bins targets, with these features...
-        run: cargo test --no-run --release --features=test-utils
-        working-directory: sn
+       # all = all crates in workspace, lib/bins targets, with these features...
+        run: cargo test --no-run --release --features=test-utils -p sn_interface -p sn_dysfunction -p sn_node
 
-      - name: Run unit tests
-        timeout-minutes: 15
+      - name: Run sn_interface tests
+        timeout-minutes: 25
         uses: jacderida/cargo-nextest@main
         with:
           test-run-name: unit-tests-${{ matrix.os }}
@@ -149,6 +155,16 @@ jobs:
           features: test-utils
           filters: "messaging prefix_map types"
 
+      - name: Run sn_dysfunction unit tests
+        timeout-minutes: 5
+        uses: jacderida/cargo-nextest@main
+        with:
+          test-run-name: dysfunction-unit-tests-${{ matrix.os }}
+          profile: ci
+          junit-path: junit.xml
+          package: sn_dysfunction
+          release: true
+
       - name: Run node unit tests
         timeout-minutes: 15
         uses: jacderida/cargo-nextest@main
@@ -156,7 +172,7 @@ jobs:
           test-run-name: unit-tests-${{ matrix.os }}
           profile: ci
           junit-path: junit.xml
-          package: safe_network
+          package: sn_node
           release: true
           features: test-utils
           filters: "dbs node routing"
@@ -170,16 +186,6 @@ jobs:
           junit-path: junit.xml
           package: sn_cli
           bin: safe
-          release: true
-
-      - name: Run sn_dysfunction unit tests
-        timeout-minutes: 5
-        uses: jacderida/cargo-nextest@main
-        with:
-          test-run-name: dysfunction-unit-tests-${{ matrix.os }}
-          profile: ci
-          junit-path: junit.xml
-          package: sn_dysfunction
           release: true
 
   e2e:
@@ -220,11 +226,7 @@ jobs:
         run: choco install ripgrep
 
       - name: Build sn bins
-        run: cd sn && cargo build --release --features=test-utils --bins
-        timeout-minutes: 60
-
-      - name: Build all safe_network tests
-        run: cd sn && cargo test --no-run --release --features=test-utils
+        run: cd sn_node && cargo build --release --features=test-utils --bins
         timeout-minutes: 60
 
       - name: Build testnet
@@ -239,7 +241,7 @@ jobs:
         run: ./target/release/testnet
         id: section-startup
         env:
-          RUST_LOG: "safe_network,sn_api,sn_node=trace"
+          RUST_LOG: "sn_node,sn_api,sn_node=trace"
 
       - name: Print Network Log Stats at start
         shell: bash
@@ -262,10 +264,9 @@ jobs:
           test-run-name: e2e-client-${{ matrix.os }}
           profile: ci
           junit-path: junit.xml
-          package: safe_network
+          package: sn_client
           release: true
           features: test-utils
-          filters: client
           test-threads: 2
         timeout-minutes: 25
 
@@ -275,7 +276,7 @@ jobs:
           test-run-name: e2e-ae-${{ matrix.os }}
           profile: ci
           junit-path: junit.xml
-          package: safe_network
+          package: sn_client
           release: true
           features: test-utils
           filters: ae_checks
@@ -287,7 +288,7 @@ jobs:
       - name: Run example app for file API against local network
         timeout-minutes: 10
         shell: bash
-        run: cd sn && cargo run  --release  --features=test-utils --example client_files
+        run: cd sn_client && cargo run --release  --features=test-utils --example client_files
 
       - name: Are nodes still running...?
         shell: bash
@@ -356,11 +357,7 @@ jobs:
         run: sudo apt-get -y install ripgrep
 
       - name: Build sn bins
-        run: cd sn && cargo build --release --features=test-utils --bins
-        timeout-minutes: 60
-
-      - name: Build all safe_network tests
-        run: cd sn && cargo test --no-run --release --features=test-utils
+        run: cd sn_node && cargo build --release --features=test-utils --bins
         timeout-minutes: 60
 
       - name: Build testnet
@@ -377,12 +374,8 @@ jobs:
         shell: bash
         run: cargo run --release --features=test-utils --example network_split
         env:
-          RUST_LOG: "safe_network=trace"
+          RUST_LOG: "sn_node,sn_client=trace"
 
-
-      # - name: Start the network
-      #   run: ./target/release/testnet
-      #   id: section-startup
 
       - name: Print Network Log Stats at start
         shell: bash
@@ -409,10 +402,9 @@ jobs:
           test-run-name: e2e-split-client-self-hosted-ubuntu
           profile: ci
           junit-path: junit.xml
-          package: safe_network
+          package: sn_client
           release: true
           features: test-utils
-          filters: client
           test-threads: 2
         timeout-minutes: 25
 
@@ -422,7 +414,7 @@ jobs:
           test-run-name: e2e-split-ae-self-hosted-ubuntu
           profile: ci
           junit-path: junit.xml
-          package: safe_network
+          package: sn_client
           release: true
           features: test-utils
           filters: ae_checks
@@ -434,7 +426,7 @@ jobs:
       - name: Run example app for file API against local network
         timeout-minutes: 10
         shell: bash
-        run: cd sn && cargo run  --release  --features=test-utils --example client_files
+        run: cd sn_client && cargo run  --release  --features=test-utils --example client_files
 
       - name: Are nodes still running...?
         shell: bash
@@ -503,7 +495,7 @@ jobs:
         run: choco install ripgrep
 
       - name: Build sn bins
-        run: cd sn && cargo build --release --features=test-utils --bins
+        run: cd sn_node && cargo build --release --features=test-utils --bins
         timeout-minutes: 60
 
       - name: Build testnet
@@ -514,14 +506,11 @@ jobs:
         run: cargo build  --release --bin log_cmds_inspector
         timeout-minutes: 60
 
-      - name: Build all sn_api tests
-        run: cargo test --no-run -p sn_api --release --lib
-
       - name: Start the network
         run: ./target/release/testnet
         id: section-startup
         env:
-          RUST_LOG: "safe_network,sn_api,sn_node=trace"
+          RUST_LOG: "sn_node,sn_api,sn_node=trace"
 
       - name: Print Network Log Stats at start
         shell: bash
@@ -628,7 +617,7 @@ jobs:
         run: choco install ripgrep
 
       - name: Build sn bins
-        run: cd sn && cargo build --release --features=test-utils --bins
+        run: cd sn_node && cargo build --release --features=test-utils --bins
         timeout-minutes: 60
 
       - name: Build testnet
@@ -643,7 +632,7 @@ jobs:
         run: ./target/release/testnet
         id: section-startup
         env:
-          RUST_LOG: "safe_network,sn_api,sn_node=trace"
+          RUST_LOG: "sn_node,sn_api,sn_node=trace"
 
       - name: Print Network Log Stats at start
         shell: bash
@@ -654,9 +643,6 @@ jobs:
         shell: bash
         run: ./resources/scripts/wait_for_nodes_to_join.sh
         timeout-minutes: 10
-
-      - name: Build all CLI tests
-        run: cargo test --no-run -p sn_cli --release
 
       - name: Generate keys for test run
         run: cargo run --package sn_cli --release -- keys create --for-cli

@@ -10,7 +10,7 @@ use super::{metadata::get_metadata, FilesMapChange, ProcessedFiles};
 use crate::{Error, Result, Safe, XorUrl};
 use bytes::Bytes;
 use log::info;
-use safe_network::client::Error as ClientError;
+use sn_client::Error as ClientError;
 use std::{
     fs,
     path::{Path, PathBuf},
