@@ -246,7 +246,7 @@ impl Safe {
         Ok(output_dbc)
     }
 
-    // Private helper to insert a DBC into the Wallet's underlying Multimap
+    /// Private helper to insert a DBC into the Wallet's underlying Multimap
     async fn insert_dbc_into_wallet(
         &self,
         safeurl: &SafeUrl,
@@ -274,9 +274,9 @@ impl Safe {
         Ok(())
     }
 
-    // Private helper to reissue DBCs using the sn_dbc API,
-    // and logging the spent input DBCs on the network.
-    // Return the output DBC, and the change DBC if there is one.
+    /// Private helper to reissue DBCs using the sn_dbc API,
+    /// and logging the spent input DBCs on the network.
+    /// Return the output DBC, and the change DBC if there is one.
     async fn reissue_dbcs(
         &self,
         input_dbcs: Vec<Dbc>,
@@ -339,7 +339,7 @@ impl Safe {
 mod tests {
     use super::*;
     use crate::app::test_helpers::{new_read_only_safe_instance, new_safe_instance};
-    use anyhow::{anyhow, bail, Result};
+    use anyhow::{anyhow, Result};
 
     // TODO: allow to set an amount and SK to generate a DBC with,
     // instead of deserialising a hard-coded serialised DBC.
@@ -558,14 +558,6 @@ mod tests {
         let safe = new_safe_instance().await?;
         let wallet_xorurl = safe.wallet_create().await?;
 
-        match safe.wallet_reissue(&wallet_xorurl, "2.55").await {
-            Err(Error::NotEnoughBalance(msg)) => {
-                assert_eq!(msg, "0.000000000");
-            }
-            Err(err) => bail!("Error returned is not the expected: {:?}", err),
-            Ok(_) => bail!("Wallet reissue succeeded unexpectedly".to_string()),
-        }
-
         let dbc = new_dbc(DBC_WITH_1_530_000_000)?;
         safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc"), &dbc)
             .await?;
@@ -578,6 +570,72 @@ mod tests {
             Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
             Ok(_) => Err(anyhow!("Wallet reissue succeeded unexpectedly".to_string())),
         }
+    }
+
+    #[tokio::test]
+    async fn test_wallet_reissue_invalid_amount() -> Result<()> {
+        let safe = new_safe_instance().await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+
+        match safe.wallet_reissue(&wallet_xorurl, "0").await {
+            Err(Error::InvalidAmount(msg)) => {
+                assert_eq!(
+                    msg,
+                    "Output amount to reissue needs to be larger than zero (0)."
+                );
+                Ok(())
+            }
+            Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
+            Ok(_) => Err(anyhow!("Wallet reissue succeeded unexpectedly".to_string())),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_wallet_reissue_with_non_compatible_content() -> Result<()> {
+        let safe = new_safe_instance().await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+
+        let dbc = new_dbc(DBC_WITH_1_530_000_000)?;
+        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc)
+            .await?;
+
+        // We insert an entry (to its underlying data type, i.e. the Multimap) which is
+        // not a valid serialised DBC, thus making part of its content incompatible/corrupted.
+        let corrupted_dbc_xorurl = safe
+            .store_private_bytes(Bytes::from_static(b"bla"), None)
+            .await?;
+        let entry = (b"corrupted-dbc".to_vec(), corrupted_dbc_xorurl.into_bytes());
+        safe.multimap_insert(&wallet_xorurl, entry, BTreeSet::default())
+            .await?;
+
+        // Now check we can still reissue from the Wallet and the corrupted entry is ignored
+        let _ = safe.wallet_reissue(&wallet_xorurl, "0.4").await?;
+        let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
+        assert_eq!(current_balance, "1.130000000");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wallet_reissue_all_balance() -> Result<()> {
+        let safe = new_safe_instance().await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+
+        let dbc = new_dbc(DBC_WITH_12_230_000_000)?;
+        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc)
+            .await?;
+
+        // Now check thaat after reissuing with the total balance,
+        // there is no change deposited in the Wallet, i.e. Wallet is empty with 0 balance
+        let _ = safe.wallet_reissue(&wallet_xorurl, "12.23").await?;
+
+        let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
+        assert_eq!(current_balance, "0.000000000");
+
+        let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
+        assert!(wallet_balances.is_empty());
+
+        Ok(())
     }
 
     #[tokio::test]

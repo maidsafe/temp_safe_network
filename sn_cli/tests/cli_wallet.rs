@@ -104,14 +104,6 @@ fn calling_safe_wallet_reissue() -> Result<()> {
     ))
     .success();
 
-    safe_cmd(["wallet", "balance", &wallet_xorurl], Some(0))?
-        .assert()
-        .stdout(format!(
-            "Wallet at \"{}\" has a total balance of 5.080000000 safecoins\n",
-            wallet_xorurl
-        ))
-        .success();
-
     Ok(())
 }
 
@@ -156,6 +148,8 @@ fn calling_safe_wallet_deposit_reissued() -> Result<()> {
         Some(0),
     )?;
 
+    // Let's check the balance to make sure the deposited DBC was being
+    // serialised (by the reissue cmd) and deserialised (by the deposit cmd) correctly
     safe_cmd(["wallet", "balance", &wallet_xorurl], Some(0))?
         .assert()
         .stdout(format!(
