@@ -189,12 +189,12 @@ impl Node {
         //       excluded_candidates which would prevent a dkg-retry from
         //       succeeding.
         let dkg_sessions = self.promote_and_demote_elders(&BTreeSet::new()).await;
-        let agreeing_elders = BTreeSet::from_iter(signed_section_auth.elders().cloned());
+
+        let agreeing_elders = BTreeSet::from_iter(signed_section_auth.names());
         if dkg_sessions
             .iter()
             .all(|session| !session.elder_names().eq(agreeing_elders.iter().copied()))
         {
-            // SectionInfo out of date, ignore.
             warn!("SectionInfo out of date, ignore");
             return Ok(vec![]);
         };

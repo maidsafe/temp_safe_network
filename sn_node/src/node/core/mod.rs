@@ -49,7 +49,7 @@ use sn_interface::messaging::{
     data::OperationId,
     signature_aggregator::SignatureAggregator,
     system::{DkgSessionId, NodeEvent, NodeState, SystemMsg},
-    AuthorityProof, DstLocation, SectionAuth, SectionAuthorityProvider
+    AuthorityProof, DstLocation, SectionAuth, SectionAuthorityProvider,
 };
 use sn_interface::types::{log_markers::LogMarker, Cache, Peer};
 

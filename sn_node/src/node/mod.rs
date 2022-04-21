@@ -17,7 +17,7 @@ mod core;
 mod dkg;
 // mod ed25519;
 mod error;
-mod handover;
+pub(crate) mod handover;
 mod logging;
 pub(crate) mod membership;
 mod messages;
