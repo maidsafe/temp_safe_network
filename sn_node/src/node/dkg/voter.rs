@@ -107,6 +107,8 @@ impl DkgVoter {
                     timer_token: 0,
                     failures: DkgFailureSigSet::from(session_id.clone()),
                     complete: false,
+                    last_message_broadcast: vec![],
+                    retries: 0,
                 };
 
                 let mut cmds = vec![];
