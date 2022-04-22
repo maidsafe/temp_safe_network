@@ -11,6 +11,7 @@ use sn_interface::messaging::{
     system::{DkgSessionId, SystemMsg},
     DstLocation, WireMsg,
 };
+use sn_interface::types::log_markers::LogMarker;
 use sn_interface::types::Peer;
 
 use xor_name::XorName;
@@ -22,7 +23,8 @@ impl Node {
         let recipients = Vec::from_iter(session_id.elder_peers());
 
         trace!(
-            "Send DkgStart for {:?} with {:?} to {:?}",
+            "{} for {:?} with {:?} to {:?}",
+            LogMarker::SendDkgStart,
             session_id.elders,
             session_id,
             recipients

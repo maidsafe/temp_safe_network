@@ -13,6 +13,7 @@ mod node_msgs;
 mod node_state;
 mod signed;
 
+use crate::network_knowledge::SapCandidate;
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SectionAuth};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
@@ -157,6 +158,8 @@ pub enum SystemMsg {
     /// Sent to the current elders by the DKG participants when at least majority of them observe
     /// a DKG failure.
     DkgFailureAgreement(DkgFailureSigSet),
+    /// Section handover consensus vote message
+    HandoverVote(SignedVote<SapCandidate>),
     /// Message containing a single `Proposal` to be aggregated in the proposal aggregator.
     Propose {
         /// The content of the proposal

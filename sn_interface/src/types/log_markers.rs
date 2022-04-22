@@ -22,6 +22,10 @@ pub enum LogMarker {
     NewPrefix,
     AeSendUpdateToSiblings,
     AgreementOfOnline,
+    // Handover
+    HandoverConsensusTrigger,
+    HandoverMsgToBeHandled,
+    HandoverConsensusTermination,
     // Malice
     DeviantsDetected,
     ProposeOffline,
@@ -53,6 +57,7 @@ pub enum LogMarker {
     CmdProcessEnd,
     CmdProcessingError,
     // DKG + Promotion
+    SendDkgStart,
     PromotedToElder,
     DemotedFromElder,
     DkgSendFailureObservation,
