@@ -617,7 +617,6 @@ impl Node {
                     // NB TODO make sure this in only called once (after handover)
                     // and that it cannot interfere with the handover voting process as it resets the handover state completely
                     // NB TODO we should keep a copy of old handover states (since they contain valuable information like who is faulty)
-                    // NB TODO non-elders should clear their handover_voting field and put None
                     self.initialize_handover().await?;
 
                     // Whenever there is an elders change, casting a round of joins_allowed
