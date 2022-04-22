@@ -22,7 +22,7 @@ pub use self::section_keys::{SectionKeyShare, SectionKeysProvider};
 
 pub use node_info::NodeInfo;
 pub use node_state::NodeState;
-pub use section_authority_provider::{SectionAuthUtils, SectionAuthorityProvider};
+pub use section_authority_provider::{SapCandidate, SectionAuthUtils, SectionAuthorityProvider};
 
 use crate::messaging::system::{KeyedSig, SectionAuth, SectionPeers as SectionPeersMsg};
 use prefix_map::NetworkPrefixMap;

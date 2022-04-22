@@ -8,6 +8,7 @@
 
 use super::Prefix;
 
+use crate::node::handover::Error as HandoverError;
 use sn_interface::messaging::data::Error as ErrorMsg;
 use sn_interface::types::{convert_dt_error_to_error_msg, DataAddress, Peer, PublicKey};
 
@@ -139,6 +140,9 @@ pub enum Error {
     /// DysfunctionDetection error.
     #[error("DysfunctionDetection error:: {0}")]
     DysfunctionDetection(#[from] sn_dysfunction::Error),
+    /// Elder Handover related errors
+    #[error("Handover Error:: {0}")]
+    HandoverError(#[from] HandoverError),
 }
 
 impl From<qp2p::ClientEndpointError> for Error {
