@@ -18,7 +18,7 @@ use xor_name::{Prefix, XorName};
 
 use bls::{PublicKey, PublicKeySet};
 use secured_linked_list::SecuredLinkedList;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeSet,
     fmt::{self, Display, Formatter},
@@ -66,6 +66,17 @@ pub struct SectionAuthorityProvider {
     members: BTreeSet<NodeState>,
 }
 
+/// SectionAuthorityProvider candidates for handover consensus to vote on
+#[allow(clippy::large_enum_variant)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Serialize, Deserialize)]
+pub enum SapCandidate {
+    ElderHandover(SectionAuth<SectionAuthorityProvider>),
+    SectionSplit(
+        SectionAuth<SectionAuthorityProvider>,
+        SectionAuth<SectionAuthorityProvider>,
+    ),
+}
+
 impl Display for SectionAuthorityProvider {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let elders_info: Vec<_> = self
@@ -90,6 +101,20 @@ impl serde::Serialize for SectionAuthorityProvider {
     {
         // Serialize as `SectionAuthorityProviderMsg`
         self.to_msg().serialize(serializer)
+    }
+}
+
+// NB TODO we should remove this and make sure SectionAuthorityProvider is only created at one place
+// at the system's boundaries when we receive it and verify it.
+// This way we can make sure that this type means that the data can always be considered verified.
+// To achieve this, we will also need to get rid of the `into_state` (from `messaging`) below.
+impl<'de> serde::Deserialize<'de> for SectionAuthorityProvider {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        // Deserialize as `SectionAuthorityProviderMsg`
+        Ok(SectionAuthorityProviderMsg::deserialize(deserializer)?.into_state())
     }
 }
 

@@ -13,7 +13,9 @@ use crate::node::{
 };
 use sn_interface::messaging::system::{KeyedSig, MembershipState, SectionAuth};
 use sn_interface::network_knowledge::SectionAuthUtils;
-use sn_interface::network_knowledge::{NodeState, SectionAuthorityProvider, MIN_ADULT_AGE};
+use sn_interface::network_knowledge::{
+    NodeState, SapCandidate, SectionAuthorityProvider, MIN_ADULT_AGE,
+};
 use sn_interface::types::log_markers::LogMarker;
 
 use std::{cmp, collections::BTreeSet};
@@ -161,52 +163,76 @@ impl Node {
         section_auth: SectionAuthorityProvider,
         sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
-        let equal_or_extension = section_auth.prefix() == self.network_knowledge.prefix().await
-            || section_auth
-                .prefix()
-                .is_extension_of(&self.network_knowledge.prefix().await);
-
-        if equal_or_extension {
-            // Our section or sub-section
-            debug!(
-                "Updating section info for our prefix: {:?}",
-                section_auth.prefix()
-            );
-
-            let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
-            // TODO: on dkg-failure, we may have tried to re-start DKG with some
-            //       elders excluded, this check here uses the empty set for the
-            //       excluded_candidates which would prevent a dkg-retry from
-            //       succeeding.
-            let dkg_sessions = self.promote_and_demote_elders(&BTreeSet::new()).await;
-
-            let agreeing_elders = BTreeSet::from_iter(signed_section_auth.names());
-            if dkg_sessions
-                .iter()
-                .all(|session| !session.elder_names().eq(agreeing_elders.iter().copied()))
-            {
-                warn!("SectionInfo out of date, ignore");
-                return Ok(vec![]);
-            };
-
-            // Send the `OurElder` proposal to all of the to-be-Elders so it's aggregated by them.
-            let proposal_recipients = dkg_sessions
-                .iter()
-                .flat_map(|session| session.elder_peers())
-                .collect();
-
-            self.send_proposal(
-                proposal_recipients,
-                Proposal::NewElders(signed_section_auth),
-            )
-            .await
-        } else {
+        // check if section matches our prefix
+        let equal_prefix = section_auth.prefix() == self.network_knowledge.prefix().await;
+        let is_extension_prefix = section_auth
+            .prefix()
+            .is_extension_of(&self.network_knowledge.prefix().await);
+        if !equal_prefix && !is_extension_prefix {
             // Other section. We shouln't be receiving or updating a SAP for
             // a remote section here, that is done with a AE msg response.
             debug!(
                 "Ignoring Proposal::SectionInfo since prefix doesn't match ours: {:?}",
                 section_auth
             );
+            return Ok(vec![]);
+        }
+        debug!(
+            "Updating section info for our prefix: {:?}",
+            section_auth.prefix()
+        );
+
+        // check if SAP is already in our network knowledge
+        let signed_section_auth = SectionAuth::new(section_auth, sig.clone());
+        // TODO: on dkg-failure, we may have tried to re-start DKG with some
+        //       elders excluded, this check here uses the empty set for the
+        //       excluded_candidates which would prevent a dkg-retry from
+        //       succeeding.
+        let dkg_sessions = self.promote_and_demote_elders(&BTreeSet::new()).await;
+
+        let agreeing_elders = BTreeSet::from_iter(signed_section_auth.names());
+        if dkg_sessions
+            .iter()
+            .all(|session| !session.elder_names().eq(agreeing_elders.iter().copied()))
+        {
+            warn!("SectionInfo out of date, ignore");
+            return Ok(vec![]);
+        };
+
+        // handle regular elder handover (1 to 1)
+        // trigger handover consensus among elders
+        if equal_prefix {
+            debug!(
+                "Propose elder handover to: {:?}",
+                signed_section_auth.prefix()
+            );
+            return self
+                .propose_handover_consensus(SapCandidate::ElderHandover(signed_section_auth))
+                .await;
+        }
+
+        // manage pending split SAP candidates
+        // NB TODO temporary while we wait for Membership generations and possibly double DKG
+        let chosen_candidates = self.split_barrier.write().await.process(
+            &self.network_knowledge.prefix().await,
+            signed_section_auth.clone(),
+            sig.clone(),
+        );
+
+        // handle section split (1 to 2)
+        if let [(sap1, _sig1), (sap2, _sig2)] = chosen_candidates.as_slice() {
+            debug!(
+                "Propose section split handover to: {:?} {:?}",
+                sap1.prefix(),
+                sap2.prefix()
+            );
+            self.propose_handover_consensus(SapCandidate::SectionSplit(
+                sap1.to_owned(),
+                sap2.to_owned(),
+            ))
+            .await
+        } else {
+            debug!("Waiting for more split handover candidates");
             Ok(vec![])
         }
     }
@@ -218,60 +244,48 @@ impl Node {
         key_sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
         trace!("{}", LogMarker::HandlingNewEldersAgreement);
-        let updates = self.split_barrier.write().await.process(
-            &self.network_knowledge.prefix().await,
-            signed_section_auth.clone(),
-            key_sig,
-        );
-
-        if updates.is_empty() {
-            return Ok(vec![]);
-        }
-
         let snapshot = self.state_snapshot().await;
         let old_chain = self.section_chain().await.clone();
 
-        for (signed_sap, key_sig) in updates {
-            let prefix = signed_sap.prefix();
-            trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);
+        let prefix = signed_section_auth.prefix();
+        trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);
 
-            info!("New SAP agreed for:{}", *signed_sap);
+        info!("New SAP agreed for:{}", *signed_section_auth);
 
-            let our_name = self.info.read().await.name();
+        let our_name = self.info.read().await.name();
 
-            // Let's update our network knowledge, including our
-            // section SAP and chain if the new SAP's prefix matches our name
-            // We need to generate the proof chain to connect our current chain to new SAP.
-            let mut proof_chain = old_chain.clone();
-            match proof_chain.insert(
-                old_chain.last_key(),
-                signed_sap.section_key(),
-                key_sig.signature,
-            ) {
-                Err(err) => error!("Failed to generate proof chain for new SAP: {:?}", err),
-                Ok(()) => match self
-                    .network_knowledge
-                    .update_knowledge_if_valid(
-                        signed_sap.clone(),
-                        &proof_chain,
-                        None,
-                        &our_name,
-                        &self.section_keys_provider,
-                    )
-                    .await
-                {
-                    Err(err) => error!(
-                        "Error updating our network knowledge for {:?}: {:?}",
-                        prefix, err
-                    ),
-                    Ok(true) => {
-                        info!("Updated our network knowledge for {:?}", prefix);
-                        info!("Writing updated knowledge to disk");
-                        self.write_prefix_map().await
-                    }
-                    _ => {}
-                },
-            }
+        // Let's update our network knowledge, including our
+        // section SAP and chain if the new SAP's prefix matches our name
+        // We need to generate the proof chain to connect our current chain to new SAP.
+        let mut proof_chain = old_chain.clone();
+        match proof_chain.insert(
+            old_chain.last_key(),
+            signed_section_auth.section_key(),
+            key_sig.signature,
+        ) {
+            Err(err) => error!("Failed to generate proof chain for new SAP: {:?}", err),
+            Ok(()) => match self
+                .network_knowledge
+                .update_knowledge_if_valid(
+                    signed_section_auth.clone(),
+                    &proof_chain,
+                    None,
+                    &our_name,
+                    &self.section_keys_provider,
+                )
+                .await
+            {
+                Err(err) => error!(
+                    "Error updating our network knowledge for {:?}: {:?}",
+                    prefix, err
+                ),
+                Ok(true) => {
+                    info!("Updated our network knowledge for {:?}", prefix);
+                    info!("Writing updated knowledge to disk");
+                    self.write_prefix_map().await
+                }
+                _ => {}
+            },
         }
 
         info!(

@@ -107,7 +107,7 @@ impl MsgType {
                 ..
             } => JOIN_RESPONSE_PRIORITY,
 
-            // Inter-node comms for joining, relocating etc.
+            // Inter-node comms for joining, relocating, section handover votes etc.
             MsgType::System {
                 msg:
                     SystemMsg::Relocate(_)
@@ -116,7 +116,8 @@ impl MsgType {
                     | SystemMsg::Propose { .. }
                     | SystemMsg::StartConnectivityTest(_)
                     | SystemMsg::MembershipVote(_)
-                    | SystemMsg::MembershipAE(_),
+                    | SystemMsg::MembershipAE(_)
+                    | SystemMsg::HandoverVote(_),
                 ..
             } => JOIN_RELOCATE_MSG_PRIORITY,
 
