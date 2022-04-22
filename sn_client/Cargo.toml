@@ -23,7 +23,6 @@ required-features = ["test-utils"]
 name = "network_split"
 required-features = ["test-utils"]
 
-
 [features]
 default = []
 chaos = []
@@ -33,6 +32,7 @@ test-utils = ["sn_interface/test-utils", "sn_interface/proptest"]
 tokio-console = ["console-subscriber"]
 
 [dependencies]
+backoff = { version = "~0.4.0", features = [ "tokio" ] }
 base64 = "~0.13.0"
 bincode = "1.3.1"
 bls = { package = "blsttc", version = "3.1.0" }
@@ -41,7 +41,7 @@ bytes = { version = "1.0.1", features = ["serde"] }
 console-subscriber = { version = "~0.1.0", optional = true }
 crdts = "7.0"
 custom_debug = "~0.5.0"
-dashmap = {version = "5.1.0", features = [ "serde" ]}
+dashmap = { version = "5.1.0", features = [ "serde" ] }
 dirs-next = "2.0.0"
 ed25519 = { version = "1.2.0", features = ["serde_bytes"] }
 ed25519-dalek = { version = "1.0.0", features = ["serde"] }
@@ -60,12 +60,12 @@ rayon = "1.5.1"
 rmp-serde = "1.0.0"
 secured_linked_list = "~0.5.0"
 self_encryption = "~0.27.4"
-sn_interface = { path = "../sn_interface", version = "^0.1.1" }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_bytes = "~0.11.5"
 serde_json = "1.0.53"
 signature = "1.1.10"
 sled = "~0.34.6"
+sn_interface = { path = "../sn_interface", version = "^0.1.1" }
 structopt = "~0.3.17"
 strum = "~0.23.0"
 strum_macros = "~0.23.1"
@@ -80,32 +80,25 @@ url = "2.2.0"
 walkdir = "2"
 xor_name = "4.0.1"
 
-[dependencies.backoff]
-version = "~0.4.0"
-features = [ "tokio" ]
-
 [dependencies.tokio]
 version = "1.17.0"
 features = ["fs", "io-util", "macros", "rt", "rt-multi-thread", "sync"]
 
 [dev-dependencies]
 criterion = { version = "~0.3", features = ["async_tokio"] }
+grep="~0.2.8"
 proptest = "1.0.0"
 rand = { version = "~0.7.3", features = ["small_rng"] }
 rand_xorshift = "~0.2.0"
+sn_launch_tool = "~0.9.7"
 termcolor="1.1.2"
 tokio-util = { version = "~0.6.7", features = ["time"] }
 walkdir = "2"
-grep="~0.2.8"
-sn_launch_tool = "~0.9.7"
-
 
 [dev-dependencies.cargo-husky]
 version = "1.5.0"
 default-features = false # Disable features which are enabled by default
 features = ["precommit-hook", "run-cargo-clippy", "run-cargo-fmt", "run-cargo-check"]
-
-
 
 [package.metadata.cargo-udeps.ignore]
 development = ["cargo-husky"]

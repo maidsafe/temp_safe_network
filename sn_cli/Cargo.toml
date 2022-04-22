@@ -18,51 +18,35 @@ path = "src/main.rs"
 [dependencies]
 ansi_term = "~0.12"
 bincode = "1.3.3"
+bls = { package = "blsttc", version = "3.1.0" }
+bytes = { version = "1.0.1", features = ["serde"] }
 chrono = "~0.4"
 color-eyre = "~0.6"
+comfy-table = "5.0.1"
 console = "~0.14"
 dirs-next = "2.0.0"
+ed25519-dalek = { version = "1.0.1", features = ["serde"] }
 hex = "~0.4"
 human-panic = "1.0.3"
 isatty = "~0.1"
 num-traits = "~0.2"
 percent-encoding = "2.1.0"
 pretty-hex = "~0.2"
-comfy-table = "5.0.1"
 rand = "~0.7"
 rcgen = "~0.7"
 relative-path = "1.3.2"
+reqwest = { version = "~0.11", default-features = false, features = [ "rustls-tls" ] }
 sn_api = { path = "../sn_api", version = "^0.58.2", default-features=false, features = ["app", "authd_client"] }
 sn_launch_tool = "~0.9.4"
 serde = "1.0.123"
 serde_json = "1.0.62"
 serde_yaml = "~0.8"
 structopt = "~0.3"
+tokio = { version = "1.6.0", features = ["macros"] }
 tracing = "~0.1.26"
 tracing-subscriber = "~0.2.15"
 url = "2.2.2"
 xor_name = "4.0.1"
-
-[dependencies.bls]
-package = "blsttc"
-version = "3.1.0"
-
-[dependencies.bytes]
-version = "1.0.1"
-features = [ "serde" ]
-
-[dependencies.ed25519-dalek]
-version = "1.0.1"
-features = [ "serde" ]
-
-[dependencies.reqwest]
-version = "~0.11"
-default-features = false
-features = [ "rustls-tls" ]
-
-[dependencies.tokio]
-version = "1.6.0"
-features = [ "macros" ]
 
 [dependencies.self_update]
 version = "~0.28.0"
