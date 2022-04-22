@@ -34,6 +34,9 @@ use xor_name::XorName;
 // Interval to progress DKG timed phase
 const DKG_PROGRESS_INTERVAL: Duration = Duration::from_secs(6);
 
+// Retry sending messages when they timeout
+const MAX_TIMEOUT_RETRIES: usize = 3;
+
 // Data for a DKG participant.
 pub(crate) struct Session {
     pub(crate) session_id: DkgSessionId,
@@ -45,6 +48,10 @@ pub(crate) struct Session {
     // remove complete sessions because the other participants might still need us to respond to
     // their messages.
     pub(crate) complete: bool,
+
+    // Retry sending messages when they timeout
+    pub(crate) last_message_broadcast: Vec<(XorName, DkgMessage)>,
+    pub(crate) retries: usize,
 }
 
 fn is_dkg_behind(expected: Phase, actual: Phase) -> bool {
@@ -247,6 +254,7 @@ impl Session {
 
         match self.key_gen.timed_phase_transition(&mut rand::thread_rng()) {
             Ok(messages) => {
+                self.last_message_broadcast = messages.clone();
                 let mut cmds = vec![];
                 cmds.extend(self.broadcast(node, messages, section_pk)?);
                 cmds.push(self.reset_timer());
@@ -254,10 +262,31 @@ impl Session {
                 Ok(cmds)
             }
             Err(error) => {
-                trace!("DKG failed for {:?}: {}", self.session_id, error);
-                let failed_participants = self.key_gen.possible_blockers();
-
-                self.report_failure(node, failed_participants, section_pk)
+                if self.retries < MAX_TIMEOUT_RETRIES {
+                    trace!(
+                        "DKG failed, retrying {}/{} for {:?}: {}",
+                        self.retries,
+                        MAX_TIMEOUT_RETRIES,
+                        self.session_id,
+                        error
+                    );
+                    self.retries += 1;
+                    let messages = self.last_message_broadcast.clone();
+                    let mut cmds = vec![];
+                    cmds.extend(self.broadcast(node, messages, section_pk)?);
+                    cmds.push(self.reset_timer());
+                    cmds.extend(self.check(node, section_pk)?);
+                    Ok(cmds)
+                } else {
+                    trace!(
+                        "DKG failed after {} retries for {:?}: {}",
+                        self.retries,
+                        self.session_id,
+                        error
+                    );
+                    let failed_participants = self.key_gen.possible_blockers();
+                    self.report_failure(node, failed_participants, section_pk)
+                }
             }
         }
     }
