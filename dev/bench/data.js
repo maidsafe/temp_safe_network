@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1650647527276,
+  "lastUpdate": 1650677713510,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -701,6 +701,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4548920785,
             "range": "± 1456535226",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "chriso83@protonmail.com",
+            "name": "Chris O'Neil",
+            "username": "jacderida"
+          },
+          "committer": {
+            "email": "chris.oneil@gmail.com",
+            "name": "Chris O'Neil",
+            "username": "jacderida"
+          },
+          "distinct": true,
+          "id": "a477c1db40b9d8f78adf3f620942a06daf0ecc2b",
+          "message": "ci: incorporate sn_client and sn_node in release process\n\nThe `sn_client` and `sn_node` crates had to be included for publishing in the release process.\n\nThere were a few other changes I made to support this:\n\n* The title of the release, with all the crate names, was getting too large. I changed it to just\n  include the version numbers. The description of the release now includes the list of crates and\n  the version numbers they relate to.\n* Stop passing the version numbers around for the changelog generation. We can just read them from\n  the Cargo manifest.\n* Change crate publishing to a sequential process, rather than have different jobs.",
+          "timestamp": "2022-04-23T02:07:59+01:00",
+          "tree_id": "25e73d412465a502cc619bc40938d235de4487e3",
+          "url": "https://github.com/maidsafe/safe_network/commit/a477c1db40b9d8f78adf3f620942a06daf0ecc2b"
+        },
+        "date": 1650677712391,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10664191688,
+            "range": "± 9312596260",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 4105387853,
+            "range": "± 4970783799",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 9648606681,
+            "range": "± 264164836",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10037757204,
+            "range": "± 2950944439",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3175404074,
+            "range": "± 1113880210",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4715985218,
+            "range": "± 7051399492",
             "unit": "ns/iter"
           }
         ]
