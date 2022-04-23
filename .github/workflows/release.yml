@@ -95,9 +95,7 @@ jobs:
       - name: generate release description first pass
         shell: bash
         run: |
-          ./resources/scripts/get_release_description.sh \
-            "${{ steps.versioning.outputs.sn_version }}" \
-            "${{ steps.versioning.outputs.sn_cli_version }}" > release_description.md
+          ./resources/scripts/get_release_description.sh > release_description.md
 
       # The second pass uses Python to extract the changelog entries for this version.
       # Python can easily do a string replace and avoid all the pain with newlines you get in Bash.
@@ -105,16 +103,8 @@ jobs:
       - name: generate release description second pass
         shell: bash
         run: |
-          ./resources/scripts/insert_changelog_entry.py \
-            --sn-interface-version "${{ steps.versioning.outputs.sn_interface_version }}"
-          ./resources/scripts/insert_changelog_entry.py \
-            --sn-dysfunction-version "${{ steps.versioning.outputs.sn_dysfunction_version }}"
-          ./resources/scripts/insert_changelog_entry.py \
-            --sn-version "${{ steps.versioning.outputs.sn_version }}"
-          ./resources/scripts/insert_changelog_entry.py \
-            --sn-api-version "${{ steps.versioning.outputs.sn_api_version }}"
-          ./resources/scripts/insert_changelog_entry.py \
-            --sn-cli-version "${{ steps.versioning.outputs.sn_cli_version }}"
+          pip install toml
+          ./resources/scripts/insert_changelog_entry.py
 
       - name: create github release
         id: create_release
@@ -188,12 +178,7 @@ jobs:
           source_dir: deploy/prod/safe
           destination_dir: ''
 
-  # At first glance, it seems like it would be possible to check the commit message in the `if` condition
-  # for the presence of the crate name, by using `contains`. However, this doesn't work, so the commit
-  # message needs to be checked at the point of publishing. The reason is because of the dependencies
-  # between the publishing jobs. If one of the jobs doesn't run because its `if` condition was evaluated
-  # to false, the next job won't run, regardless of whether its `if` condition would evaluate to true.
-  publish_sn_dysfunction:
+  publish:
     name: publish sn_dysfunction
     runs-on: ubuntu-latest
     needs: [gh_release]
@@ -209,141 +194,60 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - shell: bash
+        id: versioning
+        run: |
+          ./resources/scripts/output_versioning_info.sh
       - name: cargo login
         run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
-      - name: cargo publish
+      - name: publish sn_dysfunction
         run: |
           commit_message="${{ github.event.head_commit.message }}"
           if [[ $commit_message == *"sn_dysfunction"* ]]; then
             # The sn_dysfunction crate doesn't have any dependencies so we can go ahead and publish.
             cd sn_dysfunction && cargo publish --allow-dirty
           fi
-
-  # At first glance, it seems like it would be possible to check the commit message in the `if` condition
-  # for the presence of the crate name, by using `contains`. However, this doesn't work, so the commit
-  # message needs to be checked at the point of publishing. The reason is because of the dependencies
-  # between the publishing jobs. If one of the jobs doesn't run because its `if` condition was evaluated
-  # to false, the next job won't run, regardless of whether its `if` condition would evaluate to true.
-  publish_sn_interface:
-    name: publish sn_interface
-    runs-on: ubuntu-latest
-    needs: [gh_release]
-    if: |
-      github.repository_owner == 'maidsafe' &&
-      startsWith(github.event.head_commit.message, 'chore(release):')
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: '0'
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - name: cargo login
-        run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
-      - name: cargo publish
+      - name: publish sn_interface
         run: |
           commit_message="${{ github.event.head_commit.message }}"
           if [[ $commit_message == *"sn_interface"* ]]; then
             # The sn_interface crate doesn't have any dependencies so we can go ahead and publish.
             cd sn_interface && cargo publish --allow-dirty
           fi
-
-  publish_sn:
-    name: publish safe network
-    runs-on: ubuntu-latest
-    needs: [publish_sn_dysfunction, publish_sn_interface]
-    if: |
-      github.repository_owner == 'maidsafe' &&
-      startsWith(github.event.head_commit.message, 'chore(release):')
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: '0'
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - shell: bash
-        id: versioning
-        run: |
-          ./resources/scripts/output_versioning_info.sh
-      - name: cargo login
-        run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
-      - name: cargo publish
+      - name: publish sn_node
         run: |
           commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"safe_network"* ]]; then
-            # The sn_node crate is dependent on sn_dysfunction and sn_interface and sometimes the new version
-            # doesn't become available on crates.io immediately, so this script will use a retry
-            # loop.
+          if [[ $commit_message == *"sn_node"* ]]; then
+            # The sn_node crate is dependent on sn_dysfunction and sn_interface and sometimes the
+            # new version doesn't become available on crates.io immediately, so this script will use
+            # a retry loop.
+            # The script can only check for one dependent crate, but since this process is
+            # sequential, we'll check for sn_dysfunction.
             ./resources/scripts/publish_crate.sh \
-              "sn" "${{ steps.versioning.outputs.sn_dysfunction_version }}" "sn_dysfunction"
-            ./resources/scripts/publish_crate.sh \
-              "sn" "${{ steps.versioning.outputs.sn_interface_version }}" "sn_interface"
+              "sn_node" "${{ steps.versioning.outputs.sn_dysfunction_version }}" "sn_dysfunction"
           fi
-
-  publish_sn_api:
-    name: publish sn_api
-    runs-on: ubuntu-latest
-    needs: [publish_sn]
-    if: |
-      github.repository_owner == 'maidsafe' &&
-      startsWith(github.event.head_commit.message, 'chore(release):')
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: '0'
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - shell: bash
-        id: versioning
+      - name: publish sn_client
         run: |
-          ./resources/scripts/output_versioning_info.sh
-      - name: cargo login
-        run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
-      - name: cargo publish
+          commit_message="${{ github.event.head_commit.message }}"
+          if [[ $commit_message == *"sn_client"* ]]; then
+            # sn_client is dependent on sn_interface.
+            ./resources/scripts/publish_crate.sh \
+              "sn_client" "${{ steps.versioning.outputs.sn_interface_version }}" "sn_interface"
+          fi
+      - name: publish sn_api
         run: |
           commit_message="${{ github.event.head_commit.message }}"
           if [[ $commit_message == *"sn_api"* ]]; then
-            # The sn_api crate is dependent on safe_network and sometimes the new version doesn't
-            # become available on crates.io immediately, so this script will use a retry loop.
+            # sn_api is dependent on sn_interface and sn_client, but we should be able to check just
+            # for sn_client.
             ./resources/scripts/publish_crate.sh \
-              "sn_api" "${{ steps.versioning.outputs.sn_version }}" "safe_network"
+              "sn_api" "${{ steps.versioning.outputs.sn_client_version }}" "sn_client"
           fi
-
-  publish_sn_cli:
-    name: publish sn_cli
-    runs-on: ubuntu-latest
-    needs: [publish_sn_api]
-    if: |
-      github.repository_owner == 'maidsafe' &&
-      startsWith(github.event.head_commit.message, 'chore(release):')
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: '0'
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - shell: bash
-        id: versioning
-        run: |
-          ./resources/scripts/output_versioning_info.sh
-      - name: cargo login
-        run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
-      - name: cargo publish
+      - name: publish sn_cli
         run: |
           commit_message="${{ github.event.head_commit.message }}"
           if [[ $commit_message == *"sn_cli"* ]]; then
-            # The sn_cli crate is dependent on sn_api and sometimes the new version doesn't
+            # sn_cli is dependent on sn_api and sometimes the new version doesn't
             # become available on crates.io immediately, so this script will use a retry loop.
             ./resources/scripts/publish_crate.sh \
               "sn_cli" "${{ steps.versioning.outputs.sn_api_version }}" "sn_api"

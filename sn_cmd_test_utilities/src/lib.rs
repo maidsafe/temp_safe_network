@@ -444,6 +444,7 @@ pub mod util {
         let mut parts = release_version.split('-');
         parts.next();
         parts.next();
+        parts.next();
         let version = parts
             .next()
             .ok_or_else(|| {
