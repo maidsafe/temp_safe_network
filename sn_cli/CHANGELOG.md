@@ -4,27 +4,67 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.51.3 (2022-04-14)
+## v0.52.0 (2022-04-23)
+
+### Chore
+
+ - <csr-id-318ee1d22970b5f06e93a99b6e8fff6da638c589/> tidy references in cargo manifests
+   All references are organised alphabetically, and random usage of long-form references are removed in
+   favour of the short-form version, unless the long-form style is justified, e.g., when lots of
+   features are being used.
+ - <csr-id-ad7d340720f0737f502b0d55023a15461dded91d/> update sn_cli and api readme for sn_client extraction
+ - <csr-id-aad69387240b067604a3d54bcf631a726c9d0956/> safe_network->sn_node
 
 ### New Features
 
- - <csr-id-842c77a5fe1c4f13e9a9f37b3b5dea974c0f5a82/> adding first set of basic wallet APIs and CLI commands
+ - <csr-id-e662317e93b3247a1afd9970587ea7241a9b5619/> first and basic implementation of Wallet reissue API and related CLI cmds
+   - Generate output DBCs with sn_dbc::TransactionBuilder
+   - Change DBC is also generated and stored in the source Wallet the reissue was made from
+   - Spent DBCs are soft-removed from the source Wallet (Multimap)
+   - Reissued DBCs are all bearer at this instance
+   - Verification of generated Tx and spentproofs is not performed at this instance yet
+   - Input DBCs are not logged as spent on the network's spentbook at this instance yet
+ - <csr-id-adb085e98b00ec6cd0d670bf665009d6e93e2514/> first and basic implementation of Wallet reissue API and related CLI cmds
+   - Generate output DBCs with sn_dbc::TransactionBuilder
+   - Change DBC is also generated and stored in the source Wallet the reissue was made from
+   - Spent DBCs are soft-removed from the source Wallet (Multimap)
+   - Reissued DBCs are all bearer at this instance
+   - Verification of generated Tx and spentproofs is not performed at this instance yet
+   - Input DBCs are not logged as spent on the network's spentbook at this instance yet
+
+### Bug Fixes
+
+ - <csr-id-cf482c38278dd0aaebbf2711462b0f58b7635049/> node install command to use correct version
+   When we added the new `sn_interface` crate, we forgot to update these functions for selecting the
+   version number of sn_node. This would have been caught by our test for this command, but
+   unfortunately that test can't run because it's subject to random failures due to rate limiting from
+   the Github API.
+   
+   The README for the release process is also updated to include this as a step.
 
 ### Other
 
- - <csr-id-a6dd3dfc5d60ef5f8591e3b4628d477e4801f7a7/> fix error message parsing after crate refactors
-
-### Test
-
- - <csr-id-2c557b5d5b5e21882ea3bf1cf904103576363603/> adding CLI tests for Wallet commands
+ - <csr-id-a477c1db40b9d8f78adf3f620942a06daf0ecc2b/> incorporate sn_client and sn_node in release process
+   The `sn_client` and `sn_node` crates had to be included for publishing in the release process.
+   
+   There were a few other changes I made to support this:
+   
+   * The title of the release, with all the crate names, was getting too large. I changed it to just
+     include the version numbers. The description of the release now includes the list of crates and
+     the version numbers they relate to.
+   * Stop passing the version numbers around for the changelog generation. We can just read them from
+     the Cargo manifest.
+   * Change crate publishing to a sequential process, rather than have different jobs.
+ - <csr-id-91606f631a211d959364cab1e428d1ac895d3dca/> additional wallet API test cases
+ - <csr-id-bda0ea00e2e5a258e02a91d12dcd1e480dfff17c/> additional wallet API test cases
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 5 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 9 commits contributed to the release over the course of 4 calendar days.
+ - 8 days passed between releases.
+ - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -34,6 +74,55 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - incorporate sn_client and sn_node in release process ([`a477c1d`](https://github.com/maidsafe/safe_network/commit/a477c1db40b9d8f78adf3f620942a06daf0ecc2b))
+    - tidy references in cargo manifests ([`318ee1d`](https://github.com/maidsafe/safe_network/commit/318ee1d22970b5f06e93a99b6e8fff6da638c589))
+    - additional wallet API test cases ([`91606f6`](https://github.com/maidsafe/safe_network/commit/91606f631a211d959364cab1e428d1ac895d3dca))
+    - additional wallet API test cases ([`bda0ea0`](https://github.com/maidsafe/safe_network/commit/bda0ea00e2e5a258e02a91d12dcd1e480dfff17c))
+    - first and basic implementation of Wallet reissue API and related CLI cmds ([`e662317`](https://github.com/maidsafe/safe_network/commit/e662317e93b3247a1afd9970587ea7241a9b5619))
+    - first and basic implementation of Wallet reissue API and related CLI cmds ([`adb085e`](https://github.com/maidsafe/safe_network/commit/adb085e98b00ec6cd0d670bf665009d6e93e2514))
+    - update sn_cli and api readme for sn_client extraction ([`ad7d340`](https://github.com/maidsafe/safe_network/commit/ad7d340720f0737f502b0d55023a15461dded91d))
+    - safe_network->sn_node ([`aad6938`](https://github.com/maidsafe/safe_network/commit/aad69387240b067604a3d54bcf631a726c9d0956))
+    - node install command to use correct version ([`cf482c3`](https://github.com/maidsafe/safe_network/commit/cf482c38278dd0aaebbf2711462b0f58b7635049))
+</details>
+
+## v0.51.3 (2022-04-14)
+
+<csr-id-a6dd3dfc5d60ef5f8591e3b4628d477e4801f7a7/>
+<csr-id-2c557b5d5b5e21882ea3bf1cf904103576363603/>
+
+### New Features
+
+ - <csr-id-842c77a5fe1c4f13e9a9f37b3b5dea974c0f5a82/> adding first set of basic wallet APIs and CLI commands
+
+### Other
+
+ - <csr-id-a6dd3dfc5d60ef5f8591e3b4628d477e4801f7a7/> fix error message parsing after crate refactors
+
+### Chore
+
+ - <csr-id-9ea06ffe9339d3927897f010314b1be1bf7026bf/> sn_dysfunction-0.1.1/safe_network-0.58.13/sn_api-0.58.2/sn_cli-0.51.3
+
+### Test
+
+ - <csr-id-2c557b5d5b5e21882ea3bf1cf904103576363603/> adding CLI tests for Wallet commands
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 5 days passed between releases.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_dysfunction-0.1.1/safe_network-0.58.13/sn_api-0.58.2/sn_cli-0.51.3 ([`9ea06ff`](https://github.com/maidsafe/safe_network/commit/9ea06ffe9339d3927897f010314b1be1bf7026bf))
     - fix error message parsing after crate refactors ([`a6dd3df`](https://github.com/maidsafe/safe_network/commit/a6dd3dfc5d60ef5f8591e3b4628d477e4801f7a7))
     - adding CLI tests for Wallet commands ([`2c557b5`](https://github.com/maidsafe/safe_network/commit/2c557b5d5b5e21882ea3bf1cf904103576363603))
     - adding first set of basic wallet APIs and CLI commands ([`842c77a`](https://github.com/maidsafe/safe_network/commit/842c77a5fe1c4f13e9a9f37b3b5dea974c0f5a82))
@@ -42,6 +131,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## v0.51.2 (2022-04-09)
 
 <csr-id-487efa4d38fecc0c8071ee38b39f9a3e402a3d5b/>
+<csr-id-c4e3de1d9715c6e3618a763fa857feca4258248f/>
 
 ### Bug Fixes
 

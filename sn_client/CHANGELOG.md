@@ -1112,3 +1112,57 @@ needed, as they keypair itself contains the Arcs we need.
 * Create Example:
     - Self authentication Example
     - Example to demonstrate Storage API
+
+## v0.62.0 (2022-04-23)
+
+### Chore
+
+ - <csr-id-318ee1d22970b5f06e93a99b6e8fff6da638c589/> tidy references in cargo manifests
+   All references are organised alphabetically, and random usage of long-form references are removed in
+   favour of the short-form version, unless the long-form style is justified, e.g., when lots of
+   features are being used.
+ - <csr-id-e3dca8b07441c86744b091fe883d16a9c750f702/> set sn_client version to be new release
+   previously sn_client was its own repo and crate, we havent published under this name in some time. This will bring us back into this namespace ad on crates.io, but at a new updated version
+ - <csr-id-ad7d340720f0737f502b0d55023a15461dded91d/> update sn_cli and api readme for sn_client extraction
+ - <csr-id-8d041a80b75bc773fcbe0e4c88940ade9bda4b9d/> remove unused deps after node/client split
+ - <csr-id-2a731b990dbe67a700468865288585ee8dff0d71/> move examples/bench -> sn_client where appropriate
+ - <csr-id-88421d9cb7872b6397283a0035130bc14de6d4ff/> pull sn_client out of the node codebase
+ - <csr-id-6383f038449ebba5e7c5dec1d3f8cc1f7deca581/> remove olde node github workflows
+
+### Other
+
+ - <csr-id-fec4741438b8de957b5de94e21b78cf15886713f/> use Flat sampling in criterion upload tests
+   Criterion auto sampling is designed for tests in the pico/nano sec
+   range. Flat sampling for for longer running tests like ours.
+ - <csr-id-a05599e452dc7400e83e7a048488689db2c28e9e/> use Flat sampling in criterion upload tests
+   Criterion auto sampling is designed for tests in the pico/nano sec
+   range. Flat sampling for for longer running tests like ours.
+ - <csr-id-54000b43cdd3688e6c691bef9dedc299da3c22aa/> test updates for sn_node and sn_client
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 10 commits contributed to the release over the course of 312 calendar days.
+ - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - tidy references in cargo manifests ([`318ee1d`](https://github.com/maidsafe/safe_network/commit/318ee1d22970b5f06e93a99b6e8fff6da638c589))
+    - use Flat sampling in criterion upload tests ([`fec4741`](https://github.com/maidsafe/safe_network/commit/fec4741438b8de957b5de94e21b78cf15886713f))
+    - use Flat sampling in criterion upload tests ([`a05599e`](https://github.com/maidsafe/safe_network/commit/a05599e452dc7400e83e7a048488689db2c28e9e))
+    - set sn_client version to be new release ([`e3dca8b`](https://github.com/maidsafe/safe_network/commit/e3dca8b07441c86744b091fe883d16a9c750f702))
+    - update sn_cli and api readme for sn_client extraction ([`ad7d340`](https://github.com/maidsafe/safe_network/commit/ad7d340720f0737f502b0d55023a15461dded91d))
+    - remove unused deps after node/client split ([`8d041a8`](https://github.com/maidsafe/safe_network/commit/8d041a80b75bc773fcbe0e4c88940ade9bda4b9d))
+    - move examples/bench -> sn_client where appropriate ([`2a731b9`](https://github.com/maidsafe/safe_network/commit/2a731b990dbe67a700468865288585ee8dff0d71))
+    - test updates for sn_node and sn_client ([`54000b4`](https://github.com/maidsafe/safe_network/commit/54000b43cdd3688e6c691bef9dedc299da3c22aa))
+    - pull sn_client out of the node codebase ([`88421d9`](https://github.com/maidsafe/safe_network/commit/88421d9cb7872b6397283a0035130bc14de6d4ff))
+    - remove olde node github workflows ([`6383f03`](https://github.com/maidsafe/safe_network/commit/6383f038449ebba5e7c5dec1d3f8cc1f7deca581))
+</details>
+
