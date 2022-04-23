@@ -1,5 +1,5 @@
 SHELL := bash
-SN_NODE_VERSION := $(shell grep "^version" < sn/Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
+SN_NODE_VERSION := $(shell grep "^version" < sn_node/Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
 SN_CLI_VERSION := $(shell grep "^version" < sn_cli/Cargo.toml | head -n 1 | awk '{ print $$3 }' | sed 's/\"//g')
 UNAME_S := $(shell uname -s)
 DEPLOY_PATH := deploy
