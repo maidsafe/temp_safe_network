@@ -12,6 +12,7 @@ use crate::messaging::system::DkgSessionId;
 use crate::messaging::{
     system::{KeyedSig, SectionAuth},
     SectionAuthorityProvider as SectionAuthorityProviderMsg,
+    SapCandidate as SapCandidateMsg,
 };
 use crate::types::Peer;
 use xor_name::{Prefix, XorName};
@@ -68,7 +69,7 @@ pub struct SectionAuthorityProvider {
 
 /// SectionAuthorityProvider candidates for handover consensus to vote on
 #[allow(clippy::large_enum_variant)]
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
 pub enum SapCandidate {
     ElderHandover(SectionAuth<SectionAuthorityProvider>),
     SectionSplit(
@@ -104,19 +105,19 @@ impl serde::Serialize for SectionAuthorityProvider {
     }
 }
 
-// NB TODO we should remove this and make sure SectionAuthorityProvider is only created at one place
-// at the system's boundaries when we receive it and verify it.
-// This way we can make sure that this type means that the data can always be considered verified.
-// To achieve this, we will also need to get rid of the `into_state` (from `messaging`) below.
-impl<'de> serde::Deserialize<'de> for SectionAuthorityProvider {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        // Deserialize as `SectionAuthorityProviderMsg`
-        Ok(SectionAuthorityProviderMsg::deserialize(deserializer)?.into_state())
-    }
-}
+// // NB TODO we should remove this and make sure SectionAuthorityProvider is only created at one place
+// // at the system's boundaries when we receive it and verify it.
+// // This way we can make sure that this type means that the data can always be considered verified.
+// // To achieve this, we will also need to get rid of the `into_state` (from `messaging`) below.
+// impl<'de> serde::Deserialize<'de> for SectionAuthorityProvider {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//     where
+//         D: serde::Deserializer<'de>,
+//     {
+//         // Deserialize as `SectionAuthorityProviderMsg`
+//         Ok(SectionAuthorityProviderMsg::deserialize(deserializer)?.into_state())
+//     }
+// }
 
 impl SectionAuthorityProvider {
     /// Creates a new `SectionAuthorityProvider` with the given members, prefix and public keyset.

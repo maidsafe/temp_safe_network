@@ -18,6 +18,7 @@ use std::{
 use xor_name::{Prefix, XorName};
 
 use super::system::NodeState;
+use super::SectionAuth;
 
 // TODO: we need to maintain a list of nodes who have previosly been members of this section (archived nodes)
 //       currently, only the final members of the section are preserved on the SAP.
@@ -53,5 +54,23 @@ impl Display for SectionAuthorityProvider {
             self.elders.keys().format(", "),
             self.prefix,
         )
+    }
+}
+
+/// SectionAuthorityProvider candidates for handover consensus to vote on
+#[allow(clippy::large_enum_variant)]
+#[derive(PartialEq, Eq, Clone, PartialOrd, Ord, Debug, Serialize, Deserialize)]
+pub enum SapCandidate {
+    ElderHandover((SectionAuth, SectionAuthorityProvider)),
+    SectionSplit(
+        (SectionAuth, SectionAuthorityProvider),
+        (SectionAuth, SectionAuthorityProvider),
+    ),
+}
+
+impl Ord for SapCandidate {
+    fn cmp(&self, other: &Self) -> Ordering {
+        // self.len().cmp(&other.len())
+        // ..
     }
 }

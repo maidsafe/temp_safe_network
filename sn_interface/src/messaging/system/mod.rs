@@ -13,7 +13,7 @@ mod node_msgs;
 mod node_state;
 mod signed;
 
-use crate::network_knowledge::SapCandidate;
+// use crate::network_knowledge::SapCandidate;
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SectionAuth};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
@@ -25,7 +25,7 @@ use sn_consensus::{Generation, SignedVote};
 /// List of peers of a section
 pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
 
-use crate::messaging::{EndUser, MsgId, SectionAuthorityProvider};
+use crate::messaging::{EndUser, MsgId, SectionAuthorityProvider, SapCandidate};
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;

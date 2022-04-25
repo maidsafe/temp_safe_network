@@ -48,6 +48,6 @@ pub use self::{
     location::{DstLocation, EndUser, SrcLocation},
     msg_id::{MsgId, MESSAGE_ID_LEN},
     msg_kind::MsgKind,
-    sap::SectionAuthorityProvider,
+    sap::{SapCandidate, SectionAuthorityProvider},
     serialisation::{MsgType, NodeMsgAuthority, WireMsg},
 };
