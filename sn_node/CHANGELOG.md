@@ -5,41 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.58.13 (2022-04-23)
-
-<csr-id-7b8ce1c9d980015768a300ac99d07f69cc1f5ae3/>
-<csr-id-bc6d861706e57d6cc80bfde2b876ba9ce57efb09/>
-<csr-id-8494a01d9be3dddc0d0f4c2c37cdc4d6c3e54521/>
-<csr-id-b62ad80298eb4b3e2f9810d20dd553aaf802408b/>
-<csr-id-86ce41ca31508dbaf2de56fc81e1ca3146f863dc/>
+## v0.58.14 (2022-04-25)
 
 ### Chore
 
- - <csr-id-7b8ce1c9d980015768a300ac99d07f69cc1f5ae3/> remove unused sn_interface deps
- - <csr-id-bc6d861706e57d6cc80bfde2b876ba9ce57efb09/> fix bench types dep -> sn_interface
- - <csr-id-8494a01d9be3dddc0d0f4c2c37cdc4d6c3e54521/> split put messaging and types into top level crate
-
-### Refactor
-
- - <csr-id-1f3af46aea59ebeb1b6a4b736e80e86ce2f724d8/> remove op_id arg from track_issue
-   Based on PR feedback, Yogesh pointed out we could change the `PendingRequestOperation` to use an
-   `Option<OperationId>`. This solved the problem when performing a selection, because you can use
-   `PendingRequestOperation(None)`. That's a lot better than using some placeholder value for the
-   operation ID. This also tidies up `track_issue` to remove the optional `op_id` argument.
-
-### Other
-
- - <csr-id-a6cb9e6c5bd63d61c4114afdcc632532f48ba208/> remove test-publish step entirely.
-   It doesnt buy us much and may fail if any dep of  has changed.
-   Better to work on checking what we want (for git deps eg) rather than breaking CI
- - <csr-id-9945bf8fb5981c1a64b23d6ea1afba5089aa5c3a/> fix benchmark workflow for sn_node dir
- - <csr-id-54000b43cdd3688e6c691bef9dedc299da3c22aa/> test updates for sn_node and sn_client
-
-### Bug Fixes
-
- - <csr-id-ae4ee5c1a37dab7b5ca132d96d026bcdbac50be0/> use supported referencing style
-   Currently smart-release doesn't support the `~` style of reference; the `^` style must be used. This
-   caused the last nightly run to fail at version bumping.
+ - <csr-id-2f4e7e6305ba387f2e28945aee71df650ac1d3eb/> sn_interface-0.2.0/sn_dysfunction-0.1.2/sn_api-0.59.0/sn_cli-0.52.0
+ - <csr-id-318ee1d22970b5f06e93a99b6e8fff6da638c589/> tidy references in cargo manifests
+   All references are organised alphabetically, and random usage of long-form references are removed in
+   favour of the short-form version, unless the long-form style is justified, e.g., when lots of
+   features are being used.
+ - <csr-id-826dfa48cc7c73f19adcd67bb06c7464dba4921d/> fix sn/interface dep version
+ - <csr-id-8d041a80b75bc773fcbe0e4c88940ade9bda4b9d/> remove unused deps after node/client split
+ - <csr-id-2a731b990dbe67a700468865288585ee8dff0d71/> move examples/bench -> sn_client where appropriate
+ - <csr-id-aad69387240b067604a3d54bcf631a726c9d0956/> safe_network->sn_node
+ - <csr-id-0fc38442008ff62a6bf5398ff36cd67f99a6e172/> rename sn->sn_node now we have client extracted
+ - <csr-id-6383f038449ebba5e7c5dec1d3f8cc1f7deca581/> remove olde node github workflows
 
 ### New Features
 
@@ -96,6 +76,169 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    return all three types of scores from the refactored `calculate_scores` function, rather than
    returning a tuple of three hash tables, which would have been a bit cumbersome.
 
+### Bug Fixes
+
+ - <csr-id-9aa65d92e1d806150401f8bdefa1ead2e3cafd42/> use the config verbosity if no env var present
+ - <csr-id-1e7c4ab6d56304f99d11396e0eee5109eb4dda04/> update some instances of safe_network->sn_node
+ - <csr-id-ae4ee5c1a37dab7b5ca132d96d026bcdbac50be0/> use supported referencing style
+   Currently smart-release doesn't support the `~` style of reference; the `^` style must be used. This
+   caused the last nightly run to fail at version bumping.
+
+### Other
+
+ - <csr-id-5580cac3d7aeab7e809729697753a9a38e8f2270/> test valid nonce signature
+ - <csr-id-a6cb9e6c5bd63d61c4114afdcc632532f48ba208/> remove test-publish step entirely.
+   It doesnt buy us much and may fail if any dep of  has changed.
+   Better to work on checking what we want (for git deps eg) rather than breaking CI
+ - <csr-id-9945bf8fb5981c1a64b23d6ea1afba5089aa5c3a/> fix benchmark workflow for sn_node dir
+ - <csr-id-54000b43cdd3688e6c691bef9dedc299da3c22aa/> test updates for sn_node and sn_client
+
+### Refactor
+
+ - <csr-id-1f3af46aea59ebeb1b6a4b736e80e86ce2f724d8/> remove op_id arg from track_issue
+   Based on PR feedback, Yogesh pointed out we could change the `PendingRequestOperation` to use an
+   `Option<OperationId>`. This solved the problem when performing a selection, because you can use
+   `PendingRequestOperation(None)`. That's a lot better than using some placeholder value for the
+   operation ID. This also tidies up `track_issue` to remove the optional `op_id` argument.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 19 commits contributed to the release over the course of 314 calendar days.
+ - 17 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - use the config verbosity if no env var present ([`9aa65d9`](https://github.com/maidsafe/safe_network/commit/9aa65d92e1d806150401f8bdefa1ead2e3cafd42))
+    - update some instances of safe_network->sn_node ([`1e7c4ab`](https://github.com/maidsafe/safe_network/commit/1e7c4ab6d56304f99d11396e0eee5109eb4dda04))
+    - Merge #1128 ([`e49d382`](https://github.com/maidsafe/safe_network/commit/e49d38239b3a8c468616ad3782e1208316e9b5e0))
+    - sn_interface-0.2.0/sn_dysfunction-0.1.2/sn_api-0.59.0/sn_cli-0.52.0 ([`2f4e7e6`](https://github.com/maidsafe/safe_network/commit/2f4e7e6305ba387f2e28945aee71df650ac1d3eb))
+    - test valid nonce signature ([`5580cac`](https://github.com/maidsafe/safe_network/commit/5580cac3d7aeab7e809729697753a9a38e8f2270))
+    - tidy references in cargo manifests ([`318ee1d`](https://github.com/maidsafe/safe_network/commit/318ee1d22970b5f06e93a99b6e8fff6da638c589))
+    - use supported referencing style ([`ae4ee5c`](https://github.com/maidsafe/safe_network/commit/ae4ee5c1a37dab7b5ca132d96d026bcdbac50be0))
+    - Merge #1122 ([`f359a45`](https://github.com/maidsafe/safe_network/commit/f359a45971a5b42a6f174536475f47b8ab076901))
+    - remove op_id arg from track_issue ([`1f3af46`](https://github.com/maidsafe/safe_network/commit/1f3af46aea59ebeb1b6a4b736e80e86ce2f724d8))
+    - fix sn/interface dep version ([`826dfa4`](https://github.com/maidsafe/safe_network/commit/826dfa48cc7c73f19adcd67bb06c7464dba4921d))
+    - remove test-publish step entirely. ([`a6cb9e6`](https://github.com/maidsafe/safe_network/commit/a6cb9e6c5bd63d61c4114afdcc632532f48ba208))
+    - compare against all nodes in section ([`5df610c`](https://github.com/maidsafe/safe_network/commit/5df610c93b76cfc3a6f09734476240313b16bee6))
+    - remove unused deps after node/client split ([`8d041a8`](https://github.com/maidsafe/safe_network/commit/8d041a80b75bc773fcbe0e4c88940ade9bda4b9d))
+    - fix benchmark workflow for sn_node dir ([`9945bf8`](https://github.com/maidsafe/safe_network/commit/9945bf8fb5981c1a64b23d6ea1afba5089aa5c3a))
+    - move examples/bench -> sn_client where appropriate ([`2a731b9`](https://github.com/maidsafe/safe_network/commit/2a731b990dbe67a700468865288585ee8dff0d71))
+    - test updates for sn_node and sn_client ([`54000b4`](https://github.com/maidsafe/safe_network/commit/54000b43cdd3688e6c691bef9dedc299da3c22aa))
+    - safe_network->sn_node ([`aad6938`](https://github.com/maidsafe/safe_network/commit/aad69387240b067604a3d54bcf631a726c9d0956))
+    - rename sn->sn_node now we have client extracted ([`0fc3844`](https://github.com/maidsafe/safe_network/commit/0fc38442008ff62a6bf5398ff36cd67f99a6e172))
+    - remove olde node github workflows ([`6383f03`](https://github.com/maidsafe/safe_network/commit/6383f038449ebba5e7c5dec1d3f8cc1f7deca581))
+</details>
+
+## v0.58.13 (2022-04-23)
+
+<csr-id-7b8ce1c9d980015768a300ac99d07f69cc1f5ae3/>
+<csr-id-bc6d861706e57d6cc80bfde2b876ba9ce57efb09/>
+<csr-id-8494a01d9be3dddc0d0f4c2c37cdc4d6c3e54521/>
+<csr-id-b62ad80298eb4b3e2f9810d20dd553aaf802408b/>
+<csr-id-86ce41ca31508dbaf2de56fc81e1ca3146f863dc/>
+<csr-id-1f3af46aea59ebeb1b6a4b736e80e86ce2f724d8/>
+<csr-id-a6cb9e6c5bd63d61c4114afdcc632532f48ba208/>
+<csr-id-9945bf8fb5981c1a64b23d6ea1afba5089aa5c3a/>
+<csr-id-54000b43cdd3688e6c691bef9dedc299da3c22aa/>
+<csr-id-318ee1d22970b5f06e93a99b6e8fff6da638c589/>
+<csr-id-826dfa48cc7c73f19adcd67bb06c7464dba4921d/>
+<csr-id-8d041a80b75bc773fcbe0e4c88940ade9bda4b9d/>
+<csr-id-2a731b990dbe67a700468865288585ee8dff0d71/>
+<csr-id-aad69387240b067604a3d54bcf631a726c9d0956/>
+<csr-id-0fc38442008ff62a6bf5398ff36cd67f99a6e172/>
+<csr-id-6383f038449ebba5e7c5dec1d3f8cc1f7deca581/>
+
+### Chore
+
+ - <csr-id-7b8ce1c9d980015768a300ac99d07f69cc1f5ae3/> remove unused sn_interface deps
+ - <csr-id-bc6d861706e57d6cc80bfde2b876ba9ce57efb09/> fix bench types dep -> sn_interface
+ - <csr-id-8494a01d9be3dddc0d0f4c2c37cdc4d6c3e54521/> split put messaging and types into top level crate
+
+### Refactor
+
+ - <csr-id-1f3af46aea59ebeb1b6a4b736e80e86ce2f724d8/> remove op_id arg from track_issue
+   Based on PR feedback, Yogesh pointed out we could change the `PendingRequestOperation` to use an
+   `Option<OperationId>`. This solved the problem when performing a selection, because you can use
+   `PendingRequestOperation(None)`. That's a lot better than using some placeholder value for the
+   operation ID. This also tidies up `track_issue` to remove the optional `op_id` argument.
+
+### Other
+
+ - <csr-id-a6cb9e6c5bd63d61c4114afdcc632532f48ba208/> remove test-publish step entirely.
+   It doesnt buy us much and may fail if any dep of  has changed.
+   Better to work on checking what we want (for git deps eg) rather than breaking CI
+ - <csr-id-9945bf8fb5981c1a64b23d6ea1afba5089aa5c3a/> fix benchmark workflow for sn_node dir
+ - <csr-id-54000b43cdd3688e6c691bef9dedc299da3c22aa/> test updates for sn_node and sn_client
+
+### Bug Fixes
+
+ - <csr-id-ae4ee5c1a37dab7b5ca132d96d026bcdbac50be0/> use supported referencing style
+   Currently smart-release doesn't support the `~` style of reference; the `^` style must be used. This
+   caused the last nightly run to fail at version bumping.
+
+### New Features
+
+ - <csr-id-5df610c93b76cfc3a6f09734476240313b16bee6/> compare against all nodes in section
+   When calculating scores, we compare against the average of all the nodes in the section, rather than
+   the 'neighbours' of the node. As a consequence, the `DysfunctionDetection` struct becomes simpler,
+   as we don't need to keep track of what nodes are 'closer' to others as the set of nodes changes.
+   
+   In the course of this change, the Dysfunction API was updated.
+   
+   First, the `ScoreType` enum was renamed `IssueType`, which now details the three issue types, rather
+   than have timed versus operational. Secondly, one `track_issue` function merges three
+   `track_x_issue` functions for adding issues to the tracker.
+   
+   Both these decisions were influenced by property testing: there were properties that should have
+   been true for each issue type, and it was easier to write tests for those properties if they all
+   used a single API.
+   
+   It's worth noting, the `track_issue` function provides an `Option` argument for supplying an
+   `op_id`. This value only applies when a `PendingRequestOperation` type is used. At first, the
+   pending request entry was declared as `PendingRequestOperation([u8; 32])`, which makes sense
+   initially. For adding the issue, you just pass the op ID along with the issue type. However, the
+   problem comes when you later want to select the issues of this type. For example:
+   ```
+   let _ = op_scores.insert(
+   *node,
+   self.calculate_node_score(
+   node,
+   adults.clone(),
+   IssueType::PendingRequestOperation,
+   )
+   .await,
+   );
+   ```
+   
+   If you have the `op_id` parameter on the enum entry, the code becomes very clunky:
+   ```
+   let _ = op_scores.insert(
+   *node,
+   self.calculate_node_score(
+   node,
+   adults.clone(),
+   IssueType::PendingRequestOperation([1; 32])
+   )
+   .await,
+   );
+   ```
+   
+   As can be seen, you need to supply an ugly placeholder value that has no effect. For this reason, I
+   decided to just supply the `op_id` as an optional argument on `track_issue`. Neither solution is
+   completely ideal, but I prefer this one.
+   
+   Remaining changes were a bit more superficial. A `ScoreResults` helper struct was introduced to
+   return all three types of scores from the refactored `calculate_scores` function, rather than
+   returning a tuple of three hash tables, which would have been a bit cumbersome.
+
 ### Chore
 
  - <csr-id-318ee1d22970b5f06e93a99b6e8fff6da638c589/> tidy references in cargo manifests
@@ -116,37 +259,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Test
 
  - <csr-id-86ce41ca31508dbaf2de56fc81e1ca3146f863dc/> adding more unit tests to wallet APIs
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 14 commits contributed to the release over the course of 312 calendar days.
- - 13 commits where understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - tidy references in cargo manifests ([`318ee1d`](https://github.com/maidsafe/safe_network/commit/318ee1d22970b5f06e93a99b6e8fff6da638c589))
-    - use supported referencing style ([`ae4ee5c`](https://github.com/maidsafe/safe_network/commit/ae4ee5c1a37dab7b5ca132d96d026bcdbac50be0))
-    - Merge #1122 ([`f359a45`](https://github.com/maidsafe/safe_network/commit/f359a45971a5b42a6f174536475f47b8ab076901))
-    - remove op_id arg from track_issue ([`1f3af46`](https://github.com/maidsafe/safe_network/commit/1f3af46aea59ebeb1b6a4b736e80e86ce2f724d8))
-    - fix sn/interface dep version ([`826dfa4`](https://github.com/maidsafe/safe_network/commit/826dfa48cc7c73f19adcd67bb06c7464dba4921d))
-    - remove test-publish step entirely. ([`a6cb9e6`](https://github.com/maidsafe/safe_network/commit/a6cb9e6c5bd63d61c4114afdcc632532f48ba208))
-    - compare against all nodes in section ([`5df610c`](https://github.com/maidsafe/safe_network/commit/5df610c93b76cfc3a6f09734476240313b16bee6))
-    - remove unused deps after node/client split ([`8d041a8`](https://github.com/maidsafe/safe_network/commit/8d041a80b75bc773fcbe0e4c88940ade9bda4b9d))
-    - fix benchmark workflow for sn_node dir ([`9945bf8`](https://github.com/maidsafe/safe_network/commit/9945bf8fb5981c1a64b23d6ea1afba5089aa5c3a))
-    - move examples/bench -> sn_client where appropriate ([`2a731b9`](https://github.com/maidsafe/safe_network/commit/2a731b990dbe67a700468865288585ee8dff0d71))
-    - test updates for sn_node and sn_client ([`54000b4`](https://github.com/maidsafe/safe_network/commit/54000b43cdd3688e6c691bef9dedc299da3c22aa))
-    - safe_network->sn_node ([`aad6938`](https://github.com/maidsafe/safe_network/commit/aad69387240b067604a3d54bcf631a726c9d0956))
-    - rename sn->sn_node now we have client extracted ([`0fc3844`](https://github.com/maidsafe/safe_network/commit/0fc38442008ff62a6bf5398ff36cd67f99a6e172))
-    - remove olde node github workflows ([`6383f03`](https://github.com/maidsafe/safe_network/commit/6383f038449ebba5e7c5dec1d3f8cc1f7deca581))
-</details>
 
 ## v0.58.12 (2022-04-09)
 
