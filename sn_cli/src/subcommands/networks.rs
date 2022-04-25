@@ -67,7 +67,6 @@ pub async fn networks_commander(
                 "Successfully switched to '{}' network in your system!",
                 network_name
             );
-          
         }
         Some(NetworksSubCommands::Check {}) => {
             println!("Checking current setup network connection information...");

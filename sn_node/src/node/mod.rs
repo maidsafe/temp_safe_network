@@ -45,11 +45,10 @@ pub(crate) use self::core::MIN_LEVEL_WHEN_FULL;
 
 #[cfg(any(test, feature = "test-utils"))]
 mod test_utils {
+    use super::cfg::config_handler::Config;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use std::path::{Path, PathBuf};
     use tempfile::tempdir;
-
-    const TEST_MAX_CAPACITY: usize = 1024 * 1024;
 
     /// Create a register store for routing examples
     pub fn create_test_max_capacity_and_root_storage() -> eyre::Result<(usize, PathBuf)> {
@@ -57,7 +56,8 @@ mod test_utils {
 
         let root_dir = tempdir().map_err(|e| eyre::eyre!(e.to_string()))?;
         let storage_dir = Path::new(root_dir.path()).join(random_filename);
+        let config = Config::default();
 
-        Ok((TEST_MAX_CAPACITY, storage_dir))
+        Ok((config.max_capacity(), storage_dir))
     }
 }
