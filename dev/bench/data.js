@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1650683217384,
+  "lastUpdate": 1650877065961,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -821,6 +821,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4497098562,
             "range": "± 102181609",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "e49d38239b3a8c468616ad3782e1208316e9b5e0",
+          "message": "Merge #1128\n\n1128: tests(resource_proof): test valid nonce signature r=Yoga07 a=RolandSherwin\n\nMakes sure that the `nonce_signature` is signed by the correct peer.\n\nCo-authored-by: RolandSherwin <RolandSherwin@protonmail.com>",
+          "timestamp": "2022-04-25T07:23:32Z",
+          "tree_id": "b944a6ca44683c5de702a72c1ab3f88589e30fd8",
+          "url": "https://github.com/maidsafe/safe_network/commit/e49d38239b3a8c468616ad3782e1208316e9b5e0"
+        },
+        "date": 1650877065314,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10485377510,
+            "range": "± 10631617299",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3767715033,
+            "range": "± 730171525",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 8500721472,
+            "range": "± 3687151215",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10033546845,
+            "range": "± 2953869458",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3150609602,
+            "range": "± 14045994",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4203737346,
+            "range": "± 202317743",
             "unit": "ns/iter"
           }
         ]
