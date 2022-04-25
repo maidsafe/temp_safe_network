@@ -229,7 +229,7 @@ async fn run_node() -> Result<()> {
             tracing_subscriber::fmt()
                 .with_thread_names(true)
                 .with_ansi(false)
-                .with_env_filter(EnvFilter::from_default_env())
+                .with_env_filter(filter)
                 .with_target(false)
                 .event_format(LogFormatter::default())
                 .init();
