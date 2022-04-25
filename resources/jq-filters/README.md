@@ -6,17 +6,17 @@ The filters in this directory can be used to process the logs emitted by Safe Ne
 ## Prerequisites
 
 To use these filters, you need to enable the trace log level and JSON log output.
-You can set the trace log level by setting `safe_network=trace` in the `RUST_LOG` environment variable.
+You can set the trace log level by setting `sn_node=trace` in the `RUST_LOG` environment variable.
 JSON log output is currently only supported by `sn_node`, and can be enabled by supplying the `--json-logs` flag, e.g.
 
 ```sh
-RUST_LOG=safe_network=trace sn_node <args> --json-logs
+RUST_LOG=sn_node=trace sn_node <args> --json-logs
 ```
 
 The `--json-logs` flag can also be used with the `testnet` binary:
 
 ```sh
-RUST_LOG=safe_network=trace NODE_COUNT=11 testnet --json-logs
+RUST_LOG=sn_node=trace NODE_COUNT=11 testnet --json-logs
 ```
 
 ## Usage
