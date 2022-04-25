@@ -152,7 +152,7 @@ function amend_tags() {
     git tag "sn_dysfunction-v${sn_dysfunction_version}" -f
   fi
   if [[ $sn_client_has_changes == "true" ]]; then git tag "sn_client-v${sn_client_version}" -f; fi
-  if [[ $safe_network_has_changes == "true" ]]; then git tag "sn_node-v${sn_node_version}" -f; fi
+  if [[ $sn_node_has_changes == "true" ]]; then git tag "sn_node-v${sn_node_version}" -f; fi
   if [[ $sn_api_has_changes == "true" ]]; then git tag "sn_api-v${sn_api_version}" -f; fi
   if [[ $sn_cli_has_changes == "true" ]]; then git tag "sn_cli-v${sn_cli_version}" -f; fi
 }

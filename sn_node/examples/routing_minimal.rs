@@ -293,7 +293,7 @@ async fn handle_event(index: usize, node: &mut NodeApi, event: Event) -> bool {
 
 fn init_log(verbosity: u8) {
     const BIN_NAME: &str = module_path!();
-    const CRATE_NAME: &str = "safe_network";
+    const CRATE_NAME: &str = "sn_node";
     let filter = match verbosity {
         0 => EnvFilter::new(format!("{}=info,{}=warn", BIN_NAME, CRATE_NAME)),
         1 => EnvFilter::new(format!("{},{}=info", BIN_NAME, CRATE_NAME)),
