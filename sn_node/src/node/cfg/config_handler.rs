@@ -36,9 +36,6 @@ pub struct Config {
     /// A hex formatted BLS public key.
     #[structopt(short, long, parse(try_from_str))]
     pub wallet_id: Option<String>,
-    /// Upper limit in bytes for allowed network storage on this node.
-    #[structopt(short, long)]
-    pub max_capacity: Option<usize>,
     /// Root directory for dbs and cached state. If not set, it defaults to "root_dir"
     /// within the sn_node project data directory, located at:
     /// Linux: $HOME/.safe/node/root_dir
@@ -220,10 +217,6 @@ impl Config {
             self.wallet_id = Some(wallet_id.clone());
         }
 
-        if let Some(max_capacity) = &config.max_capacity {
-            self.max_capacity = Some(*max_capacity);
-        }
-
         if let Some(root_dir) = &config.root_dir {
             self.root_dir = Some(root_dir.clone());
         }
@@ -303,7 +296,7 @@ impl Config {
 
     /// Upper limit in bytes for allowed network storage on this node.
     pub fn max_capacity(&self) -> usize {
-        self.max_capacity.unwrap_or(DEFAULT_MAX_CAPACITY)
+        DEFAULT_MAX_CAPACITY
     }
 
     /// Root directory for dbs and cached state. If not set, it defaults to
@@ -520,7 +513,7 @@ fn smoke() {
     // NOTE: IF this value is being changed due to a change in the config,
     // the change in config also be handled in Config::merge()
     // and in examples/config_handling.rs
-    let expected_size = 472;
+    let expected_size = 456;
 
     assert_eq!(std::mem::size_of::<Config>(), expected_size);
 }
