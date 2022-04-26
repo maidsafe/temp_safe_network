@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1650963699373,
+  "lastUpdate": 1650966933599,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -1121,6 +1121,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4538416797,
             "range": "± 185847986",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "3448a0b6f1b6278dbbf8a177714a8c3b6b3832cd",
+          "message": "Merge #1137\n\n1137: chore(node): change default node max cpacity to 10GB r=joshuef a=bochaco\n\n- This also removes some outdated warning message shown by CLI.\n\nCo-authored-by: Southside <293741+willief@users.noreply.github.com>\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>",
+          "timestamp": "2022-04-26T08:28:48Z",
+          "tree_id": "befc30b29df210109de5c0bb373a91cbd9daf886",
+          "url": "https://github.com/maidsafe/safe_network/commit/3448a0b6f1b6278dbbf8a177714a8c3b6b3832cd"
+        },
+        "date": 1650966933035,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10667310958,
+            "range": "± 11973296994",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3792752587,
+            "range": "± 1203560877",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 8806514945,
+            "range": "± 5633849568",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10039529258,
+            "range": "± 6214681",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3149400062,
+            "range": "± 740383351",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4576938875,
+            "range": "± 1033440617",
             "unit": "ns/iter"
           }
         ]
