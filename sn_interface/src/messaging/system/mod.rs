@@ -168,12 +168,24 @@ pub enum SystemMsg {
     /// Message that notifies a section to test
     /// the connectivity to a node
     StartConnectivityTest(XorName),
-    /// Cmds are orders to perform some operation, only sent internally in the network.
-    NodeCmd(NodeCmd),
-    /// Queries is a read-only operation.
-    NodeQuery(NodeQuery),
     /// Events are facts about something that happened on a node.
     NodeEvent(NodeEvent),
+    /// The returned error, from any msg handling on recipient node.
+    NodeMsgError {
+        /// The error.
+        // TODO: return node::Error instead
+        error: crate::messaging::data::Error,
+        /// ID of causing cmd.
+        correlation_id: MsgId,
+    },
+
+    #[cfg(any(feature = "chunks", feature = "registers"))]
+    /// Cmds are orders to perform some operation, only sent internally in the network.
+    NodeCmd(NodeCmd),
+    #[cfg(any(feature = "chunks", feature = "registers"))]
+    /// Queries is a read-only operation.
+    NodeQuery(NodeQuery),
+    #[cfg(any(feature = "chunks", feature = "registers"))]
     /// The response to a query, containing the query result.
     NodeQueryResponse {
         /// QueryResponse.
@@ -182,13 +194,5 @@ pub enum SystemMsg {
         correlation_id: MsgId,
         /// TEMP: Add user here as part of return flow. Remove this as we have chunk routing etc
         user: EndUser,
-    },
-    /// The returned error, from any msg handling on recipient node.
-    NodeMsgError {
-        /// The error.
-        // TODO: return node::Error instead
-        error: crate::messaging::data::Error,
-        /// ID of causing cmd.
-        correlation_id: MsgId,
     },
 }

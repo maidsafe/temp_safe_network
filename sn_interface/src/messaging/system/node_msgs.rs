@@ -61,6 +61,7 @@ pub enum NodeCmd {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeEvent {
+    #[cfg(any(feature = "chunks", feature = "registers"))]
     /// Sent by a full Adult, and tells the Elders to store a chunk at some other Adult in the section
     CouldNotStoreData {
         /// Node Id
@@ -104,24 +105,31 @@ pub enum NodeQuery {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeQueryResponse {
+    #[cfg(feature = "chunks")]
     //
     // ===== Chunk =====
     //
     /// Response to [`ChunkRead::Get`].
     GetChunk(Result<Chunk>),
+    #[cfg(feature = "registers")]
     //
     // ===== Register Data =====
     //
     /// Response to [`RegisterQuery::Get`].
     GetRegister((Result<Register>, OperationId)),
+    #[cfg(feature = "registers")]
     /// Response to [`RegisterQuery::GetOwner`].
     GetRegisterOwner((Result<User>, OperationId)),
+    #[cfg(feature = "registers")]
     /// Response to [`RegisterQuery::GetEntry`].
     GetRegisterEntry((Result<Entry>, OperationId)),
+    #[cfg(feature = "registers")]
     /// Response to [`RegisterQuery::GetPolicy`].
     GetRegisterPolicy((Result<Policy>, OperationId)),
+    #[cfg(feature = "registers")]
     /// Response to [`RegisterQuery::Read`].
     ReadRegister((Result<BTreeSet<(EntryHash, Entry)>>, OperationId)),
+    #[cfg(feature = "registers")]
     /// Response to [`RegisterQuery::GetUserPermissions`].
     GetRegisterUserPermissions((Result<Permissions>, OperationId)),
     //
@@ -135,12 +143,19 @@ impl NodeQueryResponse {
     pub fn convert(self) -> QueryResponse {
         use NodeQueryResponse::*;
         match self {
+            #[cfg(feature = "chunks")]
             GetChunk(res) => QueryResponse::GetChunk(res),
+            #[cfg(feature = "registers")]
             GetRegister(res) => QueryResponse::GetRegister(res),
+            #[cfg(feature = "registers")]
             GetRegisterEntry(res) => QueryResponse::GetRegisterEntry(res),
+            #[cfg(feature = "registers")]
             GetRegisterOwner(res) => QueryResponse::GetRegisterOwner(res),
+            #[cfg(feature = "registers")]
             ReadRegister(res) => QueryResponse::ReadRegister(res),
+            #[cfg(feature = "registers")]
             GetRegisterPolicy(res) => QueryResponse::GetRegisterPolicy(res),
+            #[cfg(feature = "registers")]
             GetRegisterUserPermissions(res) => QueryResponse::GetRegisterUserPermissions(res),
             FailedToCreateOperationId => QueryResponse::FailedToCreateOperationId,
         }

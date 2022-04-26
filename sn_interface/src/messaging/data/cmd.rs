@@ -20,10 +20,12 @@ use xor_name::XorName;
 #[allow(clippy::large_enum_variant)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum DataCmd {
+    #[cfg(feature = "chunks")]
     /// [`Chunk`] write operation.
     ///
     /// [`Chunk`]: crate::types::Chunk
     StoreChunk(Chunk),
+    #[cfg(feature = "registers")]
     /// [`Register`] write operation.
     ///
     /// [`Register`]: crate::types::register::Register
@@ -36,7 +38,9 @@ impl DataCmd {
     pub fn error(&self, error: Error) -> CmdError {
         use DataCmd::*;
         match self {
+            #[cfg(feature = "chunks")]
             StoreChunk(_) => CmdError::Data(error),
+            #[cfg(feature = "registers")]
             Register(c) => c.error(error),
         }
     }
@@ -45,7 +49,9 @@ impl DataCmd {
     pub fn dst_name(&self) -> XorName {
         use DataCmd::*;
         match self {
+            #[cfg(feature = "chunks")]
             StoreChunk(c) => *c.name(),
+            #[cfg(feature = "registers")]
             Register(c) => c.name(), // TODO: c.dst_id(), as to not co-locate private and public and different tags of same name.
         }
     }

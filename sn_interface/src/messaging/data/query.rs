@@ -22,12 +22,14 @@ use xor_name::XorName;
 #[allow(clippy::large_enum_variant)]
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum DataQuery {
+    #[cfg(feature = "chunks")]
     /// Retrieve a [`Chunk`] at the given address.
     ///
     /// This should eventually lead to a [`GetChunk`] response.
     /// [`Chunk`]: crate::types::Chunk
     /// [`GetChunk`]: QueryResponse::GetChunk
     GetChunk(ChunkAddress),
+    #[cfg(feature = "registers")]
     /// [`Register`] read operation.
     ///
     /// [`Register`]: crate::types::register::Register
@@ -40,7 +42,9 @@ impl DataQuery {
     pub fn error(&self, error: Error) -> Result<QueryResponse> {
         use DataQuery::*;
         match self {
+            #[cfg(feature = "chunks")]
             GetChunk(_) => Ok(QueryResponse::GetChunk(Err(error))),
+            #[cfg(feature = "registers")]
             Register(q) => q.error(error),
         }
     }
@@ -49,7 +53,9 @@ impl DataQuery {
     pub fn dst_name(&self) -> XorName {
         use DataQuery::*;
         match self {
+            #[cfg(feature = "chunks")]
             GetChunk(address) => *address.name(),
+            #[cfg(feature = "registers")]
             Register(q) => q.dst_name(),
         }
     }
@@ -57,7 +63,9 @@ impl DataQuery {
     /// Returns the address of the data
     pub fn address(&self) -> DataAddress {
         match self {
+            #[cfg(feature = "chunks")]
             DataQuery::GetChunk(address) => DataAddress::Chunk(*address),
+            #[cfg(feature = "registers")]
             DataQuery::Register(read) => DataAddress::Register(read.dst_address()),
         }
     }
@@ -68,7 +76,9 @@ impl DataQuery {
     /// Right now returning result to fail for anything non-chunk, as that's all we're tracking from other nodes here just now.
     pub fn operation_id(&self) -> Result<OperationId> {
         match self {
+            #[cfg(feature = "chunks")]
             DataQuery::GetChunk(address) => chunk_operation_id(address),
+            #[cfg(feature = "registers")]
             DataQuery::Register(read) => read.operation_id(),
         }
     }
