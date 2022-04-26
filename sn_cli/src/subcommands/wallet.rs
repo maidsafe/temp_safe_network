@@ -7,10 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    helpers::{get_from_arg_or_stdin, serialise_output},
+    helpers::{dbc_from_hex, dbc_to_hex, get_from_arg_or_stdin, serialise_output},
     OutputFmt,
 };
-use color_eyre::{eyre::eyre, Result};
+use color_eyre::Result;
 use sn_api::Safe;
 use structopt::StructOpt;
 
@@ -85,14 +85,7 @@ pub async fn wallet_commander(
             Ok(())
         }
         WalletSubCommands::Deposit { target, name, dbc } => {
-            let mut dbc_str =
-                hex::decode(dbc).map_err(|err| eyre!("Couldn't hex-decode DBC: {:?}", err))?;
-
-            // TODO: use MsgPack instead of bincode
-            dbc_str.reverse();
-            let dbc = bincode::deserialize(&dbc_str)
-                .map_err(|err| eyre!("Couldn't deserialise DBC: {:?}", err))?;
-
+            let dbc = dbc_from_hex(&dbc)?;
             let the_name = safe.wallet_deposit(&target, name.as_deref(), &dbc).await?;
 
             if OutputFmt::Pretty == output_fmt {
@@ -108,13 +101,7 @@ pub async fn wallet_commander(
         }
         WalletSubCommands::Reissue { amount, from } => {
             let dbc = safe.wallet_reissue(&from, &amount).await?;
-
-            // TODO: use MsgPack instead of bincode
-            let mut serialised_dbc = bincode::serialize(&dbc)
-                .map_err(|err| eyre!("Couldn't serialise DBC: {:?}", err))?;
-            serialised_dbc.reverse();
-
-            let dbc_hex = hex::encode(serialised_dbc);
+            let dbc_hex = dbc_to_hex(&dbc)?;
 
             if OutputFmt::Pretty == output_fmt {
                 println!("Success. Reissued DBC with {} safecoins:", amount);

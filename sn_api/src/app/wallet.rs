@@ -128,7 +128,7 @@ impl Safe {
     }
 
     /// Check the total balance of a Wallet found at a given XOR-URL
-    pub async fn wallet_balance(&self, wallet_url: &str) -> Result<String> {
+    pub async fn wallet_balance(&self, wallet_url: &str) -> Result<Token> {
         debug!("Finding total Wallet balance for: {}", wallet_url);
 
         // Let's get the list of balances from the Wallet
@@ -160,7 +160,7 @@ impl Safe {
             }
         }
 
-        Ok(total_balance.to_string())
+        Ok(total_balance)
     }
 
     /// Reissue a Bearer-DBC from a Wallet returning the output DBC, and automatically depositing
@@ -360,7 +360,7 @@ mod tests {
         assert!(wallet_xorurl.starts_with("safe://"));
 
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
-        assert_eq!("0.000000000", current_balance);
+        assert_eq!(current_balance, Token::zero());
 
         Ok(())
     }
@@ -391,7 +391,7 @@ mod tests {
             .await?;
 
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
-        assert_eq!(current_balance, "12.230000000");
+        assert_eq!(current_balance, Token::from_nano(12_230_000_000));
 
         // ...and a second DBC with 1.53
         let dbc2 = new_dbc(DBC_WITH_1_530_000_000)?;
@@ -399,7 +399,7 @@ mod tests {
             .await?;
 
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
-        assert_eq!(current_balance, "13.760000000");
+        assert_eq!(current_balance, Token::from_nano(13_760_000_000));
 
         Ok(())
     }
@@ -511,7 +511,7 @@ mod tests {
 
         // Now check the Wallet can still be read and the corrupted entry is ignored
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
-        assert_eq!(current_balance, "1.530000000");
+        assert_eq!(current_balance, Token::from_nano(1_530_000_000));
 
         Ok(())
     }
@@ -536,7 +536,7 @@ mod tests {
         assert_eq!(output_balance.amount(), 2_350_000_000);
 
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
-        assert_eq!(current_balance, "11.410000000");
+        assert_eq!(current_balance, Token::from_nano(11_410_000_000));
 
         let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
 
@@ -611,7 +611,7 @@ mod tests {
         // Now check we can still reissue from the Wallet and the corrupted entry is ignored
         let _ = safe.wallet_reissue(&wallet_xorurl, "0.4").await?;
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
-        assert_eq!(current_balance, "1.130000000");
+        assert_eq!(current_balance, Token::from_nano(1_130_000_000));
 
         Ok(())
     }
@@ -630,7 +630,7 @@ mod tests {
         let _ = safe.wallet_reissue(&wallet_xorurl, "12.23").await?;
 
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
-        assert_eq!(current_balance, "0.000000000");
+        assert_eq!(current_balance, Token::zero());
 
         let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
         assert!(wallet_balances.is_empty());
@@ -654,7 +654,7 @@ mod tests {
             .await?;
 
         let balance = safe.wallet_balance(&wallet2_xorurl).await?;
-        assert_eq!(balance, "0.250000000");
+        assert_eq!(balance, Token::from_nano(250000000));
 
         Ok(())
     }

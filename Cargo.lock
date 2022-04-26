@@ -3635,6 +3635,7 @@ dependencies = [
  "rcgen 0.7.0",
  "relative-path",
  "reqwest",
+ "rmp-serde",
  "self_update",
  "serde",
  "serde_json",

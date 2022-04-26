@@ -12,8 +12,8 @@ use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
 use sn_api::resolver::{SafeData, SafeUrl};
 use sn_cmd_test_utilities::util::{
-    create_and_get_keys, get_random_nrs_string, parse_files_put_or_sync_output, safe_cmd,
-    safe_cmd_stdout, upload_path,
+    create_and_get_keys, get_random_nrs_string, parse_files_put_or_sync_output,
+    parse_wallet_create_output, safe_cmd, safe_cmd_stdout, upload_path,
 };
 use std::path::PathBuf;
 
@@ -132,6 +132,25 @@ fn calling_safe_dog_safekey_nrsurl() -> Result<()> {
     } else {
         Err(eyre!("Content retrieved was unexpected: {:?}", content))
     }
+}
+
+#[test]
+fn calling_safe_dog_with_wallet_xorurl() -> Result<()> {
+    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+
+    safe_cmd(["dog", &wallet_xorurl], Some(0))?
+        .assert()
+        .stdout(predicate::str::contains("= Wallet ="))
+        .stdout(predicate::str::contains(&format!(
+            "XOR-URL: {}",
+            wallet_xorurl
+        )))
+        .stdout(predicate::str::contains(
+            "Native data type: Private Register",
+        ));
+
+    Ok(())
 }
 
 #[test]
