@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1650966933599,
+  "lastUpdate": 1650973557943,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -1181,6 +1181,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4576938875,
             "range": "± 1033440617",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "22abbc73f909131a0208ddc6e9471d073061134a",
+          "message": "Merge #1139\n\n1139: chore(messaging): rename MsgKind -> AuthKind r=Yoga07 a=joshuef\n\nThis feels more correct given that the kind is actually about the authority that\r\nthe message carries.\r\n\r\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\n\nCo-authored-by: Josh Wilson <joshuef@gmail.com>\nCo-authored-by: David Irvine <david.irvine@maidsafe.net>\nCo-authored-by: Yogeshwar Murugan <yogeshwar_1997@hotmail.com>",
+          "timestamp": "2022-04-26T10:19:19Z",
+          "tree_id": "baa61c65d0977bdece8e06378e1c36b30fe05c55",
+          "url": "https://github.com/maidsafe/safe_network/commit/22abbc73f909131a0208ddc6e9471d073061134a"
+        },
+        "date": 1650973556932,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10479742010,
+            "range": "± 7656780972",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3801157716,
+            "range": "± 1119595555",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 8851481645,
+            "range": "± 1299509327",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10038800917,
+            "range": "± 5087920",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3145647318,
+            "range": "± 1206656934",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4499987441,
+            "range": "± 1389669111",
             "unit": "ns/iter"
           }
         ]
