@@ -11,9 +11,10 @@ repository = "https://github.com/maidsafe/safe_network"
 version = "0.2.0"
 
 [features]
-default = ["service-msgs"]
+default = ["chunks", "registers"]
 back-pressure = []
-service-msgs = []
+chunks = []
+registers = []
 test-utils=["proptest"]
 
 [dependencies]
