@@ -67,7 +67,6 @@ pub async fn networks_commander(
                 "Successfully switched to '{}' network in your system!",
                 network_name
             );
-            println!("If you need write access to the '{}' network, you'll need to restart authd (safe auth restart), unlock a Safe and re-authorise the CLI again", network_name);
         }
         Some(NetworksSubCommands::Check {}) => {
             println!("Checking current setup network connection information...");

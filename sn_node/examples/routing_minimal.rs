@@ -183,13 +183,12 @@ async fn start_node(
 
     info!("Node #{} starting...", index);
 
-    let (max_capacity, root) = create_test_max_capacity_and_root_storage()?;
+    let (_, root) = create_test_max_capacity_and_root_storage()?;
 
     let config = Config {
         first,
         local_addr: Some(SocketAddr::new(ip, local_port)),
         hard_coded_contacts: bootstrap_nodes.into_iter().collect(),
-        max_capacity: Some(max_capacity),
         root_dir: Some(root),
         ..Default::default()
     };
