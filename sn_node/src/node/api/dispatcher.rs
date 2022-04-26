@@ -14,7 +14,7 @@ use crate::node::{
     Error, Result,
 };
 use sn_interface::elder_count;
-use sn_interface::messaging::{system::SystemMsg, MsgKind, WireMsg};
+use sn_interface::messaging::{system::SystemMsg, AuthKind, WireMsg};
 use sn_interface::types::{log_markers::LogMarker, Peer};
 
 use itertools::Itertools;
@@ -426,11 +426,11 @@ impl Dispatcher {
         wire_msg: WireMsg,
     ) -> Result<Vec<Cmd>> {
         let cmds = match wire_msg.msg_kind() {
-            MsgKind::NodeAuthMsg(_) | MsgKind::NodeBlsShareAuthMsg(_) => {
+            AuthKind::Node(_) | AuthKind::NodeBlsShare(_) => {
                 self.deliver_msgs(recipients, delivery_group_size, wire_msg)
                     .await?
             }
-            MsgKind::ServiceMsg(_) => {
+            AuthKind::Service(_) => {
                 // we should never be sending such a msg to more than one recipient
                 // need refactors further up to solve in a nicer way
                 if recipients.len() > 1 {

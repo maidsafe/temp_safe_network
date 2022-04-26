@@ -13,7 +13,7 @@ pub(super) use self::msg_authority::NodeMsgAuthorityUtils;
 use crate::node::{Error, Result};
 use sn_interface::messaging::{
     system::{SigShare, SystemMsg},
-    AuthorityProof, BlsShareAuth, DstLocation, MsgId, MsgKind, NodeAuth, WireMsg,
+    AuthKind, AuthorityProof, BlsShareAuth, DstLocation, MsgId, NodeAuth, WireMsg,
 };
 
 use bls::PublicKey as BlsPublicKey;
@@ -52,7 +52,7 @@ impl WireMsgUtils for WireMsg {
         let msg_payload =
             WireMsg::serialize_msg_payload(&node_msg).map_err(|_| Error::InvalidMessage)?;
 
-        let msg_kind = MsgKind::NodeBlsShareAuthMsg(
+        let msg_kind = AuthKind::NodeBlsShare(
             bls_share_authorize(src_section_pk, src_name, key_share, &msg_payload).into_inner(),
         );
 
@@ -74,7 +74,7 @@ impl WireMsgUtils for WireMsg {
         let msg_payload =
             WireMsg::serialize_msg_payload(&node_msg).map_err(|_| Error::InvalidMessage)?;
 
-        let msg_kind = MsgKind::NodeAuthMsg(
+        let msg_kind = AuthKind::Node(
             NodeAuth::authorize(src_section_pk, &node.keypair, &msg_payload).into_inner(),
         );
 

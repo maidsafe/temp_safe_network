@@ -27,7 +27,7 @@ use sn_interface::messaging::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState,
         NodeState as NodeStateMsg, RelocateDetails, ResourceProofResponse, SectionAuth, SystemMsg,
     },
-    AuthorityProof, DstLocation, MsgId, MsgKind, MsgType, NodeAuth,
+    AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, NodeAuth,
     SectionAuth as MsgKindSectionAuth, WireMsg,
 };
 #[cfg(feature = "test-utils")]

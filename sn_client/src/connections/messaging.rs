@@ -11,7 +11,7 @@ use super::{QueryResult, Session};
 use crate::{connections::CmdResponse, Error, Result};
 use sn_interface::messaging::{
     data::{CmdError, DataQuery, QueryResponse},
-    DstLocation, MsgId, MsgKind, ServiceAuth, WireMsg,
+    AuthKind, DstLocation, MsgId, ServiceAuth, WireMsg,
 };
 use sn_interface::network_knowledge::prefix_map::NetworkPrefixMap;
 use sn_interface::types::{Peer, PeerLinks, PublicKey, SendToOneError};
@@ -101,7 +101,7 @@ impl Session {
             section_pk,
         };
 
-        let msg_kind = MsgKind::ServiceMsg(auth);
+        let msg_kind = AuthKind::Service(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
         let elders_len = elders.len();
@@ -231,7 +231,7 @@ impl Session {
             name: dst,
             section_pk,
         };
-        let msg_kind = MsgKind::ServiceMsg(auth);
+        let msg_kind = AuthKind::Service(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
         send_msg(self.clone(), elders, wire_msg, msg_id).await?;
@@ -369,7 +369,7 @@ impl Session {
             name: dst_address,
             section_pk,
         };
-        let msg_kind = MsgKind::ServiceMsg(auth);
+        let msg_kind = AuthKind::Service(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
         // When the client bootstrap using the nodes read from the config, the list is sorted

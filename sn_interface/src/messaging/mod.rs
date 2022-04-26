@@ -36,18 +36,18 @@ mod location;
 // Message ID definition
 mod msg_id;
 // Types of messages and corresponding source authorities
-mod msg_kind;
+mod auth_kind;
 // SectionAuthorityProvider
 mod sap;
 
 pub use self::{
+    auth_kind::AuthKind,
     authority::{
         AuthorityProof, BlsShareAuth, NodeAuth, SectionAuth, ServiceAuth, VerifyAuthority,
     },
     errors::{Error, Result},
     location::{DstLocation, EndUser, SrcLocation},
     msg_id::{MsgId, MESSAGE_ID_LEN},
-    msg_kind::MsgKind,
     sap::SectionAuthorityProvider,
     serialisation::{MsgType, NodeMsgAuthority, WireMsg},
 };
