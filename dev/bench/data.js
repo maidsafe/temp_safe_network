@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1650984342169,
+  "lastUpdate": 1650988385482,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -1301,6 +1301,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4623495149,
             "range": "± 90805765",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "865f24477244155528583afa5a3655690e4b7093",
+          "message": "Merge #1141\n\n1141: ci: increase alert threshold r=joshuef a=joshuef\n\nwe were seeing fails when no related code was touched,\r\nthis should hopefully keep that noise from affecting the CI too badly\r\n\r\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\n\nCo-authored-by: Josh Wilson <joshuef@gmail.com>",
+          "timestamp": "2022-04-26T14:20:29Z",
+          "tree_id": "0691d80ba555eaf4e7fca454486589d71309c0d4",
+          "url": "https://github.com/maidsafe/safe_network/commit/865f24477244155528583afa5a3655690e4b7093"
+        },
+        "date": 1650988384870,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 20449916330,
+            "range": "± 13669585595",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3815633901,
+            "range": "± 5312799349",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 8568977611,
+            "range": "± 2133441476",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10037256272,
+            "range": "± 1127908042",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3160619048,
+            "range": "± 1565871175",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4761627136,
+            "range": "± 1422021445",
             "unit": "ns/iter"
           }
         ]
