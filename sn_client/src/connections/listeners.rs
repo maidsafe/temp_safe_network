@@ -19,7 +19,7 @@ use sn_interface::at_least_one_correct_elder;
 use sn_interface::messaging::{
     data::{CmdError, ServiceMsg},
     system::{KeyedSig, SectionAuth, SystemMsg},
-    AuthorityProof, DstLocation, MsgId, MsgKind, MsgType, ServiceAuth, WireMsg,
+    AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, ServiceAuth, WireMsg,
 };
 use sn_interface::network_knowledge::utils::compare_and_write_prefix_map_to_disk;
 use sn_interface::network_knowledge::SectionAuthorityProvider;
@@ -322,7 +322,7 @@ impl Session {
                 let wire_msg = WireMsg::new_msg(
                     msg_id,
                     payload,
-                    MsgKind::ServiceMsg(auth.into_inner()),
+                    AuthKind::Service(auth.into_inner()),
                     dst_location,
                 )?;
 

@@ -9,7 +9,7 @@
 use crate::node::{api::cmds::Cmd, core::Node, messages::WireMsgUtils, Error, Result};
 use sn_interface::messaging::{
     system::{SectionAuth, SystemMsg},
-    DstLocation, MsgKind, WireMsg,
+    AuthKind, DstLocation, WireMsg,
 };
 use sn_interface::network_knowledge::NodeState;
 use sn_interface::types::{log_markers::LogMarker, Peer};
@@ -96,7 +96,7 @@ impl Node {
         for recipient in recipients.into_iter() {
             if recipient.name() == our_name {
                 match wire_msg.msg_kind() {
-                    MsgKind::NodeBlsShareAuthMsg(_) => {
+                    AuthKind::NodeBlsShare(_) => {
                         // do nothing, continue we should be accumulating this
                         handle = true;
                     }
