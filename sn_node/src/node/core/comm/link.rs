@@ -137,7 +137,9 @@ impl Link {
         );
         match conn.send_with(msg, priority, retry_config).await {
             Ok(()) => {
+                #[cfg(feature = "back-pressure")]
                 self.listener.count_msg().await;
+
                 Ok(())
             }
             Err(error) => {
