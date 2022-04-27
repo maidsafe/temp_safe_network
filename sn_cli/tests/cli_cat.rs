@@ -13,9 +13,9 @@ use predicates::prelude::*;
 use sn_api::resolver::{ContentType, DataType, SafeUrl};
 use sn_cmd_test_utilities::util::{
     create_and_get_keys, get_random_nrs_string, parse_files_container_output,
-    parse_files_put_or_sync_output, parse_nrs_register_output, safe_cmd, safe_cmd_stderr,
-    safe_cmd_stdout, safeurl_from, test_symlinks_are_valid, upload_path,
-    upload_test_symlinks_folder, CLI,
+    parse_files_put_or_sync_output, parse_nrs_register_output, parse_wallet_create_output,
+    safe_cmd, safe_cmd_stderr, safe_cmd_stdout, safeurl_from, test_symlinks_are_valid, upload_path,
+    upload_test_symlinks_folder, CLI, DBC_WITH_12_230_000_000,
 };
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -306,6 +306,40 @@ fn calling_safe_cat_safekey() -> Result<()> {
     let (safekey_xorurl, _sk) = create_and_get_keys()?;
     let cat_output = safe_cmd_stdout(["cat", &safekey_xorurl], Some(0))?;
     assert_eq!(cat_output, "No content to show since the URL targets a SafeKey. Use the 'dog' command to obtain additional information about the targeted SafeKey.");
+    Ok(())
+}
+
+#[test]
+fn calling_safe_cat_wallet() -> Result<()> {
+    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--name",
+            "my-first-dbc",
+            &wallet_xorurl,
+            DBC_WITH_12_230_000_000,
+        ],
+        Some(0),
+    )?;
+
+    safe_cmd(["cat", &wallet_xorurl], Some(0))?
+        .assert()
+        .stdout(predicate::str::contains(format!(
+            "Spendable balances of Wallet at \"{}\":",
+            wallet_xorurl
+        )))
+        .stdout(predicate::str::contains("my-first-dbc"))
+        .stdout(predicate::str::contains("12.230000000"))
+        .stdout(predicate::str::contains(format!(
+            "{}...{}",
+            &DBC_WITH_12_230_000_000[..8],
+            &DBC_WITH_12_230_000_000[DBC_WITH_12_230_000_000.len() - 8..]
+        )));
+
     Ok(())
 }
 

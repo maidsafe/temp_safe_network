@@ -23,7 +23,7 @@ mod safeurl;
 // re-export these useful types from sn_data_types
 pub use sn_interface::types::{
     BytesAddress, DataAddress, Keypair, PublicKey, RegisterAddress, SafeKeyAddress, Scope,
-    SecretKey,
+    SecretKey, Token,
 };
 
 #[cfg(feature = "app")]
