@@ -360,7 +360,7 @@ impl NetworkKnowledge {
             Ok(true) => {
                 there_was_an_update = true;
                 debug!(
-                    "Anti-Entropy: updated network prefix map with SAP for {:?}",
+                    "Updated network prefix map with SAP for {:?}",
                     provided_sap.prefix()
                 );
 

@@ -482,7 +482,7 @@ impl Node {
         let current_elders = BTreeSet::from_iter(sap.elders().copied());
 
         info!(
-            ">>>> ELDER CANDIDATES {}: {:?}",
+            "ELDER CANDIDATES {}: {:?}",
             elder_candidates.len(),
             elder_candidates
         );

@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{dkg::SigShare, Result};
+use sn_consensus::Generation;
 use sn_interface::messaging::system::{Proposal as ProposalMsg, SectionAuth};
 use sn_interface::network_knowledge::{NodeState, SectionAuthorityProvider};
 
@@ -14,7 +15,10 @@ use sn_interface::network_knowledge::{NodeState, SectionAuthorityProvider};
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Proposal {
     Offline(NodeState),
-    SectionInfo(SectionAuthorityProvider),
+    SectionInfo {
+        sap: SectionAuthorityProvider,
+        generation: Generation,
+    },
     NewElders(SectionAuth<SectionAuthorityProvider>),
     JoinsAllowed(bool),
 }
@@ -38,7 +42,7 @@ impl Proposal {
     pub(crate) fn as_signable_bytes(&self) -> Result<Vec<u8>> {
         Ok(match self {
             Self::Offline(node_state) => bincode::serialize(node_state),
-            Self::SectionInfo(info) => bincode::serialize(info),
+            Self::SectionInfo { sap, generation: _ } => bincode::serialize(sap),
             Self::NewElders(info) => bincode::serialize(&info.sig.public_key),
             Self::JoinsAllowed(joins_allowed) => bincode::serialize(&joins_allowed),
         }?)
@@ -49,7 +53,10 @@ impl Proposal {
     pub(crate) fn into_msg(self) -> ProposalMsg {
         match self {
             Self::Offline(node_state) => ProposalMsg::Offline(node_state.to_msg()),
-            Self::SectionInfo(sap) => ProposalMsg::SectionInfo(sap.to_msg()),
+            Self::SectionInfo { sap, generation } => ProposalMsg::SectionInfo {
+                sap: sap.to_msg(),
+                generation,
+            },
             Self::NewElders(sap) => ProposalMsg::NewElders(sap.into_authed_msg()),
             Self::JoinsAllowed(allowed) => ProposalMsg::JoinsAllowed(allowed),
         }
@@ -75,7 +82,10 @@ mod tests {
     fn serialize_for_signing() -> Result<()> {
         // Proposal::SectionInfo
         let (section_auth, _, _) = gen_section_authority_provider(Prefix::default(), 4);
-        let proposal = Proposal::SectionInfo(section_auth.clone());
+        let proposal = Proposal::SectionInfo {
+            sap: section_auth.clone(),
+            generation: 0,
+        };
         verify_serialize_for_signing(&proposal, &section_auth)?;
 
         // Proposal::NewElders
