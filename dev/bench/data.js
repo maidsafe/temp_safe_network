@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1650988385482,
+  "lastUpdate": 1651063927551,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -1361,6 +1361,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4761627136,
             "range": "± 1422021445",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "joshuef@gmail.com",
+            "name": "Josh Wilson",
+            "username": "joshuef"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "a4b7597853c9f154e6fd04f1f82133cab0b3c784",
+          "message": "fix: add missing backpressure feature gate.\n\nWe were trying to count messages when thsi wasn't instantiated w/o\nbackpressure. So were logging a looot of errors.",
+          "timestamp": "2022-04-27T14:18:36+02:00",
+          "tree_id": "38f4e31fee579bf274911899711e209c6db53da6",
+          "url": "https://github.com/maidsafe/safe_network/commit/a4b7597853c9f154e6fd04f1f82133cab0b3c784"
+        },
+        "date": 1651063926385,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10495913132,
+            "range": "± 12263123638",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3782330805,
+            "range": "± 996333405",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 8745720287,
+            "range": "± 312160251",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10035592269,
+            "range": "± 3382477047",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3138213047,
+            "range": "± 15366773",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4473295167,
+            "range": "± 139860963",
             "unit": "ns/iter"
           }
         ]
