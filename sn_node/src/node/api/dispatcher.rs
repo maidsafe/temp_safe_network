@@ -410,7 +410,12 @@ impl Dispatcher {
             Cmd::HandleDkgOutcome {
                 section_auth,
                 outcome,
-            } => self.node.handle_dkg_outcome(section_auth, outcome).await,
+                generation,
+            } => {
+                self.node
+                    .handle_dkg_outcome(section_auth, outcome, generation)
+                    .await
+            }
             Cmd::HandleDkgFailure(signeds) => self
                 .node
                 .handle_dkg_failure(signeds)
