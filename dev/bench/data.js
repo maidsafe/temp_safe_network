@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1651063927551,
+  "lastUpdate": 1651067162874,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -1421,6 +1421,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4473295167,
             "range": "± 139860963",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "b4c8086a53d20c588b4c4c941601edd3f360e04b",
+          "message": "Merge #1142\n\n1142: feat(api): return a Token value from wallet balance API instead of a string r=joshuef a=bochaco\n\n- Additionally add support to the `cat` and `dog` CLI commands for `Wallets`.\r\n- When cat command is used with a `Wallet`, it lists all spendable balances found in it,\r\nas long as the user has permissions to read it as it's expected to be a private `Multimap`.\r\n\r\nBREAKING CHANGE: `wallet_balance` API return type has been changed.\r\n\r\nResolves #1110 \r\n\r\nExample outputs for `cat` ad `dog` on a Wallet:\r\n```\r\n$ safe cat safe://hyryynyenfnx888i7xdyu6ukykb9mu9fpek8y35t8m1huohzp6rgmudxg31jy84y\r\nSpendable balances of Wallet at \"safe://hyryynyenfnx888i7xdyu6ukykb9mu9fpek8y35t8m1huohzp6rgmudxg31jy84y\":\r\n+------------------------------------------------------------------+-------------+---------------------+\r\n| Spendable balance name                                           | Balance     | DBC Data            |\r\n|------------------------------------------------------------------+-------------+---------------------|\r\n| a02a566c75aa1140aacb118fffd305298756d369e034e2caa9ccfa3e3ed56231 | 0.180000000 | 8dda5h14...00000000 |\r\n|------------------------------------------------------------------+-------------+---------------------|\r\n| my-other-dbc                                                     | 1.530000000 | 2fce3f70...00000000 |\r\n+------------------------------------------------------------------+-------------+---------------------+\r\n\r\n$ safe dog safe://hyryynyenfnx888i7xdyu6ukykb9mu9fpek8y35t8m1huohzp6rgmudxg31jy84y\r\n\r\n== URL resolution step 1 ==\r\nResolved from: safe://hyryynyenfnx888i7xdyu6ukykb9mu9fpek8y35t8m1huohzp6rgmudxg31jy84y\r\n= Wallet =\r\nXOR-URL: safe://hyryynyenfnx888i7xdyu6ukykb9mu9fpek8y35t8m1huohzp6rgmudxg31jy84y\r\nType tag: 1000\r\nXOR name: 0x289e739ebd78c13f4d40507eb9fcad428e0cee275cb93872edf10cb98de6cc92\r\nNative data type: Private Register\r\n```\n\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>",
+          "timestamp": "2022-04-27T12:19:53Z",
+          "tree_id": "8b0c504193057feffe9283eddfabba69798c985d",
+          "url": "https://github.com/maidsafe/safe_network/commit/b4c8086a53d20c588b4c4c941601edd3f360e04b"
+        },
+        "date": 1651067161971,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10501437118,
+            "range": "± 6732916370",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3962047183,
+            "range": "± 69841963",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 10048125813,
+            "range": "± 6410596738",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10039661116,
+            "range": "± 3379678538",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3177774630,
+            "range": "± 717264286",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4886676210,
+            "range": "± 1279579925",
             "unit": "ns/iter"
           }
         ]
