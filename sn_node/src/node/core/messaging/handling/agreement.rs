@@ -11,13 +11,13 @@ use crate::node::{
     core::{relocation::ChurnId, Node, Proposal},
     Event, Result,
 };
+use sn_consensus::Generation;
 use sn_interface::messaging::system::{KeyedSig, MembershipState, SectionAuth};
 use sn_interface::network_knowledge::SectionAuthUtils;
 use sn_interface::network_knowledge::{
     NodeState, SapCandidate, SectionAuthorityProvider, MIN_ADULT_AGE,
 };
 use sn_interface::types::log_markers::LogMarker;
-
 use std::{cmp, collections::BTreeSet};
 
 // Agreement
@@ -31,8 +31,9 @@ impl Node {
         debug!("handle agreement on {:?}", proposal);
         match proposal {
             Proposal::Offline(node_state) => self.handle_offline_agreement(node_state, sig).await,
-            Proposal::SectionInfo(section_auth) => {
-                self.handle_section_info_agreement(section_auth, sig).await
+            Proposal::SectionInfo { sap, generation } => {
+                self.handle_section_info_agreement(sap, sig, generation)
+                    .await
             }
             Proposal::NewElders(_) => {
                 error!("Elders agreement should be handled in a separate blocking fashion");
@@ -162,6 +163,7 @@ impl Node {
         &self,
         section_auth: SectionAuthorityProvider,
         sig: KeyedSig,
+        generation: Generation,
     ) -> Result<Vec<Cmd>> {
         // check if section matches our prefix
         let equal_prefix = section_auth.prefix() == self.network_knowledge.prefix().await;
@@ -213,11 +215,17 @@ impl Node {
 
         // manage pending split SAP candidates
         // NB TODO temporary while we wait for Membership generations and possibly double DKG
-        let chosen_candidates = self.split_barrier.write().await.process(
-            &self.network_knowledge.prefix().await,
-            signed_section_auth.clone(),
-            sig.clone(),
-        );
+        let chosen_candidates = self
+            .split_barrier
+            .write()
+            .await
+            .process(
+                &self.network_knowledge.prefix().await,
+                signed_section_auth.clone(),
+                sig.clone(),
+                generation,
+            )
+            .await;
 
         // handle section split (1 to 2)
         if let [(sap1, _sig1), (sap2, _sig2)] = chosen_candidates.as_slice() {
@@ -263,29 +271,34 @@ impl Node {
             signed_section_auth.section_key(),
             key_sig.signature,
         ) {
-            Err(err) => error!("Failed to generate proof chain for new SAP: {:?}", err),
-            Ok(()) => match self
-                .network_knowledge
-                .update_knowledge_if_valid(
-                    signed_section_auth.clone(),
-                    &proof_chain,
-                    None,
-                    &our_name,
-                    &self.section_keys_provider,
-                )
-                .await
-            {
-                Err(err) => error!(
-                    "Error updating our network knowledge for {:?}: {:?}",
-                    prefix, err
-                ),
-                Ok(true) => {
-                    info!("Updated our network knowledge for {:?}", prefix);
-                    info!("Writing updated knowledge to disk");
-                    self.write_prefix_map().await
+            Err(err) => error!(
+                "Failed to generate proof chain for a newly received SAP: {:?}",
+                err
+            ),
+            Ok(()) => {
+                match self
+                    .network_knowledge
+                    .update_knowledge_if_valid(
+                        signed_section_auth.clone(),
+                        &proof_chain,
+                        None,
+                        &our_name,
+                        &self.section_keys_provider,
+                    )
+                    .await
+                {
+                    Err(err) => error!(
+                        "Error updating our network knowledge for {:?}: {:?}",
+                        prefix, err
+                    ),
+                    Ok(true) => {
+                        info!("Updated our network knowledge for {:?}", prefix);
+                        info!("Writing updated knowledge to disk");
+                        self.write_prefix_map().await
+                    }
+                    _ => {}
                 }
-                _ => {}
-            },
+            }
         }
 
         info!(

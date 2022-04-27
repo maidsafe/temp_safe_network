@@ -16,6 +16,7 @@ use sn_interface::types::Peer;
 
 use bytes::Bytes;
 use custom_debug::Debug;
+use sn_consensus::Generation;
 use std::{
     collections::BTreeSet,
     fmt,
@@ -55,6 +56,7 @@ pub(crate) enum Cmd {
     HandleDkgOutcome {
         section_auth: SectionAuthorityProvider,
         outcome: SectionKeyShare,
+        generation: Generation,
     },
     /// Handle a DKG failure that was observed by a majority of the DKG participants.
     HandleDkgFailure(DkgFailureSigSet),
