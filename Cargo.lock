@@ -3589,7 +3589,7 @@ dependencies = [
  "serde_json",
  "sha3",
  "sn_client",
- "sn_dbc",
+ "sn_dbc 3.1.0",
  "sn_interface",
  "thiserror",
  "time 0.3.9",
@@ -3761,6 +3761,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sn_dbc"
+version = "3.1.1"
+dependencies = [
+ "bls_ringct",
+ "blsttc 5.2.0",
+ "hex",
+ "thiserror",
+ "tiny-keccak",
+]
+
+[[package]]
 name = "sn_dysfunction"
 version = "0.1.2"
 dependencies = [
@@ -3816,6 +3827,7 @@ dependencies = [
  "signature",
  "sled",
  "sn_consensus",
+ "sn_dbc 3.1.1",
  "strum",
  "strum_macros",
  "tempfile",
