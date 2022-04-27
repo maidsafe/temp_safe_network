@@ -323,12 +323,7 @@ jobs:
         if: failure()
         continue-on-error: true
 
-      # if we don't clean up, the .safe folder might persist between runs
-      - name: Cleanup self-hosted runner
-        if: matrix.os == 'ubuntu-latest' && always()
-        run: |
-          rm -rf ~/.safe
-          killall -9 sn_node
+
 
   e2e-split:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -450,12 +445,12 @@ jobs:
         if: failure()
         continue-on-error: true
 
-      # if we don't clean up, the .safe folder might persist between runs
+     # if we don't clean up, the .safe folder might persist between runs
       - name: Cleanup self-hosted runner
-        if: always()
         run: |
-          rm -rf ~/.safe
           killall -9 sn_node
+          sleep 10
+          rm -rf ~/.safe
 
   api:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -572,13 +567,6 @@ jobs:
         if: failure()
         continue-on-error: true
 
-      # if we don't clean up, the .safe folder might persist between runs
-      - name: Cleanup self-hosted runner
-        if: matrix.os == 'ubuntu-latest' && always()
-        run: |
-          rm -rf ~/.safe
-          killall -9 sn_node
-
   cli:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Run CLI tests
@@ -692,12 +680,6 @@ jobs:
         if: failure()
         continue-on-error: true
 
-      # if we don't clean up, the .safe folder might persist between runs
-      - name: Cleanup self-hosted runner
-        if: matrix.os == 'ubuntu-latest' && always()
-        run: |
-          rm -rf ~/.safe
-          killall -9 sn_node
 
   # This is required for publishing test results that come from forks. The actual publishing of the
   # results occurs in another workflow that will be triggered when this one finishes. Uploading this
