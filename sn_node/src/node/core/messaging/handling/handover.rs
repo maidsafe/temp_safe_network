@@ -23,21 +23,15 @@ impl Node {
     ) -> Vec<Cmd> {
         match handover_state.handle_signed_vote(signed_vote.clone()) {
             Ok(VoteResponse::Broadcast(signed_vote)) => {
-                trace!(
-                    ">>> Handover Vote msg successfully handled, broadcasting our vote: {:?}",
-                    signed_vote
-                );
+                trace!("Handover Vote msg successfully handled, broadcasting our vote",);
                 self.broadcast_handover_vote_msg(signed_vote).await
             }
             Ok(VoteResponse::WaitingForMoreVotes) => {
-                trace!(
-                    ">>> Handover Vote msg successfully handled, awaiting for more votes: {:?}",
-                    signed_vote
-                );
+                trace!("Handover Vote msg successfully handled, awaiting for more votes");
                 vec![]
             }
             Err(err) => {
-                error!(">>> Failed to handle handover Vote msg: {:?}", err);
+                error!("Failed to handle handover Vote msg: {:?}", err);
                 vec![]
             }
         }
@@ -48,11 +42,7 @@ impl Node {
         &self,
         signed_vote: SignedVote<SapCandidate>,
     ) -> Vec<Cmd> {
-        debug!(
-            ">>> {}: {:?}",
-            LogMarker::HandoverMsgToBeHandled,
-            signed_vote
-        );
+        debug!("{}: {:?}", LogMarker::HandoverMsgToBeHandled, signed_vote);
 
         let mut wlock = self.handover_voting.write().await;
         match &*wlock {
@@ -61,7 +51,7 @@ impl Node {
                 let mut cmds = self.handle_vote(&mut state, signed_vote).await;
                 if let Some(candidates_sap) = state.consensus_value() {
                     debug!(
-                        ">>> {}: {:?}",
+                        "{}: {:?}",
                         LogMarker::HandoverConsensusTermination,
                         candidates_sap
                     );
@@ -73,7 +63,7 @@ impl Node {
                 cmds
             }
             None => {
-                trace!(">>> Non-elder node unexpectedly received handover Vote msg, ignoring...");
+                trace!("Non-elder node unexpectedly received handover Vote msg, ignoring...");
                 vec![]
             }
         }

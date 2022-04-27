@@ -1,6 +1,5 @@
 use bls::{PublicKeySet, SecretKeyShare};
 use core::fmt::Debug;
-use tracing::info;
 use xor_name::Prefix;
 
 use sn_consensus::consensus::{Consensus, VoteResponse};
@@ -62,7 +61,7 @@ impl Handover {
     //         Ok(self.consensus.votes.values().cloned().collect())
     //     }
     // }
-
+    #[allow(dead_code)]
     pub(crate) fn id(&self) -> NodeId {
         self.consensus.id()
     }
@@ -71,7 +70,6 @@ impl Handover {
         &mut self,
         signed_vote: SignedVote<SapCandidate>,
     ) -> Result<VoteResponse<SapCandidate>> {
-        info!("[HDVR] {:?} handling vote: {:?}", self.id(), signed_vote);
         self.validate_proposals(&signed_vote)?;
 
         Ok(self.consensus.handle_signed_vote(signed_vote)?)
