@@ -138,6 +138,8 @@ impl<T: Serialize> Deref for SectionAuth<T> {
     }
 }
 
+pub type MembershipGeneration = u64;
+
 /// A step in the Propose-Broadcast-Aggregate-Execute workflow.
 #[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
@@ -151,7 +153,10 @@ pub enum Proposal {
     ///
     /// It signals the completion of a DKG by the elder candidates to the current elders.
     /// This proposal is then signed by the newly generated section key.
-    SectionInfo(SectionAuthorityProvider),
+    SectionInfo {
+        sap: SectionAuthorityProvider,
+        generation: MembershipGeneration,
+    },
     /// Proposal to change the elders (and possibly the prefix) of our section.
     /// NOTE: the `SectionAuthorityProvider` is already signed with the new key. This proposal is only to signs the
     /// new key with the current key. That way, when it aggregates, we obtain all the following
