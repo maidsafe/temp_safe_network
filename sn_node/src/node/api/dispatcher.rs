@@ -416,7 +416,7 @@ impl Dispatcher {
                         .await
                         .is_err()
                     {
-                        self.node.log_comm_issue(member_info.name()).await?
+                        self.node.track_comm_issue(member_info.name()).await?
                     }
                 }
                 Ok(vec![])
