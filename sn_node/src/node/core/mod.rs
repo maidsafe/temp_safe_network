@@ -24,6 +24,8 @@ pub(crate) use proposal::Proposal;
 #[cfg(test)]
 pub(crate) use relocation::{check as relocation_check, ChurnId};
 
+use sn_interface::elder_count;
+
 use self::{data::DataStorage, split_barrier::SplitBarrier};
 use sn_interface::{
     network_knowledge::{
@@ -337,11 +339,40 @@ impl Node {
     }
 
     /// Log a communication problem
-    pub(crate) async fn log_comm_issue(&self, name: XorName) -> Result<()> {
+    pub(crate) async fn track_comm_issue(&self, name: XorName) -> Result<()> {
         self.dysfunction_tracking
             .track_issue(name, IssueType::Communication)
             .await
             .map_err(Error::from)
+    }
+
+    /// Track an elder's knowledge issue in the dysfunction tracker
+    /// (Unless in the genesis section, with < elder_count elders)
+    pub(crate) async fn track_elder_knowledge_issue(&self, sender: Peer) -> Result<()> {
+        let section_size = self.network_knowledge.section_members().await.len();
+        let prefix = self.network_knowledge.prefix().await;
+
+        // If we're in the genesis section and we don't yet have all our elders, churn/joining could be rapid
+        // and there's a chance that knowledge issues crop up much more frequently.
+        // After this, we track everything properly
+        if prefix.is_empty() && section_size < elder_count() {
+            info!("Not tracking KnowledgeIssue before we have the elders in the first section set up.");
+            return Ok(());
+        }
+
+        // we want to log issues with an node who is out of sync here...
+        let knowledge = self.network_knowledge.elders().await;
+        let mut known_elders = knowledge.iter().map(|peer| peer.name());
+
+        if known_elders.contains(&sender.name()) {
+            // we track a dysfunction against our elder here
+            self.dysfunction_tracking
+                .track_issue(sender.name(), IssueType::Knowledge)
+                .await
+                .map_err(Error::from)
+        } else {
+            Ok(())
+        }
     }
 
     pub(crate) async fn write_prefix_map(&self) {

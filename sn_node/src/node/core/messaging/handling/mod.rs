@@ -40,7 +40,6 @@ use sn_interface::types::{log_markers::LogMarker, Peer, PublicKey};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
-use sn_dysfunction::IssueType;
 use std::collections::BTreeSet;
 use tokio::time::Duration;
 use xor_name::XorName;
@@ -161,16 +160,7 @@ impl Node {
                                     .await?
                                 {
                                     // we want to log issues with an elder who is out of sync here...
-                                    let knowledge = self.network_knowledge.elders().await;
-                                    let mut known_elders = knowledge.iter().map(|peer| peer.name());
-
-                                    if known_elders.contains(&sender.name()) {
-                                        // we track a dysfunction against our elder here
-                                        self.dysfunction_tracking
-                                            .track_issue(sender.name(), IssueType::Knowledge)
-                                            .await
-                                            .map_err(Error::from)?;
-                                    }
+                                    self.track_elder_knowledge_issue(sender).await?;
 
                                     // short circuit and send those AE responses
                                     cmds.push(ae_cmd);

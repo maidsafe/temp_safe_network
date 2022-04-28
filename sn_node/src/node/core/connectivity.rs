@@ -29,7 +29,7 @@ impl Node {
             return Ok(vec![]);
         }
 
-        self.log_comm_issue(name).await?;
+        self.track_comm_issue(name).await?;
         let cmds = vec![Cmd::StartConnectivityTest(name)];
         Ok(cmds)
     }
