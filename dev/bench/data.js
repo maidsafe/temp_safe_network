@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1651067162874,
+  "lastUpdate": 1651136853677,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -1481,6 +1481,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4886676210,
             "range": "± 1279579925",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "7058ecce9a1f9ca90c353a8f0705d81aad8943a2",
+          "message": "Merge #1149\n\n1149: fix(membership): avoid AE loop by being judicious with AE requests r=joshuef a=davidrusu\n\nThe membership was requesting AE whenever we hit an error when processing a vote. This can lead to an infinite loop if the error is not related to lacking information:\r\n\r\n1. node A sends bad vote to B.\r\n2. B processes bad vote and returns error and B requests AE from A\r\n3. node A processes the AE request and re-sends the bad vote to B\r\n4. goto 1.\r\n\r\nFix is to only request AE when we are in the wrong generation.\n\nCo-authored-by: David Rusu <davidrusu.me@gmail.com>",
+          "timestamp": "2022-04-28T07:30:14Z",
+          "tree_id": "8639522f1ba556e90ca0977afa4f52be93a68e88",
+          "url": "https://github.com/maidsafe/safe_network/commit/7058ecce9a1f9ca90c353a8f0705d81aad8943a2"
+        },
+        "date": 1651136852235,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10672520221,
+            "range": "± 10752493566",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3753572436,
+            "range": "± 754020304",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 8305744692,
+            "range": "± 401181991",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10037981703,
+            "range": "± 2217426136",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3144133606,
+            "range": "± 2199849337",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4626326874,
+            "range": "± 1277022537",
             "unit": "ns/iter"
           }
         ]
