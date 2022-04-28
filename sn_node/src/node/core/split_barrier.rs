@@ -40,6 +40,7 @@ impl SplitBarrier {
         keyed_sig: KeyedSig,
         generation: Generation,
     ) -> Vec<Entry> {
+        println!(">>>>>>>>>>>>>>>>>>> ARE WE HERE??????");
         debug!("Processing split barrier for gen: {generation}");
         if !section_auth.prefix().is_extension_of(our_prefix) {
             // Not a split, no need to cache.

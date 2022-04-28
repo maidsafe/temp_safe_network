@@ -252,51 +252,79 @@ impl Node {
         key_sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
         trace!("{}", LogMarker::HandlingNewEldersAgreement);
+
+        // let sap = *signed_section_auth;
+        let updates= if let Some(membership) = &*self.membership.read().await {
+            let generation = membership.generation();
+            let updates = self.split_barrier.write().await.process(
+                &self.network_knowledge.prefix().await,
+                signed_section_auth.clone(),
+                key_sig.clone(),
+                generation
+            ).await;
+
+            if updates.is_empty() {
+                println!("NO UPDATES FOR OUR GENNNN");
+                return Ok(vec![]);
+            }
+
+            updates
+
+        }
+        else {
+            println!("We cannot agree new elders if we have no membership gen.....");
+            return Ok(vec![]);
+        };
+
+
+
         let snapshot = self.state_snapshot().await;
         let old_chain = self.section_chain().await.clone();
 
-        let prefix = signed_section_auth.prefix();
-        trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);
+        for (signed_sap, key_sig) in updates {
+            let prefix = signed_sap.prefix();
+            trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);
 
-        info!("New SAP agreed for:{}", *signed_section_auth);
+            info!("New SAP agreed for:{}", *signed_sap);
 
-        let our_name = self.info.read().await.name();
+            let our_name = self.info.read().await.name();
 
-        // Let's update our network knowledge, including our
-        // section SAP and chain if the new SAP's prefix matches our name
-        // We need to generate the proof chain to connect our current chain to new SAP.
-        let mut proof_chain = old_chain.clone();
-        match proof_chain.insert(
-            old_chain.last_key(),
-            signed_section_auth.section_key(),
-            key_sig.signature,
-        ) {
-            Err(err) => error!(
-                "Failed to generate proof chain for a newly received SAP: {:?}",
-                err
-            ),
-            Ok(()) => {
-                match self
-                    .network_knowledge
-                    .update_knowledge_if_valid(
-                        signed_section_auth.clone(),
-                        &proof_chain,
-                        None,
-                        &our_name,
-                        &self.section_keys_provider,
-                    )
-                    .await
-                {
-                    Err(err) => error!(
-                        "Error updating our network knowledge for {:?}: {:?}",
-                        prefix, err
-                    ),
-                    Ok(true) => {
-                        info!("Updated our network knowledge for {:?}", prefix);
-                        info!("Writing updated knowledge to disk");
-                        self.write_prefix_map().await
+            // Let's update our network knowledge, including our
+            // section SAP and chain if the new SAP's prefix matches our name
+            // We need to generate the proof chain to connect our current chain to new SAP.
+            let mut proof_chain = old_chain.clone();
+            match proof_chain.insert(
+                old_chain.last_key(),
+                signed_sap.section_key(),
+                key_sig.signature,
+            ) {
+                Err(err) => error!(
+                    "Failed to generate proof chain for a newly received SAP: {:?}",
+                    err
+                ),
+                Ok(()) => {
+                    match self
+                        .network_knowledge
+                        .update_knowledge_if_valid(
+                            signed_sap.clone(),
+                            &proof_chain,
+                            None,
+                            &our_name,
+                            &self.section_keys_provider,
+                        )
+                        .await
+                    {
+                        Err(err) => error!(
+                            "Error updating our network knowledge for {:?}: {:?}",
+                            prefix, err
+                        ),
+                        Ok(true) => {
+                            info!("Updated our network knowledge for {:?}", prefix);
+                            info!("Writing updated knowledge to disk");
+                            self.write_prefix_map().await
+                        }
+                        _ => {}
                     }
-                    _ => {}
                 }
             }
         }

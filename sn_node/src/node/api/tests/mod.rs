@@ -1225,14 +1225,17 @@ async fn handle_elders_update() -> Result<()> {
 
 // Test that demoted node still sends `Sync` messages on split.
 #[tokio::test(flavor = "multi_thread")]
-async fn handle_demote_during_split() -> Result<()> {
+async fn split_barrier_works_ie_half_a_split_does_not_trigger_cmds() -> Result<()> {
     init_test_logger();
-    let _span = tracing::info_span!("handle_demote_during_split").entered();
+    let _span = tracing::info_span!("split_barrier_works_ie_half_a_split_does_not_trigger_cmds").entered();
 
-    let info = gen_info(MIN_ADULT_AGE, None);
-    let node_name = info.name();
     let prefix0 = Prefix::default().pushed(false);
     let prefix1 = Prefix::default().pushed(true);
+
+    //right not info/node could be in either section...
+    let info = gen_info(MIN_ADULT_AGE, None);
+    let node_name = info.name();
+
     // These peers together with `node` are pre-split elders.
     // These peers together with `peer_c` are prefix-0 post-split elders.
     let peers_a: Vec<_> = iter::repeat_with(|| create_peer_in_prefix(&prefix0, MIN_ADULT_AGE))
@@ -1245,6 +1248,7 @@ async fn handle_demote_during_split() -> Result<()> {
     // This peer is a prefix-0 post-split elder.
     let peer_c = create_peer_in_prefix(&prefix0, MIN_ADULT_AGE);
 
+    // all members
     let members = BTreeSet::from_iter(
         peers_a
             .iter()
@@ -1264,12 +1268,128 @@ async fn handle_demote_during_split() -> Result<()> {
     );
     let (section, section_key_share) = create_section(&sk_set_v0, &section_auth_v0).await?;
 
+    // all peers b are added
     for peer in peers_b.iter().chain(iter::once(&peer_c)).cloned() {
         let node_state = NodeState::joined(peer, None);
         let node_state = section_signed(sk_set_v0.secret_key(), node_state)?;
         assert!(section.update_member(node_state).await);
     }
 
+    // we make a new full node from info
+    let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
+    let node = Node::new(
+        create_comm().await?,
+        info,
+        section,
+        Some(section_key_share),
+        event_tx,
+        UsedSpace::new(max_capacity),
+        root_storage_dir,
+    )
+    .await?;
+
+    let sk_set_v1_p0 = SecretKeySet::random();
+    let sk_set_v1_p1 = SecretKeySet::random();
+
+    // Simulate DKG round finished succesfully by adding the first new section
+    // key share to our cache (according to which split section we'll belong to).
+    if prefix0.matches(&node_name) {
+        node.section_keys_provider
+            .insert(create_section_key_share(&sk_set_v1_p0, 0))
+            .await;
+    } else {
+        node.section_keys_provider
+            .insert(create_section_key_share(&sk_set_v1_p1, 0))
+            .await;
+    }
+
+    let dispatcher = Dispatcher::new(node);
+
+    // Create agreement on `OurElder` for both sub-sections
+    let new_elders_agreement_cmd = |signed_sap| -> Result<_> {
+        let proposal = Proposal::NewElders(signed_sap);
+        let signature = sk_set_v0.secret_key().sign(&proposal.as_signable_bytes()?);
+        let sig = KeyedSig {
+            signature,
+            public_key: sk_set_v0.public_keys().public_key(),
+        };
+
+        Ok(Cmd::HandleNewEldersAgreement { proposal, sig })
+    };
+
+    // Handle agreement on `NewElders` for prefix-0.
+    let section_auth = SectionAuthorityProvider::new(
+        peers_a.iter().cloned().chain(iter::once(peer_c)),
+        prefix0,
+        members.clone(),
+        sk_set_v1_p0.public_keys(),
+    );
+
+    let signed_sap = section_signed(sk_set_v1_p0.secret_key(), section_auth)?;
+    let cmd = new_elders_agreement_cmd(signed_sap)?;
+    let cmds = dispatcher.process_cmd(cmd, "cmd-id-1").await?;
+
+    // no action should be taken as we don't have both sides of the split yet!
+    assert_matches!(&cmds[..], &[]);
+
+    Ok(())
+
+}
+
+// Test that demoted node still sends `Sync` messages on split.
+#[tokio::test(flavor = "multi_thread")]
+async fn handle_demote_during_split() -> Result<()> {
+    init_test_logger();
+    let _span = tracing::info_span!("handle_demote_during_split").entered();
+
+    let prefix0 = Prefix::default().pushed(false);
+    let prefix1 = Prefix::default().pushed(true);
+
+    //right not info/node could be in either section...
+    let info = gen_info(MIN_ADULT_AGE, None);
+    let node_name = info.name();
+
+    // These peers together with `node` are pre-split elders.
+    // These peers together with `peer_c` are prefix-0 post-split elders.
+    let peers_a: Vec<_> = iter::repeat_with(|| create_peer_in_prefix(&prefix0, MIN_ADULT_AGE))
+        .take(elder_count() - 1)
+        .collect();
+    // These peers are prefix-1 post-split elders.
+    let peers_b: Vec<_> = iter::repeat_with(|| create_peer_in_prefix(&prefix1, MIN_ADULT_AGE))
+        .take(elder_count())
+        .collect();
+    // This peer is a prefix-0 post-split elder.
+    let peer_c = create_peer_in_prefix(&prefix0, MIN_ADULT_AGE);
+
+    // all members
+    let members = BTreeSet::from_iter(
+        peers_a
+            .iter()
+            .chain(peers_b.iter())
+            .copied()
+            .chain([info.peer(), peer_c])
+            .map(|peer| NodeState::joined(peer, None)),
+    );
+
+    // Create the pre-split section
+    let sk_set_v0 = SecretKeySet::random();
+    let section_auth_v0 = SectionAuthorityProvider::new(
+        iter::once(info.peer()).chain(peers_a.iter().cloned()),
+        Prefix::default(),
+        members.clone(),
+        sk_set_v0.public_keys(),
+    );
+    let (section, section_key_share) = create_section(&sk_set_v0, &section_auth_v0).await?;
+
+    // all peers b are added
+    for peer in peers_b.iter().chain(iter::once(&peer_c)).cloned() {
+        let node_state = NodeState::joined(peer, None);
+        let node_state = section_signed(sk_set_v0.secret_key(), node_state)?;
+        assert!(section.update_member(node_state).await);
+    }
+
+    // we make a new full node from info, to see what it does
     let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
@@ -1324,6 +1444,7 @@ async fn handle_demote_during_split() -> Result<()> {
     let cmd = create_our_elders_cmd(signed_sap)?;
     let cmds = dispatcher.process_cmd(cmd, "cmd-id-1").await?;
 
+    // no action should be taken as we don't have both sides of the split yet!
     assert_matches!(&cmds[..], &[]);
 
     // Handle agreement on `NewElders` for prefix-1.
@@ -1339,6 +1460,9 @@ async fn handle_demote_during_split() -> Result<()> {
 
     let cmds = dispatcher.process_cmd(cmd, "cmd-id-2").await?;
 
+
+
+    // now lets check that we send out AE updates for this
     let mut update_recipients = BTreeMap::new();
 
     for cmd in cmds {
