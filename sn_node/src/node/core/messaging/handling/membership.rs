@@ -15,6 +15,7 @@ use sn_interface::types::Peer;
 
 use crate::node::api::cmds::Cmd;
 use crate::node::core::{Node, Result};
+use crate::node::membership;
 
 // Message handling
 impl Node {
@@ -63,8 +64,8 @@ impl Node {
                     ]
                 }
                 Ok(VoteResponse::WaitingForMoreVotes) => vec![],
-                Err(e) => {
-                    error!("Membership - Error while processing vote {e:?}, requesting AE");
+                Err(membership::Error::RequestAntiEntropy) => {
+                    info!("Membership - We are behind the voter, requesting AE");
                     // We hit an error while processing this vote, perhaps we are missing information.
                     // We'll send a membership AE request to see if they can help us catch up.
                     let sap = self.network_knowledge.authority_provider().await;
@@ -75,6 +76,10 @@ impl Node {
                         .send_direct_msg_to_nodes(vec![peer], msg, section_name, dst_section_pk)
                         .await?;
                     vec![cmd]
+                }
+                Err(e) => {
+                    error!("Membership - error while processing vote {e:?}, dropping");
+                    vec![]
                 }
             };
 
