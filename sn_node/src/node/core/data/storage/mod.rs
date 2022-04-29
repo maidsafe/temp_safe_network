@@ -244,12 +244,27 @@ mod tests {
     use crate::dbs::Error;
     use crate::node::core::data::DataStorage;
     use crate::UsedSpace;
+    use eyre::Result;
+    use indexmap::IndexMap;
+    use proptest::{
+        collection::SizeRange,
+        prelude::{prop_compose, prop_oneof, proptest, Just},
+        strategy::Strategy,
+    };
     use sn_interface::messaging::data::DataQuery;
     use sn_interface::messaging::system::NodeQueryResponse;
     use sn_interface::types::register::User;
     use sn_interface::types::utils::random_bytes;
     use sn_interface::types::{Chunk, ReplicatedData};
     use tempfile::tempdir;
+    use tokio::runtime::Runtime;
+    use xor_name::XorName;
+
+    // size of hashmap
+    const KEY_RANGE: u8 = 20;
+    const MAX_OPS: usize = 100;
+    const CHUNK_MIN: usize = 1;
+    const CHUNK_MAX: usize = 5;
 
     #[tokio::test]
     async fn data_storage_basics() -> Result<(), Error> {
@@ -298,5 +313,47 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[derive(Clone, Debug)]
+    enum Op {
+        Store(ReplicatedData),
+        Query,
+        Get,
+        Remove,
+    }
+
+    proptest! {
+        #[test]
+        fn model_based_test(ops in arbitrary_ops(0..MAX_OPS)){
+            // model_based_test_imp(ops).unwrap();
+            println!("store data: {:?}", ops);
+        }
+    }
+
+    fn arbitrary_single_op() -> impl Strategy<Value = Op> {
+        prop_oneof![
+            (CHUNK_MIN..CHUNK_MAX).prop_map(|size| {
+                let chunk = Chunk::new(random_bytes(size * 1024 * 1024));
+                Op::Store(ReplicatedData::Chunk(chunk))
+            }),
+            Just(Op::Query),
+            Just(Op::Get),
+            Just(Op::Remove)
+        ]
+    }
+    fn arbitrary_ops(count: impl Into<SizeRange>) -> impl Strategy<Value = Vec<Op>> {
+        proptest::collection::vec(arbitrary_single_op(), count)
+    }
+
+    fn model_based_test_imp(ops: Vec<Op>) -> Result<()> {
+        println!("ops: {:?}", ops);
+        Ok(())
+        // let mut model:IndexMap<XorName, ReplicatedData> = IndexMap::new();
+        // let temp_dir = tempdir().unwrap();
+        // let path = temp_dir.path();
+        // let used_space = UsedSpace::new(usize::MAX);
+        // let runtime = Runtime::new().unwrap();
+        // let storage = DataStorage::new(path, used_space).unwrap();
     }
 }
