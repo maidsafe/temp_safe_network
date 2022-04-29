@@ -248,20 +248,21 @@ mod tests {
     use indexmap::IndexMap;
     use proptest::{
         collection::SizeRange,
-        prelude::{prop_compose, prop_oneof, proptest, Just},
+        prelude::{prop_oneof, proptest, Just},
         strategy::Strategy,
     };
+    use rand::Rng;
     use sn_interface::messaging::data::DataQuery;
     use sn_interface::messaging::system::NodeQueryResponse;
     use sn_interface::types::register::User;
     use sn_interface::types::utils::random_bytes;
-    use sn_interface::types::{Chunk, ReplicatedData};
+    use sn_interface::types::{Chunk, ChunkAddress, ReplicatedData, ReplicatedDataAddress};
+    use std::cmp::max;
     use tempfile::tempdir;
     use tokio::runtime::Runtime;
     use xor_name::XorName;
 
     // size of hashmap
-    const KEY_RANGE: u8 = 20;
     const MAX_OPS: usize = 100;
     const CHUNK_MIN: usize = 1;
     const CHUNK_MAX: usize = 5;
@@ -326,8 +327,7 @@ mod tests {
     proptest! {
         #[test]
         fn model_based_test(ops in arbitrary_ops(0..MAX_OPS)){
-            // model_based_test_imp(ops).unwrap();
-            println!("store data: {:?}", ops);
+            model_based_test_imp(ops).unwrap();
         }
     }
 
@@ -346,14 +346,112 @@ mod tests {
         proptest::collection::vec(arbitrary_single_op(), count)
     }
 
-    fn model_based_test_imp(ops: Vec<Op>) -> Result<()> {
-        println!("ops: {:?}", ops);
+    fn get_random_key(model: &IndexMap<XorName, ReplicatedData>) -> XorName {
+        let mut rng = rand::thread_rng();
+        let size = max(model.len(), 1);
+        // +1 to get None in get_index
+        let rand = rng.gen_range(0, size + 1);
+        match model.get_index(rand) {
+            Some((xor_name, _)) => *xor_name,
+            None => xor_name::rand::random(),
+        }
+    }
+
+    fn model_based_test_imp(ops: Vec<Op>) -> Result<(), &'static str> {
+        println!("\n\nNew test: {:?}", ops);
+        let mut model: IndexMap<XorName, ReplicatedData> = IndexMap::new();
+        let temp_dir = tempdir().unwrap();
+        let path = temp_dir.path();
+        let used_space = UsedSpace::new(usize::MAX);
+        let runtime = Runtime::new().unwrap();
+        let storage = DataStorage::new(path, used_space).unwrap();
+
+        for (idx, op) in ops.into_iter().enumerate() {
+            println!("{:?} OP {:?} ", idx, op);
+            match op {
+                Op::Store(data) => {
+                    let _ = runtime.block_on(storage.store(&data)).unwrap();
+                    let data_copy = data.clone();
+                    if let ReplicatedData::Chunk(chunk) = data {
+                        let gg = model.insert(*chunk.name(), data_copy);
+                        println!("Store addr{:?} op{:?} ", chunk.name(), gg);
+                    } else {
+                        return Err("Cannot be reached");
+                    }
+                }
+                Op::Query => {
+                    let key = get_random_key(&model);
+                    let query = DataQuery::GetChunk(ChunkAddress(key));
+                    let user = User::Anyone;
+                    let stored_res = runtime.block_on(storage.query(&query, user));
+                    let model_res = model.get(&key);
+                    println!("stored_res {:?}", stored_res);
+                    println!("model_res {:?}", model_res);
+
+                    match model_res {
+                        Some(m_res) => {
+                            if let NodeQueryResponse::GetChunk(Ok(s_chunk)) = stored_res {
+                                if let ReplicatedData::Chunk(m_chunk) = m_res {
+                                    println!("Query: bef assert {:?} {:?}", *m_chunk, s_chunk);
+                                    assert_eq!(
+                                        *m_chunk, s_chunk,
+                                        "failing at idx:{:?} op:{:?} with key {:?}",
+                                        idx, op, key
+                                    );
+                                    println!("Query: aft assert {:?} {:?}", *m_chunk, s_chunk);
+                                }
+                            } else {
+                                return Err("Incorrect query response");
+                            }
+                        }
+                        None => {
+                            if let NodeQueryResponse::GetChunk(Ok(_)) = stored_res {
+                                return Err("Chunk found while it should not exist");
+                            }
+                        }
+                    }
+                }
+                Op::Get => {
+                    let key = get_random_key(&model);
+                    let addr = ReplicatedDataAddress::Chunk(ChunkAddress(key));
+                    let stored_data = runtime.block_on(storage.get_from_local_store(&addr));
+                    let model_data = model.get(&key);
+                    println!("stored_res {:?}", stored_data);
+                    println!("model_res {:?}", model_data);
+
+                    match model_data {
+                        Some(m_data) => {
+                            if let Ok(s_data) = stored_data {
+                                println!("Get: bef assert {:?} {:?}", *m_data, s_data);
+                                assert_eq!(
+                                    *m_data, s_data,
+                                    "failing at idx:{:?} op:{:?} with key {:?}",
+                                    idx, op, key
+                                );
+                                println!("Get: aft assert {:?} {:?}", *m_data, s_data);
+                            } else {
+                                return Err("Cannot get ReplicatedData");
+                            }
+                        }
+                        // when random key is used
+                        None => {
+                            if let Ok(_) = stored_data {
+                                return Err("ReplicatedData found while it should not exist");
+                            }
+                        }
+                    }
+                }
+                Op::Remove => {
+                    let key = get_random_key(&model);
+                    println!("Remove {:?}", key);
+                    let addr = ReplicatedDataAddress::Chunk(ChunkAddress(key));
+                    let _ = runtime.block_on(storage.remove(&addr));
+                    let model_removed = model.remove(&key);
+                    println!("Removed: model {:?}", model_removed);
+                }
+            }
+        }
+
         Ok(())
-        // let mut model:IndexMap<XorName, ReplicatedData> = IndexMap::new();
-        // let temp_dir = tempdir().unwrap();
-        // let path = temp_dir.path();
-        // let used_space = UsedSpace::new(usize::MAX);
-        // let runtime = Runtime::new().unwrap();
-        // let storage = DataStorage::new(path, used_space).unwrap();
     }
 }
