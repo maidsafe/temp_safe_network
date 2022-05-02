@@ -1227,7 +1227,8 @@ async fn handle_elders_update() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn split_barrier_works_ie_half_a_split_does_not_trigger_cmds() -> Result<()> {
     init_test_logger();
-    let _span = tracing::info_span!("split_barrier_works_ie_half_a_split_does_not_trigger_cmds").entered();
+    let _span =
+        tracing::info_span!("split_barrier_works_ie_half_a_split_does_not_trigger_cmds").entered();
 
     let prefix0 = Prefix::default().pushed(false);
     let prefix1 = Prefix::default().pushed(true);
@@ -1334,7 +1335,6 @@ async fn split_barrier_works_ie_half_a_split_does_not_trigger_cmds() -> Result<(
     assert_matches!(&cmds[..], &[]);
 
     Ok(())
-
 }
 
 // Test that demoted node still sends `Sync` messages on split.
@@ -1459,8 +1459,6 @@ async fn handle_demote_during_split() -> Result<()> {
     let cmd = create_our_elders_cmd(signed_sap)?;
 
     let cmds = dispatcher.process_cmd(cmd, "cmd-id-2").await?;
-
-
 
     // now lets check that we send out AE updates for this
     let mut update_recipients = BTreeMap::new();

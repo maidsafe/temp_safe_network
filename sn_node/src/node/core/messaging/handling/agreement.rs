@@ -254,14 +254,19 @@ impl Node {
         trace!("{}", LogMarker::HandlingNewEldersAgreement);
 
         // let sap = *signed_section_auth;
-        let updates= if let Some(membership) = &*self.membership.read().await {
+        let updates = if let Some(membership) = &*self.membership.read().await {
             let generation = membership.generation();
-            let updates = self.split_barrier.write().await.process(
-                &self.network_knowledge.prefix().await,
-                signed_section_auth.clone(),
-                key_sig.clone(),
-                generation
-            ).await;
+            let updates = self
+                .split_barrier
+                .write()
+                .await
+                .process(
+                    &self.network_knowledge.prefix().await,
+                    signed_section_auth.clone(),
+                    key_sig.clone(),
+                    generation,
+                )
+                .await;
 
             if updates.is_empty() {
                 println!("NO UPDATES FOR OUR GENNNN");
@@ -269,14 +274,10 @@ impl Node {
             }
 
             updates
-
-        }
-        else {
+        } else {
             println!("We cannot agree new elders if we have no membership gen.....");
             return Ok(vec![]);
         };
-
-
 
         let snapshot = self.state_snapshot().await;
         let old_chain = self.section_chain().await.clone();
