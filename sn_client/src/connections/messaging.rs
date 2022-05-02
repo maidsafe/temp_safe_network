@@ -538,7 +538,7 @@ impl Session {
 
         // any SAP that does not hold elders_count() is indicative of a broken network (after genesis)
         if elders.len() < targets_count {
-            error!("Insufficient knowledge to send to {:?}", dst_address);
+            error!("Insufficient knowledge to send to address {:?}, elders for this section: {elders:?} ({targets_count} needed), section PK is: {section_pk:?}", dst_address);
             return Err(Error::InsufficientElderKnowledge {
                 connections: elders.len(),
                 required: targets_count,
