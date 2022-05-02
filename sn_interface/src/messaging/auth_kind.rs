@@ -17,38 +17,40 @@ use serde::{Deserialize, Serialize};
 /// recognised we can ask for a longer chain that can be recognised).
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum MsgKind {
+pub enum AuthKind {
+    #[cfg(any(feature = "chunks", feature = "registers"))]
     /// A data message, with the requesting peer's authority.
     ///
     /// Authority is needed to access private data, such as reading or writing a private file.
-    ServiceMsg(ServiceAuth),
+    Service(ServiceAuth),
 
     /// A message from a Node with its own independent authority.
     ///
     /// Node authority is needed when nodes send messages directly to other nodes.
     // FIXME: is the above true? What does is the recieving node validating against?
-    NodeAuthMsg(NodeAuth),
+    Node(NodeAuth),
 
     /// A message from an Elder node with its share of the section authority.
     ///
     /// Section share authority is needed for messages related to section administration, such as
     /// DKG and relocation.
-    NodeBlsShareAuthMsg(BlsShareAuth),
+    NodeBlsShare(BlsShareAuth),
 }
 
-impl MsgKind {
+impl AuthKind {
     /// The src location of the msg.
     pub fn src(&self) -> SrcLocation {
         match self {
-            Self::NodeBlsShareAuthMsg(auth) => SrcLocation::Node {
+            Self::NodeBlsShare(auth) => SrcLocation::Node {
                 name: auth.src_name,
                 section_pk: auth.sig_share.public_key_set.public_key(),
             },
-            Self::NodeAuthMsg(auth) => SrcLocation::Node {
+            Self::Node(auth) => SrcLocation::Node {
                 name: crate::types::PublicKey::Ed25519(auth.node_ed_pk).into(),
                 section_pk: auth.section_pk,
             },
-            Self::ServiceMsg(auth) => SrcLocation::EndUser(super::EndUser(auth.public_key.into())),
+            #[cfg(any(feature = "chunks", feature = "registers"))]
+            Self::Service(auth) => SrcLocation::EndUser(super::EndUser(auth.public_key.into())),
         }
     }
 }

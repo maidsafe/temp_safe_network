@@ -635,9 +635,8 @@ impl Network {
 }
 
 async fn add_node(id: u64, mut config: Config, event_tx: Sender<Event>) -> Result<()> {
-    let (max_capacity, root_dir) = create_test_max_capacity_and_root_storage()?;
+    let (_, root_dir) = create_test_max_capacity_and_root_storage()?;
 
-    config.max_capacity = Some(max_capacity);
     config.root_dir = Some(root_dir);
     let joining_timeout = Duration::from_secs(3 * 60);
 

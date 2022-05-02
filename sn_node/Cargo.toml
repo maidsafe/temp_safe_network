@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "sn_node"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
-version = "0.58.13"
+version = "0.58.14"
 
 [[example]]
 name = "routing_minimal"
@@ -28,6 +28,7 @@ test-utils = ["sn_interface/test-utils", "sn_interface/proptest"]
 tokio-console = ["console-subscriber"]
 
 [dependencies]
+backoff = { version = "~0.4.0", features = [ "tokio" ] }
 base64 = "~0.13.0"
 bincode = "1.3.1"
 bls = { package = "blsttc", version = "3.1.0" }
@@ -42,6 +43,7 @@ dirs-next = "2.0.0"
 ed25519 = { version = "1.2.0", features = ["serde_bytes"] }
 ed25519-dalek = { version = "1.0.0", features = ["serde"] }
 eyre = "~0.6.5"
+file-rotate = "~0.6.0"
 futures = "~0.3.13"
 hex = "~0.4.3"
 hex_fmt = "~0.3.0"
@@ -57,7 +59,9 @@ resource_proof = "1.0.38"
 rmp-serde = "1.0.0"
 secured_linked_list = "~0.5.0"
 self_encryption = "~0.27.4"
-sn_interface = { path = "../sn_interface", version = "^0.1.0" }
+sn_consensus = "1.16.0"
+sn_dysfunction = { path = "../sn_dysfunction", version = "^0.1.2" }
+sn_interface = { path = "../sn_interface", version = "^0.2.0" }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_bytes = "~0.11.5"
 serde_json = "1.0.53"
@@ -78,13 +82,6 @@ uluru="3.0.0"
 url = "2.2.0"
 walkdir = "2"
 xor_name = "4.0.1"
-file-rotate = "~0.6.0"
-sn_dysfunction = { path = "../sn_dysfunction", version = "~0.1.1" }
-sn_consensus = "1.16.0"
-
-[dependencies.backoff]
-version = "~0.4.0"
-features = [ "tokio" ]
 
 [dependencies.self_update]
 version = "~0.28.0"
@@ -105,13 +102,10 @@ tokio-util = { version = "~0.6.7", features = ["time"] }
 walkdir = "2"
 yansi = "~0.5.0"
 
-
 [dev-dependencies.cargo-husky]
 version = "1.5.0"
 default-features = false # Disable features which are enabled by default
 features = ["precommit-hook", "run-cargo-clippy", "run-cargo-fmt", "run-cargo-check"]
-
-
 
 [package.metadata.cargo-udeps.ignore]
 development = ["cargo-husky"]

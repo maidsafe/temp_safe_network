@@ -3560,7 +3560,7 @@ checksum = "f2dd574626839106c320a323308629dcb1acfc96e32a8cba364ddc61ac23ee83"
 
 [[package]]
 name = "sn_api"
-version = "0.58.2"
+version = "0.59.0"
 dependencies = [
  "anyhow",
  "assert_matches",
@@ -3606,7 +3606,7 @@ dependencies = [
 
 [[package]]
 name = "sn_cli"
-version = "0.51.3"
+version = "0.52.0"
 dependencies = [
  "ansi_term 0.12.1",
  "assert_cmd",
@@ -3635,6 +3635,7 @@ dependencies = [
  "rcgen 0.7.0",
  "relative-path",
  "reqwest",
+ "rmp-serde",
  "self_update",
  "serde",
  "serde_json",
@@ -3761,7 +3762,7 @@ dependencies = [
 
 [[package]]
 name = "sn_dysfunction"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "dashmap",
  "eyre",
@@ -3776,7 +3777,7 @@ dependencies = [
 
 [[package]]
 name = "sn_interface"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "backoff 0.4.0",
  "base64 0.13.0",
@@ -3846,7 +3847,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.58.13"
+version = "0.58.14"
 dependencies = [
  "assert_matches",
  "backoff 0.4.0",

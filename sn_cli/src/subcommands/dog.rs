@@ -29,7 +29,7 @@ pub struct DogCommands {
 pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe) -> Result<()> {
     let link = get_from_arg_or_stdin(cmd.location, None)?;
     let url = get_target_url(&link)?;
-    debug!("Running dog for: {:?}", &url);
+    debug!("Running dog for: {}", &url);
 
     let resolved_content = safe.inspect(&url.to_string()).await?;
     if OutputFmt::Pretty != output_fmt {
@@ -130,10 +130,46 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe)
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
                     println!("Native data type: SafeKey");
                 }
-                SafeData::Multimap { .. }
-                | SafeData::PrivateRegister { .. }
-                | SafeData::PublicRegister { .. } => {
-                    println!("Type of content not supported yet by 'dog' command.")
+                SafeData::Multimap {
+                    xorurl,
+                    resolved_from,
+                    xorname,
+                    type_tag,
+                    ..
+                } => {
+                    let safeurl = SafeUrl::from_xorurl(xorurl)?;
+                    println!("Resolved from: {}", resolved_from);
+                    if safeurl.content_type() == ContentType::Wallet {
+                        println!("= Wallet =");
+                    } else {
+                        println!("= Multimap =");
+                    }
+                    println!("XOR-URL: {}", xorurl);
+                    println!("Type tag: {}", type_tag);
+                    println!("XOR name: 0x{}", xorname_to_hex(xorname));
+                    println!("Native data type: {:?} Register", safeurl.scope());
+                }
+                SafeData::PrivateRegister {
+                    xorurl,
+                    resolved_from,
+                    xorname,
+                    type_tag,
+                    ..
+                }
+                | SafeData::PublicRegister {
+                    xorurl,
+                    resolved_from,
+                    xorname,
+                    type_tag,
+                    ..
+                } => {
+                    println!("Resolved from: {}", resolved_from);
+                    println!("= Register =");
+                    println!("XOR-URL: {}", xorurl);
+                    println!("Type tag: {}", type_tag);
+                    println!("XOR name: 0x{}", xorname_to_hex(xorname));
+                    let safeurl = SafeUrl::from_xorurl(xorurl)?;
+                    println!("Native data type: {:?} Register", safeurl.scope());
                 }
             }
         }

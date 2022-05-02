@@ -497,7 +497,7 @@ mod tests {
 
     use crate::UsedSpace;
     use sn_interface::messaging::{
-        AuthorityProof, DstLocation, MsgId, MsgKind, MsgType, NodeAuth,
+        AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, NodeAuth,
         SectionAuth as SectionAuthMsg,
     };
     #[cfg(feature = "test-utils")]
@@ -837,7 +837,7 @@ mod tests {
 
             let node_auth = NodeAuth::authorize(src_section_pk, &src_node_keypair, &payload);
 
-            let msg_kind = MsgKind::NodeAuthMsg(node_auth.into_inner());
+            let msg_kind = AuthKind::Node(node_auth.into_inner());
 
             let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 

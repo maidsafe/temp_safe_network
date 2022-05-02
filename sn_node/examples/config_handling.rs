@@ -47,12 +47,6 @@ async fn main() -> Result<()> {
         assert_eq!(file_config.wallet_id, config.wallet_id)
     }
 
-    if command_line_args.max_capacity.is_some() {
-        assert_eq!(command_line_args.max_capacity, config.max_capacity)
-    } else {
-        assert_eq!(file_config.max_capacity, config.max_capacity)
-    }
-
     if command_line_args.root_dir.is_some() {
         assert_eq!(command_line_args.root_dir, config.root_dir)
     } else {

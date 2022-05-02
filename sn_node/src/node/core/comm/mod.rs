@@ -624,7 +624,7 @@ mod tests {
     use qp2p::Config;
     use rand::rngs::OsRng;
     use sn_interface::messaging::data::{DataQuery, ServiceMsg};
-    use sn_interface::messaging::{DstLocation, MsgId, MsgKind, ServiceAuth};
+    use sn_interface::messaging::{AuthKind, DstLocation, MsgId, ServiceAuth};
     use sn_interface::types::{ChunkAddress, Keypair, Peer};
     use std::{net::Ipv4Addr, time::Duration};
     use tokio::{net::UdpSocket, sync::mpsc, time};
@@ -863,12 +863,8 @@ mod tests {
             signature: src_keypair.sign(&payload),
         };
 
-        let wire_msg = WireMsg::new_msg(
-            MsgId::new(),
-            payload,
-            MsgKind::ServiceMsg(auth),
-            dst_location,
-        )?;
+        let wire_msg =
+            WireMsg::new_msg(MsgId::new(), payload, AuthKind::Service(auth), dst_location)?;
 
         Ok(wire_msg)
     }

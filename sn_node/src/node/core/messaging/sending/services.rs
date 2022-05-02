@@ -9,7 +9,7 @@
 use crate::node::{api::cmds::Cmd, core::Node, Result};
 use sn_interface::messaging::{
     data::{CmdError, ServiceMsg},
-    DstLocation, EndUser, MsgId, MsgKind, ServiceAuth, WireMsg,
+    AuthKind, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
 };
 use sn_interface::types::{Peer, PublicKey, Signature};
 
@@ -58,12 +58,12 @@ impl Node {
     pub(crate) async fn ed_sign_client_msg(
         &self,
         client_msg: &ServiceMsg,
-    ) -> Result<(MsgKind, Bytes)> {
+    ) -> Result<(AuthKind, Bytes)> {
         let keypair = self.info.read().await.keypair.clone();
         let payload = WireMsg::serialize_msg_payload(client_msg)?;
         let signature = keypair.sign(&payload);
 
-        let msg = MsgKind::ServiceMsg(ServiceAuth {
+        let msg = AuthKind::Service(ServiceAuth {
             public_key: PublicKey::Ed25519(keypair.public),
             signature: Signature::Ed25519(signature),
         });

@@ -27,7 +27,7 @@ use sn_interface::messaging::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState,
         NodeState as NodeStateMsg, RelocateDetails, ResourceProofResponse, SectionAuth, SystemMsg,
     },
-    AuthorityProof, DstLocation, MsgId, MsgKind, MsgType, NodeAuth,
+    AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, NodeAuth,
     SectionAuth as MsgKindSectionAuth, WireMsg,
 };
 #[cfg(feature = "test-utils")]
@@ -185,7 +185,12 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
     let data = rp.create_proof_data(&nonce);
     let mut prover = rp.create_prover(data.clone());
     let solution = prover.solve();
-
+    let resource_proof_response = ResourceProofResponse {
+        solution,
+        data,
+        nonce,
+        nonce_signature,
+    };
     let wire_msg = WireMsg::single_src(
         &new_node,
         DstLocation::Section {
@@ -194,12 +199,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
         },
         SystemMsg::JoinRequest(Box::new(JoinRequest {
             section_key,
-            resource_proof_response: Some(ResourceProofResponse {
-                solution,
-                data,
-                nonce,
-                nonce_signature,
-            }),
+            resource_proof_response: Some(resource_proof_response.clone()),
         })),
         section_key,
     )?;
@@ -223,6 +223,14 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
         .as_ref()
         .unwrap()
         .is_churn_in_progress());
+    // makes sure that the nonce signature is always valid
+    let random_peer = Peer::new(xor_name::rand::random(), gen_addr());
+    assert!(
+        !dispatcher
+            .node
+            .validate_resource_proof_response(&random_peer.name(), resource_proof_response)
+            .await
+    );
 
     Ok(())
 }

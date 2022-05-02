@@ -6,11 +6,22 @@ use sn_interface::{
     messaging::system::{MembershipState, NodeState},
     network_knowledge::{recommended_section_size, SectionAuthorityProvider, MIN_ADULT_AGE},
 };
+use thiserror::Error;
 use xor_name::{Prefix, XorName};
 
 use sn_consensus::{
-    Ballot, Consensus, Decision, Error, Generation, NodeId, Result, SignedVote, Vote, VoteResponse,
+    Ballot, Consensus, Decision, Generation, NodeId, SignedVote, Vote, VoteResponse,
 };
+
+#[derive(Debug, Error)]
+pub(crate) enum Error {
+    #[error("Consensus error while processing vote {0}")]
+    Consensus(#[from] sn_consensus::Error),
+    #[error("We are behind the voter, caller should request anti-entropy")]
+    RequestAntiEntropy,
+}
+
+pub(crate) type Result<T> = std::result::Result<T, Error>;
 
 pub(crate) fn split(
     prefix: &Prefix,
@@ -123,10 +134,10 @@ impl Membership {
             self.history
                 .get(&gen)
                 .map(|(_, c)| c)
-                .ok_or(Error::BadGeneration {
+                .ok_or(Error::Consensus(sn_consensus::Error::BadGeneration {
                     requested_gen: gen,
                     gen: self.gen,
-                })
+                }))
         }
     }
 
@@ -137,10 +148,10 @@ impl Membership {
             self.history
                 .get_mut(&gen)
                 .map(|(_, c)| c)
-                .ok_or(Error::BadGeneration {
+                .ok_or(Error::Consensus(sn_consensus::Error::BadGeneration {
                     requested_gen: gen,
                     gen: self.gen,
-                })
+                }))
         }
     }
 
@@ -189,7 +200,9 @@ impl Membership {
             }
         }
 
-        Err(Error::InvalidGeneration(gen))
+        Err(Error::Consensus(sn_consensus::Error::InvalidGeneration(
+            gen,
+        )))
     }
 
     pub(crate) fn propose(
@@ -211,7 +224,9 @@ impl Membership {
             .detect_byzantine_voters(&signed_vote)
             .is_err();
         if is_invalid_proposal || is_byzantine {
-            return Err(Error::AttemptedFaultyProposal);
+            return Err(Error::Consensus(
+                sn_consensus::Error::AttemptedFaultyProposal,
+            ));
         }
 
         self.cast_vote(signed_vote)
@@ -223,7 +238,7 @@ impl Membership {
             .iter() // history is a BTreeSet, .iter() is ordered by generation
             .filter(|(gen, _)| **gen > from_gen)
             .map(|(gen, (decision, c))| {
-                c.build_super_majority_vote(decision.votes.clone(), decision.faults.clone(), *gen)
+                Ok(c.build_super_majority_vote(decision.votes.clone(), decision.faults.clone(), *gen)?)
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -251,7 +266,9 @@ impl Membership {
     ) -> Result<VoteResponse<NodeState>> {
         if !self.validate_proposals(&signed_vote, prefix)? {
             error!("Membership - dropping faulty vote {signed_vote:?}");
-            return Err(Error::AttemptedFaultyProposal);
+            return Err(Error::Consensus(
+                sn_consensus::Error::AttemptedFaultyProposal,
+            ));
         }
 
         let vote_gen = signed_vote.vote.gen;
@@ -286,14 +303,14 @@ impl Membership {
     }
 
     fn sign_vote(&self, vote: Vote<NodeState>) -> Result<SignedVote<NodeState>> {
-        self.consensus.sign_vote(vote)
+        Ok(self.consensus.sign_vote(vote)?)
     }
 
     pub(crate) fn cast_vote(
         &mut self,
         signed_vote: SignedVote<NodeState>,
     ) -> Result<SignedVote<NodeState>> {
-        self.consensus.cast_vote(signed_vote)
+        Ok(self.consensus.cast_vote(signed_vote)?)
     }
 
     fn validate_proposals(
@@ -307,7 +324,7 @@ impl Membership {
                 "Membership - dropping signed vote from invalid gen {:?}",
                 signed_vote.vote.gen
             );
-            return Ok(false);
+            return Err(Error::RequestAntiEntropy);
         }
 
         for proposal in signed_vote.proposals() {

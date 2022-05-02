@@ -5,11 +5,83 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.59.0 (2022-04-23)
+
+### Chore
+
+ - <csr-id-318ee1d22970b5f06e93a99b6e8fff6da638c589/> tidy references in cargo manifests
+   All references are organised alphabetically, and random usage of long-form references are removed in
+   favour of the short-form version, unless the long-form style is justified, e.g., when lots of
+   features are being used.
+ - <csr-id-e3dca8b07441c86744b091fe883d16a9c750f702/> set sn_client version to be new release
+   previously sn_client was its own repo and crate, we havent published under this name in some time. This will bring us back into this namespace ad on crates.io, but at a new updated version
+ - <csr-id-ad7d340720f0737f502b0d55023a15461dded91d/> update sn_cli and api readme for sn_client extraction
+ - <csr-id-88421d9cb7872b6397283a0035130bc14de6d4ff/> pull sn_client out of the node codebase
+ - <csr-id-d0913293df42e73716fabb3460ae6dbd4ddf5a1b/> update proptest dep to v1 in sn_api
+
+### New Features
+
+ - <csr-id-e662317e93b3247a1afd9970587ea7241a9b5619/> first and basic implementation of Wallet reissue API and related CLI cmds
+   - Generate output DBCs with sn_dbc::TransactionBuilder
+   - Change DBC is also generated and stored in the source Wallet the reissue was made from
+   - Spent DBCs are soft-removed from the source Wallet (Multimap)
+   - Reissued DBCs are all bearer at this instance
+   - Verification of generated Tx and spentproofs is not performed at this instance yet
+   - Input DBCs are not logged as spent on the network's spentbook at this instance yet
+ - <csr-id-adb085e98b00ec6cd0d670bf665009d6e93e2514/> first and basic implementation of Wallet reissue API and related CLI cmds
+   - Generate output DBCs with sn_dbc::TransactionBuilder
+   - Change DBC is also generated and stored in the source Wallet the reissue was made from
+   - Spent DBCs are soft-removed from the source Wallet (Multimap)
+   - Reissued DBCs are all bearer at this instance
+   - Verification of generated Tx and spentproofs is not performed at this instance yet
+   - Input DBCs are not logged as spent on the network's spentbook at this instance yet
+
+### Other
+
+ - <csr-id-91606f631a211d959364cab1e428d1ac895d3dca/> additional wallet API test cases
+ - <csr-id-bda0ea00e2e5a258e02a91d12dcd1e480dfff17c/> additional wallet API test cases
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 9 commits contributed to the release over the course of 7 calendar days.
+ - 8 days passed between releases.
+ - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - tidy references in cargo manifests ([`318ee1d`](https://github.com/maidsafe/safe_network/commit/318ee1d22970b5f06e93a99b6e8fff6da638c589))
+    - additional wallet API test cases ([`91606f6`](https://github.com/maidsafe/safe_network/commit/91606f631a211d959364cab1e428d1ac895d3dca))
+    - additional wallet API test cases ([`bda0ea0`](https://github.com/maidsafe/safe_network/commit/bda0ea00e2e5a258e02a91d12dcd1e480dfff17c))
+    - first and basic implementation of Wallet reissue API and related CLI cmds ([`e662317`](https://github.com/maidsafe/safe_network/commit/e662317e93b3247a1afd9970587ea7241a9b5619))
+    - first and basic implementation of Wallet reissue API and related CLI cmds ([`adb085e`](https://github.com/maidsafe/safe_network/commit/adb085e98b00ec6cd0d670bf665009d6e93e2514))
+    - set sn_client version to be new release ([`e3dca8b`](https://github.com/maidsafe/safe_network/commit/e3dca8b07441c86744b091fe883d16a9c750f702))
+    - update sn_cli and api readme for sn_client extraction ([`ad7d340`](https://github.com/maidsafe/safe_network/commit/ad7d340720f0737f502b0d55023a15461dded91d))
+    - pull sn_client out of the node codebase ([`88421d9`](https://github.com/maidsafe/safe_network/commit/88421d9cb7872b6397283a0035130bc14de6d4ff))
+    - update proptest dep to v1 in sn_api ([`d091329`](https://github.com/maidsafe/safe_network/commit/d0913293df42e73716fabb3460ae6dbd4ddf5a1b))
+</details>
+
 ## v0.58.2 (2022-04-14)
+
+<csr-id-8494a01d9be3dddc0d0f4c2c37cdc4d6c3e54521/>
+<csr-id-b62ad80298eb4b3e2f9810d20dd553aaf802408b/>
+<csr-id-2c557b5d5b5e21882ea3bf1cf904103576363603/>
+<csr-id-86ce41ca31508dbaf2de56fc81e1ca3146f863dc/>
 
 ### Chore
 
  - <csr-id-8494a01d9be3dddc0d0f4c2c37cdc4d6c3e54521/> split put messaging and types into top level crate
+
+### Chore
+
+ - <csr-id-9ea06ffe9339d3927897f010314b1be1bf7026bf/> sn_dysfunction-0.1.1/safe_network-0.58.13/sn_api-0.58.2/sn_cli-0.51.3
 
 ### New Features
 
@@ -28,9 +100,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release.
+ - 6 commits contributed to the release.
  - 5 days passed between releases.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -40,6 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_dysfunction-0.1.1/safe_network-0.58.13/sn_api-0.58.2/sn_cli-0.51.3 ([`9ea06ff`](https://github.com/maidsafe/safe_network/commit/9ea06ffe9339d3927897f010314b1be1bf7026bf))
     - add test-utils feat to bench ([`b62ad80`](https://github.com/maidsafe/safe_network/commit/b62ad80298eb4b3e2f9810d20dd553aaf802408b))
     - split put messaging and types into top level crate ([`8494a01`](https://github.com/maidsafe/safe_network/commit/8494a01d9be3dddc0d0f4c2c37cdc4d6c3e54521))
     - adding CLI tests for Wallet commands ([`2c557b5`](https://github.com/maidsafe/safe_network/commit/2c557b5d5b5e21882ea3bf1cf904103576363603))
@@ -48,6 +121,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.58.1 (2022-04-09)
+
+<csr-id-c4e3de1d9715c6e3618a763fa857feca4258248f/>
 
 ### Chore
 
