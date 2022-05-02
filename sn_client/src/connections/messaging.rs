@@ -15,7 +15,7 @@ use sn_interface::messaging::{
 };
 use sn_interface::network_knowledge::prefix_map::NetworkPrefixMap;
 use sn_interface::types::{Peer, PeerLinks, PublicKey, SendToOneError};
-use sn_interface::{at_least_one_correct_elder, elder_count};
+use sn_interface::{at_least_one_correct_elder_for_sap, elder_count};
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
@@ -522,19 +522,19 @@ impl Session {
     }
 
     async fn get_cmd_elders(&self, dst_address: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
+        let a_close_sap = self.network.closest_or_opposite(&dst_address, None);
+        let the_close_sap = a_close_sap.clone().map(|auth| auth.value);
         // Get DataSection elders details.
-        let (mut elders, section_pk) =
-            if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
-                let sap_elders = sap.elders_vec();
+        let (mut elders, section_pk) = if let Some(sap) = a_close_sap {
+            let sap_elders = sap.elders_vec();
 
-                trace!("SAP elders found {:?}", sap_elders);
+            trace!("SAP elders found {:?}", sap_elders);
 
-                (sap_elders, sap.section_key())
-            } else {
-                return Err(Error::NoNetworkKnowledge);
-            };
-
-        let targets_count = at_least_one_correct_elder(); // stored at Adults, so only 1 correctly functioning Elder need to relay
+            (sap_elders, sap.section_key())
+        } else {
+            return Err(Error::NoNetworkKnowledge);
+        };
+        let targets_count = at_least_one_correct_elder_for_sap(the_close_sap); // stored at Adults, so only 1 correctly functioning Elder need to relay
 
         // any SAP that does not hold elders_count() is indicative of a broken network (after genesis)
         if elders.len() < targets_count {
