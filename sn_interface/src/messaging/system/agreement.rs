@@ -29,11 +29,24 @@ pub struct DkgSessionId {
     /// Prefix of the session we are elder candidates for
     pub prefix: Prefix,
     /// Other Elders in this dkg session
+    #[debug(with = "elders_fmt")]
     pub elders: BTreeMap<XorName, SocketAddr>,
     /// The generation, as in the length of the section chain main branch.
     pub generation: u64,
     /// The bootstrap members for the next Membership instance.
+    #[debug(with = "peers_fmt")]
     pub bootstrap_members: BTreeSet<NodeState>,
+}
+
+fn elders_fmt(
+    elders: &BTreeMap<XorName, SocketAddr>,
+    f: &mut core::fmt::Formatter,
+) -> core::fmt::Result {
+    write!(f, "{:?}", BTreeSet::from_iter(elders.keys()))
+}
+
+fn peers_fmt(peers: &BTreeSet<NodeState>, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+    write!(f, "{:?}", BTreeSet::from_iter(peers.iter().map(|n| n.name)))
 }
 
 impl DkgSessionId {
