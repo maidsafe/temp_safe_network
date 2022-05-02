@@ -18,7 +18,7 @@ pub mod types;
 #[macro_use]
 extern crate tracing;
 
-pub use network_knowledge::elder_count;
+pub use network_knowledge::{elder_count, SectionAuthorityProvider};
 
 /// Number of copies of a chunk
 const DEFAULT_DATA_COPY_COUNT: usize = 4;
@@ -32,10 +32,26 @@ pub fn max_num_faulty_elders() -> usize {
     elder_count() / 3
 }
 
+/// Max number of faulty Elders is assumed to be less than 1/3.
+/// So it's no more than 2 with 7 Elders.
+pub fn max_num_faulty_elders_for_sap(sap: SectionAuthorityProvider) -> usize {
+    sap.elder_count() / 3
+}
+
 /// The least number of Elders to select, to be "guaranteed" one correctly functioning Elder.
 /// This number will be 3 with 7 Elders.
 pub fn at_least_one_correct_elder() -> usize {
     max_num_faulty_elders() + 1
+}
+
+/// The least number of Elders to select, to be "guaranteed" one correctly functioning Elder.
+/// This number will be 3 with 7 Elders. And is relative to the provided SAP.
+pub fn at_least_one_correct_elder_for_sap(sap: Option<SectionAuthorityProvider>) -> usize {
+    if let Some(sap) = sap {
+        max_num_faulty_elders_for_sap(sap) + 1
+    } else {
+        max_num_faulty_elders() + 1
+    }
 }
 
 /// Get the expected chunk copy count for our network.
