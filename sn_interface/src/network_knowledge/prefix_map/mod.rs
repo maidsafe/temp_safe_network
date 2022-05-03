@@ -149,6 +149,7 @@ impl NetworkPrefixMap {
         proof_chain: &SecuredLinkedList,
     ) -> Result<bool> {
         let prefix = signed_sap.prefix();
+
         trace!("Attempting to update prefixmap for {:?}", prefix);
         let section_key = match self.section_by_prefix(&prefix) {
             Ok(sap) => sap.section_key(),
@@ -197,12 +198,33 @@ impl NetworkPrefixMap {
             )));
         }
 
+        let incoming_prefix = &signed_sap.prefix();
+
+        // Lets warn if we're in a SAP that's shrinking for some reason.
+        // So we check the incoming elder count vs what we know of for
+        // the incoming prefix. If elder_count() is smaller at _all_ we
+        // should warn! something so we can track this.
+        match self.section_by_prefix(incoming_prefix) {
+            Ok(sap) => {
+                let current_sap_elder_count = sap.elder_count();
+                let proposed_sap_elder_count = signed_sap.elder_count();
+
+                if proposed_sap_elder_count < current_sap_elder_count {
+                    warn!("Proposed SAP elder count is LESS than current... proposed: {proposed_sap_elder_count:?}, current: {current_sap_elder_count:?} (proposed is: {signed_sap:?})");
+                }
+            }
+            Err(e) => {
+                error!("Could not find related section to {incoming_prefix:?} in order to validate SAP's section is not shrinking");
+                error!("Error on prefix search: {e}");
+            }
+        };
+
         // We currently don't keep the complete chain of remote sections,
         // **but** the SAPs of remote sections we keep were already verified by us
         // as trusted before we store them in our local records.
         // Thus, we just need to check our knowledge of the remote section's key
         // is part of the proof chain received.
-        match self.sections.get(&signed_sap.prefix()) {
+        match self.sections.get(incoming_prefix) {
             Some(entry) if entry.value() == &signed_sap => {
                 // It's the same SAP we are already aware of
                 return Ok(false);
