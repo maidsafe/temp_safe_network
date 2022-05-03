@@ -501,7 +501,7 @@ mod tests {
     use sn_interface::messaging::system::{MembershipState, NodeState};
     use sn_interface::messaging::MsgType;
     #[cfg(feature = "test-utils")]
-    use sn_interface::network_knowledge::test_utils::gen_addr;
+    use sn_interface::network_knowledge::test_utils::{gen_addr, section_signed};
     use sn_interface::network_knowledge::{NodeInfo, MIN_ADULT_AGE};
 
     #[cfg(feature = "test-utils")]
@@ -521,7 +521,8 @@ mod tests {
         // If there is only one participant, the DKG should complete immediately.
 
         let voter = DkgVoter::default();
-        let section_pk = bls::SecretKey::random().public_key();
+        let section_sk = bls::SecretKey::random();
+        let section_pk = section_sk.public_key();
         let prefix = Prefix::default();
 
         let node = NodeInfo::new(
@@ -529,12 +530,15 @@ mod tests {
             gen_addr(),
         );
         let elders = BTreeMap::from_iter([(node.name(), node.addr)]);
-        let bootstrap_members = BTreeSet::from_iter([NodeState {
-            name: node.peer().name(),
-            addr: node.peer().addr(),
-            state: MembershipState::Joined,
-            previous_name: None,
-        }]);
+        let bootstrap_members = BTreeSet::from_iter([section_signed(
+            &section_sk,
+            NodeState {
+                name: node.peer().name(),
+                addr: node.peer().addr(),
+                state: MembershipState::Joined,
+                previous_name: None,
+            },
+        )?]);
         let session_id = DkgSessionId {
             prefix,
             elders,
@@ -561,21 +565,22 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "test-utils")]
     fn proptest_full_participation_impl(nodes: Vec<NodeInfo>, seed: u64) -> Result<()> {
         // Rng used to randomize the message order.
         let mut rng = SmallRng::seed_from_u64(seed);
-        let section_pk = bls::SecretKey::random().public_key();
+        let section_sk = bls::SecretKey::random();
+        let section_pk = section_sk.public_key();
         let mut messages = Vec::new();
 
         let session_id = DkgSessionId {
             prefix: Prefix::default(),
             elders: BTreeMap::from_iter(nodes.iter().map(|n| (n.name(), n.addr))),
             generation: 0,
-            bootstrap_members: BTreeSet::from_iter(
-                nodes
-                    .iter()
-                    .map(|n| NodeState::joined(n.name(), n.addr, None)),
-            ),
+            bootstrap_members: nodes
+                .iter()
+                .map(|n| section_signed(&section_sk, NodeState::joined(n.name(), n.addr, None)))
+                .collect::<Result<_, _>>()?,
         };
 
         let mut actors: HashMap<_, _> = nodes

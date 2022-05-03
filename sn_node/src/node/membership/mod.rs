@@ -3,7 +3,7 @@ use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 use bls_dkg::{PublicKeySet, SecretKeyShare};
 use core::fmt::Debug;
 use sn_interface::{
-    messaging::system::{MembershipState, NodeState},
+    messaging::system::{KeyedSig, MembershipState, NodeState, SectionAuth},
     network_knowledge::{recommended_section_size, SectionAuthorityProvider, MIN_ADULT_AGE},
 };
 use thiserror::Error;
@@ -43,16 +43,16 @@ pub(crate) fn split(
 
 /// Returns the nodes that should be candidates to become the next elders, sorted by names.
 pub(crate) fn elder_candidates(
-    candidates: impl IntoIterator<Item = NodeState>,
+    candidates: impl IntoIterator<Item = SectionAuth<NodeState>>,
     current_elders: &SectionAuthorityProvider,
-) -> BTreeSet<NodeState> {
+) -> BTreeSet<SectionAuth<NodeState>> {
     use itertools::Itertools;
     use std::cmp::Ordering;
 
     // Compare candidates for the next elders. The one comparing `Less` wins.
     fn cmp_elder_candidates(
-        lhs: &NodeState,
-        rhs: &NodeState,
+        lhs: &SectionAuth<NodeState>,
+        rhs: &SectionAuth<NodeState>,
         current_elders: &SectionAuthorityProvider,
     ) -> Ordering {
         // Older nodes are preferred. In case of a tie, prefer current elders. If still a tie, break
@@ -70,9 +70,7 @@ pub(crate) fn elder_candidates(
                     _ => Ordering::Equal,
                 }
             })
-            .then_with(|| lhs.name.cmp(&rhs.name))
-        // TODO: replace name cmp above with sig cmp.
-        // .then_with(|| lhs.sig.signature.cmp(&rhs.sig.signature))
+            .then_with(|| lhs.sig.signature.cmp(&rhs.sig.signature))
     }
 
     candidates
@@ -85,7 +83,7 @@ pub(crate) fn elder_candidates(
 #[derive(Debug, Clone)]
 pub(crate) struct Membership {
     consensus: Consensus<NodeState>,
-    bootstrap_members: BTreeSet<NodeState>,
+    bootstrap_members: BTreeSet<SectionAuth<NodeState>>,
     gen: Generation,
     history: BTreeMap<Generation, (Decision<NodeState>, Consensus<NodeState>)>,
 }
@@ -95,7 +93,7 @@ impl Membership {
         secret_key: (NodeId, SecretKeyShare),
         elders: PublicKeySet,
         n_elders: usize,
-        bootstrap_members: BTreeSet<NodeState>,
+        bootstrap_members: BTreeSet<SectionAuth<NodeState>>,
     ) -> Self {
         Membership {
             consensus: Consensus::from(secret_key, elders, n_elders),
@@ -123,7 +121,7 @@ impl Membership {
     }
 
     #[cfg(test)]
-    pub(crate) fn force_bootstrap(&mut self, state: NodeState) {
+    pub(crate) fn force_bootstrap(&mut self, state: SectionAuth<NodeState>) {
         let _ = self.bootstrap_members.insert(state);
     }
 
@@ -164,11 +162,14 @@ impl Membership {
         }
     }
 
-    pub(crate) fn current_section_members(&self) -> BTreeMap<XorName, NodeState> {
+    pub(crate) fn current_section_members(&self) -> BTreeMap<XorName, SectionAuth<NodeState>> {
         self.section_members(self.gen).unwrap_or_default()
     }
 
-    pub(crate) fn section_members(&self, gen: Generation) -> Result<BTreeMap<XorName, NodeState>> {
+    pub(crate) fn section_members(
+        &self,
+        gen: Generation,
+    ) -> Result<BTreeMap<XorName, SectionAuth<NodeState>>> {
         let mut members =
             BTreeMap::from_iter(self.bootstrap_members.iter().cloned().map(|n| (n.name, n)));
 
@@ -177,17 +178,25 @@ impl Membership {
         }
 
         for (history_gen, (decision, _)) in self.history.iter() {
-            for (node_state, _sig) in decision.proposals.iter() {
+            for (node_state, signature) in decision.proposals.iter() {
+                let sig = KeyedSig {
+                    public_key: self.voters_public_key_set().public_key(),
+                    signature: signature.clone(),
+                };
+                let authed_state = SectionAuth {
+                    value: node_state.clone(),
+                    sig,
+                };
                 match node_state.state {
                     MembershipState::Joined => {
-                        let _ = members.insert(node_state.name, node_state.clone());
+                        let _ = members.insert(node_state.name, authed_state);
                     }
                     MembershipState::Left => {
                         let _ = members.remove(&node_state.name);
                     }
                     MembershipState::Relocated(_) => {
                         if let Entry::Vacant(e) = members.entry(node_state.name) {
-                            let _ = e.insert(node_state.clone());
+                            let _ = e.insert(authed_state);
                         } else {
                             let _ = members.remove(&node_state.name);
                         }

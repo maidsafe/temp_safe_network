@@ -17,7 +17,7 @@ use std::{
 };
 use xor_name::{Prefix, XorName};
 
-use super::system::NodeState;
+use super::system::{NodeState, SectionAuth};
 
 // TODO: we need to maintain a list of nodes who have previosly been members of this section (archived nodes)
 //       currently, only the final members of the section are preserved on the SAP.
@@ -35,7 +35,7 @@ pub struct SectionAuthorityProvider {
     /// The section's complete set of elders as a map from their name to their socket address.
     pub elders: BTreeMap<XorName, SocketAddr>,
     /// The section members at the time of this elder churn.
-    pub members: BTreeMap<XorName, NodeState>,
+    pub members: BTreeMap<XorName, SectionAuth<NodeState>>,
 }
 
 impl Borrow<Prefix> for SectionAuthorityProvider {

@@ -692,7 +692,7 @@ mod tests {
     }
 
     fn gen_section_auth(prefix: Prefix) -> Result<SectionAuth<SectionAuthorityProvider>> {
-        let (section_auth, _, secret_key_set) = gen_section_authority_provider(prefix, 5);
+        let (section_auth, _, secret_key_set) = gen_section_authority_provider(prefix, 5)?;
         section_signed(secret_key_set.secret_key(), section_auth)
             .context(format!("Failed to generate SAP for prefix {:?}", prefix))
     }

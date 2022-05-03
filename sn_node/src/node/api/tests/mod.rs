@@ -72,7 +72,7 @@ static TEST_EVENT_CHANNEL_SIZE: usize = 20;
 #[tokio::test(flavor = "multi_thread")]
 async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     let prefix1 = Prefix::default().pushed(true);
-    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix1, elder_count());
+    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix1, elder_count())?;
 
     let pk_set = sk_set.public_keys();
     let section_key = pk_set.public_key();
@@ -152,7 +152,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result<()> {
     let prefix1 = Prefix::default().pushed(true);
-    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix1, elder_count());
+    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix1, elder_count())?;
 
     let pk_set = sk_set.public_keys();
     let section_key = pk_set.public_key();
@@ -240,7 +240,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
     init_test_logger();
     let _span = tracing::info_span!("receive_join_request_from_relocated_node").entered();
 
-    let (section_auth, mut nodes, sk_set) = create_section_auth();
+    let (section_auth, mut nodes, sk_set) = create_section_auth()?;
 
     let pk_set = sk_set.public_keys();
     let section_key = pk_set.public_key();
@@ -327,7 +327,7 @@ async fn handle_agreement_on_online() -> Result<()> {
 
     let prefix = Prefix::default();
 
-    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, elder_count());
+    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, elder_count())?;
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
     let node = nodes.remove(0);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
@@ -366,7 +366,16 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let mut nodes: Vec<_> = gen_sorted_nodes(&Prefix::default(), elder_count(), true);
 
     let elders = nodes.iter().map(NodeInfo::peer);
-    let members = nodes.iter().map(|n| NodeState::joined(n.peer(), None));
+    let members: BTreeSet<SectionAuth<NodeState>> = nodes
+        .iter()
+        .map(|node_info| {
+            section_signed(
+                sk_set.secret_key(),
+                NodeState::joined(node_info.peer(), None),
+            )
+        })
+        .collect::<Result<_, _>>()?;
+
     let section_auth =
         SectionAuthorityProvider::new(elders, Prefix::default(), members, sk_set.public_keys());
     let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
@@ -419,7 +428,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
         .await
         .as_mut()
         .unwrap()
-        .force_bootstrap(node_state.to_msg());
+        .force_bootstrap(auth.clone());
 
     let cmds = dispatcher
         .process_cmd(Cmd::HandleNewNodeOnline(auth), "cmd-id")
@@ -548,7 +557,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
         NetworkPhase::Regular => "0".parse().unwrap(),
     };
     let (section_auth, mut node_infos, sk_set) =
-        gen_section_authority_provider(prefix, elder_count());
+        gen_section_authority_provider(prefix, elder_count())?;
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
 
     // Make a left peer.
@@ -617,7 +626,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     init_test_logger();
     let _span = tracing::info_span!("handle_agreement_on_offline_of_non_elder").entered();
 
-    let (section_auth, mut nodes, sk_set) = create_section_auth();
+    let (section_auth, mut nodes, sk_set) = create_section_auth()?;
 
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
 
@@ -662,7 +671,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_agreement_on_offline_of_elder() -> Result<()> {
-    let (section_auth, mut nodes, sk_set) = create_section_auth();
+    let (section_auth, mut nodes, sk_set) = create_section_auth()?;
 
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
 
@@ -735,8 +744,13 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let sk0 = bls::SecretKey::random();
     let pk0 = sk0.public_key();
 
-    let (old_sap, mut nodes, sk_set1) = create_section_auth();
-    let members = BTreeSet::from_iter(nodes.iter().map(|n| NodeState::joined(n.peer(), None)));
+    let (old_sap, mut nodes, sk_set1) = create_section_auth()?;
+
+    let members: BTreeSet<SectionAuth<NodeState>> = nodes
+        .iter()
+        .map(|node_info| section_signed(&sk0, NodeState::joined(node_info.peer(), None)))
+        .collect::<Result<_, _>>()?;
+
     let pk1 = sk_set1.secret_key().public_key();
     let pk1_signature = sk0.sign(bincode::serialize(&pk1)?);
 
@@ -840,7 +854,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
     init_test_logger();
     let _span = tracing::info_span!("untrusted_ae_msg_errors").entered();
 
-    let (our_section_auth, _, sk_set0) = create_section_auth();
+    let (our_section_auth, _, sk_set0) = create_section_auth()?;
     let sk0 = sk_set0.secret_key();
     let pk0 = sk0.public_key();
 
@@ -930,7 +944,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         RelocatedPeerRole::Elder => elder_count(),
         RelocatedPeerRole::NonElder => recommended_section_size(),
     };
-    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, elder_count());
+    let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, elder_count())?;
     let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
 
     let mut adults = section_size - elder_count();
@@ -1095,14 +1109,13 @@ async fn handle_elders_update() -> Result<()> {
     let adult_peer = create_peer(MIN_ADULT_AGE);
     let promoted_peer = create_peer(MIN_ADULT_AGE + 2);
 
-    let members = BTreeSet::from_iter(
-        [info.peer(), adult_peer, promoted_peer]
-            .into_iter()
-            .map(|p| NodeState::joined(p, None)),
-    );
-
     let sk_set0 = SecretKeySet::random();
     let pk0 = sk_set0.secret_key().public_key();
+
+    let members: BTreeSet<SectionAuth<NodeState>> = [info.peer(), adult_peer, promoted_peer]
+        .into_iter()
+        .map(|peer| section_signed(sk_set0.secret_key(), NodeState::joined(peer, None)))
+        .collect::<Result<_, _>>()?;
 
     let sap0 = SectionAuthorityProvider::new(
         iter::once(info.peer()).chain(other_elder_peers.clone()),
@@ -1248,18 +1261,17 @@ async fn handle_demote_during_split() -> Result<()> {
     // This peer is a prefix-0 post-split elder.
     let peer_c = create_peer_in_prefix(&prefix0, MIN_ADULT_AGE);
 
-    // all members
-    let members = BTreeSet::from_iter(
-        peers_a
-            .iter()
-            .chain(peers_b.iter())
-            .copied()
-            .chain([info.peer(), peer_c])
-            .map(|peer| NodeState::joined(peer, None)),
-    );
-
     // Create the pre-split section
     let sk_set_v0 = SecretKeySet::random();
+
+    let members: BTreeSet<SectionAuth<NodeState>> = peers_a
+        .iter()
+        .chain(peers_b.iter())
+        .copied()
+        .chain([info.peer(), peer_c])
+        .map(|peer| section_signed(sk_set_v0.secret_key(), NodeState::joined(peer, None)))
+        .collect::<Result<_, _>>()?;
+
     let section_auth_v0 = SectionAuthorityProvider::new(
         iter::once(info.peer()).chain(peers_a.iter().cloned()),
         Prefix::default(),
@@ -1267,8 +1279,6 @@ async fn handle_demote_during_split() -> Result<()> {
         sk_set_v0.public_keys(),
     );
     let (section, section_key_share) = create_section(&sk_set_v0, &section_auth_v0).await?;
-
-    // all peers b are added
     for peer in peers_b.iter().chain(iter::once(&peer_c)).cloned() {
         let node_state = NodeState::joined(peer, None);
         let node_state = section_signed(sk_set_v0.secret_key(), node_state)?;
@@ -1399,10 +1409,10 @@ pub(crate) async fn create_comm() -> Result<Comm> {
 }
 
 // Generate random SectionAuthorityProvider and the corresponding Nodes.
-fn create_section_auth() -> (SectionAuthorityProvider, Vec<NodeInfo>, SecretKeySet) {
+fn create_section_auth() -> Result<(SectionAuthorityProvider, Vec<NodeInfo>, SecretKeySet)> {
     let (section_auth, elders, secret_key_set) =
-        gen_section_authority_provider(Prefix::default(), elder_count());
-    (section_auth, elders, secret_key_set)
+        gen_section_authority_provider(Prefix::default(), elder_count())?;
+    Ok((section_auth, elders, secret_key_set))
 }
 
 fn create_section_key_share(sk_set: &bls::SecretKeySet, index: usize) -> SectionKeyShare {

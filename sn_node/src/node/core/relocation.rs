@@ -217,7 +217,10 @@ mod tests {
                 .take(elder_count())
                 .cloned(),
             Prefix::default(),
-            peers.iter().map(|p| NodeState::joined(*p, None)),
+            peers
+                .iter()
+                .map(|p| section_signed(sk, NodeState::joined(*p, None)))
+                .collect::<Result<Vec<_>, _>>()?,
             sk_set.public_keys(),
         );
         let section_auth = section_signed(sk, section_auth)?;

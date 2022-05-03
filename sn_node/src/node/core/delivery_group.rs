@@ -555,7 +555,7 @@ mod tests {
         let prefix1 = Prefix::default().pushed(true);
 
         let (section_auth0, _, secret_key_set) =
-            gen_section_authority_provider(prefix0, elder_count());
+            gen_section_authority_provider(prefix0, elder_count())?;
         let genesis_sk = secret_key_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
@@ -573,7 +573,7 @@ mod tests {
         }
 
         let (section_auth1, _, secret_key_set) =
-            gen_section_authority_provider(prefix1, elder_count());
+            gen_section_authority_provider(prefix1, elder_count())?;
         let sk1 = secret_key_set.secret_key();
         let pk1 = sk1.public_key();
 
@@ -608,7 +608,7 @@ mod tests {
         let prefix0 = Prefix::default().pushed(false);
 
         let (section_auth, _, secret_key_set) =
-            gen_section_authority_provider(prefix0, elder_count());
+            gen_section_authority_provider(prefix0, elder_count())?;
         let genesis_sk = secret_key_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
         let section_auth = section_signed(genesis_sk, section_auth)?;

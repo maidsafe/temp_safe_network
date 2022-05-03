@@ -63,7 +63,7 @@ pub struct SectionAuthorityProvider {
     prefix: Prefix,
     public_key_set: PublicKeySet,
     elders: BTreeSet<Peer>,
-    members: BTreeSet<NodeState>,
+    members: BTreeSet<SectionAuth<NodeState>>,
 }
 
 /// SectionAuthorityProvider candidates for handover consensus to vote on
@@ -123,7 +123,7 @@ impl SectionAuthorityProvider {
     pub fn new<E, M>(elders: E, prefix: Prefix, members: M, pk_set: PublicKeySet) -> Self
     where
         E: IntoIterator<Item = Peer>,
-        M: IntoIterator<Item = NodeState>,
+        M: IntoIterator<Item = SectionAuth<NodeState>>,
     {
         Self {
             prefix,
@@ -141,7 +141,7 @@ impl SectionAuthorityProvider {
                 .bootstrap_members
                 .iter()
                 .cloned()
-                .map(|n| n.into_state()),
+                .map(|n| n.into_authed_state()),
             pk_set,
         )
     }
@@ -202,9 +202,13 @@ impl SectionAuthorityProvider {
             members: self
                 .members
                 .iter()
-                .map(|state| (state.name(), state.to_msg()))
+                .map(|state| (state.name(), state.clone().into_authed_msg()))
                 .collect(),
         }
+    }
+
+    pub fn bootstrap_members(&self) -> &BTreeSet<SectionAuth<NodeState>> {
+        &self.members
     }
 }
 
@@ -226,7 +230,7 @@ impl SectionAuthorityProviderMsg {
             self.prefix,
             self.members
                 .into_iter()
-                .map(|(_name, state)| state.into_state()),
+                .map(|(_name, state)| state.into_authed_state()),
             self.public_key_set,
         )
     }
@@ -293,15 +297,23 @@ pub mod test_utils {
     pub fn gen_section_authority_provider(
         prefix: Prefix,
         count: usize,
-    ) -> (SectionAuthorityProvider, Vec<NodeInfo>, SecretKeySet) {
+    ) -> Result<(SectionAuthorityProvider, Vec<NodeInfo>, SecretKeySet)> {
         let nodes = gen_sorted_nodes(&prefix, count, false);
         let elders = nodes.iter().map(NodeInfo::peer);
-        let members = nodes.iter().map(|i| NodeState::joined(i.peer(), None));
         let secret_key_set = SecretKeySet::random();
+        let members = nodes
+            .iter()
+            .map(|n| {
+                section_signed(
+                    secret_key_set.secret_key(),
+                    NodeState::joined(n.peer(), None),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         let section_auth =
             SectionAuthorityProvider::new(elders, prefix, members, secret_key_set.public_keys());
 
-        (section_auth, nodes, secret_key_set)
+        Ok((section_auth, nodes, secret_key_set))
     }
 
     // Create signature for the given payload using the given secret key.

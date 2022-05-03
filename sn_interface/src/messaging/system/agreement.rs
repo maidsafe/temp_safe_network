@@ -35,7 +35,7 @@ pub struct DkgSessionId {
     pub generation: u64,
     /// The bootstrap members for the next Membership instance.
     #[debug(with = "peers_fmt")]
-    pub bootstrap_members: BTreeSet<NodeState>,
+    pub bootstrap_members: BTreeSet<SectionAuth<NodeState>>,
 }
 
 fn elders_fmt(
@@ -45,8 +45,15 @@ fn elders_fmt(
     write!(f, "{:?}", BTreeSet::from_iter(elders.keys()))
 }
 
-fn peers_fmt(peers: &BTreeSet<NodeState>, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-    write!(f, "{:?}", BTreeSet::from_iter(peers.iter().map(|n| n.name)))
+fn peers_fmt(
+    peers: &BTreeSet<SectionAuth<NodeState>>,
+    f: &mut core::fmt::Formatter,
+) -> core::fmt::Result {
+    write!(
+        f,
+        "{:?}",
+        BTreeSet::from_iter(peers.iter().map(|n| n.value.name))
+    )
 }
 
 impl DkgSessionId {

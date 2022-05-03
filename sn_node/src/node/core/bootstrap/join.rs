@@ -527,13 +527,14 @@ mod tests {
     use tokio::task;
     use xor_name::XorName;
 
+    #[cfg(feature = "test-utils")]
     #[tokio::test(flavor = "multi_thread")]
     async fn join_as_adult() -> Result<()> {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
         let (section_auth, mut nodes, sk_set) =
-            gen_section_authority_provider(Prefix::default(), elder_count());
+            gen_section_authority_provider(Prefix::default(), elder_count())?;
         let bootstrap_node = nodes.remove(0);
         let bootstrap_addr = bootstrap_node.addr;
         let sk = sk_set.secret_key();
@@ -643,7 +644,7 @@ mod tests {
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
         let (_, mut nodes, sk_set) =
-            gen_section_authority_provider(Prefix::default(), elder_count());
+            gen_section_authority_provider(Prefix::default(), elder_count())?;
         let bootstrap_node = nodes.remove(0);
         let genesis_key = sk_set.secret_key().public_key();
 
@@ -683,7 +684,7 @@ mod tests {
                 .collect();
 
             let (new_section_auth, _, new_sk_set) =
-                gen_section_authority_provider(Prefix::default(), elder_count());
+                gen_section_authority_provider(Prefix::default(), elder_count())?;
             let new_pk_set = new_sk_set.public_keys();
 
             send_response(
@@ -747,7 +748,7 @@ mod tests {
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
         let (_, mut nodes, sk_set) =
-            gen_section_authority_provider(Prefix::default(), elder_count());
+            gen_section_authority_provider(Prefix::default(), elder_count())?;
         let bootstrap_node = nodes.remove(0);
 
         let node = NodeInfo::new(
@@ -773,7 +774,7 @@ mod tests {
             assert_matches!(msg, SystemMsg::JoinRequest{..}));
 
             let (new_section_auth, _, new_sk_set) =
-                gen_section_authority_provider(Prefix::default(), elder_count());
+                gen_section_authority_provider(Prefix::default(), elder_count())?;
             let new_pk_set = new_sk_set.public_keys();
 
             send_response(
@@ -836,7 +837,7 @@ mod tests {
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
         let (section_auth, mut nodes, sk_set) =
-            gen_section_authority_provider(Prefix::default(), elder_count());
+            gen_section_authority_provider(Prefix::default(), elder_count())?;
         let bootstrap_node = nodes.remove(0);
 
         let node = NodeInfo::new(
@@ -913,7 +914,7 @@ mod tests {
             }
         };
 
-        let (section_auth, _, sk_set) = gen_section_authority_provider(good_prefix, elder_count());
+        let (section_auth, _, sk_set) = gen_section_authority_provider(good_prefix, elder_count())?;
         let section_key = sk_set.public_keys().public_key();
 
         let state = Join::new(
@@ -950,7 +951,7 @@ mod tests {
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
-                    section_auth: gen_section_authority_provider(bad_prefix, elder_count())
+                    section_auth: gen_section_authority_provider(bad_prefix, elder_count())?
                         .0
                         .to_msg(),
                     section_signed: signed_sap.sig.clone(),

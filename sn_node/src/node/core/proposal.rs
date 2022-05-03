@@ -74,7 +74,7 @@ mod tests {
     #[test]
     fn serialize_for_signing() -> Result<()> {
         // Proposal::SectionInfo
-        let (section_auth, _, _) = gen_section_authority_provider(Prefix::default(), 4);
+        let (section_auth, _, _) = gen_section_authority_provider(Prefix::default(), 4)?;
         let proposal = Proposal::SectionInfo(section_auth.clone());
         verify_serialize_for_signing(&proposal, &section_auth)?;
 

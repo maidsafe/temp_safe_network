@@ -661,10 +661,16 @@ fn create_first_section_authority_provider(
     sk_share: &bls::SecretKeyShare,
     peer: Peer,
 ) -> Result<SectionAuth<SectionAuthorityProvider>> {
+    let state = NodeState::joined(peer, None);
+    let state_sig = create_first_sig(pk_set, sk_share, &state)?;
+    let authed_state = SectionAuth {
+        value: state,
+        sig: state_sig,
+    };
     let section_auth = SectionAuthorityProvider::new(
         iter::once(peer),
         Prefix::default(),
-        [NodeState::joined(peer, None)],
+        [authed_state],
         pk_set.clone(),
     );
     let sig = create_first_sig(pk_set, sk_share, &section_auth)?;

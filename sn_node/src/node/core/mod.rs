@@ -26,6 +26,7 @@ pub(crate) use relocation::{check as relocation_check, ChurnId};
 
 use self::{data::DataStorage, split_barrier::SplitBarrier};
 use sn_interface::{
+    messaging::system::SectionAuth,
     network_knowledge::{
         recommended_section_size, supermajority, NetworkKnowledge, NodeInfo, SectionKeyShare,
         SectionKeysProvider,
@@ -49,7 +50,7 @@ use sn_interface::messaging::{
     data::OperationId,
     signature_aggregator::SignatureAggregator,
     system::{DkgSessionId, NodeEvent, NodeState, SystemMsg},
-    AuthorityProof, DstLocation, SectionAuth, SectionAuthorityProvider,
+    AuthorityProof, DstLocation, SectionAuthorityProvider,
 };
 use sn_interface::types::{log_markers::LogMarker, Cache, Peer};
 
@@ -99,7 +100,7 @@ pub(crate) const MAX_WAITING_PEERS_PER_QUERY: usize = 100;
 #[derive(Debug, Clone)]
 pub(crate) struct DkgSessionInfo {
     pub(crate) session_id: DkgSessionId,
-    pub(crate) authority: AuthorityProof<SectionAuth>,
+    pub(crate) authority: AuthorityProof<sn_interface::messaging::SectionAuth>,
 }
 
 // Store up to 100 in use backoffs
@@ -160,14 +161,13 @@ impl Node {
                 .await
                 .elder_count();
 
-            // TODO: the bootstrap members should come from handover
-            let bootstrap_members = BTreeSet::from_iter(
-                network_knowledge
-                    .section_signed_members()
-                    .await
-                    .into_iter()
-                    .map(|section_auth| section_auth.value.to_msg()),
-            );
+            let bootstrap_members = network_knowledge
+                .authority_provider()
+                .await
+                .bootstrap_members()
+                .iter()
+                .map(|state| state.clone().into_authed_msg())
+                .collect();
 
             Some(Membership::from(
                 (key.index as u8, key.secret_key_share),
@@ -370,7 +370,10 @@ impl Node {
     pub(crate) async fn get_split_info(
         &self,
         prefix: Prefix,
-    ) -> Option<(BTreeSet<NodeState>, BTreeSet<NodeState>)> {
+    ) -> Option<(
+        BTreeSet<SectionAuth<NodeState>>,
+        BTreeSet<SectionAuth<NodeState>>,
+    )> {
         let members = self
             .membership
             .read()
@@ -489,7 +492,7 @@ impl Node {
 
         if elder_candidates
             .iter()
-            .map(NodeState::peer)
+            .map(|e| e.value.peer())
             .eq(current_elders.iter())
         {
             vec![]
