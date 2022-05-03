@@ -18,6 +18,7 @@ use sn_interface::types::PeerLinks;
 
 use dashmap::DashMap;
 use qp2p::Endpoint;
+use secured_linked_list::SecuredLinkedList;
 use std::sync::Arc;
 use tokio::{
     sync::{mpsc::Sender, RwLock},
@@ -50,6 +51,8 @@ pub(super) struct Session {
     pending_cmds: PendingCmdAcks,
     /// All elders we know about from AE messages
     network: Arc<NetworkPrefixMap>,
+    /// A DAG containing all section chains of the whole network that we are aware of
+    all_sections_chains: Arc<RwLock<SecuredLinkedList>>,
     /// Network's genesis key
     genesis_key: bls::PublicKey,
     /// Initial network comms MsgId

@@ -23,6 +23,7 @@ use dashmap::DashMap;
 use futures::future::join_all;
 use qp2p::{Close, Config as QuicP2pConfig, ConnectionError, Endpoint, SendError};
 use rand::{rngs::OsRng, seq::SliceRandom};
+use secured_linked_list::SecuredLinkedList;
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::{
     sync::mpsc::{channel, Sender},
@@ -69,6 +70,7 @@ impl Session {
             initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
             cmd_ack_wait,
             peer_links,
+            all_sections_chains: Arc::new(RwLock::new(SecuredLinkedList::new(genesis_key))),
         };
 
         Ok(session)

@@ -25,6 +25,9 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
+    /// Message auth checks failed
+    #[error("Message's authority could not be trusted.")]
+    UntrustedMessage,
     /// Initial network contact failed
     #[error("Initial network contact probe failed.")]
     NetworkContact,

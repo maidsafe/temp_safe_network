@@ -24,7 +24,12 @@ pub use node_info::NodeInfo;
 pub use node_state::NodeState;
 pub use section_authority_provider::{SapCandidate, SectionAuthUtils, SectionAuthorityProvider};
 
-use crate::messaging::system::{KeyedSig, SectionAuth, SectionPeers as SectionPeersMsg};
+use crate::messaging::{
+    system::{
+        KeyedSig, NodeMsgAuthorityUtils, SectionAuth, SectionPeers as SectionPeersMsg, SystemMsg,
+    },
+    NodeMsgAuthority,
+};
 use prefix_map::NetworkPrefixMap;
 // use crate::node::{dkg::SectionAuthUtils, recommended_section_size};
 use crate::types::Peer;
@@ -300,6 +305,35 @@ impl NetworkKnowledge {
                 false
             }
         }
+    }
+
+    /// Given a NodeMsg can we trust it (including verifying contents of an AE message)
+    pub fn verify_node_msg_can_be_trusted(
+        msg_authority: NodeMsgAuthority,
+        msg: SystemMsg,
+        known_keys: &[BlsPublicKey],
+    ) -> bool {
+        if !msg_authority.verify_src_section_key_is_known(known_keys) {
+            // In case the incoming message itself is trying to update our knowledge,
+            // it shall be allowed.
+            if let SystemMsg::AntiEntropyUpdate {
+                ref proof_chain, ..
+            } = msg
+            {
+                // The attached chain shall contains a key known to us
+                if !proof_chain.check_trust(known_keys) {
+                    return false;
+                } else {
+                    trace!(
+                        "Allows AntiEntropyUpdate msg({:?}) ahead of our knowledge",
+                        msg,
+                    );
+                }
+            } else {
+                return false;
+            }
+        }
+        true
     }
 
     /// Update our network knowledge if the provided SAP is valid and can be verified
