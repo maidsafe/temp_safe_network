@@ -258,6 +258,9 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: matrix.os != 'windows-latest'
 
+      - name: Build all test targets
+        run: cargo test --no-run --release --features=test-utils -p sn_client
+
       - name: Run client tests
         uses: jacderida/cargo-nextest@main
         with:
@@ -391,7 +394,10 @@ jobs:
         shell: bash
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
-      - name: Run client tests
+      - name: Build all test targets
+        run: cargo test --no-run --release --features=test-utils -p sn_client
+
+      - name: Run sn_client tests
         uses: jacderida/cargo-nextest@main
         with:
           test-run-name: e2e-split-client-self-hosted-ubuntu
