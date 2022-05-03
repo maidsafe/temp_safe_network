@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1651136853677,
+  "lastUpdate": 1651564568965,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -1541,6 +1541,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4626326874,
             "range": "± 1277022537",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "joshuef@gmail.com",
+            "name": "Josh Wilson",
+            "username": "joshuef"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "155d62257546868513627709742215c0c8f9574f",
+          "message": "chore(sn_interface): check and log for shrinking SAP on verify_with_chain",
+          "timestamp": "2022-05-03T09:22:28+02:00",
+          "tree_id": "edde8b4861c04b438e0a10160ce5f08a96775f2b",
+          "url": "https://github.com/maidsafe/safe_network/commit/155d62257546868513627709742215c0c8f9574f"
+        },
+        "date": 1651564567907,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10498378947,
+            "range": "± 9509755235",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3753554952,
+            "range": "± 715812592",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 8379258982,
+            "range": "± 885377313",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10036716175,
+            "range": "± 4914731",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3148452379,
+            "range": "± 737723215",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4496980603,
+            "range": "± 1420453791",
             "unit": "ns/iter"
           }
         ]
