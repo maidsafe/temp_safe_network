@@ -92,8 +92,8 @@ pub enum SystemMsg {
     BackPressure(f64),
     /// Send from a section to the node to be immediately relocated.
     Relocate(SectionAuth<NodeState>),
-    /// Membership Vote
-    MembershipVote(SignedVote<NodeState>),
+    /// Membership Votes, in order they should be processed in.
+    MembershipVotes(Vec<SignedVote<NodeState>>),
     /// Membership Anti-Entropy request
     MembershipAE(Generation),
     /// Sent from a bootstrapping peer to the section requesting to join as a new member

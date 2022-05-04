@@ -38,7 +38,7 @@ impl Node {
             };
 
             let cmds = self
-                .send_msg_to_our_elders(SystemMsg::MembershipVote(membership_vote))
+                .send_msg_to_our_elders(SystemMsg::MembershipVotes(vec![membership_vote]))
                 .await?;
             Ok(vec![cmds])
         } else {
@@ -59,8 +59,10 @@ impl Node {
             let mut cmds = match membership.handle_signed_vote(signed_vote, &prefix) {
                 Ok(VoteResponse::Broadcast(response_vote)) => {
                     vec![
-                        self.send_msg_to_our_elders(SystemMsg::MembershipVote(response_vote))
-                            .await?,
+                        self.send_msg_to_our_elders(SystemMsg::MembershipVotes(vec![
+                            response_vote,
+                        ]))
+                        .await?,
                     ]
                 }
                 Ok(VoteResponse::WaitingForMoreVotes) => vec![],
@@ -136,18 +138,14 @@ impl Node {
         let cmds = if let Some(membership) = self.membership.read().await.as_ref() {
             match membership.anti_entropy(gen) {
                 Ok(catchup_votes) => {
-                    let mut catchup_cmds = Vec::new();
-                    for vote in catchup_votes {
-                        catchup_cmds.push(
-                            self.send_direct_msg(
-                                peer,
-                                SystemMsg::MembershipVote(vote),
-                                self.network_knowledge.section_key().await,
-                            )
-                            .await?,
-                        );
-                    }
-                    catchup_cmds
+                    vec![
+                        self.send_direct_msg(
+                            peer,
+                            SystemMsg::MembershipVotes(catchup_votes),
+                            self.network_knowledge.section_key().await,
+                        )
+                        .await?,
+                    ]
                 }
                 Err(e) => {
                     error!("Membership - Error while processing anti-entropy {:?}", e);
