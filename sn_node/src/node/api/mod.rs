@@ -205,7 +205,7 @@ impl NodeApi {
 
             let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE);
             let node_name = ed25519::name(&keypair.public);
-            info!("{} Bootstrapping a new node.", node_name);
+            println!("{} Bootstrapping a new node.", node_name);
 
             let (comm, bootstrap_addr) = Comm::bootstrap(
                 local_addr,
@@ -219,7 +219,7 @@ impl NodeApi {
                 connection_event_tx,
             )
             .await?;
-            info!(
+            println!(
                 "{} Joining as a new node (PID: {}) our socket: {}, bootstrapper was: {}, network's genesis key: {:?}",
                 node_name,
                 std::process::id(),

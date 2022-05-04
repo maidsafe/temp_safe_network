@@ -73,15 +73,18 @@ impl Comm {
         config: qp2p::Config,
         receive_msg: mpsc::Sender<MsgEvent>,
     ) -> Result<(Self, SocketAddr)> {
+        println!("Creating Endpoint");
         // Bootstrap to the network returning the connection to a node.
         let (our_endpoint, incoming_connections, bootstrap_node) =
             Endpoint::new_peer(local_addr, bootstrap_nodes, config).await?;
 
+        println!("Setting up comms");
         let (comm, msg_listener) = setup_comms(our_endpoint, incoming_connections, receive_msg);
 
         let (connection, incoming_msgs) = bootstrap_node.ok_or(Error::BootstrapFailed)?;
         let remote_address = connection.remote_address();
 
+        println!("Listening");
         msg_listener.listen(connection, incoming_msgs);
 
         Ok((comm, remote_address))

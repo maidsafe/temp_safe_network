@@ -82,6 +82,7 @@ uluru="3.0.0"
 url = "2.2.0"
 walkdir = "2"
 xor_name = "4.0.1"
+eframe = "0.18"
 
 [dependencies.self_update]
 version = "~0.28.0"
