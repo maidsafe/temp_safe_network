@@ -498,7 +498,8 @@ where
     Ok(())
 }
 
-fn project_dirs() -> Result<PathBuf> {
+/// Get the standard project dirs for node storage
+pub fn project_dirs() -> Result<PathBuf> {
     let mut home_dir = dirs_next::home_dir()
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Home directory not found"))?;
 

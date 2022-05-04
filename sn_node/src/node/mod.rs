@@ -30,7 +30,7 @@ pub use self::{
         event_stream::EventStream,
         NodeApi,
     },
-    cfg::config_handler::{add_connection_info, set_connection_info, Config},
+    cfg::config_handler::{add_connection_info, set_connection_info, Config, project_dirs},
     error::{Error, Result},
 };
 pub use qp2p::{Config as NetworkConfig, SendStream};
