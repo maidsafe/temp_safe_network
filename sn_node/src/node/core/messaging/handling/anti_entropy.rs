@@ -6,15 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{
-    api::cmds::Cmd,
-    core::Node,
-    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
-    Error, Result,
-};
+use crate::node::{api::cmds::Cmd, core::Node, messages::WireMsgUtils, Error, Result};
 use sn_interface::messaging::{
     system::{KeyedSig, SectionAuth, SectionPeers, SystemMsg},
-    MsgId, MsgType, NodeMsgAuthority, SrcLocation, WireMsg,
+    MsgId, MsgType, SrcLocation, WireMsg,
 };
 
 use sn_interface::network_knowledge::SectionAuthorityProvider;
@@ -282,34 +277,6 @@ impl Node {
         }
     }
 
-    pub(crate) fn verify_msg_can_be_trusted(
-        msg_authority: NodeMsgAuthority,
-        msg: SystemMsg,
-        known_keys: &[BlsPublicKey],
-    ) -> bool {
-        if !msg_authority.verify_src_section_key_is_known(known_keys) {
-            // In case the incoming message itself is trying to update our knowledge,
-            // it shall be allowed.
-            if let SystemMsg::AntiEntropyUpdate {
-                ref proof_chain, ..
-            } = msg
-            {
-                // The attached chain shall contains a key known to us
-                if !proof_chain.check_trust(known_keys) {
-                    return false;
-                } else {
-                    trace!(
-                        "Allows AntiEntropyUpdate msg({:?}) ahead of our knowledge",
-                        msg,
-                    );
-                }
-            } else {
-                return false;
-            }
-        }
-        true
-    }
-
     // If entropy is found, determine the msg to send in order to
     // bring the sender's knowledge about us up to date.
     pub(crate) async fn check_for_entropy(
@@ -492,18 +459,19 @@ mod tests {
     use crate::node::{
         api::tests::create_comm, create_test_max_capacity_and_root_storage, MIN_ADULT_AGE,
     };
-    use sn_interface::elder_count;
-    use sn_interface::network_knowledge::test_utils::section_signed;
-
     use crate::UsedSpace;
+    use sn_interface::elder_count;
     use sn_interface::messaging::{
-        AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, NodeAuth,
+        AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, NodeAuth, NodeMsgAuthority,
         SectionAuth as SectionAuthMsg,
     };
+    use sn_interface::network_knowledge::test_utils::section_signed;
     #[cfg(feature = "test-utils")]
     use sn_interface::network_knowledge::test_utils::{gen_addr, gen_section_authority_provider};
 
-    use sn_interface::network_knowledge::{NodeInfo, SectionKeyShare, SectionKeysProvider};
+    use sn_interface::network_knowledge::{
+        NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider,
+    };
     use sn_interface::types::keys::ed25519;
 
     use assert_matches::assert_matches;
@@ -552,7 +520,7 @@ mod tests {
         let (msg, msg_authority) = env.create_update_msg(proof_chain)?;
 
         // AeUpdate message shall get pass through.
-        assert!(Node::verify_msg_can_be_trusted(
+        assert!(NetworkKnowledge::verify_node_msg_can_be_trusted(
             msg_authority.clone(),
             msg,
             &known_keys
@@ -561,7 +529,7 @@ mod tests {
         // AeUpdate message contains corrupted proof_chain shall get rejected.
         let other_env = Env::new().await?;
         let (corrupted_msg, _msg_authority) = env.create_update_msg(other_env.proof_chain)?;
-        assert!(!Node::verify_msg_can_be_trusted(
+        assert!(!NetworkKnowledge::verify_node_msg_can_be_trusted(
             msg_authority.clone(),
             corrupted_msg,
             &known_keys
@@ -569,7 +537,7 @@ mod tests {
 
         // Other messages shall get rejected.
         let other_msg = SystemMsg::StartConnectivityTest(xor_name::rand::random());
-        assert!(!Node::verify_msg_can_be_trusted(
+        assert!(!NetworkKnowledge::verify_node_msg_can_be_trusted(
             msg_authority,
             other_msg,
             &known_keys

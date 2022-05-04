@@ -204,20 +204,22 @@ impl NetworkPrefixMap {
         // So we check the incoming elder count vs what we know of for
         // the incoming prefix. If elder_count() is smaller at _all_ we
         // should warn! something so we can track this.
-        match self.section_by_prefix(incoming_prefix) {
-            Ok(sap) => {
-                let current_sap_elder_count = sap.elder_count();
-                let proposed_sap_elder_count = signed_sap.elder_count();
+        if !incoming_prefix.is_empty() {
+            match self.section_by_prefix(incoming_prefix) {
+                Ok(sap) => {
+                    let current_sap_elder_count = sap.elder_count();
+                    let proposed_sap_elder_count = signed_sap.elder_count();
 
-                if proposed_sap_elder_count < current_sap_elder_count {
-                    warn!("Proposed SAP elder count is LESS than current... proposed: {proposed_sap_elder_count:?}, current: {current_sap_elder_count:?} (proposed is: {signed_sap:?})");
+                    if proposed_sap_elder_count < current_sap_elder_count {
+                        warn!("Proposed SAP elder count is LESS than current... proposed: {proposed_sap_elder_count:?}, current: {current_sap_elder_count:?} (proposed is: {signed_sap:?})");
+                    }
                 }
-            }
-            Err(e) => {
-                error!("Could not find related section to {incoming_prefix:?} in order to validate SAP's section is not shrinking");
-                error!("Error on prefix search: {e}");
-            }
-        };
+                Err(e) => {
+                    warn!("Could not find related section to {incoming_prefix:?} in order to validate SAP's section is not shrinking");
+                    warn!("Error on prefix search: {e}");
+                }
+            };
+        }
 
         // We currently don't keep the complete chain of remote sections,
         // **but** the SAPs of remote sections we keep were already verified by us

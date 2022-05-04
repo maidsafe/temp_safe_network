@@ -9,6 +9,7 @@
 mod agreement;
 mod join;
 mod join_as_relocated;
+mod msg_authority;
 mod node_msgs;
 mod node_state;
 mod signed;
@@ -17,6 +18,7 @@ use crate::network_knowledge::SapCandidate;
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SectionAuth};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
+pub use msg_authority::NodeMsgAuthorityUtils;
 pub use node_msgs::{NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse};
 pub use node_state::{MembershipState, NodeState, RelocateDetails};
 pub use signed::{KeyedSig, SigShare};
