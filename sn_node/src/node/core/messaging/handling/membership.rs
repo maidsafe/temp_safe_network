@@ -139,8 +139,12 @@ impl Node {
                     let mut catchup_cmds = Vec::new();
                     for vote in catchup_votes {
                         catchup_cmds.push(
-                            self.send_msg_to_our_elders(SystemMsg::MembershipVote(vote))
-                                .await?,
+                            self.send_direct_msg(
+                                peer,
+                                SystemMsg::MembershipVote(vote),
+                                self.network_knowledge.section_key().await,
+                            )
+                            .await?,
                         );
                     }
                     catchup_cmds
