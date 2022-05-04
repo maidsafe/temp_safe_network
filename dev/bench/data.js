@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1651675722730,
+  "lastUpdate": 1651697407869,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -1661,6 +1661,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4625007382,
             "range": "± 1069709067",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "chriso83@protonmail.com",
+            "name": "Chris O'Neil",
+            "username": "jacderida"
+          },
+          "committer": {
+            "email": "chris.oneil@gmail.com",
+            "name": "Chris O'Neil",
+            "username": "jacderida"
+          },
+          "distinct": true,
+          "id": "a98d574b470a5df60ff1ff7c9112b1e6690b34e0",
+          "message": "chore: use the nextest action from maidsafe org\n\nI transferred this action from my own personal namespace to the `maidsafe` organisation.",
+          "timestamp": "2022-05-04T21:22:41+01:00",
+          "tree_id": "ada93f15ba12125acba789c5b5218f235ac5934b",
+          "url": "https://github.com/maidsafe/safe_network/commit/a98d574b470a5df60ff1ff7c9112b1e6690b34e0"
+        },
+        "date": 1651697406306,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10490261051,
+            "range": "± 2894680593",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 4081159613,
+            "range": "± 6536988608",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 9355073366,
+            "range": "± 323948240",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10044509610,
+            "range": "± 2216642064",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3206171800,
+            "range": "± 1180008161",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4744827709,
+            "range": "± 237954335",
             "unit": "ns/iter"
           }
         ]
