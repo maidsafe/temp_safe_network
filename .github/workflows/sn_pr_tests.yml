@@ -452,6 +452,7 @@ jobs:
 
      # if we don't clean up, the .safe folder might persist between runs
       - name: Cleanup self-hosted runner
+        if: always()
         run: |
           killall -9 sn_node
           sleep 10
