@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
 use color_eyre::{Section, SectionExt};
 use eframe::{
@@ -8,7 +8,9 @@ use eframe::{
 use eyre::{eyre, Result, WrapErr};
 use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit};
 use sn_node::{
-    node::{add_connection_info, set_connection_info, project_dirs, Config, Error, EventStream, NodeApi},
+    node::{
+        add_connection_info, project_dirs, set_connection_info, Config, Error, EventStream, NodeApi,
+    },
     LogFormatter,
 };
 use tokio::{
@@ -19,9 +21,21 @@ use tracing::{self, error, info, trace, warn, Level};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::EnvFilter;
 
+fn playground_root_dir() -> PathBuf {
+    let mut root_dir = project_dirs().unwrap();
+    root_dir.push("playground");
+    root_dir
+}
+
 fn main() -> Result<()> {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let _guard = rt.enter();
+
+    tracing_subscriber::fmt::init();
+    if playground_root_dir().exists() {
+        info!("Clearing out old playground {:?}", playground_root_dir());
+        std::fs::remove_dir_all(playground_root_dir()).unwrap();
+    }
 
     // let filter = match EnvFilter::try_from_env("RUST_LOG") {
     //     Ok(filter) => filter,
@@ -36,7 +50,6 @@ fn main() -> Result<()> {
     //         EnvFilter::from_default_env().add_directive(module_filter)
     //     }
     // };
-
 
     // tracing_subscriber::fmt()
     //     .with_thread_names(true)
@@ -74,8 +87,9 @@ struct NodeSupervisor {
 
 impl NodeSupervisor {
     fn new(config: Config) -> Self {
-        Self{
-            config, ..Self::default()
+        Self {
+            config,
+            ..Self::default()
         }
     }
 
@@ -132,37 +146,11 @@ impl NodeSupervisor {
             if ui.button("Start").clicked() {
                 let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
                 let res = Handle::current()
-                    .block_on(async {
-
-                        let filter = match EnvFilter::try_from_env("RUST_LOG") {
-                            Ok(filter) => filter,
-                            // If we have an error (ie RUST_LOG not set or otherwise), we check the verbosity flags
-                            Err(_) => {
-                                // we manually determine level filter instead of using tracing EnvFilter.
-                                let level_filter = Level::TRACE;
-
-                                let module_filter = format!("{}={}", MODULE_NAME, level_filter)
-                                    .parse()
-                                    .wrap_err("BUG: invalid module filter constructed").unwrap();
-                                EnvFilter::from_default_env().add_directive(module_filter)
-                            }
-                        };
-
-
-                        tracing_subscriber::fmt()
-                            .with_thread_names(true)
-                            .with_ansi(false)
-                            .with_env_filter(filter)
-                            .with_target(false)
-                            .event_format(LogFormatter::default())
-                            .init();
-                        NodeApi::new(&self.config, bootstrap_retry_duration)
-                    });
+                    .block_on(NodeApi::new(&self.config, bootstrap_retry_duration));
                 match res {
                     Ok((api, mut event_stream)) => {
                         println!("Started");
                         tokio::task::spawn(async move {
-
                             println!("Started worker thread");
                             while let Some(event) = event_stream.next().await {
                                 println!("Routing event! {:?}", event);
@@ -339,11 +327,11 @@ impl eframe::App for NetworkGui {
                 ui.vertical(|ui| {
                     if ui.button("Spawn Node").clicked() {
                         println!("Spawning node");
-                        let mut root_dir = project_dirs().unwrap();
-                        let new_node_id = format!("node-{}",self.nodes.len());
-                        root_dir.push(new_node_id);
-                        let config = Config{
+                        let mut root_dir = playground_root_dir();
+                        root_dir.push(format!("node-{}", self.nodes.len()));
+                        let config = Config {
                             root_dir: Some(root_dir),
+                            local_addr: Some("127.0.0.1:0".parse().unwrap()),
                             verbose: 4,
                             ..Config::default()
                         };
