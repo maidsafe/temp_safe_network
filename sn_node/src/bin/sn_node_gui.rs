@@ -8,20 +8,43 @@ use eframe::{
 use eyre::{eyre, Result, WrapErr};
 use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit};
 use sn_node::{
-    node::{add_connection_info, set_connection_info, Config, Error, EventStream, NodeApi},
+    node::{add_connection_info, set_connection_info, project_dirs, Config, Error, EventStream, NodeApi},
     LogFormatter,
 };
 use tokio::{
     runtime::{Handle, Runtime},
     time::sleep,
 };
-use tracing::{self, error, info, trace, warn};
+use tracing::{self, error, info, trace, warn, Level};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::EnvFilter;
 
-fn main() {
+fn main() -> Result<()> {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let _guard = rt.enter();
+
+    // let filter = match EnvFilter::try_from_env("RUST_LOG") {
+    //     Ok(filter) => filter,
+    //     // If we have an error (ie RUST_LOG not set or otherwise), we check the verbosity flags
+    //     Err(_) => {
+    //         // we manually determine level filter instead of using tracing EnvFilter.
+    //         let level_filter = Level::TRACE;
+
+    //         let module_filter = format!("{}={}", MODULE_NAME, level_filter)
+    //             .parse()
+    //             .wrap_err("BUG: invalid module filter constructed")?;
+    //         EnvFilter::from_default_env().add_directive(module_filter)
+    //     }
+    // };
+
+
+    // tracing_subscriber::fmt()
+    //     .with_thread_names(true)
+    //     .with_ansi(false)
+    //     .with_env_filter(filter)
+    //     .with_target(false)
+    //     .event_format(LogFormatter::default())
+    //     .init();
 
     let mut options = eframe::NativeOptions::default();
     options.initial_window_size = Some(Vec2::new(800.0, 600.0));
@@ -30,6 +53,8 @@ fn main() {
         options,
         Box::new(|_cc| Box::new(NetworkGui::default())),
     );
+
+    Ok(())
 }
 
 const MODULE_NAME: &str = "sn_node";
@@ -48,6 +73,12 @@ struct NodeSupervisor {
 }
 
 impl NodeSupervisor {
+    fn new(config: Config) -> Self {
+        Self{
+            config, ..Self::default()
+        }
+    }
+
     fn draw(&mut self, ui: &mut Ui) {
         ui.label("node navigator");
         ui.group(|ui| {
@@ -101,11 +132,37 @@ impl NodeSupervisor {
             if ui.button("Start").clicked() {
                 let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
                 let res = Handle::current()
-                    .block_on(NodeApi::new(&self.config, bootstrap_retry_duration));
+                    .block_on(async {
+
+                        let filter = match EnvFilter::try_from_env("RUST_LOG") {
+                            Ok(filter) => filter,
+                            // If we have an error (ie RUST_LOG not set or otherwise), we check the verbosity flags
+                            Err(_) => {
+                                // we manually determine level filter instead of using tracing EnvFilter.
+                                let level_filter = Level::TRACE;
+
+                                let module_filter = format!("{}={}", MODULE_NAME, level_filter)
+                                    .parse()
+                                    .wrap_err("BUG: invalid module filter constructed").unwrap();
+                                EnvFilter::from_default_env().add_directive(module_filter)
+                            }
+                        };
+
+
+                        tracing_subscriber::fmt()
+                            .with_thread_names(true)
+                            .with_ansi(false)
+                            .with_env_filter(filter)
+                            .with_target(false)
+                            .event_format(LogFormatter::default())
+                            .init();
+                        NodeApi::new(&self.config, bootstrap_retry_duration)
+                    });
                 match res {
                     Ok((api, mut event_stream)) => {
                         println!("Started");
                         tokio::task::spawn(async move {
+
                             println!("Started worker thread");
                             while let Some(event) = event_stream.next().await {
                                 println!("Routing event! {:?}", event);
@@ -282,7 +339,15 @@ impl eframe::App for NetworkGui {
                 ui.vertical(|ui| {
                     if ui.button("Spawn Node").clicked() {
                         println!("Spawning node");
-                        self.nodes.push(NodeSupervisor::default());
+                        let mut root_dir = project_dirs().unwrap();
+                        let new_node_id = format!("node-{}",self.nodes.len());
+                        root_dir.push(new_node_id);
+                        let config = Config{
+                            root_dir: Some(root_dir),
+                            verbose: 4,
+                            ..Config::default()
+                        };
+                        self.nodes.push(NodeSupervisor::new(config));
                     }
                 });
             });
