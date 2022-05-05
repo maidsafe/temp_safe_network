@@ -46,6 +46,7 @@ pub use keys::{
 pub use peer::Peer;
 pub use token::Token;
 
+use crate::messaging::MsgId;
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -59,7 +60,11 @@ pub enum ReplicatedData {
     /// A chunk of data.
     Chunk(Chunk),
     /// A single cmd for a register.
-    RegisterWrite(RegisterCmd),
+    RegisterWrite {
+        cmd: RegisterCmd,
+        origin: Peer,
+        msg_id: MsgId,
+    },
     /// An entire op log of a register.
     RegisterLog(ReplicatedRegisterLog),
 }
@@ -69,7 +74,7 @@ impl ReplicatedData {
         match self {
             Self::Chunk(chunk) => *chunk.name(),
             Self::RegisterLog(log) => *log.address.name(),
-            Self::RegisterWrite(cmd) => *cmd.dst_address().name(),
+            Self::RegisterWrite { cmd, .. } => *cmd.dst_address().name(),
         }
     }
 
@@ -77,7 +82,7 @@ impl ReplicatedData {
         match self {
             Self::Chunk(chunk) => ReplicatedDataAddress::Chunk(*chunk.address()),
             Self::RegisterLog(log) => ReplicatedDataAddress::Register(log.address),
-            Self::RegisterWrite(cmd) => ReplicatedDataAddress::Register(cmd.dst_address()),
+            Self::RegisterWrite { cmd, .. } => ReplicatedDataAddress::Register(cmd.dst_address()),
         }
     }
 }

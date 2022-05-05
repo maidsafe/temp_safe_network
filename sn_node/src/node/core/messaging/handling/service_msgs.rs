@@ -178,7 +178,11 @@ impl Node {
         // extract the data from the request
         let data = match msg {
             // These reads/writes are for adult nodes...
-            ServiceMsg::Cmd(DataCmd::Register(cmd)) => ReplicatedData::RegisterWrite(cmd),
+            ServiceMsg::Cmd(DataCmd::Register(cmd)) => ReplicatedData::RegisterWrite {
+                cmd,
+                origin,
+                msg_id,
+            },
             ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => ReplicatedData::Chunk(chunk),
             ServiceMsg::Query(query) => {
                 return self
@@ -186,7 +190,10 @@ impl Node {
                     .await
             }
             _ => {
-                warn!("!!!! Unexpected ServiceMsg received in routing. Was not sent to node layer: {:?}", msg);
+                warn!(
+                    "!!!! Unexpected ServiceMsg received, and it was not handled: {:?}",
+                    msg
+                );
                 return Ok(vec![]);
             }
         };
@@ -203,6 +210,7 @@ impl Node {
             return self.send_cmd_error_response(error, origin, msg_id).await;
         }
         cmds.extend(self.send_cmd_ack(origin, msg_id).await?);
+
         Ok(cmds)
     }
 

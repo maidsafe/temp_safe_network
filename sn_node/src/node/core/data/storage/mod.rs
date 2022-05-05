@@ -66,7 +66,7 @@ impl DataStorage {
                     .update(RegisterStoreExport(vec![data]))
                     .await?
             }
-            ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd).await?,
+            ReplicatedData::RegisterWrite { cmd, .. } => self.registers.write(cmd).await?,
         };
 
         // check if we've filled another approx. 10%-points of our storage

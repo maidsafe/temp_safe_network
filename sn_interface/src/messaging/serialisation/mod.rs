@@ -144,6 +144,7 @@ impl MsgType {
             MsgType::System {
                 msg:
                     SystemMsg::NodeCmd(_)
+                    | SystemMsg::NodeEvent(NodeEvent::ReportToOrigin { .. })
                     | SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData { .. })
                     | SystemMsg::NodeQuery(_)
                     | SystemMsg::NodeQueryResponse { .. },

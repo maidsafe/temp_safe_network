@@ -59,13 +59,13 @@ impl Safe {
 
         // The Register's owner will be the client's public key
         let client = self.get_safe_client()?;
-        let my_pk = User::Key(client.public_key());
+        let owner = User::Key(client.public_key());
 
         // Store the Register on the network
         let policy = if private {
-            private_policy(my_pk)
+            private_policy(owner)
         } else {
-            public_policy(my_pk)
+            public_policy(owner)
         };
 
         let (_, op_batch) = client
@@ -200,7 +200,24 @@ impl Safe {
         }
 
         let client = self.get_safe_client()?;
-        let (entry_hash, op_batch) = client.write_to_register(address, entry, parents).await?;
+        let (entry_hash, op_batch) = match client.write_to_register(address, entry, parents).await {
+            Ok(data) => data,
+            Err(ClientError::ErrorMsg {
+                source: ErrorMsg::AccessDenied(_),
+                ..
+            }) => {
+                return Err(Error::AccessDenied(format!(
+                    "Couldn't write data on Register found at \"{}\"",
+                    url
+                )));
+            }
+            Err(err) => {
+                return Err(Error::NetDataError(format!(
+                    "Failed to write data on Register: {:?}",
+                    err
+                )))
+            }
+        };
 
         client.publish_register_ops(op_batch).await?;
 
@@ -236,8 +253,8 @@ fn public_policy(owner: User) -> Policy {
 
 #[cfg(test)]
 mod tests {
-    use crate::{app::test_helpers::new_safe_instance, ContentType};
-    use anyhow::Result;
+    use crate::{app::test_helpers::new_safe_instance, ContentType, Error};
+    use anyhow::{bail, Result};
 
     #[tokio::test]
     async fn test_register_create() -> Result<()> {
@@ -271,5 +288,65 @@ mod tests {
         assert_eq!(received_entry_priv, initial_data);
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_register_create_twice_fails() -> Result<()> {
+        let safe = new_safe_instance().await?;
+
+        let xorname = xor_name::rand::random();
+        let xorurl_priv = safe
+            .register_create(
+                Some(xorname),
+                25_000,
+                /*private=*/ true,
+                ContentType::Raw,
+            )
+            .await?;
+
+        let xorurl = safe
+            .register_create(Some(xorname), 25_000, false, ContentType::Raw)
+            .await?;
+
+        let received_data_priv = safe.register_read(&xorurl_priv).await?;
+        let received_data = safe.register_read(&xorurl).await?;
+
+        assert!(received_data_priv.is_empty());
+        assert!(received_data.is_empty());
+
+        // now we check that trying to create the same Registers with different owner shall fail
+        let safe = new_safe_instance().await?;
+
+        match safe
+            .register_create(Some(xorname), 25_000, true, ContentType::Raw)
+            .await
+        {
+            Err(Error::AccessDenied(msg)) => {
+                assert_eq!(
+                    msg,
+                    format!(
+                        "Couldn't write data on Register found at \"{}\"",
+                        xorurl_priv
+                    )
+                );
+            }
+            Err(err) => bail!("Error returned is not the expected: {:?}", err),
+            Ok(_) => bail!("Creation of private Register succeeded unexpectedly".to_string()),
+        }
+
+        match safe
+            .register_create(Some(xorname), 25_000, false, ContentType::Raw)
+            .await
+        {
+            Err(Error::AccessDenied(msg)) => {
+                assert_eq!(
+                    msg,
+                    format!("Couldn't write data on Register found at \"{}\"", xorurl)
+                );
+                Ok(())
+            }
+            Err(err) => bail!("Error returned is not the expected: {:?}", err),
+            Ok(_) => bail!("Creation of public Register succeeded unexpectedly".to_string()),
+        }
     }
 }

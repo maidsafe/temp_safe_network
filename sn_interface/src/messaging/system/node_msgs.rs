@@ -8,13 +8,14 @@
 
 use crate::messaging::{
     data::{
-        DataCmd, DataQuery, MetadataExchange, OperationId, QueryResponse, Result, StorageLevel,
+        DataCmd, DataQuery, Error, MetadataExchange, OperationId, QueryResponse, Result,
+        StorageLevel,
     },
     EndUser, MsgId, ServiceAuth,
 };
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
-    Chunk, PublicKey, ReplicatedData, ReplicatedDataAddress,
+    Chunk, Peer, PublicKey, ReplicatedData, ReplicatedDataAddress,
 };
 
 use serde::{Deserialize, Serialize};
@@ -70,6 +71,16 @@ pub enum NodeEvent {
         data: ReplicatedData,
         /// Whether store failed due to full
         full: bool,
+    },
+    #[cfg(any(feature = "chunks", feature = "registers"))]
+    /// Sent by an Adult, and tells the Elders to report it to the client/origin
+    ReportToOrigin {
+        /// The peer that sent the request the Adult is reporting the error about
+        origin: Peer,
+        /// Error reported by the Adult
+        error: Error,
+        /// Id of the message sent from origin
+        correlation_id: MsgId,
     },
     /// Inform Adults of a possible suspect node
     SuspiciousNodesDetected(BTreeSet<XorName>),

@@ -21,7 +21,7 @@ mod update_section;
 
 pub(crate) use proposals::handle_proposal;
 
-use crate::dbs::Error as DbError;
+use crate::dbs::{convert_to_error_msg, Error as DbError};
 use crate::node::{
     api::cmds::Cmd,
     core::{DkgSessionInfo, Node, Proposal as CoreProposal, DATA_QUERY_LIMIT},
@@ -29,7 +29,7 @@ use crate::node::{
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
 };
 use sn_interface::messaging::{
-    data::{ServiceMsg, StorageLevel},
+    data::{CmdError, ServiceMsg, StorageLevel},
     signature_aggregator::Error as AggregatorError,
     system::{
         JoinResponse, NodeCmd, NodeEvent, NodeMsgAuthorityUtils, NodeQuery,
@@ -38,7 +38,7 @@ use sn_interface::messaging::{
     AuthorityProof, DstLocation, MsgId, MsgType, NodeMsgAuthority, SectionAuth, WireMsg,
 };
 use sn_interface::network_knowledge::NetworkKnowledge;
-use sn_interface::types::{log_markers::LogMarker, Peer, PublicKey};
+use sn_interface::types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData};
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
@@ -648,7 +648,7 @@ impl Node {
                     "Processing CouldNotStoreData event with MsgId: {:?}",
                     msg_id
                 );
-                return if self.is_elder().await {
+                if self.is_elder().await {
                     if full {
                         let changed = self
                             .set_storage_level(&node_id, StorageLevel::from(StorageLevel::MAX)?)
@@ -662,7 +662,27 @@ impl Node {
                 } else {
                     error!("Received unexpected message while Adult");
                     Ok(vec![])
-                };
+                }
+            }
+            SystemMsg::NodeEvent(NodeEvent::ReportToOrigin {
+                origin,
+                error,
+                correlation_id,
+            }) => {
+                if self.is_elder().await {
+                    info!(
+                        "Processing ReportToOrigin event with correlation id {:?}, origin: {}, Adult: {}: {:?}",
+                        correlation_id, origin, sender, error
+                    );
+                    self.send_cmd_error_response(CmdError::Data(error), origin, correlation_id)
+                        .await
+                } else {
+                    error!(
+                        "Received unexpected ReportToOrigin message while Adult from {}",
+                        sender
+                    );
+                    Ok(vec![])
+                }
             }
             SystemMsg::NodeEvent(NodeEvent::SuspiciousNodesDetected(suspects)) => {
                 info!(
@@ -679,7 +699,6 @@ impl Node {
                     Ok(vec![])
                 } else {
                     let mut cmds = vec![];
-
                     for data in data_collection {
                         // We are an adult here, so just store away!
                         // This may return a DatabaseFull error... but we should have reported storage increase
@@ -689,27 +708,37 @@ impl Node {
                                 info!("Storage level report: {:?}", level_report);
                                 cmds.extend(self.record_storage_level_if_any(level_report).await);
                             }
-                            Err(error) => {
-                                match error {
-                                    DbError::NotEnoughSpace => {
-                                        // db full
-                                        error!("Not enough space to store more data");
+                            Err(DbError::NotEnoughSpace) => {
+                                // db full
+                                error!("Not enough space to store more data");
 
-                                        let node_id =
-                                            PublicKey::from(self.info.read().await.keypair.public);
-                                        let msg =
-                                            SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
-                                                node_id,
-                                                data,
-                                                full: true,
-                                            });
+                                let node_id =
+                                    PublicKey::from(self.info.read().await.keypair.public);
+                                let msg = SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
+                                    node_id,
+                                    data,
+                                    full: true,
+                                });
 
-                                        cmds.push(self.send_msg_to_our_elders(msg).await?)
-                                    }
-                                    _ => {
-                                        error!("Problem storing data, but it was ignored: {error}");
-                                    } // the rest seem to be non-problematic errors.. (?)
+                                cmds.push(self.send_msg_to_our_elders(msg).await?)
+                            }
+                            Err(error @ DbError::NetworkData(_)) => {
+                                // If this was a Register command from a client, we report it
+                                // back to the Elder so it can in turn send it to the client.
+                                if let ReplicatedData::RegisterWrite { origin, msg_id, .. } = data {
+                                    let msg = SystemMsg::NodeEvent(NodeEvent::ReportToOrigin {
+                                        origin,
+                                        error: convert_to_error_msg(error),
+                                        correlation_id: msg_id,
+                                    });
+                                    cmds.push(self.send_msg_to_our_elders(msg).await?)
+                                } else {
+                                    error!("Problem storing data, error that was ignored: {error}");
                                 }
+                            }
+                            Err(other) => {
+                                // the rest seem to be non-problematic errors.. (?)
+                                error!("Problem storing data, error that was ignored: {other}");
                             }
                         }
                     }
