@@ -145,7 +145,7 @@ jobs:
 
       - name: Run sn_interface tests
         timeout-minutes: 25
-        uses: jacderida/cargo-nextest@main
+        uses: maidsafe/cargo-nextest@main
         with:
           test-run-name: unit-tests-${{ matrix.os }}
           profile: ci
@@ -157,7 +157,7 @@ jobs:
 
       - name: Run sn_dysfunction unit tests
         timeout-minutes: 5
-        uses: jacderida/cargo-nextest@main
+        uses: maidsafe/cargo-nextest@main
         with:
           test-run-name: dysfunction-unit-tests-${{ matrix.os }}
           profile: ci
@@ -167,7 +167,7 @@ jobs:
 
       - name: Run node unit tests
         timeout-minutes: 15
-        uses: jacderida/cargo-nextest@main
+        uses: maidsafe/cargo-nextest@main
         with:
           test-run-name: unit-tests-${{ matrix.os }}
           profile: ci
@@ -178,7 +178,7 @@ jobs:
           filters: "dbs node routing"
 
       - name: Run CLI unit tests
-        uses: jacderida/cargo-nextest@main
+        uses: maidsafe/cargo-nextest@main
         timeout-minutes: 25
         with:
           test-run-name: cli-unit-tests-${{ matrix.os }}
@@ -259,7 +259,7 @@ jobs:
         if: matrix.os != 'windows-latest'
 
       - name: Run client tests
-        uses: jacderida/cargo-nextest@main
+        uses: maidsafe/cargo-nextest@main
         with:
           test-run-name: e2e-client-${{ matrix.os }}
           profile: ci
@@ -271,7 +271,7 @@ jobs:
         timeout-minutes: 25
 
       - name: Run AE tests
-        uses: jacderida/cargo-nextest@main
+        uses: maidsafe/cargo-nextest@main
         with:
           test-run-name: e2e-ae-${{ matrix.os }}
           profile: ci
@@ -392,7 +392,7 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
       - name: Run client tests
-        uses: jacderida/cargo-nextest@main
+        uses: maidsafe/cargo-nextest@main
         with:
           test-run-name: e2e-split-client-self-hosted-ubuntu
           profile: ci
@@ -404,7 +404,7 @@ jobs:
         timeout-minutes: 25
 
       - name: Run AE tests
-        uses: jacderida/cargo-nextest@main
+        uses: maidsafe/cargo-nextest@main
         with:
           test-run-name: e2e-split-ae-self-hosted-ubuntu
           profile: ci
@@ -447,6 +447,7 @@ jobs:
 
      # if we don't clean up, the .safe folder might persist between runs
       - name: Cleanup self-hosted runner
+        if: always()
         run: |
           killall -9 sn_node
           sleep 10
@@ -523,7 +524,7 @@ jobs:
         if: matrix.os != 'windows-latest'
 
       - name: Run API tests
-        uses: jacderida/cargo-nextest@main
+        uses: maidsafe/cargo-nextest@main
         with:
           test-run-name: api-${{ matrix.os }}
           profile: ci
@@ -636,7 +637,7 @@ jobs:
         run: cargo run --package sn_cli --release -- keys create --for-cli
 
       - name: Run CLI tests
-        uses: jacderida/cargo-nextest@main
+        uses: maidsafe/cargo-nextest@main
         with:
           test-run-name: cli-${{ matrix.os }}
           profile: ci

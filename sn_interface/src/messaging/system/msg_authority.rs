@@ -6,12 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::messaging::{NodeMsgAuthority, SrcLocation};
+use crate::types::keys::ed25519::{self};
 use bls::PublicKey as BlsPublicKey;
-use sn_interface::messaging::{NodeMsgAuthority, SrcLocation};
-use sn_interface::types::keys::ed25519::{self};
 use xor_name::XorName;
 
-pub(crate) trait NodeMsgAuthorityUtils {
+pub trait NodeMsgAuthorityUtils {
     fn src_location(&self) -> SrcLocation;
 
     fn name(&self) -> XorName;

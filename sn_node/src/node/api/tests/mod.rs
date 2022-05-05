@@ -18,14 +18,15 @@ use crate::node::{
         RESOURCE_PROOF_DIFFICULTY,
     },
     create_test_max_capacity_and_root_storage,
-    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
+    messages::WireMsgUtils,
     Error, Event, Result as RoutingResult,
 };
 use sn_interface::elder_count;
 use sn_interface::messaging::{
     system::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState,
-        NodeState as NodeStateMsg, RelocateDetails, ResourceProofResponse, SectionAuth, SystemMsg,
+        NodeMsgAuthorityUtils, NodeState as NodeStateMsg, RelocateDetails, ResourceProofResponse,
+        SectionAuth, SystemMsg,
     },
     AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, NodeAuth,
     SectionAuth as MsgKindSectionAuth, WireMsg,
