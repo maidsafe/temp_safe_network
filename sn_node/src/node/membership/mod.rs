@@ -324,7 +324,7 @@ impl Membership {
             .validate_signature(&self.consensus.elders)
             .is_err()
         {
-            // it's not for us, bail out
+            error!("Membership - dropping signed vote that was not signed by current elders");
             return Ok(false);
         }
 
