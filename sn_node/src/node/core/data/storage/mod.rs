@@ -247,10 +247,9 @@ mod tests {
     use eyre::Result;
     use proptest::{
         collection::SizeRange,
-        prelude::{prop_oneof, proptest, Just},
+        prelude::{any, prop_oneof, proptest},
         strategy::Strategy,
     };
-    use rand::Rng;
     use sn_interface::messaging::data::DataQuery;
     use sn_interface::messaging::system::NodeQueryResponse;
     use sn_interface::types::register::User;
@@ -316,8 +315,8 @@ mod tests {
         Ok(())
     }
 
-    /// Model-based testing where random sets of Operations are performed on the Storage module and
-    /// a hashmap. The behaviour of both the models should be identical.
+    // Model-based testing where random sets of Operations are performed on the Storage module and
+    // a hashmap. The behaviour of both the models should be identical.
     proptest! {
         #[test]
         fn model_based_test(ops in arbitrary_ops(0..MAX_N_OPS)){
@@ -327,33 +326,27 @@ mod tests {
 
     #[derive(Clone, Debug)]
     enum Op {
-        Store(Box<ReplicatedData>),
-        Query,
-        Get,
-        Remove,
+        Store(usize, usize),
+        Query(usize),
+        Get(usize),
+        Remove(usize),
     }
 
     fn arbitrary_single_op() -> impl Strategy<Value = Op> {
         prop_oneof![
-            (CHUNK_MIN..CHUNK_MAX).prop_map(|size| {
-                let chunk = Chunk::new(random_bytes(size * 1024 * 1024));
-                Op::Store(Box::new(ReplicatedData::Chunk(chunk)))
-            }),
-            Just(Op::Query),
-            Just(Op::Get),
-            Just(Op::Remove)
+            (any::<usize>(), CHUNK_MIN..CHUNK_MAX)
+                .prop_map(|(flag, chunk_size)| Op::Store(flag, chunk_size)),
+            any::<usize>().prop_map(Op::Query),
+            any::<usize>().prop_map(Op::Get),
+            any::<usize>().prop_map(Op::Remove),
         ]
     }
     fn arbitrary_ops(count: impl Into<SizeRange>) -> impl Strategy<Value = Vec<Op>> {
         proptest::collection::vec(arbitrary_single_op(), count)
     }
 
-    fn get_random_key(model: &BTreeMap<XorName, ReplicatedData>) -> XorName {
-        let mut rng = rand::thread_rng();
-        let size = max(model.len(), 1);
-        // +1 to get None in get_index
-        let rand = rng.gen_range(0, size + 1);
-        match model.iter().nth(rand) {
+    fn get_xor_name(model: &BTreeMap<XorName, ReplicatedData>, idx: usize) -> XorName {
+        match model.iter().nth(idx) {
             Some((xor_name, _)) => *xor_name,
             None => xor_name::rand::random(),
         }
@@ -366,23 +359,42 @@ mod tests {
         let used_space = UsedSpace::new(usize::MAX);
         let runtime = Runtime::new().unwrap();
         let storage = DataStorage::new(path, used_space).unwrap();
-
         for op in ops.into_iter() {
             match op {
-                Op::Store(data) => {
-                    let data = *data;
+                Op::Store(flag, chunk_size) => {
+                    let data = match flag.rem_euclid(2) {
+                        // get bytes from hashmap
+                        0 => {
+                            let size = max(model.len(), 1);
+                            match model.get(&get_xor_name(&model, flag % size)) {
+                                Some(data) => data.clone(),
+                                // when hashmap is empty, xor_name is random, get random_bytes
+                                None => {
+                                    let chunk = Chunk::new(random_bytes(chunk_size * 1024 * 1024));
+                                    ReplicatedData::Chunk(chunk)
+                                }
+                            }
+                        }
+                        // random bytes
+                        _ => {
+                            let chunk = Chunk::new(random_bytes(chunk_size * 1024 * 1024));
+                            ReplicatedData::Chunk(chunk)
+                        }
+                    };
                     let _ = runtime.block_on(storage.store(&data)).unwrap();
+                    // If Get/Query is performed just after a Store op, half-written data is returned
+                    // Adding some delay fixes it
+                    thread::sleep(Duration::from_millis(15));
+
                     if let ReplicatedData::Chunk(chunk) = &data {
                         let _ = model.insert(*chunk.name(), data);
-                        // If Get/Query is performed just after a Store op, half-written data is returned
-                        // adding some delay fixes it
-                        thread::sleep(Duration::from_millis(15));
                     } else {
                         return Err("Cannot be reached");
                     }
                 }
-                Op::Query => {
-                    let key = get_random_key(&model);
+                Op::Query(idx) => {
+                    // +1 for a chance to get random xor_name
+                    let key = get_xor_name(&model, idx % (model.len() + 1));
                     let query = DataQuery::GetChunk(ChunkAddress(key));
                     let user = User::Anyone;
                     let stored_res = runtime.block_on(storage.query(&query, user));
@@ -405,8 +417,8 @@ mod tests {
                         }
                     }
                 }
-                Op::Get => {
-                    let key = get_random_key(&model);
+                Op::Get(idx) => {
+                    let key = get_xor_name(&model, idx % (model.len() + 1));
                     let addr = ReplicatedDataAddress::Chunk(ChunkAddress(key));
                     let stored_data = runtime.block_on(storage.get_from_local_store(&addr));
                     let model_data = model.get(&key);
@@ -419,7 +431,6 @@ mod tests {
                                 return Err("Cannot get ReplicatedData");
                             }
                         }
-                        // when random key is used
                         None => {
                             if stored_data.is_ok() {
                                 return Err("ReplicatedData found while it should not exist");
@@ -427,8 +438,8 @@ mod tests {
                         }
                     }
                 }
-                Op::Remove => {
-                    let key = get_random_key(&model);
+                Op::Remove(idx) => {
+                    let key = get_xor_name(&model, idx % (model.len() + 1));
                     let addr = ReplicatedDataAddress::Chunk(ChunkAddress(key));
                     let _ = runtime.block_on(storage.remove(&addr));
                     let _ = model.remove(&key);
