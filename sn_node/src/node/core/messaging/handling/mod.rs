@@ -539,9 +539,7 @@ impl Node {
             }
             SystemMsg::MembershipVotes(votes) => {
                 let mut cmds = vec![];
-                for vote in votes {
-                    cmds.extend(self.handle_membership_vote(sender, vote).await?);
-                }
+                cmds.extend(self.handle_membership_votes(sender, votes).await?);
 
                 Ok(cmds)
             }
