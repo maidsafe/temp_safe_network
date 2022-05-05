@@ -134,6 +134,9 @@ pub enum Error {
     /// Data owner provided is invalid.
     #[error("Provided PublicKey is not a valid owner. Provided PublicKey: {0}")]
     InvalidOwner(PublicKey),
+    /// Signature verification failed
+    #[error("Invalid signature")]
+    InvalidSignature,
     /// Configuration error.
     #[error("Configuration error: {0}")]
     Configuration(String),
