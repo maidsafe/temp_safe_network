@@ -381,14 +381,12 @@ impl Node {
                 }
             }
             Err(_) => {
-
                 trace!(
                     "Anti-Entropy: cannot find dst_section_key {:?} sent by {} in our chain",
                     dst_section_key,
                     sender
                 );
 
-                match
                 let proof_chain = self.network_knowledge.section_chain().await;
 
                 let signed_sap = self

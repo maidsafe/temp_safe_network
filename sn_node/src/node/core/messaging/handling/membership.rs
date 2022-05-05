@@ -11,7 +11,7 @@ use std::vec;
 
 use sn_consensus::{Generation, SignedVote, VoteResponse};
 use sn_interface::messaging::system::{KeyedSig, NodeState, SectionAuth, SystemMsg};
-use sn_interface::types::{Peer, log_markers::LogMarker};
+use sn_interface::types::{log_markers::LogMarker, Peer};
 
 use crate::node::api::cmds::Cmd;
 use crate::node::core::{Node, Result};
@@ -52,7 +52,10 @@ impl Node {
         peer: Peer,
         signed_votes: Vec<SignedVote<NodeState>>,
     ) -> Result<Vec<Cmd>> {
-        debug!("{:?} {signed_votes:?} from {peer}", LogMarker::MembershipVotesBeingHandled);
+        debug!(
+            "{:?} {signed_votes:?} from {peer}",
+            LogMarker::MembershipVotesBeingHandled
+        );
         let prefix = self.network_knowledge.prefix().await;
 
         let mut cmds = vec![];
@@ -139,7 +142,9 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         debug!(
             "{:?} membership anti-entropy request for gen {:?} from {}",
-            LogMarker::MembershipAeRequestReceived, gen, peer
+            LogMarker::MembershipAeRequestReceived,
+            gen,
+            peer
         );
 
         let cmds = if let Some(membership) = self.membership.read().await.as_ref() {
