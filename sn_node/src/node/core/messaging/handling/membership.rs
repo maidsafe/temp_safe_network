@@ -93,7 +93,8 @@ impl Node {
                         return Ok(cmds);
                     }
                     Err(e) => {
-                        error!("Membership - error while processing vote {e:?}, dropping");
+                        error!("Membership - error while processing vote {e:?}, dropping this and all votes in this batch thereafter");
+                        break;
                     }
                 };
 
