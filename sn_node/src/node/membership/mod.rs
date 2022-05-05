@@ -313,11 +313,21 @@ impl Membership {
         Ok(self.consensus.cast_vote(signed_vote)?)
     }
 
+    /// Returns true if the proposal is valid
     fn validate_proposals(
         &self,
         signed_vote: &SignedVote<NodeState>,
         prefix: &Prefix,
     ) -> Result<bool> {
+        // check we're section the vote is for our current membership state
+        if signed_vote
+            .validate_signature(&self.consensus.elders)
+            .is_err()
+        {
+            // it's not for us, bail out
+            return Ok(false);
+        }
+
         // ensure we have a consensus instance for this votes generations
         if self.consensus_at_gen(signed_vote.vote.gen).is_err() {
             error!(
