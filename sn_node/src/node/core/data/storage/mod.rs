@@ -245,7 +245,6 @@ mod tests {
     use crate::node::core::data::DataStorage;
     use crate::UsedSpace;
     use eyre::Result;
-    use indexmap::IndexMap;
     use proptest::{
         collection::SizeRange,
         prelude::{prop_oneof, proptest, Just},
@@ -258,6 +257,7 @@ mod tests {
     use sn_interface::types::utils::random_bytes;
     use sn_interface::types::{Chunk, ChunkAddress, ReplicatedData, ReplicatedDataAddress};
     use std::cmp::max;
+    use std::collections::BTreeMap;
     use std::{thread, time::Duration};
     use tempfile::tempdir;
     use tokio::runtime::Runtime;
@@ -316,19 +316,21 @@ mod tests {
         Ok(())
     }
 
+    /// Model-based testing where random sets of Operations are performed on the Storage module and
+    /// a hashmap. The behaviour of both the models should be identical.
+    proptest! {
+        #[test]
+        fn model_based_test(ops in arbitrary_ops(0..MAX_N_OPS)){
+            model_based_test_imp(ops).unwrap();
+        }
+    }
+
     #[derive(Clone, Debug)]
     enum Op {
         Store(Box<ReplicatedData>),
         Query,
         Get,
         Remove,
-    }
-
-    proptest! {
-        #[test]
-        fn model_based_test(ops in arbitrary_ops(0..MAX_N_OPS)){
-            model_based_test_imp(ops).unwrap();
-        }
     }
 
     fn arbitrary_single_op() -> impl Strategy<Value = Op> {
@@ -346,19 +348,19 @@ mod tests {
         proptest::collection::vec(arbitrary_single_op(), count)
     }
 
-    fn get_random_key(model: &IndexMap<XorName, ReplicatedData>) -> XorName {
+    fn get_random_key(model: &BTreeMap<XorName, ReplicatedData>) -> XorName {
         let mut rng = rand::thread_rng();
         let size = max(model.len(), 1);
         // +1 to get None in get_index
         let rand = rng.gen_range(0, size + 1);
-        match model.get_index(rand) {
+        match model.iter().nth(rand) {
             Some((xor_name, _)) => *xor_name,
             None => xor_name::rand::random(),
         }
     }
 
     fn model_based_test_imp(ops: Vec<Op>) -> Result<(), &'static str> {
-        let mut model: IndexMap<XorName, ReplicatedData> = IndexMap::new();
+        let mut model: BTreeMap<XorName, ReplicatedData> = BTreeMap::new();
         let temp_dir = tempdir().unwrap();
         let path = temp_dir.path();
         let used_space = UsedSpace::new(usize::MAX);
@@ -370,9 +372,8 @@ mod tests {
                 Op::Store(data) => {
                     let data = *data;
                     let _ = runtime.block_on(storage.store(&data)).unwrap();
-                    let data_copy = data.clone();
-                    if let ReplicatedData::Chunk(chunk) = data {
-                        let _ = model.insert(*chunk.name(), data_copy);
+                    if let ReplicatedData::Chunk(chunk) = &data {
+                        let _ = model.insert(*chunk.name(), data);
                         // If Get/Query is performed just after a Store op, half-written data is returned
                         // adding some delay fixes it
                         thread::sleep(Duration::from_millis(15));
