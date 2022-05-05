@@ -25,6 +25,12 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug, Error)]
 #[allow(missing_docs)]
 pub enum Error {
+    // We shortcircuit and ignore older len prefixes to avoid that
+    // during a split DKG messages are still ongoing post-split
+    // and are sent to the neighbouring section, which causes an AE loop as
+    // section keys are not in chain.
+    #[error("Dkg prefix is shorter than our prefix, so dropping the message.")]
+    InvalidDkgPrefix,
     #[error("Max amount of service cmds being handled, dropping cmd.")]
     AtMaxServiceCmdThroughput,
     #[error("Permit was not retrieved in 500 loops")]

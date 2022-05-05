@@ -537,7 +537,12 @@ impl Node {
                 self.handle_join_as_relocated_request(sender, *join_request, known_keys)
                     .await
             }
-            SystemMsg::MembershipVote(vote) => self.handle_membership_vote(sender, vote).await,
+            SystemMsg::MembershipVotes(votes) => {
+                let mut cmds = vec![];
+                cmds.extend(self.handle_membership_votes(sender, votes).await?);
+
+                Ok(cmds)
+            }
             SystemMsg::MembershipAE(gen) => self.handle_membership_anti_entropy(sender, gen).await,
             SystemMsg::Propose {
                 proposal,
