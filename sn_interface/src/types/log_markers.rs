@@ -34,6 +34,10 @@ pub enum LogMarker {
     // Messaging
     ServiceMsgToBeHandled,
     SystemMsgToBeHandled,
+    // Membership
+    MembershipVotesBeingHandled,
+    MembershipSendingAeUpdateRequest,
+    MembershipAeRequestReceived,
     // Data
     DataStoreReceivedAtElder,
     DataQueryReceviedAtElder,

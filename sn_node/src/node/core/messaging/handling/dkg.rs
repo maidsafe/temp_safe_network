@@ -86,6 +86,10 @@ impl Node {
             sender
         );
 
+        if session_id.prefix.bit_count() < self.network_knowledge.prefix().await.bit_count() {
+            return Err(Error::InvalidDkgPrefix);
+        }
+
         self.dkg_voter
             .process_msg(
                 sender,
