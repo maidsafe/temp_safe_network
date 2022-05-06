@@ -17,7 +17,7 @@ use sn_interface::messaging::{
         JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, SectionAuth,
         SystemMsg,
     },
-    DstLocation, MsgKind, MsgType, NodeAuth, WireMsg,
+    AuthKind, DstLocation, MsgType, NodeAuth, WireMsg,
 };
 use sn_interface::network_knowledge::{
     prefix_map::NetworkPrefixMap, NetworkKnowledge, NodeInfo, SectionAuthUtils, MIN_ADULT_AGE,
@@ -435,8 +435,8 @@ impl<'a> Join<'a> {
                 MsgEvent::Received {
                     sender, wire_msg, ..
                 } => match wire_msg.msg_kind() {
-                    MsgKind::ServiceMsg(_) => continue,
-                    MsgKind::NodeBlsShareAuthMsg(_) => {
+                    AuthKind::Service(_) => continue,
+                    AuthKind::NodeBlsShare(_) => {
                         trace!(
                             "Bootstrap message discarded: sender: {:?} wire_msg: {:?}",
                             sender,
@@ -444,7 +444,7 @@ impl<'a> Join<'a> {
                         );
                         continue;
                     }
-                    MsgKind::NodeAuthMsg(NodeAuth { .. }) => match wire_msg.into_msg() {
+                    AuthKind::Node(NodeAuth { .. }) => match wire_msg.into_msg() {
                         Ok(MsgType::System {
                             msg: SystemMsg::JoinResponse(resp),
                             ..

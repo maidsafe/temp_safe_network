@@ -11,10 +11,11 @@ use std::vec;
 
 use sn_consensus::{Generation, SignedVote, VoteResponse};
 use sn_interface::messaging::system::{KeyedSig, NodeState, SectionAuth, SystemMsg};
-use sn_interface::types::Peer;
+use sn_interface::types::{log_markers::LogMarker, Peer};
 
 use crate::node::api::cmds::Cmd;
 use crate::node::core::{Node, Result};
+use crate::node::membership;
 
 // Message handling
 impl Node {
@@ -37,7 +38,7 @@ impl Node {
             };
 
             let cmds = self
-                .send_msg_to_our_elders(SystemMsg::MembershipVote(membership_vote))
+                .send_msg_to_our_elders(SystemMsg::MembershipVotes(vec![membership_vote]))
                 .await?;
             Ok(vec![cmds])
         } else {
@@ -46,74 +47,91 @@ impl Node {
         }
     }
 
-    pub(crate) async fn handle_membership_vote(
+    pub(crate) async fn handle_membership_votes(
         &self,
         peer: Peer,
-        signed_vote: SignedVote<NodeState>,
+        signed_votes: Vec<SignedVote<NodeState>>,
     ) -> Result<Vec<Cmd>> {
-        debug!("Membership - Received vote {signed_vote:?} from {peer}");
+        debug!(
+            "{:?} {signed_votes:?} from {peer}",
+            LogMarker::MembershipVotesBeingHandled
+        );
         let prefix = self.network_knowledge.prefix().await;
 
-        let cmds = if let Some(membership) = self.membership.write().await.as_mut() {
-            let mut cmds = match membership.handle_signed_vote(signed_vote, &prefix) {
-                Ok(VoteResponse::Broadcast(response_vote)) => {
-                    vec![
-                        self.send_msg_to_our_elders(SystemMsg::MembershipVote(response_vote))
-                            .await?,
-                    ]
-                }
-                Ok(VoteResponse::WaitingForMoreVotes) => vec![],
-                Err(e) => {
-                    error!("Membership - Error while processing vote {e:?}, requesting AE");
-                    // We hit an error while processing this vote, perhaps we are missing information.
-                    // We'll send a membership AE request to see if they can help us catch up.
-                    let sap = self.network_knowledge.authority_provider().await;
-                    let dst_section_pk = sap.section_key();
-                    let section_name = prefix.name();
-                    let msg = SystemMsg::MembershipAE(membership.generation());
-                    let cmd = self
-                        .send_direct_msg_to_nodes(vec![peer], msg, section_name, dst_section_pk)
-                        .await?;
-                    vec![cmd]
-                }
-            };
+        let mut cmds = vec![];
 
-            // TODO: We should be able to detect when a *new* decision is made
-            //       As it stands, we will reprocess each decision for any new vote
-            //       we receive, it should be safe to do as `HandleNewNodeOnline`
-            //       should be idempotent.
-            if let Some(decision) = membership.most_recent_decision() {
-                // process the membership change
-                info!(
-                    "Handling Membership Decision {:?}",
-                    BTreeSet::from_iter(decision.proposals.keys())
-                );
-                for (state, signature) in &decision.proposals {
-                    let sig = KeyedSig {
-                        public_key: membership.voters_public_key_set().public_key(),
-                        signature: signature.clone(),
-                    };
-                    if membership.is_leaving_section(state, prefix) {
-                        cmds.push(Cmd::HandleNodeLeft(SectionAuth {
-                            value: state.clone(),
-                            sig,
-                        }));
-                    } else {
-                        cmds.push(Cmd::HandleNewNodeOnline(SectionAuth {
-                            value: state.clone(),
-                            sig,
-                        }));
+        for signed_vote in signed_votes {
+            if let Some(membership) = self.membership.write().await.as_mut() {
+                match membership.handle_signed_vote(signed_vote, &prefix) {
+                    Ok(VoteResponse::Broadcast(response_vote)) => {
+                        cmds.push(
+                            self.send_msg_to_our_elders(SystemMsg::MembershipVotes(vec![
+                                response_vote,
+                            ]))
+                            .await?,
+                        );
+                    }
+                    Ok(VoteResponse::WaitingForMoreVotes) => {
+                        //do nothing
+                    }
+                    Err(membership::Error::RequestAntiEntropy) => {
+                        debug!("Membership - We are behind the voter, requesting AE");
+                        // We hit an error while processing this vote, perhaps we are missing information.
+                        // We'll send a membership AE request to see if they can help us catch up.
+                        let sap = self.network_knowledge.authority_provider().await;
+                        let dst_section_pk = sap.section_key();
+                        let section_name = prefix.name();
+                        let msg = SystemMsg::MembershipAE(membership.generation());
+                        let cmd = self
+                            .send_direct_msg_to_nodes(vec![peer], msg, section_name, dst_section_pk)
+                            .await?;
+
+                        debug!("{:?}", LogMarker::MembershipSendingAeUpdateRequest);
+                        cmds.push(cmd);
+                        // return the vec w/ the AE cmd there so as not to loop and generate AE for
+                        // any subsequent commands
+                        return Ok(cmds);
+                    }
+                    Err(e) => {
+                        error!("Membership - error while processing vote {e:?}, dropping this and all votes in this batch thereafter");
+                        break;
+                    }
+                };
+
+                // TODO: We should be able to detect when a *new* decision is made
+                //       As it stands, we will reprocess each decision for any new vote
+                //       we receive, it should be safe to do as `HandleNewNodeOnline`
+                //       should be idempotent.
+                if let Some(decision) = membership.most_recent_decision() {
+                    // process the membership change
+                    debug!(
+                        "Handling Membership Decision {:?}",
+                        BTreeSet::from_iter(decision.proposals.keys())
+                    );
+                    for (state, signature) in &decision.proposals {
+                        let sig = KeyedSig {
+                            public_key: membership.voters_public_key_set().public_key(),
+                            signature: signature.clone(),
+                        };
+                        if membership.is_leaving_section(state, prefix) {
+                            cmds.push(Cmd::HandleNodeLeft(SectionAuth {
+                                value: state.clone(),
+                                sig,
+                            }));
+                        } else {
+                            cmds.push(Cmd::HandleNewNodeOnline(SectionAuth {
+                                value: state.clone(),
+                                sig,
+                            }));
+                        }
                     }
                 }
-            }
-
-            cmds
-        } else {
-            error!(
-                "Attempted to handle membership vote when we don't yet have a membership instance"
-            );
-            vec![]
-        };
+            } else {
+                error!(
+                    "Attempted to handle membership vote when we don't yet have a membership instance"
+                );
+            };
+        }
 
         Ok(cmds)
     }
@@ -124,21 +142,23 @@ impl Node {
         gen: Generation,
     ) -> Result<Vec<Cmd>> {
         debug!(
-            "Received membership anti-entropy for gen {:?} from {}",
-            gen, peer
+            "{:?} membership anti-entropy request for gen {:?} from {}",
+            LogMarker::MembershipAeRequestReceived,
+            gen,
+            peer
         );
 
         let cmds = if let Some(membership) = self.membership.read().await.as_ref() {
             match membership.anti_entropy(gen) {
                 Ok(catchup_votes) => {
-                    let mut catchup_cmds = Vec::new();
-                    for vote in catchup_votes {
-                        catchup_cmds.push(
-                            self.send_msg_to_our_elders(SystemMsg::MembershipVote(vote))
-                                .await?,
-                        );
-                    }
-                    catchup_cmds
+                    vec![
+                        self.send_direct_msg(
+                            peer,
+                            SystemMsg::MembershipVotes(catchup_votes),
+                            self.network_knowledge.section_key().await,
+                        )
+                        .await?,
+                    ]
                 }
                 Err(e) => {
                     error!("Membership - Error while processing anti-entropy {:?}", e);

@@ -47,7 +47,7 @@ use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::filter::EnvFilter;
 
 #[cfg(not(feature = "tokio-console"))]
-const MODULE_NAME: &str = "safe_network";
+const MODULE_NAME: &str = "sn_node";
 const BOOTSTRAP_RETRY_TIME_SEC: u64 = 60;
 
 fn main() -> Result<()> {
@@ -229,7 +229,7 @@ async fn run_node() -> Result<()> {
             tracing_subscriber::fmt()
                 .with_thread_names(true)
                 .with_ansi(false)
-                .with_env_filter(EnvFilter::from_default_env())
+                .with_env_filter(filter)
                 .with_target(false)
                 .event_format(LogFormatter::default())
                 .init();

@@ -18,16 +18,17 @@ use crate::node::{
         RESOURCE_PROOF_DIFFICULTY,
     },
     create_test_max_capacity_and_root_storage,
-    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
+    messages::WireMsgUtils,
     Error, Event, Result as RoutingResult,
 };
 use sn_interface::elder_count;
 use sn_interface::messaging::{
     system::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState,
-        NodeState as NodeStateMsg, RelocateDetails, ResourceProofResponse, SectionAuth, SystemMsg,
+        NodeMsgAuthorityUtils, NodeState as NodeStateMsg, RelocateDetails, ResourceProofResponse,
+        SectionAuth, SystemMsg,
     },
-    AuthorityProof, DstLocation, MsgId, MsgKind, MsgType, NodeAuth,
+    AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, NodeAuth,
     SectionAuth as MsgKindSectionAuth, WireMsg,
 };
 #[cfg(feature = "test-utils")]
@@ -185,7 +186,12 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
     let data = rp.create_proof_data(&nonce);
     let mut prover = rp.create_prover(data.clone());
     let solution = prover.solve();
-
+    let resource_proof_response = ResourceProofResponse {
+        solution,
+        data,
+        nonce,
+        nonce_signature,
+    };
     let wire_msg = WireMsg::single_src(
         &new_node,
         DstLocation::Section {
@@ -194,12 +200,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
         },
         SystemMsg::JoinRequest(Box::new(JoinRequest {
             section_key,
-            resource_proof_response: Some(ResourceProofResponse {
-                solution,
-                data,
-                nonce,
-                nonce_signature,
-            }),
+            resource_proof_response: Some(resource_proof_response.clone()),
         })),
         section_key,
     )?;
@@ -223,6 +224,14 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
         .as_ref()
         .unwrap()
         .is_churn_in_progress());
+    // makes sure that the nonce signature is always valid
+    let random_peer = Peer::new(xor_name::rand::random(), gen_addr());
+    assert!(
+        !dispatcher
+            .node
+            .validate_resource_proof_response(&random_peer.name(), resource_proof_response)
+            .await
+    );
 
     Ok(())
 }
@@ -1221,10 +1230,13 @@ async fn handle_demote_during_split() -> Result<()> {
     init_test_logger();
     let _span = tracing::info_span!("handle_demote_during_split").entered();
 
-    let info = gen_info(MIN_ADULT_AGE, None);
-    let node_name = info.name();
     let prefix0 = Prefix::default().pushed(false);
     let prefix1 = Prefix::default().pushed(true);
+
+    //right not info/node could be in either section...
+    let info = gen_info(MIN_ADULT_AGE, None);
+    let node_name = info.name();
+
     // These peers together with `node` are pre-split elders.
     // These peers together with `peer_c` are prefix-0 post-split elders.
     let peers_a: Vec<_> = iter::repeat_with(|| create_peer_in_prefix(&prefix0, MIN_ADULT_AGE))
@@ -1237,6 +1249,7 @@ async fn handle_demote_during_split() -> Result<()> {
     // This peer is a prefix-0 post-split elder.
     let peer_c = create_peer_in_prefix(&prefix0, MIN_ADULT_AGE);
 
+    // all members
     let members = BTreeSet::from_iter(
         peers_a
             .iter()
@@ -1256,12 +1269,14 @@ async fn handle_demote_during_split() -> Result<()> {
     );
     let (section, section_key_share) = create_section(&sk_set_v0, &section_auth_v0).await?;
 
+    // all peers b are added
     for peer in peers_b.iter().chain(iter::once(&peer_c)).cloned() {
         let node_state = NodeState::joined(peer, None);
         let node_state = section_signed(sk_set_v0.secret_key(), node_state)?;
         assert!(section.update_member(node_state).await);
     }
 
+    // we make a new full node from info, to see what it does
     let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
@@ -1314,9 +1329,7 @@ async fn handle_demote_during_split() -> Result<()> {
 
     let signed_sap = section_signed(sk_set_v1_p0.secret_key(), section_auth)?;
     let cmd = create_our_elders_cmd(signed_sap)?;
-    let cmds = dispatcher.process_cmd(cmd, "cmd-id-1").await?;
-
-    assert_matches!(&cmds[..], &[]);
+    let mut cmds = dispatcher.process_cmd(cmd, "cmd-id-1").await?;
 
     // Handle agreement on `NewElders` for prefix-1.
     let section_auth = SectionAuthorityProvider::new(
@@ -1329,7 +1342,9 @@ async fn handle_demote_during_split() -> Result<()> {
     let signed_sap = section_signed(sk_set_v1_p1.secret_key(), section_auth)?;
     let cmd = create_our_elders_cmd(signed_sap)?;
 
-    let cmds = dispatcher.process_cmd(cmd, "cmd-id-2").await?;
+    let new_cmds = dispatcher.process_cmd(cmd, "cmd-id-2").await?;
+
+    cmds.extend(new_cmds);
 
     let mut update_recipients = BTreeMap::new();
 

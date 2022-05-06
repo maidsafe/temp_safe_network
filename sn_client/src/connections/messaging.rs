@@ -9,13 +9,13 @@
 use super::{QueryResult, Session};
 
 use crate::{connections::CmdResponse, Error, Result};
+use sn_interface::at_least_one_correct_elder_for_sap;
 use sn_interface::messaging::{
     data::{CmdError, DataQuery, QueryResponse},
-    DstLocation, MsgId, MsgKind, ServiceAuth, WireMsg,
+    AuthKind, DstLocation, MsgId, ServiceAuth, WireMsg,
 };
 use sn_interface::network_knowledge::prefix_map::NetworkPrefixMap;
 use sn_interface::types::{Peer, PeerLinks, PublicKey, SendToOneError};
-use sn_interface::{at_least_one_correct_elder, elder_count};
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
@@ -23,6 +23,7 @@ use dashmap::DashMap;
 use futures::future::join_all;
 use qp2p::{Close, Config as QuicP2pConfig, ConnectionError, Endpoint, SendError};
 use rand::{rngs::OsRng, seq::SliceRandom};
+use secured_linked_list::SecuredLinkedList;
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::{
     sync::mpsc::{channel, Sender},
@@ -69,6 +70,7 @@ impl Session {
             initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
             cmd_ack_wait,
             peer_links,
+            all_sections_chains: Arc::new(RwLock::new(SecuredLinkedList::new(genesis_key))),
         };
 
         Ok(session)
@@ -101,7 +103,7 @@ impl Session {
             section_pk,
         };
 
-        let msg_kind = MsgKind::ServiceMsg(auth);
+        let msg_kind = AuthKind::Service(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
         let elders_len = elders.len();
@@ -231,7 +233,7 @@ impl Session {
             name: dst,
             section_pk,
         };
-        let msg_kind = MsgKind::ServiceMsg(auth);
+        let msg_kind = AuthKind::Service(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
         send_msg(self.clone(), elders, wire_msg, msg_id).await?;
@@ -369,7 +371,7 @@ impl Session {
             name: dst_address,
             section_pk,
         };
-        let msg_kind = MsgKind::ServiceMsg(auth);
+        let msg_kind = AuthKind::Service(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
         // When the client bootstrap using the nodes read from the config, the list is sorted
@@ -407,88 +409,70 @@ impl Session {
         // wait here to give a chance for AE responses to come in and be parsed
         tokio::time::sleep(Duration::from_secs(INITIAL_WAIT)).await;
 
-        // If we start with genesis key here, we should wait until we have _at least_ one AE-Retry in
-        if section_pk == self.genesis_key {
-            info!("On client startup, awaiting some network knowledge");
+        info!("Client startup... awaiting some network knowledge");
 
-            let mut known_sap = self.network.closest_or_opposite(&dst_address, None);
+        let mut known_sap = self.network.closest_or_opposite(&dst_address, None);
 
-            let mut insufficient_sap_peers = false;
-
-            if let Some(sap) = known_sap.clone() {
-                if sap.elders_vec().len() < elder_count() {
-                    insufficient_sap_peers = true;
-                }
-            }
-
-            // wait until we have sufficient network knowledge
-            while known_sap.is_none() || insufficient_sap_peers {
-                if tried_every_contact {
-                    return Err(Error::NetworkContact);
-                }
-
-                let stats = self.network.known_sections_count();
-                debug!("Client still has not received a complete section's AE-Retry message... Current sections known: {:?}. Do we have insufficient peers: {:?}", stats, insufficient_sap_peers);
-                knowledge_checks += 1;
-
-                // only after a couple of waits do we try contacting more nodes...
-                // This just gives the initial contacts more time.
-                if knowledge_checks > 2 {
-                    let mut start_pos = outgoing_msg_rounds * NODES_TO_CONTACT_PER_STARTUP_BATCH;
-                    outgoing_msg_rounds += 1;
-
-                    // if we'd run over known contacts, then we just go to the end
-                    if start_pos > elders_or_adults.len() {
-                        start_pos = last_start_pos;
-                    }
-
-                    last_start_pos = start_pos;
-
-                    let next_batch_end = start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH;
-
-                    // if we'd run over known contacts, then we just go to the end
-                    let next_contacts = if next_batch_end > elders_or_adults.len() {
-                        // but incase we _still_ dont know anything after this
-                        let next = elders_or_adults[start_pos..].to_vec();
-                        // mark as tried all
-                        tried_every_contact = true;
-
-                        next
-                    } else {
-                        elders_or_adults[start_pos..start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH]
-                            .to_vec()
-                    };
-
-                    trace!("Sending out another batch of initial contact msgs to new nodes");
-                    send_msg(self.clone(), next_contacts, wire_msg.clone(), msg_id).await?;
-
-                    let next_wait = backoff.next_backoff();
-                    trace!(
-                        "Awaiting a duration of {:?} before trying new nodes",
-                        next_wait
-                    );
-
-                    // wait here to give a chance for AE responses to come in and be parsed
-                    if let Some(wait) = next_wait {
-                        tokio::time::sleep(wait).await;
-                    }
-
-                    known_sap = self.network.closest_or_opposite(&dst_address, None);
-
-                    debug!("Known sap: {known_sap:?}");
-                    insufficient_sap_peers = false;
-                    if let Some(sap) = known_sap.clone() {
-                        if sap.elders_vec().len() < elder_count() {
-                            debug!("Known elders: {:?}", sap.elders_vec().len());
-                            insufficient_sap_peers = true;
-                        }
-                    }
-                }
+        // wait until we have sufficient network knowledge
+        while known_sap.is_none() {
+            if tried_every_contact {
+                return Err(Error::NetworkContact);
             }
 
             let stats = self.network.known_sections_count();
-            debug!("Client has received updated network knowledge. Current sections known: {:?}. Sap for our startup-query: {:?}", stats, known_sap);
+            debug!("Client still has not received a complete section's AE-Retry message... Current sections known: {:?}", stats);
+            knowledge_checks += 1;
+
+            // only after a couple of waits do we try contacting more nodes...
+            // This just gives the initial contacts more time.
+            if knowledge_checks > 2 {
+                let mut start_pos = outgoing_msg_rounds * NODES_TO_CONTACT_PER_STARTUP_BATCH;
+                outgoing_msg_rounds += 1;
+
+                // if we'd run over known contacts, then we just go to the end
+                if start_pos > elders_or_adults.len() {
+                    start_pos = last_start_pos;
+                }
+
+                last_start_pos = start_pos;
+
+                let next_batch_end = start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH;
+
+                // if we'd run over known contacts, then we just go to the end
+                let next_contacts = if next_batch_end > elders_or_adults.len() {
+                    // but incase we _still_ dont know anything after this
+                    let next = elders_or_adults[start_pos..].to_vec();
+                    // mark as tried all
+                    tried_every_contact = true;
+
+                    next
+                } else {
+                    elders_or_adults[start_pos..start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH]
+                        .to_vec()
+                };
+
+                trace!("Sending out another batch of initial contact msgs to new nodes");
+                send_msg(self.clone(), next_contacts, wire_msg.clone(), msg_id).await?;
+
+                let next_wait = backoff.next_backoff();
+                trace!(
+                    "Awaiting a duration of {:?} before trying new nodes",
+                    next_wait
+                );
+
+                // wait here to give a chance for AE responses to come in and be parsed
+                if let Some(wait) = next_wait {
+                    tokio::time::sleep(wait).await;
+                }
+
+                known_sap = self.network.closest_or_opposite(&dst_address, None);
+
+                debug!("Known sap: {known_sap:?}");
+            }
         }
+
+        let stats = self.network.known_sections_count();
+        debug!("Client has received updated network knowledge. Current sections known: {:?}. Sap for our startup-query: {:?}", stats, known_sap);
 
         Ok(())
     }
@@ -522,23 +506,24 @@ impl Session {
     }
 
     async fn get_cmd_elders(&self, dst_address: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
+        let a_close_sap = self.network.closest_or_opposite(&dst_address, None);
+        let the_close_sap = a_close_sap.clone().map(|auth| auth.value);
         // Get DataSection elders details.
-        let (mut elders, section_pk) =
-            if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
-                let sap_elders = sap.elders_vec();
+        let (mut elders, section_pk) = if let Some(sap) = a_close_sap {
+            let sap_elders = sap.elders_vec();
 
-                trace!("SAP elders found {:?}", sap_elders);
+            trace!("SAP elders found {:?}", sap_elders);
 
-                (sap_elders, sap.section_key())
-            } else {
-                return Err(Error::NoNetworkKnowledge);
-            };
+            (sap_elders, sap.section_key())
+        } else {
+            return Err(Error::NoNetworkKnowledge);
+        };
 
-        let targets_count = at_least_one_correct_elder(); // stored at Adults, so only 1 correctly functioning Elder need to relay
+        let targets_count = at_least_one_correct_elder_for_sap(the_close_sap); // stored at Adults, so only 1 correctly functioning Elder need to relay
 
         // any SAP that does not hold elders_count() is indicative of a broken network (after genesis)
         if elders.len() < targets_count {
-            error!("Insufficient knowledge to send to {:?}", dst_address);
+            error!("Insufficient knowledge to send to address {:?}, elders for this section: {elders:?} ({targets_count} needed), section PK is: {section_pk:?}", dst_address);
             return Err(Error::InsufficientElderKnowledge {
                 connections: elders.len(),
                 required: targets_count,

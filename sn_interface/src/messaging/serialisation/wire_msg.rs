@@ -10,7 +10,7 @@ use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
     data::{ServiceError, ServiceMsg},
     system::SystemMsg,
-    AuthorityProof, DstLocation, Error, MsgId, MsgKind, MsgType, NodeMsgAuthority, Result,
+    AuthKind, AuthorityProof, DstLocation, Error, MsgId, MsgType, NodeMsgAuthority, Result,
     ServiceAuth,
 };
 use bls::PublicKey as BlsPublicKey;
@@ -65,7 +65,7 @@ impl WireMsg {
     pub fn new_msg(
         msg_id: MsgId,
         payload: Bytes,
-        msg_kind: MsgKind,
+        msg_kind: AuthKind,
         dst_location: DstLocation,
     ) -> Result<Self> {
         Ok(Self {
@@ -119,7 +119,8 @@ impl WireMsg {
     /// Deserialize the payload from this WireMsg returning a MsgType instance.
     pub fn into_msg(&self) -> Result<MsgType> {
         match self.header.msg_envelope.msg_kind.clone() {
-            MsgKind::ServiceMsg(auth) => {
+            #[cfg(any(feature = "chunks", feature = "registers"))]
+            AuthKind::Service(auth) => {
                 let msg: ServiceMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Data message payload as Msgpack: {}", err))
                 })?;
@@ -141,7 +142,7 @@ impl WireMsg {
                     msg,
                 })
             }
-            MsgKind::NodeAuthMsg(node_signed) => {
+            AuthKind::Node(node_signed) => {
                 let msg: SystemMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!("Node signed message payload as Msgpack: {}", err))
                 })?;
@@ -156,7 +157,7 @@ impl WireMsg {
                     msg,
                 })
             }
-            MsgKind::NodeBlsShareAuthMsg(bls_share_signed) => {
+            AuthKind::NodeBlsShare(bls_share_signed) => {
                 let msg: SystemMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
                     Error::FailedToParse(format!(
                         "Node message payload (BLS share signed) as Msgpack: {}",
@@ -188,7 +189,7 @@ impl WireMsg {
     }
 
     /// Return the kind of this message
-    pub fn msg_kind(&self) -> &MsgKind {
+    pub fn msg_kind(&self) -> &AuthKind {
         &self.header.msg_envelope.msg_kind
     }
 
@@ -216,8 +217,8 @@ impl WireMsg {
     /// message if it's a NodeMsg
     pub fn src_section_pk(&self) -> Option<BlsPublicKey> {
         match &self.header.msg_envelope.msg_kind {
-            MsgKind::NodeAuthMsg(node_signed) => Some(node_signed.section_pk),
-            MsgKind::NodeBlsShareAuthMsg(bls_share_signed) => Some(bls_share_signed.section_pk),
+            AuthKind::Node(node_signed) => Some(node_signed.section_pk),
+            AuthKind::NodeBlsShare(bls_share_signed) => Some(bls_share_signed.section_pk),
             _ => None,
         }
     }
@@ -284,7 +285,7 @@ mod tests {
         let payload = WireMsg::serialize_msg_payload(&node_msg)?;
         let node_auth = NodeAuth::authorize(src_section_pk, &src_node_keypair, &payload);
 
-        let msg_kind = MsgKind::NodeAuthMsg(node_auth.clone().into_inner());
+        let msg_kind = AuthKind::Node(node_auth.clone().into_inner());
 
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
         let serialized = wire_msg.serialize()?;
@@ -335,7 +336,7 @@ mod tests {
         };
         let auth_proof = AuthorityProof::verify(auth.clone(), &payload).unwrap();
 
-        let msg_kind = MsgKind::ServiceMsg(auth);
+        let msg_kind = AuthKind::Service(auth);
 
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
         let serialized = wire_msg.serialize()?;

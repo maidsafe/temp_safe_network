@@ -36,6 +36,7 @@ use sn_interface::{
 use super::{
     api::cmds::Cmd,
     dkg::DkgVoter,
+    handover::Handover,
     membership::{split, Membership},
     Elders, Event, NodeElderChange,
 };
@@ -53,7 +54,6 @@ use sn_interface::messaging::{
 use sn_interface::types::{log_markers::LogMarker, Cache, Peer};
 
 use crate::UsedSpace;
-use sn_interface::elder_count;
 use sn_interface::network_knowledge::utils::compare_and_write_prefix_map_to_disk;
 
 use backoff::ExponentialBackoff;
@@ -61,7 +61,7 @@ use dashmap::DashSet;
 use data::Capacity;
 use itertools::Itertools;
 use resource_proof::ResourceProof;
-use sn_dysfunction::{DysfunctionDetection, DysfunctionSeverity};
+use sn_dysfunction::{DysfunctionDetection, DysfunctionSeverity, IssueType};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     path::PathBuf,
@@ -129,6 +129,8 @@ pub(crate) struct Node {
     relocate_state: Arc<RwLock<Option<Box<JoiningAsRelocated>>>>,
     // ======================== Elder only ========================
     pub(crate) membership: Arc<RwLock<Option<Membership>>>,
+    // Section handover consensus state (Some for Elders, None for others)
+    pub(crate) handover_voting: Arc<RwLock<Option<Handover>>>,
     joins_allowed: Arc<RwLock<bool>>,
     // Trackers
     capacity: Capacity,
@@ -177,7 +179,7 @@ impl Node {
             None
         };
 
-        let section_keys_provider = SectionKeysProvider::new(section_key_share).await;
+        let section_keys_provider = SectionKeysProvider::new(section_key_share.clone()).await;
 
         // make sure the Node has the correct local addr as Comm
         info.addr = comm.our_connection_info();
@@ -192,12 +194,24 @@ impl Node {
                 .iter()
                 .map(|peer| peer.name())
                 .collect::<Vec<XorName>>(),
-            elder_count(),
         );
         info!(
             "DysfunctionDetection check: {:?}",
             node_dysfunction_detector
         );
+
+        // create handover
+        let handover = if let Some(key) = section_key_share {
+            let secret_key = (key.index as u8, key.secret_key_share);
+            let elders = key.public_key_set;
+            let n_elders = network_knowledge.elders().await.len();
+            let section_prefix = network_knowledge.prefix().await;
+
+            let handover_data = Handover::from(secret_key, elders, n_elders, section_prefix);
+            Some(handover_data)
+        } else {
+            None
+        };
 
         Ok(Self {
             comm,
@@ -211,6 +225,7 @@ impl Node {
             dkg_voter: DkgVoter::default(),
             relocate_state: Arc::new(RwLock::new(None)),
             event_tx,
+            handover_voting: Arc::new(RwLock::new(handover)),
             joins_allowed: Arc::new(RwLock::new(true)),
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             data_storage,
@@ -324,7 +339,7 @@ impl Node {
     /// Log a communication problem
     pub(crate) async fn log_comm_issue(&self, name: XorName) -> Result<()> {
         self.dysfunction_tracking
-            .track_comm_issue(name)
+            .track_issue(name, IssueType::Communication)
             .await
             .map_err(Error::from)
     }
@@ -525,6 +540,29 @@ impl Node {
         Ok(())
     }
 
+    async fn initialize_handover(&self) -> Result<()> {
+        let key = self
+            .section_keys_provider
+            .key_share(&self.network_knowledge.section_key().await)
+            .await?;
+        let n_elders = self
+            .network_knowledge
+            .authority_provider()
+            .await
+            .elder_count();
+        let section_prefix = self.network_knowledge.prefix().await;
+
+        let mut handover_voting = self.handover_voting.write().await;
+        *handover_voting = Some(Handover::from(
+            (key.index as u8, key.secret_key_share),
+            key.public_key_set,
+            n_elders,
+            section_prefix,
+        ));
+
+        Ok(())
+    }
+
     async fn initialize_elder_state(&self) -> Result<()> {
         let sap = self
             .network_knowledge
@@ -533,7 +571,7 @@ impl Node {
             .value
             .to_msg();
         self.initialize_membership(sap).await?;
-        // TODO: self.initialize_handover(sap).await?;
+        self.initialize_handover().await?;
         Ok(())
     }
 
@@ -576,6 +614,11 @@ impl Node {
                             .await?,
                     );
 
+                    // NB TODO make sure this in only called once (after handover)
+                    // and that it cannot interfere with the handover voting process as it resets the handover state completely
+                    // NB TODO we should keep a copy of old handover states (since they contain valuable information like who is faulty)
+                    self.initialize_handover().await?;
+
                     // Whenever there is an elders change, casting a round of joins_allowed
                     // proposals to sync.
                     cmds.extend(
@@ -585,6 +628,11 @@ impl Node {
                 }
 
                 self.print_network_stats().await;
+                self.log_section_stats().await;
+            } else {
+                // if not elder
+                let mut handover_voting = self.handover_voting.write().await;
+                *handover_voting = None;
             }
 
             if new.is_elder || old.is_elder {

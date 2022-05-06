@@ -1,20 +1,24 @@
 #!/usr/bin/env bash
 
-sn_version=$1
-if [[ -z "$sn_version" ]]; then
-    echo "You must supply a version number for sn_node"
-    exit 1
-fi
-
-sn_cli_version=$2
-if [[ -z "$sn_cli_version" ]]; then
-    echo "You must supply a version number for sn_cli"
-    exit 1
-fi
+sn_dysfunction_version=$( \
+  grep "^version" < sn_dysfunction/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+sn_interface_version=$( \
+  grep "^version" < sn_interface/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+sn_client_version=$( \
+  grep "^version" < sn_client/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+sn_node_version=$(grep "^version" < sn_node/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+sn_api_version=$(grep "^version" < sn_api/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
+sn_cli_version=$(grep "^version" < sn_cli/Cargo.toml | head -n 1 | awk '{ print $3 }' | sed 's/\"//g')
 
 # The single quotes around EOF is to stop attempted variable and backtick expansion.
 read -r -d '' release_description << 'EOF'
-Command line interface for the Safe Network. Refer to [Safe CLI User Guide](https://github.com/maidsafe/sn_cli/blob/master/README.md) for detailed instructions.
+This release of Safe Network consists of:
+* Safe Node Dysfunction v__SN_DYSFUNCTION_VERSION__
+* Safe Network Interface v__SN_INTERFACE_VERSION__
+* Safe Client v__SN_CLIENT_VERSION__
+* Safe Node v__SN_NODE_VERSION__
+* Safe API v__SN_API_VERSION__
+* Safe CLI v__SN_CLI_VERSION__
 
 ## Safe Network Interface Changelog
 
@@ -24,9 +28,13 @@ __SN_INTERFACE_CHANGELOG_TEXT__
 
 __SN_DYSFUNCTION_CHANGELOG_TEXT__
 
-## Safe Network Changelog
+## Safe Node Changelog
 
-__SN_CHANGELOG_TEXT__
+__SN_NODE_CHANGELOG_TEXT__
+
+## Safe Client Changelog
+
+__SN_CLIENT_CHANGELOG_TEXT__
 
 ## Safe API Changelog
 
@@ -92,40 +100,40 @@ tar.gz: SN_CLI_TAR_AARCH64_CHECKSUM
 EOF
 
 sn_zip_linux_checksum=$(sha256sum \
-    "./deploy/prod/sn_node/sn_node-$sn_version-x86_64-unknown-linux-musl.zip" | \
+    "./deploy/prod/sn_node/sn_node-$sn_node_version-x86_64-unknown-linux-musl.zip" | \
     awk '{ print $1 }')
 sn_zip_macos_checksum=$(sha256sum \
-    "./deploy/prod/sn_node/sn_node-$sn_version-x86_64-apple-darwin.zip" | \
+    "./deploy/prod/sn_node/sn_node-$sn_node_version-x86_64-apple-darwin.zip" | \
     awk '{ print $1 }')
 sn_zip_win_checksum=$(sha256sum \
-    "./deploy/prod/sn_node/sn_node-$sn_version-x86_64-pc-windows-msvc.zip" | \
+    "./deploy/prod/sn_node/sn_node-$sn_node_version-x86_64-pc-windows-msvc.zip" | \
     awk '{ print $1 }')
 sn_zip_arm_checksum=$(sha256sum \
-    "./deploy/prod/sn_node/sn_node-$sn_version-arm-unknown-linux-musleabi.zip" | \
+    "./deploy/prod/sn_node/sn_node-$sn_node_version-arm-unknown-linux-musleabi.zip" | \
     awk '{ print $1 }')
 sn_zip_armv7_checksum=$(sha256sum \
-    "./deploy/prod/sn_node/sn_node-$sn_version-armv7-unknown-linux-musleabihf.zip" | \
+    "./deploy/prod/sn_node/sn_node-$sn_node_version-armv7-unknown-linux-musleabihf.zip" | \
     awk '{ print $1 }')
 sn_zip_aarch64_checksum=$(sha256sum \
-    "./deploy/prod/sn_node/sn_node-$sn_version-aarch64-unknown-linux-musl.zip" | \
+    "./deploy/prod/sn_node/sn_node-$sn_node_version-aarch64-unknown-linux-musl.zip" | \
     awk '{ print $1 }')
 sn_tar_linux_checksum=$(sha256sum \
-    "./deploy/prod/sn_node/sn_node-$sn_version-x86_64-unknown-linux-musl.tar.gz" | \
+    "./deploy/prod/sn_node/sn_node-$sn_node_version-x86_64-unknown-linux-musl.tar.gz" | \
     awk '{ print $1 }')
 sn_tar_macos_checksum=$(sha256sum \
-    "./deploy/prod/sn_node/sn_node-$sn_version-x86_64-apple-darwin.tar.gz" | \
+    "./deploy/prod/sn_node/sn_node-$sn_node_version-x86_64-apple-darwin.tar.gz" | \
     awk '{ print $1 }')
 sn_tar_win_checksum=$(sha256sum \
-    "./deploy/prod/sn_node/sn_node-$sn_version-x86_64-pc-windows-msvc.tar.gz" | \
+    "./deploy/prod/sn_node/sn_node-$sn_node_version-x86_64-pc-windows-msvc.tar.gz" | \
     awk '{ print $1 }')
 sn_tar_arm_checksum=$(sha256sum \
-    "./deploy/prod/sn_node/sn_node-$sn_version-arm-unknown-linux-musleabi.tar.gz" | \
+    "./deploy/prod/sn_node/sn_node-$sn_node_version-arm-unknown-linux-musleabi.tar.gz" | \
     awk '{ print $1 }')
 sn_tar_armv7_checksum=$(sha256sum \
-    "./deploy/prod/sn_node/sn_node-$sn_version-armv7-unknown-linux-musleabihf.tar.gz" | \
+    "./deploy/prod/sn_node/sn_node-$sn_node_version-armv7-unknown-linux-musleabihf.tar.gz" | \
     awk '{ print $1 }')
 sn_tar_aarch64_checksum=$(sha256sum \
-    "./deploy/prod/sn_node/sn_node-$sn_version-aarch64-unknown-linux-musl.tar.gz" | \
+    "./deploy/prod/sn_node/sn_node-$sn_node_version-aarch64-unknown-linux-musl.tar.gz" | \
     awk '{ print $1 }')
 
 sn_cli_zip_linux_checksum=$(sha256sum \
@@ -164,6 +172,13 @@ sn_cli_tar_armv7_checksum=$(sha256sum \
 sn_cli_tar_aarch64_checksum=$(sha256sum \
     "./deploy/prod/safe/sn_cli-$sn_cli_version-aarch64-unknown-linux-musl.tar.gz" | \
     awk '{ print $1 }')
+
+release_description=$(sed "s/__SN_DYSFUNCTION_VERSION__/$sn_dysfunction_version/g" <<< "$release_description")
+release_description=$(sed "s/__SN_INTERFACE_VERSION__/$sn_interface_version/g" <<< "$release_description")
+release_description=$(sed "s/__SN_CLIENT_VERSION__/$sn_client_version/g" <<< "$release_description")
+release_description=$(sed "s/__SN_NODE_VERSION__/$sn_node_version/g" <<< "$release_description")
+release_description=$(sed "s/__SN_API_VERSION__/$sn_api_version/g" <<< "$release_description")
+release_description=$(sed "s/__SN_CLI_VERSION__/$sn_cli_version/g" <<< "$release_description")
 
 release_description=$(sed "s/SN_ZIP_LINUX_CHECKSUM/$sn_zip_linux_checksum/g" <<< "$release_description")
 release_description=$(sed "s/SN_ZIP_MACOS_CHECKSUM/$sn_zip_macos_checksum/g" <<< "$release_description")

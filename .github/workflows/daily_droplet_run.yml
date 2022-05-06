@@ -204,7 +204,6 @@ jobs:
 
       - name: Build all test targets
         run: cargo test --no-run --release --features=test-utils
-        working-directory: sn
 
       - name: Run client tests
         uses: jacderida/cargo-nextest@main
@@ -212,7 +211,7 @@ jobs:
           test-run-name: nightly-e2e-client-${{ matrix.os }}
           profile: ci
           junit-path: junit.xml
-          package: safe_network
+          package: sn_client
           release: true
           features: test-utils
           filters: client
@@ -254,8 +253,10 @@ jobs:
         with:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
+
       - name: Build all sn_api tests
         run: cargo test --no-run -p sn_api --release --lib
+
       - name: Run API tests
         uses: jacderida/cargo-nextest@main
         with:
@@ -300,8 +301,10 @@ jobs:
         run: |
           mkdir -p ~/.safe/node
           curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-node_connection_info.config > ~/.safe/node/node_connection_info.config
+
       - name: Build all CLI tests
         run: cargo test --no-run -p sn_cli --release
+
       - name: Generate keys for test run
         run: cargo run --package sn_cli --release -- keys create --for-cli
       - name: Run CLI tests

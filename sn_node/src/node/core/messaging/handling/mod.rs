@@ -9,6 +9,7 @@
 mod agreement;
 mod anti_entropy;
 mod dkg;
+mod handover;
 mod join;
 mod left;
 mod membership;
@@ -24,13 +25,16 @@ use crate::dbs::Error as DbError;
 use crate::node::{
     api::cmds::Cmd,
     core::{DkgSessionInfo, Node, Proposal as CoreProposal, DATA_QUERY_LIMIT},
-    messages::{NodeMsgAuthorityUtils, WireMsgUtils},
+    messages::WireMsgUtils,
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
 };
 use sn_interface::messaging::{
     data::{ServiceMsg, StorageLevel},
     signature_aggregator::Error as AggregatorError,
-    system::{JoinResponse, NodeCmd, NodeEvent, NodeQuery, Proposal as ProposalMsg, SystemMsg},
+    system::{
+        JoinResponse, NodeCmd, NodeEvent, NodeMsgAuthorityUtils, NodeQuery,
+        Proposal as ProposalMsg, SystemMsg,
+    },
     AuthorityProof, DstLocation, MsgId, MsgType, NodeMsgAuthority, SectionAuth, WireMsg,
 };
 use sn_interface::network_knowledge::NetworkKnowledge;
@@ -39,6 +43,7 @@ use sn_interface::types::{log_markers::LogMarker, Peer, PublicKey};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
+use sn_dysfunction::IssueType;
 use std::collections::BTreeSet;
 use tokio::time::Duration;
 use xor_name::XorName;
@@ -112,8 +117,11 @@ impl Node {
                 known_keys.extend(self.network_knowledge.prefix_map().section_keys());
                 known_keys.push(*self.network_knowledge.genesis_key());
 
-                if !Self::verify_msg_can_be_trusted(msg_authority.clone(), msg.clone(), &known_keys)
-                {
+                if !NetworkKnowledge::verify_node_msg_can_be_trusted(
+                    msg_authority.clone(),
+                    msg.clone(),
+                    &known_keys,
+                ) {
                     warn!(
                         "Untrusted message ({:?}) dropped from {:?}: {:?} ",
                         msg_id, sender, msg
@@ -165,7 +173,7 @@ impl Node {
                                     if known_elders.contains(&sender.name()) {
                                         // we track a dysfunction against our elder here
                                         self.dysfunction_tracking
-                                            .track_knowledge_issue(sender.name())
+                                            .track_issue(sender.name(), IssueType::Knowledge)
                                             .await
                                             .map_err(Error::from)?;
                                     }
@@ -513,6 +521,7 @@ impl Node {
                 trace!("Handling msg: Dkg-FailureAgreement from {}", sender);
                 self.handle_dkg_failure_agreement(&src_name, &sig_set).await
             }
+            SystemMsg::HandoverVote(vote) => Ok(self.handle_handover_msg(vote).await),
             SystemMsg::JoinRequest(join_request) => {
                 trace!("Handling msg: JoinRequest from {}", sender);
                 self.handle_join_request(sender, *join_request).await
@@ -528,7 +537,12 @@ impl Node {
                 self.handle_join_as_relocated_request(sender, *join_request, known_keys)
                     .await
             }
-            SystemMsg::MembershipVote(vote) => self.handle_membership_vote(sender, vote).await,
+            SystemMsg::MembershipVotes(votes) => {
+                let mut cmds = vec![];
+                cmds.extend(self.handle_membership_votes(sender, votes).await?);
+
+                Ok(cmds)
+            }
             SystemMsg::MembershipAE(gen) => self.handle_membership_anti_entropy(sender, gen).await,
             SystemMsg::Propose {
                 proposal,

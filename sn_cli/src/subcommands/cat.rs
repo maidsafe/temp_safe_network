@@ -7,12 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    helpers::{get_from_arg_or_stdin, get_target_url, print_nrs_map, serialise_output},
+    helpers::{
+        gen_wallet_table, get_from_arg_or_stdin, get_target_url, print_nrs_map, serialise_output,
+    },
     OutputFmt,
 };
 use color_eyre::{eyre::WrapErr, Result};
 use comfy_table::Table;
-use sn_api::{resolver::SafeData, Safe};
+use sn_api::{resolver::SafeData, ContentType, Safe, SafeUrl};
 use std::io::{self, Write};
 use structopt::StructOpt;
 use tokio::time::{sleep, Duration};
@@ -104,11 +106,25 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
         SafeData::SafeKey { .. } => {
             println!("No content to show since the URL targets a SafeKey. Use the 'dog' command to obtain additional information about the targeted SafeKey.");
         }
-        SafeData::Multimap { .. }
-        | SafeData::PrivateRegister { .. }
+        SafeData::Multimap { xorurl, data, .. } => {
+            let safeurl = SafeUrl::from_xorurl(xorurl)?;
+            if safeurl.content_type() == ContentType::Wallet {
+                if OutputFmt::Pretty == output_fmt {
+                    // Render Wallet listing spendable balances
+                    println!("Spendable balances of Wallet at \"{}\":", xorurl);
+                    let table = gen_wallet_table(safe, data).await?;
+                    println!("{table}");
+                } else {
+                    println!("{}", serialise_output(&(url.to_string(), data), output_fmt));
+                }
+            } else {
+                println!("Type of content not supported yet by 'cat' command.");
+            }
+        }
+        SafeData::PrivateRegister { .. }
         | SafeData::NrsEntry { .. }
         | SafeData::PublicRegister { .. } => {
-            println!("Type of content not supported yet by 'cat' command.")
+            println!("Type of content not supported yet by 'cat' command.");
         }
     }
 

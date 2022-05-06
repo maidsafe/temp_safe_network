@@ -7,10 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    helpers::{get_from_arg_or_stdin, serialise_output},
+    helpers::{dbc_from_hex, dbc_to_hex, get_from_arg_or_stdin, serialise_output},
     OutputFmt,
 };
-use color_eyre::{eyre::eyre, Result};
+use color_eyre::Result;
 use sn_api::Safe;
 use structopt::StructOpt;
 
@@ -44,9 +44,6 @@ pub enum WalletSubCommands {
         /// Source Wallet URL
         #[structopt(long = "from")]
         from: String,
-        /// The receiving SafeKey URL or public key, otherwise pulled from stdin if not provided
-        #[structopt(long = "to")]
-        to: Option<String>,
     },
 }
 
@@ -88,13 +85,7 @@ pub async fn wallet_commander(
             Ok(())
         }
         WalletSubCommands::Deposit { target, name, dbc } => {
-            let mut dbc_str =
-                hex::decode(dbc).map_err(|err| eyre!("Couldn't hex-decode DBC: {:?}", err))?;
-
-            dbc_str.reverse();
-            let dbc = bincode::deserialize(&dbc_str)
-                .map_err(|err| eyre!("Couldn't deserialise DBC: {:?}", err))?;
-
+            let dbc = dbc_from_hex(&dbc)?;
             let the_name = safe.wallet_deposit(&target, name.as_deref(), &dbc).await?;
 
             if OutputFmt::Pretty == output_fmt {
@@ -108,18 +99,17 @@ pub async fn wallet_commander(
 
             Ok(())
         }
-        WalletSubCommands::Reissue { amount, from, to } => {
-            let destination = get_from_arg_or_stdin(
-                to,
-                Some("...awaiting destination Wallet/SafeKey URL, or public key, from STDIN stream..."),
-            )?;
-
-            let dbc = safe.wallet_reissue(&from, &amount, &destination).await?;
+        WalletSubCommands::Reissue { amount, from } => {
+            let dbc = safe.wallet_reissue(&from, &amount).await?;
+            let dbc_hex = dbc_to_hex(&dbc)?;
 
             if OutputFmt::Pretty == output_fmt {
-                println!("Success. Reissued DBC: {:?}", dbc);
+                println!("Success. Reissued DBC with {} safecoins:", amount);
+                println!("-------- DBC DATA --------");
+                println!("{}", dbc_hex);
+                println!("--------------------------");
             } else {
-                println!("{:?}", dbc)
+                println!("{}", dbc_hex);
             }
 
             Ok(())

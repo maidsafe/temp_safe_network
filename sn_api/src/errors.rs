@@ -10,6 +10,7 @@ use super::ipc::IpcError;
 use super::nrs::NrsMap;
 use super::safeurl::{Error as UrlError, SafeUrl, XorUrl};
 use sn_client::Error as ClientError;
+use sn_dbc::Error as DbcError;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -92,8 +93,8 @@ pub enum Error {
     /// InvalidMediaType
     #[error("InvalidMediaType: {0}")]
     InvalidMediaType(String),
-    /// NotEnoughBalance
-    #[error("NotEnoughBalance: {0}")]
+    /// Not enough balance to perform a transaction
+    #[error("Not enough balance: {0}")]
     NotEnoughBalance(String),
     /// NrsNameAlreadyExists
     #[error("NrsNameAlreadyExists: {0}")]
@@ -107,12 +108,18 @@ pub enum Error {
     /// UrlError
     #[error("UrlError: {0}")]
     UrlError(#[from] UrlError),
+    /// DbcError
+    #[error("DbcError: {0}")]
+    DbcError(#[from] DbcError),
     /// UnversionedContentError
     #[error("UnversionedContentError: {0}")]
     UnversionedContentError(String),
     /// Content may have been correctly stored on the network, but verification failed
     #[error("Content may have been correctly stored on the network, but verification failed: {0}")]
     ContentUploadVerificationFailed(XorUrl),
+    /// DbcReissueError
+    #[error("DbcReissueError: {0}")]
+    DbcReissueError(String),
     /// NotImplementedError
     #[error("NotImplementedError: {0}")]
     NotImplementedError(String),

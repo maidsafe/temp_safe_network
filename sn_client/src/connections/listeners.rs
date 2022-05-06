@@ -19,12 +19,13 @@ use sn_interface::at_least_one_correct_elder;
 use sn_interface::messaging::{
     data::{CmdError, ServiceMsg},
     system::{KeyedSig, SectionAuth, SystemMsg},
-    AuthorityProof, DstLocation, MsgId, MsgKind, MsgType, ServiceAuth, WireMsg,
+    AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, ServiceAuth, WireMsg,
 };
 use sn_interface::network_knowledge::utils::compare_and_write_prefix_map_to_disk;
-use sn_interface::network_knowledge::SectionAuthorityProvider;
+use sn_interface::network_knowledge::{NetworkKnowledge, SectionAuthorityProvider};
 use sn_interface::types::{log_markers::LogMarker, Peer};
 
+use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
 use qp2p::{Close, ConnectionError, ConnectionIncoming as IncomingMsgs, SendError};
@@ -114,7 +115,7 @@ impl Session {
         src_peer: Peer,
         session: Session,
     ) -> Result<(), Error> {
-        match msg {
+        match msg.clone() {
             MsgType::Service { msg_id, msg, .. } => {
                 Self::handle_client_msg(session, msg_id, msg, src_peer)
             }
@@ -126,8 +127,40 @@ impl Session {
                         section_chain,
                         bounced_msg,
                     },
+                msg_authority,
                 ..
             } => {
+                let sys_msg = SystemMsg::AntiEntropyRedirect {
+                    section_auth: section_auth.clone(),
+                    section_signed: section_signed.clone(),
+                    section_chain: section_chain.clone(),
+                    bounced_msg: bounced_msg.clone(),
+                };
+                // check that the message can be trusted based upon our network knowledge
+
+                // Let's now verify the section key in the msg authority is trusted
+                // based on our current knowledge of the network and sections chains.
+                let known_keys: Vec<BlsPublicKey> = session
+                    .all_sections_chains
+                    .read()
+                    .await
+                    .keys()
+                    .cloned()
+                    .collect();
+
+                if !NetworkKnowledge::verify_node_msg_can_be_trusted(
+                    msg_authority.clone(),
+                    sys_msg,
+                    &known_keys,
+                ) {
+                    warn!(
+                        "Untrusted message has been dropped, from {:?}: {:?} ",
+                        src_peer, msg
+                    );
+                    return Err(Error::UntrustedMessage);
+                }
+
+                // Okay, we can carry on
                 debug!("AE-Redirect msg received");
                 let result = Self::handle_ae_msg(
                     session,
@@ -283,7 +316,7 @@ impl Session {
         session: Session,
         target_sap: SectionAuthorityProvider,
         section_signed: KeyedSig,
-        section_chain: SecuredLinkedList,
+        provided_section_chain: SecuredLinkedList,
         bounced_msg: Bytes,
         src_peer: Peer,
     ) -> Result<(), Error> {
@@ -298,7 +331,7 @@ impl Session {
             &session,
             target_sap.clone(),
             section_signed,
-            section_chain,
+            provided_section_chain,
             src_peer,
         )
         .await;
@@ -322,7 +355,7 @@ impl Session {
                 let wire_msg = WireMsg::new_msg(
                     msg_id,
                     payload,
-                    MsgKind::ServiceMsg(auth.into_inner()),
+                    AuthKind::Service(auth.into_inner()),
                     dst_location,
                 )?;
 
@@ -346,12 +379,16 @@ impl Session {
         proof_chain: SecuredLinkedList,
         sender: Peer,
     ) {
-        match session.network.update(
+        // update our proof_chain based upon passed in knowledge
+        // self.network.verify_with_chain_and_update(sap.clone(), proof_chain)
+
+        match session.network.verify_with_chain_and_update(
             SectionAuth {
                 value: sap.clone(),
                 sig: section_signed,
             },
             &proof_chain,
+            &*session.all_sections_chains.read().await,
         ) {
             Ok(true) => {
                 debug!(

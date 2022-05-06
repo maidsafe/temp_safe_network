@@ -9,13 +9,16 @@
 mod agreement;
 mod join;
 mod join_as_relocated;
+mod msg_authority;
 mod node_msgs;
 mod node_state;
 mod signed;
 
+use crate::network_knowledge::SapCandidate;
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SectionAuth};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
+pub use msg_authority::NodeMsgAuthorityUtils;
 pub use node_msgs::{NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse};
 pub use node_state::{MembershipState, NodeState, RelocateDetails};
 pub use signed::{KeyedSig, SigShare};
@@ -89,8 +92,8 @@ pub enum SystemMsg {
     BackPressure(f64),
     /// Send from a section to the node to be immediately relocated.
     Relocate(SectionAuth<NodeState>),
-    /// Membership Vote
-    MembershipVote(SignedVote<NodeState>),
+    /// Membership Votes, in order they should be processed in.
+    MembershipVotes(Vec<SignedVote<NodeState>>),
     /// Membership Anti-Entropy request
     MembershipAE(Generation),
     /// Sent from a bootstrapping peer to the section requesting to join as a new member
@@ -157,6 +160,8 @@ pub enum SystemMsg {
     /// Sent to the current elders by the DKG participants when at least majority of them observe
     /// a DKG failure.
     DkgFailureAgreement(DkgFailureSigSet),
+    /// Section handover consensus vote message
+    HandoverVote(SignedVote<SapCandidate>),
     /// Message containing a single `Proposal` to be aggregated in the proposal aggregator.
     Propose {
         /// The content of the proposal
@@ -168,12 +173,24 @@ pub enum SystemMsg {
     /// Message that notifies a section to test
     /// the connectivity to a node
     StartConnectivityTest(XorName),
-    /// Cmds are orders to perform some operation, only sent internally in the network.
-    NodeCmd(NodeCmd),
-    /// Queries is a read-only operation.
-    NodeQuery(NodeQuery),
     /// Events are facts about something that happened on a node.
     NodeEvent(NodeEvent),
+    /// The returned error, from any msg handling on recipient node.
+    NodeMsgError {
+        /// The error.
+        // TODO: return node::Error instead
+        error: crate::messaging::data::Error,
+        /// ID of causing cmd.
+        correlation_id: MsgId,
+    },
+
+    #[cfg(any(feature = "chunks", feature = "registers"))]
+    /// Cmds are orders to perform some operation, only sent internally in the network.
+    NodeCmd(NodeCmd),
+    #[cfg(any(feature = "chunks", feature = "registers"))]
+    /// Queries is a read-only operation.
+    NodeQuery(NodeQuery),
+    #[cfg(any(feature = "chunks", feature = "registers"))]
     /// The response to a query, containing the query result.
     NodeQueryResponse {
         /// QueryResponse.
@@ -182,13 +199,5 @@ pub enum SystemMsg {
         correlation_id: MsgId,
         /// TEMP: Add user here as part of return flow. Remove this as we have chunk routing etc
         user: EndUser,
-    },
-    /// The returned error, from any msg handling on recipient node.
-    NodeMsgError {
-        /// The error.
-        // TODO: return node::Error instead
-        error: crate::messaging::data::Error,
-        /// ID of causing cmd.
-        correlation_id: MsgId,
     },
 }

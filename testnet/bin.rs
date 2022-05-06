@@ -207,7 +207,7 @@ pub async fn run_network() -> Result<()> {
     // If RUST_LOG was set we pass it down to the launch tool
     // so it's set for each of the nodes logs as well.
     let rust_log =
-        std::env::var(EnvFilter::DEFAULT_ENV).unwrap_or_else(|_| "safe_network=info".to_string());
+        std::env::var(EnvFilter::DEFAULT_ENV).unwrap_or_else(|_| "sn_node=info".to_string());
     if !rust_log.is_empty() {
         sn_launch_tool_args.push("--rust-log");
         sn_launch_tool_args.push(&rust_log);

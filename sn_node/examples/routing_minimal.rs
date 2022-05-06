@@ -183,13 +183,12 @@ async fn start_node(
 
     info!("Node #{} starting...", index);
 
-    let (max_capacity, root) = create_test_max_capacity_and_root_storage()?;
+    let (_, root) = create_test_max_capacity_and_root_storage()?;
 
     let config = Config {
         first,
         local_addr: Some(SocketAddr::new(ip, local_port)),
         hard_coded_contacts: bootstrap_nodes.into_iter().collect(),
-        max_capacity: Some(max_capacity),
         root_dir: Some(root),
         ..Default::default()
     };
@@ -293,7 +292,7 @@ async fn handle_event(index: usize, node: &mut NodeApi, event: Event) -> bool {
 
 fn init_log(verbosity: u8) {
     const BIN_NAME: &str = module_path!();
-    const CRATE_NAME: &str = "safe_network";
+    const CRATE_NAME: &str = "sn_node";
     let filter = match verbosity {
         0 => EnvFilter::new(format!("{}=info,{}=warn", BIN_NAME, CRATE_NAME)),
         1 => EnvFilter::new(format!("{},{}=info", BIN_NAME, CRATE_NAME)),
