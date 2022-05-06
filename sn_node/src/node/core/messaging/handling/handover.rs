@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use futures::future;
 use sn_consensus::{SignedVote, VoteResponse};
 
 use crate::node::handover::Handover;
@@ -48,37 +47,40 @@ impl Node {
         }
     }
 
-    async fn check_sap(&self, sap: &SectionAuth<SectionAuthorityProvider>) -> Result<()> {
+    /// Verifies the SAP signature and checks that the signature's public key matches the
+    /// signature of the SAP, because SAP candidates are signed by the candidate section key
+    fn check_sap(&self, sap: &SectionAuth<SectionAuthorityProvider>) -> Result<()> {
         let sap_bytes = Proposal::SectionInfo(sap.value.clone()).as_signable_bytes()?;
         if !sap.sig.verify(&sap_bytes) {
             return Err(Error::InvalidSignature);
         }
-        let our_section_key = self.network_knowledge.section_key().await;
-        if our_section_key != sap.sig.public_key {
+        if sap.value.section_key() != sap.sig.public_key {
             return Err(Error::UntrustedSectionAuthProvider(format!(
-                "the signer of this SAP is not our section: {:?} != {:?}",
-                sap.sig.public_key, our_section_key,
+                "the auth around the SAP does not match the SAP's public key: {:?} != {:?}",
+                sap.sig.public_key,
+                sap.value.section_key(),
             )));
         }
         Ok(())
     }
 
-    async fn check_sap_candidate(&self, sap_candidate: &SapCandidate) -> Result<()> {
+    fn check_sap_candidate(&self, sap_candidate: &SapCandidate) -> Result<()> {
         match sap_candidate {
-            SapCandidate::ElderHandover(authed_sap) => self.check_sap(authed_sap).await,
+            SapCandidate::ElderHandover(authed_sap) => self.check_sap(authed_sap),
             SapCandidate::SectionSplit(authed_sap1, authed_sap2) => {
-                self.check_sap(authed_sap1).await?;
-                self.check_sap(authed_sap2).await
+                self.check_sap(authed_sap1)?;
+                self.check_sap(authed_sap2)
             }
         }
     }
 
-    async fn check_signed_vote_saps(&self, signed_vote: &SignedVote<SapCandidate>) -> Result<()> {
+    fn check_signed_vote_saps(&self, signed_vote: &SignedVote<SapCandidate>) -> Result<()> {
         let sap_candidates = signed_vote.proposals();
-        let checks = sap_candidates
+        let checks: Result<Vec<_>> = sap_candidates
             .iter()
-            .map(|sap_can| self.check_sap_candidate(sap_can));
-        let _ = future::try_join_all(checks).await?;
+            .map(|sap_can| self.check_sap_candidate(sap_can))
+            .collect();
+        let _ = checks?;
         Ok(())
     }
 
@@ -93,7 +95,7 @@ impl Node {
             signed_vote
         );
 
-        if let Err(err) = self.check_signed_vote_saps(&signed_vote).await {
+        if let Err(err) = self.check_signed_vote_saps(&signed_vote) {
             // NB TODO tracking who sent this invalid vote?
             error!("Ignoring invalid handover vote: {}", err);
             return vec![];
