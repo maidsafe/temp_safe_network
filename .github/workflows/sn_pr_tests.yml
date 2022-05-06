@@ -259,7 +259,7 @@ jobs:
           release: true
           features: test-utils
           test-threads: 2
-          retries: 2
+          retries: 0
         timeout-minutes: 25
 
       - name: Run AE tests
@@ -273,7 +273,7 @@ jobs:
           features: test-utils
           filters: ae_checks
           test-threads: 2
-          retries: 2
+          retries: 0
         timeout-minutes: 15
         env:
           SN_AE_WAIT: 10
