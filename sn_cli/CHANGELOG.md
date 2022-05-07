@@ -4,7 +4,56 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.53.0 (2022-05-06)
+
+### Chore
+
+ - <csr-id-3894e8ed5ab48bc72287c4ae74fa53ef0ba51aaa/> remove the max-capacity flag from sn_node cli
+ - <csr-id-0a87a96a911b6497d6cd667c18ebbe75e86876dc/> remove the max-capacity flag from sn_node cli
+ - <csr-id-1f2d7037d3178e211842f9b554d8fd0d462709e2/> change default node max cpacity to 10GB
+   - Also delete an outdated warning output by CLI about re-enabling authd after switching networks.
+ - <csr-id-e17baffdc356d244075a97e9422d5ffab2ca46c7/> change default node max cpacity to 10GB
+   - Also delete an outdated warning output by CLI about re-enabling authd after switching networks.
+
+### New Features (BREAKING)
+
+ - <csr-id-681457a75e818beb30401154f336383507acd935/> return a Token value from wallet balance API instead of a string
+   - Additionally add support to the cat and dog commands for Wallets.
+   - When cat command is used with a Wallet, it lists all spendable balances found in it,
+   as long as the user has permissions to read it as it's expected to be a private Multimap.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release over the course of 10 calendar days.
+ - 12 days passed between releases.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - return a Token value from wallet balance API instead of a string ([`681457a`](https://github.com/maidsafe/safe_network/commit/681457a75e818beb30401154f336383507acd935))
+    - remove the max-capacity flag from sn_node cli ([`3894e8e`](https://github.com/maidsafe/safe_network/commit/3894e8ed5ab48bc72287c4ae74fa53ef0ba51aaa))
+    - remove the max-capacity flag from sn_node cli ([`0a87a96`](https://github.com/maidsafe/safe_network/commit/0a87a96a911b6497d6cd667c18ebbe75e86876dc))
+    - change default node max cpacity to 10GB ([`1f2d703`](https://github.com/maidsafe/safe_network/commit/1f2d7037d3178e211842f9b554d8fd0d462709e2))
+    - change default node max cpacity to 10GB ([`e17baff`](https://github.com/maidsafe/safe_network/commit/e17baffdc356d244075a97e9422d5ffab2ca46c7))
+    - Merge #1128 ([`e49d382`](https://github.com/maidsafe/safe_network/commit/e49d38239b3a8c468616ad3782e1208316e9b5e0))
+</details>
+
 ## v0.52.0 (2022-04-23)
+
+<csr-id-318ee1d22970b5f06e93a99b6e8fff6da638c589/>
+<csr-id-ad7d340720f0737f502b0d55023a15461dded91d/>
+<csr-id-aad69387240b067604a3d54bcf631a726c9d0956/>
+<csr-id-a477c1db40b9d8f78adf3f620942a06daf0ecc2b/>
+<csr-id-91606f631a211d959364cab1e428d1ac895d3dca/>
+<csr-id-bda0ea00e2e5a258e02a91d12dcd1e480dfff17c/>
 
 ### Chore
 
@@ -15,22 +64,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - <csr-id-ad7d340720f0737f502b0d55023a15461dded91d/> update sn_cli and api readme for sn_client extraction
  - <csr-id-aad69387240b067604a3d54bcf631a726c9d0956/> safe_network->sn_node
 
+### Chore
+
+ - <csr-id-2f4e7e6305ba387f2e28945aee71df650ac1d3eb/> sn_interface-0.2.0/sn_dysfunction-0.1.2/sn_api-0.59.0/sn_cli-0.52.0
+
 ### New Features
+
+<csr-id-adb085e98b00ec6cd0d670bf665009d6e93e2514/>
 
  - <csr-id-e662317e93b3247a1afd9970587ea7241a9b5619/> first and basic implementation of Wallet reissue API and related CLI cmds
    - Generate output DBCs with sn_dbc::TransactionBuilder
-   - Change DBC is also generated and stored in the source Wallet the reissue was made from
-   - Spent DBCs are soft-removed from the source Wallet (Multimap)
-   - Reissued DBCs are all bearer at this instance
-   - Verification of generated Tx and spentproofs is not performed at this instance yet
-   - Input DBCs are not logged as spent on the network's spentbook at this instance yet
- - <csr-id-adb085e98b00ec6cd0d670bf665009d6e93e2514/> first and basic implementation of Wallet reissue API and related CLI cmds
-   - Generate output DBCs with sn_dbc::TransactionBuilder
-   - Change DBC is also generated and stored in the source Wallet the reissue was made from
-   - Spent DBCs are soft-removed from the source Wallet (Multimap)
-   - Reissued DBCs are all bearer at this instance
-   - Verification of generated Tx and spentproofs is not performed at this instance yet
-   - Input DBCs are not logged as spent on the network's spentbook at this instance yet
+- Change DBC is also generated and stored in the source Wallet the reissue was made from
+- Spent DBCs are soft-removed from the source Wallet (Multimap)
+- Reissued DBCs are all bearer at this instance
+- Verification of generated Tx and spentproofs is not performed at this instance yet
+- Input DBCs are not logged as spent on the network's spentbook at this instance yet
+- Generate output DBCs with sn_dbc::TransactionBuilder
+- Change DBC is also generated and stored in the source Wallet the reissue was made from
+- Spent DBCs are soft-removed from the source Wallet (Multimap)
+- Reissued DBCs are all bearer at this instance
+- Verification of generated Tx and spentproofs is not performed at this instance yet
+- Input DBCs are not logged as spent on the network's spentbook at this instance yet
 
 ### Bug Fixes
 
@@ -62,9 +116,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 9 commits contributed to the release over the course of 4 calendar days.
+ - 10 commits contributed to the release over the course of 4 calendar days.
  - 8 days passed between releases.
- - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -74,6 +128,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.2.0/sn_dysfunction-0.1.2/sn_api-0.59.0/sn_cli-0.52.0 ([`2f4e7e6`](https://github.com/maidsafe/safe_network/commit/2f4e7e6305ba387f2e28945aee71df650ac1d3eb))
     - incorporate sn_client and sn_node in release process ([`a477c1d`](https://github.com/maidsafe/safe_network/commit/a477c1db40b9d8f78adf3f620942a06daf0ecc2b))
     - tidy references in cargo manifests ([`318ee1d`](https://github.com/maidsafe/safe_network/commit/318ee1d22970b5f06e93a99b6e8fff6da638c589))
     - additional wallet API test cases ([`91606f6`](https://github.com/maidsafe/safe_network/commit/91606f631a211d959364cab1e428d1ac895d3dca))
@@ -85,10 +140,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - node install command to use correct version ([`cf482c3`](https://github.com/maidsafe/safe_network/commit/cf482c38278dd0aaebbf2711462b0f58b7635049))
 </details>
 
+<csr-unknown>
+ first and basic implementation of Wallet reissue API and related CLI cmds<csr-unknown/>
+
 ## v0.51.3 (2022-04-14)
 
 <csr-id-a6dd3dfc5d60ef5f8591e3b4628d477e4801f7a7/>
 <csr-id-2c557b5d5b5e21882ea3bf1cf904103576363603/>
+<csr-id-9ea06ffe9339d3927897f010314b1be1bf7026bf/>
 
 ### New Features
 

@@ -5,7 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.60.0 (2022-05-06)
+
+### New Features (BREAKING)
+
+ - <csr-id-681457a75e818beb30401154f336383507acd935/> return a Token value from wallet balance API instead of a string
+   - Additionally add support to the cat and dog commands for Wallets.
+   - When cat command is used with a Wallet, it lists all spendable balances found in it,
+   as long as the user has permissions to read it as it's expected to be a private Multimap.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release over the course of 10 calendar days.
+ - 12 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - return a Token value from wallet balance API instead of a string ([`681457a`](https://github.com/maidsafe/safe_network/commit/681457a75e818beb30401154f336383507acd935))
+    - Merge #1128 ([`e49d382`](https://github.com/maidsafe/safe_network/commit/e49d38239b3a8c468616ad3782e1208316e9b5e0))
+</details>
+
 ## v0.59.0 (2022-04-23)
+
+<csr-id-318ee1d22970b5f06e93a99b6e8fff6da638c589/>
+<csr-id-e3dca8b07441c86744b091fe883d16a9c750f702/>
+<csr-id-ad7d340720f0737f502b0d55023a15461dded91d/>
+<csr-id-88421d9cb7872b6397283a0035130bc14de6d4ff/>
+<csr-id-d0913293df42e73716fabb3460ae6dbd4ddf5a1b/>
+<csr-id-91606f631a211d959364cab1e428d1ac895d3dca/>
+<csr-id-bda0ea00e2e5a258e02a91d12dcd1e480dfff17c/>
 
 ### Chore
 
@@ -19,22 +56,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-88421d9cb7872b6397283a0035130bc14de6d4ff/> pull sn_client out of the node codebase
  - <csr-id-d0913293df42e73716fabb3460ae6dbd4ddf5a1b/> update proptest dep to v1 in sn_api
 
+### Chore
+
+ - <csr-id-2f4e7e6305ba387f2e28945aee71df650ac1d3eb/> sn_interface-0.2.0/sn_dysfunction-0.1.2/sn_api-0.59.0/sn_cli-0.52.0
+
 ### New Features
+
+<csr-id-adb085e98b00ec6cd0d670bf665009d6e93e2514/>
 
  - <csr-id-e662317e93b3247a1afd9970587ea7241a9b5619/> first and basic implementation of Wallet reissue API and related CLI cmds
    - Generate output DBCs with sn_dbc::TransactionBuilder
-   - Change DBC is also generated and stored in the source Wallet the reissue was made from
-   - Spent DBCs are soft-removed from the source Wallet (Multimap)
-   - Reissued DBCs are all bearer at this instance
-   - Verification of generated Tx and spentproofs is not performed at this instance yet
-   - Input DBCs are not logged as spent on the network's spentbook at this instance yet
- - <csr-id-adb085e98b00ec6cd0d670bf665009d6e93e2514/> first and basic implementation of Wallet reissue API and related CLI cmds
-   - Generate output DBCs with sn_dbc::TransactionBuilder
-   - Change DBC is also generated and stored in the source Wallet the reissue was made from
-   - Spent DBCs are soft-removed from the source Wallet (Multimap)
-   - Reissued DBCs are all bearer at this instance
-   - Verification of generated Tx and spentproofs is not performed at this instance yet
-   - Input DBCs are not logged as spent on the network's spentbook at this instance yet
+- Change DBC is also generated and stored in the source Wallet the reissue was made from
+- Spent DBCs are soft-removed from the source Wallet (Multimap)
+- Reissued DBCs are all bearer at this instance
+- Verification of generated Tx and spentproofs is not performed at this instance yet
+- Input DBCs are not logged as spent on the network's spentbook at this instance yet
+- Generate output DBCs with sn_dbc::TransactionBuilder
+- Change DBC is also generated and stored in the source Wallet the reissue was made from
+- Spent DBCs are soft-removed from the source Wallet (Multimap)
+- Reissued DBCs are all bearer at this instance
+- Verification of generated Tx and spentproofs is not performed at this instance yet
+- Input DBCs are not logged as spent on the network's spentbook at this instance yet
 
 ### Other
 
@@ -45,9 +87,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 9 commits contributed to the release over the course of 7 calendar days.
+ - 10 commits contributed to the release over the course of 7 calendar days.
  - 8 days passed between releases.
- - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -57,6 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.2.0/sn_dysfunction-0.1.2/sn_api-0.59.0/sn_cli-0.52.0 ([`2f4e7e6`](https://github.com/maidsafe/safe_network/commit/2f4e7e6305ba387f2e28945aee71df650ac1d3eb))
     - tidy references in cargo manifests ([`318ee1d`](https://github.com/maidsafe/safe_network/commit/318ee1d22970b5f06e93a99b6e8fff6da638c589))
     - additional wallet API test cases ([`91606f6`](https://github.com/maidsafe/safe_network/commit/91606f631a211d959364cab1e428d1ac895d3dca))
     - additional wallet API test cases ([`bda0ea0`](https://github.com/maidsafe/safe_network/commit/bda0ea00e2e5a258e02a91d12dcd1e480dfff17c))
@@ -68,12 +111,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - update proptest dep to v1 in sn_api ([`d091329`](https://github.com/maidsafe/safe_network/commit/d0913293df42e73716fabb3460ae6dbd4ddf5a1b))
 </details>
 
+<csr-unknown>
+ first and basic implementation of Wallet reissue API and related CLI cmds<csr-unknown/>
+
 ## v0.58.2 (2022-04-14)
 
 <csr-id-8494a01d9be3dddc0d0f4c2c37cdc4d6c3e54521/>
 <csr-id-b62ad80298eb4b3e2f9810d20dd553aaf802408b/>
 <csr-id-2c557b5d5b5e21882ea3bf1cf904103576363603/>
 <csr-id-86ce41ca31508dbaf2de56fc81e1ca3146f863dc/>
+<csr-id-9ea06ffe9339d3927897f010314b1be1bf7026bf/>
 
 ### Chore
 
