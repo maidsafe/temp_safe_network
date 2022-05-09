@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1652102097590,
+  "lastUpdate": 1652109370040,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -1961,6 +1961,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4690686941,
             "range": "± 1009966132",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "e08096d37dfab490f22ae9786a006aa3f9f630c1",
+          "message": "Merge #1165\n\n1165: chore: use different retry count for certain runs r=joshuef a=jacderida\n\nAlso use Cargo to install ripgrep, which is a cross-platform solution.\n\nCo-authored-by: Chris O'Neil <chriso83@protonmail.com>\nCo-authored-by: joshuef <joshuef@gmail.com>",
+          "timestamp": "2022-05-09T13:49:50Z",
+          "tree_id": "6b90ca7ab26e92e06b34d4c77de2f2458a1650c4",
+          "url": "https://github.com/maidsafe/safe_network/commit/e08096d37dfab490f22ae9786a006aa3f9f630c1"
+        },
+        "date": 1652109368679,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10520126387,
+            "range": "± 6533345739",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3902796723,
+            "range": "± 1457007505",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 9693359830,
+            "range": "± 334816087",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10041569016,
+            "range": "± 7638326",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3147131549,
+            "range": "± 31587400",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4935858107,
+            "range": "± 1438321306",
             "unit": "ns/iter"
           }
         ]
