@@ -653,7 +653,8 @@ impl Node {
                     "Processing CouldNotStoreData event with MsgId: {:?}",
                     msg_id
                 );
-                return if self.is_elder().await {
+
+                if self.is_elder().await {
                     if full {
                         let changed = self
                             .set_storage_level(&node_id, StorageLevel::from(StorageLevel::MAX)?)
@@ -667,7 +668,7 @@ impl Node {
                 } else {
                     error!("Received unexpected message while Adult");
                     Ok(vec![])
-                };
+                }
             }
             SystemMsg::NodeEvent(NodeEvent::SuspiciousNodesDetected(suspects)) => {
                 info!(

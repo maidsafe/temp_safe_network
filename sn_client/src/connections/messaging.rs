@@ -120,6 +120,7 @@ impl Session {
         }
 
         let expected_acks = std::cmp::max(1, elders_len * 2 / 3);
+
         // We are not wait for the receive of majority of cmd Acks.
         // This could be further strict to wait for ALL the Acks get received.
         // The period is expected to have AE completed, hence no extra wait is required.
@@ -134,7 +135,7 @@ impl Session {
                 Ok((src, None)) => {
                     received_ack += 1;
                     trace!(
-                        "received CmdAck of {:?} from {:?}, so far {:?} / {:?}",
+                        "received CmdAck of {:?} from {:?}, so far {} / {}",
                         msg_id,
                         src,
                         received_ack,
@@ -148,7 +149,7 @@ impl Session {
                 Ok((src, Some(error))) => {
                     received_err += 1;
                     error!(
-                        "received error response {:?} of cmd {:?} from {:?}, so far {:?} vs. {:?}",
+                        "received error response {:?} of cmd {:?} from {:?}, so far {} acks vs. {} errors",
                         error, msg_id, src, received_ack, received_err
                     );
                     if received_err >= expected_acks {
@@ -164,13 +165,13 @@ impl Session {
             attempts += 1;
             if attempts >= expected_cmd_ack_wait_attempts {
                 warn!(
-                    "Terminated with insufficient CmdAcks for {:?}, {:?} / {:?} acks received",
+                    "Terminated with insufficient CmdAcks for {:?}, {} / {} acks received",
                     msg_id, received_ack, expected_acks
                 );
                 break;
             }
             trace!(
-                "current ack waiting loop count {:?}/{:?}",
+                "current ack waiting loop count {}/{}",
                 attempts,
                 expected_cmd_ack_wait_attempts
             );

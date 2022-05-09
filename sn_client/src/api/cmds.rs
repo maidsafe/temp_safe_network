@@ -34,7 +34,7 @@ impl Client {
     #[instrument(skip(self), level = "debug")]
     async fn send_cmd_with_retry_count(&self, cmd: DataCmd, retry_count: f32) -> Result<(), Error> {
         let client_pk = self.public_key();
-        let dst_name = cmd.dst_name(); // let msg = ServiceMsg::Cmd(cmd.clone());
+        let dst_name = cmd.dst_name();
 
         let debug_cmd = format!("{:?}", cmd);
 
@@ -90,7 +90,6 @@ impl Client {
                 tokio::time::sleep(delay).await;
             } else {
                 // we're done trying
-
                 break res;
             }
         }
