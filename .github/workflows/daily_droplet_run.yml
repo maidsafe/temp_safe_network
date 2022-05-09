@@ -155,7 +155,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-access-key-secret: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           ssh-secret-key: ${{ secrets.SSH_SECRET_KEY  }}
-          node-count: ${{ github.event.inputs.node-count || 15 }}
+          node-count: ${{ github.event.inputs.node-count || 30 }}
           node-path: /tmp/sn_node
       # The other jobs in the workflow have the testnet launch as a dependency, but they go ahead
       # even if this job fails. It would be better if the whole workflow is abandoned if we don't
@@ -274,7 +274,7 @@ jobs:
     name: cli tests
     if: ${{ always() }} # give the suite a chance to run, even if the api tests fail.
     runs-on: ${{ matrix.os }}
-    needs: [api, client]
+    needs: launch-testnet
     strategy:
       fail-fast: false
       matrix:
