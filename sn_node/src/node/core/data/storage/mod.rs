@@ -352,13 +352,13 @@ mod tests {
         }
     }
 
-    fn model_based_test_imp(ops: Vec<Op>) -> Result<(), &'static str> {
+    fn model_based_test_imp(ops: Vec<Op>) -> Result<(), Error> {
         let mut model: BTreeMap<XorName, ReplicatedData> = BTreeMap::new();
-        let temp_dir = tempdir().unwrap();
+        let temp_dir = tempdir()?;
         let path = temp_dir.path();
         let used_space = UsedSpace::new(usize::MAX);
-        let runtime = Runtime::new().unwrap();
-        let storage = DataStorage::new(path, used_space).unwrap();
+        let runtime = Runtime::new()?;
+        let storage = DataStorage::new(path, used_space)?;
         for op in ops.into_iter() {
             match op {
                 Op::Store(flag, chunk_size) => {
@@ -381,15 +381,13 @@ mod tests {
                             ReplicatedData::Chunk(chunk)
                         }
                     };
-                    let _ = runtime.block_on(storage.store(&data)).unwrap();
+                    let _ = runtime.block_on(storage.store(&data))?;
                     // If Get/Query is performed just after a Store op, half-written data is returned
                     // Adding some delay fixes it
                     thread::sleep(Duration::from_millis(15));
 
                     if let ReplicatedData::Chunk(chunk) = &data {
                         let _ = model.insert(*chunk.name(), data);
-                    } else {
-                        return Err("Cannot be reached");
                     }
                 }
                 Op::Query(idx) => {
@@ -407,12 +405,12 @@ mod tests {
                                     assert_eq!(*m_chunk, s_chunk);
                                 }
                             } else {
-                                return Err("Incorrect query response");
+                                return Err(Error::ChunkNotFound(key));
                             }
                         }
                         None => {
                             if let NodeQueryResponse::GetChunk(Ok(_)) = stored_res {
-                                return Err("Chunk found while it should not exist");
+                                return Err(Error::DataExists);
                             }
                         }
                     }
@@ -428,12 +426,12 @@ mod tests {
                             if let Ok(s_data) = stored_data {
                                 assert_eq!(*m_data, s_data);
                             } else {
-                                return Err("Cannot get ReplicatedData");
+                                return Err(Error::ChunkNotFound(key));
                             }
                         }
                         None => {
                             if stored_data.is_ok() {
-                                return Err("ReplicatedData found while it should not exist");
+                                return Err(Error::DataExists);
                             }
                         }
                     }
@@ -441,8 +439,20 @@ mod tests {
                 Op::Remove(idx) => {
                     let key = get_xor_name(&model, idx % (model.len() + 1));
                     let addr = ReplicatedDataAddress::Chunk(ChunkAddress(key));
-                    let _ = runtime.block_on(storage.remove(&addr));
-                    let _ = model.remove(&key);
+
+                    let storage_res = runtime.block_on(storage.remove(&addr));
+                    match model.remove(&key) {
+                        Some(_) => {
+                            if let Err(err) = storage_res {
+                                return Err(err);
+                            }
+                        }
+                        None => {
+                            if storage_res.is_ok() {
+                                return Err(Error::DataExists);
+                            }
+                        }
+                    }
                 }
             }
         }
