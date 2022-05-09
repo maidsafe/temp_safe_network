@@ -534,8 +534,6 @@ jobs:
           test-threads: 10
         timeout-minutes: 80
         # NRS is slow without this change
-        env:
-          SN_QUERY_TIMEOUT: 20
 
       - name: Are nodes still running...?
         shell: bash
@@ -648,8 +646,6 @@ jobs:
           release: true
           test-threads: 10
         timeout-minutes: 80
-        env:
-          SN_QUERY_TIMEOUT: 20
 
       - name: Are nodes still running...?
         shell: bash
