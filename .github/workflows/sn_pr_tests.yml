@@ -213,17 +213,8 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
-      - name: Mac install ripgrep
-        if: matrix.os == 'macos-latest'
-        run: brew install ripgrep
-
-      - name: ubuntu install ripgrep
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get -y install ripgrep
-
-      - name: windows install ripgrep
-        if: matrix.os == 'windows-latest'
-        run: choco install ripgrep
+      - name: install ripgrep
+        run: cargo install ripgrep
 
       - name: Build sn bins
         run: cd sn_node && cargo build --release --features=test-utils --bins
@@ -268,6 +259,7 @@ jobs:
           release: true
           features: test-utils
           test-threads: 2
+          retries: 0
         timeout-minutes: 25
 
       - name: Run AE tests
@@ -281,6 +273,7 @@ jobs:
           features: test-utils
           filters: ae_checks
           test-threads: 2
+          retries: 0
         timeout-minutes: 15
         env:
           SN_AE_WAIT: 10
@@ -348,8 +341,8 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
-      - name: ubuntu install ripgrep
-        run: sudo apt-get -y install ripgrep
+      - name: install ripgrep
+        run: cargo install ripgrep
 
       - name: Build sn bins
         run: cd sn_node && cargo build --release --features=test-utils --bins
@@ -478,17 +471,8 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
-      - name: Mac install ripgrep
-        if: matrix.os == 'macos-latest'
-        run: brew install ripgrep
-
-      - name: ubuntu install ripgrep
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get -y install ripgrep
-
-      - name: windows install ripgrep
-        if: matrix.os == 'windows-latest'
-        run: choco install ripgrep
+      - name: install ripgrep
+        run: cargo install ripgrep
 
       - name: Build sn bins
         run: cd sn_node && cargo build --release --features=test-utils --bins
@@ -594,17 +578,8 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}
 
-      - name: Mac install ripgrep
-        if: matrix.os == 'macos-latest'
-        run: brew install ripgrep
-
-      - name: ubuntu install ripgrep
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get -y install ripgrep
-
-      - name: windows install ripgrep
-        if: matrix.os == 'windows-latest'
-        run: choco install ripgrep
+      - name: install ripgrep
+        run: cargo install ripgrep
 
       - name: Build sn bins
         run: cd sn_node && cargo build --release --features=test-utils --bins

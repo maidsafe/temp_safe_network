@@ -28,7 +28,7 @@ impl Node {
         proposal: Proposal,
         sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
-        debug!("handle agreement on {:?}", proposal);
+        debug!("{:?} {:?}", LogMarker::ProposalAgreed, proposal);
         match proposal {
             Proposal::Offline(node_state) => self.handle_offline_agreement(node_state, sig).await,
             Proposal::SectionInfo(section_auth) => {

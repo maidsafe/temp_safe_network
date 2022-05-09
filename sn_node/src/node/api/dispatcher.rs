@@ -11,7 +11,7 @@ use super::Cmd;
 use crate::node::{
     core::{DeliveryStatus, Node, Proposal},
     messages::WireMsgUtils,
-    Error, Result,
+    Result,
 };
 use sn_interface::elder_count;
 use sn_interface::messaging::{system::SystemMsg, AuthKind, WireMsg};
@@ -507,7 +507,6 @@ impl Dispatcher {
             }
             _ => Ok(vec![]),
         }
-        .map_err(|e: Error| e)
     }
 
     async fn handle_schedule_timeout(&self, duration: Duration, token: u64) -> Option<Cmd> {
