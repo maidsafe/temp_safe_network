@@ -145,8 +145,6 @@ impl<T: Serialize> Deref for SectionAuth<T> {
 /// This can be a result of seeing a node come online, go offline, changes to section info etc.
 /// Anything where we need section authority before action can be taken
 pub enum Proposal {
-    /// Proposal to remove a node from our section
-    Offline(NodeState),
     /// Proposal to update info about a section.
     ///
     /// It signals the completion of a DKG by the elder candidates to the current elders.

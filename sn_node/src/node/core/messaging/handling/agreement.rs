@@ -30,7 +30,6 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         debug!("{:?} {:?}", LogMarker::ProposalAgreed, proposal);
         match proposal {
-            Proposal::Offline(node_state) => self.handle_offline_agreement(node_state, sig).await,
             Proposal::SectionInfo(section_auth) => {
                 self.handle_section_info_agreement(section_auth, sig).await
             }
@@ -143,13 +142,10 @@ impl Node {
     }
 
     #[instrument(skip(self))]
-    async fn handle_offline_agreement(
-        &self,
-        node_state: NodeState,
-        sig: KeyedSig,
-    ) -> Result<Vec<Cmd>> {
+    pub(crate) async fn vote_member_offline(&self, node_state: NodeState) -> Result<Vec<Cmd>> {
         info!(
-            "Agreement - proposing membership change with node offline: {} at {}",
+            "{:?}: membership change with node offline: {} at {}",
+            LogMarker::VotingOffline,
             node_state.name(),
             node_state.addr()
         );

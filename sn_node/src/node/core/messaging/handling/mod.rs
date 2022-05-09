@@ -556,9 +556,6 @@ impl Node {
 
                 // lets convert our message into a usable proposal for core
                 let core_proposal = match proposal {
-                    ProposalMsg::Offline(node_state) => {
-                        CoreProposal::Offline(node_state.into_state())
-                    }
                     ProposalMsg::SectionInfo(sap) => CoreProposal::SectionInfo(sap.into_state()),
                     ProposalMsg::NewElders(sap) => CoreProposal::NewElders(sap.into_authed_state()),
                     ProposalMsg::JoinsAllowed(allowed) => CoreProposal::JoinsAllowed(allowed),

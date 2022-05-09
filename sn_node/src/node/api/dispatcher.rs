@@ -391,7 +391,7 @@ impl Dispatcher {
                 .await
                 .into_iter()
                 .collect()),
-            Cmd::ProposeOffline(names) => self.node.cast_offline_proposals(&names).await,
+            Cmd::ProposeOffline(names) => self.node.cast_offline_votes(&names).await,
             Cmd::StartConnectivityTest(name) => Ok(vec![
                 self.node
                     .send_msg_to_our_elders(SystemMsg::StartConnectivityTest(name))

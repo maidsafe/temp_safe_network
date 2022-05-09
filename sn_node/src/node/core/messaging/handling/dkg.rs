@@ -219,7 +219,7 @@ impl Node {
                 generation, dkg_session
             );
             cmds.extend(
-                self.cast_offline_proposals(&failure_set.failed_participants)
+                self.cast_offline_votes(&failure_set.failed_participants)
                     .await?,
             );
         }

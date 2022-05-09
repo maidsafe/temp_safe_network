@@ -31,6 +31,7 @@ pub enum LogMarker {
     // Malice
     DeviantsDetected,
     ProposeOffline,
+    VotingOffline,
     AcceptedNodeAsOffline,
     IgnoredNodeAsOffline,
     // Messaging

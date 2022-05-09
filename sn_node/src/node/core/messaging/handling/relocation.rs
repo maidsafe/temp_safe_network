@@ -11,7 +11,7 @@ use crate::node::{
     core::{
         bootstrap::JoiningAsRelocated,
         relocation::{find_nodes_to_relocate, ChurnId, RelocateDetailsUtils},
-        Node, Proposal,
+        Node,
     },
     Event, Result,
 };
@@ -60,10 +60,7 @@ impl Node {
                 churn_id
             );
 
-            cmds.extend(
-                self.propose(Proposal::Offline(node_state.relocate(relocate_details)))
-                    .await?,
-            );
+            cmds.extend(self.vote_member_offline(node_state).await?);
         }
 
         Ok(cmds)
@@ -85,8 +82,7 @@ impl Node {
             relocate_details.age
         );
 
-        self.propose(Proposal::Offline(node_state.relocate(relocate_details)))
-            .await
+        self.vote_member_offline(node_state).await
     }
 
     pub(crate) async fn handle_relocate(
