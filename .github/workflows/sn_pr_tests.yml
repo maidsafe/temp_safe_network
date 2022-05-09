@@ -506,7 +506,7 @@ jobs:
         run: ./target/release/testnet
         id: section-startup
         env:
-          RUST_LOG: "sn_node,sn_api,sn_node=trace"
+          RUST_LOG: "sn_node=trace"
 
       - name: Print Network Log Stats at start
         shell: bash
@@ -532,9 +532,10 @@ jobs:
           package: sn_api
           release: true
           test-threads: 10
-        timeout-minutes: 60
+        timeout-minutes: 80
+        # NRS is slow without this change
         env:
-          SN_QUERY_TIMEOUT: 10
+          SN_QUERY_TIMEOUT: 20
 
       - name: Are nodes still running...?
         shell: bash
@@ -636,6 +637,7 @@ jobs:
       - name: Generate keys for test run
         run: cargo run --package sn_cli --release -- keys create --for-cli
 
+
       - name: Run CLI tests
         uses: maidsafe/cargo-nextest@main
         with:
@@ -645,9 +647,9 @@ jobs:
           package: sn_cli
           release: true
           test-threads: 10
-        timeout-minutes: 60
+        timeout-minutes: 80
         env:
-          SN_QUERY_TIMEOUT: 10
+          SN_QUERY_TIMEOUT: 20
 
       - name: Are nodes still running...?
         shell: bash
