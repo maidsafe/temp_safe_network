@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1652089667085,
+  "lastUpdate": 1652102097590,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -1901,6 +1901,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4430397995,
             "range": "± 1010859547",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "5b21c663c7f11124f0ed2f330b2f8687745f7da7",
+          "message": "Merge #1167\n\n1167: docs: Add recursive flag to rm of dir r=joshuef a=dirvine\n\nIn addition removed unneeded map_err\r\n\r\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\n\nCo-authored-by: David Irvine <david.irvine@maidsafe.net>\nCo-authored-by: joshuef <joshuef@gmail.com>",
+          "timestamp": "2022-05-09T11:40:04Z",
+          "tree_id": "5ca12db92dc66ea452ace1acf796864f01cb1f16",
+          "url": "https://github.com/maidsafe/safe_network/commit/5b21c663c7f11124f0ed2f330b2f8687745f7da7"
+        },
+        "date": 1652102096367,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10493047304,
+            "range": "± 8524835117",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 4126703099,
+            "range": "± 1635257473",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 9605267496,
+            "range": "± 13864268660",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10043973767,
+            "range": "± 2956926000",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3152105020,
+            "range": "± 32411713",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4690686941,
+            "range": "± 1009966132",
             "unit": "ns/iter"
           }
         ]
