@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1652113163525,
+  "lastUpdate": 1652124316532,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -2081,6 +2081,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4777427117,
             "range": "± 145064643",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "837c44cda38c2757f689cc4db4a84fa7c02091c0",
+          "message": "Merge #1172\n\n1172: fix(client): check Register permissions on ops locally to prevent failures when broadcasted to the network r=joshuef a=bochaco\n\nResolve PR #836.\r\n\r\nNote that commands creating a Register don't fail as the network doesn't return any type of errors (by design) but only an ACK that the message was delivered to the section. However, we can perform checks locally on CRDT operations, like in the case of a Register operation, so any permissions issue is detected locally on the client side before the operation is sent/broadcasted to the network. This PR, does simply that, it makes sure the permissions are checked locally when building the Register CRDT operation.\n\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>",
+          "timestamp": "2022-05-09T17:56:28Z",
+          "tree_id": "4c576055231830c75dcd52fe07d7e234938bf2d9",
+          "url": "https://github.com/maidsafe/safe_network/commit/837c44cda38c2757f689cc4db4a84fa7c02091c0"
+        },
+        "date": 1652124315855,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10484901795,
+            "range": "± 7242120255",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 4088398091,
+            "range": "± 4605330023",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 9533703121,
+            "range": "± 644309610",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 8872762095,
+            "range": "± 1635874445",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3148096232,
+            "range": "± 751728468",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4804536275,
+            "range": "± 960125196",
             "unit": "ns/iter"
           }
         ]
