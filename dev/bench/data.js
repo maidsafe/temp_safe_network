@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1652109370040,
+  "lastUpdate": 1652113163525,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -2021,6 +2021,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4935858107,
             "range": "± 1438321306",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "459b641f22b488f33825777b974da80512eabed5",
+          "message": "Merge #1140\n\n1140: tests(storage): model-based test for DataStorage module r=Yoga07 a=RolandSherwin\n\nModel based testing using the following logic:\r\n- Create random combinations of Store, Get, Query, Remove operations using `quickcheck` lib\r\n- Do the operations on `DataStorage` module as well as a `HashMap` and make sure that their results don't diverge.\r\n\r\nFew shortcomings:\r\n1. Cannot do non-blocking async calls because `quickcheck` does not support it (as far as I know). Found [this](https://github.com/nytopop/quickcheck_async) library, but was unsuccessful using it. Thus takes ~25 seconds to do 100 quickcheck tests on my system.\r\n2. Only implemented the tests for `ChunkStorage` field. \r\n3. The chunk sizes are in the range of 1 to 3 mb only.\n\nCo-authored-by: RolandSherwin <RolandSherwin@protonmail.com>",
+          "timestamp": "2022-05-09T14:51:26Z",
+          "tree_id": "9cdc91b857a36b76cd59e7b59e585a2610938edf",
+          "url": "https://github.com/maidsafe/safe_network/commit/459b641f22b488f33825777b974da80512eabed5"
+        },
+        "date": 1652113162898,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10593333806,
+            "range": "± 8852407539",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 4036137081,
+            "range": "± 1635374867",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 9548970037,
+            "range": "± 642767585",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10040813307,
+            "range": "± 2955988103",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3234065827,
+            "range": "± 1190979959",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4777427117,
+            "range": "± 145064643",
             "unit": "ns/iter"
           }
         ]
