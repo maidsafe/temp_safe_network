@@ -17,7 +17,7 @@ Some of the `safe_network` tests require a live network to test against.
 
 ### Running a local testnet
 
-You should first ensure that your local machine does not have any artefacts from prior runs. Eg on unix: `killall sn_node ||true && rm  ~/.safe/node/local-test-network || true` will remove any running `sn_node` instances and remove any prior run's data stored.
+You should first ensure that your local machine does not have any artefacts from prior runs. Eg on unix: `killall sn_node ||true && rm  -r ~/.safe/node/local-test-network || true` will remove any running `sn_node` instances and remove any prior run's data stored.
 
 You can then run a local testnet using the `testnet` bin:
 
