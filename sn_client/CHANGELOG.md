@@ -1113,7 +1113,106 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
+## v0.62.1 (2022-05-06)
+
+### Chore
+
+ - <csr-id-9fc497a3c27f2545c9dc2a8106e31feeb497ef3a/> reduce number of query attempts from client once again
+ - <csr-id-c2f5f855191fa46d549adea15e9123674c24d44a/> remove concept of 'sufficent' knowledge
+   Previously we waited on 7 elders at least... but we should just trust saps provided
+   they are valid. So here we remove this check
+ - <csr-id-e8f4fbca2acb81b3ddc1b275140e5f7b1b56f9a9/> make client targets relative to sap size
+   The proivided sap could be different from expected, but
+   we should be able to trust if if it's valid... As such
+   we base target counts off of the provided SAP
+ - <csr-id-800008d2ec43d6df3bc078c59b7ae405610e5539/> more logging for insufficent elders
+ - <csr-id-7766e7d20b392cf5b8563d1dbc9560254b44e756/> rename MsgKind -> AuthKind
+   This feels more correct given that the kind is actually about the authority that
+   the message carries.
+ - <csr-id-2f4e7e6305ba387f2e28945aee71df650ac1d3eb/> sn_interface-0.2.0/sn_dysfunction-0.1.2/sn_api-0.59.0/sn_cli-0.52.0
+ - <csr-id-318ee1d22970b5f06e93a99b6e8fff6da638c589/> tidy references in cargo manifests
+   All references are organised alphabetically, and random usage of long-form references are removed in
+   favour of the short-form version, unless the long-form style is justified, e.g., when lots of
+   features are being used.
+ - <csr-id-e3dca8b07441c86744b091fe883d16a9c750f702/> set sn_client version to be new release
+   previously sn_client was its own repo and crate, we havent published under this name in some time. This will bring us back into this namespace ad on crates.io, but at a new updated version
+ - <csr-id-ad7d340720f0737f502b0d55023a15461dded91d/> update sn_cli and api readme for sn_client extraction
+ - <csr-id-8d041a80b75bc773fcbe0e4c88940ade9bda4b9d/> remove unused deps after node/client split
+ - <csr-id-2a731b990dbe67a700468865288585ee8dff0d71/> move examples/bench -> sn_client where appropriate
+ - <csr-id-88421d9cb7872b6397283a0035130bc14de6d4ff/> pull sn_client out of the node codebase
+ - <csr-id-6383f038449ebba5e7c5dec1d3f8cc1f7deca581/> remove olde node github workflows
+
+### Bug Fixes
+
+ - <csr-id-9f4c3a523212c41079afcde8052a0891f3895f3b/> client knowledge could not update
+   adds network knowledge storage to clients.
+   Previously we were seeing issues where knowledge could not be
+   updated after receiving one of two sibling saps after split.
+   
+   now we store the whole knowledge and validate against this chain
+
+### Other
+
+ - <csr-id-975520e1abf6056bd50cc29ca5a569015b3a77e4/> delay removing .safe folder on hosted runners
+   this should hopefully occasional avoid cleanup errors
+ - <csr-id-fec4741438b8de957b5de94e21b78cf15886713f/> use Flat sampling in criterion upload tests
+   Criterion auto sampling is designed for tests in the pico/nano sec
+   range. Flat sampling for for longer running tests like ours.
+ - <csr-id-a05599e452dc7400e83e7a048488689db2c28e9e/> use Flat sampling in criterion upload tests
+   Criterion auto sampling is designed for tests in the pico/nano sec
+   range. Flat sampling for for longer running tests like ours.
+ - <csr-id-54000b43cdd3688e6c691bef9dedc299da3c22aa/> test updates for sn_node and sn_client
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 21 commits contributed to the release over the course of 325 calendar days.
+ - 18 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - reduce number of query attempts from client once again ([`9fc497a`](https://github.com/maidsafe/safe_network/commit/9fc497a3c27f2545c9dc2a8106e31feeb497ef3a))
+    - remove concept of 'sufficent' knowledge ([`c2f5f85`](https://github.com/maidsafe/safe_network/commit/c2f5f855191fa46d549adea15e9123674c24d44a))
+    - client knowledge could not update ([`9f4c3a5`](https://github.com/maidsafe/safe_network/commit/9f4c3a523212c41079afcde8052a0891f3895f3b))
+    - make client targets relative to sap size ([`e8f4fbc`](https://github.com/maidsafe/safe_network/commit/e8f4fbca2acb81b3ddc1b275140e5f7b1b56f9a9))
+    - more logging for insufficent elders ([`800008d`](https://github.com/maidsafe/safe_network/commit/800008d2ec43d6df3bc078c59b7ae405610e5539))
+    - delay removing .safe folder on hosted runners ([`975520e`](https://github.com/maidsafe/safe_network/commit/975520e1abf6056bd50cc29ca5a569015b3a77e4))
+    - Merge branch 'main' into Feat-InterfaceAuthKind ([`df40fb9`](https://github.com/maidsafe/safe_network/commit/df40fb94f6847b31aec730eb7cbc6c0b97fe9a0e))
+    - Merge branch 'main' into Feat-InterfaceAuthKind ([`5db6533`](https://github.com/maidsafe/safe_network/commit/5db6533b2151e2377299a0be11e513210adfabd4))
+    - rename MsgKind -> AuthKind ([`7766e7d`](https://github.com/maidsafe/safe_network/commit/7766e7d20b392cf5b8563d1dbc9560254b44e756))
+    - Merge #1128 ([`e49d382`](https://github.com/maidsafe/safe_network/commit/e49d38239b3a8c468616ad3782e1208316e9b5e0))
+    - sn_interface-0.2.0/sn_dysfunction-0.1.2/sn_api-0.59.0/sn_cli-0.52.0 ([`2f4e7e6`](https://github.com/maidsafe/safe_network/commit/2f4e7e6305ba387f2e28945aee71df650ac1d3eb))
+    - tidy references in cargo manifests ([`318ee1d`](https://github.com/maidsafe/safe_network/commit/318ee1d22970b5f06e93a99b6e8fff6da638c589))
+    - use Flat sampling in criterion upload tests ([`fec4741`](https://github.com/maidsafe/safe_network/commit/fec4741438b8de957b5de94e21b78cf15886713f))
+    - use Flat sampling in criterion upload tests ([`a05599e`](https://github.com/maidsafe/safe_network/commit/a05599e452dc7400e83e7a048488689db2c28e9e))
+    - set sn_client version to be new release ([`e3dca8b`](https://github.com/maidsafe/safe_network/commit/e3dca8b07441c86744b091fe883d16a9c750f702))
+    - update sn_cli and api readme for sn_client extraction ([`ad7d340`](https://github.com/maidsafe/safe_network/commit/ad7d340720f0737f502b0d55023a15461dded91d))
+    - remove unused deps after node/client split ([`8d041a8`](https://github.com/maidsafe/safe_network/commit/8d041a80b75bc773fcbe0e4c88940ade9bda4b9d))
+    - move examples/bench -> sn_client where appropriate ([`2a731b9`](https://github.com/maidsafe/safe_network/commit/2a731b990dbe67a700468865288585ee8dff0d71))
+    - test updates for sn_node and sn_client ([`54000b4`](https://github.com/maidsafe/safe_network/commit/54000b43cdd3688e6c691bef9dedc299da3c22aa))
+    - pull sn_client out of the node codebase ([`88421d9`](https://github.com/maidsafe/safe_network/commit/88421d9cb7872b6397283a0035130bc14de6d4ff))
+    - remove olde node github workflows ([`6383f03`](https://github.com/maidsafe/safe_network/commit/6383f038449ebba5e7c5dec1d3f8cc1f7deca581))
+</details>
+
 ## v0.62.0 (2022-04-23)
+
+<csr-id-318ee1d22970b5f06e93a99b6e8fff6da638c589/>
+<csr-id-e3dca8b07441c86744b091fe883d16a9c750f702/>
+<csr-id-ad7d340720f0737f502b0d55023a15461dded91d/>
+<csr-id-8d041a80b75bc773fcbe0e4c88940ade9bda4b9d/>
+<csr-id-2a731b990dbe67a700468865288585ee8dff0d71/>
+<csr-id-88421d9cb7872b6397283a0035130bc14de6d4ff/>
+<csr-id-6383f038449ebba5e7c5dec1d3f8cc1f7deca581/>
+<csr-id-fec4741438b8de957b5de94e21b78cf15886713f/>
+<csr-id-a05599e452dc7400e83e7a048488689db2c28e9e/>
+<csr-id-54000b43cdd3688e6c691bef9dedc299da3c22aa/>
 
 ### Chore
 
@@ -1138,31 +1237,4 @@ needed, as they keypair itself contains the Arcs we need.
    Criterion auto sampling is designed for tests in the pico/nano sec
    range. Flat sampling for for longer running tests like ours.
  - <csr-id-54000b43cdd3688e6c691bef9dedc299da3c22aa/> test updates for sn_node and sn_client
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 10 commits contributed to the release over the course of 312 calendar days.
- - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - tidy references in cargo manifests ([`318ee1d`](https://github.com/maidsafe/safe_network/commit/318ee1d22970b5f06e93a99b6e8fff6da638c589))
-    - use Flat sampling in criterion upload tests ([`fec4741`](https://github.com/maidsafe/safe_network/commit/fec4741438b8de957b5de94e21b78cf15886713f))
-    - use Flat sampling in criterion upload tests ([`a05599e`](https://github.com/maidsafe/safe_network/commit/a05599e452dc7400e83e7a048488689db2c28e9e))
-    - set sn_client version to be new release ([`e3dca8b`](https://github.com/maidsafe/safe_network/commit/e3dca8b07441c86744b091fe883d16a9c750f702))
-    - update sn_cli and api readme for sn_client extraction ([`ad7d340`](https://github.com/maidsafe/safe_network/commit/ad7d340720f0737f502b0d55023a15461dded91d))
-    - remove unused deps after node/client split ([`8d041a8`](https://github.com/maidsafe/safe_network/commit/8d041a80b75bc773fcbe0e4c88940ade9bda4b9d))
-    - move examples/bench -> sn_client where appropriate ([`2a731b9`](https://github.com/maidsafe/safe_network/commit/2a731b990dbe67a700468865288585ee8dff0d71))
-    - test updates for sn_node and sn_client ([`54000b4`](https://github.com/maidsafe/safe_network/commit/54000b43cdd3688e6c691bef9dedc299da3c22aa))
-    - pull sn_client out of the node codebase ([`88421d9`](https://github.com/maidsafe/safe_network/commit/88421d9cb7872b6397283a0035130bc14de6d4ff))
-    - remove olde node github workflows ([`6383f03`](https://github.com/maidsafe/safe_network/commit/6383f038449ebba5e7c5dec1d3f8cc1f7deca581))
-</details>
 
