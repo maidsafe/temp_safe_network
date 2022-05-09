@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1652128161538,
+  "lastUpdate": 1652134004564,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -2201,6 +2201,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 10392302004,
             "range": "± 41707748",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "9a8789e307fa09b9624a8602978f720d3dc9fc8b",
+          "message": "Merge #1175\n\n1175: ci: nightly improvements and fix release process issues r=joshuef a=jacderida\n\nA few changes for things spotted in the last nightly/release run:\r\n\r\n* Use `usize::MAX` for max capacity on ARM/ARMv7. A change to use a max capacity of 10GB wouldn't\r\n  compile on these 32-bit architectures, since the value exceeded 2^32.\r\n* Exit on error if ARM builds fail. Even though compilation failed, the release process didn't\r\n  report an error for the failure. The outer process must be disabling the `set -e` effect.\r\n* During the publishing process, instruct `sn_node` to wait on `sn_interface` rather than\r\n  `sn_dysfunction`, since `sn_interface` is published immediately before `sn_node`. The last release\r\n  failed when it tried to publish `sn_node` because `sn_interface` wasn't available yet.\r\n* Use 30 nodes in the testnet for the nightly run.\r\n* Run the CLI test suite in parallel with the API and client tests. Previously we didn't try this\r\n  because we never knew if the network would handle the load.\r\n\n\nCo-authored-by: Chris O'Neil <chriso83@protonmail.com>\nCo-authored-by: joshuef <joshuef@gmail.com>",
+          "timestamp": "2022-05-09T20:40:12Z",
+          "tree_id": "d0c31a0f6dfcbe577bb9f8c27060fb129417fd04",
+          "url": "https://github.com/maidsafe/safe_network/commit/9a8789e307fa09b9624a8602978f720d3dc9fc8b"
+        },
+        "date": 1652134003455,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10575214525,
+            "range": "± 11926418052",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 4138593225,
+            "range": "± 3450934037",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 8471964706,
+            "range": "± 229455706",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10034535191,
+            "range": "± 2215474479",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3158308832,
+            "range": "± 962475624",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4534062594,
+            "range": "± 194734415",
             "unit": "ns/iter"
           }
         ]
