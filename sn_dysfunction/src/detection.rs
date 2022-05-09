@@ -13,12 +13,12 @@ use xor_name::XorName;
 use std::time::Duration;
 static RECENT_ISSUE_DURATION: Duration = Duration::from_secs(60 * 15);
 
-static CONN_WEIGHTING: f32 = 20.0;
-static OP_WEIGHTING: f32 = 1.5;
-static KNOWLEDGE_WEIGHTING: f32 = 60.0;
+static CONN_WEIGHTING: f32 = 2.0;
+static OP_WEIGHTING: f32 = 1.0;
+static KNOWLEDGE_WEIGHTING: f32 = 3.0;
 
 // Ratio to mean scores should be over to be considered dys/sus
-static DYSFUNCTION_MEAN_RATIO: f32 = 4.5;
+static DYSFUNCTION_MEAN_RATIO: f32 = 9.5;
 static SUSPECT_MEAN_RATIO: f32 = 1.5;
 
 #[derive(Clone, Debug)]
@@ -225,7 +225,7 @@ impl DysfunctionDetection {
             );
 
             if nodes_score >= to_beat {
-                debug!("DysfunctionDetection: Adding {name} as {severity:?} node");
+                info!("DysfunctionDetection: Adding {name} as {severity:?} node");
                 let _existed = dysfunctional_nodes.insert(name);
             }
         }
@@ -489,9 +489,9 @@ mod comm_tests {
 
     // Above this, nodes should be sus
     // this is only counting last RECENT minutes atm
-    pub(crate) const NORMAL_CONNECTION_PROBLEM_COUNT: usize = 5;
-    pub(crate) const SUSPECT_CONNECTION_PROBLEM_COUNT: usize = 20;
-    pub(crate) const DYSFUNCTIONAL_CONNECTION_PROBLEM_COUNT: usize = 35;
+    pub(crate) const NORMAL_CONNECTION_PROBLEM_COUNT: usize = 50;
+    pub(crate) const SUSPECT_CONNECTION_PROBLEM_COUNT: usize = 200;
+    pub(crate) const DYSFUNCTIONAL_CONNECTION_PROBLEM_COUNT: usize = 350;
 
     #[tokio::test]
     async fn conn_dys_is_tolerant_of_norms() -> Result<()> {
@@ -615,9 +615,9 @@ mod knowledge_tests {
     type Result<T, E = Error> = std::result::Result<T, E>;
 
     // 5 here means we have some tolerance for AE rounds while nodes are getting up to speed on churn/split
-    pub(crate) const NORMAL_KNOWLEDGE_ISSUES: usize = 7;
-    pub(crate) const SUSPECT_KNOWLEDGE_ISSUES: usize = 15;
-    pub(crate) const DYSFUNCTIONAL_KNOWLEDGE_ISSUES: usize = 28;
+    pub(crate) const NORMAL_KNOWLEDGE_ISSUES: usize = 70;
+    pub(crate) const SUSPECT_KNOWLEDGE_ISSUES: usize = 150;
+    pub(crate) const DYSFUNCTIONAL_KNOWLEDGE_ISSUES: usize = 280;
 
     #[tokio::test]
     async fn knowledge_dys_is_tolerant_of_norms() -> Result<()> {
