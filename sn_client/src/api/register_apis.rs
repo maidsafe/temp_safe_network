@@ -14,7 +14,7 @@ use sn_interface::messaging::data::{
     RegisterQuery, SignedRegisterCreate, SignedRegisterDelete, SignedRegisterEdit,
 };
 use sn_interface::types::{
-    register::{Entry, EntryHash, Permissions, Policy, Register, User},
+    register::{Action, Entry, EntryHash, Permissions, Policy, Register, User},
     RegisterAddress as Address,
 };
 
@@ -134,6 +134,11 @@ impl Client {
         debug!("Writing to register at {:?}", address);
         let mut register = self.get_register(address).await?;
 
+        // Let's check the policy/permissions to make sure this operation is allowed,
+        // otherwise it will fail when the operation is applied on the network replica.
+        let public_key = self.keypair.public_key();
+        register.check_permissions(Action::Write, Some(User::Key(public_key)))?;
+
         // We can now write the entry to the Register
         let (hash, op) = register.write(entry, children)?;
         let op = EditRegister { address, edit: op };
@@ -143,7 +148,7 @@ impl Client {
         let edit = SignedRegisterEdit {
             op,
             auth: sn_interface::messaging::ServiceAuth {
-                public_key: self.keypair.public_key(),
+                public_key,
                 signature,
             },
         };

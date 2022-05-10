@@ -186,7 +186,10 @@ impl Node {
                     .await
             }
             _ => {
-                warn!("!!!! Unexpected ServiceMsg received in routing. Was not sent to node layer: {:?}", msg);
+                warn!(
+                    "!!!! Unexpected ServiceMsg received, and it was not handled: {:?}",
+                    msg
+                );
                 return Ok(vec![]);
             }
         };

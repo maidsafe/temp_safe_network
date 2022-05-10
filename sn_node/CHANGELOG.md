@@ -5,7 +5,120 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.58.15 (2022-05-06)
+
+### Chore
+
+ - <csr-id-3757300caaea01c99a1d692ce4f572d790570ac2/> validate votes are for our section
+ - <csr-id-c71d179e8b8089d638853956a1a39676c01c39b8/> send membership ae to only requesting peer
+ - <csr-id-c5ba36e5ab89b2c440db38f1d1f06d4cf6c90b6a/> remove outdated comment
+ - <csr-id-3894e8ed5ab48bc72287c4ae74fa53ef0ba51aaa/> remove the max-capacity flag from sn_node cli
+ - <csr-id-0a87a96a911b6497d6cd667c18ebbe75e86876dc/> remove the max-capacity flag from sn_node cli
+ - <csr-id-7766e7d20b392cf5b8563d1dbc9560254b44e756/> rename MsgKind -> AuthKind
+   This feels more correct given that the kind is actually about the authority that
+   the message carries.
+ - <csr-id-1f2d7037d3178e211842f9b554d8fd0d462709e2/> change default node max cpacity to 10GB
+   - Also delete an outdated warning output by CLI about re-enabling authd after switching networks.
+ - <csr-id-e17baffdc356d244075a97e9422d5ffab2ca46c7/> change default node max cpacity to 10GB
+   - Also delete an outdated warning output by CLI about re-enabling authd after switching networks.
+
+### New Features
+
+ - <csr-id-0d5cdf940afc390de22d94e91621e76d45a9eaad/> handover integration squashed
+
+### Bug Fixes
+
+ - <csr-id-ffc1a23b094b6ab99daaa61c91a628e478acb0e1/> log error when dropping vote due to bad signature
+ - <csr-id-7491323ded9a484ce0ed8f0253c76848921c54a9/> dont keep processing a vote batch when errored
+   Previously we process each vote, even if an earlier one failed.
+   This could lead to us parsing invalid votes from another section (if messages are off), and requesting ae updates in a loop
+ - <csr-id-23aafad827a4b5b738db17a966f835f13b9cdf65/> stop DKG message loops post-split
+   It could happen that during a split DKG messages are still ongoing post-split
+   and are sent to the neighbouring section, which causes an AE loop as
+   section keys are not in chain.
+ - <csr-id-dd353b969ace383c3e89c94f7f242b84b6aee89f/> early return when AE required from a vote batch
+   With latest changes we can have vote batches, and if for some reason
+   we were not up to speed with the provided info, we were requesting AE
+   updates for _every_ vote in the batch.
+   
+   Here we change that to request only one AE for the first one that fails.
+ - <csr-id-9f4c3a523212c41079afcde8052a0891f3895f3b/> client knowledge could not update
+   adds network knowledge storage to clients.
+   Previously we were seeing issues where knowledge could not be
+   updated after receiving one of two sibling saps after split.
+   
+   now we store the whole knowledge and validate against this chain
+ - <csr-id-829eb33184c6012faa2020333e72a7c811fdb660/> batch MembershipVotes in order to ensure that order is preserved.
+   Membership AE could trigger looping if response messages were processed in a bad
+   order, so now we just send all the votes in a oner, in order, and those will be handled
+   in the correct order. Hopefully cutting down on potential AE looping.
+ - <csr-id-2f69548f5250d8c4bbcd03052bb9a49f9a2bc091/> avoid AE loop by being judicious with AE requests
+ - <csr-id-a4b7597853c9f154e6fd04f1f82133cab0b3c784/> add missing backpressure feature gate.
+   We were trying to count messages when thsi wasn't instantiated w/o
+   backpressure. So were logging a looot of errors.
+
+### Other
+
+ - <csr-id-4de29a018a5305d18589bdd5a3d557f7979eafd7/> fix split/demotion test
+   We were incorrectly assuming no AE update from prefix0 for... no reason
+   I can see. This was being hit after the recent handover/dkg generation
+   updates. Removing the check and ensuring we checked _both_ sections
+   for updates solves this
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 21 commits contributed to the release over the course of 10 calendar days.
+ - 10 days passed between releases.
+ - 18 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - log error when dropping vote due to bad signature ([`ffc1a23`](https://github.com/maidsafe/safe_network/commit/ffc1a23b094b6ab99daaa61c91a628e478acb0e1))
+    - validate votes are for our section ([`3757300`](https://github.com/maidsafe/safe_network/commit/3757300caaea01c99a1d692ce4f572d790570ac2))
+    - dont keep processing a vote batch when errored ([`7491323`](https://github.com/maidsafe/safe_network/commit/7491323ded9a484ce0ed8f0253c76848921c54a9))
+    - stop DKG message loops post-split ([`23aafad`](https://github.com/maidsafe/safe_network/commit/23aafad827a4b5b738db17a966f835f13b9cdf65))
+    - early return when AE required from a vote batch ([`dd353b9`](https://github.com/maidsafe/safe_network/commit/dd353b969ace383c3e89c94f7f242b84b6aee89f))
+    - client knowledge could not update ([`9f4c3a5`](https://github.com/maidsafe/safe_network/commit/9f4c3a523212c41079afcde8052a0891f3895f3b))
+    - batch MembershipVotes in order to ensure that order is preserved. ([`829eb33`](https://github.com/maidsafe/safe_network/commit/829eb33184c6012faa2020333e72a7c811fdb660))
+    - send membership ae to only requesting peer ([`c71d179`](https://github.com/maidsafe/safe_network/commit/c71d179e8b8089d638853956a1a39676c01c39b8))
+    - fix split/demotion test ([`4de29a0`](https://github.com/maidsafe/safe_network/commit/4de29a018a5305d18589bdd5a3d557f7979eafd7))
+    - remove outdated comment ([`c5ba36e`](https://github.com/maidsafe/safe_network/commit/c5ba36e5ab89b2c440db38f1d1f06d4cf6c90b6a))
+    - handover integration squashed ([`0d5cdf9`](https://github.com/maidsafe/safe_network/commit/0d5cdf940afc390de22d94e91621e76d45a9eaad))
+    - avoid AE loop by being judicious with AE requests ([`2f69548`](https://github.com/maidsafe/safe_network/commit/2f69548f5250d8c4bbcd03052bb9a49f9a2bc091))
+    - Merge #1142 ([`b4c8086`](https://github.com/maidsafe/safe_network/commit/b4c8086a53d20c588b4c4c941601edd3f360e04b))
+    - add missing backpressure feature gate. ([`a4b7597`](https://github.com/maidsafe/safe_network/commit/a4b7597853c9f154e6fd04f1f82133cab0b3c784))
+    - Merge branch 'main' into Feat-InterfaceAuthKind ([`df40fb9`](https://github.com/maidsafe/safe_network/commit/df40fb94f6847b31aec730eb7cbc6c0b97fe9a0e))
+    - Merge branch 'main' into Feat-InterfaceAuthKind ([`5db6533`](https://github.com/maidsafe/safe_network/commit/5db6533b2151e2377299a0be11e513210adfabd4))
+    - remove the max-capacity flag from sn_node cli ([`3894e8e`](https://github.com/maidsafe/safe_network/commit/3894e8ed5ab48bc72287c4ae74fa53ef0ba51aaa))
+    - remove the max-capacity flag from sn_node cli ([`0a87a96`](https://github.com/maidsafe/safe_network/commit/0a87a96a911b6497d6cd667c18ebbe75e86876dc))
+    - rename MsgKind -> AuthKind ([`7766e7d`](https://github.com/maidsafe/safe_network/commit/7766e7d20b392cf5b8563d1dbc9560254b44e756))
+    - change default node max cpacity to 10GB ([`1f2d703`](https://github.com/maidsafe/safe_network/commit/1f2d7037d3178e211842f9b554d8fd0d462709e2))
+    - change default node max cpacity to 10GB ([`e17baff`](https://github.com/maidsafe/safe_network/commit/e17baffdc356d244075a97e9422d5ffab2ca46c7))
+</details>
+
 ## v0.58.14 (2022-04-25)
+
+<csr-id-2f4e7e6305ba387f2e28945aee71df650ac1d3eb/>
+<csr-id-318ee1d22970b5f06e93a99b6e8fff6da638c589/>
+<csr-id-826dfa48cc7c73f19adcd67bb06c7464dba4921d/>
+<csr-id-8d041a80b75bc773fcbe0e4c88940ade9bda4b9d/>
+<csr-id-2a731b990dbe67a700468865288585ee8dff0d71/>
+<csr-id-aad69387240b067604a3d54bcf631a726c9d0956/>
+<csr-id-0fc38442008ff62a6bf5398ff36cd67f99a6e172/>
+<csr-id-6383f038449ebba5e7c5dec1d3f8cc1f7deca581/>
+<csr-id-5580cac3d7aeab7e809729697753a9a38e8f2270/>
+<csr-id-a6cb9e6c5bd63d61c4114afdcc632532f48ba208/>
+<csr-id-9945bf8fb5981c1a64b23d6ea1afba5089aa5c3a/>
+<csr-id-54000b43cdd3688e6c691bef9dedc299da3c22aa/>
+<csr-id-1f3af46aea59ebeb1b6a4b736e80e86ce2f724d8/>
 
 ### Chore
 
@@ -20,6 +133,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-aad69387240b067604a3d54bcf631a726c9d0956/> safe_network->sn_node
  - <csr-id-0fc38442008ff62a6bf5398ff36cd67f99a6e172/> rename sn->sn_node now we have client extracted
  - <csr-id-6383f038449ebba5e7c5dec1d3f8cc1f7deca581/> remove olde node github workflows
+
+### Chore
+
+ - <csr-id-cbf5d45ec4522961fc7ef0860d86cc7d5e0ecca8/> sn_node-0.58.14
 
 ### New Features
 
@@ -45,26 +162,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    problem comes when you later want to select the issues of this type. For example:
    ```
    let _ = op_scores.insert(
-       *node,
-       self.calculate_node_score(
-           node,
-           adults.clone(),
-           IssueType::PendingRequestOperation,
-       )
-       .await,
+   *node,
+   self.calculate_node_score(
+   node,
+   adults.clone(),
+   IssueType::PendingRequestOperation,
+   )
+   .await,
    );
    ```
    
    If you have the `op_id` parameter on the enum entry, the code becomes very clunky:
    ```
    let _ = op_scores.insert(
-       *node,
-       self.calculate_node_score(
-           node,
-           adults.clone(),
-           IssueType::PendingRequestOperation([1; 32])
-       )
-       .await,
+   *node,
+   self.calculate_node_score(
+   node,
+   adults.clone(),
+   IssueType::PendingRequestOperation([1; 32])
+   )
+   .await,
    );
    ```
    
@@ -105,8 +222,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 19 commits contributed to the release over the course of 314 calendar days.
- - 17 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 20 commits contributed to the release over the course of 314 calendar days.
+ - 18 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -116,6 +233,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_node-0.58.14 ([`cbf5d45`](https://github.com/maidsafe/safe_network/commit/cbf5d45ec4522961fc7ef0860d86cc7d5e0ecca8))
     - use the config verbosity if no env var present ([`9aa65d9`](https://github.com/maidsafe/safe_network/commit/9aa65d92e1d806150401f8bdefa1ead2e3cafd42))
     - update some instances of safe_network->sn_node ([`1e7c4ab`](https://github.com/maidsafe/safe_network/commit/1e7c4ab6d56304f99d11396e0eee5109eb4dda04))
     - Merge #1128 ([`e49d382`](https://github.com/maidsafe/safe_network/commit/e49d38239b3a8c468616ad3782e1208316e9b5e0))

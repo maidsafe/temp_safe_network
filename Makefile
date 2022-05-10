@@ -25,7 +25,11 @@ gha-build-arm-unknown-linux-musleabi: arm-unknown-linux-musleabi
 gha-build-armv7-unknown-linux-musleabihf: armv7-unknown-linux-musleabihf
 gha-build-aarch64-unknown-linux-musl: aarch64-unknown-linux-musl
 
+.ONESHELL:
 arm-unknown-linux-musleabi:
+	# The outer process that calls this, i.e., the build agent on Github Actions, must be performing
+	# set +e, because even if the compilation fails it just continues and no error is reported.
+	@set -e
 	rm -rf target
 	rm -rf artifacts
 	mkdir artifacts
@@ -35,7 +39,11 @@ arm-unknown-linux-musleabi:
 		--no-default-features --features testing
 	find target/arm-unknown-linux-musleabi/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
+.ONESHELL:
 armv7-unknown-linux-musleabihf:
+	# The outer process that calls this, i.e., the build agent on Github Actions, must be performing
+	# set +e, because even if the compilation fails it just continues and no error is reported.
+	@set -e
 	rm -rf target
 	rm -rf artifacts
 	mkdir artifacts
@@ -45,7 +53,11 @@ armv7-unknown-linux-musleabihf:
 		--no-default-features --features testing
 	find target/armv7-unknown-linux-musleabihf/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
+.ONESHELL:
 aarch64-unknown-linux-musl:
+	# The outer process that calls this, i.e., the build agent on Github Actions, must be performing
+	# set +e, because even if the compilation fails it just continues and no error is reported.
+	@set -e
 	rm -rf target
 	rm -rf artifacts
 	mkdir artifacts
