@@ -552,6 +552,10 @@ impl Node {
             .elder_count();
         let section_prefix = self.network_knowledge.prefix().await;
 
+        // reset split barrier for
+        let mut split_barrier = self.split_barrier.write().await;
+        *split_barrier = SplitBarrier::new();
+
         let mut handover_voting = self.handover_voting.write().await;
         *handover_voting = Some(Handover::from(
             (key.index as u8, key.secret_key_share),

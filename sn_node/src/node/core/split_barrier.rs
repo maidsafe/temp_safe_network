@@ -57,7 +57,6 @@ impl SplitBarrier {
                     cached_section_auth.prefix() == section_auth.prefix().sibling()
                 });
 
-        // let _prev = gen_map_guard.insert(generation, keep.clone());
         if give.is_empty() {
             // No sibling found. Cache this update until we see the sibling update.
             keep.push((section_auth, keyed_sig));
