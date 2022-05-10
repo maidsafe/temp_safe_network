@@ -11,9 +11,6 @@ env:
   SAFE_AUTH_PASSPHRASE: "x"
   SAFE_AUTH_PASSWORD: "y"
   NODE_COUNT: 15
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  AWS_DEFAULT_REGION: 'eu-west-2'
 
 jobs:
   # bors Continuous Integration
@@ -298,16 +295,6 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: matrix.os != 'windows-latest'
 
-      - name: Upload Node Logs to AWS for Windowns
-        run: aws s3 sync C:\Users\runneradmin\.safe\node\local-test-network\ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure() &&  matrix.os == 'windows-latest'
-        continue-on-error: true
-
-      - name: Upload Node Logs to AWS for Non-Windows
-        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure() &&  matrix.os != 'windows-latest'
-        continue-on-error: true
-
       - name: Upload Node Logs
         uses: actions/upload-artifact@v2
         with:
@@ -533,16 +520,6 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success'
 
-      - name: Upload Node Logs to AWS for Windowns
-        run: aws s3 sync C:\Users\runneradmin\.safe\node\local-test-network\ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure() &&  matrix.os == 'windows-latest'
-        continue-on-error: true
-
-      - name: Upload Node Logs to AWS for Non-Windows
-        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure() &&  matrix.os != 'windows-latest'
-        continue-on-error: true
-
       - name: Upload Node Logs
         uses: actions/upload-artifact@v2
         with:
@@ -636,20 +613,10 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success'
 
-      - name: Upload Node Logs to AWS for Windowns
-        run: aws s3 sync C:\Users\runneradmin\.safe\node\local-test-network\ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure() &&  matrix.os == 'windows-latest'
-        continue-on-error: true
-
-      - name: Upload Node Logs to AWS for Non-Windows
-        run: aws s3 sync ~/.safe/node/local-test-network/ s3://safe-network-ci-logs/${{github.sha}}/${{ github.run_id }}-${{ github.run_number }}/${{matrix.os}}
-        if: failure() &&  matrix.os != 'windows-latest'
-        continue-on-error: true
-
       - name: Upload Node Logs
         uses: actions/upload-artifact@v2
         with:
-          name: sn_node_logs_api_${{matrix.os}}
+          name: sn_node_logs_cli_${{matrix.os}}
           path: ~/.safe/node/local-test-network/**/*.log*
         if: failure()
         continue-on-error: true
