@@ -218,36 +218,23 @@ jobs:
         run: |
           commit_message="${{ github.event.head_commit.message }}"
           if [[ $commit_message == *"sn_node"* ]]; then
-            # The sn_node crate is dependent on sn_dysfunction and sn_interface and sometimes the
-            # new version doesn't become available on crates.io immediately, so this script will use
-            # a retry loop. The script can only check for one dependent crate, but since this
-            # process is sequential, we'll check for sn_interface, since this was the preceding
-            # crate and is less likely than sn_dysfunction to be available.
-            ./resources/scripts/publish_crate.sh \
-              "sn_node" "${{ steps.versioning.outputs.sn_interface_version }}" "sn_interface"
+            ./resources/scripts/publish_crate_with_retries.sh "sn_node"
           fi
       - name: publish sn_client
         run: |
           commit_message="${{ github.event.head_commit.message }}"
           if [[ $commit_message == *"sn_client"* ]]; then
-            # sn_client is dependent on sn_interface.
-            # We already waited for sn_interface to be published in the last step, so we can just go
-            # ahead and attempt the publish without the retry script.
-            cd sn_client && cargo publish --allow-dirty
+            ./resources/scripts/publish_crate_with_retries.sh "sn_client"
           fi
       - name: publish sn_api
         run: |
           commit_message="${{ github.event.head_commit.message }}"
           if [[ $commit_message == *"sn_api"* ]]; then
-            # sn_api is dependent on sn_interface and sn_client, but we should be able to check just
-            # for sn_client.
-            ./resources/scripts/publish_crate.sh \
-              "sn_api" "${{ steps.versioning.outputs.sn_client_version }}" "sn_client"
+            ./resources/scripts/publish_crate_with_retries.sh "sn_api"
           fi
       - name: publish sn_cli
         run: |
           commit_message="${{ github.event.head_commit.message }}"
           if [[ $commit_message == *"sn_cli"* ]]; then
-            ./resources/scripts/publish_crate.sh \
-              "sn_cli" "${{ steps.versioning.outputs.sn_api_version }}" "sn_api"
+            ./resources/scripts/publish_crate_with_retries.sh "sn_cli"
           fi
