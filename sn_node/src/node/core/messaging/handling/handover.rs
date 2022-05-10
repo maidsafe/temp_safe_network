@@ -88,18 +88,14 @@ impl Node {
     pub(crate) async fn handle_handover_msg(
         &self,
         signed_vote: SignedVote<SapCandidate>,
-    ) -> Vec<Cmd> {
+    ) -> Result<Vec<Cmd>> {
         debug!(
             ">>> {}: {:?}",
             LogMarker::HandoverMsgToBeHandled,
             signed_vote
         );
 
-        if let Err(err) = self.check_signed_vote_saps(&signed_vote) {
-            // NB TODO tracking who sent this invalid vote?
-            error!("Ignoring invalid handover vote: {}", err);
-            return vec![];
-        }
+        self.check_signed_vote_saps(&signed_vote)?;
 
         let mut wlock = self.handover_voting.write().await;
         match &*wlock {
@@ -117,11 +113,11 @@ impl Node {
                     cmds.extend(bcast_cmds);
                 }
                 *wlock = Some(state);
-                cmds
+                Ok(cmds)
             }
             None => {
                 trace!(">>> Non-elder node unexpectedly received handover Vote msg, ignoring...");
-                vec![]
+                Ok(vec![])
             }
         }
     }
