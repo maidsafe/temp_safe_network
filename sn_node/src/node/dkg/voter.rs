@@ -129,7 +129,7 @@ impl DkgVoter {
 
                 // Remove unneeded old sessions.
                 self.sessions.retain(|_, existing_session| {
-                    existing_session.session_id.generation >= session_id.generation
+                    existing_session.session_id.section_chain_len >= session_id.section_chain_len
                 });
 
                 Ok(cmds)

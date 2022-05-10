@@ -544,7 +544,7 @@ mod tests {
         let session_id = DkgSessionId {
             prefix,
             elders,
-            generation: 0,
+            section_chain_len: 0,
             bootstrap_members,
         };
 
@@ -576,7 +576,7 @@ mod tests {
         let session_id = DkgSessionId {
             prefix: Prefix::default(),
             elders: BTreeMap::from_iter(nodes.iter().map(|n| (n.name(), n.addr))),
-            generation: 0,
+            section_chain_len: 0,
             bootstrap_members: BTreeSet::from_iter(
                 nodes
                     .iter()

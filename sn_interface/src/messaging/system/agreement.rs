@@ -30,8 +30,8 @@ pub struct DkgSessionId {
     pub prefix: Prefix,
     /// Other Elders in this dkg session
     pub elders: BTreeMap<XorName, SocketAddr>,
-    /// The generation, as in the length of the section chain main branch.
-    pub generation: u64,
+    /// The length of the section chain main branch.
+    pub section_chain_len: u64,
     /// The bootstrap members for the next Membership instance.
     pub bootstrap_members: BTreeSet<NodeState>,
 }
@@ -52,7 +52,7 @@ impl DkgSessionId {
             hasher.update(&elder);
         }
 
-        hasher.update(&self.generation.to_le_bytes());
+        hasher.update(&self.section_chain_len.to_le_bytes());
 
         for member in self.bootstrap_members.iter() {
             hasher.update(&member.name);

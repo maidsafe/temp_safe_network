@@ -434,13 +434,13 @@ impl Node {
         let zero_id = DkgSessionId {
             prefix: zero_prefix,
             elders: BTreeMap::from_iter(zero_elders.iter().map(|node| (node.name, node.addr))),
-            generation,
+            section_chain_len: generation,
             bootstrap_members: zero,
         };
         let one_id = DkgSessionId {
             prefix: one_prefix,
             elders: BTreeMap::from_iter(one_elders.iter().map(|node| (node.name, node.addr))),
-            generation,
+            section_chain_len: generation,
             bootstrap_members: one,
         };
 
@@ -515,7 +515,7 @@ impl Node {
                         .into_iter()
                         .map(|node| (node.name, node.addr)),
                 ),
-                generation,
+                section_chain_len: generation,
                 bootstrap_members: BTreeSet::from_iter(members.into_values()),
             };
             vec![session_id]
