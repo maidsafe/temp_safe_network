@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1652194408367,
+  "lastUpdate": 1652198445269,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -2435,6 +2435,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4747493450,
             "range": "± 1018071236",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "0cd217240a72b462e04314bd67e1bbaf054374c0",
+          "message": "Merge #1176\n\n1176: ci: use different mechanism for crate publishing r=joshuef a=jacderida\n\nThe last two release runs have failed when attempting to publish `sn_node`. It seems even if the\r\ndependent crate is returned in a `cargo search`, this doesn't ensure the crate will still be\r\navailable when you attempt to publish the crate with the dependency.\r\n\r\nNow the script is changed to simply just attempt the publish itself in a retry loop.\r\n\n\nCo-authored-by: Chris O'Neil <chriso83@protonmail.com>",
+          "timestamp": "2022-05-10T14:27:35Z",
+          "tree_id": "6e26b82d1742baaa4e823cd71666ac45dd94c825",
+          "url": "https://github.com/maidsafe/safe_network/commit/0cd217240a72b462e04314bd67e1bbaf054374c0"
+        },
+        "date": 1652198444625,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10581848212,
+            "range": "± 10875383194",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3789798537,
+            "range": "± 744269048",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 10950498980,
+            "range": "± 1520434049",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10037338064,
+            "range": "± 7144857",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3185392519,
+            "range": "± 1106009314",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4532772556,
+            "range": "± 212531258",
             "unit": "ns/iter"
           }
         ]
