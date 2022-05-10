@@ -40,7 +40,7 @@ impl DkgSessionIdUtils for DkgSessionId {
         Self {
             prefix,
             elders,
-            generation,
+            section_chain_len: generation,
             bootstrap_members,
         }
     }

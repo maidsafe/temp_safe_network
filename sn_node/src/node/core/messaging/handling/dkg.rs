@@ -29,7 +29,7 @@ use xor_name::XorName;
 impl Node {
     pub(crate) async fn handle_dkg_start(&self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
         let current_generation = self.network_knowledge.chain_len().await;
-        if session_id.generation < current_generation {
+        if session_id.section_chain_len < current_generation {
             trace!("Skipping DkgStart for older generation: {:?}", &session_id);
             return Ok(vec![]);
         }
@@ -68,7 +68,7 @@ impl Node {
             .write()
             .await
             .retain(|_, existing_session_info| {
-                existing_session_info.session_id.generation >= session_id.generation
+                existing_session_info.session_id.section_chain_len >= session_id.section_chain_len
             });
         let cmds = self
             .dkg_voter
@@ -148,7 +148,7 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         let section_key = self.network_knowledge().section_key().await;
         let current_generation = self.network_knowledge.chain_len().await;
-        if session_id.generation < current_generation {
+        if session_id.section_chain_len < current_generation {
             trace!(
                 "Ignoring DkgRetry for expired DKG session: {:?}",
                 &session_id
