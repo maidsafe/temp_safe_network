@@ -1113,7 +1113,46 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
+## v0.62.2 (2022-05-10)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 2 days passed between releases.
+ - 0 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #1171 ([`06b4433`](https://github.com/maidsafe/safe_network/commit/06b4433f199ba7c622ad57e767d80f58f0b50a69))
+</details>
+
 ## v0.62.1 (2022-05-06)
+
+<csr-id-9fc497a3c27f2545c9dc2a8106e31feeb497ef3a/>
+<csr-id-c2f5f855191fa46d549adea15e9123674c24d44a/>
+<csr-id-e8f4fbca2acb81b3ddc1b275140e5f7b1b56f9a9/>
+<csr-id-800008d2ec43d6df3bc078c59b7ae405610e5539/>
+<csr-id-7766e7d20b392cf5b8563d1dbc9560254b44e756/>
+<csr-id-2f4e7e6305ba387f2e28945aee71df650ac1d3eb/>
+<csr-id-318ee1d22970b5f06e93a99b6e8fff6da638c589/>
+<csr-id-e3dca8b07441c86744b091fe883d16a9c750f702/>
+<csr-id-ad7d340720f0737f502b0d55023a15461dded91d/>
+<csr-id-8d041a80b75bc773fcbe0e4c88940ade9bda4b9d/>
+<csr-id-2a731b990dbe67a700468865288585ee8dff0d71/>
+<csr-id-88421d9cb7872b6397283a0035130bc14de6d4ff/>
+<csr-id-6383f038449ebba5e7c5dec1d3f8cc1f7deca581/>
+<csr-id-975520e1abf6056bd50cc29ca5a569015b3a77e4/>
+<csr-id-fec4741438b8de957b5de94e21b78cf15886713f/>
+<csr-id-a05599e452dc7400e83e7a048488689db2c28e9e/>
+<csr-id-54000b43cdd3688e6c691bef9dedc299da3c22aa/>
 
 ### Chore
 
@@ -1142,6 +1181,10 @@ needed, as they keypair itself contains the Arcs we need.
  - <csr-id-88421d9cb7872b6397283a0035130bc14de6d4ff/> pull sn_client out of the node codebase
  - <csr-id-6383f038449ebba5e7c5dec1d3f8cc1f7deca581/> remove olde node github workflows
 
+### Chore
+
+ - <csr-id-737d906a61f772593ac7df755d995d66059e8b5e/> sn_interface-0.2.1/sn_client-0.62.1/sn_node-0.58.15/sn_api-0.60.0/sn_cli-0.53.0
+
 ### Bug Fixes
 
  - <csr-id-9f4c3a523212c41079afcde8052a0891f3895f3b/> client knowledge could not update
@@ -1150,6 +1193,7 @@ needed, as they keypair itself contains the Arcs we need.
    updated after receiving one of two sibling saps after split.
    
    now we store the whole knowledge and validate against this chain
+ - <csr-id-ae4156228a4bb684ff10ac8c98917dd4dae434ea/> check Register permissions on ops locally to prevent failures when broadcasted to the network
 
 ### Other
 
@@ -1167,8 +1211,8 @@ needed, as they keypair itself contains the Arcs we need.
 
 <csr-read-only-do-not-edit/>
 
- - 21 commits contributed to the release over the course of 325 calendar days.
- - 18 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 25 commits contributed to the release over the course of 326 calendar days.
+ - 20 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1178,6 +1222,10 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.2.1/sn_client-0.62.1/sn_node-0.58.15/sn_api-0.60.0/sn_cli-0.53.0 ([`737d906`](https://github.com/maidsafe/safe_network/commit/737d906a61f772593ac7df755d995d66059e8b5e))
+    - check Register permissions on ops locally to prevent failures when broadcasted to the network ([`ae41562`](https://github.com/maidsafe/safe_network/commit/ae4156228a4bb684ff10ac8c98917dd4dae434ea))
+    - Merge #1140 ([`459b641`](https://github.com/maidsafe/safe_network/commit/459b641f22b488f33825777b974da80512eabed5))
+    - Merge #1169 ([`e5d0c17`](https://github.com/maidsafe/safe_network/commit/e5d0c17c335a3a25ee0bb4c81906fa176abeb7f5))
     - reduce number of query attempts from client once again ([`9fc497a`](https://github.com/maidsafe/safe_network/commit/9fc497a3c27f2545c9dc2a8106e31feeb497ef3a))
     - remove concept of 'sufficent' knowledge ([`c2f5f85`](https://github.com/maidsafe/safe_network/commit/c2f5f855191fa46d549adea15e9123674c24d44a))
     - client knowledge could not update ([`9f4c3a5`](https://github.com/maidsafe/safe_network/commit/9f4c3a523212c41079afcde8052a0891f3895f3b))

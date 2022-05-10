@@ -5,22 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.60.0 (2022-05-06)
-
-### New Features (BREAKING)
-
- - <csr-id-681457a75e818beb30401154f336383507acd935/> return a Token value from wallet balance API instead of a string
-   - Additionally add support to the cat and dog commands for Wallets.
-   - When cat command is used with a Wallet, it lists all spendable balances found in it,
-   as long as the user has permissions to read it as it's expected to be a private Multimap.
+## v0.60.1 (2022-05-10)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release over the course of 10 calendar days.
- - 12 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 2 days passed between releases.
+ - 0 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -30,6 +23,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1171 ([`06b4433`](https://github.com/maidsafe/safe_network/commit/06b4433f199ba7c622ad57e767d80f58f0b50a69))
+</details>
+
+## v0.60.0 (2022-05-06)
+
+### Bug Fixes
+
+ - <csr-id-ae4156228a4bb684ff10ac8c98917dd4dae434ea/> check Register permissions on ops locally to prevent failures when broadcasted to the network
+
+### Chore
+
+ - <csr-id-737d906a61f772593ac7df755d995d66059e8b5e/> sn_interface-0.2.1/sn_client-0.62.1/sn_node-0.58.15/sn_api-0.60.0/sn_cli-0.53.0
+
+### New Features (BREAKING)
+
+ - <csr-id-681457a75e818beb30401154f336383507acd935/> return a Token value from wallet balance API instead of a string
+   - Additionally add support to the cat and dog commands for Wallets.
+- When cat command is used with a Wallet, it lists all spendable balances found in it,
+   as long as the user has permissions to read it as it's expected to be a private Multimap.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release over the course of 11 calendar days.
+ - 13 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.2.1/sn_client-0.62.1/sn_node-0.58.15/sn_api-0.60.0/sn_cli-0.53.0 ([`737d906`](https://github.com/maidsafe/safe_network/commit/737d906a61f772593ac7df755d995d66059e8b5e))
+    - check Register permissions on ops locally to prevent failures when broadcasted to the network ([`ae41562`](https://github.com/maidsafe/safe_network/commit/ae4156228a4bb684ff10ac8c98917dd4dae434ea))
+    - Merge #1140 ([`459b641`](https://github.com/maidsafe/safe_network/commit/459b641f22b488f33825777b974da80512eabed5))
+    - Merge #1169 ([`e5d0c17`](https://github.com/maidsafe/safe_network/commit/e5d0c17c335a3a25ee0bb4c81906fa176abeb7f5))
     - return a Token value from wallet balance API instead of a string ([`681457a`](https://github.com/maidsafe/safe_network/commit/681457a75e818beb30401154f336383507acd935))
     - Merge #1128 ([`e49d382`](https://github.com/maidsafe/safe_network/commit/e49d38239b3a8c468616ad3782e1208316e9b5e0))
 </details>
@@ -43,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-d0913293df42e73716fabb3460ae6dbd4ddf5a1b/>
 <csr-id-91606f631a211d959364cab1e428d1ac895d3dca/>
 <csr-id-bda0ea00e2e5a258e02a91d12dcd1e480dfff17c/>
+<csr-id-2f4e7e6305ba387f2e28945aee71df650ac1d3eb/>
 
 ### Chore
 
@@ -66,17 +100,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-e662317e93b3247a1afd9970587ea7241a9b5619/> first and basic implementation of Wallet reissue API and related CLI cmds
    - Generate output DBCs with sn_dbc::TransactionBuilder
-- Change DBC is also generated and stored in the source Wallet the reissue was made from
-- Spent DBCs are soft-removed from the source Wallet (Multimap)
-- Reissued DBCs are all bearer at this instance
-- Verification of generated Tx and spentproofs is not performed at this instance yet
-- Input DBCs are not logged as spent on the network's spentbook at this instance yet
-- Generate output DBCs with sn_dbc::TransactionBuilder
-- Change DBC is also generated and stored in the source Wallet the reissue was made from
-- Spent DBCs are soft-removed from the source Wallet (Multimap)
-- Reissued DBCs are all bearer at this instance
-- Verification of generated Tx and spentproofs is not performed at this instance yet
-- Input DBCs are not logged as spent on the network's spentbook at this instance yet
 
 ### Other
 
@@ -112,7 +135,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 <csr-unknown>
- first and basic implementation of Wallet reissue API and related CLI cmds<csr-unknown/>
+Change DBC is also generated and stored in the source Wallet the reissue was made fromSpent DBCs are soft-removed from the source Wallet (Multimap)Reissued DBCs are all bearer at this instanceVerification of generated Tx and spentproofs is not performed at this instance yetInput DBCs are not logged as spent on the network’s spentbook at this instance yetGenerate output DBCs with sn_dbc::TransactionBuilderChange DBC is also generated and stored in the source Wallet the reissue was made fromSpent DBCs are soft-removed from the source Wallet (Multimap)Reissued DBCs are all bearer at this instanceVerification of generated Tx and spentproofs is not performed at this instance yetInput DBCs are not logged as spent on the network’s spentbook at this instance yet<csr-unknown/>
 
 ## v0.58.2 (2022-04-14)
 
