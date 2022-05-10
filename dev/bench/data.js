@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1652163522281,
+  "lastUpdate": 1652169796540,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -2321,6 +2321,60 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4440160264,
             "range": "± 203800391",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "joshuef@gmail.com",
+            "name": "Josh Wilson",
+            "username": "joshuef"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "ddb939d5831b2f0d66fa2e0954b62e5e22a3ee69",
+          "message": "fix(dysfunction): relax dysfunction for knowledge and conn issues\n\nIncreases 10x the amount of conn or knowledge issues. We've been voting\noff nodes far too quickly, even on droplet testnets",
+          "timestamp": "2022-05-10T09:33:04+02:00",
+          "tree_id": "856773313992b8ca01796987ce18d00578e31b88",
+          "url": "https://github.com/maidsafe/safe_network/commit/ddb939d5831b2f0d66fa2e0954b62e5e22a3ee69"
+        },
+        "date": 1652169795977,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 29403372641,
+            "range": "± 11721495580",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3938469992,
+            "range": "± 1112637309",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10025441626,
+            "range": "± 18880013",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 10103620411,
+            "range": "± 34491244",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 10448801455,
+            "range": "± 97343424",
             "unit": "ns/iter"
           }
         ]
