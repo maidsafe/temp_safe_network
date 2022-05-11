@@ -25,6 +25,7 @@ use tracing::Instrument;
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 #[cfg(feature = "back-pressure")]
 const BACKPRESSURE_INTERVAL: Duration = Duration::from_secs(60);
+const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(120);
 const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(120);
 const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(60);
 
@@ -142,6 +143,38 @@ impl Dispatcher {
             }
         });
     }
+
+    pub(super) async fn start_section_probing(self: Arc<Self>) {
+        info!("Starting to probe section");
+        let _handle = tokio::spawn(async move {
+            let dispatcher = self.clone();
+            let mut interval = tokio::time::interval(SECTION_PROBE_INTERVAL);
+            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+            loop {
+                let _instant = interval.tick().await;
+
+                // Send a probe message to an elder
+                let node = &dispatcher.node;
+                if !node.network_knowledge().prefix().await.is_empty() {
+                    match node.generate_section_probe_msg().await {
+                        Ok(cmd) => {
+                            info!("Sending section probe msg");
+                            if let Err(e) = dispatcher
+                                .clone()
+                                .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
+                                .await
+                            {
+                                error!("Error sending section probe msg: {:?}", e);
+                            }
+                        }
+                        Err(error) => error!("Problem generating section probe msg: {:?}", error),
+                    }
+                }
+            }
+        });
+    }
+
     pub(super) async fn start_cleaning_peer_links(self: Arc<Self>) {
         info!("Starting cleaning up network links");
         let _handle = tokio::spawn(async move {

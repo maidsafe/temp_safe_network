@@ -97,7 +97,7 @@ impl MsgType {
                     SystemMsg::AntiEntropyRetry { .. }
                     | SystemMsg::AntiEntropyRedirect { .. }
                     | SystemMsg::AntiEntropyUpdate { .. }
-                    | SystemMsg::AntiEntropyProbe(_),
+                    | SystemMsg::AntiEntropyProbe,
                 ..
             } => ANTIENTROPY_MSG_PRIORITY,
 

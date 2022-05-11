@@ -410,7 +410,7 @@ impl Node {
                 )
                 .await
             }
-            SystemMsg::AntiEntropyProbe(_dst) => {
+            SystemMsg::AntiEntropyProbe => {
                 trace!("Received Probe message from {}: {:?}", sender, msg_id);
                 Ok(vec![])
             }
