@@ -89,11 +89,7 @@ impl Node {
         &self,
         signed_vote: SignedVote<SapCandidate>,
     ) -> Result<Vec<Cmd>> {
-        debug!(
-            ">>> {}: {:?}",
-            LogMarker::HandoverMsgToBeHandled,
-            signed_vote
-        );
+        debug!("{}", LogMarker::HandoverMsgBeingHandled);
 
         self.check_signed_vote_saps(&signed_vote)?;
 
@@ -104,11 +100,11 @@ impl Node {
                 let mut cmds = self.handle_vote(&mut state, signed_vote).await;
                 if let Some(candidates_sap) = state.consensus_value() {
                     debug!(
-                        ">>> {}: {:?}",
+                        "{}: {:?}",
                         LogMarker::HandoverConsensusTermination,
                         candidates_sap
                     );
-                    // NB TOTO make sure error has to be swallowed
+                    // NB TODO make sure error has to be swallowed
                     let bcast_cmds = self.broadcast_handover_decision(candidates_sap).await;
                     cmds.extend(bcast_cmds);
                 }
@@ -116,7 +112,7 @@ impl Node {
                 Ok(cmds)
             }
             None => {
-                trace!(">>> Non-elder node unexpectedly received handover Vote msg, ignoring...");
+                trace!("Non-elder node unexpectedly received handover Vote msg, ignoring...");
                 Ok(vec![])
             }
         }
