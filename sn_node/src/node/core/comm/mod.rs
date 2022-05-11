@@ -29,11 +29,7 @@ use bytes::Bytes;
 use futures::stream::{FuturesUnordered, StreamExt};
 use qp2p::{Endpoint, IncomingConnections};
 use std::time::Duration;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    net::SocketAddr,
-    sync::Arc,
-};
+use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
 use tokio::{
     sync::{mpsc, RwLock},
     task,
@@ -91,21 +87,32 @@ impl Comm {
         self.our_endpoint.public_addr()
     }
 
-    pub(crate) async fn remove_expired(&self) {
+    pub(crate) async fn cleanup_peers(&self) {
         let sessions = self.sessions.read().await;
-        for (_, session) in sessions.iter() {
+        let mut peers_to_cleanup = vec![];
+        for (peer, session) in sessions.iter() {
             session.remove_expired().await;
-        }
-    }
+            let is_connected = session.is_connected().await;
 
-    pub(crate) async fn is_connected(&self, id: &Peer) -> bool {
-        let sessions = self.sessions.read().await;
-        if let Some(c) = sessions.get(id) {
-            // peer id exists, check if connected
-            return c.is_connected().await;
+            if !is_connected {
+                peers_to_cleanup.push(*peer);
+            }
         }
 
-        false
+        // explicitly drop the read here.
+        drop(sessions);
+
+        // cleanup any and all conns that are not connected
+        // TODO: check if we need to remove client conns manually, or if we can assume they're disconnected...
+        // Perhaps above a threshold we cleanup non-section conns?
+        if !peers_to_cleanup.is_empty() {
+            let mut sessions_write_guard = self.sessions.write().await;
+            for peer in peers_to_cleanup {
+                if let Some(session) = sessions_write_guard.remove(&peer) {
+                    session.disconnect().await
+                };
+            }
+        }
     }
 
     /// Fake function used as replacement for testing only.
@@ -139,11 +146,6 @@ impl Comm {
         result
     }
 
-    pub(crate) async fn linked_peers(&self) -> BTreeSet<Peer> {
-        let sessions = self.sessions.read().await;
-        sessions.keys().into_iter().cloned().collect()
-    }
-
     #[cfg(feature = "back-pressure")]
     /// Returns our caller-specific tolerated msgs per s, if the value has changed significantly.
     pub(crate) async fn tolerated_msgs_per_s(&self) -> Option<f64> {
@@ -157,18 +159,6 @@ impl Comm {
     pub(crate) async fn regulate(&self, peer: &Peer, msgs_per_s: f64) {
         let session = self.get_or_create(peer).await;
         session.update_send_rate(msgs_per_s).await;
-    }
-
-    /// Disposes of the link and all underlying
-    /// resources, and drops all queued msgs.
-    /// TODO: Also use this when new membership is in place, call whenever we drop a member.
-    pub(crate) async fn unlink_peer(&self, peer: &Peer) {
-        let mut sessions = self.sessions.write().await;
-        let session = match sessions.remove(peer) {
-            Some(session) => session,
-            None => return, // none here, all good
-        };
-        session.disconnect().await;
     }
 
     /// Sends a message to a client. Reuses an existing or creates a connection if none.
@@ -450,7 +440,7 @@ impl Comm {
         // however, first comms should be a minor part of total time spent using link,
         // so that is ok
         let mut sessions = self.sessions.write().await;
-        match sessions.get(peer).cloned() {
+        let res = match sessions.get(peer).cloned() {
             // someone else inserted in the meanwhile, so use that
             Some(session) => session,
             // still not in list, go ahead and create + insert
@@ -460,7 +450,9 @@ impl Comm {
                 let _ = sessions.insert(*peer, session.clone());
                 session
             }
-        }
+        };
+
+        res
     }
 
     /// Any number of incoming qp2p:Connections can be added.
@@ -475,7 +467,6 @@ impl Comm {
             }
             // else still not in list, go ahead and insert
         }
-
         let mut sessions = self.sessions.write().await;
         match sessions.get(peer) {
             // someone else inserted in the meanwhile, add to it
