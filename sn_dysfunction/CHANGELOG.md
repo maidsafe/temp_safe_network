@@ -5,7 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.1.3 (2022-05-11)
+
+### Bug Fixes
+
+ - <csr-id-ddb939d5831b2f0d66fa2e0954b62e5e22a3ee69/> relax dysfunction for knowledge and conn issues
+   Increases 10x the amount of conn or knowledge issues. We've been voting
+   off nodes far too quickly, even on droplet testnets
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release over the course of 15 calendar days.
+ - 17 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - relax dysfunction for knowledge and conn issues ([`ddb939d`](https://github.com/maidsafe/safe_network/commit/ddb939d5831b2f0d66fa2e0954b62e5e22a3ee69))
+    - Merge #1128 ([`e49d382`](https://github.com/maidsafe/safe_network/commit/e49d38239b3a8c468616ad3782e1208316e9b5e0))
+</details>
+
 ## v0.1.2 (2022-04-23)
+
+<csr-id-318ee1d22970b5f06e93a99b6e8fff6da638c589/>
+<csr-id-6452690c1b75bb8804c1f9de19c394a83f178acb/>
+<csr-id-08385f4e03cd43b94f15523597f90f1cc9977a87/>
+<csr-id-66901bcb3b68d3fbe84bfde915bb80ae1b562347/>
+<csr-id-1f3af46aea59ebeb1b6a4b736e80e86ce2f724d8/>
 
 ### Chore
 
@@ -28,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    easier because it wraps the code that reads values from the concurrent data structures, which can be
    quite verbose.
  - <csr-id-66901bcb3b68d3fbe84bfde915bb80ae1b562347/> remove unused dep
+
+### Chore
+
+ - <csr-id-2f4e7e6305ba387f2e28945aee71df650ac1d3eb/> sn_interface-0.2.0/sn_dysfunction-0.1.2/sn_api-0.59.0/sn_cli-0.52.0
 
 ### New Features
 
@@ -53,26 +91,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    problem comes when you later want to select the issues of this type. For example:
    ```
    let _ = op_scores.insert(
-       *node,
-       self.calculate_node_score(
-           node,
-           adults.clone(),
-           IssueType::PendingRequestOperation,
-       )
-       .await,
+   *node,
+   self.calculate_node_score(
+   node,
+   adults.clone(),
+   IssueType::PendingRequestOperation,
+   )
+   .await,
    );
    ```
    
    If you have the `op_id` parameter on the enum entry, the code becomes very clunky:
    ```
    let _ = op_scores.insert(
-       *node,
-       self.calculate_node_score(
-           node,
-           adults.clone(),
-           IssueType::PendingRequestOperation([1; 32])
-       )
-       .await,
+   *node,
+   self.calculate_node_score(
+   node,
+   adults.clone(),
+   IssueType::PendingRequestOperation([1; 32])
+   )
+   .await,
    );
    ```
    
@@ -96,9 +134,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release over the course of 2 calendar days.
+ - 8 commits contributed to the release over the course of 2 calendar days.
  - 27 days passed between releases.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -108,6 +146,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.2.0/sn_dysfunction-0.1.2/sn_api-0.59.0/sn_cli-0.52.0 ([`2f4e7e6`](https://github.com/maidsafe/safe_network/commit/2f4e7e6305ba387f2e28945aee71df650ac1d3eb))
     - tidy references in cargo manifests ([`318ee1d`](https://github.com/maidsafe/safe_network/commit/318ee1d22970b5f06e93a99b6e8fff6da638c589))
     - Merge #1122 ([`f359a45`](https://github.com/maidsafe/safe_network/commit/f359a45971a5b42a6f174536475f47b8ab076901))
     - remove modules that only contained tests ([`6452690`](https://github.com/maidsafe/safe_network/commit/6452690c1b75bb8804c1f9de19c394a83f178acb))
@@ -118,6 +157,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.1.1 (2022-03-26)
+
+<csr-id-df66875627aa41d06b7613085f05a97187c7175d/>
+<csr-id-2e6d78c13c137e422d3714e8c113aeb4c0b597a3/>
+<csr-id-b471b5c9f539933dd12de7af3473d2b0f61d7f28/>
+<csr-id-1aa331daa42ef306728fc99e612fbddeed1501d7/>
+<csr-id-52c218861044a46bf4e1666188dc58de232bde60/>
+<csr-id-c9f27640d3b1c62bdf88ec954a395e09e799a181/>
+<csr-id-907c7d3ef4f65df5566627938154dfca1e2fdc05/>
+<csr-id-15a0d354fd804f8f44735b09c22f9e456211c067/>
+<csr-id-aafb6d2a458fc4e2dc94ea3a08cb519fe52bc131/>
 
 ### Other
 

@@ -3762,7 +3762,7 @@ dependencies = [
 
 [[package]]
 name = "sn_dysfunction"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "dashmap",
  "eyre",
@@ -3847,7 +3847,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.58.16"
+version = "0.58.17"
 dependencies = [
  "assert_matches",
  "backoff 0.4.0",

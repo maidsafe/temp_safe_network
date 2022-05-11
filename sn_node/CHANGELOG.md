@@ -5,7 +5,99 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.58.17 (2022-05-11)
+
+### New Features
+
+ - <csr-id-db8b58477b5b953ff2ce34163ebcc45f47cc0ab8/> return an error when received an invalid SAP
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #1176 ([`0cd2172`](https://github.com/maidsafe/safe_network/commit/0cd217240a72b462e04314bd67e1bbaf054374c0))
+    - return an error when received an invalid SAP ([`db8b584`](https://github.com/maidsafe/safe_network/commit/db8b58477b5b953ff2ce34163ebcc45f47cc0ab8))
+    - Merge branch 'main' into sap_sig_checks ([`f8ec2e5`](https://github.com/maidsafe/safe_network/commit/f8ec2e54943eaa18b50bd9d7562d41f57d5d3248))
+</details>
+
+## v0.58.16 (2022-05-10)
+
+### Chore
+
+ - <csr-id-61ba367c308a846cb3f1ae065b1fbbdfb85838e4/> sn_interface-0.2.2/sn_client-0.62.2/sn_node-0.58.16/sn_api-0.60.1
+
+### New Features
+
+ - <csr-id-9caadf9f3c64b98aa5edbe992dcde98b5fce8bf7/> check incoming authed SAP in signed votes
+
+### Bug Fixes
+
+ - <csr-id-9203456e5b5f53e628566d8591dca447481ecb57/> check against the new section key instead of the current
+ - <csr-id-ffc1a23b094b6ab99daaa61c91a628e478acb0e1/> log error when dropping vote due to bad signature
+
+### Other
+
+ - <csr-id-bd04335d3ee074610ffd5fd4daff15a080b6353d/> nightly improvements and fix release process issues
+   A few changes for things spotted in the last nightly/release run:
+   
+   * Use `usize::MAX` for max capacity on ARM/ARMv7. A change to use a max capacity of 10GB wouldn't
+     compile on these 32-bit architectures, since the value exceeded 2^32.
+   * Exit on error if ARM builds fail. Even though compilation failed, the release process didn't
+     report an error for the failure. The outer process must be disabling the `set -e` effect.
+   * During the publishing process, instruct `sn_node` to wait on `sn_interface` rather than
+     `sn_dysfunction`, since `sn_interface` is published immediately before `sn_node`. The last release
+     failed when it tried to publish `sn_node` because `sn_interface` wasn't available yet.
+   * Use 30 nodes in the testnet for the nightly run.
+   * Run the CLI test suite in parallel with the API and client tests. Previously we didn't try this
+     because we never knew if the network would handle the load.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 7 commits contributed to the release over the course of 4 calendar days.
+ - 3 days passed between releases.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.2.2/sn_client-0.62.2/sn_node-0.58.16/sn_api-0.60.1 ([`61ba367`](https://github.com/maidsafe/safe_network/commit/61ba367c308a846cb3f1ae065b1fbbdfb85838e4))
+    - check against the new section key instead of the current ([`9203456`](https://github.com/maidsafe/safe_network/commit/9203456e5b5f53e628566d8591dca447481ecb57))
+    - check incoming authed SAP in signed votes ([`9caadf9`](https://github.com/maidsafe/safe_network/commit/9caadf9f3c64b98aa5edbe992dcde98b5fce8bf7))
+    - Merge branch 'main' into nightly-improvements ([`ee3bbe1`](https://github.com/maidsafe/safe_network/commit/ee3bbe188cea756384dc38d490fe58c59c050292))
+    - Merge #1171 ([`06b4433`](https://github.com/maidsafe/safe_network/commit/06b4433f199ba7c622ad57e767d80f58f0b50a69))
+    - nightly improvements and fix release process issues ([`bd04335`](https://github.com/maidsafe/safe_network/commit/bd04335d3ee074610ffd5fd4daff15a080b6353d))
+    - log error when dropping vote due to bad signature ([`ffc1a23`](https://github.com/maidsafe/safe_network/commit/ffc1a23b094b6ab99daaa61c91a628e478acb0e1))
+</details>
+
 ## v0.58.15 (2022-05-06)
+
+<csr-id-3757300caaea01c99a1d692ce4f572d790570ac2/>
+<csr-id-c71d179e8b8089d638853956a1a39676c01c39b8/>
+<csr-id-c5ba36e5ab89b2c440db38f1d1f06d4cf6c90b6a/>
+<csr-id-3894e8ed5ab48bc72287c4ae74fa53ef0ba51aaa/>
+<csr-id-0a87a96a911b6497d6cd667c18ebbe75e86876dc/>
+<csr-id-7766e7d20b392cf5b8563d1dbc9560254b44e756/>
+<csr-id-1f2d7037d3178e211842f9b554d8fd0d462709e2/>
+<csr-id-e17baffdc356d244075a97e9422d5ffab2ca46c7/>
+<csr-id-4de29a018a5305d18589bdd5a3d557f7979eafd7/>
 
 ### Chore
 
@@ -21,6 +113,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    - Also delete an outdated warning output by CLI about re-enabling authd after switching networks.
  - <csr-id-e17baffdc356d244075a97e9422d5ffab2ca46c7/> change default node max cpacity to 10GB
    - Also delete an outdated warning output by CLI about re-enabling authd after switching networks.
+
+### Other
+
+ - <csr-id-26db0aaf0acba424c6a93b49e066f036baa42e8b/> polish remove operation
+ - <csr-id-937ea457ea5d7e6f7f123eeba6b5da45fef5b404/> deterministic operations, insert stored data
+ - <csr-id-d7b288726368fcc44c10beee42616468c64ffaae/> use btreemap
+ - <csr-id-56dc95e12310abac60531d50e79895113df49853/> add delay during Store Op
+ - <csr-id-ca5e9226a41a878ff6ac255d0d7ca26b41e07c7d/> model-based test using proptest module
+ - <csr-id-dd8b50cff2ac35dd4134a3a6179a06b798305e91/> create proptest Strategy to generate ops
+
+### Documentation
+
+ - <csr-id-20fa632dab329f589001355a52bea70f7ddf6e86/> Add recursive flag to rm of dir
+   In addition removed unneeded map_err
+
+### Chore
+
+ - <csr-id-737d906a61f772593ac7df755d995d66059e8b5e/> sn_interface-0.2.1/sn_client-0.62.1/sn_node-0.58.15/sn_api-0.60.0/sn_cli-0.53.0
+ - <csr-id-ae9aeeb94f55f29849c8c5fe1b05419b96fac6e9/> add ProposalAgreed log marker
 
 ### New Features
 
@@ -56,6 +167,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-a4b7597853c9f154e6fd04f1f82133cab0b3c784/> add missing backpressure feature gate.
    We were trying to count messages when thsi wasn't instantiated w/o
    backpressure. So were logging a looot of errors.
+ - <csr-id-ae4156228a4bb684ff10ac8c98917dd4dae434ea/> check Register permissions on ops locally to prevent failures when broadcasted to the network
 
 ### Other
 
@@ -69,9 +181,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 21 commits contributed to the release over the course of 10 calendar days.
- - 10 days passed between releases.
- - 18 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 35 commits contributed to the release over the course of 11 calendar days.
+ - 11 days passed between releases.
+ - 27 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -81,15 +193,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - log error when dropping vote due to bad signature ([`ffc1a23`](https://github.com/maidsafe/safe_network/commit/ffc1a23b094b6ab99daaa61c91a628e478acb0e1))
+    - sn_interface-0.2.1/sn_client-0.62.1/sn_node-0.58.15/sn_api-0.60.0/sn_cli-0.53.0 ([`737d906`](https://github.com/maidsafe/safe_network/commit/737d906a61f772593ac7df755d995d66059e8b5e))
+    - check Register permissions on ops locally to prevent failures when broadcasted to the network ([`ae41562`](https://github.com/maidsafe/safe_network/commit/ae4156228a4bb684ff10ac8c98917dd4dae434ea))
+    - Merge #1140 ([`459b641`](https://github.com/maidsafe/safe_network/commit/459b641f22b488f33825777b974da80512eabed5))
     - validate votes are for our section ([`3757300`](https://github.com/maidsafe/safe_network/commit/3757300caaea01c99a1d692ce4f572d790570ac2))
+    - Merge #1165 ([`e08096d`](https://github.com/maidsafe/safe_network/commit/e08096d37dfab490f22ae9786a006aa3f9f630c1))
+    - polish remove operation ([`26db0aa`](https://github.com/maidsafe/safe_network/commit/26db0aaf0acba424c6a93b49e066f036baa42e8b))
     - dont keep processing a vote batch when errored ([`7491323`](https://github.com/maidsafe/safe_network/commit/7491323ded9a484ce0ed8f0253c76848921c54a9))
+    - Merge #1167 ([`5b21c66`](https://github.com/maidsafe/safe_network/commit/5b21c663c7f11124f0ed2f330b2f8687745f7da7))
+    - deterministic operations, insert stored data ([`937ea45`](https://github.com/maidsafe/safe_network/commit/937ea457ea5d7e6f7f123eeba6b5da45fef5b404))
     - stop DKG message loops post-split ([`23aafad`](https://github.com/maidsafe/safe_network/commit/23aafad827a4b5b738db17a966f835f13b9cdf65))
+    - Merge #1169 ([`e5d0c17`](https://github.com/maidsafe/safe_network/commit/e5d0c17c335a3a25ee0bb4c81906fa176abeb7f5))
+    - Merge branch 'main' into main ([`d3f07bb`](https://github.com/maidsafe/safe_network/commit/d3f07bbe5192174082e24869ba86125b6a7b1b20))
+    - use btreemap ([`d7b2887`](https://github.com/maidsafe/safe_network/commit/d7b288726368fcc44c10beee42616468c64ffaae))
     - early return when AE required from a vote batch ([`dd353b9`](https://github.com/maidsafe/safe_network/commit/dd353b969ace383c3e89c94f7f242b84b6aee89f))
     - client knowledge could not update ([`9f4c3a5`](https://github.com/maidsafe/safe_network/commit/9f4c3a523212c41079afcde8052a0891f3895f3b))
+    - add ProposalAgreed log marker ([`ae9aeeb`](https://github.com/maidsafe/safe_network/commit/ae9aeeb94f55f29849c8c5fe1b05419b96fac6e9))
+    - Add recursive flag to rm of dir ([`20fa632`](https://github.com/maidsafe/safe_network/commit/20fa632dab329f589001355a52bea70f7ddf6e86))
+    - add delay during Store Op ([`56dc95e`](https://github.com/maidsafe/safe_network/commit/56dc95e12310abac60531d50e79895113df49853))
     - batch MembershipVotes in order to ensure that order is preserved. ([`829eb33`](https://github.com/maidsafe/safe_network/commit/829eb33184c6012faa2020333e72a7c811fdb660))
+    - model-based test using proptest module ([`ca5e922`](https://github.com/maidsafe/safe_network/commit/ca5e9226a41a878ff6ac255d0d7ca26b41e07c7d))
     - send membership ae to only requesting peer ([`c71d179`](https://github.com/maidsafe/safe_network/commit/c71d179e8b8089d638853956a1a39676c01c39b8))
     - fix split/demotion test ([`4de29a0`](https://github.com/maidsafe/safe_network/commit/4de29a018a5305d18589bdd5a3d557f7979eafd7))
+    - create proptest Strategy to generate ops ([`dd8b50c`](https://github.com/maidsafe/safe_network/commit/dd8b50cff2ac35dd4134a3a6179a06b798305e91))
     - remove outdated comment ([`c5ba36e`](https://github.com/maidsafe/safe_network/commit/c5ba36e5ab89b2c440db38f1d1f06d4cf6c90b6a))
     - handover integration squashed ([`0d5cdf9`](https://github.com/maidsafe/safe_network/commit/0d5cdf940afc390de22d94e91621e76d45a9eaad))
     - avoid AE loop by being judicious with AE requests ([`2f69548`](https://github.com/maidsafe/safe_network/commit/2f69548f5250d8c4bbcd03052bb9a49f9a2bc091))
@@ -119,6 +245,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-9945bf8fb5981c1a64b23d6ea1afba5089aa5c3a/>
 <csr-id-54000b43cdd3688e6c691bef9dedc299da3c22aa/>
 <csr-id-1f3af46aea59ebeb1b6a4b736e80e86ce2f724d8/>
+<csr-id-cbf5d45ec4522961fc7ef0860d86cc7d5e0ecca8/>
 
 ### Chore
 
