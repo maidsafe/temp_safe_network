@@ -13,13 +13,10 @@ use crate::node::{
     messages::WireMsgUtils,
     Result,
 };
-use sn_interface::elder_count;
 #[cfg(feature = "back-pressure")]
 use sn_interface::messaging::DstLocation;
 use sn_interface::messaging::{system::SystemMsg, AuthKind, WireMsg};
 use sn_interface::types::{log_markers::LogMarker, Peer};
-
-use itertools::Itertools;
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
 use tokio::{sync::watch, time};
@@ -366,32 +363,7 @@ impl Dispatcher {
     async fn try_processing_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
         match cmd {
             Cmd::CleanupPeerLinks => {
-                let linked_peers = self.node.comm.linked_peers().await;
-
-                if linked_peers.len() < elder_count() {
-                    return Ok(vec![]);
-                }
-
-                self.node.comm.remove_expired().await;
-
-                let sections = self.node.network_knowledge().prefix_map().all();
-                let network_peers = sections
-                    .iter()
-                    .flat_map(|info| info.elders_vec())
-                    .collect_vec();
-
-                for peer in linked_peers.clone() {
-                    if !network_peers.contains(&peer) {
-                        // not among known peers in the network
-                        if !self.node.pending_data_queries_contains_client(&peer).await
-                            && !self.node.comm.is_connected(&peer).await
-                        {
-                            trace!("{peer:?} not waiting on queries and not in the network, so lets unlink them");
-                            self.node.comm.unlink_peer(&peer).await;
-                        }
-                    }
-                }
-
+                self.node.comm.cleanup_peers().await;
                 Ok(vec![])
             }
             Cmd::SignOutgoingSystemMsg { msg, dst } => {

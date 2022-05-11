@@ -58,20 +58,6 @@ impl Node {
         Ok(cmds)
     }
 
-    /// see if a client is waiting in the pending queries for a response
-    /// If not, we could remove its link eg.
-    pub(crate) async fn pending_data_queries_contains_client(&self, peer: &Peer) -> bool {
-        // now we check if our peer is still waiting...
-        for (_op_id, peer_vec) in self.pending_data_queries.get_items().await {
-            let vec = peer_vec.object;
-            if vec.contains(peer) {
-                return true;
-            }
-        }
-
-        false
-    }
-
     /// Handle data read
     /// Records response in liveness tracking
     /// Forms a response to send to the requester
