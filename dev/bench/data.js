@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1652249943642,
+  "lastUpdate": 1652261133080,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -2555,6 +2555,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 5031028020,
             "range": "± 2043173546",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "a03107ea7ea8a393c818a193eb2489e92cbbda20",
+          "message": "Merge #1127\n\n1127: Back pressure debug r=joshuef a=joshuef\n\nPreviously we had backpressure running in response to every single message that came in. \r\n\r\nThis was somehow disrupting section formation and DKG. Moving it to an optional feature helped stabilise the base test cases in `main` w/ the membership changes.\r\n\r\nHere, I look to reenable backpressure as a default feature. \r\n\r\nI've moved it away from being triggered on _every_ incoming message, to be a periodic check on a loop over an interval.\r\n\r\nIt also now _only_ fires back pressure messages to the same section. \r\n\r\n(As things stand, intersection comms is currently limited to AE messages flows which should not overwhelm our nodes if backpressure within the section - which is where most messages arise - is working properly).\r\n\r\n(We _could_ fire backpressure to every connected node peer eg, but we don't know if they are clients so may be wasting time there...)\n\nCo-authored-by: Josh Wilson <joshuef@gmail.com>",
+          "timestamp": "2022-05-11T07:49:06Z",
+          "tree_id": "8e96b1cfcd3a7fb4fee48ef75be8ff2e9e007ece",
+          "url": "https://github.com/maidsafe/safe_network/commit/a03107ea7ea8a393c818a193eb2489e92cbbda20"
+        },
+        "date": 1652261131786,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 11368344806,
+            "range": "± 4775909654",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 5084993735,
+            "range": "± 1240282821",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 11928699575,
+            "range": "± 13817389324",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10054108776,
+            "range": "± 2958516836",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3176033287,
+            "range": "± 1117215845",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4724682921,
+            "range": "± 126909029",
             "unit": "ns/iter"
           }
         ]
