@@ -56,12 +56,16 @@ pub(super) async fn find_nodes_to_relocate(
     );
 
     // Find the peers that pass the relocation check
-    let candidates: BTreeSet<_> = joined_nodes
+    let mut candidates: Vec<_> = joined_nodes
             .into_iter()
             .filter(|info| check(info.age(), churn_id))
             // the newly joined node shall not be relocated immediately
             .filter(|info| !excluded.contains(&info.name()))
             .collect();
+    // To avoid a node to manipulate its name to gain priority of always being first in XorName,
+    // here we sort the nodes by its distance to the churn_id.
+    let target_name = XorName::from_content(&churn_id.0);
+    candidates.sort_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()));
 
     let max_age = if let Some(age) = candidates.iter().map(|info| info.age()).max() {
         age
@@ -253,7 +257,6 @@ mod tests {
         let relocations: Vec<_> = relocations
             .into_iter()
             .map(|(_, details)| details)
-            .sorted_by_key(|details| details.previous_name)
             .collect();
 
         let allowed_relocations = if peers.len() > recommended_section_size() {
@@ -269,17 +272,22 @@ mod tests {
             .filter(|age| *age <= signature_trailing_zeros)
             .max();
 
-        let expected_relocated_peers: Vec<_> = peers
+        let mut expected_relocated_peers: Vec<_> = peers
             .iter()
             .filter(|peer| Some(peer.age()) == expected_relocated_age)
-            .sorted_by_key(|peer| peer.name())
+            .collect();
+        let target_name = XorName::from_content(&churn_id.0);
+        expected_relocated_peers
+            .sort_by(|lhs, rhs| target_name.cmp_distance(&lhs.name(), &rhs.name()));
+        let expected_relocated_peers: Vec<_> = expected_relocated_peers
+            .iter()
             .take(allowed_relocations)
             .collect();
 
         assert_eq!(expected_relocated_peers.len(), relocations.len());
 
         // Verify the relocate action is correct depending on whether the peer is elder or not.
-        // NOTE: `zip` works here, because both collections are sorted by name.
+        // NOTE: `zip` works here, as both collections are sorted by the same criteria.
         for (peer, details) in expected_relocated_peers.into_iter().zip(relocations) {
             assert_eq!(peer.name(), details.previous_name);
         }
