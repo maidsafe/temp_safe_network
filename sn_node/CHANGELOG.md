@@ -5,17 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.58.17 (2022-05-11)
+## v0.58.18 (2022-05-12)
 
 ### New Features
 
- - <csr-id-db8b58477b5b953ff2ce34163ebcc45f47cc0ab8/> return an error when received an invalid SAP
+ - <csr-id-965310a12e09f399d125e8c5227c237d307bc20f/> disable backpressure as a deafult feature
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
+ - 1 commit contributed to the release.
  - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -26,12 +26,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - disable backpressure as a deafult feature ([`965310a`](https://github.com/maidsafe/safe_network/commit/965310a12e09f399d125e8c5227c237d307bc20f))
+</details>
+
+## v0.58.17 (2022-05-11)
+
+### Chore
+
+ - <csr-id-66638f508ad4df12b757672df589ba8ad09fbdfc/> sn_dysfunction-0.1.3/sn_node-0.58.17
+ - <csr-id-00dc9c0ba9afb6de038dda9e20a10e6727a0b0e6/> reduce handover logging
+
+### New Features
+
+ - <csr-id-db8b58477b5b953ff2ce34163ebcc45f47cc0ab8/> return an error when received an invalid SAP
+ - <csr-id-fe017fd27a65a3c432209d2351df8d6397572ec3/> reenable backpressure as a default feature
+   This moves backpressure report sending to be periodic and only to our
+   section.
+   
+   Previously it _seems_ like the extra load from running backpressure
+   analysis on every message was problematic (removing it shored up the
+   membership change prs).
+   
+   So here we remove that, and look to only inform our section (which is
+   where most messaging will likely be coming from). Intra section messages
+   just now are purely AE... so should be minimal and/or update our node
+   with new info so that the sender will thereafter receive updates.
+   
+   We _could_ still send messages to all known Links... but that seems
+   overkill just now.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 1 day passed between releases.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_dysfunction-0.1.3/sn_node-0.58.17 ([`66638f5`](https://github.com/maidsafe/safe_network/commit/66638f508ad4df12b757672df589ba8ad09fbdfc))
+    - reduce handover logging ([`00dc9c0`](https://github.com/maidsafe/safe_network/commit/00dc9c0ba9afb6de038dda9e20a10e6727a0b0e6))
     - Merge #1176 ([`0cd2172`](https://github.com/maidsafe/safe_network/commit/0cd217240a72b462e04314bd67e1bbaf054374c0))
+    - reenable backpressure as a default feature ([`fe017fd`](https://github.com/maidsafe/safe_network/commit/fe017fd27a65a3c432209d2351df8d6397572ec3))
     - return an error when received an invalid SAP ([`db8b584`](https://github.com/maidsafe/safe_network/commit/db8b58477b5b953ff2ce34163ebcc45f47cc0ab8))
     - Merge branch 'main' into sap_sig_checks ([`f8ec2e5`](https://github.com/maidsafe/safe_network/commit/f8ec2e54943eaa18b50bd9d7562d41f57d5d3248))
 </details>
 
 ## v0.58.16 (2022-05-10)
+
+<csr-id-61ba367c308a846cb3f1ae065b1fbbdfb85838e4/>
+<csr-id-bd04335d3ee074610ffd5fd4daff15a080b6353d/>
 
 ### Chore
 
@@ -98,6 +149,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-1f2d7037d3178e211842f9b554d8fd0d462709e2/>
 <csr-id-e17baffdc356d244075a97e9422d5ffab2ca46c7/>
 <csr-id-4de29a018a5305d18589bdd5a3d557f7979eafd7/>
+<csr-id-26db0aaf0acba424c6a93b49e066f036baa42e8b/>
+<csr-id-937ea457ea5d7e6f7f123eeba6b5da45fef5b404/>
+<csr-id-d7b288726368fcc44c10beee42616468c64ffaae/>
+<csr-id-56dc95e12310abac60531d50e79895113df49853/>
+<csr-id-ca5e9226a41a878ff6ac255d0d7ca26b41e07c7d/>
+<csr-id-dd8b50cff2ac35dd4134a3a6179a06b798305e91/>
+<csr-id-737d906a61f772593ac7df755d995d66059e8b5e/>
+<csr-id-ae9aeeb94f55f29849c8c5fe1b05419b96fac6e9/>
 
 ### Chore
 
