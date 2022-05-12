@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1652370494041,
+  "lastUpdate": 1652378014690,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -2795,6 +2795,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 5527784470,
             "range": "± 1367533875",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "2062bcee463c46f028991374d1d548b848f9052b",
+          "message": "Merge #1181\n\n1181: fix: publishing script not exiting correctly r=joshuef a=jacderida\n\nIn the last release run, publishing of crates were successful with the retry loop; however, the\r\nscript didn't exit correctly on the successful publish. The loop then continued until the retries\r\nwere exceeded.\r\n\r\nThe problem was the use of the sub shell. I use this from habit. Whenever a script is changing\r\ndirectories, using a sub shell means the change only applies inside the sub shell, so the outer\r\nscript will retain its current directory, which is often desirable behaviour. The use of `exit 0` inside\r\nthe sub shell only exits the sub shell, not the entire script, as was intended.\r\n\r\nI've now removed the use of the sub shell; it wasn't really a necessary protection for this scenario\r\nanyway.\n\nCo-authored-by: Chris O'Neil <chriso83@protonmail.com>",
+          "timestamp": "2022-05-12T16:23:44Z",
+          "tree_id": "517d2b8150664895dd39baaf44315ceae451a025",
+          "url": "https://github.com/maidsafe/safe_network/commit/2062bcee463c46f028991374d1d548b848f9052b"
+        },
+        "date": 1652378014007,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10540740553,
+            "range": "± 5764774328",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3942365799,
+            "range": "± 969110640",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 10246829357,
+            "range": "± 580875217",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10044084948,
+            "range": "± 2947287946",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3144270637,
+            "range": "± 20372175",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4791109934,
+            "range": "± 178101852",
             "unit": "ns/iter"
           }
         ]
