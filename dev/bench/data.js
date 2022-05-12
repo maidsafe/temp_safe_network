@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1652336618230,
+  "lastUpdate": 1652364970235,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -2675,6 +2675,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4596943556,
             "range": "± 217421356",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "joshuef@gmail.com",
+            "name": "Josh Wilson",
+            "username": "joshuef"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "53ee4c51b82ebd0060c9adba32dac1a102890120",
+          "message": "chore: simplify cleanupPeerLinks\n\nThere was a suspected deadlock in the CleanUpPeerLinks code, so here\nwe simplify things in order to hopefully prevent any deadlock.\n\nMoving the cleanup into comms, removing any checks against membership\n(as all nodes should be connectable; clients can always retry).\n\nAnd removing PeerLinks that are not conncted at all.",
+          "timestamp": "2022-05-12T15:46:54+02:00",
+          "tree_id": "a49b0fbb25d8f73eb52c08c24ceeac10d8843d20",
+          "url": "https://github.com/maidsafe/safe_network/commit/53ee4c51b82ebd0060c9adba32dac1a102890120"
+        },
+        "date": 1652364968994,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10589199804,
+            "range": "± 7102132699",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 4216381308,
+            "range": "± 1642902972",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 11622225552,
+            "range": "± 14091508127",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10041620698,
+            "range": "± 1207624171",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3162304287,
+            "range": "± 36878522",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4763683877,
+            "range": "± 1369550940",
             "unit": "ns/iter"
           }
         ]
