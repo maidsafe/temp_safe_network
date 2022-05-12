@@ -260,6 +260,9 @@ mod tests {
     use sn_interface::messaging::data::OperationId;
     use tokio::runtime::Runtime;
     use xor_name::{rand::random as random_xorname, XorName};
+    // use proptest_derive::Arbitrary;
+    use crate::tests::init_test_logger;
+    use eyre::bail;
 
     fn issue_type_strategy() -> impl Strategy<Value = IssueType> {
         prop_oneof![
@@ -350,7 +353,7 @@ mod tests {
         /// TODO: right now this fails, as it appears our dysfunction barrier is TooDamnHigh
         /// This _feels_ like a more correct test thanu sing the arbitrary counts we've had. Thoughts?
         fn pt_correct_amount_of_dysf_nodes_should_be_detected(
-            good_nodes in 7..50, bad_nodes in 1..7, issue_count in 1100..5000, issue_type in issue_type_strategy())
+            good_nodes in 7..50, bad_nodes in 1..7, issue_count in 1000..5000, issue_type in issue_type_strategy())
             {
 
             // finish early as we're over byzantine levels
@@ -358,7 +361,6 @@ mod tests {
                 println!("early end, good: {good_nodes}, bad: {bad_nodes}");
                 return Ok(());
             }
-
             init_test_logger();
             let _outer_span = tracing::info_span!("pt_correct_amount_of_dysf_nodes_should_be_detected").entered();
 
