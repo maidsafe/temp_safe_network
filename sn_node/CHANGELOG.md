@@ -5,18 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.58.18 (2022-05-12)
+## v0.58.19 (2022-05-13)
+
+### Chore
+
+ - <csr-id-53ee4c51b82ebd0060c9adba32dac1a102890120/> simplify cleanupPeerLinks
+   There was a suspected deadlock in the CleanUpPeerLinks code, so here
+   we simplify things in order to hopefully prevent any deadlock.
+   
+   Moving the cleanup into comms, removing any checks against membership
+   (as all nodes should be connectable; clients can always retry).
+   
+   And removing PeerLinks that are not conncted at all.
 
 ### New Features
 
- - <csr-id-965310a12e09f399d125e8c5227c237d307bc20f/> disable backpressure as a deafult feature
+ - <csr-id-e552c17d89d8747b1de32598bf6c58ba43a4f285/> sort relocate candidates by distance to the churn_id
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -26,10 +37,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1181 ([`2062bce`](https://github.com/maidsafe/safe_network/commit/2062bcee463c46f028991374d1d548b848f9052b))
+    - Merge #1180 ([`aed6d50`](https://github.com/maidsafe/safe_network/commit/aed6d5050c0b2cc37cc66d4c7b6ada70ee79808a))
+    - simplify cleanupPeerLinks ([`53ee4c5`](https://github.com/maidsafe/safe_network/commit/53ee4c51b82ebd0060c9adba32dac1a102890120))
+    - sort relocate candidates by distance to the churn_id ([`e552c17`](https://github.com/maidsafe/safe_network/commit/e552c17d89d8747b1de32598bf6c58ba43a4f285))
+</details>
+
+## v0.58.18 (2022-05-12)
+
+### Chore
+
+ - <csr-id-a49a007ef8fde53a346403824f09eb0fd25e1109/> sn_interface-0.2.3/sn_node-0.58.18
+
+### New Features
+
+ - <csr-id-965310a12e09f399d125e8c5227c237d307bc20f/> disable backpressure as a deafult feature
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.2.3/sn_node-0.58.18 ([`a49a007`](https://github.com/maidsafe/safe_network/commit/a49a007ef8fde53a346403824f09eb0fd25e1109))
     - disable backpressure as a deafult feature ([`965310a`](https://github.com/maidsafe/safe_network/commit/965310a12e09f399d125e8c5227c237d307bc20f))
 </details>
 
 ## v0.58.17 (2022-05-11)
+
+<csr-id-66638f508ad4df12b757672df589ba8ad09fbdfc/>
+<csr-id-00dc9c0ba9afb6de038dda9e20a10e6727a0b0e6/>
 
 ### Chore
 
