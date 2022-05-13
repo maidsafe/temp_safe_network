@@ -116,6 +116,11 @@ impl Comm {
                 };
             }
         }
+
+        debug!(
+            "PeerLink count post-cleanup: ${:?}",
+            self.sessions.read().await.len()
+        );
     }
 
     /// Fake function used as replacement for testing only.
