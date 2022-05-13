@@ -213,9 +213,13 @@ impl Node {
             sig: section_signed.clone(),
         };
         let our_name = self.info.read().await.name();
+        let our_section_prefix = self.network_knowledge.prefix().await;
+        let equal_prefix = section_auth.prefix() == our_section_prefix;
+        let is_extension_prefix = section_auth.prefix().is_extension_of(&our_section_prefix);
+        let our_peer_info = self.info.read().await.peer();
 
-        // Update our network knowledge.
-        if self
+        // Update our network knowledge
+        let there_was_an_update = self
             .network_knowledge
             .update_knowledge_if_valid(
                 signed_sap.clone(),
@@ -224,13 +228,26 @@ impl Node {
                 &our_name,
                 &self.section_keys_provider,
             )
-            .await?
-        {
+            .await?;
+
+        if there_was_an_update {
             self.write_prefix_map().await;
             info!(
                 "PrefixMap written to disk with update for prefix {:?}",
                 prefix
             );
+
+            // check for churn join miss
+            let is_in_current_section = section_auth
+                .members()
+                .any(|node_state| node_state.peer() == &our_peer_info);
+            let prefix_matches_our_name = prefix.matches(&our_name);
+            let was_in_ancestor_section = equal_prefix || is_extension_prefix;
+
+            if was_in_ancestor_section && prefix_matches_our_name && !is_in_current_section {
+                error!("Detected churn join miss while processing msg ({:?}), was in section {:?}, updated to {:?}, wasn't in members anymore even if name matches: {:?}", msg_id, our_section_prefix, prefix, our_name);
+                return Err(Error::ChurnJoinMiss);
+            }
         }
 
         // If the new SAP's section key is the same as the section key set when the

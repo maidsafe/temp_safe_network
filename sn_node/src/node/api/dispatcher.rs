@@ -11,7 +11,7 @@ use super::Cmd;
 use crate::node::{
     core::{DeliveryStatus, Node, Proposal},
     messages::WireMsgUtils,
-    Result,
+    Error, Result,
 };
 #[cfg(feature = "back-pressure")]
 use sn_interface::messaging::DstLocation;
@@ -90,6 +90,10 @@ impl Dispatcher {
                         // Error here is only related to queueing, and so a dropped cmd will be logged
                         let _result = self.clone().spawn_cmd_handling(cmd, sub_cmd_id);
                     }
+                }
+                Err(Error::ChurnJoinMiss) => {
+                    info!("Handling churn join miss from cmd {:?}", cmd_id);
+                    // NB TODO rejoin here
                 }
                 Err(err) => {
                     error!("Failed to handle cmd {:?} with error {:?}", cmd_id, err);

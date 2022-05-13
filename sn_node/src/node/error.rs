@@ -92,6 +92,9 @@ pub enum Error {
     /// Timeout when trying to join the network
     #[error("Timeout when trying to join the network")]
     JoinTimeout,
+    /// Join occured during section churn and new elders missed it, need to re-join the network
+    #[error("Join occured during section churn and new elders missed it")]
+    ChurnJoinMiss,
     /// Database error.
     #[error("Database error:: {0}")]
     Database(#[from] crate::dbs::Error),

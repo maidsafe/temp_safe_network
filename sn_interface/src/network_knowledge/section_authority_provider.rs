@@ -155,6 +155,10 @@ impl SectionAuthorityProvider {
         self.elders.iter()
     }
 
+    pub fn members(&self) -> impl Iterator<Item = &NodeState> + '_ {
+        self.members.iter()
+    }
+
     /// A convenience function since we often use SAP elders as recipients.
     pub fn elders_vec(&self) -> Vec<Peer> {
         self.elders.iter().cloned().collect()
