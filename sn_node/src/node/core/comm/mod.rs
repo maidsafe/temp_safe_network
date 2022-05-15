@@ -106,9 +106,12 @@ impl Comm {
         // TODO: check if we need to remove client conns manually, or if we can assume they're disconnected...
         // Perhaps above a threshold we cleanup non-section conns?
         if !peers_to_cleanup.is_empty() {
-            let mut sessions_write_guard = self.sessions.write().await;
             for peer in peers_to_cleanup {
-                if let Some(session) = sessions_write_guard.remove(&peer) {
+                let mut sessions_write_guard = self.sessions.write().await;
+                let perhaps_peer = sessions_write_guard.remove(&peer);
+                drop(sessions_write_guard);
+
+                if let Some(session) =  perhaps_peer {
                     session.disconnect().await
                 };
             }
@@ -444,20 +447,21 @@ impl Comm {
         // i.e. first comms to any node, will impact all sending at that instant..
         // however, first comms should be a minor part of total time spent using link,
         // so that is ok
-        let mut sessions = self.sessions.write().await;
-        let res = match sessions.get(peer).cloned() {
+        // let res = match sessions.get(peer).cloned() {
             // someone else inserted in the meanwhile, so use that
-            Some(session) => session,
+            // Some(session) => session,
             // still not in list, go ahead and create + insert
-            None => {
+            // None => {
+
                 let link = Link::new(*peer, self.our_endpoint.clone(), self.msg_listener.clone());
                 let session = PeerSession::new(link);
+                let mut sessions = self.sessions.write().await;
                 let _ = sessions.insert(*peer, session.clone());
                 session
-            }
-        };
+            // }
+        // };
 
-        res
+        // res
     }
 
     /// Any number of incoming qp2p:Connections can be added.
@@ -472,12 +476,11 @@ impl Comm {
             }
             // else still not in list, go ahead and insert
         }
-        let mut sessions = self.sessions.write().await;
-        match sessions.get(peer) {
-            // someone else inserted in the meanwhile, add to it
-            Some(c) => c.add(conn).await,
-            // still not in list, go ahead and insert
-            None => {
+        // match sessions.get(peer) {
+            //     // someone else inserted in the meanwhile, add to it
+            //     Some(c) => c.add(conn).await,
+            //     // still not in list, go ahead and insert
+            //     None => {
                 let link = Link::new_with(
                     *peer,
                     self.our_endpoint.clone(),
@@ -486,9 +489,10 @@ impl Comm {
                 )
                 .await;
                 let session = PeerSession::new(link);
+                let mut sessions = self.sessions.write().await;
                 let _ = sessions.insert(*peer, session);
-            }
-        }
+        //     }
+        // }
     }
 
     // Helper to send a message to a single recipient.
