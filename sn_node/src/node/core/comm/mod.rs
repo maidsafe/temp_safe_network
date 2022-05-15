@@ -106,9 +106,12 @@ impl Comm {
         // TODO: check if we need to remove client conns manually, or if we can assume they're disconnected...
         // Perhaps above a threshold we cleanup non-section conns?
         if !peers_to_cleanup.is_empty() {
-            let mut sessions_write_guard = self.sessions.write().await;
             for peer in peers_to_cleanup {
-                if let Some(session) = sessions_write_guard.remove(&peer) {
+                let mut sessions_write_guard = self.sessions.write().await;
+                let perhaps_peer = sessions_write_guard.remove(&peer);
+                drop(sessions_write_guard);
+
+                if let Some(session) = perhaps_peer {
                     session.disconnect().await
                 };
             }
