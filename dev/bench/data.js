@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1652422582914,
+  "lastUpdate": 1652690842027,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -2915,6 +2915,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4827116265,
             "range": "± 844871233",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "b5a222c7facb6f1617281ed1133464a435db01f8",
+          "message": "Merge #1182\n\n1182: chore(node): dont hold comms session lock over session cleanup r=Yoga07 a=joshuef\n\nIt's still not clear if this is where we may be deadlocking. But moving to hold the lock over a shorter duration certainly seems sensible\r\n\r\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\n\nCo-authored-by: Josh Wilson <joshuef@gmail.com>",
+          "timestamp": "2022-05-16T07:09:04Z",
+          "tree_id": "f165d5a2f5d01d7a99e202ee9f7a184d8edd41ec",
+          "url": "https://github.com/maidsafe/safe_network/commit/b5a222c7facb6f1617281ed1133464a435db01f8"
+        },
+        "date": 1652690840889,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10899572100,
+            "range": "± 11149293090",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3836230820,
+            "range": "± 1176872445",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 9166083337,
+            "range": "± 1626066669",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10038979674,
+            "range": "± 5474574",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 4317839131,
+            "range": "± 1223529412",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4549476477,
+            "range": "± 1371209155",
             "unit": "ns/iter"
           }
         ]
