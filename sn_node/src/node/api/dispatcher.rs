@@ -15,9 +15,14 @@ use crate::node::{
 };
 #[cfg(feature = "back-pressure")]
 use sn_interface::messaging::DstLocation;
-use sn_interface::messaging::{system::SystemMsg, AuthKind, WireMsg};
 use sn_interface::types::{log_markers::LogMarker, Peer};
-
+use sn_interface::{
+    messaging::{
+        system::{NodeCmd, SystemMsg},
+        AuthKind, WireMsg,
+    },
+    types::ReplicatedDataAddress,
+};
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
 use tokio::{sync::watch, time};
@@ -442,12 +447,13 @@ impl Dispatcher {
                 recipients,
                 wire_msg,
             } => self.send_msg(&recipients, recipients.len(), wire_msg).await,
-            Cmd::ThrottledSendBatchMsgs {
+            Cmd::ThrottledSendBatchData {
                 throttle_duration,
-                recipients,
-                mut wire_msgs,
+                recipient,
+                mut data_batches,
             } => {
-                self.send_throttled_batch_msgs(recipients, &mut wire_msgs, throttle_duration)
+                // TODO, if we have outgoing msg deduplication, we can put all relevant nodes in recipients here...
+                self.send_throttled_batch_data(recipient, &mut data_batches, throttle_duration)
                     .await
             }
             Cmd::SendMsgDeliveryGroup {
@@ -530,26 +536,55 @@ impl Dispatcher {
         Ok(cmds)
     }
 
-    async fn send_throttled_batch_msgs(
+    /// Sends a batch of data every `throttle_duration` so as not to overwhelm the nodes,
+    /// or cause too much memory pressure holding data in mem locally
+    async fn send_throttled_batch_data(
         &self,
-        recipients: Vec<Peer>,
-        messages: &mut Vec<WireMsg>,
+        recipient: Peer,
+        data_batches: &mut Vec<Vec<ReplicatedDataAddress>>,
         throttle_duration: Duration,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
-
         let mut interval = tokio::time::interval(throttle_duration);
         interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
         loop {
             let _instant = interval.tick().await;
-            if let Some(message) = messages.pop() {
-                cmds.extend(
-                    self.send_msg(&recipients, recipients.len(), message)
-                        .await?,
-                )
+            if let Some(data_batch) = data_batches.pop() {
+                // get info for the WireMsg
+                let section_pk = self.node.section_key_by_name(&recipient.name()).await;
+                let src_section_pk = self.node.network_knowledge().section_key().await;
+                let our_info = &*self.node.info.read().await;
+                let dst = sn_interface::messaging::DstLocation::Node {
+                    name: recipient.name(),
+                    section_pk,
+                };
+
+                let mut data_to_send = vec![];
+
+                // grab the data we want to be sending
+                for data_address in data_batch {
+                    let data = self
+                        .node
+                        .data_storage
+                        .get_from_local_store(&data_address)
+                        .await?;
+                    data_to_send.push(data)
+                }
+
+                let system_msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(data_to_send));
+
+                let wire_msg = WireMsg::single_src(our_info, dst, system_msg, src_section_pk)?;
+
+                debug!(
+                    "{:?} batch to: {:?} w/ {:?} ",
+                    LogMarker::SendingMissingReplicatedData,
+                    recipient,
+                    wire_msg.msg_id()
+                );
+                cmds.extend(self.send_msg(&[recipient], 1, wire_msg).await?)
             } else {
-                info!("Finished sending a batch of messages");
+                info!("Finished queing sending a batch of messages");
                 break;
             }
         }
