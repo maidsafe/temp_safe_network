@@ -286,6 +286,12 @@ impl Node {
             .await
     }
 
+    /// Removes any PeerLinks not from our section elders
+    pub(crate) async fn cleanup_non_elder_peers(&self) {
+        let elders = self.network_knowledge.elders().await;
+        self.comm.cleanup_peers(elders).await
+    }
+
     /// returns names that are relatively dysfunctional
     pub(crate) async fn get_dysfunctional_node_names(&self) -> Result<BTreeSet<XorName>> {
         self.dysfunction_tracking
