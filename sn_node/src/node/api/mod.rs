@@ -268,6 +268,13 @@ impl NodeApi {
             .clone()
             .check_for_dysfunction_periodically()
             .await;
+
+        #[cfg(feature = "back-pressure")]
+        dispatcher
+            .clone()
+            .report_backpressure_to_our_section_periodically()
+            .await;
+
         dispatcher.clone().start_cleaning_peer_links().await;
         dispatcher.clone().write_prefixmap_to_disk().await;
 

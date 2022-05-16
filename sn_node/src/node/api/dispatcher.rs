@@ -13,17 +13,18 @@ use crate::node::{
     messages::WireMsgUtils,
     Result,
 };
-use sn_interface::elder_count;
+#[cfg(feature = "back-pressure")]
+use sn_interface::messaging::DstLocation;
 use sn_interface::messaging::{system::SystemMsg, AuthKind, WireMsg};
 use sn_interface::types::{log_markers::LogMarker, Peer};
-
-use itertools::Itertools;
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
 use tokio::{sync::watch, time};
 use tracing::Instrument;
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
+#[cfg(feature = "back-pressure")]
+const BACKPRESSURE_INTERVAL: Duration = Duration::from_secs(60);
 const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(120);
 const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(60);
 
@@ -216,6 +217,80 @@ impl Dispatcher {
         });
     }
 
+    #[cfg(feature = "back-pressure")]
+    /// Periodically send back-pressure reports to our section.
+    ///
+    /// We do not send reports outside of the section as most messages will come from within our section
+    /// (and there's no easy way to determine what incoming mesages are spam, or joining nodes etc)
+    /// Worst case is after a split, nodes sending messaging from a sibling section to update us may not
+    /// know about our load just now. Though that would only be AE messages... and if backpressure is working we should
+    /// not be overloaded...
+    pub(super) async fn report_backpressure_to_our_section_periodically(self: Arc<Self>) {
+        info!("Firing off backpressure reports");
+        let _handle = tokio::spawn(async move {
+            let dispatcher = self.clone();
+            let mut interval = tokio::time::interval(BACKPRESSURE_INTERVAL);
+            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+            let _ = interval.tick().await;
+
+            loop {
+                let _ = interval.tick().await;
+
+                let members = dispatcher.node.network_knowledge().section_members().await;
+                let section_pk = dispatcher.node.network_knowledge().section_key().await;
+
+                if let Some(load_report) = dispatcher.node.comm.tolerated_msgs_per_s().await {
+                    trace!("New BackPressure report to disseminate: {:?}", load_report);
+
+                    // TODO: use comms to send report to anyone connected? (can we ID end users there?)
+                    for member in members {
+                        let our_name = dispatcher.node.info.read().await.name();
+                        let peer = member.peer();
+
+                        if peer.name() == our_name {
+                            continue;
+                        }
+
+                        let wire_msg = match WireMsg::single_src(
+                            &*dispatcher.node.info.read().await,
+                            DstLocation::Node {
+                                name: peer.name(),
+                                section_pk,
+                            },
+                            SystemMsg::BackPressure(load_report),
+                            section_pk,
+                        ) {
+                            Ok(msg) => msg,
+                            Err(e) => {
+                                error!(
+                                    "Error forming backpressure message to section member {:?}",
+                                    e
+                                );
+                                continue;
+                            }
+                        };
+
+                        let cmd = Cmd::SendMsg {
+                            wire_msg,
+                            recipients: vec![*peer],
+                        };
+
+                        if let Err(e) = dispatcher
+                            .clone()
+                            .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
+                            .await
+                        {
+                            error!(
+                                "Error sending backpressure report to section member {:?}: {:?}",
+                                peer, e
+                            );
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     pub(super) async fn write_prefixmap_to_disk(self: Arc<Self>) {
         info!("Writing our PrefixMap to disk");
         self.clone().node.write_prefix_map().await
@@ -288,32 +363,7 @@ impl Dispatcher {
     async fn try_processing_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
         match cmd {
             Cmd::CleanupPeerLinks => {
-                let linked_peers = self.node.comm.linked_peers().await;
-
-                if linked_peers.len() < elder_count() {
-                    return Ok(vec![]);
-                }
-
-                self.node.comm.remove_expired().await;
-
-                let sections = self.node.network_knowledge().prefix_map().all();
-                let network_peers = sections
-                    .iter()
-                    .flat_map(|info| info.elders_vec())
-                    .collect_vec();
-
-                for peer in linked_peers.clone() {
-                    if !network_peers.contains(&peer) {
-                        // not among known peers in the network
-                        if !self.node.pending_data_queries_contains_client(&peer).await
-                            && !self.node.comm.is_connected(&peer).await
-                        {
-                            trace!("{peer:?} not waiting on queries and not in the network, so lets unlink them");
-                            self.node.comm.unlink_peer(&peer).await;
-                        }
-                    }
-                }
-
+                self.node.comm.cleanup_peers().await;
                 Ok(vec![])
             }
             Cmd::SignOutgoingSystemMsg { msg, dst } => {

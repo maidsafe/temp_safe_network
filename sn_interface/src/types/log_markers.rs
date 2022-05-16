@@ -26,7 +26,7 @@ pub enum LogMarker {
     ProposalAgreed,
     // Handover
     HandoverConsensusTrigger,
-    HandoverMsgToBeHandled,
+    HandoverMsgBeingHandled,
     HandoverConsensusTermination,
     // Malice
     DeviantsDetected,
