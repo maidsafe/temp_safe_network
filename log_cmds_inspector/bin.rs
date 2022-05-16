@@ -184,7 +184,7 @@ pub fn update_cmds_info_for_markers(
     }
 
     let matcher = RegexMatcher::new_line_matcher(&pattern)?;
-    let cmd_id_regex = RegexMatcher::new_line_matcher(r".*cmd_id=([^\s-]*)")?;
+    let cmd_id_matcher = RegexMatcher::new(r"\d{10}[.\d]*")?;
     let msg_id_regex = RegexMatcher::new_line_matcher(r".*MsgId\((.*)\)")?;
 
     for path in paths {
@@ -214,7 +214,7 @@ pub fn update_cmds_info_for_markers(
                     let count = info.counts.entry(matched_marker.clone()).or_insert(0);
                     *count += 1;
 
-                    if let Some(cmd_id_match) = cmd_id_regex.find(line.as_bytes())? {
+                    if let Some(cmd_id_match) = cmd_id_matcher.find(line.as_bytes())? {
                         let cmd_id = &line[cmd_id_match].to_string();
                         let root_cmd_id = get_root_cmd_id(cmd_id);
 
@@ -313,6 +313,7 @@ fn inspect_log_files(args: &CmdArgs) -> Result<BTreeMap<String, Vec<String>>> {
         .by_marker
         .get(&LogMarker::CmdProcessStart)
         .unwrap_or(&default_map);
+
     let succeeded = info
         .by_marker
         .get(&LogMarker::CmdProcessEnd)
@@ -339,7 +340,7 @@ fn inspect_log_files(args: &CmdArgs) -> Result<BTreeMap<String, Vec<String>>> {
                 );
             }
             SubCmds::IncompleteCmds => {
-                check_completed_cmds(&info, spawned, started, succeeded, failed, &mut report);
+                check_completed_cmds(&info, spawned, started, succeeded, failed);
             }
         }
     }
@@ -384,93 +385,83 @@ fn check_completed_cmds(
     started: &CmdsInfoList,
     succeeded: &CmdsInfoList,
     failed: &CmdsInfoList,
-    report: &mut BTreeMap<String, Vec<String>>,
 ) {
+    let mut flattened_spawned: BTreeMap<CmdId, String> = BTreeMap::default();
+    for (_root_cmd_id, sub_cmds) in spawned.iter() {
+        // TODO: Do we want the root here too?
+        for (cmd_id, log_entry) in sub_cmds.cmd_logs.iter() {
+            let _ = flattened_spawned.insert(cmd_id.to_string(), log_entry.to_string());
+        }
+    }
+    let mut flattened_started: BTreeMap<CmdId, String> = BTreeMap::default();
+    for (_root_cmd_id, sub_cmds) in started.iter() {
+        // TODO: Do we want the root here too?
+        for (cmd_id, log_entry) in sub_cmds.cmd_logs.iter() {
+            let _ = flattened_started.insert(cmd_id.to_string(), log_entry.to_string());
+        }
+    }
+    let mut flattened_succeeded: BTreeMap<CmdId, String> = BTreeMap::default();
+    for (_root_cmd_id, sub_cmds) in succeeded.iter() {
+        // TODO: Do we want the root here too?
+        for (cmd_id, log_entry) in sub_cmds.cmd_logs.iter() {
+            let _ = flattened_succeeded.insert(cmd_id.to_string(), log_entry.to_string());
+        }
+    }
+    let mut flattened_failed: BTreeMap<CmdId, String> = BTreeMap::default();
+    for (_root_cmd_id, sub_cmds) in failed.iter() {
+        // TODO: Do we want the root here too?
+        for (cmd_id, log_entry) in sub_cmds.cmd_logs.iter() {
+            let _ = flattened_failed.insert(cmd_id.to_string(), log_entry.to_string());
+        }
+    }
+
     let mut cmds_with_error = vec![];
+    let mut cmds_not_started = vec![];
     let mut cmds_not_completed = vec![];
-    let mut cmds_with_end = 0;
 
     println!("Checking completed cmds...");
     println!("-------------------------");
+    println!("spawned len {:?}", spawned.len());
+    println!("started len {:?}", started.len());
+    println!("succeeded len {:?}", succeeded.len());
+    println!("failed len {:?}", failed.len());
 
-    for (cmd_id, log_entry, logfile) in spawned.iter().flat_map(|(_, sub_cmds)| {
-        let mut cmds = vec![];
-        for (cmd_id, log_entry) in sub_cmds.cmd_logs.iter() {
-            cmds.push((cmd_id, log_entry, sub_cmds.logfile.clone()))
+    for (cmd_id, log_entry) in flattened_spawned {
+        if flattened_started.get(&cmd_id).is_none() {
+            cmds_not_started.push((cmd_id.clone(), log_entry.clone()));
+        } else if flattened_started.get(&cmd_id).is_some()
+            && flattened_succeeded.get(&cmd_id).is_none()
+            && flattened_failed.get(&cmd_id).is_none()
+        {
+            cmds_not_completed.push((cmd_id.clone(), log_entry.clone()));
         }
 
-        cmds
-    }) {
-        let logfile = logfile.display().to_string();
-
-        let root_cmd_id = get_root_cmd_id(cmd_id);
-
-        if started
-            .get(&root_cmd_id)
-            .and_then(|sub_cmds| sub_cmds.cmd_logs.get(cmd_id))
-            .is_none()
-        {
-            println!(
-                "Cmd with id {} spawned but not started: {}",
-                cmd_id, log_entry
-            );
-
-            cmds_not_completed.push((cmd_id, logfile.clone(), log_entry));
-            report
-                .entry(logfile)
-                .or_insert_with(Vec::new)
-                .push(log_entry.clone());
-        } else {
-            // cmd spawned and started, let's see if it completed...
-            if succeeded
-                .get(&root_cmd_id)
-                .and_then(|sub_cmds| sub_cmds.cmd_logs.get(cmd_id))
-                .is_none()
-            {
-                if failed
-                    .get(&root_cmd_id)
-                    .and_then(|sub_cmds| sub_cmds.cmd_logs.get(cmd_id))
-                    .is_none()
-                {
-                    cmds_with_error.push((cmd_id, logfile, log_entry));
-                } else {
-                    println!(
-                        "Cmd with id {} spawned and started, but not completed: {}",
-                        cmd_id, log_entry
-                    );
-                    cmds_not_completed.push((cmd_id, logfile.clone(), log_entry));
-                    report
-                        .entry(logfile)
-                        .or_insert_with(Vec::new)
-                        .push(log_entry.clone());
-                }
-            } else {
-                // cmd completed
-                cmds_with_end += 1;
-            }
+        if flattened_started.get(&cmd_id).is_some() && flattened_failed.get(&cmd_id).is_some() {
+            cmds_with_error.push((cmd_id.clone(), log_entry.clone()));
         }
     }
 
     println!(
-        "Cmds handled which Failed: {}, Succeeded: {}, not Completed: {}",
+        "Cmds handled which Failed: {}, Succeeded: {}, not Completed: {}, failed to start: {}",
         cmds_with_error.len(),
-        cmds_with_end,
-        cmds_not_completed.len()
+        flattened_succeeded.len(),
+        cmds_not_completed.len(),
+        cmds_not_started.len()
     );
     println!("Incoming msgs handled: {}", info.cmd_by_msg_id.len());
 
     if !cmds_not_completed.is_empty() {
         println!("\n!!! ERROR !!!: Some cmd/s were not completed in log:");
-        for (id, file, line) in cmds_not_completed {
-            println!("{}{}{}", id, file, line);
+        for (id, line) in cmds_not_completed {
+            println!("{}{}", id, line);
         }
     }
     println!();
 
     if !cmds_with_error.is_empty() {
         println!("\n!!! ERROR !!!: Some cmds produced errors:");
-        for (id, file, line) in cmds_with_error {
-            println!("{} {} {}", id, file, line);
+        for (id, line) in cmds_with_error {
+            println!("{} {}", id, line);
         }
     }
 
