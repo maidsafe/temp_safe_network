@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1652782707059,
+  "lastUpdate": 1652787735491,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -3155,6 +3155,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4605986786,
             "range": "± 973288876",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "00f41b4a96bcc172d91620aa0da0cb799db5483c",
+          "message": "Merge #1189\n\n1189: chore(client): send some msgs in bg threads r=Yoga07 a=joshuef\n\nThis should unblock client threads on initial contact and on queries\r\n\n\nCo-authored-by: Josh Wilson <joshuef@gmail.com>",
+          "timestamp": "2022-05-17T10:12:40Z",
+          "tree_id": "9ea566556ffd9e75b38b76ac476b7b23a9802042",
+          "url": "https://github.com/maidsafe/safe_network/commit/00f41b4a96bcc172d91620aa0da0cb799db5483c"
+        },
+        "date": 1652787734725,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10678747747,
+            "range": "± 10965837275",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3931954961,
+            "range": "± 1272012386",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 11690036637,
+            "range": "± 2457184937",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10041521243,
+            "range": "± 2957920946",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3190265082,
+            "range": "± 1108116517",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4861978381,
+            "range": "± 1016525596",
             "unit": "ns/iter"
           }
         ]
