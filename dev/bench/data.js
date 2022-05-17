@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1652787735491,
+  "lastUpdate": 1652826344061,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -3215,6 +3215,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4861978381,
             "range": "± 1016525596",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "8833cb8a4ae13f04ea86c67e92fce4d82a107f5a",
+          "message": "Merge #1190\n\n1190: chore(deps): upgrade blsttc to v5.2.0 and rand to v0.8 r=bochaco a=bochaco\n\n\n\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>",
+          "timestamp": "2022-05-17T20:48:05Z",
+          "tree_id": "f104c83a664ca6af1445ed66ae1576e1e676b356",
+          "url": "https://github.com/maidsafe/safe_network/commit/8833cb8a4ae13f04ea86c67e92fce4d82a107f5a"
+        },
+        "date": 1652826342900,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10897732835,
+            "range": "± 9252957262",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3703284580,
+            "range": "± 4315651296",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 9496399165,
+            "range": "± 901457698",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10031778894,
+            "range": "± 4895385",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3118777706,
+            "range": "± 26525409",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4465393287,
+            "range": "± 987191974",
             "unit": "ns/iter"
           }
         ]
