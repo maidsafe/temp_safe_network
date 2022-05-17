@@ -22,13 +22,14 @@ use sn_interface::types::{log_markers::LogMarker, Peer};
 
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
+use sn_consensus::Generation;
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
 impl Node {
     pub(crate) async fn handle_dkg_start(&self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
         let current_generation = self.network_knowledge.chain_len().await;
-        if session_id.generation < current_generation {
+        if session_id.section_chain_len < current_generation {
             trace!("Skipping DkgStart for older generation: {:?}", &session_id);
             return Ok(vec![]);
         }
@@ -55,12 +56,19 @@ impl Node {
             peers.push(peer);
         }
 
+        let membership_generation = if let Some(membership) = &*self.membership.read().await {
+            membership.generation()
+        } else {
+            // 0 is the genesis. Which avoids DKG entirely
+            1_u64
+        };
+
         trace!("Received DkgStart for {:?}", session_id);
         self.dkg_sessions
             .write()
             .await
             .retain(|_, existing_session_info| {
-                existing_session_info.session_id.generation >= session_id.generation
+                existing_session_info.session_id.section_chain_len >= session_id.section_chain_len
             });
         let cmds = self
             .dkg_voter
@@ -68,6 +76,7 @@ impl Node {
                 &self.info.read().await.clone(),
                 session_id,
                 self.network_knowledge().section_key().await,
+                membership_generation,
             )
             .await?;
         Ok(cmds)
@@ -139,7 +148,7 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         let section_key = self.network_knowledge().section_key().await;
         let current_generation = self.network_knowledge.chain_len().await;
-        if session_id.generation < current_generation {
+        if session_id.section_chain_len < current_generation {
             trace!(
                 "Ignoring DkgRetry for expired DKG session: {:?}",
                 &session_id
@@ -240,6 +249,7 @@ impl Node {
         &self,
         sap: SectionAuthorityProvider,
         key_share: SectionKeyShare,
+        generation: Generation,
     ) -> Result<Vec<Cmd>> {
         let key_share_pk = key_share.public_key_set.public_key();
         trace!(
@@ -266,7 +276,7 @@ impl Node {
         } else {
             // This proposal is sent to the current set of elders to be aggregated
             // and section signed.
-            let proposal = Proposal::SectionInfo(sap);
+            let proposal = Proposal::SectionInfo { sap, generation };
             let recipients: Vec<_> = self
                 .network_knowledge
                 .authority_provider()

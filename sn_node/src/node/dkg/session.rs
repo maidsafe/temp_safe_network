@@ -24,6 +24,7 @@ use bls_dkg::key_gen::{
     message::Message as DkgMessage, Error as DkgError, KeyGen, MessageAndTarget, Phase,
 };
 use itertools::Itertools;
+use sn_consensus::Generation;
 use std::{
     collections::{BTreeMap, BTreeSet},
     iter, mem,
@@ -52,6 +53,8 @@ pub(crate) struct Session {
     // Retry sending messages when they timeout
     pub(crate) last_message_broadcast: Vec<(XorName, DkgMessage)>,
     pub(crate) retries: usize,
+    // Membership generation
+    pub(crate) generation: Generation,
 }
 
 fn is_dkg_behind(expected: Phase, actual: Phase) -> bool {
@@ -369,9 +372,12 @@ impl Session {
             secret_key_share: outcome.secret_key_share,
         };
 
+        let generation = self.generation;
+
         Ok(vec![Cmd::HandleDkgOutcome {
             section_auth,
             outcome,
+            generation,
         }])
     }
 
@@ -538,11 +544,11 @@ mod tests {
         let session_id = DkgSessionId {
             prefix,
             elders,
-            generation: 0,
+            section_chain_len: 0,
             bootstrap_members,
         };
 
-        let cmds = voter.start(&node, session_id, section_pk).await?;
+        let cmds = voter.start(&node, session_id, section_pk, 0).await?;
         assert_matches!(&cmds[..], &[Cmd::HandleDkgOutcome { .. }]);
 
         Ok(())
@@ -570,7 +576,7 @@ mod tests {
         let session_id = DkgSessionId {
             prefix: Prefix::default(),
             elders: BTreeMap::from_iter(nodes.iter().map(|n| (n.name(), n.addr))),
-            generation: 0,
+            section_chain_len: 0,
             bootstrap_members: BTreeSet::from_iter(
                 nodes
                     .iter()
@@ -588,6 +594,7 @@ mod tests {
                 &actor.node,
                 session_id.clone(),
                 section_pk,
+                0,
             ))?;
 
             for cmd in cmds {

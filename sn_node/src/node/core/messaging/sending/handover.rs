@@ -27,7 +27,7 @@ impl Node {
                 let mut vs = handover_voting_state.clone();
                 let vote = vs.propose(sap_candidates)?;
                 *wlock = Some(vs);
-                debug!(">>> {}: {:?}", LogMarker::HandoverConsensusTrigger, &vote);
+                debug!("{}: {:?}", LogMarker::HandoverConsensusTrigger, &vote);
                 Ok(self.broadcast_handover_vote_msg(vote).await)
             }
             None => {
@@ -43,12 +43,12 @@ impl Node {
         signed_vote: SignedVote<SapCandidate>,
     ) -> Vec<Cmd> {
         // Deliver each SignedVote to all current Elders
-        trace!(">>> Broadcasting Vote msg: {:?}", signed_vote);
+        trace!("Broadcasting Vote msg: {:?}", signed_vote);
         let node_msg = SystemMsg::HandoverVote(signed_vote);
         match self.send_msg_to_our_elders(node_msg).await {
             Ok(cmd) => vec![cmd],
             Err(err) => {
-                error!(">>> Failed to send SystemMsg::Handover message: {:?}", err);
+                error!("Failed to send SystemMsg::Handover message: {:?}", err);
                 vec![]
             }
         }

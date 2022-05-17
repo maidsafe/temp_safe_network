@@ -50,7 +50,12 @@ impl Node {
     /// Verifies the SAP signature and checks that the signature's public key matches the
     /// signature of the SAP, because SAP candidates are signed by the candidate section key
     fn check_sap(&self, sap: &SectionAuth<SectionAuthorityProvider>) -> Result<()> {
-        let sap_bytes = Proposal::SectionInfo(sap.value.clone()).as_signable_bytes()?;
+        let bogus_generation = 0; // generation is not used for signing SAPs
+        let sap_bytes = Proposal::SectionInfo {
+            sap: sap.value.clone(),
+            generation: bogus_generation,
+        }
+        .as_signable_bytes()?;
         if !sap.sig.verify(&sap_bytes) {
             return Err(Error::InvalidSignature);
         }

@@ -434,13 +434,13 @@ impl Node {
         let zero_id = DkgSessionId {
             prefix: zero_prefix,
             elders: BTreeMap::from_iter(zero_elders.iter().map(|node| (node.name, node.addr))),
-            generation,
+            section_chain_len: generation,
             bootstrap_members: zero,
         };
         let one_id = DkgSessionId {
             prefix: one_prefix,
             elders: BTreeMap::from_iter(one_elders.iter().map(|node| (node.name, node.addr))),
-            generation,
+            section_chain_len: generation,
             bootstrap_members: one,
         };
 
@@ -482,7 +482,7 @@ impl Node {
         let current_elders = BTreeSet::from_iter(sap.elders().copied());
 
         info!(
-            ">>>> ELDER CANDIDATES {}: {:?}",
+            "ELDER CANDIDATES {}: {:?}",
             elder_candidates.len(),
             elder_candidates
         );
@@ -515,7 +515,7 @@ impl Node {
                         .into_iter()
                         .map(|node| (node.name, node.addr)),
                 ),
-                generation,
+                section_chain_len: generation,
                 bootstrap_members: BTreeSet::from_iter(members.into_values()),
             };
             vec![session_id]
@@ -551,6 +551,10 @@ impl Node {
             .await
             .elder_count();
         let section_prefix = self.network_knowledge.prefix().await;
+
+        // reset split barrier for
+        let mut split_barrier = self.split_barrier.write().await;
+        *split_barrier = SplitBarrier::new();
 
         let mut handover_voting = self.handover_voting.write().await;
         *handover_voting = Some(Handover::from(
