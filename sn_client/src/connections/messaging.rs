@@ -237,7 +237,7 @@ impl Session {
         let msg_kind = AuthKind::Service(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
-        send_msg(self.clone(), elders, wire_msg, msg_id).await?;
+        send_msg_in_bg(self.clone(), elders, wire_msg, msg_id)?;
 
         // TODO:
         // We are now simply accepting the very first valid response we receive,
@@ -388,7 +388,7 @@ impl Session {
             .take(NODES_TO_CONTACT_PER_STARTUP_BATCH)
             .collect();
 
-        send_msg(self.clone(), initial_contacts, wire_msg.clone(), msg_id).await?;
+        send_msg_in_bg(self.clone(), initial_contacts, wire_msg.clone(), msg_id)?;
 
         *self.initial_connection_check_msg_id.write().await = Some(msg_id);
 
@@ -453,7 +453,7 @@ impl Session {
                 };
 
                 trace!("Sending out another batch of initial contact msgs to new nodes");
-                send_msg(self.clone(), next_contacts, wire_msg.clone(), msg_id).await?;
+                send_msg_in_bg(self.clone(), next_contacts, wire_msg.clone(), msg_id)?;
 
                 let next_wait = backoff.next_backoff();
                 trace!(
@@ -541,6 +541,26 @@ impl Session {
     }
 }
 
+#[instrument(skip_all, level = "trace")]
+/// Pushes a send_msg call into a background thread. Errors will be logged
+pub(super) fn send_msg_in_bg(
+    session: Session,
+    nodes: Vec<Peer>,
+    wire_msg: WireMsg,
+    msg_id: MsgId,
+) -> Result<()> {
+    trace!("Sending client message in bg thread so as not to block");
+
+    let _handle = tokio::spawn(async move {
+        let send_res = send_msg(session, nodes, wire_msg, msg_id).await;
+
+        if send_res.is_err() {
+            error!("Error sending msg in the bg: {:?}", send_res);
+        }
+    });
+
+    Ok(())
+}
 #[instrument(skip_all, level = "trace")]
 pub(super) async fn send_msg(
     session: Session,
