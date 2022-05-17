@@ -49,7 +49,7 @@ pub use token::Token;
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
-#[cfg(feature = "test-utils")]
+#[cfg(any(test, feature = "test-utils"))]
 pub use keys::secret_key::test_utils::{keyed_signed, SecretKeySet};
 
 ///

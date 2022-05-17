@@ -49,7 +49,7 @@ jobs:
         uses: aig787/cargo-udeps-action@v1
         with:
           version: 'latest'
-          args: '--all-targets --features test-utils'
+          args: '--all-targets'
 
   cargo-deny:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -138,7 +138,7 @@ jobs:
 
       - name: Build all test targets
        # all = all crates in workspace, lib/bins targets, with these features...
-        run: cargo test --no-run --release --features=test-utils -p sn_interface -p sn_dysfunction -p sn_node
+        run: cargo test --no-run --release -p sn_interface -p sn_dysfunction -p sn_node
 
       - name: Run sn_interface tests
         timeout-minutes: 25
@@ -149,7 +149,6 @@ jobs:
           junit-path: junit.xml
           package: sn_interface
           release: true
-          features: test-utils
           filters: "messaging prefix_map types"
 
       - name: Run sn_dysfunction unit tests
@@ -171,7 +170,6 @@ jobs:
           junit-path: junit.xml
           package: sn_node
           release: true
-          features: test-utils
           filters: "dbs node routing"
 
       - name: Run CLI unit tests
@@ -214,7 +212,7 @@ jobs:
         run: cargo install ripgrep
 
       - name: Build sn bins
-        run: cd sn_node && cargo build --release --features=test-utils --bins
+        run: cd sn_node && cargo build --release --bins
         timeout-minutes: 60
 
       - name: Build testnet
@@ -254,7 +252,6 @@ jobs:
           junit-path: junit.xml
           package: sn_client
           release: true
-          features: test-utils
           test-threads: 2
           retries: 0
         timeout-minutes: 25
@@ -267,7 +264,6 @@ jobs:
           junit-path: junit.xml
           package: sn_client
           release: true
-          features: test-utils
           filters: ae_checks
           test-threads: 2
           retries: 0
@@ -278,7 +274,7 @@ jobs:
       - name: Run example app for file API against local network
         timeout-minutes: 10
         shell: bash
-        run: cd sn_client && cargo run --release  --features=test-utils --example client_files
+        run: cd sn_client && cargo run --release --example client_files
 
       - name: Are nodes still running...?
         shell: bash
@@ -332,7 +328,7 @@ jobs:
         run: cargo install ripgrep
 
       - name: Build sn bins
-        run: cd sn_node && cargo build --release --features=test-utils --bins
+        run: cd sn_node && cargo build --release --bins
         timeout-minutes: 60
 
       - name: Build testnet
@@ -347,7 +343,7 @@ jobs:
       - name: Run network split data integrity test
         timeout-minutes: 30
         shell: bash
-        run: cargo run --release --features=test-utils --example network_split
+        run: cargo run --release --example network_split
         env:
           RUST_LOG: "sn_node,sn_client=trace"
 
@@ -379,7 +375,6 @@ jobs:
           junit-path: junit.xml
           package: sn_client
           release: true
-          features: test-utils
           test-threads: 10
         timeout-minutes: 25
 
@@ -391,7 +386,6 @@ jobs:
           junit-path: junit.xml
           package: sn_client
           release: true
-          features: test-utils
           filters: ae_checks
           test-threads: 2
         timeout-minutes: 15
@@ -401,7 +395,7 @@ jobs:
       - name: Run example app for file API against local network
         timeout-minutes: 10
         shell: bash
-        run: cd sn_client && cargo run  --release  --features=test-utils --example client_files
+        run: cd sn_client && cargo run  --release --example client_files
 
       - name: Are nodes still running...?
         shell: bash
@@ -462,7 +456,7 @@ jobs:
         run: cargo install ripgrep
 
       - name: Build sn bins
-        run: cd sn_node && cargo build --release --features=test-utils --bins
+        run: cd sn_node && cargo build --release --bins
         timeout-minutes: 60
 
       - name: Build testnet
@@ -557,7 +551,7 @@ jobs:
         run: cargo install ripgrep
 
       - name: Build sn bins
-        run: cd sn_node && cargo build --release --features=test-utils --bins
+        run: cd sn_node && cargo build --release --bins
         timeout-minutes: 60
 
       - name: Build testnet

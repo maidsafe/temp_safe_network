@@ -16,15 +16,12 @@ use sn_client::{Client, ClientConfig, Error, Result};
 use sn_interface::types::{utils::random_bytes, BytesAddress, Scope};
 use tiny_keccak::{Hasher, Sha3};
 
-#[cfg(feature = "test-utils")]
 use sn_client::utils::test_utils::read_network_conn_info;
 
-#[cfg(feature = "test-utils")]
 #[tokio::main]
 async fn main() -> Result<()> {
     sn_client::init_test_logger();
 
-    #[cfg(feature = "test-utils")]
     run_chunk_soak().await?;
 
     Ok(())
@@ -55,7 +52,6 @@ pub(crate) fn files_count() -> usize {
     }
 }
 
-#[cfg(feature = "test-utils")]
 /// uploads data and verifies that data
 pub async fn run_chunk_soak() -> Result<()> {
     let all_data_put = std::sync::Arc::new(tokio::sync::RwLock::new(vec![]));

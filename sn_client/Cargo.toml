@@ -13,21 +13,18 @@ version = "0.62.3"
 [[bench]]
 name = "upload_bytes"
 harness = false
-required-features = ["test-utils"]
 
 [[example]]
 name = "client_files"
-required-features = ["test-utils"]
 
 [[example]]
 name = "network_split"
-required-features = ["test-utils"]
 
 [features]
 default = []
 chaos = []
 unstable-wiremsg-debuginfo = []
-test-utils = ["sn_interface/test-utils", "sn_interface/proptest"]
+test-utils = []
 # Needs to be built with RUSTFLAGS="--cfg tokio_unstable"
 tokio-console = ["console-subscriber"]
 

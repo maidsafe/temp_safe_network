@@ -170,7 +170,6 @@ mod tests {
 
     use sn_interface::elder_count;
     use sn_interface::network_knowledge::test_utils::section_signed;
-    #[cfg(feature = "test-utils")]
     use sn_interface::types::SecretKeySet;
 
     use eyre::Result;

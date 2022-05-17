@@ -19,18 +19,15 @@ required-features = ["test-utils"]
 
 [[example]]
 name = "routing_minimal"
-required-features = ["test-utils"]
 
 [[example]]
 name = "routing_stress"
-required-features = ["test-utils"]
 
 [features]
 default = []
 chaos = []
 back-pressure = ["sn_interface/back-pressure"]
 unstable-wiremsg-debuginfo = []
-test-utils = ["sn_interface/test-utils", "sn_interface/proptest"]
 # Needs to be built with RUSTFLAGS="--cfg tokio_unstable"
 tokio-console = ["console-subscriber"]
 
@@ -110,6 +107,7 @@ rand_xorshift = "~0.2.0"
 tokio-util = { version = "~0.6.7", features = ["time"] }
 walkdir = "2"
 yansi = "~0.5.0"
+sn_interface = { path = "../sn_interface", version = "^0.2.3", features= ["test-utils", "proptest"] }
 
 [dev-dependencies.cargo-husky]
 version = "1.5.0"

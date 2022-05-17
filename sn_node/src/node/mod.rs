@@ -42,12 +42,10 @@ pub use sn_interface::network_knowledge::{
 };
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
 
-#[cfg(feature = "test-utils")]
 pub use test_utils::*;
 
 pub(crate) use self::core::MIN_LEVEL_WHEN_FULL;
 
-#[cfg(any(test, feature = "test-utils"))]
 mod test_utils {
     use super::cfg::config_handler::Config;
     use rand::{distributions::Alphanumeric, thread_rng, Rng};

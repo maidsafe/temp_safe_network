@@ -10,14 +10,16 @@
 mod test_client;
 
 use crate::Error;
+#[cfg(test)]
 use backoff::ExponentialBackoff;
 use dirs_next::home_dir;
 use eyre::{eyre, Context, Result};
 use sn_interface::types::PublicKey;
+#[cfg(test)]
+use std::future::Future;
+#[cfg(test)]
 use std::time::Duration;
-use std::{
-    collections::BTreeSet, fs::File, future::Future, io::BufReader, net::SocketAddr, path::Path,
-};
+use std::{collections::BTreeSet, fs::File, io::BufReader, net::SocketAddr, path::Path};
 #[cfg(test)]
 pub use test_client::{create_test_client, create_test_client_with, init_test_logger};
 
@@ -26,6 +28,7 @@ pub type ClientResult<T> = Result<T, Error>;
 
 ///
 #[allow(clippy::needless_question_mark)]
+#[cfg(test)]
 pub async fn run_w_backoff_delayed<R, F, Fut>(f: F, _retries: u8, delay: usize) -> Result<R, Error>
 where
     F: Fn() -> Fut,
@@ -45,6 +48,7 @@ where
     }
 }
 
+#[cfg(test)]
 fn retry<R, E, Fn, Fut>(
     op: Fn,
     initial_interval: Duration,

@@ -31,15 +31,11 @@ use sn_interface::messaging::{
     AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, NodeAuth,
     SectionAuth as MsgKindSectionAuth, WireMsg,
 };
-#[cfg(feature = "test-utils")]
-use sn_interface::network_knowledge::test_utils::*;
-use sn_interface::network_knowledge::test_utils::{prove, section_signed};
 use sn_interface::network_knowledge::{
-    recommended_section_size, supermajority, NetworkKnowledge, NodeInfo, NodeState,
+    recommended_section_size, supermajority, test_utils::*, NetworkKnowledge, NodeInfo, NodeState,
     SectionAuthorityProvider, SectionKeyShare, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE,
     MIN_ADULT_AGE,
 };
-#[cfg(feature = "test-utils")]
 use sn_interface::types::{keyed_signed, SecretKeySet};
 
 use sn_interface::types::{keys::ed25519, Keypair, Peer, PublicKey};
@@ -52,8 +48,6 @@ use itertools::Itertools;
 use rand::{distributions::Alphanumeric, rngs::OsRng, Rng};
 use resource_proof::ResourceProof;
 use secured_linked_list::SecuredLinkedList;
-#[cfg(feature = "test-utils")]
-use sn_interface::network_knowledge::test_utils::gen_section_authority_provider;
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     iter,

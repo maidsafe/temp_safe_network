@@ -506,7 +506,6 @@ mod tests {
 
     use crate::node::{messages::WireMsgUtils, Error as RoutingError, MIN_ADULT_AGE};
 
-    #[cfg(feature = "test-utils")]
     use sn_interface::network_knowledge::{test_utils::*, NodeState};
 
     use crate::init_test_logger;
@@ -521,8 +520,6 @@ mod tests {
         pin_mut,
     };
     use secured_linked_list::SecuredLinkedList;
-    #[cfg(feature = "test-utils")]
-    use sn_interface::network_knowledge::test_utils::gen_section_authority_provider;
     use std::{collections::BTreeMap, net::SocketAddr};
     use tokio::task;
     use xor_name::XorName;

@@ -203,7 +203,7 @@ jobs:
           curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-node_connection_info.config > ~/.safe/node/node_connection_info.config
 
       - name: Build all test targets
-        run: cargo test --no-run --release --features=test-utils
+        run: cargo test --no-run --release
 
       - name: Run client tests
         uses: jacderida/cargo-nextest@main
@@ -213,14 +213,13 @@ jobs:
           junit-path: junit.xml
           package: sn_client
           release: true
-          features: test-utils
           filters: client
           test-threads: 2
         timeout-minutes: 25
 
       - name: Run example app for file API
         shell: bash
-        run: cargo run --release  --features=test-utils --example client_files
+        run: cargo run --release --example client_files
 
   api:
     name: api tests

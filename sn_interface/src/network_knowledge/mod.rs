@@ -15,7 +15,7 @@ pub mod section_keys;
 mod section_peers;
 pub mod utils;
 
-#[cfg(feature = "test-utils")]
+#[cfg(any(test, feature = "test-utils"))]
 pub use self::section_authority_provider::test_utils;
 
 pub use self::section_keys::{SectionKeyShare, SectionKeysProvider};

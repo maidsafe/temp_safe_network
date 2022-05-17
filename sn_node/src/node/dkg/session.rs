@@ -506,11 +506,7 @@ mod tests {
     use sn_interface::elder_count;
     use sn_interface::messaging::system::{MembershipState, NodeState};
     use sn_interface::messaging::MsgType;
-    #[cfg(feature = "test-utils")]
-    use sn_interface::network_knowledge::test_utils::gen_addr;
-    use sn_interface::network_knowledge::{NodeInfo, MIN_ADULT_AGE};
-
-    #[cfg(feature = "test-utils")]
+    use sn_interface::network_knowledge::{test_utils::gen_addr, NodeInfo, MIN_ADULT_AGE};
     use sn_interface::types::keys::ed25519::{self, proptesting::arbitrary_keypair};
 
     use assert_matches::assert_matches;
@@ -522,7 +518,6 @@ mod tests {
     use xor_name::Prefix;
 
     #[tokio::test]
-    #[cfg(feature = "test-utils")]
     async fn single_participant() -> Result<()> {
         // If there is only one participant, the DKG should complete immediately.
 
@@ -559,7 +554,6 @@ mod tests {
         // Expect the session to successfully complete without timed transitions.
         // NOTE: `seed` is for seeding the rng that randomizes the message order.
         #[test]
-        #[cfg(feature = "test-utils")]
         fn proptest_full_participation(nodes in arbitrary_elder_nodes(), seed in any::<u64>()) {
             if let Err(error) = proptest_full_participation_impl(nodes, seed) {
                 panic!("{}", error);
@@ -696,13 +690,11 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "test-utils")]
     fn arbitrary_elder_nodes() -> impl Strategy<Value = Vec<NodeInfo>> {
         arbitrary_unique_nodes(2..=elder_count())
     }
 
     // Generate Vec<Node> where no two nodes have the same name.
-    #[cfg(feature = "test-utils")]
     pub(crate) fn arbitrary_unique_nodes(
         count: impl Into<SizeRange>,
     ) -> impl Strategy<Value = Vec<NodeInfo>> {
@@ -716,7 +708,6 @@ mod tests {
         })
     }
 
-    #[cfg(feature = "test-utils")]
     fn arbitrary_node() -> impl Strategy<Value = NodeInfo> {
         (arbitrary_keypair(), any::<SocketAddr>())
             .prop_map(|(keypair, addr)| NodeInfo::new(keypair, addr))

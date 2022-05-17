@@ -71,12 +71,9 @@ mod tests {
     use super::*;
     use eyre::Result;
     use serde::Serialize;
-
+    use sn_interface::network_knowledge::test_utils::gen_section_authority_provider;
     use std::fmt::Debug;
     use xor_name::Prefix;
-
-    #[cfg(feature = "test-utils")]
-    use sn_interface::network_knowledge::test_utils::gen_section_authority_provider;
 
     #[test]
     fn serialize_for_signing() -> Result<()> {

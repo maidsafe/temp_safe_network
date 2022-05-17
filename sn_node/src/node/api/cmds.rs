@@ -110,11 +110,11 @@ impl fmt::Display for Cmd {
             Cmd::HandleNodeLeft(_) => write!(f, "HandleNodeLeft"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Cmd::HandleDkgFailure(_) => write!(f, "HandleDkgFailure"),
-            #[cfg(not(feature = "test-utils"))]
+            #[cfg(not(test))]
             Cmd::SendMsg { wire_msg, .. } => {
                 write!(f, "SendMsg {:?}", wire_msg.msg_id())
             }
-            #[cfg(feature = "test-utils")]
+            #[cfg(test)]
             Cmd::SendMsg { wire_msg, .. } => {
                 write!(
                     f,
