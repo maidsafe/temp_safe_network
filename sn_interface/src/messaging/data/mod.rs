@@ -316,7 +316,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         let bls_secret_key = bls::SecretKeySet::random(1, &mut rng);
         vec![
-            Keypair::new_ed25519(&mut rng),
+            Keypair::new_ed25519(),
             Keypair::new_bls_share(
                 0,
                 bls_secret_key.secret_key_share(0),

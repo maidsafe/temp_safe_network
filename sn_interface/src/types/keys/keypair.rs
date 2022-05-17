@@ -18,7 +18,6 @@ use super::super::{PublicKey, SecretKey, Signature, SignatureShare};
 use bls::{self, serde_impl::SerdeSecret, PublicKeySet};
 use bytes::Bytes;
 use ed25519_dalek::Signer;
-use rand::{CryptoRng, Rng};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -141,8 +140,9 @@ impl Eq for Keypair {}
 
 impl Keypair {
     /// Constructs a random Ed25519 keypair.
-    pub fn new_ed25519<T: CryptoRng + Rng>(rng: &mut T) -> Self {
-        let keypair = ed25519_dalek::Keypair::generate(rng);
+    pub fn new_ed25519() -> Self {
+        let mut rng = rand_07::thread_rng();
+        let keypair = ed25519_dalek::Keypair::generate(&mut rng);
         Self::Ed25519(Arc::new(keypair))
     }
 
@@ -230,7 +230,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         let bls_secret_key = bls::SecretKeySet::random(1, &mut rng);
         vec![
-            Keypair::new_ed25519(&mut rng),
+            Keypair::new_ed25519(),
             Keypair::new_bls_share(
                 0,
                 bls_secret_key.secret_key_share(0),

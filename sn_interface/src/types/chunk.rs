@@ -83,7 +83,7 @@ mod tests {
     use crate::types::{utils, Chunk, Error, Result};
     use bytes::Bytes;
     use hex::encode;
-    use rand::{self, Rng, SeedableRng};
+    use rand_07::{self, Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
     use std::{env, iter, thread};
 

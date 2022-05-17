@@ -721,7 +721,6 @@ mod test {
     use sn_interface::types::DataAddress;
     use sn_interface::types::{register::User, Keypair};
 
-    use rand::rngs::OsRng;
     use rand::Rng;
     use tempfile::tempdir;
     use xor_name::Prefix;
@@ -958,8 +957,7 @@ mod test {
     }
 
     fn random_user() -> (User, Keypair) {
-        let mut rng = OsRng;
-        let keypair = Keypair::new_ed25519(&mut rng);
+        let keypair = Keypair::new_ed25519();
         let authority = User::Key(keypair.public_key());
         (authority, keypair)
     }

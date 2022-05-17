@@ -282,7 +282,11 @@ pub mod util {
     }
 
     pub fn get_random_nrs_string() -> String {
-        thread_rng().sample_iter(&Alphanumeric).take(15).collect()
+        thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(15)
+            .map(char::from)
+            .collect()
     }
 
     pub fn safeurl_from(url: &str) -> Result<SafeUrl> {

@@ -53,7 +53,11 @@ mod test_utils {
 
     /// Create a register store for routing examples
     pub fn create_test_max_capacity_and_root_storage() -> eyre::Result<(usize, PathBuf)> {
-        let random_filename: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let random_filename: String = thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(15)
+            .map(char::from)
+            .collect();
 
         let root_dir = tempdir().map_err(|e| eyre::eyre!(e.to_string()))?;
         let storage_dir = Path::new(root_dir.path()).join(random_filename);

@@ -43,7 +43,7 @@ pub fn gen_name_with_age(age: u8) -> XorName {
 /// Construct a `Keypair` whose name is in the interval [start, end] (both endpoints inclusive).
 /// And the last byte equals to the targeted age.
 pub fn gen_keypair(range: &RangeInclusive<XorName>, age: u8) -> Keypair {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand_07::thread_rng();
 
     loop {
         let keypair = Keypair::generate(&mut rng);

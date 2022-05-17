@@ -166,7 +166,7 @@ pub fn keypair_to_hex_strings(keypair: &Keypair) -> Result<(String, String)> {
 #[cfg(feature = "testing")]
 pub async fn create_new_key(safe: &Safe) -> Result<(String, Keypair)> {
     // '--pay-with' is either a Wallet XOR-URL, or a secret key
-    let key_pair = safe.generate_random_ed_keypair();
+    let key_pair = safe.new_keypair();
 
     let xorname = XorName::from(key_pair.public_key());
     let xorurl = SafeUrl::encode_safekey(xorname, safe.xorurl_base)?;

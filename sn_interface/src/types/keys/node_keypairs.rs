@@ -10,7 +10,6 @@ use super::super::{PublicKey, Signature};
 use crate::types::{BlsKeypairShare, SignatureShare};
 use bls::{serde_impl::SerdeSecret, PublicKeySet, SecretKeyShare as BlsSecretKeyShare};
 use ed25519_dalek::Keypair as Ed25519Keypair;
-use rand::{CryptoRng, Rng};
 use serde::{Deserialize, Serialize};
 use signature::Signer;
 use xor_name::XorName;
@@ -26,23 +25,31 @@ pub struct NodeKeypairs {
     bls: Option<BlsKeypairShare>,
 }
 
+impl Default for NodeKeypairs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NodeKeypairs {
     /// Constructs a `NodeKeypairs` with a random Ed25519 keypair and no BLS keys.
-    pub fn new<T: CryptoRng + Rng>(rng: &mut T) -> Self {
-        let ed25519 = Ed25519Keypair::generate(rng);
+    pub fn new() -> Self {
+        let mut rng = rand_07::thread_rng();
+        let ed25519 = Ed25519Keypair::generate(&mut rng);
 
         Self { ed25519, bls: None }
     }
 
     /// Constructs a `NodeKeypairs` whose name is in the interval [start, end] (both endpoints inclusive).
-    pub fn within_range<T: CryptoRng + Rng>(start: &XorName, end: &XorName, rng: &mut T) -> Self {
-        let mut ed25519 = Ed25519Keypair::generate(rng);
+    pub fn within_range(start: &XorName, end: &XorName) -> Self {
+        let mut rng = rand_07::thread_rng();
+        let mut ed25519 = Ed25519Keypair::generate(&mut rng);
         loop {
             let name: XorName = PublicKey::Ed25519(ed25519.public).into();
             if name >= *start && name <= *end {
                 return Self { ed25519, bls: None };
             }
-            ed25519 = Ed25519Keypair::generate(rng);
+            ed25519 = Ed25519Keypair::generate(&mut rng);
         }
     }
 

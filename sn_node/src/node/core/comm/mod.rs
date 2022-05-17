@@ -622,7 +622,6 @@ mod tests {
     use eyre::Result;
     use futures::future;
     use qp2p::Config;
-    use rand::rngs::OsRng;
     use sn_interface::messaging::data::{DataQuery, ServiceMsg};
     use sn_interface::messaging::{AuthKind, DstLocation, MsgId, ServiceAuth};
     use sn_interface::types::{ChunkAddress, Keypair, Peer};
@@ -852,8 +851,7 @@ mod tests {
             section_pk: bls::SecretKey::random().public_key(),
         };
 
-        let mut rng = OsRng;
-        let src_keypair = Keypair::new_ed25519(&mut rng);
+        let src_keypair = Keypair::new_ed25519();
 
         let payload = WireMsg::serialize_msg_payload(&ServiceMsg::Query(DataQuery::GetChunk(
             ChunkAddress(xor_name::rand::random()),

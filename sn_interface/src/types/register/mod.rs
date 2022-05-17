@@ -235,7 +235,7 @@ mod tests {
     };
     use crate::{types::RegisterAddress as Address, types::Scope};
     use proptest::prelude::*;
-    use rand::{rngs::OsRng, seq::SliceRandom, thread_rng, Rng};
+    use rand_07::{rngs::OsRng, seq::SliceRandom, thread_rng, Rng};
     use std::{
         collections::{BTreeMap, BTreeSet},
         sync::Arc,
@@ -284,9 +284,9 @@ mod tests {
 
     #[test]
     fn register_concurrent_write_ops() -> Result<()> {
-        let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
+        let authority_keypair1 = Keypair::new_ed25519();
         let authority1 = User::Key(authority_keypair1.public_key());
-        let authority_keypair2 = Keypair::new_ed25519(&mut OsRng);
+        let authority_keypair2 = Keypair::new_ed25519();
         let authority2 = User::Key(authority_keypair2.public_key());
 
         let name: XorName = xor_name::rand::random();
@@ -391,7 +391,7 @@ mod tests {
         let tag = 43_666;
 
         // one replica will allow write ops to anyone
-        let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
+        let authority_keypair1 = Keypair::new_ed25519();
         let owner1 = User::Key(authority_keypair1.public_key());
         let mut perms1 = BTreeMap::default();
         let _prev = perms1.insert(User::Anyone, PublicPermissions::new(true));
@@ -406,7 +406,7 @@ mod tests {
         );
 
         // the other replica will allow write ops to 'owner1' and 'authority2' only
-        let authority_keypair2 = Keypair::new_ed25519(&mut OsRng);
+        let authority_keypair2 = Keypair::new_ed25519();
         let authority2 = User::Key(authority_keypair2.public_key());
         let mut perms2 = BTreeMap::default();
         let _prev = perms2.insert(owner1, PublicPermissions::new(true));
@@ -442,7 +442,7 @@ mod tests {
             Permissions::Public(PublicPermissions::new(true)),
         );
 
-        let random_keypair = Keypair::new_ed25519(&mut OsRng);
+        let random_keypair = Keypair::new_ed25519();
         let random_user = User::Key(random_keypair.public_key());
         assert_eq!(replica2.permissions(random_user), Err(Error::NoSuchEntry),);
 
@@ -454,9 +454,9 @@ mod tests {
         let name = xor_name::rand::random();
         let tag = 43_666;
 
-        let authority_keypair1 = Keypair::new_ed25519(&mut OsRng);
+        let authority_keypair1 = Keypair::new_ed25519();
         let authority1 = User::Key(authority_keypair1.public_key());
-        let authority_keypair2 = Keypair::new_ed25519(&mut OsRng);
+        let authority_keypair2 = Keypair::new_ed25519();
         let authority2 = User::Key(authority_keypair2.public_key());
 
         let mut perms1 = BTreeMap::default();
@@ -517,7 +517,7 @@ mod tests {
             Permissions::Private(PrivatePermissions::new(false, true)),
         );
 
-        let random_keypair = Keypair::new_ed25519(&mut OsRng);
+        let random_keypair = Keypair::new_ed25519();
         let random_user = User::Key(random_keypair.public_key());
         assert_eq!(replica2.permissions(random_user), Err(Error::NoSuchEntry),);
 
@@ -544,7 +544,7 @@ mod tests {
             .map(|_| {
                 let authority_keypair = authority_keypair
                     .clone()
-                    .unwrap_or_else(|| Keypair::new_ed25519(&mut OsRng));
+                    .unwrap_or_else(Keypair::new_ed25519);
                 let authority = User::Key(authority_keypair.public_key());
                 let register = Register::new_public(authority, name, tag, policy.clone(), u16::MAX);
                 (authority_keypair, register)
@@ -566,7 +566,7 @@ mod tests {
             .map(|_| {
                 let authority_keypair = authority_keypair
                     .clone()
-                    .unwrap_or_else(|| Keypair::new_ed25519(&mut OsRng));
+                    .unwrap_or_else(Keypair::new_ed25519);
                 let authority = User::Key(authority_keypair.public_key());
                 let register =
                     Register::new_private(authority, name, tag, policy.clone(), u16::MAX);
@@ -628,7 +628,7 @@ mod tests {
         let xorname = xor_name::rand::random();
         let tag = 45_000u64;
 
-        let owner_keypair = Arc::new(Keypair::new_ed25519(&mut OsRng));
+        let owner_keypair = Arc::new(Keypair::new_ed25519());
         let owner = User::Key(owner_keypair.public_key());
         let policy = PublicPolicy {
             owner,
@@ -674,7 +674,7 @@ mod tests {
             // Instantiate the same Register on two replicas
             let name = xor_name::rand::random();
             let tag = 45_000u64;
-            let owner_keypair = Keypair::new_ed25519(&mut OsRng);
+            let owner_keypair = Keypair::new_ed25519();
             let policy = PublicPolicy {
                 owner: User::Key(owner_keypair.public_key()),
                 permissions: BTreeMap::default(),
@@ -704,7 +704,7 @@ mod tests {
             // Instantiate the same Register on two replicas
             let name = xor_name::rand::random();
             let tag = 43_000u64;
-            let owner_keypair = Keypair::new_ed25519(&mut OsRng);
+            let owner_keypair = Keypair::new_ed25519();
             let policy = PublicPolicy {
                 owner: User::Key(owner_keypair.public_key()),
                 permissions: BTreeMap::default(),
@@ -743,7 +743,7 @@ mod tests {
             // Instantiate the same Register on two replicas
             let name = xor_name::rand::random();
             let tag = 43_000u64;
-            let owner_keypair = Keypair::new_ed25519(&mut OsRng);
+            let owner_keypair = Keypair::new_ed25519();
             let policy = PublicPolicy {
                 owner: User::Key(owner_keypair.public_key()),
                 permissions: BTreeMap::default(),
@@ -883,7 +883,7 @@ mod tests {
             // Instantiate the same Register on two replicas
             let name = xor_name::rand::random();
             let tag = 43_000u64;
-            let owner_keypair = Keypair::new_ed25519(&mut OsRng);
+            let owner_keypair = Keypair::new_ed25519();
             let policy = PublicPolicy {
                 owner: User::Key(owner_keypair.public_key()),
                 permissions: BTreeMap::default(),
@@ -1005,7 +1005,7 @@ mod tests {
             let xorname = xor_name::rand::random();
             let tag = 45_000u64;
             let cap = u16::MAX;
-            let random_owner_keypair = Keypair::new_ed25519(&mut OsRng);
+            let random_owner_keypair = Keypair::new_ed25519();
             let mut bogus_replica = Register::new_public(User::Key(random_owner_keypair.public_key()), xorname, tag, None, cap);
 
             // add bogus ops from bogus replica + bogus data
