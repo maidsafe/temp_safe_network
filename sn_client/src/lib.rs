@@ -156,14 +156,11 @@ where
     }
 }
 
-#[cfg(any(test, feature = "test-utils"))]
 use std::sync::Once;
 
-#[cfg(any(test, feature = "test-utils"))]
 static INIT: Once = Once::new();
 
 // TODO: dedupe this w/ sn_node?
-#[cfg(any(test, feature = "test-utils"))]
 /// Initialise logger for tests, this is run only once, even if called multiple times.
 pub fn init_test_logger() {
     INIT.call_once(|| {

@@ -105,10 +105,6 @@ async fn main() -> Result<()> {
             build_args.push("--features");
             build_args.push("unstable-command-prioritisation");
         }
-        if cfg!(feature = "test-utils") {
-            build_args.push("--features");
-            build_args.push("test-utils");
-        }
         if cfg!(feature = "unstable-no-connection-pooling") {
             build_args.push("--features");
             build_args.push("unstable-no-connection-pooling");

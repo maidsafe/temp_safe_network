@@ -176,7 +176,6 @@ mod tests {
     use eyre::{ContextCompat, Result};
     use rand::seq::IteratorRandom;
     use secured_linked_list::SecuredLinkedList;
-    #[cfg(feature = "test-utils")]
     use sn_interface::network_knowledge::{
         test_utils::{gen_addr, gen_section_authority_provider},
         NodeState, SectionAuthorityProvider, MIN_ADULT_AGE,

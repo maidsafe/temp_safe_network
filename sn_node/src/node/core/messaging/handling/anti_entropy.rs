@@ -465,9 +465,9 @@ mod tests {
         AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, NodeAuth, NodeMsgAuthority,
         SectionAuth as SectionAuthMsg,
     };
-    use sn_interface::network_knowledge::test_utils::section_signed;
-    #[cfg(feature = "test-utils")]
-    use sn_interface::network_knowledge::test_utils::{gen_addr, gen_section_authority_provider};
+    use sn_interface::network_knowledge::test_utils::{
+        gen_addr, gen_section_authority_provider, section_signed,
+    };
 
     use sn_interface::network_knowledge::{
         NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider,

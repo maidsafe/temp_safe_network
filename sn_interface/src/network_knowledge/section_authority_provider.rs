@@ -241,7 +241,7 @@ impl SectionAuth<SectionAuthorityProviderMsg> {
     }
 }
 
-#[cfg(feature = "test-utils")]
+#[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils {
     use super::*;
     use crate::network_knowledge::{NodeInfo, MIN_ADULT_AGE};

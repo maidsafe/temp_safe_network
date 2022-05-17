@@ -59,7 +59,7 @@ use tracing_subscriber::{
 
 // pub(crate) use sn_interface::{data_copy_count, at_least_one_correct_elder, max_num_faulty_elders}
 
-#[cfg(any(test, feature = "test-utils"))]
+#[cfg(test)]
 use std::sync::Once;
 
 #[cfg(test)]
@@ -136,10 +136,10 @@ where
     }
 }
 
-#[cfg(any(test, feature = "test-utils"))]
+#[cfg(test)]
 static INIT: Once = Once::new();
 
-#[cfg(any(test, feature = "test-utils"))]
+#[cfg(test)]
 /// Initialise logger for tests, this is run only once, even if called multiple times.
 pub fn init_test_logger() {
     INIT.call_once(|| {

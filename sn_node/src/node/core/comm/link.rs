@@ -82,7 +82,7 @@ impl Link {
         instance
     }
 
-    #[cfg(feature = "test-utils")]
+    #[cfg(test)]
     pub(crate) fn peer(&self) -> &Peer {
         &self.peer
     }

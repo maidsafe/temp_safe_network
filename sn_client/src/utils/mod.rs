@@ -7,7 +7,6 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 /// Common utility functions for writing test cases.
-#[cfg(any(test, feature = "test-utils"))]
 pub mod test_utils;
 
 use bytes::Bytes;
