@@ -25,7 +25,6 @@ use sn_interface::types::{Chunk, Keypair, Peer, PublicKey, RegisterAddress};
 
 use bytes::Bytes;
 use itertools::Itertools;
-use rand::rngs::OsRng;
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
 use tokio::{
     sync::{mpsc::Receiver, RwLock},
@@ -88,15 +87,13 @@ impl Client {
         optional_keypair: Option<Keypair>,
         read_prefixmap: bool,
     ) -> Result<Self, Error> {
-        let mut rng = OsRng;
-
         let keypair = match optional_keypair {
             Some(id) => {
                 info!("Client started for specific pk: {:?}", id.public_key());
                 id
             }
             None => {
-                let keypair = Keypair::new_ed25519(&mut rng);
+                let keypair = Keypair::new_ed25519();
                 info!(
                     "Client started for new randomly created pk: {:?}",
                     keypair.public_key()
@@ -317,8 +314,7 @@ mod tests {
     async fn client_creation_with_existing_keypair() -> Result<()> {
         init_test_logger();
 
-        let mut rng = OsRng;
-        let full_id = Keypair::new_ed25519(&mut rng);
+        let full_id = Keypair::new_ed25519();
         let pk = full_id.public_key();
 
         let client = create_test_client_with(Some(full_id), None, true).await?;

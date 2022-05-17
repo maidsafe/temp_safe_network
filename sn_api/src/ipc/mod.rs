@@ -44,7 +44,7 @@ impl IpcMsg {
     pub fn new_auth_req(app_id: &str, app_name: &str, app_vendor: &str) -> Self {
         use rand::Rng;
         // Generate the number in range 1..MAX inclusive.
-        let req_id: u32 = rand::thread_rng().gen_range(0, u32::max_value()) + 1;
+        let req_id: u32 = rand::thread_rng().gen_range(0..u32::max_value()) + 1;
 
         Self::Req(IpcReq::Auth(AuthReq {
             req_id,

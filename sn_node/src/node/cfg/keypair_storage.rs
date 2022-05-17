@@ -101,7 +101,7 @@ mod test {
         get_network_keypair, get_reward_pk, store_network_keypair, store_new_reward_keypair,
     };
     use eyre::{eyre, Result};
-    use rand::rngs::OsRng;
+    use rand_07::rngs::OsRng;
     use tempfile::{tempdir, TempDir};
 
     #[tokio::test(flavor = "multi_thread")]

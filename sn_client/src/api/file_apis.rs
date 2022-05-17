@@ -388,7 +388,6 @@ mod tests {
     use bytes::Bytes;
     use eyre::Result;
     use futures::future::join_all;
-    use rand::rngs::OsRng;
     use std::time::Duration;
     use tokio::time::Instant;
     use tracing::{instrument::Instrumented, Instrument};
@@ -398,7 +397,7 @@ mod tests {
     #[test]
     fn deterministic_chunking() -> Result<()> {
         init_test_logger();
-        let keypair = Keypair::new_ed25519(&mut OsRng);
+        let keypair = Keypair::new_ed25519();
         let file = random_bytes(LARGE_FILE_SIZE_MIN);
 
         use crate::api::data::encrypt_large;

@@ -63,6 +63,7 @@ pub fn generate_readable_string(length: usize) -> String {
     ::std::iter::repeat(())
         .map(|()| rng.sample(Alphanumeric))
         .take(length)
+        .map(char::from)
         .collect()
 }
 

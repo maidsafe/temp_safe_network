@@ -703,7 +703,7 @@ impl ChurnSchedule {
                 queue.insert(
                     ChurnEvent::Join,
                     if start < end {
-                        rng.gen_range(start, end)
+                        rng.gen_range(start..end)
                     } else {
                         start
                     },
@@ -714,7 +714,7 @@ impl ChurnSchedule {
                 queue.insert(
                     ChurnEvent::Drop,
                     if start < end {
-                        rng.gen_range(start, end)
+                        rng.gen_range(start..end)
                     } else {
                         start
                     },

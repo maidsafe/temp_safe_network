@@ -1348,7 +1348,11 @@ mod tests {
     #[tokio::test]
     async fn test_files_store_public() -> Result<()> {
         let safe = new_safe_instance().await?;
-        let random_content: String = thread_rng().sample_iter(&Alphanumeric).take(20).collect();
+        let random_content: String = thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(20)
+            .map(char::from)
+            .collect();
 
         let file_xorurl = safe
             .store_public_bytes(Bytes::from(random_content.to_owned()), None)

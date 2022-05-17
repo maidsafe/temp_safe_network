@@ -9,17 +9,10 @@
 use super::Safe;
 use crate::{Error, Result};
 use hex::encode;
-use rand::rngs::OsRng;
-use sn_interface::types::{Keypair, SecretKey};
+use sn_interface::types::SecretKey;
 use xor_name::XorName;
 
 impl Safe {
-    // Generate a key pair
-    pub fn generate_random_ed_keypair(&self) -> Keypair {
-        let mut rng = OsRng;
-        Keypair::new_ed25519(&mut rng)
-    }
-
     // Check that the XOR/NRS-URL corresponds to the public key derived from the provided client id
     pub async fn validate_sk_for_url(&self, secret_key: &SecretKey, url: &str) -> Result<String> {
         let derived_xorname = match secret_key {

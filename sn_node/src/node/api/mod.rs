@@ -37,7 +37,7 @@ use sn_interface::types::{keys::ed25519, log_markers::LogMarker, PublicKey as Ty
 
 use ed25519_dalek::PublicKey;
 use itertools::Itertools;
-use rand::rngs::OsRng;
+use rand_07::rngs::OsRng;
 use secured_linked_list::SecuredLinkedList;
 use std::{
     collections::BTreeSet,

@@ -616,7 +616,7 @@ mod tests {
 
             // NOTE: this panics if `messages` is empty, but that's OK because it would mean
             // failure anyway.
-            let index = rng.gen_range(0, messages.len());
+            let index = rng.gen_range(0..messages.len());
             let (addr, message) = messages.swap_remove(index);
 
             let actor = actors.get_mut(&addr).context("Unknown message recipient")?;

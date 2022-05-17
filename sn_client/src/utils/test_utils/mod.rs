@@ -13,7 +13,7 @@ use crate::Error;
 use backoff::ExponentialBackoff;
 use dirs_next::home_dir;
 use eyre::{eyre, Context, Result};
-use sn_interface::types::{Keypair, PublicKey};
+use sn_interface::types::PublicKey;
 use std::time::Duration;
 use std::{
     collections::BTreeSet, fs::File, future::Future, io::BufReader, net::SocketAddr, path::Path,
@@ -66,12 +66,6 @@ where
 
 // Relative path from $HOME where to read the genesis node connection information from
 const GENESIS_CONN_INFO_FILEPATH: &str = ".safe/node/node_connection_info.config";
-
-/// Generates a random BLS secret and public keypair.
-pub fn gen_ed_keypair() -> Keypair {
-    let mut rng = rand::thread_rng();
-    Keypair::new_ed25519(&mut rng)
-}
 
 /// Read local network bootstrapping/connection information
 pub fn read_network_conn_info() -> Result<(bls::PublicKey, BTreeSet<SocketAddr>)> {

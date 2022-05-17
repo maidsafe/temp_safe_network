@@ -247,7 +247,6 @@ mod tests {
     };
     use anyhow::{anyhow, bail, Context, Result};
     use bytes::Bytes;
-    use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use sn_interface::types::DataAddress;
     use std::io::Read;
 
@@ -321,7 +320,7 @@ mod tests {
         // link to an nrs map
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
-        let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let site_name = random_nrs_name();
         let _ = safe.nrs_add(&site_name, &safe_url).await?;
         let nrs_url = format!("safe://{}", site_name);
 
@@ -384,7 +383,7 @@ mod tests {
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
         let files_container_url = safe_url;
-        let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let site_name = random_nrs_name();
         let (nrs_resolution_url, did_create) =
             safe.nrs_add(&site_name, &files_container_url).await?;
         assert!(did_create);
@@ -484,7 +483,7 @@ mod tests {
             .await?;
 
         let safe_url = SafeUrl::from_url(&xorurl)?;
-        let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let site_name = random_nrs_name();
         let public_name = format!("file.{site_name}");
         safe.nrs_add(&public_name, &safe_url).await?;
 
@@ -569,7 +568,7 @@ mod tests {
         // map to nrs name
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_content_version(Some(version0));
-        let site_name: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let site_name = random_nrs_name();
         let _ = safe.nrs_add(&site_name, &safe_url).await?;
         let nrs_url = format!("safe://{}/test.md", site_name);
 

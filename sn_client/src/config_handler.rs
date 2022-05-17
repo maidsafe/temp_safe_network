@@ -215,7 +215,11 @@ mod tests {
 
         let temp_dir = tempdir()?;
         let root_dir = temp_dir.path().to_path_buf();
-        let cfg_filename: String = thread_rng().sample_iter(&Alphanumeric).take(15).collect();
+        let cfg_filename: String = thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(15)
+            .map(char::from)
+            .collect();
         let config_filepath = root_dir.join(&cfg_filename);
         let genesis_key = bls::SecretKey::random().public_key();
 

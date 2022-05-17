@@ -258,7 +258,7 @@ mod tests {
     };
     use bls::SecretKey;
     use eyre::Result;
-    use rand::rngs::OsRng;
+    use rand_07::rngs::OsRng;
 
     #[test]
     fn serialisation_node_msg() -> Result<()> {
@@ -314,8 +314,7 @@ mod tests {
 
     #[test]
     fn serialisation_client_msg() -> Result<()> {
-        let mut rng = OsRng;
-        let src_client_keypair = Keypair::new_ed25519(&mut rng);
+        let src_client_keypair = Keypair::new_ed25519();
 
         let dst_name = xor_name::rand::random();
         let dst_section_pk = SecretKey::random().public_key();

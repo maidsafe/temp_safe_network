@@ -55,7 +55,7 @@ impl Client {
 
         // Add jitter so not all clients retry at the same rate. This divider will knock on to the overall retry window
         // and should help prevent elders from being conseceutively overwhelmed
-        let jitter = rng.gen_range(1.0, 1.5);
+        let jitter = rng.gen_range(1.0..1.5);
         let attempt_timeout = self.query_timeout.div_f32(retry_count + jitter);
         trace!("Setting up query retry, interval is: {:?}", attempt_timeout);
 

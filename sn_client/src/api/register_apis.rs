@@ -284,9 +284,7 @@ fn section_auth() -> sn_interface::messaging::SectionAuth {
 mod tests {
     use crate::retry_loop_for_pattern;
     use crate::{
-        utils::test_utils::{
-            create_test_client, create_test_client_with, gen_ed_keypair, init_test_logger,
-        },
+        utils::test_utils::{create_test_client, create_test_client_with, init_test_logger},
         Error,
     };
     use eyre::{bail, eyre, Result};
@@ -298,6 +296,7 @@ mod tests {
             Action, EntryHash, Permissions, Policy, PrivatePolicy, PublicPermissions, PublicPolicy,
             User,
         },
+        Keypair,
     };
     use std::{
         collections::{BTreeMap, BTreeSet},
@@ -513,7 +512,7 @@ mod tests {
             ),
         }
 
-        let other_user = User::Key(gen_ed_keypair().public_key());
+        let other_user = User::Key(Keypair::new_ed25519().public_key());
 
         match client
             .get_register_permissions_for_user(address, other_user)
@@ -568,7 +567,7 @@ mod tests {
             }
         }
 
-        let other_user = User::Key(gen_ed_keypair().public_key());
+        let other_user = User::Key(Keypair::new_ed25519().public_key());
 
         match client
             .get_register_permissions_for_user(address, other_user)

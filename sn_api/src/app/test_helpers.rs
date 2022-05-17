@@ -8,7 +8,7 @@
 
 use crate::{ipc::NodeConfig, Safe, SafeUrl};
 use anyhow::{anyhow, bail, Context, Result};
-use rand::{distributions::Alphanumeric, rngs::OsRng, thread_rng, Rng};
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use sn_interface::types::{Keypair, PublicKey};
 use std::{
     collections::{BTreeSet, HashMap},
@@ -99,10 +99,7 @@ pub async fn new_safe_instance() -> Result<Safe> {
                 TEST_AUTH_CREDENTIALS
             )
         })?,
-        Err(_) => {
-            let mut rng = OsRng;
-            Keypair::new_ed25519(&mut rng)
-        }
+        Err(_) => Keypair::new_ed25519(),
     };
 
     let bootstrap_contacts = get_bootstrap_contacts()?;
@@ -122,7 +119,11 @@ pub async fn new_read_only_safe_instance() -> Result<Safe> {
 
 // Create a random NRS name
 pub fn random_nrs_name() -> String {
-    thread_rng().sample_iter(&Alphanumeric).take(15).collect()
+    thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(15)
+        .map(char::from)
+        .collect()
 }
 
 fn read_default_peers_from_file() -> Result<(String, BTreeSet<SocketAddr>)> {

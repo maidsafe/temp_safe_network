@@ -11,8 +11,7 @@ use crate::{
     Result, SafeAuthReq,
 };
 use hmac::Hmac;
-use rand::rngs::StdRng;
-use rand_core::SeedableRng;
+use rand_07::{rngs::StdRng, SeedableRng};
 use sha3::Sha3_256;
 use sn_client::api::Client;
 use sn_interface::types::{Keypair, RegisterAddress};
@@ -20,6 +19,7 @@ use std::{
     collections::HashSet,
     net::SocketAddr,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 use tiny_keccak::{Hasher, Sha3};
 use xor_name::{XorName, XOR_NAME_LEN};
@@ -61,7 +61,8 @@ fn create_ed25519_keypair_from_seed(seeder: &[u8]) -> Keypair {
     hasher.update(seeder);
     hasher.finalize(&mut seed);
     let mut rng = StdRng::from_seed(seed);
-    Keypair::new_ed25519(&mut rng)
+    let keypair = ed25519_dalek::Keypair::generate(&mut rng);
+    Keypair::Ed25519(Arc::new(keypair))
 }
 
 /// Perform all derivations and seeding to deterministically obtain location and Keypair from input

@@ -35,8 +35,8 @@ tokio-console = ["console-subscriber"]
 backoff = { version = "~0.4.0", features = [ "tokio" ] }
 base64 = "~0.13.0"
 bincode = "1.3.1"
-bls = { package = "blsttc", version = "3.1.0" }
-bls_dkg = "~0.9.2"
+bls = { package = "blsttc", version = "5.2.0" }
+bls_dkg = "~0.10.2"
 bytes = { version = "1.0.1", features = ["serde"] }
 console-subscriber = { version = "~0.1.0", optional = true }
 crdts = "7.0"
@@ -55,10 +55,10 @@ multibase = "~0.9.1"
 num_cpus = "1.13.0"
 priority-queue = "1.2.1"
 qp2p = "~0.28.3"
-rand = "~0.7.3"
+rand = "~0.8.5"
 rayon = "1.5.1"
 rmp-serde = "1.0.0"
-secured_linked_list = "~0.5.0"
+secured_linked_list = "~0.5.1"
 self_encryption = "~0.27.4"
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_bytes = "~0.11.5"
@@ -88,7 +88,7 @@ features = ["fs", "io-util", "macros", "rt", "rt-multi-thread", "sync"]
 criterion = { version = "~0.3", features = ["async_tokio"] }
 grep="~0.2.8"
 proptest = "1.0.0"
-rand = { version = "~0.7.3", features = ["small_rng"] }
+rand = { version = "~0.8.5", features = ["small_rng"] }
 rand_xorshift = "~0.2.0"
 sn_launch_tool = "~0.9.7"
 termcolor="1.1.2"

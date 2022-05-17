@@ -35,7 +35,6 @@ use super::{common, constants, Error, Result};
 
 use crate::NodeConfig;
 
-use rand::rngs::OsRng;
 use sn_client::{Client, ClientConfig, DEFAULT_OPERATION_TIMEOUT};
 use sn_interface::types::Keypair;
 use tracing::debug;
@@ -131,8 +130,7 @@ impl Safe {
 
     /// Generate a new random Ed25519 keypair
     pub fn new_keypair(&self) -> Keypair {
-        let mut rng = OsRng;
-        Keypair::new_ed25519(&mut rng)
+        Keypair::new_ed25519()
     }
 
     // Private helper to obtain the Client instance
