@@ -37,8 +37,9 @@ use tracing::info;
 use xor_name::XorName;
 
 /// Operations on data.
-#[derive(Clone)]
-pub(crate) struct DataStorage {
+#[derive(Clone, Debug)]
+// exposed as pub due to benches
+pub struct DataStorage {
     chunks: ChunkStorage,
     registers: RegisterStorage,
     used_space: UsedSpace,
@@ -46,7 +47,8 @@ pub(crate) struct DataStorage {
 }
 
 impl DataStorage {
-    pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
+    /// Set up a new DataStorage instance
+    pub fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
             chunks: ChunkStorage::new(path, used_space.clone())?,
             registers: RegisterStorage::new(path, used_space.clone())?,
@@ -57,7 +59,7 @@ impl DataStorage {
 
     /// Store data in the local store
     #[instrument(skip(self))]
-    pub(crate) async fn store(&self, data: &ReplicatedData) -> Result<Option<StorageLevel>> {
+    pub async fn store(&self, data: &ReplicatedData) -> Result<Option<StorageLevel>> {
         debug!("Replicating {data:?}");
         match data.clone() {
             ReplicatedData::Chunk(chunk) => self.chunks.store(&chunk).await?,
@@ -122,7 +124,8 @@ impl DataStorage {
         }
     }
 
-    async fn keys(&self) -> Result<Vec<DataAddress>> {
+    /// Retrieve all keys/ReplicatedDataAddresses of stored data
+    pub async fn keys(&self) -> Result<Vec<DataAddress>> {
         let chunk_keys = self.chunks.keys()?.into_iter().map(DataAddress::Chunk);
         let reg_keys = self
             .registers

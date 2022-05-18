@@ -8,12 +8,15 @@
 
 //! Implementation of the "Node" node for the SAFE Network.
 
-// Configuration
-mod cfg;
+/// Node Configuration
+pub mod cfg;
 // Node public API
 mod api;
 
 mod core;
+
+pub use self::core::DataStorage;
+
 mod dkg;
 // mod ed25519;
 mod error;

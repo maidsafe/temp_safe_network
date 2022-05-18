@@ -19,7 +19,7 @@ use std::{
 use tracing::info;
 
 /// Operations on data chunks.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct ChunkStorage {
     db: ChunkStore,
 }

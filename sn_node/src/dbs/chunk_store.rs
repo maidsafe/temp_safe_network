@@ -21,7 +21,7 @@ const BIT_TREE_DEPTH: usize = 20;
 const CHUNK_DB_DIR: &str = "chunkdb";
 
 /// A disk store for chunks
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct ChunkStore {
     bit_tree_depth: usize,
     chunk_store_path: PathBuf,
