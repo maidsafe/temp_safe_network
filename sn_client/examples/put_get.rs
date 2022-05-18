@@ -13,6 +13,7 @@ use tokio::time::{sleep, Duration, Instant};
 use tracing::{debug, warn};
 
 use sn_client::{Client, ClientConfig, Error, Result};
+use sn_interface::init_logger;
 use sn_interface::types::{utils::random_bytes, BytesAddress, Scope};
 use tiny_keccak::{Hasher, Sha3};
 
@@ -20,7 +21,7 @@ use sn_client::utils::test_utils::read_network_conn_info;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    sn_client::init_test_logger();
+    init_logger();
 
     run_chunk_soak().await?;
 

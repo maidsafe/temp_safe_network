@@ -14,6 +14,8 @@ use crate::Error;
 use backoff::ExponentialBackoff;
 use dirs_next::home_dir;
 use eyre::{eyre, Context, Result};
+#[cfg(test)]
+pub use sn_interface::init_logger;
 use sn_interface::types::PublicKey;
 #[cfg(test)]
 use std::future::Future;
@@ -21,7 +23,7 @@ use std::future::Future;
 use std::time::Duration;
 use std::{collections::BTreeSet, fs::File, io::BufReader, net::SocketAddr, path::Path};
 #[cfg(test)]
-pub use test_client::{create_test_client, create_test_client_with, init_test_logger};
+pub use test_client::{create_test_client, create_test_client_with};
 
 ///
 pub type ClientResult<T> = Result<T, Error>;

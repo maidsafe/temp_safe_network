@@ -34,7 +34,7 @@ use sn_node::node::{add_connection_info, set_connection_info, Config, Error, Eve
 
 use self_update::{cargo_crate_version, Status};
 #[cfg(not(feature = "tokio-console"))]
-use sn_node::LogFormatter;
+use sn_interface::LogFormatter;
 use std::{fmt::Debug, fs::File, io, path::Path};
 use std::{io::Write, process::exit};
 use structopt::{clap, StructOpt};

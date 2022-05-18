@@ -91,6 +91,7 @@ sn_launch_tool = "~0.9.7"
 termcolor="1.1.2"
 tokio-util = { version = "~0.6.7", features = ["time"] }
 walkdir = "2"
+sn_interface = { path = "../sn_interface", version = "^0.2.3", features= ["test-utils"] }
 
 [dev-dependencies.cargo-husky]
 version = "1.5.0"
