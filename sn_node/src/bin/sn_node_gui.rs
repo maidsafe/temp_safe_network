@@ -2,7 +2,7 @@ use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
 use color_eyre::{Section, SectionExt};
 use eframe::{
-    egui::{self, Ui},
+    egui::{self, TextEdit, Ui},
     emath::Vec2,
 };
 use eyre::{eyre, Result, WrapErr};
@@ -65,9 +65,7 @@ fn main() -> Result<()> {
         "Safe Network Gui",
         options,
         Box::new(|_cc| Box::new(NetworkGui::default())),
-    );
-
-    Ok(())
+    )
 }
 
 const MODULE_NAME: &str = "sn_node";
@@ -93,52 +91,75 @@ impl NodeSupervisor {
         }
     }
 
-    fn draw(&mut self, ui: &mut Ui) {
-        ui.label("node navigator");
-        ui.group(|ui| {
-            ui.label("Config");
-            ui.separator();
-            ui.horizontal(|ui| {
-                ui.label("genesis key (hex encoded)");
-                if let Some(key) = self.config.genesis_key.as_mut() {
-                    ui.text_edit_singleline(key);
-                    if ui.button("clear").clicked() {
+    fn ui(&mut self, ui: &mut Ui) {
+        ui.label("Config");
+        ui.separator();
+        egui::Grid::new("Config")
+            .spacing([40.0, 4.0])
+            .striped(true)
+            .show(ui, |ui| {
+                ui.label("genesis key");
+                if let Some(key) = self.config.genesis_key.clone() {
+                    ui.label(format!("{}..", &key[..7.min(key.len())]));
+                    if ui.button("unset").clicked() {
                         self.config.genesis_key = None
                     }
                 } else {
-                    ui.label("<not set>").enabled;
-                    ui.text_edit_singleline(&mut self.genesis_key_input);
+                    ui.add(
+                        TextEdit::singleline(&mut self.genesis_key_input)
+                            .code_editor()
+                            .hint_text("unset"),
+                    );
                     if ui.button("set").clicked() {
                         self.config.genesis_key = Some(std::mem::take(&mut self.genesis_key_input));
                     }
                 }
-            });
 
-            ui.separator();
+                ui.end_row();
+                ui.label("first");
+                ui.label(format!("{}", self.config.first));
+                ui.checkbox(&mut self.config.first, "")
+                    .on_hover_text("Check if this is the genesis node.");
 
-            ui.horizontal(|ui| {
-                ui.checkbox(&mut self.config.first, "first");
-            });
-
-            ui.separator();
-            ui.vertical(|ui| {
+                ui.end_row();
                 ui.label("bootstrap nodes");
-                for addr in self.config.hard_coded_contacts.clone() {
-                    ui.horizontal(|ui| {
-                        ui.label(format!("{:?}", addr));
-                        if ui.button("delete").clicked() {
-                            self.config.hard_coded_contacts.remove(&addr);
-                        }
-                    });
-                }
+                ui.group(|ui| {
+                    for addr in self.config.hard_coded_contacts.clone() {
+                        ui.horizontal(|ui| {
+                            ui.label(format!("{:?}", addr));
+                            if ui.button("delete").clicked() {
+                                self.config.hard_coded_contacts.remove(&addr);
+                            }
+                        });
+                    }
+                });
+
                 ui.text_edit_singleline(&mut self.bootstrap_node_input);
-                if ui.button("add bootstrap node").clicked() {
+                if ui.button("add").clicked() {
                     if let Ok(addr) = self.bootstrap_node_input.parse::<SocketAddr>() {
                         self.config.hard_coded_contacts.insert(addr);
                         self.bootstrap_node_input.clear();
                     }
                 }
-            })
+            });
+        ui.separator();
+        ui.vertical(|ui| {
+            ui.label("bootstrap nodes");
+            for addr in self.config.hard_coded_contacts.clone() {
+                ui.horizontal(|ui| {
+                    ui.label(format!("{:?}", addr));
+                    if ui.button("delete").clicked() {
+                        self.config.hard_coded_contacts.remove(&addr);
+                    }
+                });
+            }
+            ui.text_edit_singleline(&mut self.bootstrap_node_input);
+            if ui.button("add bootstrap node").clicked() {
+                if let Ok(addr) = self.bootstrap_node_input.parse::<SocketAddr>() {
+                    self.config.hard_coded_contacts.insert(addr);
+                    self.bootstrap_node_input.clear();
+                }
+            }
         });
 
         ui.group(|ui| {
@@ -168,17 +189,25 @@ impl NodeSupervisor {
         if let Some(node) = self.node.as_mut() {
             ui.group(|ui| {
                 ui.label("Node State");
-                ui.horizontal(|ui| {
-                    ui.label("connection info");
-                    ui.text_edit_singleline(&mut format!(
-                        "{:?}",
-                        Handle::current().block_on(node.api.our_connection_info())
-                    ));
-                });
+                ui.separator();
                 ui.horizontal(|ui| {
                     ui.label("genesis key");
                     let genesis_key = Handle::current().block_on(node.api.genesis_key());
-                    ui.text_edit_singleline(&mut hex::encode(genesis_key.to_bytes()));
+                    let encoded_key = hex::encode(genesis_key.to_bytes());
+                    if ui
+                        .button(format!("{}..", &encoded_key[..7.min(encoded_key.len())]))
+                        .clicked()
+                    {
+                        ui.output().copied_text = encoded_key;
+                    }
+                });
+                ui.horizontal(|ui| {
+                    ui.label("connection info");
+                    let node_addr = Handle::current().block_on(node.api.our_connection_info());
+                    let formatted_node_addr = format!("{:?}", node_addr);
+                    if ui.button(&formatted_node_addr).clicked() {
+                        ui.output().copied_text = formatted_node_addr;
+                    }
                 });
             });
         } else {
@@ -317,7 +346,9 @@ impl eframe::App for NetworkGui {
         for (i, node) in self.nodes.iter_mut().enumerate() {
             egui::Window::new(&format!("Node - {i}"))
                 .collapsible(true)
-                .show(ctx, |ui| node.draw(ui));
+                .resizable(true)
+                .default_width(280.0)
+                .show(ctx, |ui| node.ui(ui));
         }
 
         egui::Window::new("Actions")
