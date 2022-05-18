@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1652855093490,
+  "lastUpdate": 1652880139621,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -3335,6 +3335,102 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4389428856,
             "range": "± 1074571286",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "joshuef@gmail.com",
+            "name": "Josh Wilson",
+            "username": "joshuef"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "06591a11458adb5cfd917cc1239371acf4f8834f",
+          "message": "fix: prevent deadlock in lru cache impl.\n\nWe were locking over the queue, and then attempting to purge the queue\nwithin the self.priority() func, which required a lock",
+          "timestamp": "2022-05-18T14:41:34+02:00",
+          "tree_id": "f96fe5585ac2379b11ee240ce01a2d0655094577",
+          "url": "https://github.com/maidsafe/safe_network/commit/06591a11458adb5cfd917cc1239371acf4f8834f"
+        },
+        "date": 1652880138087,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10657978365,
+            "range": "± 12436176602",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3791136624,
+            "range": "± 1005970087",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 9892655733,
+            "range": "± 1724234126",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10030319879,
+            "range": "± 2954835444",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3151077295,
+            "range": "± 1617126179",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4556766449,
+            "range": "± 253359281",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10676947399,
+            "range": "± 11511627129",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3850042770,
+            "range": "± 1803279632",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 8612633025,
+            "range": "± 292375492",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10031653857,
+            "range": "± 2215643636",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3143662011,
+            "range": "± 989120942",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4741931028,
+            "range": "± 1061306607",
             "unit": "ns/iter"
           }
         ]
