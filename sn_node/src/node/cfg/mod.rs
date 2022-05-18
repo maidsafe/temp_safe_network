@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 /// Configuration
-pub(crate) mod config_handler;
+pub mod config_handler;
 
 /// File storage for keypairs
 pub(crate) mod keypair_storage;

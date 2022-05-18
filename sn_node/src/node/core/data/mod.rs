@@ -10,4 +10,4 @@ mod records;
 mod storage;
 
 pub(crate) use self::records::{Capacity, MIN_LEVEL_WHEN_FULL};
-pub(crate) use self::storage::DataStorage;
+pub use self::storage::DataStorage;

@@ -3776,6 +3776,7 @@ dependencies = [
  "color-eyre",
  "console-subscriber",
  "crdts",
+ "criterion",
  "ctor",
  "custom_debug",
  "dashmap",

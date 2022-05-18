@@ -17,14 +17,15 @@ mod proposal;
 mod relocation;
 mod split_barrier;
 
+/// DataStorage apis.
+pub use self::data::DataStorage;
+use self::split_barrier::SplitBarrier;
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use comm::{Comm, DeliveryStatus, MsgEvent};
 pub(crate) use data::MIN_LEVEL_WHEN_FULL;
 pub(crate) use proposal::Proposal;
 #[cfg(test)]
 pub(crate) use relocation::{check as relocation_check, ChurnId};
-
-use self::{data::DataStorage, split_barrier::SplitBarrier};
 use sn_interface::{
     network_knowledge::{
         recommended_section_size, supermajority, NetworkKnowledge, NodeInfo, SectionKeyShare,
