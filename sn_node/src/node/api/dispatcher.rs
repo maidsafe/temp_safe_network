@@ -11,7 +11,7 @@ use super::Cmd;
 use crate::node::{
     core::{DeliveryStatus, Node, Proposal},
     messages::WireMsgUtils,
-    Error, NodeApi, Result,
+    Error, Result,
 };
 #[cfg(feature = "back-pressure")]
 use sn_interface::messaging::DstLocation;
@@ -19,10 +19,7 @@ use sn_interface::messaging::{system::SystemMsg, AuthKind, WireMsg};
 use sn_interface::types::{log_markers::LogMarker, Peer};
 
 use itertools::Itertools;
-use std::path::Path;
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
-use tokio::sync::mpsc;
-use tokio::sync::RwLock;
 use tokio::time::MissedTickBehavior;
 use tokio::{sync::watch, time};
 use tracing::Instrument;
@@ -39,7 +36,7 @@ type CmdId = String;
 
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
-    pub(crate) node: Arc<RwLock<Node>>,
+    pub(crate) node: Node,
     cancel_timer_tx: watch::Sender<bool>,
     cancel_timer_rx: watch::Receiver<bool>,
 }
@@ -55,7 +52,7 @@ impl Dispatcher {
     pub(super) fn new(node: Node) -> Self {
         let (cancel_timer_tx, cancel_timer_rx) = watch::channel(false);
         Self {
-            node: Arc::new(RwLock::new(node)),
+            node,
             cancel_timer_tx,
             cancel_timer_rx,
         }
@@ -72,32 +69,6 @@ impl Dispatcher {
 
             self.handle_cmd_and_offshoots(cmd, Some(cmd_id)).await
         });
-        Ok(())
-    }
-
-    async fn rejoin_network(self: Arc<Self>) -> Result<()> {
-        let node = self.node.read().await;
-        let config = node.config.clone();
-        let used_space = node.data_storage.used_space().await;
-        let root_storage_dir: &Path = &node.data_storage.store_path().await;
-        let event_tx = node.event_tx.clone();
-
-        let (connection_event_tx, mut connection_event_rx) = mpsc::channel(1);
-        let new_node = NodeApi::new_bootstraped_node(
-            &config,
-            used_space,
-            root_storage_dir,
-            connection_event_tx,
-            &mut connection_event_rx,
-            event_tx,
-        )
-        .await?;
-        let mut wr = self.node.write().await;
-        *wr = new_node;
-
-        // NB TODO listen on connection_event_rx!
-        // this is a placeholder, nothing is done in that function!
-
         Ok(())
     }
 
@@ -124,9 +95,7 @@ impl Dispatcher {
                 }
                 Err(Error::ChurnJoinMiss) => {
                     info!("Handling churn join miss from cmd {:?}", cmd_id);
-                    if let Err(e) = self.rejoin_network().await {
-                        error!("Failed rejoin network: {:?}", e);
-                    }
+                    // NB TODO rejoin here
                 }
                 Err(err) => {
                     error!("Failed to handle cmd {:?} with error {:?}", cmd_id, err);
@@ -161,7 +130,7 @@ impl Dispatcher {
                 let _instant = interval.tick().await;
 
                 // Send a probe message if we are an elder
-                let node = &dispatcher.node.read().await;
+                let node = &dispatcher.node;
                 if node.is_elder().await && !node.network_knowledge().prefix().await.is_empty() {
                     match node.generate_probe_msg().await {
                         Ok(cmd) => {
@@ -192,7 +161,7 @@ impl Dispatcher {
                 let _instant = interval.tick().await;
 
                 // Send a probe message to an elder
-                let node = &dispatcher.node.read().await;
+                let node = &dispatcher.node;
                 if !node.network_knowledge().prefix().await.is_empty() {
                     match node.generate_section_probe_msg().await {
                         Ok(cmd) => {
@@ -246,12 +215,7 @@ impl Dispatcher {
             loop {
                 let _instant = interval.tick().await;
 
-                let unresponsive_nodes = match dispatcher
-                    .node
-                    .read()
-                    .await
-                    .get_dysfunctional_node_names()
-                    .await
+                let unresponsive_nodes = match dispatcher.node.get_dysfunctional_node_names().await
                 {
                     Ok(nodes) => nodes,
                     Err(error) => {
@@ -272,13 +236,7 @@ impl Dispatcher {
                     }
                 }
 
-                match dispatcher
-                    .node
-                    .read()
-                    .await
-                    .notify_about_newly_suspect_nodes()
-                    .await
-                {
+                match dispatcher.node.notify_about_newly_suspect_nodes().await {
                     Ok(suspect_cmds) => {
                         for cmd in suspect_cmds {
                             if let Err(e) = dispatcher
@@ -317,34 +275,15 @@ impl Dispatcher {
             loop {
                 let _ = interval.tick().await;
 
-                let members = dispatcher
-                    .node
-                    .read()
-                    .await
-                    .network_knowledge()
-                    .section_members()
-                    .await;
-                let section_pk = dispatcher
-                    .node
-                    .read()
-                    .await
-                    .network_knowledge()
-                    .section_key()
-                    .await;
+                let members = dispatcher.node.network_knowledge().section_members().await;
+                let section_pk = dispatcher.node.network_knowledge().section_key().await;
 
-                if let Some(load_report) = dispatcher
-                    .node
-                    .read()
-                    .await
-                    .comm
-                    .tolerated_msgs_per_s()
-                    .await
-                {
+                if let Some(load_report) = dispatcher.node.comm.tolerated_msgs_per_s().await {
                     trace!("New BackPressure report to disseminate: {:?}", load_report);
 
                     // TODO: use comms to send report to anyone connected? (can we ID end users there?)
                     for member in members {
-                        let our_name = dispatcher.node.read().await.info.read().await.name();
+                        let our_name = dispatcher.node.info.read().await.name();
                         let peer = member.peer();
 
                         if peer.name() == our_name {
@@ -352,7 +291,7 @@ impl Dispatcher {
                         }
 
                         let wire_msg = match WireMsg::single_src(
-                            &*dispatcher.node.read().await.info.read().await,
+                            &*dispatcher.node.info.read().await,
                             DstLocation::Node {
                                 name: peer.name(),
                                 section_pk,
@@ -393,7 +332,7 @@ impl Dispatcher {
 
     pub(super) async fn write_prefixmap_to_disk(self: Arc<Self>) {
         info!("Writing our PrefixMap to disk");
-        self.clone().node.write().await.write_prefix_map().await
+        self.clone().node.write_prefix_map().await
     }
 
     /// Handles a single cmd.
@@ -402,7 +341,7 @@ impl Dispatcher {
         // analyzing logs produced by running multiple nodes within the same process, for example
         // from integration tests.
         let span = {
-            let node = &self.node.read().await;
+            let node = &self.node;
 
             let prefix = node.network_knowledge().prefix().await;
             let is_elder = node.is_elder().await;
@@ -467,22 +406,12 @@ impl Dispatcher {
                 Ok(vec![])
             }
             Cmd::SignOutgoingSystemMsg { msg, dst } => {
-                let src_section_pk = self
-                    .node
-                    .read()
-                    .await
-                    .network_knowledge()
-                    .section_key()
-                    .await;
-                let wire_msg = WireMsg::single_src(
-                    &*self.node.read().await.info.read().await,
-                    dst,
-                    msg,
-                    src_section_pk,
-                )?;
+                let src_section_pk = self.node.network_knowledge().section_key().await;
+                let wire_msg =
+                    WireMsg::single_src(&*self.node.info.read().await, dst, msg, src_section_pk)?;
 
                 let mut cmds = vec![];
-                cmds.extend(self.node.read().await.send_msg_to_nodes(wire_msg).await?);
+                cmds.extend(self.node.send_msg_to_nodes(wire_msg).await?);
 
                 Ok(cmds)
             }
@@ -490,40 +419,24 @@ impl Dispatcher {
                 sender,
                 wire_msg,
                 original_bytes,
-            } => {
-                self.node
-                    .read()
-                    .await
-                    .handle_msg(sender, wire_msg, original_bytes)
-                    .await
-            }
-            Cmd::HandleTimeout(token) => self.node.read().await.handle_timeout(token).await,
+            } => self.node.handle_msg(sender, wire_msg, original_bytes).await,
+            Cmd::HandleTimeout(token) => self.node.handle_timeout(token).await,
             Cmd::HandleAgreement { proposal, sig } => {
-                self.node
-                    .read()
-                    .await
-                    .handle_general_agreements(proposal, sig)
-                    .await
+                self.node.handle_general_agreements(proposal, sig).await
             }
             Cmd::HandleNewNodeOnline(auth) => {
                 self.node
-                    .read()
-                    .await
                     .handle_online_agreement(auth.value.into_state(), auth.sig)
                     .await
             }
             Cmd::HandleNodeLeft(auth) => {
                 self.node
-                    .read()
-                    .await
                     .handle_node_left(auth.value.into_state(), auth.sig)
                     .await
             }
             Cmd::HandleNewEldersAgreement { proposal, sig } => match proposal {
                 Proposal::NewElders(section_auth) => {
                     self.node
-                        .read()
-                        .await
                         .handle_new_elders_agreement(section_auth, sig)
                         .await
                 }
@@ -532,9 +445,7 @@ impl Dispatcher {
                     Ok(vec![])
                 }
             },
-            Cmd::HandlePeerLost(peer) => {
-                self.node.read().await.handle_peer_lost(&peer.addr()).await
-            }
+            Cmd::HandlePeerLost(peer) => self.node.handle_peer_lost(&peer.addr()).await,
             Cmd::HandleDkgOutcome {
                 section_auth,
                 outcome,
@@ -546,8 +457,6 @@ impl Dispatcher {
             }
             Cmd::HandleDkgFailure(signeds) => self
                 .node
-                .read()
-                .await
                 .handle_dkg_failure(signeds)
                 .await
                 .map(|cmd| vec![cmd]),
@@ -576,40 +485,27 @@ impl Dispatcher {
                 .await
                 .into_iter()
                 .collect()),
-            Cmd::ProposeOffline(names) => {
-                self.node.read().await.cast_offline_proposals(&names).await
-            }
+            Cmd::ProposeOffline(names) => self.node.cast_offline_proposals(&names).await,
             Cmd::StartConnectivityTest(name) => Ok(vec![
                 self.node
-                    .read()
-                    .await
                     .send_msg_to_our_elders(SystemMsg::StartConnectivityTest(name))
                     .await?,
             ]),
             Cmd::TestConnectivity(name) => {
                 if let Some(member_info) = self
                     .node
-                    .read()
-                    .await
                     .network_knowledge()
                     .get_section_member(&name)
                     .await
                 {
                     if self
                         .node
-                        .read()
-                        .await
                         .comm
                         .is_reachable(&member_info.addr())
                         .await
                         .is_err()
                     {
-                        self.node
-                            .clone()
-                            .read()
-                            .await
-                            .log_comm_issue(member_info.name())
-                            .await?
+                        self.node.log_comm_issue(member_info.name()).await?
                     }
                 }
                 Ok(vec![])
@@ -638,8 +534,6 @@ impl Dispatcher {
                 if let Some(recipient) = recipients.get(0) {
                     if let Err(err) = self
                         .node
-                        .read()
-                        .await
                         .comm
                         .send_to_client(recipient, wire_msg.clone())
                         .await
@@ -693,8 +587,6 @@ impl Dispatcher {
     ) -> Result<Vec<Cmd>> {
         let status = self
             .node
-            .read()
-            .await
             .comm
             .send(recipients, delivery_group_size, wire_msg)
             .await?;

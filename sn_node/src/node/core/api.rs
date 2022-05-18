@@ -11,7 +11,7 @@ use super::{delivery_group, Comm, Node};
 use crate::node::{
     api::cmds::Cmd,
     error::{Error, Result},
-    Config, Event,
+    Event,
 };
 use crate::UsedSpace;
 use sn_interface::messaging::WireMsg;
@@ -42,7 +42,6 @@ impl Node {
             NetworkKnowledge::first_node(node.peer(), genesis_sk_set).await?;
         Self::new(
             comm,
-            Config::new().await?,
             node,
             section,
             Some(section_key_share),

@@ -12,7 +12,6 @@ use super::{Cmd, Comm, Dispatcher};
 
 use crate::dbs::UsedSpace;
 use crate::init_test_logger;
-use crate::node::Config;
 use crate::node::{
     core::{
         relocation_check, ChurnId, MsgEvent, Node, Proposal, RESOURCE_PROOF_DATA_SIZE,
@@ -61,12 +60,10 @@ use std::{
     net::Ipv4Addr,
     ops::Deref,
     path::Path,
-    sync::Arc,
 };
 use tempfile::tempdir;
 use tokio::{
     sync::mpsc,
-    sync::RwLock,
     time::{timeout, Duration},
 };
 use xor_name::{Prefix, XorName};
@@ -86,7 +83,6 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
         create_comm().await?,
-        Config::new().await?,
         node,
         section,
         Some(section_key_share),
@@ -167,7 +163,6 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
         create_comm().await?,
-        Config::new().await?,
         node,
         section,
         Some(section_key_share),
@@ -185,10 +180,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
 
     let nonce: [u8; 32] = rand::random();
     let serialized = bincode::serialize(&(new_node.name(), nonce))?;
-    let nonce_signature = ed25519::sign(
-        &serialized,
-        &dispatcher.node.read().await.info.read().await.keypair,
-    );
+    let nonce_signature = ed25519::sign(&serialized, &dispatcher.node.info.read().await.keypair);
 
     let rp = ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY);
     let data = rp.create_proof_data(&nonce);
@@ -226,8 +218,6 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
 
     assert!(dispatcher
         .node
-        .read()
-        .await
         .membership
         .read()
         .await
@@ -239,8 +229,6 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
     assert!(
         !dispatcher
             .node
-            .read()
-            .await
             .validate_resource_proof_response(&random_peer.name(), resource_proof_response)
             .await
     );
@@ -265,7 +253,6 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
         create_comm().await?,
-        Config::new().await?,
         node,
         section,
         Some(section_key_share),
@@ -325,8 +312,6 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 
     assert!(dispatcher
         .node
-        .read()
-        .await
         .membership
         .read()
         .await
@@ -349,7 +334,6 @@ async fn handle_agreement_on_online() -> Result<()> {
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
         create_comm().await?,
-        Config::new().await?,
         node,
         section,
         Some(section_key_share),
@@ -411,7 +395,6 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
         create_comm().await?,
-        Config::new().await?,
         node,
         section,
         Some(section_key_share),
@@ -432,8 +415,6 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     // Force this node to join
     dispatcher
         .node
-        .write()
-        .await
         .membership
         .write()
         .await
@@ -583,7 +564,6 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
         create_comm().await?,
-        Config::new().await?,
         info,
         section,
         Some(section_key_share),
@@ -653,7 +633,6 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
         create_comm().await?,
-        Config::new().await?,
         node,
         section,
         Some(section_key_share),
@@ -674,8 +653,6 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
 
     assert!(!dispatcher
         .node
-        .read()
-        .await
         .network_knowledge()
         .section_members()
         .await
@@ -711,7 +688,6 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let node = nodes.remove(0);
     let node = Node::new(
         create_comm().await?,
-        Config::new().await?,
         node,
         section,
         Some(section_key_share),
@@ -734,8 +710,6 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
     assert!(dispatcher
         .node
-        .read()
-        .await
         .membership
         .read()
         .await
@@ -780,7 +754,6 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
         create_comm().await?,
-        Config::new().await?,
         node,
         network_knowledge,
         Some(section_key_share),
@@ -894,7 +867,6 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
         create_comm().await?,
-        Config::new().await?,
         info,
         our_section.clone(),
         None,
@@ -929,23 +901,9 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
         )
         .await?;
 
+    assert_eq!(dispatcher.node.network_knowledge().genesis_key(), &pk0);
     assert_eq!(
-        dispatcher
-            .node
-            .read()
-            .await
-            .network_knowledge()
-            .genesis_key(),
-        &pk0
-    );
-    assert_eq!(
-        dispatcher
-            .node
-            .read()
-            .await
-            .network_knowledge()
-            .prefix_map()
-            .all(),
+        dispatcher.node.network_knowledge().prefix_map().all(),
         vec![section_signed_our_section_auth.value]
     );
 
@@ -993,7 +951,6 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
         create_comm().await?,
-        Config::new().await?,
         node,
         section,
         Some(section_key_share),
@@ -1192,7 +1149,6 @@ async fn handle_elders_update() -> Result<()> {
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
         create_comm().await?,
-        Config::new().await?,
         info,
         section0.clone(),
         Some(section_key_share),
@@ -1325,7 +1281,6 @@ async fn handle_demote_during_split() -> Result<()> {
     let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
     let node = Node::new(
         create_comm().await?,
-        Config::new().await?,
         info,
         section,
         Some(section_key_share),
