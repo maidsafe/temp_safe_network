@@ -108,7 +108,7 @@ impl Safe {
         .await;
 
         self.client = Some(
-            Client::new(config, bootstrap_config.1, keypair)
+            Client::new(config, bootstrap_config.1, keypair, None)
                 .await
                 .map_err(|err| {
                     Error::ConnectionError(format!(
