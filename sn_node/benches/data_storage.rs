@@ -8,8 +8,6 @@
 
 use criterion::Criterion;
 
-use std::time::Duration;
-
 use eyre::{Result, WrapErr};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use sn_interface::messaging::data::{CreateRegister, SignedRegisterCreate};
