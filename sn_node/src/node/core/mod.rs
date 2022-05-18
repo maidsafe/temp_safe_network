@@ -45,6 +45,7 @@ use super::{
 use crate::node::{
     error::{Error, Result},
     membership::elder_candidates,
+    Config,
 };
 use sn_interface::messaging::{
     data::OperationId,
@@ -110,6 +111,8 @@ pub(crate) type AeBackoffCache =
 // Core state + logic of a node.
 pub(crate) struct Node {
     pub(super) event_tx: mpsc::Sender<Event>,
+    // startup configuration, needed for rejoins after a churn join miss
+    pub(super) config: Config,
     pub(crate) info: Arc<RwLock<NodeInfo>>,
 
     pub(crate) comm: Comm,
@@ -148,6 +151,7 @@ impl Node {
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn new(
         comm: Comm,
+        config: Config,
         mut info: NodeInfo,
         network_knowledge: NetworkKnowledge,
         section_key_share: Option<SectionKeyShare>,
@@ -216,6 +220,7 @@ impl Node {
 
         Ok(Self {
             comm,
+            config,
             info: Arc::new(RwLock::new(info)),
             network_knowledge,
             section_keys_provider,

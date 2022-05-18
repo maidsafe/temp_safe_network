@@ -21,6 +21,12 @@ impl LogCtx {
     }
 
     pub(crate) async fn prefix(&self) -> Prefix {
-        self.cmds_dispatcher.node.network_knowledge().prefix().await
+        self.cmds_dispatcher
+            .node
+            .read()
+            .await
+            .network_knowledge()
+            .prefix()
+            .await
     }
 }

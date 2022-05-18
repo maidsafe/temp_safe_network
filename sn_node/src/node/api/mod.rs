@@ -94,7 +94,16 @@ impl NodeApi {
         .map_err(|_| Error::JoinTimeout)??;
 
         // Network keypair may have to be changed due to naming criteria or network requirements.
-        let keypair_as_bytes = api.dispatcher.node.info.read().await.keypair.to_bytes();
+        let keypair_as_bytes = api
+            .dispatcher
+            .node
+            .read()
+            .await
+            .info
+            .read()
+            .await
+            .keypair
+            .to_bytes();
         store_network_keypair(root_dir, keypair_as_bytes).await?;
 
         let our_pid = std::process::id();
@@ -118,6 +127,81 @@ impl NodeApi {
         Ok((api, network_events))
     }
 
+    pub(super) async fn new_bootstraped_node(
+        config: &Config,
+        used_space: UsedSpace,
+        root_storage_dir: &Path,
+        connection_event_tx: mpsc::Sender<MsgEvent>,
+        connection_event_rx: &mut mpsc::Receiver<MsgEvent>,
+        event_tx: mpsc::Sender<Event>,
+    ) -> Result<Node> {
+        let local_addr = config
+            .local_addr
+            .unwrap_or_else(|| SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)));
+
+        let genesis_key_str = config.genesis_key.as_ref().ok_or_else(|| {
+            Error::Configuration("Network's genesis key was not provided.".to_string())
+        })?;
+        let genesis_key = TypesPublicKey::bls_from_hex(genesis_key_str)?
+            .bls()
+            .ok_or_else(|| {
+                Error::Configuration(
+                    "Unexpectedly failed to obtain genesis key from configuration.".to_string(),
+                )
+            })?;
+
+        let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE);
+        let node_name = ed25519::name(&keypair.public);
+        info!("{} Bootstrapping a new node.", node_name);
+
+        let (comm, bootstrap_addr) = Comm::bootstrap(
+            local_addr,
+            config
+                .hard_coded_contacts
+                .iter()
+                .copied()
+                .collect_vec()
+                .as_slice(),
+            config.network_config().clone(),
+            connection_event_tx,
+        )
+        .await?;
+        info!(
+            "{} Joining as a new node (PID: {}) our socket: {}, bootstrapper was: {}, network's genesis key: {:?}",
+            node_name,
+            std::process::id(),
+            comm.our_connection_info(),
+            bootstrap_addr,
+            genesis_key
+        );
+
+        let joining_node = NodeInfo::new(keypair, comm.our_connection_info());
+        let (info, network_knowledge) = join_network(
+            joining_node,
+            &comm,
+            connection_event_rx,
+            bootstrap_addr,
+            genesis_key,
+        )
+        .await?;
+
+        let node = Node::new(
+            comm,
+            config.clone(),
+            info,
+            network_knowledge,
+            None,
+            event_tx,
+            used_space.clone(),
+            root_storage_dir.to_path_buf(),
+        )
+        .await?;
+        info!("{} Joined the network!", node.info.read().await.name());
+        info!("Our AGE: {}", node.info.read().await.age());
+
+        Ok(node)
+    }
+
     // Private helper to create a new node using the given config and bootstraps it to the network.
     //
     // NOTE: It's not guaranteed this function ever returns. This can happen due to messages being
@@ -131,11 +215,11 @@ impl NodeApi {
         let (event_tx, event_rx) = mpsc::channel(EVENT_CHANNEL_SIZE);
         let (connection_event_tx, mut connection_event_rx) = mpsc::channel(1);
 
-        let local_addr = config
-            .local_addr
-            .unwrap_or_else(|| SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)));
-
         let node = if config.is_first() {
+            let local_addr = config
+                .local_addr
+                .unwrap_or_else(|| SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)));
+
             // Genesis node having a fix age of 255.
             let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), 255);
             let node_name = ed25519::name(&keypair.public);
@@ -192,66 +276,15 @@ impl NodeApi {
 
             node
         } else {
-            let genesis_key_str = config.genesis_key.as_ref().ok_or_else(|| {
-                Error::Configuration("Network's genesis key was not provided.".to_string())
-            })?;
-            let genesis_key = TypesPublicKey::bls_from_hex(genesis_key_str)?
-                .bls()
-                .ok_or_else(|| {
-                    Error::Configuration(
-                        "Unexpectedly failed to obtain genesis key from configuration.".to_string(),
-                    )
-                })?;
-
-            let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE);
-            let node_name = ed25519::name(&keypair.public);
-            info!("{} Bootstrapping a new node.", node_name);
-
-            let (comm, bootstrap_addr) = Comm::bootstrap(
-                local_addr,
-                config
-                    .hard_coded_contacts
-                    .iter()
-                    .copied()
-                    .collect_vec()
-                    .as_slice(),
-                config.network_config().clone(),
+            NodeApi::new_bootstraped_node(
+                config,
+                used_space,
+                root_storage_dir,
                 connection_event_tx,
-            )
-            .await?;
-            info!(
-                "{} Joining as a new node (PID: {}) our socket: {}, bootstrapper was: {}, network's genesis key: {:?}",
-                node_name,
-                std::process::id(),
-                comm.our_connection_info(),
-                bootstrap_addr,
-                genesis_key
-            );
-
-            let joining_node = NodeInfo::new(keypair, comm.our_connection_info());
-            let (info, network_knowledge) = join_network(
-                joining_node,
-                &comm,
                 &mut connection_event_rx,
-                bootstrap_addr,
-                genesis_key,
-            )
-            .await?;
-
-            let node = Node::new(
-                comm,
-                info,
-                network_knowledge,
-                None,
                 event_tx,
-                used_space.clone(),
-                root_storage_dir.to_path_buf(),
             )
-            .await?;
-            info!("{} Joined the network!", node.info.read().await.name());
-            info!("Our AGE: {}", node.info.read().await.age());
-
-            node
+            .await?
         };
 
         let dispatcher = Arc::new(Dispatcher::new(node));
@@ -286,57 +319,94 @@ impl NodeApi {
 
     /// Returns the current age of this node.
     pub async fn age(&self) -> u8 {
-        self.dispatcher.node.info.read().await.age()
+        self.dispatcher.node.read().await.info.read().await.age()
     }
 
     /// Returns the ed25519 public key of this node.
     pub async fn public_key(&self) -> PublicKey {
-        self.dispatcher.node.info.read().await.keypair.public
+        self.dispatcher
+            .node
+            .read()
+            .await
+            .info
+            .read()
+            .await
+            .keypair
+            .public
     }
 
     /// The name of this node.
     pub async fn name(&self) -> XorName {
-        self.dispatcher.node.info.read().await.name()
+        self.dispatcher.node.read().await.info.read().await.name()
     }
 
     /// Returns connection info of this node.
     pub async fn our_connection_info(&self) -> SocketAddr {
-        self.dispatcher.node.our_connection_info()
+        self.dispatcher.node.read().await.our_connection_info()
     }
 
     /// Returns the Section Signed Chain
     pub async fn section_chain(&self) -> SecuredLinkedList {
-        self.dispatcher.node.section_chain().await
+        self.dispatcher.node.read().await.section_chain().await
     }
 
     /// Returns the Section Chain's genesis key
     pub async fn genesis_key(&self) -> bls::PublicKey {
-        *self.dispatcher.node.network_knowledge().genesis_key()
+        *self
+            .dispatcher
+            .node
+            .read()
+            .await
+            .network_knowledge()
+            .genesis_key()
     }
 
     /// Prefix of our section
     pub async fn our_prefix(&self) -> Prefix {
-        self.dispatcher.node.network_knowledge().prefix().await
+        self.dispatcher
+            .node
+            .read()
+            .await
+            .network_knowledge()
+            .prefix()
+            .await
     }
 
     /// Returns whether the node is Elder.
     pub async fn is_elder(&self) -> bool {
-        self.dispatcher.node.is_elder().await
+        self.dispatcher.node.read().await.is_elder().await
     }
 
     /// Returns the information of all the current section elders.
     pub async fn our_elders(&self) -> Vec<Peer> {
-        self.dispatcher.node.network_knowledge().elders().await
+        self.dispatcher
+            .node
+            .read()
+            .await
+            .network_knowledge()
+            .elders()
+            .await
     }
 
     /// Returns the information of all the current section adults.
     pub async fn our_adults(&self) -> Vec<Peer> {
-        self.dispatcher.node.network_knowledge().adults().await
+        self.dispatcher
+            .node
+            .read()
+            .await
+            .network_knowledge()
+            .adults()
+            .await
     }
 
     /// Returns the info about the section matching the name.
     pub async fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        self.dispatcher.node.matching_section(name).await
+        self.dispatcher
+            .node
+            .read()
+            .await
+            .matching_section(name)
+            .await
     }
 
     /// Builds a WireMsg signed by this Node
@@ -347,7 +417,7 @@ impl NodeApi {
     ) -> Result<WireMsg> {
         let src_section_pk = *self.section_chain().await.last_key();
         WireMsg::single_src(
-            &self.dispatcher.node.info.read().await.clone(),
+            &self.dispatcher.node.read().await.info.read().await.clone(),
             dst,
             node_msg,
             src_section_pk,
@@ -363,7 +433,14 @@ impl NodeApi {
             wire_msg.msg_id()
         );
 
-        if let Some(cmd) = self.dispatcher.node.send_msg_to_nodes(wire_msg).await? {
+        if let Some(cmd) = self
+            .dispatcher
+            .node
+            .read()
+            .await
+            .send_msg_to_nodes(wire_msg)
+            .await?
+        {
             self.dispatcher
                 .clone()
                 .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
@@ -376,12 +453,12 @@ impl NodeApi {
     /// Returns the current BLS public key set if this node has one, or
     /// `Error::MissingSecretKeyShare` otherwise.
     pub async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        self.dispatcher.node.public_key_set().await
+        self.dispatcher.node.read().await.public_key_set().await
     }
 }
 
 // Listen for incoming connection events and handle them.
-async fn handle_connection_events(
+pub(super) async fn handle_connection_events(
     dispatcher: Arc<Dispatcher>,
     mut incoming_conns: mpsc::Receiver<MsgEvent>,
 ) {
@@ -399,7 +476,7 @@ async fn handle_connection_events(
                 );
 
                 let span = {
-                    let node = &dispatcher.node;
+                    let node = &dispatcher.node.read().await;
                     trace_span!("handle_message", name = %node.info.read().await.name(), ?sender, msg_id = ?wire_msg.msg_id())
                 };
                 let _span_guard = span.enter();

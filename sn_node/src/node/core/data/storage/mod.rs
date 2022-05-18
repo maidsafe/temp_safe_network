@@ -29,7 +29,7 @@ use sn_interface::types::ReplicatedDataAddress;
 use std::collections::btree_map::Entry;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    path::Path,
+    path::{Path, PathBuf},
     sync::Arc,
 };
 use tokio::sync::RwLock;
@@ -44,6 +44,7 @@ pub struct DataStorage {
     registers: RegisterStorage,
     used_space: UsedSpace,
     last_recorded_level: Arc<RwLock<StorageLevel>>,
+    store_path: PathBuf,
 }
 
 impl DataStorage {
@@ -54,7 +55,16 @@ impl DataStorage {
             registers: RegisterStorage::new(path, used_space.clone())?,
             used_space,
             last_recorded_level: Arc::new(RwLock::new(StorageLevel::zero())),
+            store_path: path.to_path_buf(),
         })
+    }
+
+    pub(crate) async fn used_space(&self) -> UsedSpace {
+        self.used_space.clone()
+    }
+
+    pub(crate) async fn store_path(&self) -> PathBuf {
+        self.store_path.clone()
     }
 
     /// Store data in the local store
