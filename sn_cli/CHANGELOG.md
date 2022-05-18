@@ -4,7 +4,37 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.53.1 (2022-05-18)
+
+### Chore
+
+ - <csr-id-07504faeda6cbfd0b27abea25facde992398ecf9/> upgrade blsttc to v5.2.0 and rand to v0.8
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 10 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - upgrade blsttc to v5.2.0 and rand to v0.8 ([`07504fa`](https://github.com/maidsafe/safe_network/commit/07504faeda6cbfd0b27abea25facde992398ecf9))
+</details>
+
 ## v0.53.0 (2022-05-06)
+
+<csr-id-3894e8ed5ab48bc72287c4ae74fa53ef0ba51aaa/>
+<csr-id-0a87a96a911b6497d6cd667c18ebbe75e86876dc/>
+<csr-id-1f2d7037d3178e211842f9b554d8fd0d462709e2/>
+<csr-id-e17baffdc356d244075a97e9422d5ffab2ca46c7/>
 
 ### Chore
 
@@ -15,20 +45,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
  - <csr-id-e17baffdc356d244075a97e9422d5ffab2ca46c7/> change default node max cpacity to 10GB
    - Also delete an outdated warning output by CLI about re-enabling authd after switching networks.
 
+### Chore
+
+ - <csr-id-737d906a61f772593ac7df755d995d66059e8b5e/> sn_interface-0.2.1/sn_client-0.62.1/sn_node-0.58.15/sn_api-0.60.0/sn_cli-0.53.0
+
 ### New Features (BREAKING)
 
  - <csr-id-681457a75e818beb30401154f336383507acd935/> return a Token value from wallet balance API instead of a string
    - Additionally add support to the cat and dog commands for Wallets.
-   - When cat command is used with a Wallet, it lists all spendable balances found in it,
+- When cat command is used with a Wallet, it lists all spendable balances found in it,
    as long as the user has permissions to read it as it's expected to be a private Multimap.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 6 commits contributed to the release over the course of 10 calendar days.
- - 12 days passed between releases.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 9 commits contributed to the release over the course of 11 calendar days.
+ - 13 days passed between releases.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -38,6 +72,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.2.1/sn_client-0.62.1/sn_node-0.58.15/sn_api-0.60.0/sn_cli-0.53.0 ([`737d906`](https://github.com/maidsafe/safe_network/commit/737d906a61f772593ac7df755d995d66059e8b5e))
+    - Merge #1140 ([`459b641`](https://github.com/maidsafe/safe_network/commit/459b641f22b488f33825777b974da80512eabed5))
+    - Merge #1169 ([`e5d0c17`](https://github.com/maidsafe/safe_network/commit/e5d0c17c335a3a25ee0bb4c81906fa176abeb7f5))
     - return a Token value from wallet balance API instead of a string ([`681457a`](https://github.com/maidsafe/safe_network/commit/681457a75e818beb30401154f336383507acd935))
     - remove the max-capacity flag from sn_node cli ([`3894e8e`](https://github.com/maidsafe/safe_network/commit/3894e8ed5ab48bc72287c4ae74fa53ef0ba51aaa))
     - remove the max-capacity flag from sn_node cli ([`0a87a96`](https://github.com/maidsafe/safe_network/commit/0a87a96a911b6497d6cd667c18ebbe75e86876dc))
@@ -54,6 +91,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <csr-id-a477c1db40b9d8f78adf3f620942a06daf0ecc2b/>
 <csr-id-91606f631a211d959364cab1e428d1ac895d3dca/>
 <csr-id-bda0ea00e2e5a258e02a91d12dcd1e480dfff17c/>
+<csr-id-2f4e7e6305ba387f2e28945aee71df650ac1d3eb/>
 
 ### Chore
 
@@ -74,17 +112,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - <csr-id-e662317e93b3247a1afd9970587ea7241a9b5619/> first and basic implementation of Wallet reissue API and related CLI cmds
    - Generate output DBCs with sn_dbc::TransactionBuilder
-- Change DBC is also generated and stored in the source Wallet the reissue was made from
-- Spent DBCs are soft-removed from the source Wallet (Multimap)
-- Reissued DBCs are all bearer at this instance
-- Verification of generated Tx and spentproofs is not performed at this instance yet
-- Input DBCs are not logged as spent on the network's spentbook at this instance yet
-- Generate output DBCs with sn_dbc::TransactionBuilder
-- Change DBC is also generated and stored in the source Wallet the reissue was made from
-- Spent DBCs are soft-removed from the source Wallet (Multimap)
-- Reissued DBCs are all bearer at this instance
-- Verification of generated Tx and spentproofs is not performed at this instance yet
-- Input DBCs are not logged as spent on the network's spentbook at this instance yet
 
 ### Bug Fixes
 
@@ -141,7 +168,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 <csr-unknown>
- first and basic implementation of Wallet reissue API and related CLI cmds<csr-unknown/>
+Change DBC is also generated and stored in the source Wallet the reissue was made fromSpent DBCs are soft-removed from the source Wallet (Multimap)Reissued DBCs are all bearer at this instanceVerification of generated Tx and spentproofs is not performed at this instance yetInput DBCs are not logged as spent on the network’s spentbook at this instance yetGenerate output DBCs with sn_dbc::TransactionBuilderChange DBC is also generated and stored in the source Wallet the reissue was made fromSpent DBCs are soft-removed from the source Wallet (Multimap)Reissued DBCs are all bearer at this instanceVerification of generated Tx and spentproofs is not performed at this instance yetInput DBCs are not logged as spent on the network’s spentbook at this instance yet<csr-unknown/>
 
 ## v0.51.3 (2022-04-14)
 

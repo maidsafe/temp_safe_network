@@ -1,6 +1,6 @@
 [package]
 name = "sn_api"
-version = "0.60.1"
+version = "0.60.2"
 description = "Safe API"
 authors = [
   "bochaco <gabrielviganotti@gmail.com>",
@@ -39,9 +39,9 @@ pbkdf2 = { version = "~0.7", default-features = false }
 serde = "1.0.123"
 serde_json = "1.0.62"
 sha3 = "~0.9"
-sn_client = { path = "../sn_client", version = "^0.62.2" }
+sn_client = { path = "../sn_client", version = "^0.62.3" }
 sn_dbc = { version = "3.1.0", features = [ "serdes" ] }
-sn_interface = { path = "../sn_interface", version = "^0.2.2" }
+sn_interface = { path = "../sn_interface", version = "^0.2.4" }
 thiserror = "1.0.23"
 time = { version = "~0.3.4", features = ["formatting"] }
 tiny-keccak = { version = "2.0.2", features = ["sha3"] }

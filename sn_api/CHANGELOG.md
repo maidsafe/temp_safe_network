@@ -5,15 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.60.1 (2022-05-10)
+## v0.60.2 (2022-05-18)
+
+### Chore
+
+ - <csr-id-07504faeda6cbfd0b27abea25facde992398ecf9/> upgrade blsttc to v5.2.0 and rand to v0.8
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 2 days passed between releases.
- - 0 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 7 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -23,10 +27,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - upgrade blsttc to v5.2.0 and rand to v0.8 ([`07504fa`](https://github.com/maidsafe/safe_network/commit/07504faeda6cbfd0b27abea25facde992398ecf9))
+</details>
+
+## v0.60.1 (2022-05-10)
+
+### Chore
+
+ - <csr-id-61ba367c308a846cb3f1ae065b1fbbdfb85838e4/> sn_interface-0.2.2/sn_client-0.62.2/sn_node-0.58.16/sn_api-0.60.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 3 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.2.2/sn_client-0.62.2/sn_node-0.58.16/sn_api-0.60.1 ([`61ba367`](https://github.com/maidsafe/safe_network/commit/61ba367c308a846cb3f1ae065b1fbbdfb85838e4))
     - Merge #1171 ([`06b4433`](https://github.com/maidsafe/safe_network/commit/06b4433f199ba7c622ad57e767d80f58f0b50a69))
 </details>
 
 ## v0.60.0 (2022-05-06)
+
+<csr-id-737d906a61f772593ac7df755d995d66059e8b5e/>
 
 ### Bug Fixes
 
@@ -40,8 +72,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-681457a75e818beb30401154f336383507acd935/> return a Token value from wallet balance API instead of a string
    - Additionally add support to the cat and dog commands for Wallets.
-- When cat command is used with a Wallet, it lists all spendable balances found in it,
-   as long as the user has permissions to read it as it's expected to be a private Multimap.
 
 ### Commit Statistics
 
@@ -66,6 +96,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - return a Token value from wallet balance API instead of a string ([`681457a`](https://github.com/maidsafe/safe_network/commit/681457a75e818beb30401154f336383507acd935))
     - Merge #1128 ([`e49d382`](https://github.com/maidsafe/safe_network/commit/e49d38239b3a8c468616ad3782e1208316e9b5e0))
 </details>
+
+<csr-unknown>
+When cat command is used with a Wallet, it lists all spendable balances found in it,as long as the user has permissions to read it as it’s expected to be a private Multimap.<csr-unknown/>
 
 ## v0.59.0 (2022-04-23)
 
@@ -133,9 +166,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - pull sn_client out of the node codebase ([`88421d9`](https://github.com/maidsafe/safe_network/commit/88421d9cb7872b6397283a0035130bc14de6d4ff))
     - update proptest dep to v1 in sn_api ([`d091329`](https://github.com/maidsafe/safe_network/commit/d0913293df42e73716fabb3460ae6dbd4ddf5a1b))
 </details>
-
-<csr-unknown>
-Change DBC is also generated and stored in the source Wallet the reissue was made fromSpent DBCs are soft-removed from the source Wallet (Multimap)Reissued DBCs are all bearer at this instanceVerification of generated Tx and spentproofs is not performed at this instance yetInput DBCs are not logged as spent on the network’s spentbook at this instance yetGenerate output DBCs with sn_dbc::TransactionBuilderChange DBC is also generated and stored in the source Wallet the reissue was made fromSpent DBCs are soft-removed from the source Wallet (Multimap)Reissued DBCs are all bearer at this instanceVerification of generated Tx and spentproofs is not performed at this instance yetInput DBCs are not logged as spent on the network’s spentbook at this instance yet<csr-unknown/>
 
 ## v0.58.2 (2022-04-14)
 

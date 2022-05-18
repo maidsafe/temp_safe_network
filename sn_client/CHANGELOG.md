@@ -1113,15 +1113,21 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.62.2 (2022-05-10)
+## v0.62.3 (2022-05-18)
+
+### Chore
+
+ - <csr-id-07504faeda6cbfd0b27abea25facde992398ecf9/> upgrade blsttc to v5.2.0 and rand to v0.8
+ - <csr-id-fb7ec7f4b90678cc0693d311a1f2efd87a6714a6/> send some msgs in bg threads
+   This should unblock client threads on initial contact and on queries
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 2 days passed between releases.
- - 0 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 7 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1131,6 +1137,33 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - upgrade blsttc to v5.2.0 and rand to v0.8 ([`07504fa`](https://github.com/maidsafe/safe_network/commit/07504faeda6cbfd0b27abea25facde992398ecf9))
+    - send some msgs in bg threads ([`fb7ec7f`](https://github.com/maidsafe/safe_network/commit/fb7ec7f4b90678cc0693d311a1f2efd87a6714a6))
+</details>
+
+## v0.62.2 (2022-05-10)
+
+### Chore
+
+ - <csr-id-61ba367c308a846cb3f1ae065b1fbbdfb85838e4/> sn_interface-0.2.2/sn_client-0.62.2/sn_node-0.58.16/sn_api-0.60.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 3 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.2.2/sn_client-0.62.2/sn_node-0.58.16/sn_api-0.60.1 ([`61ba367`](https://github.com/maidsafe/safe_network/commit/61ba367c308a846cb3f1ae065b1fbbdfb85838e4))
     - Merge #1171 ([`06b4433`](https://github.com/maidsafe/safe_network/commit/06b4433f199ba7c622ad57e767d80f58f0b50a69))
 </details>
 
@@ -1153,6 +1186,7 @@ needed, as they keypair itself contains the Arcs we need.
 <csr-id-fec4741438b8de957b5de94e21b78cf15886713f/>
 <csr-id-a05599e452dc7400e83e7a048488689db2c28e9e/>
 <csr-id-54000b43cdd3688e6c691bef9dedc299da3c22aa/>
+<csr-id-737d906a61f772593ac7df755d995d66059e8b5e/>
 
 ### Chore
 
@@ -1225,9 +1259,9 @@ needed, as they keypair itself contains the Arcs we need.
     - sn_interface-0.2.1/sn_client-0.62.1/sn_node-0.58.15/sn_api-0.60.0/sn_cli-0.53.0 ([`737d906`](https://github.com/maidsafe/safe_network/commit/737d906a61f772593ac7df755d995d66059e8b5e))
     - check Register permissions on ops locally to prevent failures when broadcasted to the network ([`ae41562`](https://github.com/maidsafe/safe_network/commit/ae4156228a4bb684ff10ac8c98917dd4dae434ea))
     - Merge #1140 ([`459b641`](https://github.com/maidsafe/safe_network/commit/459b641f22b488f33825777b974da80512eabed5))
-    - Merge #1169 ([`e5d0c17`](https://github.com/maidsafe/safe_network/commit/e5d0c17c335a3a25ee0bb4c81906fa176abeb7f5))
     - reduce number of query attempts from client once again ([`9fc497a`](https://github.com/maidsafe/safe_network/commit/9fc497a3c27f2545c9dc2a8106e31feeb497ef3a))
     - remove concept of 'sufficent' knowledge ([`c2f5f85`](https://github.com/maidsafe/safe_network/commit/c2f5f855191fa46d549adea15e9123674c24d44a))
+    - Merge #1169 ([`e5d0c17`](https://github.com/maidsafe/safe_network/commit/e5d0c17c335a3a25ee0bb4c81906fa176abeb7f5))
     - client knowledge could not update ([`9f4c3a5`](https://github.com/maidsafe/safe_network/commit/9f4c3a523212c41079afcde8052a0891f3895f3b))
     - make client targets relative to sap size ([`e8f4fbc`](https://github.com/maidsafe/safe_network/commit/e8f4fbca2acb81b3ddc1b275140e5f7b1b56f9a9))
     - more logging for insufficent elders ([`800008d`](https://github.com/maidsafe/safe_network/commit/800008d2ec43d6df3bc078c59b7ae405610e5539))

@@ -5,7 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.58.20 (2022-05-17)
+## v0.58.20 (2022-05-18)
+
+<csr-id-78ad1d4ebddd5a9f9d6acb1b0ed0fd9b63bf0385/>
+<csr-id-fb324b077d601503d012c032cc9889a70d82e75f/>
 
 ### Chore
 
@@ -13,13 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-fb324b077d601503d012c032cc9889a70d82e75f/> dont hold comms session lock over session cleanup
    It's still not clear if this is where we may be deadlocking. But moving to hold the lock over a shorter duration certainly seems sensible
 
+### Chore
+
+ - <csr-id-332e8f126e0e9351e8698ce2604e6fdd8ce6f7b5/> sn_node-0.58.20
+ - <csr-id-f863e07357fab813246ee92ad62adf59e476312a/> update sap checks for generation addition
+ - <csr-id-07504faeda6cbfd0b27abea25facde992398ecf9/> upgrade blsttc to v5.2.0 and rand to v0.8
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 3 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -29,13 +37,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - add PeerLink count log ([`78ad1d4`](https://github.com/maidsafe/safe_network/commit/78ad1d4ebddd5a9f9d6acb1b0ed0fd9b63bf0385))
-    - dont hold comms session lock over session cleanup ([`fb324b0`](https://github.com/maidsafe/safe_network/commit/fb324b077d601503d012c032cc9889a70d82e75f))
+    - upgrade blsttc to v5.2.0 and rand to v0.8 ([`07504fa`](https://github.com/maidsafe/safe_network/commit/07504faeda6cbfd0b27abea25facde992398ecf9))
+    - Merge #1189 ([`00f41b4`](https://github.com/maidsafe/safe_network/commit/00f41b4a96bcc172d91620aa0da0cb799db5483c))
+    - Merge #1150 ([`afda86c`](https://github.com/maidsafe/safe_network/commit/afda86c5bd759f6a19cb921c356fad51f76daecd))
 </details>
 
 ## v0.58.19 (2022-05-13)
 
 <csr-id-53ee4c51b82ebd0060c9adba32dac1a102890120/>
+<csr-id-aeb2945e164ca9a07390b4b7fc5220daf07f9401/>
 
 ### Chore
 
@@ -50,18 +60,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chore
 
+ - <csr-id-e25fb53a299dd5daa755799c36a316e4b011f4d7/> rename DkgId generation to section chain len
+ - <csr-id-7bac8dfa016ac9ab2fc58c2ae6de02261fc9dc1a/> reset split barrier when initializing handover
+
+### Chore
+
  - <csr-id-aeb2945e164ca9a07390b4b7fc5220daf07f9401/> sn_node-0.58.19
 
 ### New Features
 
  - <csr-id-e552c17d89d8747b1de32598bf6c58ba43a4f285/> sort relocate candidates by distance to the churn_id
+ - <csr-id-2b18ba8a1b0e8342af176bb78dba08f3e7b65d26/> add membership generation to DKG and SectionInfo agreement
+   This prevents bogus DKG failure when two generations (of same prefix)
+   may crossover under heavy churn
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release over the course of 1 calendar day.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 8 commits contributed to the release.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -73,9 +91,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * **Uncategorized**
     - sn_node-0.58.19 ([`aeb2945`](https://github.com/maidsafe/safe_network/commit/aeb2945e164ca9a07390b4b7fc5220daf07f9401))
     - Merge #1181 ([`2062bce`](https://github.com/maidsafe/safe_network/commit/2062bcee463c46f028991374d1d548b848f9052b))
+    - rename DkgId generation to section chain len ([`e25fb53`](https://github.com/maidsafe/safe_network/commit/e25fb53a299dd5daa755799c36a316e4b011f4d7))
     - Merge #1180 ([`aed6d50`](https://github.com/maidsafe/safe_network/commit/aed6d5050c0b2cc37cc66d4c7b6ada70ee79808a))
+    - reset split barrier when initializing handover ([`7bac8df`](https://github.com/maidsafe/safe_network/commit/7bac8dfa016ac9ab2fc58c2ae6de02261fc9dc1a))
     - simplify cleanupPeerLinks ([`53ee4c5`](https://github.com/maidsafe/safe_network/commit/53ee4c51b82ebd0060c9adba32dac1a102890120))
     - sort relocate candidates by distance to the churn_id ([`e552c17`](https://github.com/maidsafe/safe_network/commit/e552c17d89d8747b1de32598bf6c58ba43a4f285))
+    - add membership generation to DKG and SectionInfo agreement ([`2b18ba8`](https://github.com/maidsafe/safe_network/commit/2b18ba8a1b0e8342af176bb78dba08f3e7b65d26))
 </details>
 
 ## v0.58.18 (2022-05-12)
