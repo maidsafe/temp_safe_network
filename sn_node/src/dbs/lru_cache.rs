@@ -51,7 +51,15 @@ impl<T> LruCache<T> {
 
         let _ = self.data.insert(*key, val);
         {
-            let _ = self.queue.write().await.push(*key, self.priority().await);
+            let mut prio = self.priority();
+            if prio == 0 {
+                // empty the cache when we overflow
+                self.queue.write().await.clear();
+                self.data.clear();
+                prio = self.start.fetch_sub(1, Ordering::SeqCst)
+            }
+
+            let _ = self.queue.write().await.push(*key, prio);
         }
 
         let len = { self.queue.read().await.len() as u16 };
@@ -69,11 +77,15 @@ impl<T> LruCache<T> {
             read_only.get(key).is_some()
         };
         if exists {
-            let _ = self
-                .queue
-                .write()
-                .await
-                .change_priority(key, self.priority().await);
+            let mut prio = self.priority();
+            if prio == 0 {
+                // empty the cache when we overflow
+                self.queue.write().await.clear();
+                self.data.clear();
+                prio = self.start.fetch_sub(1, Ordering::SeqCst)
+            }
+
+            let _ = self.queue.write().await.change_priority(key, prio);
         }
         self.data.get(key).as_deref().cloned()
     }
@@ -83,16 +95,9 @@ impl<T> LruCache<T> {
         let _ = self.data.remove(key);
     }
 
-    async fn priority(&self) -> Priority {
-        let prio = self.start.fetch_sub(1, Ordering::SeqCst);
-        if prio == 0 {
-            // empty the cache when we overflow
-            self.queue.write().await.clear();
-            self.data.clear();
-            self.start.fetch_sub(1, Ordering::SeqCst)
-        } else {
-            prio
-        }
+    /// returns current priority
+    fn priority(&self) -> Priority {
+        self.start.fetch_sub(1, Ordering::SeqCst)
     }
 }
 

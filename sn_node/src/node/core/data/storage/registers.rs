@@ -93,10 +93,10 @@ impl RegisterStorage {
         type KeyResults = Vec<Result<XorName>>;
         let mut the_data = vec![];
 
+        let current_db = self.key_db.export();
+
         // parse keys in parallel
-        let (ok, err): (KeyResults, KeyResults) = self
-            .key_db
-            .export()
+        let (ok, err): (KeyResults, KeyResults) = current_db
             .into_iter()
             .flat_map(|(_, _, pairs)| pairs)
             .par_bridge()
