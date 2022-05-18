@@ -92,7 +92,6 @@ impl RegisterStorage {
     pub(crate) async fn keys(&self) -> Result<Vec<Address>> {
         type KeyResults = Vec<Result<XorName>>;
         let mut the_data = vec![];
-
         let current_db = self.key_db.export();
 
         // parse keys in parallel
@@ -113,6 +112,7 @@ impl RegisterStorage {
             })
             .partition(|r| r.is_ok());
 
+        println!("ok got");
         if !err.is_empty() {
             for e in err {
                 error!("{:?}", e);
@@ -130,7 +130,6 @@ impl RegisterStorage {
                 Err(e) => return Err(e),
             }
         }
-
         Ok(the_data)
     }
 
@@ -325,7 +324,6 @@ impl RegisterStorage {
                 let old_value = None::<Vec<u8>>;
                 let new_value = Some(vec![]); // inserts empty value
 
-                debug!("Getting store for key");
                 // init store first, to allow append to happen asap after key insert
                 // could be races, but edge case for later todos.
                 let store = self.get_or_create_store(&key)?;
@@ -592,11 +590,11 @@ impl RegisterStorage {
         NodeQueryResponse::GetRegisterPolicy((result, operation_id))
     }
 
-    /// ========================================================================
-    /// =========================== Helpers ====================================
-    /// ========================================================================
+    // ========================================================================
+    // =========================== Helpers ====================================
+    // ========================================================================
 
-    // get or create a register op store
+    /// get or create a register op store
     fn get_or_create_store(&self, id: &XorName) -> Result<RegOpStore> {
         RegOpStore::new(id, self.reg_db.clone()).map_err(Error::from)
     }
