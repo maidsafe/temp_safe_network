@@ -3609,6 +3609,7 @@ dependencies = [
  "serde_json",
  "signature",
  "sled",
+ "sn_dbc",
  "sn_interface",
  "sn_launch_tool",
  "structopt",

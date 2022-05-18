@@ -67,7 +67,7 @@ pub async fn run_chunk_soak() -> Result<()> {
 
     let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
 
-    let client = Client::new(config.clone(), bootstrap_nodes.clone(), None).await?;
+    let client = Client::new(config.clone(), bootstrap_nodes.clone(), None, None).await?;
 
     let mut put_tasks = vec![];
     // i is used to determine uppload size, so 0 is 0 bytes, which fails
@@ -94,7 +94,7 @@ pub async fn run_chunk_soak() -> Result<()> {
         "put data len is same as we tried to put"
     );
 
-    let client = Client::new(config, bootstrap_nodes, None).await?;
+    let client = Client::new(config, bootstrap_nodes, None, None).await?;
 
     println!("Now we retrieve the data");
 
@@ -145,7 +145,7 @@ async fn upload_data_using_fresh_client(iteration: usize) -> Result<(BytesAddres
     let (genesis_key, bootstrap_nodes) =
         read_network_conn_info().map_err(|_e| Error::NoNetworkKnowledge)?;
     let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
-    let client = Client::new(config, bootstrap_nodes, None).await?;
+    let client = Client::new(config, bootstrap_nodes, None, None).await?;
 
     upload_data_using_client(client, iteration).await
 }

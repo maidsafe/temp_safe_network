@@ -23,7 +23,10 @@ use std::future::Future;
 use std::time::Duration;
 use std::{collections::BTreeSet, fs::File, io::BufReader, net::SocketAddr, path::Path};
 #[cfg(test)]
-pub use test_client::{create_test_client, create_test_client_with};
+pub use test_client::{
+    create_test_client, create_test_client_with, get_dbc_owner_from_secret_key_hex,
+    init_test_logger,
+};
 
 ///
 pub type ClientResult<T> = Result<T, Error>;

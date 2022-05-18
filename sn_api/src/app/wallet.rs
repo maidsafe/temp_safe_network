@@ -284,8 +284,8 @@ impl Safe {
         change_amount: Token,
     ) -> Result<(Dbc, Option<Dbc>)> {
         // TODO: support for non-bearer DBCs, and allow to provide a recipient's pk
-        let recipient_owner = Owner::from_random_secret_key(&mut rng::thread_rng());
-        let owneronce = OwnerOnce::from_owner_base(recipient_owner, &mut rng::thread_rng());
+        let client = self.get_safe_client()?;
+        let owneronce = OwnerOnce::from_owner_base(client.dbc_owner(), &mut rng::thread_rng());
 
         // TODO: enable the use ot decoys
         let mut tx_builder = TransactionBuilder::default()
