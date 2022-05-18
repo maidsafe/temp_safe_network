@@ -15,7 +15,6 @@ version = "0.58.20"
 [[bench]]
 name = "data_storage"
 harness = false
-required-features = ["test-utils"]
 
 [[example]]
 name = "routing_minimal"

@@ -379,7 +379,7 @@ mod tests {
     use crate::utils::test_utils::create_test_client_with;
     use crate::{
         api::file_apis::LargeFile,
-        utils::test_utils::{create_test_client, init_test_logger},
+        utils::test_utils::{create_test_client, init_logger},
         Client,
     };
     use sn_interface::types::log_markers::LogMarker;
@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn deterministic_chunking() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let keypair = Keypair::new_ed25519();
         let file = random_bytes(LARGE_FILE_SIZE_MIN);
 
@@ -421,7 +421,7 @@ mod tests {
     // Test storing and reading min sized LargeFile.
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_3kb() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _start_span = tracing::info_span!("store_and_read_3kb").entered();
 
         let client = create_test_client().await?;
@@ -466,7 +466,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn seek_with_unknown_length() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("seek_with_unknown_length").entered();
         let client = create_test_client().await?;
 
@@ -489,7 +489,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn seek_in_data() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("seek_in_data").entered();
         let client = create_test_client().await?;
 
@@ -533,7 +533,7 @@ mod tests {
     // Test storing and reading 5mb file. Try and read from many clients and ensure we do not overwelm nodes.
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_5mb_from_many_clients() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _start_span = tracing::info_span!("store_and_read_5mb_from_many_clients").entered();
 
         let uploader = create_test_client().await?;
@@ -627,7 +627,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "Testnet network_assert_ tests should be excluded from normal tests runs, they need to be run in sequence to ensure validity of checks"]
     async fn file_network_assert_expected_log_counts() -> Result<()> {
-        init_test_logger();
+        init_logger();
 
         let _outer_span = tracing::info_span!("file_network_assert").entered();
 
@@ -667,7 +667,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_1kb() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let size = LARGE_FILE_SIZE_MIN / 3;
         let _outer_span = tracing::info_span!("store_and_read_1kb", size).entered();
         let client = create_test_client().await?;
@@ -677,7 +677,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_1mb() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("store_and_read_1mb").entered();
         let client = create_test_client().await?;
         store_and_read(&client, 1024 * 1024, Scope::Public).await?;
@@ -686,7 +686,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ae_checks_file_test() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("ae_checks_file_test").entered();
         let client = create_test_client_with(None, None, false).await?;
         store_and_read(&client, 10 * 1024 * 1024, Scope::Private).await
@@ -694,7 +694,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_10mb() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("store_and_read_10mb").entered();
         let client = create_test_client().await?;
         store_and_read(&client, 10 * 1024 * 1024, Scope::Private).await
@@ -702,7 +702,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_20mb() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("store_and_read_20mb").entered();
         let client = create_test_client().await?;
         store_and_read(&client, 20 * 1024 * 1024, Scope::Private).await
@@ -710,7 +710,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_40mb() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("store_and_read_40mb").entered();
         let client = create_test_client().await?;
         store_and_read(&client, 40 * 1024 * 1024, Scope::Private).await
@@ -718,7 +718,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn store_and_read_100mb() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("store_and_read_100mb").entered();
         let client = create_test_client().await?;
         store_and_read(&client, 100 * 1024 * 1024, Scope::Private).await
@@ -728,7 +728,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn parallel_timings() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("parallel_timings").entered();
 
         let client = create_test_client().await?;
@@ -763,7 +763,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn one_by_one_timings() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("test__one_by_one_timings").entered();
 
         let client = create_test_client().await?;

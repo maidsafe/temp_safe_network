@@ -284,7 +284,7 @@ fn section_auth() -> sn_interface::messaging::SectionAuth {
 mod tests {
     use crate::retry_loop_for_pattern;
     use crate::{
-        utils::test_utils::{create_test_client, create_test_client_with, init_test_logger},
+        utils::test_utils::{create_test_client, create_test_client_with, init_logger},
         Error,
     };
     use eyre::{bail, eyre, Result};
@@ -307,7 +307,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_register_batching() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("test__register_basics").entered();
 
         let client = create_test_client().await?;
@@ -354,7 +354,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "Testnet network_assert_ tests should be excluded from normal tests runs, they need to be run in sequence to ensure validity of checks"]
     async fn register_network_assert_expected_log_counts() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("register_network_assert").entered();
 
         let mut the_logs = crate::testnet_grep::NetworkLogState::new()?;
@@ -390,7 +390,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     #[ignore = "too heavy for CI"]
     async fn measure_upload_times() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("test__measure_upload_times").entered();
 
         let client = create_test_client().await?;
@@ -429,7 +429,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_basics() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("test__register_basics").entered();
 
         let client = create_test_client().await?;
@@ -474,7 +474,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_private_permissions() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("test__register_private_permissions").entered();
 
         let client = create_test_client().await?;
@@ -532,7 +532,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_public_permissions() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("test__register_public_permissions").entered();
 
         let client = create_test_client().await?;
@@ -587,7 +587,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_write() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let start_span = tracing::info_span!("test__register_write_start").entered();
 
         let client = create_test_client().await?;
@@ -674,7 +674,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_owner() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("test__register_owner").entered();
 
         let client = create_test_client().await?;
@@ -698,7 +698,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_can_delete_private() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("test__register_can_delete_private").entered();
 
         let mut client = create_test_client().await?;
@@ -744,7 +744,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn register_cannot_delete_public() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("test__register_cannot_delete_public").entered();
 
         let client = create_test_client().await?;
@@ -787,7 +787,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn ae_checks_register_test() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _outer_span = tracing::info_span!("ae_checks_register_test").entered();
         let client = create_test_client_with(None, None, false).await?;
 

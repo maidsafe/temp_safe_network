@@ -11,7 +11,6 @@
 use super::{Cmd, Comm, Dispatcher};
 
 use crate::dbs::UsedSpace;
-use crate::init_test_logger;
 use crate::node::{
     core::{
         relocation_check, ChurnId, MsgEvent, Node, Proposal, RESOURCE_PROOF_DATA_SIZE,
@@ -21,7 +20,6 @@ use crate::node::{
     messages::WireMsgUtils,
     Error, Event, Result as RoutingResult,
 };
-use sn_interface::elder_count;
 use sn_interface::messaging::{
     system::{
         JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState,
@@ -37,6 +35,7 @@ use sn_interface::network_knowledge::{
     MIN_ADULT_AGE,
 };
 use sn_interface::types::{keyed_signed, SecretKeySet};
+use sn_interface::{elder_count, init_logger};
 
 use sn_interface::types::{keys::ed25519, Keypair, Peer, PublicKey};
 
@@ -232,7 +231,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
 
 #[tokio::test(flavor = "multi_thread")]
 async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result<()> {
-    init_test_logger();
+    init_logger();
     let _span = tracing::info_span!("receive_join_request_from_relocated_node").entered();
 
     let (section_auth, mut nodes, sk_set) = create_section_auth();
@@ -353,7 +352,7 @@ async fn handle_agreement_on_online() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
-    init_test_logger();
+    init_logger();
     let sk_set = SecretKeySet::random();
     let chain = SecuredLinkedList::new(sk_set.secret_key().public_key());
 
@@ -609,7 +608,7 @@ async fn handle_agreement_on_online_of_rejoined_node_with_low_age_after_startup(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
-    init_test_logger();
+    init_logger();
     let _span = tracing::info_span!("handle_agreement_on_offline_of_non_elder").entered();
 
     let (section_auth, mut nodes, sk_set) = create_section_auth();
@@ -723,7 +722,7 @@ enum UntrustedMessageSource {
 #[tokio::test(flavor = "multi_thread")]
 // Checking when we get AE info that is ahead of us we should handle it.
 async fn ae_msg_from_the_future_is_handled() -> Result<()> {
-    init_test_logger();
+    init_logger();
     let _span = info_span!("ae_msg_from_the_future_is_handled").entered();
 
     // Create first `Section` with a chain of length 2
@@ -832,7 +831,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 #[tokio::test(flavor = "multi_thread")]
 // Checking when we send AE info to a section from untrusted section, we do not handle it and error out
 async fn untrusted_ae_msg_errors() -> Result<()> {
-    init_test_logger();
+    init_logger();
     let _span = tracing::info_span!("untrusted_ae_msg_errors").entered();
 
     let (our_section_auth, _, sk_set0) = create_section_auth();
@@ -1079,7 +1078,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_elders_update() -> Result<()> {
-    init_test_logger();
+    init_logger();
     let _span = tracing::info_span!("handle_elders_update").entered();
     // Start with section that has `elder_count()` elders with age 6, 1 non-elder with age 5 and one
     // to-be-elder with age 7:
@@ -1221,7 +1220,7 @@ async fn handle_elders_update() -> Result<()> {
 // Test that demoted node still sends `Sync` messages on split.
 #[tokio::test(flavor = "multi_thread")]
 async fn handle_demote_during_split() -> Result<()> {
-    init_test_logger();
+    init_logger();
     let _span = tracing::info_span!("handle_demote_during_split").entered();
 
     let prefix0 = Prefix::default().pushed(false);

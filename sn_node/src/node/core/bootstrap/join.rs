@@ -508,8 +508,8 @@ mod tests {
 
     use sn_interface::network_knowledge::{test_utils::*, NodeState};
 
-    use crate::init_test_logger;
     use sn_interface::elder_count;
+    use sn_interface::init_logger;
     use sn_interface::messaging::SectionAuthorityProvider as SectionAuthorityProviderMsg;
     use sn_interface::types::PublicKey;
 
@@ -737,7 +737,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn join_invalid_redirect_response() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _span = tracing::info_span!("join_invalid_redirect_response").entered();
 
         let (send_tx, mut send_rx) = mpsc::channel(1);
@@ -883,7 +883,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn join_invalid_retry_prefix_response() -> Result<()> {
-        init_test_logger();
+        init_logger();
         let _span = tracing::info_span!("join_invalid_retry_prefix_response").entered();
 
         let (send_tx, mut send_rx) = mpsc::channel(1);
