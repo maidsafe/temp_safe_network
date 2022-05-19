@@ -7,15 +7,19 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{core::Proposal, XorName};
-use sn_interface::messaging::{
-    system::{DkgFailureSigSet, KeyedSig, NodeState, SectionAuth, SystemMsg},
-    DstLocation, WireMsg,
-};
 use sn_interface::network_knowledge::{SectionAuthorityProvider, SectionKeyShare};
 use sn_interface::types::Peer;
+use sn_interface::{
+    messaging::{
+        system::{DkgFailureSigSet, KeyedSig, NodeState, SectionAuth, SystemMsg},
+        DstLocation, WireMsg,
+    },
+    types::ReplicatedDataAddress,
+};
 
 use bytes::Bytes;
 use custom_debug::Debug;
+use dashmap::DashSet;
 use sn_consensus::Generation;
 use std::{
     collections::BTreeSet,
@@ -65,11 +69,14 @@ pub(crate) enum Cmd {
         recipients: Vec<Peer>,
         wire_msg: WireMsg,
     },
-    /// Send the batch of given messages in a throttled/controlled fashion to the given `recipients`.
-    ThrottledSendBatchMsgs {
-        throttle_duration: Duration,
-        recipients: Vec<Peer>,
-        wire_msgs: Vec<WireMsg>,
+    /// Send the batch of data messages in a throttled/controlled fashion to the given `recipients`.
+    /// chunks addresses are provided, so that we only retrieve the data right before we send it,
+    /// hopefully reducing memory impact or data replication
+    EnqueueDataForReplication {
+        // throttle_duration: Duration,
+        recipient: Peer,
+        /// Batches of ReplicatedDataAddress to be sent together
+        data_batch: DashSet<ReplicatedDataAddress>,
     },
     /// Performs serialisation and signing for sending of NodeMsg.
     /// This cmd only send this to other nodes
@@ -124,7 +131,7 @@ impl fmt::Display for Cmd {
                 )
             }
             Cmd::SignOutgoingSystemMsg { .. } => write!(f, "SignOutgoingSystemMsg"),
-            Cmd::ThrottledSendBatchMsgs { .. } => write!(f, "ThrottledSendBatchMsgs"),
+            Cmd::EnqueueDataForReplication { .. } => write!(f, "ThrottledSendBatchMsgs"),
             Cmd::SendMsgDeliveryGroup { wire_msg, .. } => {
                 write!(f, "SendMsgDeliveryGroup {:?}", wire_msg.msg_id())
             }

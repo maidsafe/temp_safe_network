@@ -124,7 +124,11 @@ impl Node {
                 .pending_data_queries
                 .set(op_id, waiting_peers.clone(), None)
                 .await;
-            trace!("Node {:?}, reported data not found ", sending_node_pk);
+            trace!(
+                "Node {:?}, reported data not found {:?}",
+                sending_node_pk,
+                op_id
+            );
             return Ok(cmds);
         }
 
@@ -204,6 +208,7 @@ impl Node {
         auth: AuthorityProof<ServiceAuth>,
         user: Peer,
     ) -> Result<Vec<Cmd>> {
+        // TODO: We're ot checking the DstLocation node name anywhere...
         trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
         if let DstLocation::EndUser(_) = dst_location {
             warn!(

@@ -9,32 +9,18 @@
 mod chunks;
 mod registers;
 
-use crate::{
-    dbs::Result,
-    node::core::{Cmd, Node},
-    UsedSpace,
-};
+use crate::{dbs::Result, UsedSpace};
 
 use sn_interface::messaging::{
     data::{DataQuery, RegisterStoreExport, StorageLevel},
-    system::{NodeCmd, NodeQueryResponse, SystemMsg},
-    DstLocation,
+    system::NodeQueryResponse,
 };
 use sn_interface::types::{register::User, ReplicatedData, ReplicatedDataAddress as DataAddress};
 
 pub(crate) use chunks::ChunkStorage;
 pub(crate) use registers::RegisterStorage;
-
-use sn_interface::types::ReplicatedDataAddress;
-use std::collections::btree_map::Entry;
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    path::Path,
-    sync::Arc,
-};
+use std::{path::Path, sync::Arc};
 use tokio::sync::RwLock;
-use tracing::info;
-use xor_name::XorName;
 
 /// Operations on data.
 #[derive(Clone, Debug)]
@@ -134,111 +120,6 @@ impl DataStorage {
             .into_iter()
             .map(DataAddress::Register);
         Ok(reg_keys.chain(chunk_keys).collect())
-    }
-
-    pub(crate) async fn get_for_replication(
-        &self,
-        data_address: ReplicatedDataAddress,
-    ) -> Result<ReplicatedData> {
-        self.get_from_local_store(&data_address).await
-    }
-}
-
-impl Node {
-    #[allow(clippy::mutable_key_type)]
-    pub(crate) async fn reorganize_data(
-        &self,
-        new_adults: BTreeSet<XorName>,
-        lost_adults: BTreeSet<XorName>,
-        remaining: BTreeSet<XorName>,
-    ) -> Result<Vec<Cmd>, crate::node::Error> {
-        let data = self.data_storage.clone();
-        let keys = data.keys().await?;
-        let mut data_for_replication = BTreeMap::new();
-        for addr in keys.iter() {
-            if let Some((data, holders)) = self
-                .get_replica_targets(addr, &new_adults, &lost_adults, &remaining)
-                .await
-            {
-                let _prev = data_for_replication.insert(data.address(), (data, holders));
-            }
-        }
-
-        let mut cmds = vec![];
-        let section_pk = self.network_knowledge.section_key().await;
-        let mut send_list: BTreeMap<XorName, Vec<ReplicatedDataAddress>> = BTreeMap::new();
-
-        for (data_address, (_data, targets)) in data_for_replication {
-            for target in targets {
-                let entry = send_list.entry(target);
-                match entry {
-                    Entry::Occupied(mut present_entries) => {
-                        let addresses = present_entries.get_mut();
-                        addresses.push(data_address);
-                    }
-                    Entry::Vacant(e) => {
-                        let _ = e.insert(vec![data_address]);
-                    }
-                }
-            }
-        }
-
-        for (target, data_addresses) in send_list.into_iter() {
-            cmds.push(Cmd::SignOutgoingSystemMsg {
-                msg: SystemMsg::NodeCmd(NodeCmd::SendReplicateDataAddress(data_addresses).clone()),
-                dst: DstLocation::Node {
-                    name: target,
-                    section_pk,
-                },
-            })
-        }
-
-        Ok(cmds)
-    }
-
-    // on adults
-    async fn get_replica_targets(
-        &self,
-        address: &DataAddress,
-        new_adults: &BTreeSet<XorName>,
-        lost_adults: &BTreeSet<XorName>,
-        remaining: &BTreeSet<XorName>,
-    ) -> Option<(ReplicatedData, BTreeSet<XorName>)> {
-        let storage = self.data_storage.clone();
-
-        let old_adult_list = remaining.union(lost_adults).copied().collect();
-        let new_adult_list = remaining.union(new_adults).copied().collect();
-        let new_holders = self.compute_holders(address, &new_adult_list);
-
-        debug!("New holders len: {:?}", new_holders.len());
-        let old_holders = self.compute_holders(address, &old_adult_list);
-
-        let new_adult_is_holder = !new_holders.is_disjoint(new_adults);
-        let lost_old_holder = !old_holders.is_disjoint(lost_adults);
-
-        if new_adult_is_holder || lost_old_holder {
-            info!("Replicating data at {:?}", address);
-            trace!(
-                "New Adult is Holder? {}, Lost Adult was holder? {}",
-                new_adult_is_holder,
-                lost_old_holder
-            );
-            let data = match storage.get_from_local_store(address).await {
-                Ok(data) => {
-                    info!("Data found for replication: {address:?}");
-                    Ok(data)
-                }
-                Err(error) => {
-                    warn!("Error finding {address:?} for replication: {error:?}");
-                    Err(error)
-                }
-            }
-            .ok()?;
-
-            Some((data, new_holders))
-        } else {
-            None
-        }
     }
 }
 
