@@ -97,7 +97,6 @@ pub enum LogMarker {
     SendJoinsDisallowed,
     SendDKGUnderway,
     SendNodeApproval,
-    SendSuspiciousNodesDetected,
     // Approved to join
     ReceivedJoinApproval,
     // Connections
