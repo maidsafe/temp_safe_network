@@ -28,9 +28,9 @@
 )]
 
 use color_eyre::{Section, SectionExt};
-use eyre::{eyre, Result, WrapErr};
+use eyre::{eyre, ErrReport, Result, WrapErr};
 use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
-use sn_node::node::{add_connection_info, set_connection_info, Config, Error, NodeApi};
+use sn_node::node::{add_connection_info, set_connection_info, Config, Error, Event, NodeApi};
 
 use self_update::{cargo_crate_version, Status};
 #[cfg(not(feature = "tokio-console"))]
@@ -55,22 +55,33 @@ fn main() -> Result<()> {
     #[cfg(feature = "tokio-console")]
     console_subscriber::init();
 
-    let handle = std::thread::Builder::new()
-        .name("sn_node".to_string())
-        .stack_size(16 * 1024 * 1024)
-        .spawn(move || {
-            let rt = tokio::runtime::Runtime::new()?;
-            rt.block_on(run_node())?;
-            Ok(())
-        })
-        .wrap_err("Failed to spawn node thread")?;
+    // loops ready to catch any ChurnJoinMiss
+    loop {
+        // start runtime
+        let handle = std::thread::Builder::new()
+            .name("sn_node".to_string())
+            .stack_size(16 * 1024 * 1024)
+            .spawn(move || {
+                let rt = tokio::runtime::Runtime::new()?;
+                rt.block_on(run_node())?;
+                Ok(())
+            })
+            .wrap_err("Failed to spawn node thread")?;
 
-    match handle.join() {
-        Ok(result) => result,
-        Err(error) => {
-            // thread panic errors cannot be converted to `eyre::Report` as they are not `Sync`, so
-            // the best thing to do is propagate the panic.
-            std::panic::resume_unwind(error)
+        // join it
+        match handle.join() {
+            Ok(result) => {
+                return result;
+            }
+            Err(error) => {
+                if let Some(Error::ChurnJoinMiss) = error.downcast_ref::<Error>() {
+                    warn!("Received churn join miss, restarting node...");
+                    continue;
+                }
+                // thread panic errors cannot be converted to `eyre::Report` as they are not `Sync`, so
+                // the best thing to do is propagate the panic.
+                std::panic::resume_unwind(error)
+            }
         }
     }
 }
@@ -338,6 +349,9 @@ async fn run_node() -> Result<()> {
     // This just keeps the node going as long as routing goes
     while let Some(event) = event_stream.next().await {
         trace!("Routing event! {:?}", event);
+        if let Event::ChurnJoinMissError = event {
+            return Err(Error::ChurnJoinMiss).map_err(ErrReport::msg);
+        }
     }
 
     Ok(())

@@ -256,7 +256,7 @@ impl Node {
 
         let matching_section = self.network_knowledge.section_by_name(&dst)?;
 
-        let message = SystemMsg::AntiEntropyProbe(dst);
+        let message = SystemMsg::AntiEntropyProbe;
         let section_key = matching_section.section_key();
         let dst_name = matching_section.prefix().name();
         let recipients = matching_section.elders_vec();
@@ -264,6 +264,24 @@ impl Node {
         info!(
             "ProbeMsg target {:?} w/key {:?}",
             matching_section.prefix(),
+            section_key
+        );
+
+        self.send_direct_msg_to_nodes(recipients, message, dst_name, section_key)
+            .await
+    }
+
+    pub(crate) async fn generate_section_probe_msg(&self) -> Result<Cmd> {
+        let our_section = self.network_knowledge.authority_provider().await;
+
+        let message = SystemMsg::AntiEntropyProbe;
+        let section_key = our_section.section_key();
+        let dst_name = our_section.prefix().name();
+        let recipients = our_section.elders_vec();
+
+        info!(
+            "ProbeMsg target section {:?} w/key {:?}",
+            our_section.prefix(),
             section_key
         );
 

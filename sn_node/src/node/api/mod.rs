@@ -264,6 +264,7 @@ impl NodeApi {
         ));
 
         dispatcher.clone().start_network_probing().await;
+        dispatcher.clone().start_section_probing().await;
         dispatcher
             .clone()
             .check_for_dysfunction_periodically()
