@@ -109,8 +109,8 @@ impl DysfunctionDetection {
                 queue.push_back(Instant::now());
             }
             IssueType::PendingRequestOperation(op_id) => {
-                let entry = self.unfulfilled_ops.entry(node_id).or_default();
-                let v = entry.value();
+                let mut entry = self.unfulfilled_ops.entry(node_id).or_default();
+                let v = entry.value_mut();
                 let op_id = op_id.ok_or_else(|| {
                     Error::OpIdNotSupplied(
                         "An operation ID must be supplied for a pending request operation."
