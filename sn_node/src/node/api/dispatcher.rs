@@ -18,7 +18,6 @@ use sn_interface::messaging::DstLocation;
 use sn_interface::messaging::{system::SystemMsg, AuthKind, WireMsg};
 use sn_interface::types::{log_markers::LogMarker, Peer};
 
-use itertools::Itertools;
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
 use tokio::{sync::watch, time};
