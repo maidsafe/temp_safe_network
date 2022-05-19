@@ -92,7 +92,7 @@ impl Comm {
 
         let mut peers_to_cleanup = vec![];
         for (peer, session) in sessions.iter() {
-            if retain_peers.contains(&peer) {
+            if retain_peers.contains(peer) {
                 continue;
             }
             session.remove_expired().await;

@@ -20,7 +20,7 @@ use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
-use std::{collections::BTreeSet, time::Duration};
+use std::time::Duration;
 use xor_name::XorName;
 
 impl Node {
@@ -33,13 +33,6 @@ impl Node {
         members: SectionPeers,
     ) -> Result<Vec<Cmd>> {
         let snapshot = self.state_snapshot().await;
-        let old_adults: BTreeSet<_> = self
-            .network_knowledge
-            .adults()
-            .await
-            .iter()
-            .map(|p| p.name())
-            .collect();
 
         let our_name = self.info.read().await.name();
         let signed_sap = SectionAuth {
@@ -58,10 +51,9 @@ impl Node {
             )
             .await?;
 
-        let mut cmds = self.try_reorganize_data(old_adults).await?;
-
         // always run this, only changes will trigger events
-        cmds.extend(self.update_self_for_new_node_state(snapshot).await?);
+        let mut cmds = self.update_self_for_new_node_state(snapshot).await?;
+        cmds.extend(self.try_reorganize_data().await?);
 
         Ok(cmds)
     }
@@ -486,11 +478,11 @@ mod tests {
     use sn_interface::network_knowledge::test_utils::{
         gen_addr, gen_section_authority_provider, section_signed,
     };
-
     use sn_interface::network_knowledge::{
         NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider,
     };
     use sn_interface::types::keys::ed25519;
+    use std::collections::BTreeSet;
 
     use assert_matches::assert_matches;
     use bls::SecretKey;
