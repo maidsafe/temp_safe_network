@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1652962148478,
+  "lastUpdate": 1653002870083,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -3503,6 +3503,78 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/single chunks",
             "value": 136691,
             "range": "± 882",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "d9ba264a6b2b657dce60b5ded78f1cecd840dbb1",
+          "message": "Merge #1178\n\n1178: Section probing for all nodes to trigger rejoin if needed r=davidrusu a=grumbach\n\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\r\n- Section probing for all nodes every now and then\r\n- Removed unused/ignored `dst` field in `AntiEntropyProbe`\r\n- Trigger `ChurnJoinMiss` error and event when nodes realise they are not members of a section they should be in during AE\r\n- Node rejoins/restart when they receive `ChurnJoinMiss`\n\nCo-authored-by: grumbach <anselmega@gmail.com>",
+          "timestamp": "2022-05-19T21:46:30Z",
+          "tree_id": "b4e6f9ae67ea53761957b1a434af1539ddc8872c",
+          "url": "https://github.com/maidsafe/safe_network/commit/d9ba264a6b2b657dce60b5ded78f1cecd840dbb1"
+        },
+        "date": 1653002869067,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10789665333,
+            "range": "± 11260843886",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3825045659,
+            "range": "± 1110895824",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 9361545862,
+            "range": "± 896846494",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10032534257,
+            "range": "± 6499338",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3315862178,
+            "range": "± 2198526145",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4534453446,
+            "range": "± 1307539741",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single registers",
+            "value": 13467,
+            "range": "± 398",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single chunks",
+            "value": 197771,
+            "range": "± 4345",
             "unit": "ns/iter"
           }
         ]
