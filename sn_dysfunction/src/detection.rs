@@ -238,6 +238,7 @@ impl DysfunctionDetection {
 mod tests {
     use crate::{detection::IssueType, DysfunctionDetection};
     use proptest::prelude::*;
+    use sn_interface::messaging::data::OperationId;
     use tokio::runtime::Runtime;
     use xor_name::{rand::random as random_xorname, XorName};
 
@@ -245,7 +246,8 @@ mod tests {
         prop_oneof![
             Just(IssueType::Communication),
             Just(IssueType::Knowledge),
-            (any::<[u8; 32]>()).prop_map(|x| IssueType::PendingRequestOperation(Some(x)))
+            (any::<[u8; 32]>())
+                .prop_map(|x| IssueType::PendingRequestOperation(Some(OperationId(x))))
         ]
     }
 
@@ -368,7 +370,7 @@ mod ops_tests {
 
     fn get_random_operation_id() -> Option<OperationId> {
         let mut rng = rand::thread_rng();
-        Some(rng.gen())
+        Some(OperationId(rng.gen()))
     }
 
     #[tokio::test]

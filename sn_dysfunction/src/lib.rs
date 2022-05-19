@@ -50,6 +50,7 @@ use xor_name::XorName;
 
 use crate::error::Result;
 use dashmap::DashMap;
+use sn_interface::messaging::data::OperationId;
 use std::collections::{BTreeSet, VecDeque};
 use std::sync::Arc;
 use std::time::Instant;
@@ -60,10 +61,6 @@ pub use detection::{DysfunctionSeverity, IssueType};
 
 /// Some reproducible xorname derived from the operation. This is a permanent reference needed for logging all dysfunction.
 type NodeIdentifier = XorName;
-
-// re declaration here to not create circular dep w/ sn atm.
-// TODO: depend on types once that's extracted
-type OperationId = [u8; 32];
 
 pub(crate) type TimedTracker = Arc<DashMap<NodeIdentifier, Arc<RwLock<VecDeque<Instant>>>>>;
 
@@ -230,8 +227,8 @@ pub(crate) fn get_mean_of(data: &[f32]) -> Option<f32> {
 #[cfg(test)]
 mod tests {
     use super::{DysfunctionDetection, IssueType};
-
     use eyre::Error;
+    use sn_interface::messaging::data::OperationId;
     use std::collections::BTreeSet;
     use std::sync::Once;
     use xor_name::{rand::random as random_xorname, XorName};
@@ -287,7 +284,10 @@ mod tests {
                 .track_issue(*adult, IssueType::Knowledge)
                 .await;
             let _ = dysfunctional_detection
-                .track_issue(*adult, IssueType::PendingRequestOperation(Some([1; 32])))
+                .track_issue(
+                    *adult,
+                    IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
+                )
                 .await;
         }
 
@@ -299,7 +299,10 @@ mod tests {
             .track_issue(adults[6], IssueType::Knowledge)
             .await;
         let _ = dysfunctional_detection
-            .track_issue(adults[7], IssueType::PendingRequestOperation(Some([1; 32])))
+            .track_issue(
+                adults[7],
+                IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
+            )
             .await;
 
         let nodes_to_retain = adults[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
@@ -351,7 +354,10 @@ mod tests {
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
 
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([1; 32])))
+            .track_issue(
+                adults[0],
+                IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
+            )
             .await?;
 
         assert_eq!(dysfunctional_detection.unfulfilled_ops.len(), 1);
@@ -398,13 +404,22 @@ mod tests {
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
 
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([1; 32])))
+            .track_issue(
+                adults[0],
+                IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
+            )
             .await?;
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([2; 32])))
+            .track_issue(
+                adults[0],
+                IssueType::PendingRequestOperation(Some(OperationId([2; 32]))),
+            )
             .await?;
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([3; 32])))
+            .track_issue(
+                adults[0],
+                IssueType::PendingRequestOperation(Some(OperationId([3; 32]))),
+            )
             .await?;
 
         let op_ids = dysfunctional_detection.get_unfulfilled_ops(adults[0]).await;
@@ -419,13 +434,22 @@ mod tests {
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
 
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([1; 32])))
+            .track_issue(
+                adults[0],
+                IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
+            )
             .await?;
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([2; 32])))
+            .track_issue(
+                adults[0],
+                IssueType::PendingRequestOperation(Some(OperationId([2; 32]))),
+            )
             .await?;
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([3; 32])))
+            .track_issue(
+                adults[0],
+                IssueType::PendingRequestOperation(Some(OperationId([3; 32]))),
+            )
             .await?;
 
         let op_ids = dysfunctional_detection.get_unfulfilled_ops(adults[1]).await;
@@ -438,16 +462,25 @@ mod tests {
     async fn request_operation_fulfilled_should_remove_pending_op() -> Result<()> {
         let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
-        let op_id = [2; 32];
+        let op_id = OperationId([2; 32]);
 
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([1; 32])))
+            .track_issue(
+                adults[0],
+                IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
+            )
             .await?;
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([2; 32])))
+            .track_issue(
+                adults[0],
+                IssueType::PendingRequestOperation(Some(OperationId([2; 32]))),
+            )
             .await?;
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([3; 32])))
+            .track_issue(
+                adults[0],
+                IssueType::PendingRequestOperation(Some(OperationId([3; 32]))),
+            )
             .await?;
 
         let has_removed = dysfunctional_detection
@@ -457,8 +490,8 @@ mod tests {
         assert!(has_removed);
         let op_ids = dysfunctional_detection.get_unfulfilled_ops(adults[0]).await;
         assert_eq!(2, op_ids.len());
-        assert_eq!([1; 32], op_ids[0]);
-        assert_eq!([3; 32], op_ids[1]);
+        assert_eq!(OperationId([1; 32]), op_ids[0]);
+        assert_eq!(OperationId([3; 32]), op_ids[1]);
         Ok(())
     }
 
@@ -466,16 +499,25 @@ mod tests {
     async fn request_operation_fulfilled_should_return_false_for_node_with_no_ops() -> Result<()> {
         let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
-        let op_id = [2; 32];
+        let op_id = OperationId([2; 32]);
 
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([1; 32])))
+            .track_issue(
+                adults[0],
+                IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
+            )
             .await?;
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([2; 32])))
+            .track_issue(
+                adults[0],
+                IssueType::PendingRequestOperation(Some(OperationId([2; 32]))),
+            )
             .await?;
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([3; 32])))
+            .track_issue(
+                adults[0],
+                IssueType::PendingRequestOperation(Some(OperationId([3; 32]))),
+            )
             .await?;
 
         let has_removed = dysfunctional_detection
@@ -491,16 +533,25 @@ mod tests {
     {
         let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
-        let op_id = [4; 32];
+        let op_id = OperationId([4; 32]);
 
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([1; 32])))
+            .track_issue(
+                adults[0],
+                IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
+            )
             .await?;
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([2; 32])))
+            .track_issue(
+                adults[0],
+                IssueType::PendingRequestOperation(Some(OperationId([2; 32]))),
+            )
             .await?;
         dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation(Some([3; 32])))
+            .track_issue(
+                adults[0],
+                IssueType::PendingRequestOperation(Some(OperationId([3; 32]))),
+            )
             .await?;
 
         let has_removed = dysfunctional_detection
