@@ -3557,6 +3557,7 @@ dependencies = [
  "serde_yaml",
  "sn_api",
  "sn_cmd_test_utilities",
+ "sn_dbc",
  "sn_launch_tool",
  "structopt",
  "tokio",

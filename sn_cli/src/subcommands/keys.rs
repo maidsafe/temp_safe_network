@@ -8,41 +8,48 @@
 
 use super::{helpers::serialise_output, OutputFmt};
 use crate::operations::auth_and_connect::{create_credentials_file, read_credentials};
+use crate::operations::config::Config;
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
 use hex::encode;
 use sn_api::{
     resolver::{SafeData, SafeUrl},
     sk_to_hex, Keypair, PublicKey, Safe, XorName,
 };
+use sn_dbc::{rng, Owner};
+use std::fs::File;
 use std::io::Write;
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 pub enum KeysSubCommands {
-    /// Show information about a SafeKey, by default it will show info about the one owned by CLI (if found)
+    /// Show information about a SafeKey. By default it will show the one owned by CLI (if found).
     Show {
-        /// Show Secret Key as well
+        /// Set this flag to show the secret key
         #[structopt(long = "show-sk")]
         show_sk: bool,
         /// The SafeKey's URL to decode and show its Public Key. If this is not provided, the SafeKey owned by CLI (if found) will be shown
         keyurl: Option<String>,
     },
     #[structopt(name = "create")]
-    /// Create a new SafeKey
+    /// Create a new SafeKey. Currently generates an Ed25519 keypair.
     Create {
-        // /// The secret key of a SafeKey for paying the operation costs. If not provided, the application's default wallet will be used, unless '--test-coins' was set
-        // #[structopt(short = "w", long = "pay-with")]
-        // pay_with: Option<String>,
-        // /// Create a SafeKey and allocate test-coins onto it
-        // #[structopt(long = "test-coins")]
-        // test_coins: bool,
-        /// Set the newly created keys to be used by CLI
+        /// Set this flag to output the generated keypair to file at ~/.safe/cli/credentials. The
+        /// CLI will then sign all commands using this keypair.
         #[structopt(long = "for-cli")]
         for_cli: bool,
     },
+    /// Generate a secret key for use with DBC reissues.
+    #[structopt(name = "create-dbc-owner")]
+    CreateDbcOwner {},
 }
 
-pub async fn key_commander(cmd: KeysSubCommands, output_fmt: OutputFmt, safe: &Safe) -> Result<()> {
+pub async fn key_commander(
+    cmd: KeysSubCommands,
+    output_fmt: OutputFmt,
+    safe: &Safe,
+    config: &Config,
+) -> Result<()> {
     match cmd {
         KeysSubCommands::Show { show_sk, keyurl } => {
             if let Some(url) = keyurl {
@@ -76,7 +83,7 @@ pub async fn key_commander(cmd: KeysSubCommands, output_fmt: OutputFmt, safe: &S
                     Err(err) => bail!(err),
                 }
             } else {
-                match read_credentials()? {
+                match read_credentials(config)? {
                     (file_path, Some(keypair)) => {
                         let xorname = XorName::from(keypair.public_key());
                         let xorurl = SafeUrl::encode_safekey(xorname, safe.xorurl_base)?;
@@ -95,13 +102,13 @@ pub async fn key_commander(cmd: KeysSubCommands, output_fmt: OutputFmt, safe: &S
 
             Ok(())
         }
-        KeysSubCommands::Create { for_cli, .. } => {
+        KeysSubCommands::Create { for_cli } => {
             let (xorurl, key_pair) = create_new_key(safe).await?;
             print_new_key_output(output_fmt, xorurl, Some(&key_pair));
 
             if for_cli {
                 println!("Setting new SafeKey to be used by CLI...");
-                let (mut file, file_path) = create_credentials_file()?;
+                let (mut file, file_path) = create_credentials_file(config)?;
                 let serialised_keypair = serde_json::to_string(&key_pair)
                     .wrap_err("Unable to serialise the credentials created")?;
 
@@ -116,7 +123,13 @@ pub async fn key_commander(cmd: KeysSubCommands, output_fmt: OutputFmt, safe: &S
                 );
                 println!("Safe CLI now has write access to the network");
             }
-
+            Ok(())
+        }
+        KeysSubCommands::CreateDbcOwner { .. } => {
+            println!("Generating secret key for DBC reissues...");
+            let sk = Owner::from_random_secret_key(&mut rng::thread_rng());
+            let path = dbc_owner_to_file(&sk, config)?;
+            println!("Saved key at {}", path.display());
             Ok(())
         }
     }
@@ -165,22 +178,144 @@ pub fn keypair_to_hex_strings(keypair: &Keypair) -> Result<(String, String)> {
 
 #[cfg(feature = "testing")]
 pub async fn create_new_key(safe: &Safe) -> Result<(String, Keypair)> {
-    // '--pay-with' is either a Wallet XOR-URL, or a secret key
     let key_pair = safe.new_keypair();
-
     let xorname = XorName::from(key_pair.public_key());
     let xorurl = SafeUrl::encode_safekey(xorname, safe.xorurl_base)?;
-    // // TODO: support Wallet XOR-URL, we now support only secret key
-    // // If the --pay-with is not provided the API will use the application's default wallet/sk
-    // let (xorurl, key_pair) = match pay_with {
-    //     Some(payee) => {
-    //         safe.keys_create_and_preload_from_sk_string(&payee, &amount)
-    //             .await?
-    //     }
-    //     None => {
-    //         debug!("Missing the '--pay-with' argument, using app's wallet for funds");
-    //     }
-    // };
-
     Ok((xorurl, key_pair))
+}
+
+fn dbc_owner_to_file(owner: &Owner, config: &Config) -> Result<PathBuf> {
+    let hex = hex::encode(owner.to_bytes());
+    let mut file_path = config.cli_config_path.clone();
+    file_path.pop();
+    file_path.push("dbc_sk");
+    let mut file = File::create(&file_path).with_context(|| {
+        format!(
+            "Unable to open dbc secret key file at {}",
+            file_path.display()
+        )
+    })?;
+    file.write_all(hex.as_bytes())?;
+    Ok(file_path)
+}
+
+#[cfg(test)]
+mod create_command {
+    use super::{key_commander, KeysSubCommands};
+    use crate::operations::auth_and_connect::read_credentials;
+    use crate::operations::config::Config;
+    use crate::subcommands::OutputFmt;
+    use assert_fs::prelude::*;
+    use color_eyre::{eyre::eyre, Result};
+    use predicates::prelude::*;
+    use sn_api::{Keypair, Safe};
+
+    #[tokio::test]
+    async fn should_create_ed25519_keypair() -> Result<()> {
+        let config_dir = assert_fs::TempDir::new()?;
+        let credentials_file = config_dir.child(".safe/cli/credentials");
+        let cli_config_file = config_dir.child(".safe/cli/config.json");
+        let node_config_file = config_dir.child(".safe/node/node_connection_info.config");
+        let config = Config::new(
+            cli_config_file.path().to_path_buf(),
+            node_config_file.path().to_path_buf(),
+        )
+        .await?;
+        let safe = Safe::dry_runner(None);
+
+        let result = key_commander(
+            KeysSubCommands::Create { for_cli: false },
+            OutputFmt::Pretty,
+            &safe,
+            &config,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        credentials_file.assert(predicate::path::missing());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn should_create_ed25519_keypair_saved_to_credentials_file() -> Result<()> {
+        let config_dir = assert_fs::TempDir::new()?;
+        let credentials_file = config_dir.child(".safe/cli/credentials");
+        let cli_config_file = config_dir.child(".safe/cli/config.json");
+        let node_config_file = config_dir.child(".safe/node/node_connection_info.config");
+        let config = Config::new(
+            cli_config_file.path().to_path_buf(),
+            node_config_file.path().to_path_buf(),
+        )
+        .await?;
+        let safe = Safe::dry_runner(None);
+
+        let result = key_commander(
+            KeysSubCommands::Create { for_cli: true },
+            OutputFmt::Pretty,
+            &safe,
+            &config,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        credentials_file.assert(predicate::path::is_file());
+
+        let (_, keypair) = read_credentials(&config)?;
+        let keypair =
+            keypair.ok_or_else(|| eyre!("The command should have generated a keypair"))?;
+        match keypair {
+            Keypair::Ed25519(_) => {
+                return Ok(());
+            }
+            _ => {
+                return Err(eyre!("The command should generate a Ed25519 keypair"));
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod create_dbc_owner_command {
+    use super::{key_commander, KeysSubCommands};
+    use crate::operations::config::Config;
+    use crate::subcommands::OutputFmt;
+    use assert_fs::prelude::*;
+    use bls::SecretKey;
+    use color_eyre::{eyre::eyre, Result};
+    use predicates::prelude::*;
+    use sn_api::Safe;
+    use sn_dbc::Owner;
+
+    #[tokio::test]
+    async fn should_create_a_dbc_owner_secret_key() -> Result<()> {
+        let config_dir = assert_fs::TempDir::new()?;
+        let db_sk_file = config_dir.child(".safe/cli/dbc_sk");
+        let cli_config_file = config_dir.child(".safe/cli/config.json");
+        let node_config_file = config_dir.child(".safe/node/node_connection_info.config");
+        let config = Config::new(
+            cli_config_file.path().to_path_buf(),
+            node_config_file.path().to_path_buf(),
+        )
+        .await?;
+        let safe = Safe::dry_runner(None);
+
+        let result = key_commander(
+            KeysSubCommands::CreateDbcOwner {},
+            OutputFmt::Pretty,
+            &safe,
+            &config,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        db_sk_file.assert(predicate::path::is_file());
+
+        // There's no real properties we can check on the key/owner, so just make sure it
+        // deserializes without error. That at least verifies that the file is a valid SecretKey.
+        let hex = std::fs::read_to_string(db_sk_file.path())?;
+        let sk: SecretKey = bincode::deserialize(hex.as_bytes()).map_err(|e| eyre!(e))?;
+        let _owner = Owner::from(sk);
+
+        Ok(())
+    }
 }

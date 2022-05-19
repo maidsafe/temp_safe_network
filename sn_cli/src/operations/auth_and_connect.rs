@@ -25,8 +25,9 @@ pub async fn authorise_cli(
     endpoint: Option<String>,
     is_self_authing: bool,
     authd_cert_path: &Path,
+    config: &Config,
 ) -> Result<()> {
-    let (mut file, file_path) = create_credentials_file()?;
+    let (mut file, file_path) = create_credentials_file(config)?;
     println!("Authorising CLI application...");
     if !is_self_authing {
         println!("Note you can use this CLI from another console to authorise it with 'auth allow' command. Alternativelly, you can also use '--self-auth' flag with 'auth unlock' command to automatically self authorise the CLI app.");
@@ -55,10 +56,10 @@ pub async fn authorise_cli(
 
 // Attempt to connect with credentials if found and valid,
 // otherwise it creates a read only connection.
-pub async fn connect(safe: &mut Safe, config: Config, timeout: Duration) -> Result<()> {
+pub async fn connect(safe: &mut Safe, config: &Config, timeout: Duration) -> Result<()> {
     debug!("Connecting...");
 
-    let app_keypair = if let Ok((_, keypair)) = read_credentials() {
+    let app_keypair = if let Ok((_, keypair)) = read_credentials(config) {
         keypair
     } else {
         None
@@ -92,8 +93,8 @@ pub async fn connect(safe: &mut Safe, config: Config, timeout: Duration) -> Resu
     }
 }
 
-pub fn create_credentials_file() -> Result<(File, PathBuf)> {
-    let (credentials_folder, file_path) = get_credentials_file_path()?;
+pub fn create_credentials_file(config: &Config) -> Result<(File, PathBuf)> {
+    let (credentials_folder, file_path) = get_credentials_file_path(config)?;
     if !credentials_folder.exists() {
         println!("Creating '{}' folder", credentials_folder.display());
         create_dir_all(credentials_folder)
@@ -105,8 +106,8 @@ pub fn create_credentials_file() -> Result<(File, PathBuf)> {
     Ok((file, file_path))
 }
 
-pub fn read_credentials() -> Result<(PathBuf, Option<Keypair>)> {
-    let (_, file_path) = get_credentials_file_path()?;
+pub fn read_credentials(config: &Config) -> Result<(PathBuf, Option<Keypair>)> {
+    let (_, file_path) = get_credentials_file_path(config)?;
 
     let keypair = if let Ok(mut file) = File::open(&file_path) {
         let mut credentials = String::new();
@@ -138,8 +139,8 @@ pub fn read_credentials() -> Result<(PathBuf, Option<Keypair>)> {
 }
 
 #[allow(dead_code)]
-pub fn clear_credentials() -> Result<()> {
-    let (_, file_path) = create_credentials_file().context("Failed to clear credentials")?;
+pub fn clear_credentials(config: &Config) -> Result<()> {
+    let (_, file_path) = create_credentials_file(config).context("Failed to clear credentials")?;
 
     println!(
         "Credentials were succesfully cleared from {}",
@@ -148,17 +149,14 @@ pub fn clear_credentials() -> Result<()> {
     Ok(())
 }
 
-// Private helpers
+///
+/// Private helpers
+///
 
-fn get_credentials_file_path() -> Result<(PathBuf, PathBuf)> {
-    let mut project_data_path =
-        dirs_next::home_dir().ok_or_else(|| eyre!("Failed to obtain user's home path"))?;
-
-    project_data_path.push(".safe");
-    project_data_path.push("cli");
-
-    let credentials_folder = project_data_path;
-
+fn get_credentials_file_path(config: &Config) -> Result<(PathBuf, PathBuf)> {
+    let mut pb = config.cli_config_path.clone();
+    pb.pop();
+    let credentials_folder = pb;
     let file_path = credentials_folder.join(AUTH_CREDENTIALS_FILENAME);
     Ok((credentials_folder, file_path))
 }
