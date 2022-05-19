@@ -269,6 +269,7 @@ impl NodeApi {
             .clone()
             .check_for_dysfunction_periodically()
             .await;
+        dispatcher.clone().start_sending_any_data_batches().await;
 
         #[cfg(feature = "back-pressure")]
         dispatcher

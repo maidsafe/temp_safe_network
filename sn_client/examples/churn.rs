@@ -36,12 +36,12 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 const NODES_DIR: &str = "local-test-network";
 const INTERVAL: &str = "10000";
 const RUST_LOG: &str = "RUST_LOG";
-const ADDITIONAL_NODES_TO_SPLIT: u64 = 15;
+const ADDITIONAL_NODES_TO_SPLIT: u64 = 12;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // First lets build the network and testnet launcher, to ensure we're on the latest version
-    let args: Vec<&str> = vec!["build", "--release", "--features=test-utils"];
+    let args: Vec<&str> = vec!["build", "--release"];
 
     println!("Building current sn_node");
     let _child = Command::new("cargo")
@@ -105,6 +105,7 @@ pub async fn run_split() -> Result<()> {
     // Let's create an args array to pass to the network launcher tool
     let mut sn_launch_tool_args = vec![
         "sn_launch_tool",
+        "-yyyy", // RUST_LOG
         "--node-path",
         &arg_node_path,
         "--nodes-dir",
@@ -136,13 +137,13 @@ pub async fn run_split() -> Result<()> {
         .wrap_err("Error starting the testnet")?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
-    let interval_duration = Duration::from_millis(*interval_as_int);
-    sleep(interval_duration).await;
-    println!("Done sleeping....");
+    let _interval_duration = Duration::from_millis(*interval_as_int);
+    // sleep(interval_duration).await;
+    // println!("Done sleeping....");
 
     let mut all_data_put = vec![];
 
-    let files_to_put: i32 = 12;
+    let files_to_put: i32 = 40;
     for _i in 0..files_to_put {
         let (address, hash) = upload_data().await?;
         all_data_put.push((address, hash));
@@ -166,7 +167,6 @@ pub async fn run_split() -> Result<()> {
         .and_then(|launch| launch.run())
         .wrap_err("Error adding nodes to the testnet")?;
 
-    // leave a longer interval with more nodes to allow for splits if using split amounts
     let interval_duration = Duration::from_millis(*interval_as_int);
 
     sleep(interval_duration).await;
@@ -216,7 +216,7 @@ async fn upload_data() -> Result<(BytesAddress, [u8; 32])> {
     let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
-    let bytes = random_bytes(1024 * 1024 * 3);
+    let bytes = random_bytes(1024 * 1024 * 10);
 
     let mut hasher = Sha3::v256();
     let mut output = [0; 32];

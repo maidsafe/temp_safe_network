@@ -20,6 +20,10 @@ name = "client_files"
 [[example]]
 name = "network_split"
 
+[[example]]
+# is data retained over churn
+name = "churn"
+
 [features]
 default = []
 chaos = []
