@@ -54,6 +54,9 @@ pub struct Elders {
 #[allow(clippy::large_enum_variant)]
 #[derive(custom_debug::Debug)]
 pub enum Event {
+    /// Join occured during section churn and new elders missed it,
+    /// therefore the node is not a section member anymore, it needs to rejoin the network.
+    ChurnJoinMissError,
     /// Received a message from another Node.
     MessageReceived {
         /// The message ID

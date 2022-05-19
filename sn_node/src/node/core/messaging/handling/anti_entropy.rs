@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{api::cmds::Cmd, core::Node, messages::WireMsgUtils, Error, Result};
+use crate::node::{api::cmds::Cmd, core::Node, messages::WireMsgUtils, Error, Event, Result};
 use sn_interface::messaging::{
     system::{KeyedSig, SectionAuth, SectionPeers, SystemMsg},
     MsgId, MsgType, SrcLocation, WireMsg,
@@ -246,6 +246,7 @@ impl Node {
 
             if was_in_ancestor_section && prefix_matches_our_name && !is_in_current_section {
                 error!("Detected churn join miss while processing msg ({:?}), was in section {:?}, updated to {:?}, wasn't in members anymore even if name matches: {:?}", msg_id, our_section_prefix, prefix, our_name);
+                self.send_event(Event::ChurnJoinMissError).await;
                 return Err(Error::ChurnJoinMiss);
             }
         }
