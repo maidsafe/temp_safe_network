@@ -28,18 +28,15 @@ pub(crate) use proposal::Proposal;
 pub(crate) use relocation::{check as relocation_check, ChurnId};
 use sn_interface::{
     network_knowledge::{
-        recommended_section_size, supermajority, NetworkKnowledge, NodeInfo, SectionKeyShare,
-        SectionKeysProvider,
+        recommended_section_size, split, supermajority, NetworkKnowledge, NodeInfo,
+        SectionKeyShare, SectionKeysProvider,
     },
     types::keys::ed25519::Digest256,
 };
 
 use super::{
-    api::cmds::Cmd,
-    dkg::DkgVoter,
-    handover::Handover,
-    membership::{split, Membership},
-    Elders, Event, NodeElderChange,
+    api::cmds::Cmd, dkg::DkgVoter, handover::Handover, membership::Membership, Elders, Event,
+    NodeElderChange,
 };
 
 use crate::node::{

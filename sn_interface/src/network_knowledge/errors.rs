@@ -57,6 +57,8 @@ pub enum Error {
     InvalidMessage,
     #[error("A signature share is invalid.")]
     InvalidSignatureShare,
+    #[error("A node has invalid relocation details")]
+    InvalidRelocationDetails,
     #[error("The secret key share is missing for public key {0:?}")]
     MissingSecretKeyShare(bls::PublicKey),
     #[error("Failed to send a message to {0}, {1}")]
@@ -84,7 +86,10 @@ pub enum Error {
     /// Timeout when trying to join the network
     #[error("Timeout when trying to join the network")]
     JoinTimeout,
-    /// Not enough in the section to perform Chunk operation
+    #[error("The node in question is not a member of the section")]
+    NotAMember,
+    #[error("Request does not match the section prefix")]
+    WrongSection,
     #[error("Not enough Adults available in Section({0:?}) to perform operation")]
     NoAdults(Prefix),
     /// Not Section PublicKey.

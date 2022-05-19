@@ -9,11 +9,12 @@
 use crate::messaging::system::{
     MembershipState, NodeState as NodeStateMsg, RelocateDetails, SectionAuth,
 };
-use crate::network_knowledge::errors::Error;
+use crate::network_knowledge::{section_has_room_for_node, Error, Result};
 use crate::types::Peer;
 
+use std::collections::BTreeSet;
 use std::net::SocketAddr;
-use xor_name::XorName;
+use xor_name::{Prefix, XorName};
 
 /// Information about a member of our section.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -65,6 +66,64 @@ impl NodeState {
             state: MembershipState::Relocated(Box::new(relocate_details)),
             previous_name,
         }
+    }
+
+    pub fn validate(&self, prefix: &Prefix, members: &BTreeSet<XorName>) -> Result<()> {
+        let name = self.name();
+        info!("Validating node state for {name}");
+
+        if !prefix.matches(&name) {
+            info!("Membership - rejecting node {name}, name doesn't match our prefix {prefix:?}");
+            return Err(Error::WrongSection);
+        }
+
+        self.validate_relocation_details(prefix)?;
+
+        match self.state {
+            MembershipState::Joined | MembershipState::Relocated(_) => {
+                if members.contains(&name) {
+                    info!("Rejecting join from existing member {name}");
+                    Err(Error::AlreadyJoinedTheNetwork)
+                } else if !section_has_room_for_node(name, prefix, members.iter().copied()) {
+                    info!("Rejecting join since we are at capacity");
+                    Err(Error::TryJoinLater)
+                } else {
+                    Ok(())
+                }
+            }
+            MembershipState::Left => {
+                if !members.contains(&name) {
+                    info!("Rejecting leave from non-existing member");
+                    Err(Error::NotAMember)
+                } else {
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    fn validate_relocation_details(&self, prefix: &Prefix) -> Result<()> {
+        if let MembershipState::Relocated(details) = &self.state {
+            let name = self.name();
+            let dest = details.dst;
+
+            if !prefix.matches(&dest) {
+                info!("Invalid relocation request from {name} - {dest} doesn't match our prefix {prefix:?}.");
+                return Err(Error::WrongSection);
+            }
+
+            // We requires the node name matches the relocation details age.
+            let age = details.age;
+            let state_age = self.age();
+            if age != state_age {
+                info!(
+		    "Invalid relocation request from {name} - relocation age ({age}) doesn't match peer's age ({state_age})."
+		);
+                return Err(Error::InvalidRelocationDetails);
+            }
+        }
+
+        Ok(())
     }
 
     pub fn peer(&self) -> &Peer {
