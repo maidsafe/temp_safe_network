@@ -36,6 +36,7 @@ impl Node {
         // Collection of data addresses that we do not have
         let mut data_for_sender = vec![];
         let data_i_have = self.data_storage.keys().await?;
+        trace!("Our data got");
 
         if data_i_have.is_empty() {
             trace!("We have no data");
