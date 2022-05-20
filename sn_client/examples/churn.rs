@@ -143,7 +143,7 @@ pub async fn run_split() -> Result<()> {
 
     let mut all_data_put = vec![];
 
-    let files_to_put: i32 = 12;
+    let files_to_put: i32 = 10;
     for _i in 0..files_to_put {
         let (address, hash) = upload_data().await?;
         all_data_put.push((address, hash));
@@ -216,7 +216,7 @@ async fn upload_data() -> Result<(BytesAddress, [u8; 32])> {
     let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
     let client = Client::new(config, bootstrap_nodes, None).await?;
 
-    let bytes = random_bytes(1024 * 1024 * 3);
+    let bytes = random_bytes(1024 * 1024 * 10);
 
     let mut hasher = Sha3::v256();
     let mut output = [0; 32];

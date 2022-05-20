@@ -37,6 +37,11 @@ impl Node {
         let mut data_for_sender = vec![];
         let data_i_have = self.data_storage.keys().await?;
 
+        if data_i_have.is_empty() {
+            trace!("We have no data");
+            return Ok(vec![]);
+        }
+
         let adults = self.network_knowledge.adults().await;
         let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
 
@@ -55,6 +60,11 @@ impl Node {
                 debug!("Our requester should hold: {:?}", data);
                 data_for_sender.push(data);
             }
+        }
+
+        if data_for_sender.is_empty() {
+            trace!("We have no data worth sending");
+            return Ok(vec![]);
         }
 
         let mut data_batches = vec![];
