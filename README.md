@@ -27,11 +27,11 @@ You can then run a local testnet using the `testnet` bin:
 
 ### Running tests
 
-Once you have your network running you can simply run `cargo test --release --features=test-utils`. `test-utils` is needed to enable some of the test setup for the clients. This will run _all_ tests in `sn`. 
+Once you have your network running you can simply run `cargo test --release`. This will run _all_ tests in `sn`. 
 
-> Note: if you're running in the root directory, either `cd sn` before running tests or inclide `-p safe_network` in the cargo command to target _only_ that package. Otherwise you'll be running tests from _all_ crates, including sn_api and sn_cli. Eg: `cargo test --release -p safe_network --features=test-utils`
+> Note: if you're running in the root directory, either `cd sn` before running tests or inclide `-p safe_network` in the cargo command to target _only_ that package. Otherwise you'll be running tests from _all_ crates, including sn_api and sn_cli. Eg: `cargo test --release -p safe_network`
 
-In general it can be useful to scope your test running, eg `cargo test --release --features=test-utils client_api` will run _only_ the client tests. Or perhaps you want to ignore `proptests` as they can be quite long: `cargo test --release --features=test-utils client_api --skip proptest`
+In general it can be useful to scope your test running, eg `cargo test --release client_api` will run _only_ the client tests. Or perhaps you want to ignore `proptests` as they can be quite long: `cargo test --release client_api --skip proptest`
 
 
 
