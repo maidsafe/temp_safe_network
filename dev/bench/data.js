@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1653002870083,
+  "lastUpdate": 1653047490683,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -3575,6 +3575,78 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/single chunks",
             "value": 197771,
             "range": "± 4345",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "1d1689f91d0bc450257d1a279561ea7b0c1b71a7",
+          "message": "Merge #1196\n\n1196: chore(messaging): add Display for OperationId r=joshuef a=joshuef\n\nBREAKING CHANGE: changes messsaging and OperationId types to get nicer\r\nOpId logging\r\n\r\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\n\nCo-authored-by: Josh Wilson <joshuef@gmail.com>",
+          "timestamp": "2022-05-20T10:23:20Z",
+          "tree_id": "b0eb95d481e3f8d05f6f1ac64b64592712f35980",
+          "url": "https://github.com/maidsafe/safe_network/commit/1d1689f91d0bc450257d1a279561ea7b0c1b71a7"
+        },
+        "date": 1653047489479,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10493873529,
+            "range": "± 6868597216",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3759876511,
+            "range": "± 1021707101",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 9625789987,
+            "range": "± 1063576212",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10027740842,
+            "range": "± 1633421037",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3193285995,
+            "range": "± 1120211410",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4522983135,
+            "range": "± 300357690",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single registers",
+            "value": 13451,
+            "range": "± 586",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single chunks",
+            "value": 197984,
+            "range": "± 2452",
             "unit": "ns/iter"
           }
         ]
