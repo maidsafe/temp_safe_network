@@ -678,27 +678,23 @@ impl Node {
                                 info!("Storage level report: {:?}", level_report);
                                 cmds.extend(self.record_storage_level_if_any(level_report).await);
                             }
+                            Err(DbError::NotEnoughSpace) => {
+                                // db full
+                                error!("Not enough space to store more data");
+
+                                let node_id =
+                                    PublicKey::from(self.info.read().await.keypair.public);
+                                let msg = SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
+                                    node_id,
+                                    data,
+                                    full: true,
+                                });
+
+                                cmds.push(self.send_msg_to_our_elders(msg).await?)
+                            }
                             Err(error) => {
-                                match error {
-                                    DbError::NotEnoughSpace => {
-                                        // db full
-                                        error!("Not enough space to store more data");
-
-                                        let node_id =
-                                            PublicKey::from(self.info.read().await.keypair.public);
-                                        let msg =
-                                            SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
-                                                node_id,
-                                                data,
-                                                full: true,
-                                            });
-
-                                        cmds.push(self.send_msg_to_our_elders(msg).await?)
-                                    }
-                                    _ => {
-                                        error!("Problem storing data, but it was ignored: {error}");
-                                    } // the rest seem to be non-problematic errors.. (?)
-                                }
+                                // the rest seem to be non-problematic errors.. (?)
+                                error!("Problem storing data, but it was ignored: {error}");
                             }
                         }
                     }
@@ -775,7 +771,8 @@ impl Node {
             SystemMsg::NodeCmd(NodeCmd::FetchReplicateData(data_addresses)) => {
                 let mut cmds = vec![];
                 info!("FetchReplicateData MsgId: {:?}", msg_id);
-                return if self.is_elder().await {
+
+                if self.is_elder().await {
                     error!("Received unexpected message while Elder");
                     Ok(vec![])
                 } else {
@@ -816,7 +813,7 @@ impl Node {
 
                     // Provide the requested data
                     Ok(cmds)
-                };
+                }
             }
             SystemMsg::NodeCmd(node_cmd) => {
                 self.send_event(Event::MessageReceived {

@@ -159,6 +159,8 @@ pub enum DataType {
     File = 0x01,
     #[allow(missing_docs)]
     Register = 0x02,
+    #[allow(missing_docs)]
+    Spentbook = 0x03,
 }
 
 impl std::fmt::Display for DataType {
@@ -546,6 +548,7 @@ impl SafeUrl {
             DataAddress::Bytes(_) => DataType::File,
             DataAddress::Register(_) => DataType::Register,
             DataAddress::SafeKey(_) => DataType::SafeKey,
+            DataAddress::Spentbook(_) => DataType::Spentbook,
         }
     }
 

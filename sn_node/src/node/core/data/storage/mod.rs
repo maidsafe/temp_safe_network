@@ -16,19 +16,22 @@ use crate::{
 };
 
 use sn_interface::messaging::{
-    data::{DataQuery, RegisterStoreExport, StorageLevel},
+    data::{DataQuery, Error, RegisterQuery, RegisterStoreExport, StorageLevel},
     system::{NodeCmd, NodeQueryResponse, SystemMsg},
     DstLocation,
 };
-use sn_interface::types::{register::User, ReplicatedData, ReplicatedDataAddress as DataAddress};
+
+use sn_interface::types::{
+    register::User, RegisterAddress, ReplicatedData, ReplicatedDataAddress, SPENTBOOK_TYPE_SCOPE,
+    SPENTBOOK_TYPE_TAG,
+};
 
 pub(crate) use chunks::ChunkStorage;
 pub(crate) use registers::RegisterStorage;
 
-use sn_interface::types::ReplicatedDataAddress;
-use std::collections::btree_map::Entry;
+use sn_dbc::SpentProofShare;
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{btree_map::Entry, BTreeMap, BTreeSet},
     path::Path,
     sync::Arc,
 };
@@ -69,6 +72,21 @@ impl DataStorage {
                     .await?
             }
             ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd).await?,
+            ReplicatedData::SpentbookWrite(cmd) => {
+                // FIMXE: this is temporay logic to create a spentbook to make sure it exists.
+                // Spentbooks shall always exist, and the section nodes shall create them by default.
+                self.registers
+                    .create_spentbook_register(&cmd.dst_address())
+                    .await?;
+
+                // We now write the cmd received
+                self.registers.write(cmd).await?
+            }
+            ReplicatedData::SpentbookLog(data) => {
+                self.registers
+                    .update(RegisterStoreExport(vec![data]))
+                    .await?
+            }
         };
 
         // check if we've filled another approx. 10%-points of our storage
@@ -94,6 +112,55 @@ impl DataStorage {
         match query {
             DataQuery::GetChunk(addr) => self.chunks.get(addr).await,
             DataQuery::Register(read) => self.registers.read(read, requester).await,
+            DataQuery::Spentbook(read) => {
+                // TODO: this is temporary till spentbook native data type is implemented,
+                // we read from the Register where we store the spentbook data
+                let spentbook_op_id = match read.operation_id() {
+                    Ok(id) => id,
+                    Err(_e) => {
+                        return NodeQueryResponse::FailedToCreateOperationId;
+                    }
+                };
+
+                let reg_addr =
+                    RegisterAddress::new(read.dst_name(), SPENTBOOK_TYPE_SCOPE, SPENTBOOK_TYPE_TAG);
+
+                match self
+                    .registers
+                    .read(&RegisterQuery::Get(reg_addr), requester)
+                    .await
+                {
+                    NodeQueryResponse::GetRegister((Err(Error::DataNotFound(_)), _)) => {
+                        NodeQueryResponse::SpentProofShares((Ok(Vec::new()), spentbook_op_id))
+                    }
+                    NodeQueryResponse::GetRegister((result, _)) => {
+                        let proof_shares_result = result.map(|reg| {
+                            let mut proof_shares = Vec::new();
+                            let entries = reg.read();
+                            for (_, entry) in entries {
+                                // Deserialise spent proof share from the entry
+                                let spent_proof_share: SpentProofShare = match rmp_serde::from_slice(&entry) {
+                                    Ok(proof) => proof,
+                                    Err(err) => {
+                                        warn!("Ignoring entry found in Spentbook since it cannot be deserialised as a valid SpentProofShare: {:?}", err);
+                                        continue;
+                                    }
+                                };
+
+                                proof_shares.push(spent_proof_share);
+                            }
+                            proof_shares
+                        });
+
+                        NodeQueryResponse::SpentProofShares((proof_shares_result, spentbook_op_id))
+                    }
+                    other => {
+                        // TODO: this is temporary till spentbook native data type is implemented,
+                        // for now we just return the response even that it's a Register query response.
+                        other
+                    }
+                }
+            }
         }
     }
 
@@ -102,37 +169,54 @@ impl DataStorage {
     // Read data from local store
     pub(crate) async fn get_from_local_store(
         &self,
-        address: &DataAddress,
+        address: &ReplicatedDataAddress,
     ) -> Result<ReplicatedData> {
         match address {
-            DataAddress::Chunk(addr) => {
+            ReplicatedDataAddress::Chunk(addr) => {
                 self.chunks.get_chunk(addr).await.map(ReplicatedData::Chunk)
             }
-            DataAddress::Register(addr) => self
+            ReplicatedDataAddress::Register(addr) => self
                 .registers
                 .get_register_replica(addr)
                 .await
                 .map(ReplicatedData::RegisterLog),
+            ReplicatedDataAddress::Spentbook(addr) => {
+                let reg_addr =
+                    RegisterAddress::new(*addr.name(), SPENTBOOK_TYPE_SCOPE, SPENTBOOK_TYPE_TAG);
+                self.registers
+                    .get_register_replica(&reg_addr)
+                    .await
+                    .map(ReplicatedData::SpentbookLog)
+            }
         }
     }
 
     #[allow(dead_code)]
-    pub(crate) async fn remove(&self, address: &DataAddress) -> Result<()> {
+    pub(crate) async fn remove(&self, address: &ReplicatedDataAddress) -> Result<()> {
         match address {
-            DataAddress::Chunk(addr) => self.chunks.remove_chunk(addr).await,
-            DataAddress::Register(addr) => self.registers.remove_register(addr).await,
+            ReplicatedDataAddress::Chunk(addr) => self.chunks.remove_chunk(addr).await,
+            ReplicatedDataAddress::Register(addr) => self.registers.remove_register(addr).await,
+            ReplicatedDataAddress::Spentbook(addr) => {
+                let reg_addr =
+                    RegisterAddress::new(*addr.name(), SPENTBOOK_TYPE_SCOPE, SPENTBOOK_TYPE_TAG);
+                self.registers.remove_register(&reg_addr).await
+            }
         }
     }
 
     /// Retrieve all keys/ReplicatedDataAddresses of stored data
-    pub async fn keys(&self) -> Result<Vec<DataAddress>> {
-        let chunk_keys = self.chunks.keys()?.into_iter().map(DataAddress::Chunk);
+    pub async fn keys(&self) -> Result<Vec<ReplicatedDataAddress>> {
+        let chunk_keys = self
+            .chunks
+            .keys()?
+            .into_iter()
+            .map(ReplicatedDataAddress::Chunk);
         let reg_keys = self
             .registers
             .keys()
             .await?
             .into_iter()
-            .map(DataAddress::Register);
+            .map(ReplicatedDataAddress::Register);
         Ok(reg_keys.chain(chunk_keys).collect())
     }
 
@@ -199,7 +283,7 @@ impl Node {
     // on adults
     async fn get_replica_targets(
         &self,
-        address: &DataAddress,
+        address: &ReplicatedDataAddress,
         new_adults: &BTreeSet<XorName>,
         lost_adults: &BTreeSet<XorName>,
         remaining: &BTreeSet<XorName>,

@@ -11,6 +11,7 @@ mod data;
 mod file_apis;
 mod queries;
 mod register_apis;
+mod spentbook_apis;
 
 pub use register_apis::RegisterWriteAheadLog;
 

@@ -9,6 +9,7 @@
 mod bytes;
 mod register;
 mod safe_key;
+mod spentbook;
 
 #[allow(unreachable_pub)]
 pub use self::bytes::BytesAddress;
@@ -16,6 +17,8 @@ pub use self::bytes::BytesAddress;
 pub use register::RegisterAddress;
 #[allow(unreachable_pub)]
 pub use safe_key::SafeKeyAddress;
+#[allow(unreachable_pub)]
+pub use spentbook::SpentbookAddress;
 
 use super::{utils, Result};
 use serde::{Deserialize, Serialize};
@@ -39,6 +42,8 @@ pub enum DataAddress {
     Bytes(BytesAddress),
     ///
     Register(RegisterAddress),
+    ///
+    Spentbook(SpentbookAddress),
 }
 
 impl DataAddress {
@@ -48,6 +53,7 @@ impl DataAddress {
             Self::SafeKey(address) => address.name(),
             Self::Bytes(address) => address.name(),
             Self::Register(address) => address.name(),
+            Self::Spentbook(address) => address.name(),
         }
     }
 
@@ -66,6 +72,7 @@ impl DataAddress {
             Self::SafeKey(address) => address.is_public(),
             Self::Bytes(address) => address.is_public(),
             Self::Register(address) => address.is_public(),
+            Self::Spentbook(_) => true,
         }
     }
 
@@ -98,6 +105,11 @@ impl DataAddress {
     pub fn safe_key(name: XorName, scope: Scope) -> DataAddress {
         DataAddress::SafeKey(SafeKeyAddress::new(name, scope))
     }
+
+    ///
+    pub fn spentbook(name: XorName) -> DataAddress {
+        DataAddress::Spentbook(SpentbookAddress::new(name))
+    }
 }
 
 /// An address of data on the network
@@ -107,6 +119,8 @@ pub enum ReplicatedDataAddress {
     Chunk(ChunkAddress),
     ///
     Register(RegisterAddress),
+    ///
+    Spentbook(SpentbookAddress),
 }
 
 impl ReplicatedDataAddress {
@@ -115,6 +129,7 @@ impl ReplicatedDataAddress {
         match self {
             Self::Chunk(address) => address.name(),
             Self::Register(address) => address.name(),
+            Self::Spentbook(address) => address.name(),
         }
     }
 
@@ -123,6 +138,7 @@ impl ReplicatedDataAddress {
         match self {
             Self::Chunk(address) => ReplicatedDataAddress::Chunk(*address),
             Self::Register(address) => ReplicatedDataAddress::Register(*address),
+            Self::Spentbook(address) => ReplicatedDataAddress::Spentbook(*address),
         }
     }
 }

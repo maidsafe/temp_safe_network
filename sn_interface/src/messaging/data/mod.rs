@@ -13,16 +13,21 @@ mod data_exchange;
 mod errors;
 mod query;
 mod register;
+mod spentbook;
 
 pub use self::{
     cmd::DataCmd,
-    data_exchange::{MetadataExchange, RegisterStoreExport, ReplicatedRegisterLog, StorageLevel},
+    data_exchange::{
+        MetadataExchange, RegisterStoreExport, ReplicatedRegisterLog, ReplicatedSpentbookLog,
+        SpentbookStoreExport, StorageLevel,
+    },
     errors::{Error, Result},
     query::DataQuery,
     register::{
         CreateRegister, DeleteRegister, EditRegister, ExtendRegister, RegisterCmd, RegisterQuery,
         SignedRegisterCreate, SignedRegisterDelete, SignedRegisterEdit, SignedRegisterExtend,
     },
+    spentbook::{SpentbookCmd, SpentbookQuery},
 };
 
 use crate::types::{
@@ -35,8 +40,12 @@ use crate::{
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
-use std::fmt::{self, Debug, Display, Formatter};
-use std::{collections::BTreeSet, convert::TryFrom};
+use sn_dbc::SpentProofShare;
+use std::{
+    collections::BTreeSet,
+    convert::TryFrom,
+    fmt::{self, Debug, Display, Formatter},
+};
 use tiny_keccak::{Hasher, Sha3};
 use xor_name::XorName;
 
@@ -180,6 +189,11 @@ pub enum QueryResponse {
     /// Response to [`RegisterQuery::GetUserPermissions`].
     GetRegisterUserPermissions((Result<Permissions>, OperationId)),
     //
+    // ===== Spentbook Data =====
+    //
+    /// Response to [`SpentbookQuery::SpentProofShares`].
+    SpentProofShares((Result<Vec<SpentProofShare>>, OperationId)),
+    //
     // ===== Other =====
     //
     /// Failed to create id generation
@@ -198,6 +212,7 @@ impl QueryResponse {
             ReadRegister((result, _op_id)) => result.is_ok(),
             GetRegisterPolicy((result, _op_id)) => result.is_ok(),
             GetRegisterUserPermissions((result, _op_id)) => result.is_ok(),
+            SpentProofShares((result, _op_id)) => result.is_ok(),
             FailedToCreateOperationId => false,
         }
     }
@@ -235,6 +250,10 @@ impl QueryResponse {
                 Ok(_) => false,
                 Err(error) => matches!(*error, ErrorMsg::DataNotFound(_)),
             },
+            SpentProofShares((result, _op_id)) => match result {
+                Ok(_) => false,
+                Err(error) => matches!(*error, ErrorMsg::DataNotFound(_)),
+            },
             FailedToCreateOperationId => false,
         }
     }
@@ -269,7 +288,8 @@ impl QueryResponse {
             | GetRegisterOwner((_, operation_id))
             | ReadRegister((_, operation_id))
             | GetRegisterPolicy((_, operation_id))
-            | GetRegisterUserPermissions((_, operation_id)) => Ok(*operation_id),
+            | GetRegisterUserPermissions((_, operation_id))
+            | SpentProofShares((_, operation_id)) => Ok(*operation_id),
             FailedToCreateOperationId => Err(Error::NoOperationId),
         }
     }

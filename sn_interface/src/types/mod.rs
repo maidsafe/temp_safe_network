@@ -28,10 +28,10 @@ mod token;
 
 pub use connections::{PeerLinks, SendToOneError};
 
-pub use crate::messaging::data::{RegisterCmd, ReplicatedRegisterLog};
+pub use crate::messaging::data::{RegisterCmd, ReplicatedRegisterLog, ReplicatedSpentbookLog};
 pub use address::{
     BytesAddress, ChunkAddress, DataAddress, RegisterAddress, ReplicatedDataAddress,
-    SafeKeyAddress, Scope,
+    SafeKeyAddress, Scope, SpentbookAddress,
 };
 pub use cache::Cache;
 pub use chunk::{Chunk, MAX_CHUNK_SIZE_IN_BYTES};
@@ -52,6 +52,11 @@ use xor_name::XorName;
 #[cfg(any(test, feature = "test-utils"))]
 pub use keys::secret_key::test_utils::{keyed_signed, SecretKeySet};
 
+// TODO: temporary scope and type tag for spentbook since its underlying data type is
+// still not implemented, it uses a Public Register for now.
+pub const SPENTBOOK_TYPE_SCOPE: Scope = Scope::Public;
+pub const SPENTBOOK_TYPE_TAG: u64 = 0;
+
 ///
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
@@ -62,6 +67,10 @@ pub enum ReplicatedData {
     RegisterWrite(RegisterCmd),
     /// An entire op log of a register.
     RegisterLog(ReplicatedRegisterLog),
+    /// A single cmd for a spentbook.
+    SpentbookWrite(RegisterCmd),
+    /// An entire op log of a spentbook.
+    SpentbookLog(ReplicatedRegisterLog),
 }
 
 impl ReplicatedData {
@@ -70,6 +79,8 @@ impl ReplicatedData {
             Self::Chunk(chunk) => *chunk.name(),
             Self::RegisterLog(log) => *log.address.name(),
             Self::RegisterWrite(cmd) => *cmd.dst_address().name(),
+            Self::SpentbookLog(log) => *log.address.name(),
+            Self::SpentbookWrite(cmd) => *cmd.dst_address().name(),
         }
     }
 
@@ -78,6 +89,12 @@ impl ReplicatedData {
             Self::Chunk(chunk) => ReplicatedDataAddress::Chunk(*chunk.address()),
             Self::RegisterLog(log) => ReplicatedDataAddress::Register(log.address),
             Self::RegisterWrite(cmd) => ReplicatedDataAddress::Register(cmd.dst_address()),
+            Self::SpentbookLog(log) => {
+                ReplicatedDataAddress::Spentbook(SpentbookAddress::new(*log.address.name()))
+            }
+            Self::SpentbookWrite(cmd) => {
+                ReplicatedDataAddress::Spentbook(SpentbookAddress::new(*cmd.dst_address().name()))
+            }
         }
     }
 }

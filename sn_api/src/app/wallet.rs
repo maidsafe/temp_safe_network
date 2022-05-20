@@ -302,17 +302,20 @@ impl Safe {
                 tx_builder.add_output_by_amount(change_amount.as_nano(), change_owneronce.clone());
         }
 
-        let dbc_builder = tx_builder.build(&mut rng::thread_rng())?;
+        let mut dbc_builder = tx_builder.build(&mut rng::thread_rng())?;
 
         // Build the output DBCs
-        /*
-        // TODO: spend all the input DBCs, collecting the spent proof for each of them:
-        //   let _spent_proof_share = self.spend_dbc(input_dbcs).await?;
-        //   dbc_builder = dbc_builder.add_spent_proof_share(spent_proof_share);
-        //
-        // TODO: perform the verification of the transaction and spentproofs before building DBCs.
-         */
+        // Spend all the input DBCs, collecting the spent proof shares for each of them
+        let client = self.get_safe_client()?;
+        for (keyimage, tx) in dbc_builder.inputs() {
+            // TODO: spend DBCs in parallel spawning tasks
+            client.spend_dbc(keyimage, tx).await?;
+            let spent_proof_shares = client.spent_proof_shares(keyimage).await?;
+            dbc_builder = dbc_builder.add_spent_proof_shares(spent_proof_shares.into_iter());
+        }
 
+        // TODO: perform the verification of the transaction and spentproofs before building DBCs.
+        // This will be possible once sn_client APIs return a super-majority of spent proof shares.
         let dbcs = dbc_builder.build_without_verifying()?;
 
         let mut output_dbc = None;
@@ -517,7 +520,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_wallet_reissue() -> Result<()> {
+    async fn test_wallet_reissue_ok() -> Result<()> {
         let safe = new_safe_instance().await?;
         let wallet_xorurl = safe.wallet_create().await?;
 
