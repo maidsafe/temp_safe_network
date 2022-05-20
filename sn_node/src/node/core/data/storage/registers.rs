@@ -16,17 +16,18 @@ use sn_interface::messaging::{
         SignedRegisterDelete, SignedRegisterEdit, SignedRegisterExtend,
     },
     system::NodeQueryResponse,
-    SectionAuth, VerifyAuthority,
+    SectionAuth, ServiceAuth, VerifyAuthority,
 };
 use sn_interface::types::{
-    register::{Action, EntryHash, Register, User},
-    DataAddress, RegisterAddress as Address,
+    register::{Action, EntryHash, Policy, PublicPermissions, PublicPolicy, Register, User},
+    DataAddress, Keypair, PublicKey, RegisterAddress, SPENTBOOK_TYPE_TAG,
 };
 
 use bincode::serialize;
 use rayon::prelude::*;
 use sled::Db;
 use std::{
+    collections::BTreeMap,
     fmt::{self, Display, Formatter},
     path::Path,
     sync::Arc,
@@ -84,12 +85,12 @@ impl RegisterStorage {
     /// --- Node Synching ---
     /// These are node internal functions, not to be exposed to users.
     #[allow(dead_code)]
-    pub(crate) async fn remove_register(&self, address: &Address) -> Result<()> {
+    pub(crate) async fn remove_register(&self, address: &RegisterAddress) -> Result<()> {
         trace!("Removing register, {:?}", address);
         self.drop_register_key(address.id()?).await
     }
 
-    pub(crate) async fn keys(&self) -> Result<Vec<Address>> {
+    pub(crate) async fn keys(&self) -> Result<Vec<RegisterAddress>> {
         type KeyResults = Vec<Result<XorName>>;
         let mut the_data = vec![];
         let current_db = self.key_db.export();
@@ -136,7 +137,7 @@ impl RegisterStorage {
     /// Used for replication of data to new Adults.
     pub(crate) async fn get_register_replica(
         &self,
-        address: &Address,
+        address: &RegisterAddress,
     ) -> Result<ReplicatedRegisterLog> {
         let key = address.id()?;
         let entry = match self.try_load_cache_entry(&key).await {
@@ -363,15 +364,18 @@ impl RegisterStorage {
                     .apply_op(edit)
                     .map_err(Error::NetworkData);
 
-                if result.is_ok() {
-                    entry.store.append(cmd)?;
-                    self.used_space.increase(required_space);
-                    trace!("Editing Register success!");
-                } else {
-                    trace!("Editing Register failed!");
+                match result {
+                    Ok(()) => {
+                        entry.store.append(cmd)?;
+                        self.used_space.increase(required_space);
+                        trace!("Editing Register success!");
+                        Ok(())
+                    }
+                    Err(err) => {
+                        trace!("Editing Register failed!: {:?}", err);
+                        Err(err)
+                    }
                 }
-
-                result
             }
             Delete(SignedRegisterDelete { op, auth }) => {
                 let DeleteRegister(address) = &op;
@@ -440,6 +444,27 @@ impl RegisterStorage {
         }
     }
 
+    /// Temporary helper function which makes sure there exists a Register for the spentbook,
+    /// this shouldn't be required once we have a Spentbook data type.
+    pub(crate) async fn create_spentbook_register(&self, address: &RegisterAddress) -> Result<()> {
+        trace!("Creating new spentbook register: {:?}", address);
+
+        // TODO: use the node's own keypair and section key share for signatures
+        let mut permissions = BTreeMap::new();
+        let _ = permissions.insert(User::Anyone, PublicPermissions::new(true));
+        let pk = bls::SecretKey::random().public_key();
+        let owner = User::Key(PublicKey::Bls(pk));
+        let policy = PublicPolicy { owner, permissions };
+
+        let keypair = Keypair::new_ed25519();
+        let cmd = create_reg_w_policy(*address.name(), SPENTBOOK_TYPE_TAG, policy.into(), keypair)?;
+
+        match self.write(cmd).await {
+            Ok(()) | Err(Error::DataExists) => Ok(()),
+            other => other,
+        }
+    }
+
     /// --- Reading ---
 
     pub(crate) async fn read(&self, read: &RegisterQuery, requester: User) -> NodeQueryResponse {
@@ -471,7 +496,7 @@ impl RegisterStorage {
     /// Get `Register` from the store and check permissions.
     async fn get_register(
         &self,
-        address: &Address,
+        address: &RegisterAddress,
         action: Action,
         requester: User,
     ) -> Result<Register> {
@@ -494,7 +519,7 @@ impl RegisterStorage {
     /// Get entire Register.
     async fn get(
         &self,
-        address: Address,
+        address: RegisterAddress,
         requester: User,
         operation_id: OperationId,
     ) -> NodeQueryResponse {
@@ -508,7 +533,7 @@ impl RegisterStorage {
 
     async fn read_register(
         &self,
-        address: Address,
+        address: RegisterAddress,
         requester: User,
         operation_id: OperationId,
     ) -> NodeQueryResponse {
@@ -522,7 +547,7 @@ impl RegisterStorage {
 
     async fn get_owner(
         &self,
-        address: Address,
+        address: RegisterAddress,
         requester: User,
         operation_id: OperationId,
     ) -> NodeQueryResponse {
@@ -536,7 +561,7 @@ impl RegisterStorage {
 
     async fn get_entry(
         &self,
-        address: Address,
+        address: RegisterAddress,
         hash: EntryHash,
         requester: User,
         operation_id: OperationId,
@@ -555,7 +580,7 @@ impl RegisterStorage {
 
     async fn get_user_permissions(
         &self,
-        address: Address,
+        address: RegisterAddress,
         user: User,
         requester: User,
         operation_id: OperationId,
@@ -574,7 +599,7 @@ impl RegisterStorage {
 
     async fn get_policy(
         &self,
-        address: Address,
+        address: RegisterAddress,
         requester_pk: User,
         operation_id: OperationId,
     ) -> NodeQueryResponse {
@@ -704,16 +729,59 @@ impl Display for RegisterStorage {
     }
 }
 
+// Helper functions temporarily used for spentbook logic, but also used for tests.
+// This shouldn't be required outside of tests once we have a Spentbook data type.
+fn create_reg_w_policy(
+    name: XorName,
+    tag: u64,
+    policy: Policy,
+    keypair: Keypair,
+) -> Result<RegisterCmd> {
+    let op = CreateRegister::Empty {
+        name,
+        tag,
+        size: u16::MAX,
+        policy,
+    };
+    let signature = keypair.sign(&serialize(&op)?);
+
+    let auth = ServiceAuth {
+        public_key: keypair.public_key(),
+        signature,
+    };
+
+    Ok(RegisterCmd::Create {
+        cmd: SignedRegisterCreate { op, auth },
+        section_auth: section_auth(),
+    })
+}
+
+fn section_auth() -> SectionAuth {
+    use sn_interface::messaging::system::KeyedSig;
+
+    let sk = bls::SecretKey::random();
+    let public_key = sk.public_key();
+    let data = "hello".to_string();
+    let signature = sk.sign(&data);
+    let sig = KeyedSig {
+        public_key,
+        signature,
+    };
+    SectionAuth {
+        src_name: sn_interface::types::PublicKey::Bls(public_key).into(),
+        sig,
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::RegisterStorage;
+    use super::{create_reg_w_policy, RegisterStorage};
 
     use crate::node::{Error, Result};
     use crate::UsedSpace;
     use sn_interface::messaging::{
-        data::{CreateRegister, RegisterCmd, RegisterQuery, SignedRegisterCreate},
+        data::{RegisterCmd, RegisterQuery},
         system::NodeQueryResponse,
-        SectionAuth, ServiceAuth,
     };
     use sn_interface::types::register::{EntryHash, Policy, PrivatePolicy, PublicPolicy};
     use sn_interface::types::DataAddress;
@@ -966,7 +1034,10 @@ mod test {
             owner: authority,
             permissions: Default::default(),
         });
-        Ok((create_reg_w_policy(policy, keypair)?, authority))
+        Ok((
+            create_reg_w_policy(xor_name::rand::random(), 0, policy, keypair)?,
+            authority,
+        ))
     }
 
     fn create_public_register() -> Result<(RegisterCmd, User)> {
@@ -975,43 +1046,9 @@ mod test {
             owner: authority,
             permissions: Default::default(),
         });
-        Ok((create_reg_w_policy(policy, keypair)?, authority))
-    }
-
-    fn create_reg_w_policy(policy: Policy, keypair: Keypair) -> Result<RegisterCmd> {
-        let op = CreateRegister::Empty {
-            name: xor_name::rand::random(),
-            tag: 1,
-            size: u16::MAX,
-            policy,
-        };
-        let signature = keypair.sign(&bincode::serialize(&op)?);
-
-        let auth = ServiceAuth {
-            public_key: keypair.public_key(),
-            signature,
-        };
-
-        Ok(RegisterCmd::Create {
-            cmd: SignedRegisterCreate { op, auth },
-            section_auth: section_auth(),
-        })
-    }
-
-    fn section_auth() -> SectionAuth {
-        use sn_interface::messaging::system::KeyedSig;
-
-        let sk = bls::SecretKey::random();
-        let public_key = sk.public_key();
-        let data = "hello".to_string();
-        let signature = sk.sign(&data);
-        let sig = KeyedSig {
-            public_key,
-            signature,
-        };
-        SectionAuth {
-            src_name: sn_interface::types::PublicKey::Bls(public_key).into(),
-            sig,
-        }
+        Ok((
+            create_reg_w_policy(xor_name::rand::random(), 0, policy, keypair)?,
+            authority,
+        ))
     }
 }

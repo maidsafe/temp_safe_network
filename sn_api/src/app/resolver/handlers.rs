@@ -132,6 +132,18 @@ impl Safe {
                 };
                 Ok(safe_data)
             }
+            DataType::Spentbook => {
+                // TODO: perhaps define a new SafeData::Spentbook
+                let safe_data = SafeData::PublicRegister {
+                    xorurl: input_url.to_xorurl_string(),
+                    xorname: input_url.xorname(),
+                    type_tag: input_url.type_tag(),
+                    data: BTreeSet::new(),
+                    resolved_from: input_url.to_string(),
+                };
+
+                Ok(safe_data)
+            }
         }
     }
 

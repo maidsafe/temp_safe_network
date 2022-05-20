@@ -113,7 +113,10 @@ impl Node {
                     .await?;
             }
 
-            trace!("Adding to pending data queries");
+            trace!(
+                "Adding to pending data queries for op id: {:?}",
+                operation_id
+            );
 
             let _prior_value = self
                 .pending_data_queries

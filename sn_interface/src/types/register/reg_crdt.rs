@@ -9,7 +9,7 @@
 use super::metadata::Entry;
 use super::{
     super::{
-        RegisterAddress as Address, Signature, {Error, Result},
+        RegisterAddress, Signature, {Error, Result},
     },
     User,
 };
@@ -48,7 +48,7 @@ impl Display for EntryHash {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CrdtOperation<T> {
     /// Address of a Register object on the network.
-    pub address: Address,
+    pub address: RegisterAddress,
     /// The data operation to apply.
     pub crdt_op: Node<T>,
     /// The PublicKey of the entity that generated the operation
@@ -59,9 +59,9 @@ pub struct CrdtOperation<T> {
 
 /// Register data type as a CRDT with Access Control
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd)]
-pub(super) struct RegisterCrdt {
+pub(crate) struct RegisterCrdt {
     /// Address on the network of this piece of data
-    address: Address,
+    address: RegisterAddress,
     /// CRDT to store the actual data, i.e. the items of the Register.
     data: MerkleReg<Entry>,
 }
@@ -81,7 +81,7 @@ impl Display for RegisterCrdt {
 
 impl RegisterCrdt {
     /// Constructs a new 'RegisterCrdt'.
-    pub(super) fn new(address: Address) -> Self {
+    pub(crate) fn new(address: RegisterAddress) -> Self {
         Self {
             address,
             data: MerkleReg::new(),
@@ -89,18 +89,18 @@ impl RegisterCrdt {
     }
 
     /// Returns the address.
-    pub(super) fn address(&self) -> &Address {
+    pub(crate) fn address(&self) -> &RegisterAddress {
         &self.address
     }
 
     /// Returns total number of items in the register.
-    pub(super) fn size(&self) -> u64 {
+    pub(crate) fn size(&self) -> u64 {
         (self.data.num_nodes() + self.data.num_orphans()) as u64
     }
 
     /// Write a new entry to the RegisterCrdt, returning the hash
     /// of the entry and the CRDT operation without a signature
-    pub(super) fn write(
+    pub(crate) fn write(
         &mut self,
         entry: Entry,
         children: BTreeSet<EntryHash>,
@@ -125,7 +125,7 @@ impl RegisterCrdt {
     }
 
     /// Apply a remote data CRDT operation to this replica of the RegisterCrdt.
-    pub(super) fn apply_op(&mut self, op: CrdtOperation<Entry>) -> Result<()> {
+    pub(crate) fn apply_op(&mut self, op: CrdtOperation<Entry>) -> Result<()> {
         // Let's first check the op is validly signed.
         // Note: Perms and valid sig for the op are checked at the upper Register layer.
 
@@ -141,12 +141,12 @@ impl RegisterCrdt {
     }
 
     /// Get the entry corresponding to the provided `hash` if it exists.
-    pub(super) fn get(&self, hash: EntryHash) -> Option<&Entry> {
+    pub(crate) fn get(&self, hash: EntryHash) -> Option<&Entry> {
         self.data.node(hash.0).map(|node| &node.value)
     }
 
     /// Read current entries (multiple entries occur on concurrent writes).
-    pub(super) fn read(&self) -> BTreeSet<(EntryHash, Entry)> {
+    pub(crate) fn read(&self) -> BTreeSet<(EntryHash, Entry)> {
         self.data
             .read()
             .hashes_and_nodes()
