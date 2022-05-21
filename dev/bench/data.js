@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1653159771788,
+  "lastUpdate": 1653163242234,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -3719,6 +3719,78 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/single chunks",
             "value": 205801,
             "range": "± 1121",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "chriso83@protonmail.com",
+            "name": "Chris O'Neil",
+            "username": "jacderida"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "bd24e72036c602f3978b8cf4a742cd293dcb2100",
+          "message": "ci: additional check in version bumping process\n\nPreviously we were checking for a particular piece of text in the smart-release output, but it turns\nout there can also be other text that indicates that a crate will have changes. Not sure how it was\nmissed until this point.",
+          "timestamp": "2022-05-21T21:30:59+02:00",
+          "tree_id": "5c1266fb1ae5ef708637a3e29c956ec65a55f4b4",
+          "url": "https://github.com/maidsafe/safe_network/commit/bd24e72036c602f3978b8cf4a742cd293dcb2100"
+        },
+        "date": 1653163241067,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10894240148,
+            "range": "± 13854775972",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3921021816,
+            "range": "± 4660443949",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 9809693450,
+            "range": "± 1213602960",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10032642378,
+            "range": "± 2952023335",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3188139696,
+            "range": "± 961139533",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4781621412,
+            "range": "± 951689882",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single registers",
+            "value": 15497,
+            "range": "± 662",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single chunks",
+            "value": 243054,
+            "range": "± 6240",
             "unit": "ns/iter"
           }
         ]
