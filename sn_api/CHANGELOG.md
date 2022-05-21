@@ -5,19 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.61.0 (2022-05-21)
+
 ## v0.60.2 (2022-05-18)
+
+<csr-id-07504faeda6cbfd0b27abea25facde992398ecf9/>
 
 ### Chore
 
  - <csr-id-07504faeda6cbfd0b27abea25facde992398ecf9/> upgrade blsttc to v5.2.0 and rand to v0.8
 
+### Chore
+
+ - <csr-id-9b06304f46e1a1bda90a0fc6ff82edc928c2529d/> sn_interface-0.2.4/sn_client-0.62.3/sn_api-0.60.2/sn_cli-0.53.1
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 7 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 8 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -27,22 +35,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.2.4/sn_client-0.62.3/sn_api-0.60.2/sn_cli-0.53.1 ([`9b06304`](https://github.com/maidsafe/safe_network/commit/9b06304f46e1a1bda90a0fc6ff82edc928c2529d))
     - upgrade blsttc to v5.2.0 and rand to v0.8 ([`07504fa`](https://github.com/maidsafe/safe_network/commit/07504faeda6cbfd0b27abea25facde992398ecf9))
 </details>
 
 ## v0.60.1 (2022-05-10)
 
+<csr-id-61ba367c308a846cb3f1ae065b1fbbdfb85838e4/>
+
 ### Chore
 
  - <csr-id-61ba367c308a846cb3f1ae065b1fbbdfb85838e4/> sn_interface-0.2.2/sn_client-0.62.2/sn_node-0.58.16/sn_api-0.60.1
+
+### Bug Fixes
+
+ - <csr-id-ae4156228a4bb684ff10ac8c98917dd4dae434ea/> check Register permissions on ops locally to prevent failures when broadcasted to the network
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 5 commits contributed to the release.
  - 3 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -54,6 +69,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  * **Uncategorized**
     - sn_interface-0.2.2/sn_client-0.62.2/sn_node-0.58.16/sn_api-0.60.1 ([`61ba367`](https://github.com/maidsafe/safe_network/commit/61ba367c308a846cb3f1ae065b1fbbdfb85838e4))
     - Merge #1171 ([`06b4433`](https://github.com/maidsafe/safe_network/commit/06b4433f199ba7c622ad57e767d80f58f0b50a69))
+    - check Register permissions on ops locally to prevent failures when broadcasted to the network ([`ae41562`](https://github.com/maidsafe/safe_network/commit/ae4156228a4bb684ff10ac8c98917dd4dae434ea))
+    - Merge #1140 ([`459b641`](https://github.com/maidsafe/safe_network/commit/459b641f22b488f33825777b974da80512eabed5))
+    - Merge #1169 ([`e5d0c17`](https://github.com/maidsafe/safe_network/commit/e5d0c17c335a3a25ee0bb4c81906fa176abeb7f5))
 </details>
 
 ## v0.60.0 (2022-05-06)
@@ -77,9 +95,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 6 commits contributed to the release over the course of 11 calendar days.
+ - 3 commits contributed to the release over the course of 11 calendar days.
  - 13 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -90,15 +108,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  * **Uncategorized**
     - sn_interface-0.2.1/sn_client-0.62.1/sn_node-0.58.15/sn_api-0.60.0/sn_cli-0.53.0 ([`737d906`](https://github.com/maidsafe/safe_network/commit/737d906a61f772593ac7df755d995d66059e8b5e))
-    - check Register permissions on ops locally to prevent failures when broadcasted to the network ([`ae41562`](https://github.com/maidsafe/safe_network/commit/ae4156228a4bb684ff10ac8c98917dd4dae434ea))
-    - Merge #1140 ([`459b641`](https://github.com/maidsafe/safe_network/commit/459b641f22b488f33825777b974da80512eabed5))
-    - Merge #1169 ([`e5d0c17`](https://github.com/maidsafe/safe_network/commit/e5d0c17c335a3a25ee0bb4c81906fa176abeb7f5))
     - return a Token value from wallet balance API instead of a string ([`681457a`](https://github.com/maidsafe/safe_network/commit/681457a75e818beb30401154f336383507acd935))
     - Merge #1128 ([`e49d382`](https://github.com/maidsafe/safe_network/commit/e49d38239b3a8c468616ad3782e1208316e9b5e0))
 </details>
-
-<csr-unknown>
-When cat command is used with a Wallet, it lists all spendable balances found in it,as long as the user has permissions to read it as it’s expected to be a private Multimap.<csr-unknown/>
 
 ## v0.59.0 (2022-04-23)
 
@@ -158,8 +170,8 @@ When cat command is used with a Wallet, it lists all spendable balances found in
     - sn_interface-0.2.0/sn_dysfunction-0.1.2/sn_api-0.59.0/sn_cli-0.52.0 ([`2f4e7e6`](https://github.com/maidsafe/safe_network/commit/2f4e7e6305ba387f2e28945aee71df650ac1d3eb))
     - tidy references in cargo manifests ([`318ee1d`](https://github.com/maidsafe/safe_network/commit/318ee1d22970b5f06e93a99b6e8fff6da638c589))
     - additional wallet API test cases ([`91606f6`](https://github.com/maidsafe/safe_network/commit/91606f631a211d959364cab1e428d1ac895d3dca))
-    - additional wallet API test cases ([`bda0ea0`](https://github.com/maidsafe/safe_network/commit/bda0ea00e2e5a258e02a91d12dcd1e480dfff17c))
     - first and basic implementation of Wallet reissue API and related CLI cmds ([`e662317`](https://github.com/maidsafe/safe_network/commit/e662317e93b3247a1afd9970587ea7241a9b5619))
+    - additional wallet API test cases ([`bda0ea0`](https://github.com/maidsafe/safe_network/commit/bda0ea00e2e5a258e02a91d12dcd1e480dfff17c))
     - first and basic implementation of Wallet reissue API and related CLI cmds ([`adb085e`](https://github.com/maidsafe/safe_network/commit/adb085e98b00ec6cd0d670bf665009d6e93e2514))
     - set sn_client version to be new release ([`e3dca8b`](https://github.com/maidsafe/safe_network/commit/e3dca8b07441c86744b091fe883d16a9c750f702))
     - update sn_cli and api readme for sn_client extraction ([`ad7d340`](https://github.com/maidsafe/safe_network/commit/ad7d340720f0737f502b0d55023a15461dded91d))
@@ -412,7 +424,7 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release over the course of 1 calendar day.
+ - 7 commits contributed to the release over the course of 2 calendar days.
  - 9 days passed between releases.
  - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
@@ -426,11 +438,11 @@ When cat command is used with a Wallet, it lists all spendable balances found in
  * **Uncategorized**
     - safe_network-0.58.2/sn_api-0.57.1/sn_cli-0.50.2 ([`634010f`](https://github.com/maidsafe/safe_network/commit/634010fd79ce1487abbff5adf3d15da59709dd95))
     - Merge #1038 #1042 ([`08da844`](https://github.com/maidsafe/safe_network/commit/08da8440f9acd2eb8b2494ca7d1c2f8f3f8f631e))
+    - more general dep updates ([`d5e6f46`](https://github.com/maidsafe/safe_network/commit/d5e6f462615de830cd9c27dba49a34ba2da13b81))
+    - update multibase to be inline across codebase ([`7b4672d`](https://github.com/maidsafe/safe_network/commit/7b4672dfb6ae305221018e7eab090deabe4d6739))
     - changes to appease clippy 1.59 ([`705995e`](https://github.com/maidsafe/safe_network/commit/705995ef67b3d4c45c95689c4a675e1063467ec9))
     - introduce cohesive conn handling ([`38fb057`](https://github.com/maidsafe/safe_network/commit/38fb057da44a0e243186410df0c39361a21ec46e))
     - more dep updates ([`f95ef3d`](https://github.com/maidsafe/safe_network/commit/f95ef3d1cdc5d588e99c343470b8f45aedda70b4))
-    - more general dep updates ([`d5e6f46`](https://github.com/maidsafe/safe_network/commit/d5e6f462615de830cd9c27dba49a34ba2da13b81))
-    - update multibase to be inline across codebase ([`7b4672d`](https://github.com/maidsafe/safe_network/commit/7b4672dfb6ae305221018e7eab090deabe4d6739))
 </details>
 
 ## v0.57.0 (2022-02-17)
@@ -531,7 +543,7 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release over the course of 2 calendar days.
+ - 7 commits contributed to the release over the course of 3 calendar days.
  - 3 days passed between releases.
  - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
@@ -548,8 +560,8 @@ When cat command is used with a Wallet, it lists all spendable balances found in
     - make nrs url validation private ([`f558b5c`](https://github.com/maidsafe/safe_network/commit/f558b5c60df64dd349158a327bec945321937cf3))
     - resolve nrs map container content ([`0bc50ae`](https://github.com/maidsafe/safe_network/commit/0bc50ae33ccb934016ac425e7bb2eca90a4b06e3))
     - update nrs tests to use helper ([`b9ceb22`](https://github.com/maidsafe/safe_network/commit/b9ceb229091ca29f5dcc675d66a0d9ff46a60427))
-    - Merge #995 ([`5176b3a`](https://github.com/maidsafe/safe_network/commit/5176b3a72e2f5f3f1dfc21116a6bf3ffa3893830))
     - retrieve subname version ([`ced0f66`](https://github.com/maidsafe/safe_network/commit/ced0f6631ac5e8d24546841ba15b8cb7b43929c4))
+    - Merge #995 ([`5176b3a`](https://github.com/maidsafe/safe_network/commit/5176b3a72e2f5f3f1dfc21116a6bf3ffa3893830))
 </details>
 
 ## v0.55.0 (2022-02-08)
@@ -583,9 +595,9 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
  * **Uncategorized**
     - safe_network-0.56.0/sn_api-0.55.0/sn_cli-0.48.0 ([`3f75bf8`](https://github.com/maidsafe/safe_network/commit/3f75bf8da770a6167c396080b3ad8b54cfeb27e2))
-    - improve acronym consistency ([`471d910`](https://github.com/maidsafe/safe_network/commit/471d910f2b6d8952569c3dc4b2dd31fe7aa30dfa))
     - Merge branch 'main' into fix-cli-shell-api-instances ([`5fe7e54`](https://github.com/maidsafe/safe_network/commit/5fe7e54874e5d665fd10906c4c973f24d613aeba))
     - CLI shell was creating a new Safe API instance, and connecting to the net, for every command ([`e867b1f`](https://github.com/maidsafe/safe_network/commit/e867b1f5aa290823e77eff95f0846f00d7c0416c))
+    - improve acronym consistency ([`471d910`](https://github.com/maidsafe/safe_network/commit/471d910f2b6d8952569c3dc4b2dd31fe7aa30dfa))
 </details>
 
 ## v0.54.1 (2022-02-04)
@@ -596,6 +608,54 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
  - <csr-id-86975f228f31303597a707e158005e44c86de1cc/> safe_network-0.55.3/sn_api-0.54.1/sn_cli-0.47.1
 
+### Refactor
+
+ - <csr-id-9af70e7785c9329d8262de99bda68c4ad79d5154/> remove get_target_url function
+   This function contained an unnecessary check to see if the `safe://` prefix wasn't present in top
+   name or public names, which we wouldn't expect it to be. I'm not sure what I was thinking with this.
+   
+   Also made some more readability changes based on PR feedback.
+ - <csr-id-58bf678793cbf474751c7bccc80e08fe3cd2d192/> subname -> public name
+   Since we're now storing the full public name in the NRS map, the key should be referred to as the
+   public name rather than the subname. Error messages were also updated.
+ - <csr-id-a58f6c5019e73ffbfa0f29965aa0fa62b026ece7/> remove url sanitisation from api
+   The `Safe::parse_url` function was removed from the API. This function 'sanitised' a URL by applying
+   a `safe://` prefix to a URL string if the caller hadn't specified it.
+   
+   Initially, it was done to tidy up NRS code that was calling this function, but the same code was
+   also calling a private function `parse_url` was making use of, so effectively the code was being
+   called twice. More generally, we decided callers of the API should be responsible for passing a
+   valid URL.
+   
+   The function was being called by various other parts of the API and also in the CLI, so these were
+   changed to call `SafeUrl::from_url` directly.
+   
+   Some code was added to CLI commands to apply the `safe://` prefix if the user omitted it, so no
+   functionality  was broken. A few test cases were added to cover it. A couple of NRS test cases for
+   validating URLs were also removed as they no longer apply. This behaviour may actually have been
+   incorrect in the first place.
+   
+   Also apply various clippy fixes.
+
+### Other
+
+ - <csr-id-effc6fa5a035f8d88b7537eca304e4b0d6de29a3/> rework nrs tests and provide more coverage
+   Added more coverage for code paths that weren't being tested:
+   * `nrs_create` duplicate topname
+   * `nrs_associate` with non-versioned files container link
+   * `nrs_associate` with non-versioned NRS map container link
+   * `nrs_associate` with register link
+   * `nrs_associate` with invalid URL
+   
+   Some NRS tests were reworked as follows:
+   * Make them single purpose. Some tests were testing a few things, which makes it a bit harder to
+     identify what's failed.
+   * Trim down. Some tests had assertions and setup that didn't seem quite relevant, like checking and
+     assigning versions.
+   * Test `nrs_associate` without calling `nrs_add`. This muddies the water a little bit because
+     `nrs_add` calls associate.
+   * Separate `nrs_associate` tests for topnames and subnames.
+
 ### New Features
 
  - <csr-id-1115093a4cb4a0c7ed9f8d2b846aa435a7026b2e/> store full public name in nrs map
@@ -604,14 +664,18 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 * a.example -> link
 * b.example -> link
 * a.b.example -> link
+ - <csr-id-b2b0520630774d935aca1f2b602a1de9479ba6f9/> enable cmd retries
+   Previously a command error would simply error out and fail.
+   Now we use an exponential backoff to retry incase errors
+   can be overcome
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 6 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 9 commits contributed to the release over the course of 2 calendar days.
+ - 2 days passed between releases.
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -623,6 +687,13 @@ When cat command is used with a Wallet, it lists all spendable balances found in
  * **Uncategorized**
     - safe_network-0.55.3/sn_api-0.54.1/sn_cli-0.47.1 ([`86975f2`](https://github.com/maidsafe/safe_network/commit/86975f228f31303597a707e158005e44c86de1cc))
     - Merge #993 ([`303e856`](https://github.com/maidsafe/safe_network/commit/303e856346dd1d4e5544c9ceae6d571c54cfb84e))
+    - remove get_target_url function ([`9af70e7`](https://github.com/maidsafe/safe_network/commit/9af70e7785c9329d8262de99bda68c4ad79d5154))
+    - subname -> public name ([`58bf678`](https://github.com/maidsafe/safe_network/commit/58bf678793cbf474751c7bccc80e08fe3cd2d192))
+    - remove url sanitisation from api ([`a58f6c5`](https://github.com/maidsafe/safe_network/commit/a58f6c5019e73ffbfa0f29965aa0fa62b026ece7))
+    - rework nrs tests and provide more coverage ([`effc6fa`](https://github.com/maidsafe/safe_network/commit/effc6fa5a035f8d88b7537eca304e4b0d6de29a3))
+    - store full public name in nrs map ([`1115093`](https://github.com/maidsafe/safe_network/commit/1115093a4cb4a0c7ed9f8d2b846aa435a7026b2e))
+    - enable cmd retries ([`b2b0520`](https://github.com/maidsafe/safe_network/commit/b2b0520630774d935aca1f2b602a1de9479ba6f9))
+    - Merge #985 ([`ba572d5`](https://github.com/maidsafe/safe_network/commit/ba572d5f909f5c1dc389b9affadffec39a4e0369))
 </details>
 
 ## v0.54.0 (2022-02-01)
@@ -677,9 +748,9 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
 <csr-read-only-do-not-edit/>
 
- - 6 commits contributed to the release over the course of 6 calendar days.
- - 10 days passed between releases.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 3 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -690,11 +761,7 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
  * **Uncategorized**
     - safe_network-0.55.1/sn_api-0.54.0/sn_cli-0.47.0 ([`2ec86e2`](https://github.com/maidsafe/safe_network/commit/2ec86e28246031084d603768ffa1fddf320a10a2))
-    - Merge branch 'main' into nrs_resolve_immutable_content ([`099bf22`](https://github.com/maidsafe/safe_network/commit/099bf224714e667bf998de80099eeeabfd869d8b))
-    - retrieve immutable content via nrs ([`3d73dd0`](https://github.com/maidsafe/safe_network/commit/3d73dd03a7a6913a248e5cca7d714f8b8e4c0d01))
-    - enable cmd retries ([`b2b0520`](https://github.com/maidsafe/safe_network/commit/b2b0520630774d935aca1f2b602a1de9479ba6f9))
     - dry-runner was making a connection to the network ([`e088598`](https://github.com/maidsafe/safe_network/commit/e0885987742226f72ed761e7b78b86e2fa72e256))
-    - nrs map fetch and rename multimap ([`889e0d9`](https://github.com/maidsafe/safe_network/commit/889e0d99a6f096329e875c812a29ec165e61f5ae))
 </details>
 
 ## v0.53.0 (2022-01-28)
@@ -733,6 +800,18 @@ When cat command is used with a Wallet, it lists all spendable balances found in
    incorrect in the first place.
    
    Also apply various clippy fixes.
+
+### Refactor
+
+ - <csr-id-889e0d99a6f096329e875c812a29ec165e61f5ae/> nrs map fetch and rename multimap
+   The `MultimapKeyValues` type alias was renamed to `Multimap` to make it easier to work with. Some
+   functions were also renamed to the same effect, e.g., `fetch_multimap_values` -> `fetch_multimap`.
+   
+   The function for retrieving the NRS map was also refactored. Some aspects were broken down into
+   smaller functions to reduce some complex if/else cases. Things were also setup for the version in
+   the last entry in the Multimap to be collected. This is going to be used with the returned
+   NrsMapContainer, to facilitate returning links to immutable content, which doesn't have a version.
+   Currently the code isn't setup to support that scenario.
 
 ### Other
 
@@ -785,8 +864,9 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits contributed to the release over the course of 2 calendar days.
+ - 6 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -797,12 +877,9 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
  * **Uncategorized**
     - safe_network-0.55.0/sn_api-0.53.0/sn_cli-0.46.0 ([`366eee2`](https://github.com/maidsafe/safe_network/commit/366eee25f4b982d5a20d90168368a1aa14aa3181))
-    - remove get_target_url function ([`9af70e7`](https://github.com/maidsafe/safe_network/commit/9af70e7785c9329d8262de99bda68c4ad79d5154))
-    - subname -> public name ([`58bf678`](https://github.com/maidsafe/safe_network/commit/58bf678793cbf474751c7bccc80e08fe3cd2d192))
-    - remove url sanitisation from api ([`a58f6c5`](https://github.com/maidsafe/safe_network/commit/a58f6c5019e73ffbfa0f29965aa0fa62b026ece7))
-    - rework nrs tests and provide more coverage ([`effc6fa`](https://github.com/maidsafe/safe_network/commit/effc6fa5a035f8d88b7537eca304e4b0d6de29a3))
-    - Merge #985 ([`ba572d5`](https://github.com/maidsafe/safe_network/commit/ba572d5f909f5c1dc389b9affadffec39a4e0369))
-    - store full public name in nrs map ([`1115093`](https://github.com/maidsafe/safe_network/commit/1115093a4cb4a0c7ed9f8d2b846aa435a7026b2e))
+    - Merge branch 'main' into nrs_resolve_immutable_content ([`099bf22`](https://github.com/maidsafe/safe_network/commit/099bf224714e667bf998de80099eeeabfd869d8b))
+    - retrieve immutable content via nrs ([`3d73dd0`](https://github.com/maidsafe/safe_network/commit/3d73dd03a7a6913a248e5cca7d714f8b8e4c0d01))
+    - nrs map fetch and rename multimap ([`889e0d9`](https://github.com/maidsafe/safe_network/commit/889e0d99a6f096329e875c812a29ec165e61f5ae))
 </details>
 
 ## v0.52.0 (2022-01-22)
@@ -828,9 +905,9 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
 <csr-read-only-do-not-edit/>
 
- - 8 commits contributed to the release over the course of 3 calendar days.
+ - 5 commits contributed to the release over the course of 1 calendar day.
  - 1 day passed between releases.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -844,10 +921,7 @@ When cat command is used with a Wallet, it lists all spendable balances found in
     - update remaining places ([`3dc2327`](https://github.com/maidsafe/safe_network/commit/3dc23278c6a4fabc250b27f4312f5c51f0f271a4))
     - Merge #958 ([`437a113`](https://github.com/maidsafe/safe_network/commit/437a113e6e5736e4eb4287f41228806678a9762e))
     - Merge branch 'main' into simplify-sn-api ([`33ef052`](https://github.com/maidsafe/safe_network/commit/33ef0524ae238391f25c8fb340627c34ea79fcb2))
-    - remove one layer of indirection ([`3b5ce19`](https://github.com/maidsafe/safe_network/commit/3b5ce194213a7090ee83c02b0043700cda230796))
-    - update from MIT/BSD3 to GPL3 ([`20f416c`](https://github.com/maidsafe/safe_network/commit/20f416cb7d0960a1d8d6f167a1ad1eed33ed6a7b))
     - Merge #962 ([`29d01da`](https://github.com/maidsafe/safe_network/commit/29d01da5233fd2a10b30699b555a0d85d7a7409a))
-    - update year on files modified 2022 ([`7a7752f`](https://github.com/maidsafe/safe_network/commit/7a7752f830785ec39d301e751dc75f228d43d595))
 </details>
 
 ## v0.51.0 (2022-01-20)
@@ -862,6 +936,16 @@ When cat command is used with a Wallet, it lists all spendable balances found in
  - <csr-id-57749b7d0671423fe205447bc84d9f8bfc99f54b/> solving new clippy findings
  - <csr-id-941b83f3960c84cfee86a8c818233fbbc403c189/> fix additional wrongly setup test cases
 
+### Refactor
+
+ - <csr-id-3b5ce194213a7090ee83c02b0043700cda230796/> remove one layer of indirection
+ - <csr-id-9c9a537ad12cc809540df321297c8552c52a8648/> ties up the loose ends in unified data flow
+
+### Chore
+
+ - <csr-id-20f416cb7d0960a1d8d6f167a1ad1eed33ed6a7b/> update from MIT/BSD3 to GPL3
+ - <csr-id-7a7752f830785ec39d301e751dc75f228d43d595/> update year on files modified 2022
+
 ### Bug Fixes
 
  - <csr-id-e18c88019d37ab4f7618dde1a90e19ddf94db1c7/> VersioinHash use Display for encode
@@ -871,9 +955,9 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
 <csr-read-only-do-not-edit/>
 
- - 11 commits contributed to the release over the course of 13 calendar days.
+ - 16 commits contributed to the release over the course of 13 calendar days.
  - 13 days passed between releases.
- - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 8 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -884,16 +968,21 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
  * **Uncategorized**
     - safe_network-0.53.0/sn_api-0.51.0/sn_cli-0.44.0 ([`923930a`](https://github.com/maidsafe/safe_network/commit/923930acb3769cfa7047954a1fee1853ec9e3062))
-    - solving new clippy findings ([`57749b7`](https://github.com/maidsafe/safe_network/commit/57749b7d0671423fe205447bc84d9f8bfc99f54b))
+    - remove one layer of indirection ([`3b5ce19`](https://github.com/maidsafe/safe_network/commit/3b5ce194213a7090ee83c02b0043700cda230796))
+    - update from MIT/BSD3 to GPL3 ([`20f416c`](https://github.com/maidsafe/safe_network/commit/20f416cb7d0960a1d8d6f167a1ad1eed33ed6a7b))
+    - update year on files modified 2022 ([`7a7752f`](https://github.com/maidsafe/safe_network/commit/7a7752f830785ec39d301e751dc75f228d43d595))
     - Merge node-logrotate origin for rebase with main ([`6df7f6f`](https://github.com/maidsafe/safe_network/commit/6df7f6fec3ee9d37b44db188fd670e4b65796e8c))
-    - Merge #885 ([`72a3f12`](https://github.com/maidsafe/safe_network/commit/72a3f1269c9c38add9b88455837655f2bc33b551))
     - fix additional wrongly setup test cases ([`941b83f`](https://github.com/maidsafe/safe_network/commit/941b83f3960c84cfee86a8c818233fbbc403c189))
+    - make use of all the queries ([`83ef7a6`](https://github.com/maidsafe/safe_network/commit/83ef7a66bb245e2303b80d98d6b8fa888b93d6ba))
+    - ties up the loose ends in unified data flow ([`9c9a537`](https://github.com/maidsafe/safe_network/commit/9c9a537ad12cc809540df321297c8552c52a8648))
+    - solving new clippy findings ([`57749b7`](https://github.com/maidsafe/safe_network/commit/57749b7d0671423fe205447bc84d9f8bfc99f54b))
+    - Merge #885 ([`72a3f12`](https://github.com/maidsafe/safe_network/commit/72a3f1269c9c38add9b88455837655f2bc33b551))
     - Merge branch 'main' into kill-the-blob ([`5a055ba`](https://github.com/maidsafe/safe_network/commit/5a055ba679e6a4f2cd92700af68f8b36ac12a544))
     - Merge branch 'main' into kill-the-blob ([`411ce5b`](https://github.com/maidsafe/safe_network/commit/411ce5b9d4c396484d2384324ae09d346c79013f))
-    - make use of all the queries ([`83ef7a6`](https://github.com/maidsafe/safe_network/commit/83ef7a66bb245e2303b80d98d6b8fa888b93d6ba))
     - Merge branch 'main' into kill-the-blob ([`9c5cd80`](https://github.com/maidsafe/safe_network/commit/9c5cd80c286308c6d075c5418d8a1650e87fddd5))
-    - Merge #916 #918 #919 ([`5c4d3a9`](https://github.com/maidsafe/safe_network/commit/5c4d3a92ff28126468f07d599c6caf416661aba2))
     - Merge branch 'main' into kill-the-blob ([`fe814a6`](https://github.com/maidsafe/safe_network/commit/fe814a69e5ef5fbe4c62a056498ef88ce5897fef))
+    - Merge #917 ([`0eb6439`](https://github.com/maidsafe/safe_network/commit/0eb643910098ab6021561e5b997b6289be9e2c57))
+    - Merge #916 #918 #919 ([`5c4d3a9`](https://github.com/maidsafe/safe_network/commit/5c4d3a92ff28126468f07d599c6caf416661aba2))
 </details>
 
 ## v0.50.6 (2022-01-06)
@@ -909,6 +998,10 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
 ### Chore
 
+ - <csr-id-4f29c285a0b48220df1f1c6c52c4b487350eae08/> safe_network-0.52.12
+
+### Chore
+
  - <csr-id-155ee032ee56cbbb34928f2d14529273ccb69559/> safe_network-0.52.13/sn_api-0.50.6
  - <csr-id-7b0cd4d183a9f82d1d78dbb56572e5bf36714a0a/> safe_network-0.52.10
  - <csr-id-bf16c5ea7051386064233443921438cbbd79d907/> log EntryHash human readable
@@ -921,9 +1014,8 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
 <csr-read-only-do-not-edit/>
 
- - 6 commits contributed to the release.
- - 1 day passed between releases.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -934,11 +1026,8 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
  * **Uncategorized**
     - safe_network-0.52.13/sn_api-0.50.6 ([`155ee03`](https://github.com/maidsafe/safe_network/commit/155ee032ee56cbbb34928f2d14529273ccb69559))
-    - safe_network-0.52.10 ([`7b0cd4d`](https://github.com/maidsafe/safe_network/commit/7b0cd4d183a9f82d1d78dbb56572e5bf36714a0a))
+    - safe_network-0.52.12 ([`4f29c28`](https://github.com/maidsafe/safe_network/commit/4f29c285a0b48220df1f1c6c52c4b487350eae08))
     - VersioinHash use Display for encode ([`e18c880`](https://github.com/maidsafe/safe_network/commit/e18c88019d37ab4f7618dde1a90e19ddf94db1c7))
-    - Merge branch 'main' into kill-the-blob ([`6f89f12`](https://github.com/maidsafe/safe_network/commit/6f89f129ece75dee45f311d30e52ca71b6b7bc98))
-    - log EntryHash human readable ([`bf16c5e`](https://github.com/maidsafe/safe_network/commit/bf16c5ea7051386064233443921438cbbd79d907))
-    - ties up the loose ends in unified data flow ([`9c9a537`](https://github.com/maidsafe/safe_network/commit/9c9a537ad12cc809540df321297c8552c52a8648))
 </details>
 
 ## v0.50.5 (2022-01-06)
@@ -949,12 +1038,18 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
  - <csr-id-99d012ef529df78ef4c84f5e6ea99d3a77414797/> safe_network-0.52.11/sn_api-0.50.5/sn_cli-0.43.2
 
+### Chore
+
+ - <csr-id-bf16c5ea7051386064233443921438cbbd79d907/> log EntryHash human readable
+ - <csr-id-7b0cd4d183a9f82d1d78dbb56572e5bf36714a0a/> safe_network-0.52.10
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -965,8 +1060,10 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
  * **Uncategorized**
     - safe_network-0.52.11/sn_api-0.50.5/sn_cli-0.43.2 ([`99d012e`](https://github.com/maidsafe/safe_network/commit/99d012ef529df78ef4c84f5e6ea99d3a77414797))
-    - Merge #917 ([`0eb6439`](https://github.com/maidsafe/safe_network/commit/0eb643910098ab6021561e5b997b6289be9e2c57))
+    - log EntryHash human readable ([`bf16c5e`](https://github.com/maidsafe/safe_network/commit/bf16c5ea7051386064233443921438cbbd79d907))
+    - safe_network-0.52.10 ([`7b0cd4d`](https://github.com/maidsafe/safe_network/commit/7b0cd4d183a9f82d1d78dbb56572e5bf36714a0a))
     - Merge branch 'main' into kill-the-blob ([`40268a5`](https://github.com/maidsafe/safe_network/commit/40268a598aea8d14c1dbeb1c00712b9f9a664ef8))
+    - Merge branch 'main' into kill-the-blob ([`6f89f12`](https://github.com/maidsafe/safe_network/commit/6f89f129ece75dee45f311d30e52ca71b6b7bc98))
 </details>
 
 ## v0.50.4 (2022-01-04)
@@ -985,6 +1082,10 @@ When cat command is used with a Wallet, it lists all spendable balances found in
  - <csr-id-ab8109cf5aede62596abfdeb813a019d03201f96/> revert change of fn name
  - <csr-id-5214d5e7f84a3c1cf213097a5d55bfb293f03324/> safe_network-0.52.8
 
+### Refactor
+
+ - <csr-id-c790077bebca691f974000278d5525f4b011b8a7/> rename blob to file
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -1001,11 +1102,11 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
  * **Uncategorized**
     - safe_network-0.52.9/sn_api-0.50.4 ([`a64c7e0`](https://github.com/maidsafe/safe_network/commit/a64c7e0414b77f545cb8cdbf64af0fb7212d1f2e))
-    - Merge branch 'main' into kill-the-blob ([`7d38c3d`](https://github.com/maidsafe/safe_network/commit/7d38c3df14d03c042b645ad05be6cd3cc540d631))
-    - safe_network-0.52.12 ([`4f29c28`](https://github.com/maidsafe/safe_network/commit/4f29c285a0b48220df1f1c6c52c4b487350eae08))
     - rename dest to dst ([`bebdae9`](https://github.com/maidsafe/safe_network/commit/bebdae9d52d03bd13b679ee19446452990d1e2cf))
-    - revert change of fn name ([`ab8109c`](https://github.com/maidsafe/safe_network/commit/ab8109cf5aede62596abfdeb813a019d03201f96))
     - safe_network-0.52.8 ([`5214d5e`](https://github.com/maidsafe/safe_network/commit/5214d5e7f84a3c1cf213097a5d55bfb293f03324))
+    - Merge branch 'main' into kill-the-blob ([`7d38c3d`](https://github.com/maidsafe/safe_network/commit/7d38c3df14d03c042b645ad05be6cd3cc540d631))
+    - revert change of fn name ([`ab8109c`](https://github.com/maidsafe/safe_network/commit/ab8109cf5aede62596abfdeb813a019d03201f96))
+    - rename blob to file ([`c790077`](https://github.com/maidsafe/safe_network/commit/c790077bebca691f974000278d5525f4b011b8a7))
 </details>
 
 ## v0.50.3 (2022-01-04)
@@ -1020,6 +1121,10 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
 ### Chore
 
+ - <csr-id-40d1844e0b28578e8b8c6b270151dbb86961a766/> safe_network-0.52.7
+
+### Chore
+
  - <csr-id-5f7000c5ec5895fb3f4c4a17a74ada52bb873fc7/> sn_api-0.50.3
  - <csr-id-ab00eca916d6ed8a0a137004a6b9fd24e7217a70/> safe_network-0.52.5
 
@@ -1027,8 +1132,8 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1039,8 +1144,7 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
  * **Uncategorized**
     - sn_api-0.50.3 ([`5f7000c`](https://github.com/maidsafe/safe_network/commit/5f7000c5ec5895fb3f4c4a17a74ada52bb873fc7))
-    - rename blob to file ([`c790077`](https://github.com/maidsafe/safe_network/commit/c790077bebca691f974000278d5525f4b011b8a7))
-    - safe_network-0.52.5 ([`ab00eca`](https://github.com/maidsafe/safe_network/commit/ab00eca916d6ed8a0a137004a6b9fd24e7217a70))
+    - safe_network-0.52.7 ([`40d1844`](https://github.com/maidsafe/safe_network/commit/40d1844e0b28578e8b8c6b270151dbb86961a766))
 </details>
 
 ## v0.50.2 (2022-01-04)
@@ -1053,12 +1157,15 @@ When cat command is used with a Wallet, it lists all spendable balances found in
  - <csr-id-0a70425fb314de4c165da54fdc29a127ae900d81/> safe_network-0.52.6/sn_api-0.50.2
  - <csr-id-292466119e2d99c36043e7f2247b1bde9ec9ced9/> safe_network-0.52.3
 
+### Chore
+
+ - <csr-id-ab00eca916d6ed8a0a137004a6b9fd24e7217a70/> safe_network-0.52.5
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 2 commits contributed to the release.
- - 1 day passed between releases.
  - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -1070,7 +1177,7 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
  * **Uncategorized**
     - safe_network-0.52.6/sn_api-0.50.2 ([`0a70425`](https://github.com/maidsafe/safe_network/commit/0a70425fb314de4c165da54fdc29a127ae900d81))
-    - safe_network-0.52.3 ([`2924661`](https://github.com/maidsafe/safe_network/commit/292466119e2d99c36043e7f2247b1bde9ec9ced9))
+    - safe_network-0.52.5 ([`ab00eca`](https://github.com/maidsafe/safe_network/commit/ab00eca916d6ed8a0a137004a6b9fd24e7217a70))
 </details>
 
 ## v0.50.1 (2022-01-04)
@@ -1082,6 +1189,10 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
  - <csr-id-4bb2adf52efdac6187fffc299018bf13f3398e14/> safe_network-0.52.4/sn_api-0.50.1
  - <csr-id-40d1844e0b28578e8b8c6b270151dbb86961a766/> safe_network-0.52.7
+
+### Chore
+
+ - <csr-id-292466119e2d99c36043e7f2247b1bde9ec9ced9/> safe_network-0.52.3
 
 ### Commit Statistics
 
@@ -1099,7 +1210,7 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
  * **Uncategorized**
     - safe_network-0.52.4/sn_api-0.50.1 ([`4bb2adf`](https://github.com/maidsafe/safe_network/commit/4bb2adf52efdac6187fffc299018bf13f3398e14))
-    - safe_network-0.52.7 ([`40d1844`](https://github.com/maidsafe/safe_network/commit/40d1844e0b28578e8b8c6b270151dbb86961a766))
+    - safe_network-0.52.3 ([`2924661`](https://github.com/maidsafe/safe_network/commit/292466119e2d99c36043e7f2247b1bde9ec9ced9))
 </details>
 
 ## v0.50.0 (2022-01-03)
@@ -2120,7 +2231,7 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 
 <csr-read-only-do-not-edit/>
 
- - 205 commits contributed to the release over the course of 404 calendar days.
+ - 205 commits contributed to the release over the course of 431 calendar days.
  - 173 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 1 unique issue was worked on: [#6](https://github.com/maidsafe/safe_network/issues/6)
 
@@ -2152,23 +2263,23 @@ When cat command is used with a Wallet, it lists all spendable balances found in
     - Merge remote-tracking branch 'upstream/main' into merge_sn_cli_into_workspace ([`eea8307`](https://github.com/maidsafe/safe_network/commit/eea83074b9bbd334d80b80f12cfcce724d0e8ca3))
     - update cli to use new nrs api ([`8691034`](https://github.com/maidsafe/safe_network/commit/86910340897256bb4df77b6edaa0f2c9584d6dce))
     - switch from `chrono` to `time` ([`442c1bd`](https://github.com/maidsafe/safe_network/commit/442c1bdd3f9c22424aa9642d71d4016c868b0b58))
-    - merge github.com:maidsafe/sn_cli into safe_network ([`414aca2`](https://github.com/maidsafe/safe_network/commit/414aca284b35f1bcb27e5d0cca2bfe451b69e27b))
     - upgrade `tracing-appender` and `tracing-subscriber` ([`0387123`](https://github.com/maidsafe/safe_network/commit/0387123114ff6ae42920577706497319c8a888cb))
-    - update actions workflows for workspace refactor ([`3703819`](https://github.com/maidsafe/safe_network/commit/3703819c7f0da220c8ff21169ca1e8161a20157b))
-    - move safe_network code into sn directory ([`2254329`](https://github.com/maidsafe/safe_network/commit/225432908839359800d301d9e5aa8274e4652ee1))
-    - move sn_api code into an sn_api directory ([`2b5d177`](https://github.com/maidsafe/safe_network/commit/2b5d17740ca74fc379cab89cb95683e200589148))
     - Merge remote-tracking branch 'upstream/main' into merge_sn_api_into_workspace ([`8ed5aff`](https://github.com/maidsafe/safe_network/commit/8ed5aff8b30ce798f71eac22d66eb3aa9b0bdcdd))
     - upgrade sn_api to use 0.36.x of safe_network ([`0118362`](https://github.com/maidsafe/safe_network/commit/01183625d7a1a60b652b1a295a908fa8ba04f6f7))
     - Merge remote-tracking branch 'upstream/main' into merge_sn_api_into_workspace ([`3a2817a`](https://github.com/maidsafe/safe_network/commit/3a2817a4c802d74b57d475d88d7bc23223994147))
     - Merge remote-tracking branch 'upstream/main' into merge_sn_api_into_workspace ([`50f48ae`](https://github.com/maidsafe/safe_network/commit/50f48aefcba272345df7d4cd45a59071a5844932))
     - Merge branch 'merge_sn_api_into_workspace' into nrs_resolver_refactor ([`a273d97`](https://github.com/maidsafe/safe_network/commit/a273d9733b8d50b94b0ea3faec1d9e721d86aa27))
     - various renamings and changes matching PR comments ([`335f9dc`](https://github.com/maidsafe/safe_network/commit/335f9dcfc4588624728b4b10c576953d51a08e1a))
+    - merge github.com:maidsafe/sn_cli into safe_network ([`414aca2`](https://github.com/maidsafe/safe_network/commit/414aca284b35f1bcb27e5d0cca2bfe451b69e27b))
     - fmt ([`49d04e1`](https://github.com/maidsafe/safe_network/commit/49d04e1414bf517cc76ebe2c6b86e0b3dd48e47a))
     - resolution test except for the blob range tests ([`c88a1bc`](https://github.com/maidsafe/safe_network/commit/c88a1bc5fda40093bb129b4351eef73d2eb7c041))
+    - update actions workflows for workspace refactor ([`3703819`](https://github.com/maidsafe/safe_network/commit/3703819c7f0da220c8ff21169ca1e8161a20157b))
     - NRS all tests except for the register issue ([`2fe38d1`](https://github.com/maidsafe/safe_network/commit/2fe38d13bc74a7c7cede96340d275ef3f94e1427))
     - parsing Url as xorurl ([`6c61764`](https://github.com/maidsafe/safe_network/commit/6c61764c7479405d2978bec1bbc5cbd11ca5e7c8))
     - nrs and resolver ([`c0ac51a`](https://github.com/maidsafe/safe_network/commit/c0ac51ae4bf4dbd9df3dd39700887df439eec4f6))
     - update actions workflows for workspace refactor ([`d0134e8`](https://github.com/maidsafe/safe_network/commit/d0134e870bb097e095e1c8a33e607cf7994e6491))
+    - move safe_network code into sn directory ([`2254329`](https://github.com/maidsafe/safe_network/commit/225432908839359800d301d9e5aa8274e4652ee1))
+    - move sn_api code into an sn_api directory ([`2b5d177`](https://github.com/maidsafe/safe_network/commit/2b5d17740ca74fc379cab89cb95683e200589148))
     - add an example app showcasing how to fetch a Blob from Safe using sn_api ([`9098cff`](https://github.com/maidsafe/safe_network/commit/9098cff4c4d2ba15321dd072c970a18781a04a49))
     - Version change: sn_api v0.26.0; sn_cli v0.26.0; sn_authd v0.8.0 ([`3bcf8ef`](https://github.com/maidsafe/safe_network/commit/3bcf8efcee84c5fb45f5e03ec49d5a623147dc4d))
     - Version change: sn_api v0.25.3; sn_cli v0.25.3; sn_authd v0.7.3 ([`ab68342`](https://github.com/maidsafe/safe_network/commit/ab683420665c54df1ae3dae95055000518b543d1))
@@ -2210,9 +2321,9 @@ When cat command is used with a Wallet, it lists all spendable balances found in
     - adapting to new Seq type where Policy is immutable ([`85462b6`](https://github.com/maidsafe/safe_network/commit/85462b6fb58f16f4797d7ef2816e96a287af7ad9))
     - customise the error message displayed when a panic occurred ([`45f11ae`](https://github.com/maidsafe/safe_network/commit/45f11ae22df242e229d01bfc5dc2b6ac9de8536d))
     - re-enabling wallet APIs tests in CI ([`6cf5602`](https://github.com/maidsafe/safe_network/commit/6cf56022cd6beec4254d0b1667c4d654f87e6a5a))
-    - Version change: sn_api v0.20.0; sn_cli v0.20.0; sn_authd v0.2.0; qjsonrpc v0.1.2 ([`a35ffb7`](https://github.com/maidsafe/safe_network/commit/a35ffb759bafd6e2b03d96bffa62747eb1965c89))
     - re-enabling xorurl & keys APIs tests in CI ([`4518154`](https://github.com/maidsafe/safe_network/commit/4518154481dbd3aeb397353d4ec296ea98ee3e9a))
     - re-enabling sequence & fetch APIs tests in CI ([`590c4c6`](https://github.com/maidsafe/safe_network/commit/590c4c634046ab655a84093c2ed60e8289415d44))
+    - Version change: sn_api v0.20.0; sn_cli v0.20.0; sn_authd v0.2.0; qjsonrpc v0.1.2 ([`a35ffb7`](https://github.com/maidsafe/safe_network/commit/a35ffb759bafd6e2b03d96bffa62747eb1965c89))
     - remove unused utility function ([`a09c4c2`](https://github.com/maidsafe/safe_network/commit/a09c4c26230b0cf60d7d792d89f0e275f2b64bc2))
     - store serialised NrsMap in a Blob and only its XOR-URL in the NrsMapContainer's underlying Sequence ([`ddb318d`](https://github.com/maidsafe/safe_network/commit/ddb318d96c8a9bf8299bd14aa6824252296bde27))
     - store serialised FilesMap in a Blob and only its XOR-URL in the FilesContainer's underlying Sequence ([`1f37703`](https://github.com/maidsafe/safe_network/commit/1f377038ea693d5253f658d480885662df5b0542))
@@ -2308,23 +2419,16 @@ When cat command is used with a Wallet, it lists all spendable balances found in
     - reenable decoding auth reqs and basic app key generation ([`3f23687`](https://github.com/maidsafe/safe_network/commit/3f23687471b846e3ad1e2492c237a21f212b753f))
     - remove merge added file ([`c56e265`](https://github.com/maidsafe/safe_network/commit/c56e26502ee44af179bfa65c8a194a2190b16842))
     - clippy ([`e0a4de8`](https://github.com/maidsafe/safe_network/commit/e0a4de8de20e5023b83256d39beca19f759ba129))
-    - update to reference renamed sn_client ([`5f8d61c`](https://github.com/maidsafe/safe_network/commit/5f8d61cf41eb547c13b65d2030beefd235b75820))
     - tidying up ([`4905fae`](https://github.com/maidsafe/safe_network/commit/4905fae6259063411c5e4ef5fd2afb531980630c))
-    - update to reference renamed sn_node crate/repo ([`ee05ed3`](https://github.com/maidsafe/safe_network/commit/ee05ed31cb12d8e1d8bac7569beec90db52a5840))
     - fix merge bugs and readd some shell completion logic ([`b99e7de`](https://github.com/maidsafe/safe_network/commit/b99e7dee3e72e703b47888e3ff03d2baa933b408))
     - Merge branch 'master' into ExploreUpdatesForApis ([`34f9bc7`](https://github.com/maidsafe/safe_network/commit/34f9bc704f301ac903f768813fbd4140cd702f21))
-    - rename artifacts and paths to match new naming convention ([`e389ab2`](https://github.com/maidsafe/safe_network/commit/e389ab24f2186fc515b115e736a06d20756ae031))
     - reenabling more transfer funcs ([`d3d04e3`](https://github.com/maidsafe/safe_network/commit/d3d04e36b8fb52ce070aecc2b1f77eb158983427))
     - further ffi cleanup ([`d5c1cd2`](https://github.com/maidsafe/safe_network/commit/d5c1cd2808f9844b06b846ec10dfe05146137023))
-    - update safe-cmd-test-utilities name to ([`8f309da`](https://github.com/maidsafe/safe_network/commit/8f309dada1517afa10c263a52f5597429f764890))
     - remove mock/ffi builds + files ([`8b9b481`](https://github.com/maidsafe/safe_network/commit/8b9b481df5d124857abb02158739a6ded8f02af7))
-    - update jsonrpc-quic crate name to qjsonrpc ([`6f2dd39`](https://github.com/maidsafe/safe_network/commit/6f2dd39d783812a9b3abd774b6bebd4cde2d5a1e))
     - upgrade multibase to v0.8.0 ([`08f5fec`](https://github.com/maidsafe/safe_network/commit/08f5fec47809bbf0aea61a939dfb3c909043703f))
     - tests updated for wallet changes ([`95200df`](https://github.com/maidsafe/safe_network/commit/95200df5f310911294ee72153d10d13f2e4fb737))
-    - update safe-authd crate name to sn_authd ([`019370c`](https://github.com/maidsafe/safe_network/commit/019370cfd0ace44c656caf45c17248f2a547dbbf))
     - reenable wallet apis ([`873fe29`](https://github.com/maidsafe/safe_network/commit/873fe29ac9042b7ad28a29630d2c048bde3a7634))
     - reenabling map ([`9e19113`](https://github.com/maidsafe/safe_network/commit/9e191132a4281c53bd4872a756888234adfc0e2a))
-    - update safe-api repo/crate name to sn_api ([`cb66e8f`](https://github.com/maidsafe/safe_network/commit/cb66e8f5a89872d018e48311738d96173ae8274c))
     - sn_client updated ([`4320a05`](https://github.com/maidsafe/safe_network/commit/4320a059224ef6018f7fc067f4a40a6534beeebb))
     - use dirs_next for dir finding ([`426158f`](https://github.com/maidsafe/safe_network/commit/426158fcbb6d7c1fe44755c138bba1ac825a0a0c))
     - clippy ([`0b17fdd`](https://github.com/maidsafe/safe_network/commit/0b17fddbe3418531df1d03a82d4eb510b819b811))
@@ -2337,5 +2441,12 @@ When cat command is used with a Wallet, it lists all spendable balances found in
     - moving in basics of auth func into the repo ([`07dd195`](https://github.com/maidsafe/safe_network/commit/07dd1956d4a53e2f4d09310b48e2a43a3a10e795))
     - safe_nd -> sn_data_types ([`4466c48`](https://github.com/maidsafe/safe_network/commit/4466c48a3fcec76f6c90cf6fcf1f28b177978c90))
     - initial tweaks for app / auth changes ([`1e4c47a`](https://github.com/maidsafe/safe_network/commit/1e4c47aed1aeed3488e370ab0c33a7b5519e40f5))
+    - update to reference renamed sn_client ([`5f8d61c`](https://github.com/maidsafe/safe_network/commit/5f8d61cf41eb547c13b65d2030beefd235b75820))
+    - update to reference renamed sn_node crate/repo ([`ee05ed3`](https://github.com/maidsafe/safe_network/commit/ee05ed31cb12d8e1d8bac7569beec90db52a5840))
+    - rename artifacts and paths to match new naming convention ([`e389ab2`](https://github.com/maidsafe/safe_network/commit/e389ab24f2186fc515b115e736a06d20756ae031))
+    - update safe-cmd-test-utilities name to ([`8f309da`](https://github.com/maidsafe/safe_network/commit/8f309dada1517afa10c263a52f5597429f764890))
+    - update jsonrpc-quic crate name to qjsonrpc ([`6f2dd39`](https://github.com/maidsafe/safe_network/commit/6f2dd39d783812a9b3abd774b6bebd4cde2d5a1e))
+    - update safe-authd crate name to sn_authd ([`019370c`](https://github.com/maidsafe/safe_network/commit/019370cfd0ace44c656caf45c17248f2a547dbbf))
+    - update safe-api repo/crate name to sn_api ([`cb66e8f`](https://github.com/maidsafe/safe_network/commit/cb66e8f5a89872d018e48311738d96173ae8274c))
 </details>
 
