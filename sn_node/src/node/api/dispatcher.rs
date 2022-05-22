@@ -13,6 +13,7 @@ use crate::node::{
     messages::WireMsgUtils,
     Result,
 };
+use dashmap::DashMap;
 #[cfg(feature = "back-pressure")]
 use sn_interface::messaging::DstLocation;
 use sn_interface::messaging::{system::SystemMsg, AuthKind, WireMsg};
@@ -20,7 +21,7 @@ use sn_interface::types::{log_markers::LogMarker, Peer};
 
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
-use tokio::{sync::watch, time};
+use tokio::{sync::watch, sync::RwLock, task::JoinHandle, time};
 use tracing::Instrument;
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
@@ -200,6 +201,109 @@ impl Dispatcher {
             }
         });
     }
+
+    /// Periodically loop over any pending data batches and queue up send_msg for those
+    pub(super) async fn start_sending_any_data_batches(self: Arc<Self>) {
+        info!("Starting sending any queued data for replication in batches");
+
+        let _handle: JoinHandle<Result<()>> = tokio::spawn(async move {
+            let dispatcher = self.clone();
+            let mut interval = tokio::time::interval(DATA_BATCH_INTERVAL);
+            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+            let _ = interval.tick().await;
+
+            loop {
+                use rand::seq::IteratorRandom;
+                let mut rng = rand::rngs::OsRng;
+                let mut cmds = vec![];
+                let mut this_batch_address = None;
+
+                // choose a data to replicate at random
+                if let Some(data_queued) = self
+                    .pending_data_to_replicate_to_peers
+                    .iter()
+                    .choose(&mut rng)
+                {
+                    this_batch_address = Some(*data_queued.key());
+                }
+
+                if let Some(address) = this_batch_address {
+                    if let Some((data_address, data_recipients)) =
+                        self.pending_data_to_replicate_to_peers.remove(&address)
+                    {
+                        // get info for the WireMsg
+                        // TODO: match this per message.....
+                        let src_section_pk = self.node.network_knowledge().section_key().await;
+                        let our_info = &*self.node.info.read().await;
+
+                        let mut recipients = vec![];
+
+                        // TODO: do we need this to be a dashset??
+                        for peer in data_recipients.read().await.iter() {
+                            recipients.push(*peer);
+                        }
+
+                        if recipients.is_empty() {
+                            continue;
+                        }
+
+                        let name = recipients[0].name();
+
+                        // TODO recipeinttt
+                        let dst = sn_interface::messaging::DstLocation::Node {
+                            // Seems like we don't check/use this anywhere atm...
+                            // Should check if we can map this to a vec and then validate
+                            // targets there?
+                            // is that wortwhile?
+                            name,
+                            section_pk: src_section_pk,
+                        };
+
+                        let data_to_send = self
+                            .node
+                            .data_storage
+                            .get_from_local_store(&data_address)
+                            .await?;
+
+                        let system_msg =
+                            SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
+                        let wire_msg =
+                            WireMsg::single_src(our_info, dst, system_msg, src_section_pk)?;
+
+                        debug!(
+                            "{:?} to: {:?} w/ {:?} ",
+                            LogMarker::SendingMissingReplicatedData,
+                            recipients,
+                            wire_msg.msg_id()
+                        );
+
+                        cmds.extend(
+                            self.send_msg(&recipients, recipients.len(), wire_msg)
+                                .await?,
+                        )
+                    }
+                }
+
+                for cmd in cmds {
+                    if let Err(e) = dispatcher
+                        .clone()
+                        .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
+                        .await
+                    {
+                        error!(
+                            "Error requesting a cleaning up of unused PeerLinks: {:?}",
+                            e
+                        );
+                    }
+                }
+
+                let _ = interval.tick().await;
+            }
+
+            // Result::<()>::Ok(())
+        });
+    }
+
     pub(super) async fn check_for_dysfunction_periodically(self: Arc<Self>) {
         info!("Starting dysfunction checking");
         let _handle = tokio::spawn(async move {
@@ -464,8 +568,29 @@ impl Dispatcher {
                 recipients,
                 mut wire_msgs,
             } => {
-                self.send_throttled_batch_msgs(recipients, &mut wire_msgs, throttle_duration)
-                    .await
+                // we should queue this
+
+                for data in data_batch {
+                    if let Some(data_entry) = self.pending_data_to_replicate_to_peers.get_mut(&data)
+                    {
+                        let peer_set = data_entry.value();
+                        debug!("data already queued, adding peer");
+                        let _existed = peer_set.write().await.insert(recipient);
+                    } else {
+                        // let queue = DashSet::new();
+                        let mut peer_set = BTreeSet::new();
+                        let _existed = peer_set.insert(recipient);
+                        let _existed = self
+                            .pending_data_to_replicate_to_peers
+                            .insert(data, Arc::new(RwLock::new(peer_set)));
+                    }
+                }
+
+                Ok(vec![])
+
+                // // TODO, if we have outgoing msg deduplication, we can put all relevant nodes in recipients here...
+                // self.send_throttled_batch_data(recipient, &mut data_batches, throttle_duration)
+                //     .await
             }
             Cmd::SendMsgDeliveryGroup {
                 recipients,
