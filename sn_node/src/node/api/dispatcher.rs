@@ -25,7 +25,7 @@ use sn_interface::{
 };
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::time::MissedTickBehavior;
-use tokio::{sync::watch, sync::RwLock, time};
+use tokio::{sync::watch, sync::RwLock, task::JoinHandle, time};
 use tracing::Instrument;
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
@@ -217,7 +217,7 @@ impl Dispatcher {
     pub(super) async fn start_sending_any_data_batches(self: Arc<Self>) {
         info!("Starting sending any queued data for replication in batches");
 
-        let _handle = tokio::spawn(async move {
+        let _handle: JoinHandle<Result<()>> = tokio::spawn(async move {
             let dispatcher = self.clone();
             let mut interval = tokio::time::interval(DATA_BATCH_INTERVAL);
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
@@ -235,7 +235,7 @@ impl Dispatcher {
                     .iter()
                     .choose(&mut rng)
                 {
-                    this_batch_address = Some(data_queued.key().clone());
+                    this_batch_address = Some(*data_queued.key());
                 }
 
                 if let Some(address) = this_batch_address {
@@ -251,7 +251,7 @@ impl Dispatcher {
 
                         // TODO: do we need this to be a dashset??
                         for peer in data_recipients.read().await.iter() {
-                            recipients.push(peer.clone());
+                            recipients.push(*peer);
                         }
 
                         if recipients.is_empty() {
@@ -311,7 +311,7 @@ impl Dispatcher {
                 let _ = interval.tick().await;
             }
 
-            Result::<()>::Ok(())
+            // Result::<()>::Ok(())
         });
     }
 
@@ -574,7 +574,8 @@ impl Dispatcher {
                         // let queue = DashSet::new();
                         let mut peer_set = BTreeSet::new();
                         let _existed = peer_set.insert(recipient);
-                        self.pending_data_to_replicate_to_peers
+                        let _existed = self
+                            .pending_data_to_replicate_to_peers
                             .insert(data, Arc::new(RwLock::new(peer_set)));
                     }
                 }

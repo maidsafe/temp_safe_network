@@ -19,7 +19,6 @@ use sn_interface::{
     types::ReplicatedDataAddress,
 };
 use std::collections::BTreeSet;
-use tokio::time::Duration;
 
 impl Node {
     /// Given a set of known data, we can calculate what more from what we have a
