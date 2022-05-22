@@ -21,9 +21,6 @@ use sn_interface::{
 use std::collections::BTreeSet;
 use tokio::time::Duration;
 
-const REPLICATION_BATCH_SIZE: usize = 50;
-const REPLICATION_MSG_THROTTLE_DURATION: Duration = Duration::from_secs(5);
-
 impl Node {
     /// Given a set of known data, we can calculate what more from what we have a
     /// given node should be responsible for
@@ -48,7 +45,7 @@ impl Node {
         let adults = self.network_knowledge.adults().await;
         let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
 
-        let mut data_for_sender = DashSet::new();
+        let data_for_sender = DashSet::new();
         for data in data_i_have {
             if data_sender_has.contains(&data) {
                 continue;
@@ -62,31 +59,20 @@ impl Node {
 
             if holder_adult_list.contains(&sender.name()) {
                 debug!("Our requester should hold: {:?}", data);
-                data_for_sender.insert(data);
+                let _existed = data_for_sender.insert(data);
             }
         }
-
-        // TODO: we should only need to send 1/data_copy_count() of data
-        // from the xorname range... depending on how close we are.
 
         if data_for_sender.is_empty() {
             trace!("We have no data worth sending");
             return Ok(vec![]);
         }
 
-        // let mut data_batches = Dash;
-
         debug!(
             "{:?} batch to: {:?} ",
             LogMarker::QueuingMissingReplicatedData,
             sender
         );
-        // // Chunks the collection into REPLICATION_BATCH_SIZE addresses in a batch. This avoids memory
-        // // explosion in the network when the amount of data to be replicated is high
-        // for chunked_data_address in &data_for_sender.into_iter().chunks(REPLICATION_BATCH_SIZE) {
-        //     let data_batch = chunked_data_address.collect_vec();
-        //     data_batches.push(data_batch);
-        // }
 
         let cmd = Cmd::EnqueueDataForReplication {
             // throttle_duration: REPLICATION_MSG_THROTTLE_DURATION,

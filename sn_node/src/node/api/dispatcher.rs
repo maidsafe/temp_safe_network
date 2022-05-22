@@ -12,8 +12,7 @@ use crate::node::{
     messages::WireMsgUtils,
     Result,
 };
-use dashmap::{DashMap, DashSet};
-use itertools::Itertools;
+use dashmap::DashMap;
 #[cfg(feature = "back-pressure")]
 use sn_interface::messaging::DstLocation;
 use sn_interface::types::{log_markers::LogMarker, Peer};
@@ -216,8 +215,6 @@ impl Dispatcher {
 
     /// Periodically loop over any pending data batches and queue up send_msg for those
     pub(super) async fn start_sending_any_data_batches(self: Arc<Self>) {
-        /// Q: how we do we solve this for peers???
-        ///
         info!("Starting sending any queued data for replication in batches");
 
         let _handle = tokio::spawn(async move {
@@ -242,7 +239,7 @@ impl Dispatcher {
                 }
 
                 if let Some(address) = this_batch_address {
-                    if let Some((data_address, mut data_recipients)) =
+                    if let Some((data_address, data_recipients)) =
                         self.pending_data_to_replicate_to_peers.remove(&address)
                     {
                         // get info for the WireMsg
@@ -568,8 +565,7 @@ impl Dispatcher {
                 // we should queue this
 
                 for data in data_batch {
-                    if let Some(mut data_entry) =
-                        self.pending_data_to_replicate_to_peers.get_mut(&data)
+                    if let Some(data_entry) = self.pending_data_to_replicate_to_peers.get_mut(&data)
                     {
                         let peer_set = data_entry.value();
                         debug!("data already queued, adding peer");
