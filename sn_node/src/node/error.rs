@@ -155,6 +155,9 @@ pub enum Error {
     /// Elder Handover related errors
     #[error("Handover Error:: {0}")]
     HandoverError(#[from] HandoverError),
+    /// Request Handover Anti Entropy
+    #[error("RequestHandoverAntiEntropy {0}")]
+    RequestHandoverAntiEntropy(u64),
 }
 
 impl From<qp2p::ClientEndpointError> for Error {

@@ -38,6 +38,14 @@ pub enum Error {
     #[error("Faulty Proposal")]
     FaultyProposal,
 
+    /// Handover generation is behind received vote, we need anti-entropy
+    #[error("We are behind the voter, caller should request anti-entropy")]
+    RequestAntiEntropy,
+
+    /// Handover history is corrupted, there is a mistake in the code or the node is byzantine
+    #[error("Corrupted Handover History: {0}")]
+    CorruptedHandoverHistory(String),
+
     /// Consensus related errors and faults
     #[error("Consensus Error: {0}")]
     ConsensusFault(#[from] ConsensusError),

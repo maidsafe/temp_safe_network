@@ -1,10 +1,13 @@
 use bls::{PublicKeySet, SecretKeyShare};
 use core::fmt::Debug;
+use std::cmp::Ordering;
+use std::collections::BTreeMap;
 use tracing::info;
 use xor_name::Prefix;
 
 use sn_consensus::consensus::{Consensus, VoteResponse};
 use sn_consensus::vote::{Ballot, SignedVote, Vote};
+use sn_consensus::Generation;
 use sn_consensus::NodeId;
 
 use super::errors::{Error, Result};
@@ -17,6 +20,9 @@ use sn_interface::network_knowledge::SectionAuthorityProvider;
 pub(crate) struct Handover {
     pub(crate) consensus: Consensus<SapCandidate>,
     pub(crate) section_prefix: Prefix,
+    pub(crate) failed_consensus_rounds: BTreeMap<Generation, Consensus<SapCandidate>>,
+    /// Handover gen starting at 0, and then +1 for each retries after failed consensus rounds
+    pub(crate) gen: Generation,
 }
 
 impl Handover {
@@ -29,12 +35,14 @@ impl Handover {
         Handover {
             consensus: Consensus::<SapCandidate>::from(secret_key, elders, n_elders),
             section_prefix,
+            failed_consensus_rounds: BTreeMap::new(),
+            gen: 0,
         }
     }
 
     pub(crate) fn propose(&mut self, proposal: SapCandidate) -> Result<SignedVote<SapCandidate>> {
         let vote = Vote {
-            gen: 0,
+            gen: self.gen,
             ballot: Ballot::Propose(proposal),
             faults: self.consensus.faults(),
         };
@@ -50,35 +58,101 @@ impl Handover {
         self.cast_vote(signed_vote)
     }
 
-    // NB TODO do we need anti-entropy for handover? How do we trigger it?
-    // // Get someone up to speed on our view of the current votes
-    // pub(crate) fn anti_entropy(&self) -> Result<Vec<SignedVote<SapCandidate>>> {
-    //     info!("[HDVR] anti-entropy from {:?}", self.id());
-    //
-    //     if let Some(decision) = self.consensus.decision.as_ref() {
-    //         let vote = self.consensus.build_super_majority_vote(
-    //             decision.votes.clone(),
-    //             decision.faults.clone(),
-    //             0,
-    //         )?;
-    //         Ok(vec![vote])
-    //     } else {
-    //         Ok(self.consensus.votes.values().cloned().collect())
-    //     }
-    // }
+    // Get someone up to speed on our view of the current votes when receiving votes from an older gen
+    pub(crate) fn anti_entropy(
+        &self,
+        from_gen: Generation,
+    ) -> Result<Vec<SignedVote<SapCandidate>>> {
+        let mut proof_votes = self
+            .failed_consensus_rounds
+            .iter()
+            .filter(|(gen, _)| **gen >= from_gen)
+            .map(|(gen, consensus)| {
+                if let Some(decision) = consensus.decision.clone() {
+                    Ok(consensus.build_super_majority_vote(
+                        decision.votes.clone(),
+                        decision.faults,
+                        *gen,
+                    )?)
+                } else {
+                    Err(Error::CorruptedHandoverHistory(format!(
+                        "missing decision for handover history at generation {}",
+                        gen
+                    )))
+                }
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        // include the current in-progres votes as well.
+        proof_votes.extend(self.consensus.votes.values().cloned());
+
+        info!(
+            "Handover - anti-entropy from gen {}..{} id {:?}",
+            from_gen,
+            self.gen,
+            self.id()
+        );
+        Ok(proof_votes)
+    }
+
+    pub(crate) fn handle_empty_set_decision(&mut self) {
+        if let Some(decision) = &self.consensus.decision {
+            if decision.proposals.is_empty() {
+                let new_consensus = Consensus::<SapCandidate>::from(
+                    self.consensus.secret_key.clone(),
+                    self.consensus.elders.clone(),
+                    self.consensus.n_elders,
+                );
+                let old_consensus = std::mem::replace(&mut self.consensus, new_consensus);
+                let _none = self.failed_consensus_rounds.insert(self.gen, old_consensus);
+                self.gen += 1;
+                info!(
+                    "Handover - noticed consensus on empty set, updading to gen {} id {:?}",
+                    self.gen,
+                    self.id()
+                );
+            }
+        }
+    }
 
     pub(crate) fn id(&self) -> NodeId {
         self.consensus.id()
+    }
+
+    pub(crate) fn generation(&self) -> Generation {
+        self.gen
+    }
+
+    fn handle_outdated_signed_vote(
+        &mut self,
+        signed_vote: SignedVote<SapCandidate>,
+    ) -> Result<VoteResponse<SapCandidate>> {
+        if let Some(consensus) = self.failed_consensus_rounds.get_mut(&signed_vote.vote.gen) {
+            Ok(consensus.handle_signed_vote(signed_vote)?)
+        } else {
+            Err(Error::CorruptedHandoverHistory(format!(
+                "could not find history for gen {} when we're at {}",
+                signed_vote.vote.gen, self.gen
+            )))
+        }
     }
 
     pub(crate) fn handle_signed_vote(
         &mut self,
         signed_vote: SignedVote<SapCandidate>,
     ) -> Result<VoteResponse<SapCandidate>> {
-        info!("[HDVR] {:?} handling vote: {:?}", self.id(), signed_vote);
+        info!(
+            "Handover - {:?} handling vote: {:?}",
+            self.id(),
+            signed_vote
+        );
         self.validate_proposals(&signed_vote)?;
 
-        Ok(self.consensus.handle_signed_vote(signed_vote)?)
+        match signed_vote.vote.gen.cmp(&self.gen) {
+            Ordering::Less => self.handle_outdated_signed_vote(signed_vote),
+            Ordering::Greater => Err(Error::RequestAntiEntropy),
+            Ordering::Equal => Ok(self.consensus.handle_signed_vote(signed_vote)?),
+        }
     }
 
     pub(crate) fn sign_vote(&self, vote: Vote<SapCandidate>) -> Result<SignedVote<SapCandidate>> {

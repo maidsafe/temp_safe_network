@@ -44,7 +44,7 @@ impl Node {
     ) -> Vec<Cmd> {
         // Deliver each SignedVote to all current Elders
         trace!("Broadcasting Vote msg: {:?}", signed_vote);
-        let node_msg = SystemMsg::HandoverVote(signed_vote);
+        let node_msg = SystemMsg::HandoverVotes(vec![signed_vote]);
         match self.send_msg_to_our_elders(node_msg).await {
             Ok(cmd) => vec![cmd],
             Err(err) => {
