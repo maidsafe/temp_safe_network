@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1653163242234,
+  "lastUpdate": 1653420687357,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -3791,6 +3791,78 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/single chunks",
             "value": 243054,
             "range": "± 6240",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "c6e6e324164028c6c15a78643783a9f86679f39e",
+          "message": "Merge #1195\n\n1195: refactor(node_state): move NodeState validations to NodeState struct r=davidrusu a=davidrusu\n\nThis is part of the work to move membership history to NetworkKnowledge. By moving NodeState validations to the NodeState struct, we have less code in Membership and so, less code to move to NetworkKnowledge.\n\nCo-authored-by: David Rusu <davidrusu.me@gmail.com>\nCo-authored-by: David Irvine <david.irvine@maidsafe.net>",
+          "timestamp": "2022-05-24T17:50:40Z",
+          "tree_id": "6f89bda404265b1affb34f7f56d7a37ab47bc239",
+          "url": "https://github.com/maidsafe/safe_network/commit/c6e6e324164028c6c15a78643783a9f86679f39e"
+        },
+        "date": 1653420686654,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10787247250,
+            "range": "± 11870124342",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3695483661,
+            "range": "± 1038236290",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 8650492152,
+            "range": "± 1267229647",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10028078392,
+            "range": "± 2216826133",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 4298178808,
+            "range": "± 1615015716",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4424916862,
+            "range": "± 962399949",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single registers",
+            "value": 12214,
+            "range": "± 412",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single chunks",
+            "value": 201157,
+            "range": "± 1863",
             "unit": "ns/iter"
           }
         ]
