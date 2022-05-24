@@ -4,7 +4,7 @@ use bls_dkg::{PublicKeySet, SecretKeyShare};
 use core::fmt::Debug;
 use sn_interface::{
     messaging::system::{MembershipState, NodeState},
-    network_knowledge::{recommended_section_size, SectionAuthorityProvider, MIN_ADULT_AGE},
+    network_knowledge::SectionAuthorityProvider,
 };
 use thiserror::Error;
 use xor_name::{Prefix, XorName};
@@ -19,27 +19,13 @@ pub(crate) enum Error {
     Consensus(#[from] sn_consensus::Error),
     #[error("We are behind the voter, caller should request anti-entropy")]
     RequestAntiEntropy,
+    #[error("Invalid proposal")]
+    InvalidProposal,
+    #[error("Network Knowledge error {0:?}")]
+    NetworkKnowledge(#[from] sn_interface::network_knowledge::Error),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;
-
-pub(crate) fn split(
-    prefix: &Prefix,
-    nodes: impl IntoIterator<Item = XorName>,
-) -> Option<(BTreeSet<XorName>, BTreeSet<XorName>)> {
-    let decision_index: u8 = if let Ok(idx) = prefix.bit_count().try_into() {
-        idx
-    } else {
-        return None;
-    };
-
-    let (one, zero) = nodes
-        .into_iter()
-        .filter(|name| prefix.matches(name))
-        .partition(|name| name.bit(decision_index));
-
-    Some((zero, one))
-}
 
 /// Returns the nodes that should be candidates to become the next elders, sorted by names.
 pub(crate) fn elder_candidates(
@@ -218,15 +204,10 @@ impl Membership {
         };
         let signed_vote = self.sign_vote(vote)?;
 
-        let is_invalid_proposal = !self.validate_proposals(&signed_vote, prefix)?;
-        let is_byzantine = self
-            .consensus
-            .detect_byzantine_voters(&signed_vote)
-            .is_err();
-        if is_invalid_proposal || is_byzantine {
-            return Err(Error::Consensus(
-                sn_consensus::Error::AttemptedFaultyProposal,
-            ));
+        self.validate_proposals(&signed_vote, prefix)?;
+        if let Err(e) = self.consensus.detect_byzantine_voters(&signed_vote) {
+            error!("Attempted invalid proposal: {e:?}");
+            return Err(Error::InvalidProposal);
         }
 
         self.cast_vote(signed_vote)
@@ -264,12 +245,7 @@ impl Membership {
         signed_vote: SignedVote<NodeState>,
         prefix: &Prefix,
     ) -> Result<VoteResponse<NodeState>> {
-        if !self.validate_proposals(&signed_vote, prefix)? {
-            error!("Membership - dropping faulty vote {signed_vote:?}");
-            return Err(Error::Consensus(
-                sn_consensus::Error::AttemptedFaultyProposal,
-            ));
-        }
+        self.validate_proposals(&signed_vote, prefix)?;
 
         let vote_gen = signed_vote.vote.gen;
 
@@ -318,165 +294,22 @@ impl Membership {
         &self,
         signed_vote: &SignedVote<NodeState>,
         prefix: &Prefix,
-    ) -> Result<bool> {
+    ) -> Result<()> {
         // check we're section the vote is for our current membership state
-        if signed_vote
-            .validate_signature(&self.consensus.elders)
-            .is_err()
-        {
-            error!("Membership - dropping signed vote that was not signed by current elders");
-            return Ok(false);
-        }
+        signed_vote.validate_signature(&self.consensus.elders)?;
 
         // ensure we have a consensus instance for this votes generations
-        if self.consensus_at_gen(signed_vote.vote.gen).is_err() {
-            error!(
-                "Membership - dropping signed vote from invalid gen {:?}",
-                signed_vote.vote.gen
-            );
-            return Err(Error::RequestAntiEntropy);
-        }
+        let _ = self
+            .consensus_at_gen(signed_vote.vote.gen)
+            .map_err(|_| Error::RequestAntiEntropy)?;
+
+        let members =
+            BTreeSet::from_iter(self.section_members(signed_vote.vote.gen - 1)?.into_keys());
 
         for proposal in signed_vote.proposals() {
-            if !self.validate_node_state(proposal, signed_vote.vote.gen, prefix)? {
-                return Ok(false);
-            }
+            proposal.into_state().validate(prefix, &members)?;
         }
 
-        Ok(true)
-    }
-
-    fn allowed_to_join(
-        &self,
-        joining_name: XorName,
-        prefix: &Prefix,
-        members: impl IntoIterator<Item = XorName>,
-    ) -> bool {
-        // We multiply by two to allow a buffer for when nodes are joining sequentially.
-        let split_section_size_cap = recommended_section_size() * 2;
-
-        match split(prefix, members) {
-            Some((zeros, ones)) => {
-                info!(
-                    "Membership - Section {prefix:?} would split into {} zero and {} one nodes",
-                    zeros.len(),
-                    ones.len()
-                );
-                match joining_name.bit(prefix.bit_count() as u8) {
-                    // joining node would be part of the `ones` child section
-                    true => ones.len() < split_section_size_cap,
-
-                    // joining node would be part of the `zeros` child section
-                    false => zeros.len() < split_section_size_cap,
-                }
-            }
-            None => false,
-        }
-    }
-
-    #[allow(dead_code)]
-    fn validate_node_age(&self, node_state: &NodeState) -> bool {
-        let age = node_state.age();
-        match node_state.state {
-            MembershipState::Joined => age == MIN_ADULT_AGE,
-            MembershipState::Relocated(_) => age > MIN_ADULT_AGE,
-            MembershipState::Left => true,
-        }
-    }
-
-    fn is_relocated_to_our_section(&self, name: &XorName) -> bool {
-        self.history
-            .values()
-            .flat_map(|(decision, _)| decision.proposals.keys())
-            .any(|node_state| {
-                node_state.clone().into_state().previous_name().as_ref() == Some(name)
-            })
-    }
-
-    fn validate_relocation_details(&self, node_state: &NodeState, prefix: &Prefix) -> bool {
-        let name = node_state.name;
-        if let MembershipState::Relocated(details) = &node_state.state {
-            let dest = details.dst;
-
-            if !prefix.matches(&dest) {
-                info!(
-		    "Membership - Ignoring relocate request from {name} - {dest} doesn't match our prefix {prefix:?}."
-		);
-                return false;
-            }
-
-            // We requires the node name matches the relocation details age.
-            let age = details.age;
-            let state_age = node_state.age();
-            if age != state_age {
-                info!(
-		    "Membership - Ignoring relocation req from {name} - relocation age ({age}) doesn't match peer's age ({state_age})."
-		);
-                return false;
-            }
-
-            let prev_name = &details.previous_name;
-            if self.is_relocated_to_our_section(prev_name) {
-                info!("Membership - Ignoring relocation req from {name} - original node {prev_name:?} already relocated to us.");
-                return false;
-            }
-        }
-
-        true
-    }
-
-    fn validate_node_state(
-        &self,
-        node_state: NodeState,
-        gen: Generation,
-        prefix: &Prefix,
-    ) -> Result<bool> {
-        let name = node_state.name;
-        info!(
-            "Membership - validating node state for {name}, state {:?}",
-            node_state.state
-        );
-
-        if !prefix.matches(&node_state.name) {
-            warn!("Membership - rejecting node {name}, name doesn't match our prefix {prefix:?}");
-            return Ok(false);
-        }
-
-        // TODO: disabled temporarily, until we can resolve node age issues
-        // if !self.validate_node_age(&node_state) {
-        //     warn!("Membership - rejecting node {name} with invalid age {}", node_state.age());
-        //     return Ok(false);
-        // }
-
-        if !self.validate_relocation_details(&node_state, prefix) {
-            warn!("Membership - rejecting node {name} with invalid relocation details");
-            return Ok(false);
-        }
-
-        let members = self.section_members(gen - 1)?;
-        let is_valid = match node_state.state {
-            MembershipState::Joined | MembershipState::Relocated(_) => {
-                if members.contains_key(&node_state.name) {
-                    warn!("Membership - rejecting join from existing member {name}");
-                    false
-                } else if !self.allowed_to_join(node_state.name, prefix, members.keys().copied()) {
-                    warn!("Membership - rejecting join since we are at capacity");
-                    false
-                } else {
-                    true
-                }
-            }
-            MembershipState::Left => {
-                if members.get(&node_state.name).map(|n| &n.state) != Some(&MembershipState::Joined)
-                {
-                    warn!("Membership - rejecting leave from non-existing member");
-                    false
-                } else {
-                    true
-                }
-            }
-        };
-
-        Ok(is_valid)
+        Ok(())
     }
 }

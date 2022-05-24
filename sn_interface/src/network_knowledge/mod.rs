@@ -92,6 +92,49 @@ pub const fn supermajority(group_size: usize) -> usize {
     1 + group_size * 2 / 3
 }
 
+pub fn split(
+    prefix: &Prefix,
+    nodes: impl IntoIterator<Item = XorName>,
+) -> Option<(BTreeSet<XorName>, BTreeSet<XorName>)> {
+    let decision_index: u8 = if let Ok(idx) = prefix.bit_count().try_into() {
+        idx
+    } else {
+        return None;
+    };
+
+    let (one, zero) = nodes
+        .into_iter()
+        .filter(|name| prefix.matches(name))
+        .partition(|name| name.bit(decision_index));
+
+    Some((zero, one))
+}
+
+pub fn section_has_room_for_node(
+    joining_node: XorName,
+    prefix: &Prefix,
+    members: impl IntoIterator<Item = XorName>,
+) -> bool {
+    // We multiply by two to allow a buffer for when nodes are joining sequentially.
+    let split_section_size_cap = recommended_section_size() * 2;
+
+    match split(prefix, members) {
+        Some((zeros, ones)) => {
+            let n_zeros = zeros.len();
+            let n_ones = ones.len();
+            info!("Section {prefix:?} would split into {n_zeros} zero and {n_ones} one nodes");
+            match joining_node.bit(prefix.bit_count() as u8) {
+                // joining node would be part of the `ones` child section
+                true => n_ones < split_section_size_cap,
+
+                // joining node would be part of the `zeros` child section
+                false => n_zeros < split_section_size_cap,
+            }
+        }
+        None => false,
+    }
+}
+
 /// Container for storing information about the network, including our own section.
 #[derive(Clone, Debug)]
 pub struct NetworkKnowledge {
