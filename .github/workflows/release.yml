@@ -200,19 +200,18 @@ jobs:
           ./resources/scripts/output_versioning_info.sh
       - name: cargo login
         run: cargo login ${{ secrets.CRATES_IO_TOKEN }}
-      - name: publish sn_dysfunction
-        run: |
-          commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_dysfunction"* ]]; then
-            # The sn_dysfunction crate doesn't have any dependencies so we can go ahead and publish.
-            cd sn_dysfunction && cargo publish --allow-dirty
-          fi
       - name: publish sn_interface
         run: |
           commit_message="${{ github.event.head_commit.message }}"
           if [[ $commit_message == *"sn_interface"* ]]; then
             # The sn_interface crate doesn't have any dependencies so we can go ahead and publish.
             cd sn_interface && cargo publish --allow-dirty
+          fi
+      - name: publish sn_dysfunction
+        run: |
+          commit_message="${{ github.event.head_commit.message }}"
+          if [[ $commit_message == *"sn_dysfunction"* ]]; then
+            ./resources/scripts/publish_crate_with_retries.sh "sn_dysfunction"
           fi
       - name: publish sn_node
         run: |
