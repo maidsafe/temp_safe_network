@@ -210,7 +210,6 @@ impl Membership {
             &self.consensus.votes,
             &self.consensus.processed_votes_cache,
         ) {
-            // if let Err(e) = self.consensus.detect_byzantine_voters(&signed_vote) {
             error!("Attempted invalid proposal: {e:?}");
             return Err(Error::InvalidProposal);
         }
