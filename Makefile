@@ -164,3 +164,25 @@ run-local-baby-fleming:
 	cargo build --release --bin sn_node
 	cp target/release/sn_node ~/.safe/node
 	cargo run --release node run-baby-fleming
+
+ci-unit-tests:
+	cargo test --no-run --release --features=test-utils --package sn_interface \
+		--package sn_dysfunction --package sn_node
+	cargo nextest run --profile ci --release --features test-utils --package sn_interface \
+		messaging prefix_map types
+	cargo nextest run --profile ci --release --package sn_dysfunction
+	cargo nextest run --profile ci --release --features test-utils --package sn_node \
+		dbs node routing
+	cargo nextest run --profile ci --release --package sn_cli --bin safe
+
+ci-e2e-tests:
+	cargo nextest run --profile ci --release --features test-utils --package sn_client \
+		--test-threads 2
+	cargo nextest run --profile ci --release --features test-utils --package sn_client \
+		--test-threads 2 ae_checks
+	cd sn_client && cargo run --release --features=test-utils --example client_files
+
+ci-test-suite: ci-unit-tests ci-e2e-tests
+	cargo nextest run --profile ci --release --package sn_api --test-threads 10
+	cargo run --package sn_cli --release -- keys create --for-cli
+	cargo nextest run --profile ci --release --package sn_cli --test-threads 10
