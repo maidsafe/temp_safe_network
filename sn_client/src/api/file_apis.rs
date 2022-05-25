@@ -599,7 +599,7 @@ mod tests {
     async fn ae_checks_file_test() -> Result<()> {
         init_logger();
         let _outer_span = tracing::info_span!("ae_checks_file_test").entered();
-        let client = create_test_client_with(None, None, None, false).await?;
+        let client = create_test_client_with(None, None, None).await?;
         store_and_read(&client, 10 * 1024 * 1024).await
     }
 

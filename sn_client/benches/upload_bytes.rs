@@ -11,7 +11,7 @@ use criterion::{criterion_group, criterion_main, Criterion, SamplingMode};
 use eyre::Result;
 use rand::{rngs::OsRng, Rng};
 use rayon::current_num_threads;
-use sn_client::{utils::test_utils::read_network_conn_info, Client, ClientConfig, Error};
+use sn_client::{Client, ClientConfig, Error};
 use tokio::runtime::Runtime;
 
 /// Generates a random vector using provided `length`.
@@ -66,9 +66,8 @@ fn grows_vec_to_bytes(seed: &[u8], length: usize) -> Bytes {
 }
 
 async fn create_client() -> Result<Client, Error> {
-    let (genesis_key, bootstrap_nodes) = read_network_conn_info().unwrap();
-    let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
-    let client = Client::new(config, bootstrap_nodes, None, None).await?;
+    let config = ClientConfig::new(None, None, None, None, None, None).await;
+    let client = Client::new(config, None, None).await?;
 
     Ok(client)
 }

@@ -19,13 +19,9 @@ pub use sn_interface::init_logger;
 
 use crate::Error;
 
-use sn_interface::types::PublicKey;
-
 #[cfg(test)]
 use backoff::ExponentialBackoff;
-use dirs_next::home_dir;
-use eyre::{eyre, Context, Result};
-use std::{collections::BTreeSet, fs::File, io::BufReader, net::SocketAddr, path::Path};
+use eyre::Result;
 #[cfg(test)]
 use std::{future::Future, time::Duration};
 
@@ -72,36 +68,6 @@ where
     };
 
     backoff::future::retry(backoff, op)
-}
-
-// Relative path from $HOME where to read the genesis node connection information from
-const GENESIS_CONN_INFO_FILEPATH: &str = ".safe/node/node_connection_info.config";
-
-/// Read local network bootstrapping/connection information
-pub fn read_network_conn_info() -> Result<(bls::PublicKey, BTreeSet<SocketAddr>)> {
-    let user_dir = home_dir().ok_or_else(|| eyre!("Could not fetch home directory"))?;
-    let conn_info_path = user_dir.join(Path::new(GENESIS_CONN_INFO_FILEPATH));
-
-    let file = File::open(&conn_info_path).with_context(|| {
-        format!(
-            "Failed to open node connection information file at '{}'",
-            conn_info_path.display(),
-        )
-    })?;
-    let reader = BufReader::new(file);
-    let (genesis_key_hex, bootstrap_nodes): (String, BTreeSet<SocketAddr>) =
-        serde_json::from_reader(reader).with_context(|| {
-            format!(
-                "Failed to parse content of node connection information file at '{}'",
-                conn_info_path.display(),
-            )
-        })?;
-
-    let genesis_key = PublicKey::bls_from_hex(&genesis_key_hex)?
-        .bls()
-        .ok_or_else(|| eyre!("Unexpectedly failed to obtain (BLS) genesis key."))?;
-
-    Ok((genesis_key, bootstrap_nodes))
 }
 
 #[cfg(test)]

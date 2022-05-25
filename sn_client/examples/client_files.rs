@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use eyre::Result;
-use sn_client::{utils::test_utils::read_network_conn_info, Client, ClientConfig};
+use sn_client::{Client, ClientConfig};
 use sn_interface::types::utils::random_bytes;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -16,16 +16,8 @@ use tokio::time::sleep;
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
-    println!("Reading network bootstrap information...");
-    let (genesis_key, bootstrap_nodes) = read_network_conn_info()?;
-
-    println!("Creating a Client to connect to {:?}", bootstrap_nodes);
-    println!(
-        "Network's genesis key: {}",
-        hex::encode(genesis_key.to_bytes())
-    );
-    let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
-    let client = Client::new(config, bootstrap_nodes, None, None).await?;
+    let config = ClientConfig::new(None, None, None, None, None, None).await;
+    let client = Client::new(config, None, None).await?;
 
     let pk = client.public_key();
     println!("Client Public Key: {}", pk);

@@ -9,12 +9,12 @@
 //! `sn_node` provides the interface to Safe routing.  The resulting executable is the node
 //! for the Safe network.
 
-use sn_client::{utils::test_utils::read_network_conn_info, Client, ClientConfig, Error, Result};
+use sn_client::{Client, ClientConfig, Result};
 use sn_interface::{init_logger, types::utils::random_bytes};
 
 use tiny_keccak::{Hasher, Sha3};
 use tokio::time::{sleep, Duration, Instant};
-use tracing::{debug, warn};
+use tracing::warn;
 use xor_name::XorName;
 
 #[tokio::main]
@@ -55,17 +55,10 @@ pub(crate) fn files_count() -> usize {
 pub async fn run_chunk_soak() -> Result<()> {
     let all_data_put = std::sync::Arc::new(tokio::sync::RwLock::new(vec![]));
 
-    // now we read the data
-    let (genesis_key, bootstrap_nodes) =
-        read_network_conn_info().map_err(|_e| Error::NoNetworkKnowledge)?;
-
-    debug!("Contacting nodes: {:?}", bootstrap_nodes);
-
     let files_to_put = files_count();
 
-    let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
-
-    let client = Client::new(config.clone(), bootstrap_nodes.clone(), None, None).await?;
+    let config = ClientConfig::new(None, None, None, None, None, None).await;
+    let client = Client::new(config.clone(), None, None).await?;
 
     let mut put_tasks = vec![];
     // i is used to determine uppload size, so 0 is 0 bytes, which fails
@@ -92,7 +85,7 @@ pub async fn run_chunk_soak() -> Result<()> {
         "put data len is same as we tried to put"
     );
 
-    let client = Client::new(config, bootstrap_nodes, None, None).await?;
+    let client = Client::new(config, None, None).await?;
 
     println!("Now we retrieve the data");
 
@@ -139,11 +132,8 @@ pub async fn run_chunk_soak() -> Result<()> {
 
 #[allow(dead_code)]
 async fn upload_data_using_fresh_client(iteration: usize) -> Result<(XorName, [u8; 32])> {
-    // Now we upload the data.
-    let (genesis_key, bootstrap_nodes) =
-        read_network_conn_info().map_err(|_e| Error::NoNetworkKnowledge)?;
-    let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
-    let client = Client::new(config, bootstrap_nodes, None, None).await?;
+    let config = ClientConfig::new(None, None, None, None, None, None).await;
+    let client = Client::new(config, None, None).await?;
 
     upload_data_using_client(client, iteration).await
 }

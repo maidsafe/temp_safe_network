@@ -30,10 +30,9 @@ use rand::{
     Rng,
 };
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     fs::File,
     io::BufWriter,
-    net::SocketAddr,
     time::{Duration, Instant},
 };
 use structopt::StructOpt;
@@ -128,7 +127,7 @@ async fn main() -> Result<()> {
             let mut network = Network::new();
 
             // Create the genesis node
-            network.create_node(event_tx.clone()).await;
+            network.create_node(event_tx.clone(), true).await;
 
             let mut churn_events = schedule.events();
 
@@ -147,7 +146,7 @@ async fn main() -> Result<()> {
                     event = churn_events.next() => {
                         match event {
                             Some(ChurnEvent::Join) => {
-                                network.create_node(event_tx.clone()).await
+                                network.create_node(event_tx.clone(), false).await
                             }
                             Some(ChurnEvent::Drop) => {
                                 network.remove_random_node()
@@ -222,16 +221,13 @@ impl Network {
     }
 
     // Create new node and let it join the network.
-    async fn create_node(&mut self, event_tx: Sender<Event>) {
-        let bootstrap_nodes = self.get_bootstrap_nodes().await;
-
+    async fn create_node(&mut self, event_tx: Sender<Event>, first: bool) {
         let id = self.new_node_id();
         let _prev = self.nodes.insert(id, Node::Joining);
         self.stats.join_attempts += 1;
 
         let config = Config {
-            first: bootstrap_nodes.is_empty(),
-            hard_coded_contacts: bootstrap_nodes,
+            first,
             ..Default::default()
         };
 
@@ -395,33 +391,6 @@ impl Network {
         let id = self.next_id;
         self.next_id = self.next_id.checked_add(1).expect("too many nodes");
         id
-    }
-
-    // Returns the socket addresses to bootstrap against.
-    async fn get_bootstrap_nodes(&self) -> BTreeSet<SocketAddr> {
-        // Number of bootstrap contacts to use. Use more than one to increase the chance of
-        // successful bootstrap in case some of the bootstrap nodes get dropped.
-        //
-        // FIXME: seems there is a bug which causes a hang if more than one contact is used.
-        // Need to investigate.
-        const COUNT: usize = 1;
-
-        // Use the oldest nodes in the network as the bootstrap contacts.
-        let mut nodes = BTreeSet::new();
-        for (node, _) in self
-            .nodes
-            .values()
-            .filter_map(|node| match node {
-                Node::Joined { node, age, .. } => Some((node, age)),
-                Node::Joining => None,
-            })
-            .sorted_by(|(_, lhs_age), (_, rhs_age)| lhs_age.cmp(rhs_age).reverse())
-            .take(COUNT)
-        {
-            let _prev = nodes.insert(node.our_connection_info().await);
-        }
-
-        nodes
     }
 
     // Send messages to probe network health.

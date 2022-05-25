@@ -8,16 +8,18 @@
 
 use crate::network_knowledge::prefix_map::NetworkPrefixMap;
 use crate::types::{Error, Result};
-use std::path::Path;
+#[cfg(unix)]
+use std::os::unix::fs::symlink;
+#[cfg(windows)]
+use std::os::windows::fs::symlink_file;
+use std::path::PathBuf;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+pub const DEFAULT_PREFIX_SYMLINK_NAME: &str = "default";
 
 pub async fn compare_and_write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap) -> Result<()> {
     // Open or create `$User/.safe/prefix_maps` dir
-    let prefix_map_dir = dirs_next::home_dir()
-        .ok_or_else(|| Error::DirectoryHandling("Could not read '.safe' directory".to_string()))?
-        .join(".safe")
-        .join("prefix_maps");
+    let prefix_map_dir = get_prefix_map_dir()?;
 
     tokio::fs::create_dir_all(prefix_map_dir.clone())
         .await
@@ -28,7 +30,7 @@ pub async fn compare_and_write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap)
     let prefix_map_file = prefix_map_dir.join(format!("{:?}", prefix_map.genesis_key()));
 
     // Check if the prefixMap is already present and is latest to the provided Map.
-    let disk_map = read_prefix_map_from_disk(&prefix_map_file).await.ok();
+    let disk_map = read_prefix_map_from_disk().await.ok();
 
     if let Some(old_map) = disk_map {
         // Return early as the PrefixMap in disk is the equivalent/latest already
@@ -42,7 +44,7 @@ pub async fn compare_and_write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap)
     let serialized =
         rmp_serde::to_vec(prefix_map).map_err(|e| Error::Serialisation(e.to_string()))?;
 
-    let mut file = File::create(prefix_map_file)
+    let mut file = File::create(&prefix_map_file)
         .await
         .map_err(|e| Error::FileHandling(e.to_string()))?;
 
@@ -57,9 +59,10 @@ pub async fn compare_and_write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap)
     Ok(())
 }
 
-pub async fn read_prefix_map_from_disk(path: &Path) -> Result<NetworkPrefixMap> {
+pub async fn read_prefix_map_from_disk() -> Result<NetworkPrefixMap> {
     // Read NetworkPrefixMap from disk if present else create a new one
-    match File::open(path).await {
+    let path = get_prefix_map_dir()?.join(DEFAULT_PREFIX_SYMLINK_NAME);
+    match File::open(&path).await {
         Ok(mut prefix_map_file) => {
             let mut prefix_map_contents = vec![];
             let _ = prefix_map_file
@@ -83,4 +86,31 @@ pub async fn read_prefix_map_from_disk(path: &Path) -> Result<NetworkPrefixMap> 
         }
         Err(e) => Err(Error::FailedToParse(e.to_string())),
     }
+}
+
+pub fn update_prefix_map_symlink(genesis_key: &bls::PublicKey) -> Result<()> {
+    // point '.safe/prefix_maps/default' to the PrefixMap corresponding to the given genesis_key
+    let prefix_map_dir = get_prefix_map_dir()?;
+    let prefix_map_file = prefix_map_dir.join(format!("{:?}", genesis_key));
+    let default_prefix = prefix_map_dir.join(DEFAULT_PREFIX_SYMLINK_NAME);
+
+    trace!(
+        "Creating symlink for PrefixMap from {:?} to {:?}",
+        prefix_map_file,
+        default_prefix
+    );
+    #[cfg(unix)]
+    symlink(prefix_map_file, default_prefix)
+        .map_err(|e| Error::FileHandling(format!("Error creating PrefixMap symlink: {:?}", e)))?;
+    #[cfg(windows)]
+    symlink_file(prefix_map_file, default_prefix)
+        .map_err(|e| Error::FileHandling(format!("Error creating PrefixMap symlink: {:?}", e)))?;
+    Ok(())
+}
+
+fn get_prefix_map_dir() -> Result<PathBuf> {
+    Ok(dirs_next::home_dir()
+        .ok_or_else(|| Error::DirectoryHandling("Could not read '.safe' directory".to_string()))?
+        .join(".safe")
+        .join("prefix_maps"))
 }

@@ -7,11 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use bytes::Buf;
-use color_eyre::{eyre::eyre, Result};
-use sn_api::{resolver::SafeData, PublicKey, Safe, SafeUrl};
-use std::{
-    collections::BTreeSet, env::temp_dir, fs::File, io::Write, net::SocketAddr, path::PathBuf,
-};
+use color_eyre::Result;
+use sn_api::{resolver::SafeData, Safe, SafeUrl};
+use std::{env::temp_dir, fs::File, io::Write, path::PathBuf};
 
 const FILE_TO_UPLOAD: &str = "file_to_upload.rs";
 
@@ -23,21 +21,8 @@ async fn main() -> Result<()> {
     // which is the file we'll then upload to the network.
     let file_path = create_tmp_file()?;
 
-    // We assume there is a local network running which we can
-    // bootstrap to using 127.0.0.1:12000 contact address.
-    // We would also need to be supplied the 'genesis key' (BLS public key) from the running
-    // network. Here we just provide an example.
-    let genesis_key = PublicKey::bls_from_hex("8640e62cc44e75cf4fadc8ee91b74b4cf0fd2c0984fb0e3ab40f026806857d8c41f01d3725223c55b1ef87d669f5e2cc")?
-        .bls()
-        .ok_or_else(|| eyre!("Unexpectedly failed to obtain (BLS) genesis key."))?;
-
-    // Let's build the bootstrap config
-    let mut nodes: BTreeSet<SocketAddr> = BTreeSet::new();
-    nodes.insert("127.0.0.1:12000".parse()?);
-    let bootstrap_config = (genesis_key, nodes);
-
     // The Safe instance is what will give us access to the network API.
-    let safe = Safe::connected(bootstrap_config, None, None, None, None, None).await?;
+    let safe = Safe::connected(None, None, None, None, None).await?;
 
     // We can now upload the file to the network, using the following information
     let dst = None; // root path at destination container

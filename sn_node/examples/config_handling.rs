@@ -112,15 +112,6 @@ async fn main() -> Result<()> {
         !command_line_args.skip_auto_port_forwarding
     );
 
-    if !command_line_args.hard_coded_contacts.is_empty() {
-        assert_eq!(
-            command_line_args.hard_coded_contacts,
-            config.hard_coded_contacts
-        )
-    } else {
-        assert_eq!(file_config.hard_coded_contacts, config.hard_coded_contacts)
-    }
-
     if command_line_args.max_msg_size_allowed.is_some() {
         assert_eq!(
             command_line_args.max_msg_size_allowed,

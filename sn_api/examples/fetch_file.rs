@@ -8,8 +8,8 @@
 
 use bytes::Buf;
 use color_eyre::{eyre::eyre, Result};
-use sn_api::{resolver::SafeData, PublicKey, Safe};
-use std::{collections::BTreeSet, env::args, net::SocketAddr};
+use sn_api::{resolver::SafeData, Safe};
+use std::{env::args, net::SocketAddr};
 
 // To be executed passing Safe network contact address and file Safe URL, e.g.:
 // $ cargo run --release --example fetch_file 127.0.0.1:12000 safe://hy8oyeyqhd1e8keggcjyb9zjyje1m7ihod1pyru6h5y6jkmmihdnym4ngdf
@@ -36,17 +36,8 @@ async fn main() -> Result<()> {
         .ok_or_else(|| eyre!("No Safe URL provided as argument"))?;
     println!("Fetching file from Safe with URL: {}", url);
 
-    // We assume there is a local network running which we can
-    // bootstrap to using the provided contact address.
-    let genesis_key = PublicKey::bls_from_hex("8640e62cc44e75cf4fadc8ee91b74b4cf0fd2c0984fb0e3ab40f026806857d8c41f01d3725223c55b1ef87d669f5e2cc")?
-        .bls()
-        .ok_or_else(|| eyre!("Unexpectedly failed to obtain (BLS) genesis key."))?;
-    let mut nodes: BTreeSet<SocketAddr> = BTreeSet::new();
-    nodes.insert(network_addr);
-    let node_config = (genesis_key, nodes);
-
     // The Safe instance is what will give us access to the network API.
-    let safe = Safe::connected(node_config, None, None, None, None, None).await?;
+    let safe = Safe::connected(None, None, None, None, None).await?;
 
     println!("Connected to Safe!");
 
