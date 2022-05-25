@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1653473155521,
+  "lastUpdate": 1653499117080,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -4079,6 +4079,78 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/single chunks",
             "value": 284922,
             "range": "± 11611",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "6c9b851dd5bab8b2f5d9b3ef1db72d198706ac9d",
+          "message": "Merge #1208\n\n1208: Feat constant replication flow r=joshuef a=joshuef\n\nTo give an idea, adding:\r\n\r\nSendingDataReplicationBatch logs to [here](https://github.com/maidsafe/safe_network/blob/main/sn_node/src/node/api/dispatcher.rs#L563-L567), on main, we see over the course of the network split test, updated w/ same values as churn in this PR\r\n\r\n- it's `found: 312 times`. Each one of those is ~50mb. a total of ~15.6gb\r\n- memory jumps high. I have to kill it when it reaches ~700mb per node.\r\n\r\nWith this PR, over the course of the `churn` test:\r\n\r\n- nodes dont go over ~110mb\r\n- it succeeds\r\n- SendingMissingReplicatedData found: 3287 times, 3.2gb... \r\n\r\nThis is a slower rate of transfer, which is safer for nodes/systems running nodes, that can more easily be tweaked by the node themselves down the line. (And add in there that there should be less mem per message too!)\r\n\n\nCo-authored-by: Josh Wilson <joshuef@gmail.com>",
+          "timestamp": "2022-05-25T15:41:23Z",
+          "tree_id": "66be106e42c5fc341bd10d23894a65887f4c79df",
+          "url": "https://github.com/maidsafe/safe_network/commit/6c9b851dd5bab8b2f5d9b3ef1db72d198706ac9d"
+        },
+        "date": 1653499115594,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10599642286,
+            "range": "± 12166461744",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3946638237,
+            "range": "± 4881230378",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 9426413778,
+            "range": "± 2588154174",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 8870437115,
+            "range": "± 1633221793",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3147783031,
+            "range": "± 45550812",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4597580387,
+            "range": "± 992719351",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single registers",
+            "value": 16307,
+            "range": "± 1493",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single chunks",
+            "value": 266576,
+            "range": "± 14439",
             "unit": "ns/iter"
           }
         ]
