@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1653461071396,
+  "lastUpdate": 1653468713094,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -3935,6 +3935,78 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/single chunks",
             "value": 204859,
             "range": "± 2217",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "cd32ca6535b17aedacfb4051e97e4b3540bb8a71",
+          "message": "Merge #1203\n\n1203: chore(deps): bump consensus 1.16.0 -> 2.0.0 r=joshuef a=davidrusu\n\n\n\nCo-authored-by: David Rusu <davidrusu.me@gmail.com>\nCo-authored-by: joshuef <joshuef@gmail.com>",
+          "timestamp": "2022-05-25T07:15:17Z",
+          "tree_id": "8a0033874e8a4109fbe63a055fa73a809ed1c63d",
+          "url": "https://github.com/maidsafe/safe_network/commit/cd32ca6535b17aedacfb4051e97e4b3540bb8a71"
+        },
+        "date": 1653468712342,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 20049256293,
+            "range": "± 10246841038",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3721932456,
+            "range": "± 755811708",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 8629974350,
+            "range": "± 7000810009",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10031656430,
+            "range": "± 2215167352",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3307264945,
+            "range": "± 1170466748",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4348584942,
+            "range": "± 780068251",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single registers",
+            "value": 13267,
+            "range": "± 402",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single chunks",
+            "value": 189966,
+            "range": "± 10871",
             "unit": "ns/iter"
           }
         ]
