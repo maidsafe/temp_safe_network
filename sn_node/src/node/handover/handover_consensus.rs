@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use tracing::info;
 use xor_name::Prefix;
 
-use sn_consensus::consensus::{Consensus, VoteResponse};
+use sn_consensus::consensus::{Consensus, Decision, VoteResponse};
 use sn_consensus::vote::{Ballot, SignedVote, Vote};
 use sn_consensus::Generation;
 use sn_consensus::NodeId;
@@ -20,7 +20,8 @@ use sn_interface::network_knowledge::SectionAuthorityProvider;
 pub(crate) struct Handover {
     pub(crate) consensus: Consensus<SapCandidate>,
     pub(crate) section_prefix: Prefix,
-    pub(crate) failed_consensus_rounds: BTreeMap<Generation, Consensus<SapCandidate>>,
+    pub(crate) failed_consensus_rounds:
+        BTreeMap<Generation, (Consensus<SapCandidate>, Decision<SapCandidate>)>,
     /// Handover gen starting at 0, and then +1 for each retries after failed consensus rounds
     pub(crate) gen: Generation,
 }
@@ -67,19 +68,12 @@ impl Handover {
             .failed_consensus_rounds
             .iter()
             .filter(|(gen, _)| **gen >= from_gen)
-            .map(|(gen, consensus)| {
-                if let Some(decision) = consensus.decision.clone() {
-                    Ok(consensus.build_super_majority_vote(
-                        decision.votes.clone(),
-                        decision.faults,
-                        *gen,
-                    )?)
-                } else {
-                    Err(Error::CorruptedHandoverHistory(format!(
-                        "missing decision for handover history at generation {}",
-                        gen
-                    )))
-                }
+            .map(|(gen, (consensus, decision))| {
+                Ok(consensus.build_super_majority_vote(
+                    decision.votes.clone(),
+                    decision.faults.clone(),
+                    *gen,
+                )?)
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -103,8 +97,11 @@ impl Handover {
                     self.consensus.elders.clone(),
                     self.consensus.n_elders,
                 );
+                let old_decision = decision.clone();
                 let old_consensus = std::mem::replace(&mut self.consensus, new_consensus);
-                let _none = self.failed_consensus_rounds.insert(self.gen, old_consensus);
+                let _none = self
+                    .failed_consensus_rounds
+                    .insert(self.gen, (old_consensus, old_decision));
                 self.gen += 1;
                 info!(
                     "Handover - noticed consensus on empty set, updading to gen {} id {:?}",
@@ -127,7 +124,9 @@ impl Handover {
         &mut self,
         signed_vote: SignedVote<SapCandidate>,
     ) -> Result<VoteResponse<SapCandidate>> {
-        if let Some(consensus) = self.failed_consensus_rounds.get_mut(&signed_vote.vote.gen) {
+        if let Some((consensus, _decision)) =
+            self.failed_consensus_rounds.get_mut(&signed_vote.vote.gen)
+        {
             Ok(consensus.handle_signed_vote(signed_vote)?)
         } else {
             Err(Error::CorruptedHandoverHistory(format!(
