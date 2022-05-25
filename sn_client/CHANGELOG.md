@@ -1113,21 +1113,15 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.62.3 (2022-05-18)
-
-### Chore
-
- - <csr-id-07504faeda6cbfd0b27abea25facde992398ecf9/> upgrade blsttc to v5.2.0 and rand to v0.8
- - <csr-id-fb7ec7f4b90678cc0693d311a1f2efd87a6714a6/> send some msgs in bg threads
-   This should unblock client threads on initial contact and on queries
+## v0.64.0 (2022-05-25)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 7 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 2 days passed between releases.
+ - 0 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1137,23 +1131,64 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1195 ([`c6e6e32`](https://github.com/maidsafe/safe_network/commit/c6e6e324164028c6c15a78643783a9f86679f39e))
+</details>
+
+## v0.62.3 (2022-05-18)
+
+<csr-id-07504faeda6cbfd0b27abea25facde992398ecf9/>
+<csr-id-fb7ec7f4b90678cc0693d311a1f2efd87a6714a6/>
+
+### Chore
+
+ - <csr-id-07504faeda6cbfd0b27abea25facde992398ecf9/> upgrade blsttc to v5.2.0 and rand to v0.8
+ - <csr-id-fb7ec7f4b90678cc0693d311a1f2efd87a6714a6/> send some msgs in bg threads
+   This should unblock client threads on initial contact and on queries
+
+### Chore
+
+ - <csr-id-9b06304f46e1a1bda90a0fc6ff82edc928c2529d/> sn_interface-0.2.4/sn_client-0.62.3/sn_api-0.60.2/sn_cli-0.53.1
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 8 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.2.4/sn_client-0.62.3/sn_api-0.60.2/sn_cli-0.53.1 ([`9b06304`](https://github.com/maidsafe/safe_network/commit/9b06304f46e1a1bda90a0fc6ff82edc928c2529d))
     - upgrade blsttc to v5.2.0 and rand to v0.8 ([`07504fa`](https://github.com/maidsafe/safe_network/commit/07504faeda6cbfd0b27abea25facde992398ecf9))
     - send some msgs in bg threads ([`fb7ec7f`](https://github.com/maidsafe/safe_network/commit/fb7ec7f4b90678cc0693d311a1f2efd87a6714a6))
 </details>
 
 ## v0.62.2 (2022-05-10)
 
+<csr-id-61ba367c308a846cb3f1ae065b1fbbdfb85838e4/>
+
 ### Chore
 
  - <csr-id-61ba367c308a846cb3f1ae065b1fbbdfb85838e4/> sn_interface-0.2.2/sn_client-0.62.2/sn_node-0.58.16/sn_api-0.60.1
+
+### Bug Fixes
+
+ - <csr-id-ae4156228a4bb684ff10ac8c98917dd4dae434ea/> check Register permissions on ops locally to prevent failures when broadcasted to the network
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
+ - 5 commits contributed to the release.
  - 3 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1165,6 +1200,9 @@ needed, as they keypair itself contains the Arcs we need.
  * **Uncategorized**
     - sn_interface-0.2.2/sn_client-0.62.2/sn_node-0.58.16/sn_api-0.60.1 ([`61ba367`](https://github.com/maidsafe/safe_network/commit/61ba367c308a846cb3f1ae065b1fbbdfb85838e4))
     - Merge #1171 ([`06b4433`](https://github.com/maidsafe/safe_network/commit/06b4433f199ba7c622ad57e767d80f58f0b50a69))
+    - check Register permissions on ops locally to prevent failures when broadcasted to the network ([`ae41562`](https://github.com/maidsafe/safe_network/commit/ae4156228a4bb684ff10ac8c98917dd4dae434ea))
+    - Merge #1140 ([`459b641`](https://github.com/maidsafe/safe_network/commit/459b641f22b488f33825777b974da80512eabed5))
+    - Merge #1169 ([`e5d0c17`](https://github.com/maidsafe/safe_network/commit/e5d0c17c335a3a25ee0bb4c81906fa176abeb7f5))
 </details>
 
 ## v0.62.1 (2022-05-06)
@@ -1245,8 +1283,8 @@ needed, as they keypair itself contains the Arcs we need.
 
 <csr-read-only-do-not-edit/>
 
- - 25 commits contributed to the release over the course of 326 calendar days.
- - 20 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 22 commits contributed to the release over the course of 326 calendar days.
+ - 19 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1257,12 +1295,9 @@ needed, as they keypair itself contains the Arcs we need.
 
  * **Uncategorized**
     - sn_interface-0.2.1/sn_client-0.62.1/sn_node-0.58.15/sn_api-0.60.0/sn_cli-0.53.0 ([`737d906`](https://github.com/maidsafe/safe_network/commit/737d906a61f772593ac7df755d995d66059e8b5e))
-    - check Register permissions on ops locally to prevent failures when broadcasted to the network ([`ae41562`](https://github.com/maidsafe/safe_network/commit/ae4156228a4bb684ff10ac8c98917dd4dae434ea))
-    - Merge #1140 ([`459b641`](https://github.com/maidsafe/safe_network/commit/459b641f22b488f33825777b974da80512eabed5))
     - reduce number of query attempts from client once again ([`9fc497a`](https://github.com/maidsafe/safe_network/commit/9fc497a3c27f2545c9dc2a8106e31feeb497ef3a))
-    - remove concept of 'sufficent' knowledge ([`c2f5f85`](https://github.com/maidsafe/safe_network/commit/c2f5f855191fa46d549adea15e9123674c24d44a))
-    - Merge #1169 ([`e5d0c17`](https://github.com/maidsafe/safe_network/commit/e5d0c17c335a3a25ee0bb4c81906fa176abeb7f5))
     - client knowledge could not update ([`9f4c3a5`](https://github.com/maidsafe/safe_network/commit/9f4c3a523212c41079afcde8052a0891f3895f3b))
+    - remove concept of 'sufficent' knowledge ([`c2f5f85`](https://github.com/maidsafe/safe_network/commit/c2f5f855191fa46d549adea15e9123674c24d44a))
     - make client targets relative to sap size ([`e8f4fbc`](https://github.com/maidsafe/safe_network/commit/e8f4fbca2acb81b3ddc1b275140e5f7b1b56f9a9))
     - more logging for insufficent elders ([`800008d`](https://github.com/maidsafe/safe_network/commit/800008d2ec43d6df3bc078c59b7ae405610e5539))
     - delay removing .safe folder on hosted runners ([`975520e`](https://github.com/maidsafe/safe_network/commit/975520e1abf6056bd50cc29ca5a569015b3a77e4))
@@ -1272,8 +1307,8 @@ needed, as they keypair itself contains the Arcs we need.
     - Merge #1128 ([`e49d382`](https://github.com/maidsafe/safe_network/commit/e49d38239b3a8c468616ad3782e1208316e9b5e0))
     - sn_interface-0.2.0/sn_dysfunction-0.1.2/sn_api-0.59.0/sn_cli-0.52.0 ([`2f4e7e6`](https://github.com/maidsafe/safe_network/commit/2f4e7e6305ba387f2e28945aee71df650ac1d3eb))
     - tidy references in cargo manifests ([`318ee1d`](https://github.com/maidsafe/safe_network/commit/318ee1d22970b5f06e93a99b6e8fff6da638c589))
-    - use Flat sampling in criterion upload tests ([`fec4741`](https://github.com/maidsafe/safe_network/commit/fec4741438b8de957b5de94e21b78cf15886713f))
     - use Flat sampling in criterion upload tests ([`a05599e`](https://github.com/maidsafe/safe_network/commit/a05599e452dc7400e83e7a048488689db2c28e9e))
+    - use Flat sampling in criterion upload tests ([`fec4741`](https://github.com/maidsafe/safe_network/commit/fec4741438b8de957b5de94e21b78cf15886713f))
     - set sn_client version to be new release ([`e3dca8b`](https://github.com/maidsafe/safe_network/commit/e3dca8b07441c86744b091fe883d16a9c750f702))
     - update sn_cli and api readme for sn_client extraction ([`ad7d340`](https://github.com/maidsafe/safe_network/commit/ad7d340720f0737f502b0d55023a15461dded91d))
     - remove unused deps after node/client split ([`8d041a8`](https://github.com/maidsafe/safe_network/commit/8d041a80b75bc773fcbe0e4c88940ade9bda4b9d))
@@ -1281,6 +1316,38 @@ needed, as they keypair itself contains the Arcs we need.
     - test updates for sn_node and sn_client ([`54000b4`](https://github.com/maidsafe/safe_network/commit/54000b43cdd3688e6c691bef9dedc299da3c22aa))
     - pull sn_client out of the node codebase ([`88421d9`](https://github.com/maidsafe/safe_network/commit/88421d9cb7872b6397283a0035130bc14de6d4ff))
     - remove olde node github workflows ([`6383f03`](https://github.com/maidsafe/safe_network/commit/6383f038449ebba5e7c5dec1d3f8cc1f7deca581))
+</details>
+
+## v0.63.0 (2022-05-21)
+
+### Chore
+
+ - <csr-id-cf21d66b9b726123e0a4320cd68481b67f7af03d/> sn_dysfunction-0.2.0/sn_client-0.63.0/sn_node-0.59.0/sn_api-0.61.0/sn_cli-0.54.0
+
+### Refactor
+
+ - <csr-id-8e2731d8b7923a9050451b31ef3a92f892d2d6d3/> de-dupe init_test_logger
+ - <csr-id-f2742d92b3c3b56ed80732aa1d6943885fcd4317/> cargo test works without feature flag
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release over the course of 1 calendar day.
+ - 3 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_dysfunction-0.2.0/sn_client-0.63.0/sn_node-0.59.0/sn_api-0.61.0/sn_cli-0.54.0 ([`cf21d66`](https://github.com/maidsafe/safe_network/commit/cf21d66b9b726123e0a4320cd68481b67f7af03d))
+    - de-dupe init_test_logger ([`8e2731d`](https://github.com/maidsafe/safe_network/commit/8e2731d8b7923a9050451b31ef3a92f892d2d6d3))
+    - cargo test works without feature flag ([`f2742d9`](https://github.com/maidsafe/safe_network/commit/f2742d92b3c3b56ed80732aa1d6943885fcd4317))
 </details>
 
 ## v0.62.0 (2022-04-23)
