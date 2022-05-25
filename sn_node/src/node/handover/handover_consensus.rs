@@ -5,8 +5,9 @@ use std::collections::BTreeMap;
 use tracing::info;
 use xor_name::Prefix;
 
-use sn_consensus::consensus::{Consensus, Decision, VoteResponse};
+use sn_consensus::consensus::{Consensus, VoteResponse};
 use sn_consensus::vote::{Ballot, SignedVote, Vote};
+use sn_consensus::Decision;
 use sn_consensus::Generation;
 use sn_consensus::NodeId;
 
@@ -225,5 +226,47 @@ impl Handover {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bls_dkg::blsttc::SecretKeySet;
+    use rand::{prelude::StdRng, SeedableRng};
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn test_handle_empty_set_decision() {
+        let mut rng = StdRng::from_seed([0u8; 32]);
+
+        // init dummy section
+        let elders_sk = SecretKeySet::random(7, &mut rng);
+        let mut nodes_handover_state = Vec::from_iter((1..=7).into_iter().map(|id| {
+            Handover::from(
+                (id, elders_sk.secret_key_share(id as usize)),
+                elders_sk.public_keys(),
+                7,
+                Prefix::default(),
+            )
+        }));
+
+        // section agrees on empty set
+        let _ = nodes_handover_state.iter_mut().map(|state| {
+            state.consensus.decision = Some(Decision {
+                votes: BTreeSet::new(),
+                proposals: BTreeMap::new(),
+                faults: BTreeSet::new(),
+            });
+        });
+
+        // make sure gen was updated after empty set check
+        let _ = nodes_handover_state.iter_mut().map(|state| {
+            state.handle_empty_set_decision();
+        });
+        let _ = nodes_handover_state.iter().map(|state| {
+            assert_eq!(state.gen, 1);
+            assert_eq!(state.consensus.decision, None);
+        });
     }
 }
