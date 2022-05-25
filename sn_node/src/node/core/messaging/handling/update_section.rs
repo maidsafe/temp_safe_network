@@ -73,7 +73,6 @@ impl Node {
         );
 
         let cmd = Cmd::EnqueueDataForReplication {
-            // throttle_duration: REPLICATION_MSG_THROTTLE_DURATION,
             recipient: sender,
             data_batch: data_for_sender,
         };

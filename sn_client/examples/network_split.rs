@@ -142,7 +142,7 @@ pub async fn run_split() -> Result<()> {
 
     let mut all_data_put = vec![];
 
-    let files_to_put: i32 = 20;
+    let files_to_put: i32 = 40;
     for _i in 0..files_to_put {
         let (address, hash) = upload_data().await?;
         all_data_put.push((address, hash));
