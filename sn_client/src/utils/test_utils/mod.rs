@@ -25,7 +25,6 @@ use std::{collections::BTreeSet, fs::File, io::BufReader, net::SocketAddr, path:
 #[cfg(test)]
 pub use test_client::{
     create_test_client, create_test_client_with, get_dbc_owner_from_secret_key_hex,
-    init_test_logger,
 };
 
 ///
