@@ -20,8 +20,8 @@ use sn_interface::{
 use std::collections::BTreeSet;
 
 impl Node {
-    /// Given a set of known data, we can calculate what more from what we have a
-    /// given node should be responsible for
+    /// Given what data the peer has, we shall calculate what data the peer is missing that
+    /// we have, and send such data to the peer.
     #[instrument(skip(self, data_sender_has))]
     pub(crate) async fn get_missing_data_for_node(
         &self,

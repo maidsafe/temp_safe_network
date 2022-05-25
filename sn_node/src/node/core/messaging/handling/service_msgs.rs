@@ -13,8 +13,6 @@ use sn_interface::messaging::{
     system::{NodeQueryResponse, SystemMsg},
     AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
 };
-// use crate::node::{api::cmds::Cmd, core::Node, Result};
-// use sn_interface::types::{log_markers::LogMarker, register::User, Peer, PublicKey, ReplicatedData};
 use sn_interface::types::{
     log_markers::LogMarker, register::User, Peer, PublicKey, ReplicatedData,
 };
@@ -37,8 +35,6 @@ impl Node {
             .data_storage
             .query(query, User::Key(auth.public_key))
             .await;
-
-        trace!("data query response at adult is:  {:?}", response);
 
         let msg = SystemMsg::NodeQueryResponse {
             response,
@@ -208,7 +204,6 @@ impl Node {
         auth: AuthorityProof<ServiceAuth>,
         user: Peer,
     ) -> Result<Vec<Cmd>> {
-        // TODO: We're ot checking the DstLocation node name anywhere...
         trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
         if let DstLocation::EndUser(_) = dst_location {
             warn!(

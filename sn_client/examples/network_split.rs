@@ -1,4 +1,4 @@
-// Copyright 2021 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -79,7 +79,7 @@ fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf> {
     }
 }
 
-/// Uses SNLT to create a local network of nodes
+/// Uses sn_launch_tool to create a local network of nodes
 pub async fn run_split() -> Result<()> {
     info!("Starting local network");
     let node_path = Some(PathBuf::from("./target/release"));
@@ -167,8 +167,6 @@ pub async fn run_split() -> Result<()> {
         .wrap_err("Error adding nodes to the testnet")?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
-    let interval_duration = Duration::from_millis(*interval_as_int);
-
     sleep(interval_duration).await;
 
     // now we read the data

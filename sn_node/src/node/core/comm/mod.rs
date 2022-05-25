@@ -92,10 +92,12 @@ impl Comm {
 
         let mut peers_to_cleanup = vec![];
         for (peer, session) in sessions.iter() {
+            session.remove_expired().await;
+
             if retain_peers.contains(peer) {
                 continue;
             }
-            session.remove_expired().await;
+
             let is_connected = session.is_connected().await;
 
             if !is_connected {
