@@ -6,36 +6,34 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+mod background_tasks;
 use super::Cmd;
-
 use crate::node::{
     core::{DeliveryStatus, Node, Proposal},
     messages::WireMsgUtils,
     Result,
 };
-#[cfg(feature = "back-pressure")]
-use sn_interface::messaging::DstLocation;
-use sn_interface::messaging::{system::SystemMsg, AuthKind, WireMsg};
+use dashmap::DashMap;
 use sn_interface::types::{log_markers::LogMarker, Peer};
-
+use sn_interface::{
+    messaging::{system::SystemMsg, AuthKind, WireMsg},
+    types::ReplicatedDataAddress,
+};
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
-use tokio::time::MissedTickBehavior;
-use tokio::{sync::watch, time};
+use tokio::{sync::watch, sync::RwLock, time};
 use tracing::Instrument;
 
-const PROBE_INTERVAL: Duration = Duration::from_secs(30);
-#[cfg(feature = "back-pressure")]
-const BACKPRESSURE_INTERVAL: Duration = Duration::from_secs(60);
-const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
-const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(120);
-const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(60);
-
 // A command/subcommand id e.g. "963111461", "963111461.0"
-type CmdId = String;
+pub(crate) type CmdId = String;
 
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
     pub(crate) node: Node,
+    /// queue up all batch data to be replicated (as a result of churn events atm)
+    // TODO: This can probably be reworked into the general per peer msg queue, but as
+    // we need to pull data first before we form the WireMsg, we won't do that just now
+    pub(crate) pending_data_to_replicate_to_peers:
+        Arc<DashMap<ReplicatedDataAddress, Arc<RwLock<BTreeSet<Peer>>>>>,
     cancel_timer_tx: watch::Sender<bool>,
     cancel_timer_rx: watch::Receiver<bool>,
 }
@@ -54,6 +52,7 @@ impl Dispatcher {
             node,
             cancel_timer_tx,
             cancel_timer_rx,
+            pending_data_to_replicate_to_peers: Arc::new(DashMap::new()),
         }
     }
 
@@ -112,222 +111,6 @@ impl Dispatcher {
     fn spawn_cmd_handling(self: Arc<Self>, cmd: Cmd, cmd_id: String) -> Result<()> {
         let _task = tokio::spawn(self.enqueue_and_handle_next_cmd_and_offshoots(cmd, Some(cmd_id)));
         Ok(())
-    }
-
-    pub(super) async fn start_network_probing(self: Arc<Self>) {
-        info!("Starting to probe network");
-        let _handle = tokio::spawn(async move {
-            let dispatcher = self.clone();
-            let mut interval = tokio::time::interval(PROBE_INTERVAL);
-            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-
-            loop {
-                let _instant = interval.tick().await;
-
-                // Send a probe message if we are an elder
-                let node = &dispatcher.node;
-                if node.is_elder().await && !node.network_knowledge().prefix().await.is_empty() {
-                    match node.generate_probe_msg().await {
-                        Ok(cmd) => {
-                            info!("Sending probe msg");
-                            if let Err(e) = dispatcher
-                                .clone()
-                                .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
-                                .await
-                            {
-                                error!("Error sending a probe msg to the network: {:?}", e);
-                            }
-                        }
-                        Err(error) => error!("Problem generating probe msg: {:?}", error),
-                    }
-                }
-            }
-        });
-    }
-
-    pub(super) async fn start_section_probing(self: Arc<Self>) {
-        info!("Starting to probe section");
-        let _handle = tokio::spawn(async move {
-            let dispatcher = self.clone();
-            let mut interval = tokio::time::interval(SECTION_PROBE_INTERVAL);
-            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-
-            loop {
-                let _instant = interval.tick().await;
-
-                // Send a probe message to an elder
-                let node = &dispatcher.node;
-                if !node.network_knowledge().prefix().await.is_empty() {
-                    match node.generate_section_probe_msg().await {
-                        Ok(cmd) => {
-                            info!("Sending section probe msg");
-                            if let Err(e) = dispatcher
-                                .clone()
-                                .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
-                                .await
-                            {
-                                error!("Error sending section probe msg: {:?}", e);
-                            }
-                        }
-                        Err(error) => error!("Problem generating section probe msg: {:?}", error),
-                    }
-                }
-            }
-        });
-    }
-
-    pub(super) async fn start_cleaning_peer_links(self: Arc<Self>) {
-        info!("Starting cleaning up network links");
-        let _handle = tokio::spawn(async move {
-            let dispatcher = self.clone();
-            let mut interval = tokio::time::interval(LINK_CLEANUP_INTERVAL);
-            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-            let _ = interval.tick().await;
-
-            loop {
-                let _ = interval.tick().await;
-                let cmd = Cmd::CleanupPeerLinks;
-                if let Err(e) = dispatcher
-                    .clone()
-                    .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
-                    .await
-                {
-                    error!(
-                        "Error requesting a cleaning up of unused PeerLinks: {:?}",
-                        e
-                    );
-                }
-            }
-        });
-    }
-    pub(super) async fn check_for_dysfunction_periodically(self: Arc<Self>) {
-        info!("Starting dysfunction checking");
-        let _handle = tokio::spawn(async move {
-            let dispatcher = self.clone();
-            let mut interval = tokio::time::interval(DYSFUNCTION_CHECK_INTERVAL);
-            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-
-            loop {
-                let _instant = interval.tick().await;
-
-                let unresponsive_nodes = match dispatcher.node.get_dysfunctional_node_names().await
-                {
-                    Ok(nodes) => nodes,
-                    Err(error) => {
-                        error!("Error getting dysfunctional nodes: {error}");
-                        BTreeSet::default()
-                    }
-                };
-
-                if !unresponsive_nodes.is_empty() {
-                    debug!("{:?} : {unresponsive_nodes:?}", LogMarker::ProposeOffline);
-                    let cmd = Cmd::ProposeOffline(unresponsive_nodes);
-                    if let Err(e) = dispatcher
-                        .clone()
-                        .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
-                        .await
-                    {
-                        error!("Error sending Propose Offline for dysfunctional nodes: {e:?}");
-                    }
-                }
-
-                match dispatcher.node.notify_about_newly_suspect_nodes().await {
-                    Ok(suspect_cmds) => {
-                        for cmd in suspect_cmds {
-                            if let Err(e) = dispatcher
-                                .clone()
-                                .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
-                                .await
-                            {
-                                error!("Error processing suspect node cmds: {:?}", e);
-                            }
-                        }
-                    }
-                    Err(error) => {
-                        error!("Error getting suspect nodes: {error}");
-                    }
-                };
-            }
-        });
-    }
-
-    #[cfg(feature = "back-pressure")]
-    /// Periodically send back-pressure reports to our section.
-    ///
-    /// We do not send reports outside of the section as most messages will come from within our section
-    /// (and there's no easy way to determine what incoming mesages are spam, or joining nodes etc)
-    /// Worst case is after a split, nodes sending messaging from a sibling section to update us may not
-    /// know about our load just now. Though that would only be AE messages... and if backpressure is working we should
-    /// not be overloaded...
-    pub(super) async fn report_backpressure_to_our_section_periodically(self: Arc<Self>) {
-        info!("Firing off backpressure reports");
-        let _handle = tokio::spawn(async move {
-            let dispatcher = self.clone();
-            let mut interval = tokio::time::interval(BACKPRESSURE_INTERVAL);
-            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-            let _ = interval.tick().await;
-
-            loop {
-                let _ = interval.tick().await;
-
-                let members = dispatcher.node.network_knowledge().section_members().await;
-                let section_pk = dispatcher.node.network_knowledge().section_key().await;
-
-                if let Some(load_report) = dispatcher.node.comm.tolerated_msgs_per_s().await {
-                    trace!("New BackPressure report to disseminate: {:?}", load_report);
-
-                    // TODO: use comms to send report to anyone connected? (can we ID end users there?)
-                    for member in members {
-                        let our_name = dispatcher.node.info.read().await.name();
-                        let peer = member.peer();
-
-                        if peer.name() == our_name {
-                            continue;
-                        }
-
-                        let wire_msg = match WireMsg::single_src(
-                            &*dispatcher.node.info.read().await,
-                            DstLocation::Node {
-                                name: peer.name(),
-                                section_pk,
-                            },
-                            SystemMsg::BackPressure(load_report),
-                            section_pk,
-                        ) {
-                            Ok(msg) => msg,
-                            Err(e) => {
-                                error!(
-                                    "Error forming backpressure message to section member {:?}",
-                                    e
-                                );
-                                continue;
-                            }
-                        };
-
-                        let cmd = Cmd::SendMsg {
-                            wire_msg,
-                            recipients: vec![*peer],
-                        };
-
-                        if let Err(e) = dispatcher
-                            .clone()
-                            .enqueue_and_handle_next_cmd_and_offshoots(cmd, None)
-                            .await
-                        {
-                            error!(
-                                "Error sending backpressure report to section member {:?}: {:?}",
-                                peer, e
-                            );
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    pub(super) async fn write_prefixmap_to_disk(self: Arc<Self>) {
-        info!("Writing our PrefixMap to disk");
-        self.clone().node.write_prefix_map().await
     }
 
     /// Handles a single cmd.
@@ -397,7 +180,7 @@ impl Dispatcher {
     async fn try_processing_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
         match cmd {
             Cmd::CleanupPeerLinks => {
-                self.node.comm.cleanup_peers().await;
+                self.node.cleanup_non_elder_peers().await;
                 Ok(vec![])
             }
             Cmd::SignOutgoingSystemMsg { msg, dst } => {
@@ -459,13 +242,30 @@ impl Dispatcher {
                 recipients,
                 wire_msg,
             } => self.send_msg(&recipients, recipients.len(), wire_msg).await,
-            Cmd::ThrottledSendBatchMsgs {
-                throttle_duration,
-                recipients,
-                mut wire_msgs,
+            Cmd::EnqueueDataForReplication {
+                // throttle_duration,
+                recipient,
+                data_batch,
             } => {
-                self.send_throttled_batch_msgs(recipients, &mut wire_msgs, throttle_duration)
-                    .await
+                // we should queue this
+
+                for data in data_batch {
+                    if let Some(data_entry) = self.pending_data_to_replicate_to_peers.get_mut(&data)
+                    {
+                        let peer_set = data_entry.value();
+                        debug!("data already queued, adding peer");
+                        let _existed = peer_set.write().await.insert(recipient);
+                    } else {
+                        // let queue = DashSet::new();
+                        let mut peer_set = BTreeSet::new();
+                        let _existed = peer_set.insert(recipient);
+                        let _existed = self
+                            .pending_data_to_replicate_to_peers
+                            .insert(data, Arc::new(RwLock::new(peer_set)));
+                    }
+                }
+
+                Ok(vec![])
             }
             Cmd::SendMsgDeliveryGroup {
                 recipients,
@@ -543,33 +343,6 @@ impl Dispatcher {
                 vec![]
             }
         };
-
-        Ok(cmds)
-    }
-
-    async fn send_throttled_batch_msgs(
-        &self,
-        recipients: Vec<Peer>,
-        messages: &mut Vec<WireMsg>,
-        throttle_duration: Duration,
-    ) -> Result<Vec<Cmd>> {
-        let mut cmds = vec![];
-
-        let mut interval = tokio::time::interval(throttle_duration);
-        interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-
-        loop {
-            let _instant = interval.tick().await;
-            if let Some(message) = messages.pop() {
-                cmds.extend(
-                    self.send_msg(&recipients, recipients.len(), message)
-                        .await?,
-                )
-            } else {
-                info!("Finished sending a batch of messages");
-                break;
-            }
-        }
 
         Ok(cmds)
     }

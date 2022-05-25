@@ -13,8 +13,6 @@ use sn_interface::messaging::{
     system::{NodeQueryResponse, SystemMsg},
     AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
 };
-// use crate::node::{api::cmds::Cmd, core::Node, Result};
-// use sn_interface::types::{log_markers::LogMarker, register::User, Peer, PublicKey, ReplicatedData};
 use sn_interface::types::{
     log_markers::LogMarker, register::User, Peer, PublicKey, ReplicatedData,
 };
@@ -37,8 +35,6 @@ impl Node {
             .data_storage
             .query(query, User::Key(auth.public_key))
             .await;
-
-        trace!("data query response at adult is:  {:?}", response);
 
         let msg = SystemMsg::NodeQueryResponse {
             response,
@@ -124,7 +120,11 @@ impl Node {
                 .pending_data_queries
                 .set(op_id, waiting_peers.clone(), None)
                 .await;
-            trace!("Node {:?}, reported data not found ", sending_node_pk);
+            trace!(
+                "Node {:?}, reported data not found {:?}",
+                sending_node_pk,
+                op_id
+            );
             return Ok(cmds);
         }
 

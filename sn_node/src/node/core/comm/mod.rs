@@ -22,7 +22,7 @@ use self::peer_session::{PeerSession, SendWatcher};
 
 use crate::node::core::comm::peer_session::SendStatus;
 use crate::node::error::{Error, Result};
-use sn_interface::messaging::{MsgId, WireMsg};
+use sn_interface::messaging::WireMsg;
 use sn_interface::types::Peer;
 
 use bytes::Bytes;
@@ -87,11 +87,17 @@ impl Comm {
         self.our_endpoint.public_addr()
     }
 
-    pub(crate) async fn cleanup_peers(&self) {
+    pub(crate) async fn cleanup_peers(&self, retain_peers: Vec<Peer>) {
         let sessions = self.sessions.read().await;
+
         let mut peers_to_cleanup = vec![];
         for (peer, session) in sessions.iter() {
             session.remove_expired().await;
+
+            if retain_peers.contains(peer) {
+                continue;
+            }
+
             let is_connected = session.is_connected().await;
 
             if !is_connected {
@@ -185,13 +191,12 @@ impl Comm {
 
         wire_msg.set_dst_xorname(name);
 
-        let bytes = wire_msg.serialize()?;
+        let msg_id = wire_msg.msg_id();
+
         // TODO: rework priority so this we dont need to deserialise payload to determine priority.
         let priority = wire_msg.into_msg()?.priority();
 
-        let (_, result) = self
-            .send_to_one(*recipient, wire_msg.msg_id(), priority, bytes)
-            .await;
+        let (_, result) = self.send_to_one(*recipient, wire_msg, priority).await;
 
         match result {
             Err(error) => {
@@ -205,7 +210,7 @@ impl Comm {
                 );
                 error!(
                     "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed as we have disconnected from the peer. (Error is: {})",
-                    wire_msg.msg_id(),
+                    msg_id,
                     addr,
                     name,
                     error,
@@ -230,7 +235,7 @@ impl Comm {
                             // we have dropped this peer for some reason
                             error!(
                                 "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed, as we have dropped the link to it.",
-                                wire_msg.msg_id(),
+                                msg_id,
                                 addr,
                                 name,
                             );
@@ -241,7 +246,7 @@ impl Comm {
                             // (if not, then this clause can be collapsed with the one below)
                             error!(
                                 "Gave up on sending message (msg_id: {:?}) to {:?} (name {:?}), after retrying {} times",
-                                wire_msg.msg_id(),
+                                msg_id,
                                 addr,
                                 name,
                                 retries,
@@ -254,7 +259,7 @@ impl Comm {
                             // or the msg was sent, meaning the send didn't actually fail,
                             error!(
                                 "Sending message (msg_id: {:?}) to {:?} (name {:?}) possibly failed, as monitoring of the send job was aborted",
-                                wire_msg.msg_id(),
+                                msg_id,
                                 addr,
                                 name,
                             );
@@ -317,7 +322,6 @@ impl Comm {
             return Err(Error::EmptyRecipientList);
         }
 
-        let msg_bytes = wire_msg.serialize().map_err(Error::Messaging)?;
         let priority = wire_msg.clone().into_msg()?.priority();
 
         // Run all the sends concurrently (using `FuturesUnordered`). If any of them fails, pick
@@ -325,7 +329,11 @@ impl Comm {
         // succeeds or if there are no more recipients to pick.
         let mut tasks: FuturesUnordered<_> = recipients[0..delivery_group_size]
             .iter()
-            .map(|recipient| self.send_to_one(*recipient, msg_id, priority, msg_bytes.clone()))
+            .map(|recipient| {
+                let mut msg = wire_msg.clone();
+                msg.set_dst_xorname(recipient.name());
+                self.send_to_one(*recipient, msg, priority)
+            })
             .collect();
 
         let mut next = delivery_group_size;
@@ -337,7 +345,9 @@ impl Comm {
             failed_recipients.push(recipient);
 
             if next < recipients.len() {
-                tasks.push(self.send_to_one(recipients[next], msg_id, priority, msg_bytes.clone()));
+                let mut msg = wire_msg.clone();
+                msg.set_dst_xorname(recipients[next].name());
+                tasks.push(self.send_to_one(recipients[next], msg, priority));
                 next += 1;
             }
         };
@@ -498,10 +508,18 @@ impl Comm {
     async fn send_to_one(
         &self,
         recipient: Peer,
-        msg_id: MsgId,
+        wire_msg: WireMsg,
         msg_priority: i32,
-        msg_bytes: Bytes,
     ) -> (Peer, Result<SendWatcher>) {
+        let msg_id = wire_msg.msg_id();
+        let msg_bytes = match wire_msg.serialize() {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                // early return if we cannot serialise msg
+                return (recipient, Err(Error::Messaging(error)));
+            }
+        };
+
         trace!(
             "Sending message ({} bytes, msg_id: {:?}) to {:?}",
             msg_bytes.len(),
@@ -647,11 +665,19 @@ mod tests {
         assert_matches!(status, DeliveryStatus::AllRecipients);
 
         if let Some(bytes) = rx0.recv().await {
-            assert_eq!(WireMsg::from(bytes)?, original_message.clone());
+            // the dst location name is updated per sender, so
+            // we need to update that here before we check
+            let mut check_msg = original_message.clone();
+            check_msg.set_dst_xorname(peer0.name());
+            assert_eq!(WireMsg::from(bytes)?, check_msg);
         }
 
         if let Some(bytes) = rx1.recv().await {
-            assert_eq!(WireMsg::from(bytes)?, original_message);
+            // the dst location name is updated per sender, so
+            // we need to update that here before we check
+            let mut check_msg = original_message.clone();
+            check_msg.set_dst_xorname(peer1.name());
+            assert_eq!(WireMsg::from(bytes)?, check_msg);
         }
 
         Ok(())
@@ -673,7 +699,12 @@ mod tests {
         assert_matches!(status, DeliveryStatus::AllRecipients);
 
         if let Some(bytes) = rx0.recv().await {
-            assert_eq!(WireMsg::from(bytes)?, original_message);
+            // the dst location name is updated per sender, so
+            // we need to update that here before we check
+            let mut check_msg = original_message.clone();
+            check_msg.set_dst_xorname(peer0.name());
+
+            assert_eq!(WireMsg::from(bytes)?, check_msg);
         }
 
         assert!(time::timeout(TIMEOUT, rx1.recv())
@@ -732,7 +763,12 @@ mod tests {
         });
 
         if let Some(bytes) = rx.recv().await {
-            assert_eq!(WireMsg::from(bytes)?, message);
+            // the dst location name is updated per sender, so
+            // we need to update that here before we check
+            let mut check_msg = message.clone();
+            check_msg.set_dst_xorname(peer.name());
+
+            assert_eq!(WireMsg::from(bytes)?, check_msg);
         }
         Ok(())
     }
@@ -761,7 +797,12 @@ mod tests {
         );
 
         if let Some(bytes) = rx.recv().await {
-            assert_eq!(WireMsg::from(bytes)?, message);
+            // the dst location name is updated per sender, so
+            // we need to update that here before we check
+            let mut check_msg = message.clone();
+            check_msg.set_dst_xorname(peer.name());
+
+            assert_eq!(WireMsg::from(bytes)?, check_msg);
         }
         Ok(())
     }
@@ -788,7 +829,11 @@ mod tests {
         {
             if let Some((_, mut incoming_msgs)) = incoming_connections.next().await {
                 if let Some(msg) = time::timeout(TIMEOUT, incoming_msgs.next()).await?? {
-                    assert_eq!(WireMsg::from(msg)?, msg0);
+                    // the dst location name is updated per sender, so
+                    // we need to update that here before we check
+                    let mut check_msg = msg0.clone();
+                    check_msg.set_dst_xorname(name);
+                    assert_eq!(WireMsg::from(msg)?, check_msg);
                     msg0_received = true;
                 }
 
@@ -807,7 +852,12 @@ mod tests {
 
         if let Some((_, mut incoming_msgs)) = incoming_connections.next().await {
             if let Some(msg) = time::timeout(TIMEOUT, incoming_msgs.next()).await?? {
-                assert_eq!(WireMsg::from(msg)?, msg1);
+                // the dst location name is updated per sender, so
+                // we need to update that here before we check
+                let mut check_msg = msg1.clone();
+                check_msg.set_dst_xorname(name);
+                assert_eq!(WireMsg::from(msg)?, check_msg);
+
                 msg1_received = true;
             }
         }

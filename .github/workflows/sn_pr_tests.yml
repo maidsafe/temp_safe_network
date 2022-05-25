@@ -339,6 +339,26 @@ jobs:
         run: cargo build  --release --bin log_cmds_inspector
         timeout-minutes: 60
 
+      # This starts a 25 node network, we should kill before moving on to split checks
+      - name: Run network churn data integrity test
+        timeout-minutes: 30
+        shell: bash
+        run: cargo run --release --example churn
+        env:
+          RUST_LOG: "sn_node,sn_client=trace"
+
+
+      - name: Print Network Stats after churn test
+        shell: bash
+        run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
+
+
+      - name: Cleanup churn test
+        run: |
+          killall -9 sn_node
+          sleep 10
+          rm -rf ~/.safe
+
       # This starts a 30 node network
       - name: Run network split data integrity test
         timeout-minutes: 30

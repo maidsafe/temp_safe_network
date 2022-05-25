@@ -50,7 +50,10 @@ pub enum LogMarker {
     ChunkQueryReceviedAtElder,
     ChunkQueryReceviedAtAdult,
     // Data reorganisation
+    RequestForAnyMissingData,
     DataReorganisationUnderway,
+    QueuingMissingReplicatedData,
+    SendingMissingReplicatedData,
     // Register
     RegisterWrite,
     RegisterQueryReceivedAtElder,
@@ -97,7 +100,6 @@ pub enum LogMarker {
     SendJoinsDisallowed,
     SendDKGUnderway,
     SendNodeApproval,
-    SendSuspiciousNodesDetected,
     // Approved to join
     ReceivedJoinApproval,
     // Connections
