@@ -6,7 +6,6 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::read_network_conn_info;
 use crate::{Client, ClientConfig};
 use bls::SecretKey;
 use eyre::{eyre, Result};
@@ -18,7 +17,7 @@ use tempfile::tempdir;
 /// Create a test client without providing any specific keypair, DBC owner, `bootstrap_config`, or
 /// timeout.
 pub async fn create_test_client() -> Result<Client> {
-    create_test_client_with(None, None, None, false).await
+    create_test_client_with(None, None, None).await
 }
 
 /// Create a test client optionally providing keypair and/or `bootstrap_config`
@@ -27,33 +26,22 @@ pub async fn create_test_client_with(
     optional_keypair: Option<Keypair>,
     dbc_owner: Option<Owner>,
     timeout: Option<u64>,
-    read_prefix_map: bool,
 ) -> Result<Client> {
     let root_dir = tempdir().map_err(|e| eyre::eyre!(e.to_string()))?;
     let timeout = timeout.map(Duration::from_secs);
-    let (genesis_key, bootstrap_nodes) = read_network_conn_info()?;
-
     // use standard wait
     let cmd_ack_wait = None;
 
     let config = ClientConfig::new(
         Some(root_dir.path()),
         None,
-        genesis_key,
         None,
         timeout,
         timeout,
         cmd_ack_wait,
     )
     .await;
-    let client = Client::create_with(
-        config,
-        bootstrap_nodes,
-        optional_keypair.clone(),
-        dbc_owner.clone(),
-        read_prefix_map,
-    )
-    .await?;
+    let client = Client::new(config, optional_keypair.clone(), dbc_owner.clone()).await?;
 
     Ok(client)
 }

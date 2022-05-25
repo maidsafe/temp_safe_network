@@ -33,8 +33,6 @@ mod test_helpers;
 
 use super::{common, constants, Error, Result};
 
-use crate::NodeConfig;
-
 use sn_client::{Client, ClientConfig, DEFAULT_OPERATION_TIMEOUT};
 use sn_dbc::Owner;
 use sn_interface::types::Keypair;
@@ -63,7 +61,6 @@ impl Safe {
 
     /// Create a Safe instance connected to the SAFE Network
     pub async fn connected(
-        bootstrap_config: NodeConfig,
         keypair: Option<Keypair>,
         config_path: Option<&Path>,
         xorurl_base: Option<XorUrlBase>,
@@ -76,7 +73,7 @@ impl Safe {
             dry_run_mode: false,
         };
 
-        safe.connect(bootstrap_config, keypair, config_path, timeout, dbc_owner)
+        safe.connect(keypair, config_path, timeout, dbc_owner)
             .await?;
 
         Ok(safe)
@@ -85,7 +82,6 @@ impl Safe {
     /// Connect to the SAFE Network
     pub async fn connect(
         &mut self,
-        bootstrap_config: NodeConfig,
         keypair: Option<Keypair>,
         config_path: Option<&Path>,
         timeout: Option<Duration>,
@@ -96,12 +92,10 @@ impl Safe {
         let config_path = config_path.map(|p| p.to_path_buf());
 
         debug!("Client to be instantiated with specific pk?: {:?}", keypair);
-        debug!("Bootstrap contacts list set to: {:?}", bootstrap_config);
 
         let config = ClientConfig::new(
             None,
             None,
-            bootstrap_config.0,
             config_path.as_deref(),
             timeout.or(Some(DEFAULT_OPERATION_TIMEOUT)),
             timeout.or(Some(DEFAULT_OPERATION_TIMEOUT)),
@@ -110,7 +104,7 @@ impl Safe {
         .await;
 
         self.client = Some(
-            Client::new(config, bootstrap_config.1, keypair, dbc_owner)
+            Client::new(config, keypair, dbc_owner)
                 .await
                 .map_err(|err| {
                     Error::ConnectionError(format!(

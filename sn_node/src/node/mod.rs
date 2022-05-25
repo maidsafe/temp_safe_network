@@ -31,7 +31,7 @@ pub use self::{
         event_channel::EventReceiver,
         NodeApi,
     },
-    cfg::config_handler::{add_connection_info, set_connection_info, Config},
+    cfg::config_handler::Config,
     core::DataStorage,
     error::{Error, Result},
     test_utils::*,

@@ -9,7 +9,6 @@
 use crate::node::{Error, NetworkConfig, Result};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeSet,
     io::{self},
     net::SocketAddr,
     path::PathBuf,
@@ -23,7 +22,6 @@ use tokio::{
 use tracing::{debug, warn, Level};
 
 const CONFIG_FILE: &str = "node.config";
-const CONNECTION_INFO_FILE: &str = "node_connection_info.config";
 const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 #[cfg(not(target_arch = "arm"))]
 const DEFAULT_MAX_CAPACITY: usize = 10 * 1024 * 1024 * 1024; // 10GB
@@ -108,17 +106,6 @@ pub struct Config {
     /// e.g. Digital Ocean droplets.
     #[structopt(long)]
     pub skip_auto_port_forwarding: bool,
-    /// Hard Coded contacts
-    #[structopt(
-        short,
-        long,
-        default_value = "[]",
-        parse(try_from_str = serde_json::from_str)
-    )]
-    pub hard_coded_contacts: BTreeSet<SocketAddr>,
-    /// Genesis key of the network in hex format.
-    #[structopt(long)]
-    pub genesis_key: Option<String>,
     /// This is the maximum message size we'll allow the peer to send to us. Any bigger message and
     /// we'll error out probably shutting down the connection to the peer. If none supplied we'll
     /// default to the documented constant.
@@ -156,22 +143,8 @@ impl Config {
 
         let mut config = Config::default();
 
-        let mut cmd_line_args = Config::from_args();
+        let cmd_line_args = Config::from_args();
         cmd_line_args.validate().map_err(Error::Configuration)?;
-
-        if cmd_line_args.hard_coded_contacts.is_empty() {
-            debug!("Using node connection config file as no hard coded contacts were passed in");
-            if let Ok((_, info)) = read_conn_info_from_file().await {
-                cmd_line_args.hard_coded_contacts = info;
-            }
-        }
-
-        if cmd_line_args.genesis_key.is_none() {
-            debug!("Using node connection config file as no genesis key was passed in");
-            if let Ok((genesis_key, _)) = read_conn_info_from_file().await {
-                cmd_line_args.genesis_key = Some(genesis_key);
-            }
-        }
 
         config.merge(cmd_line_args);
 
@@ -260,14 +233,6 @@ impl Config {
         }
 
         self.network_config.forward_port = !config.skip_auto_port_forwarding;
-
-        if !config.hard_coded_contacts.is_empty() {
-            self.hard_coded_contacts = config.hard_coded_contacts;
-        }
-
-        if config.genesis_key.is_some() {
-            self.genesis_key = config.genesis_key;
-        }
 
         if let Some(max_msg_size) = config.max_msg_size_allowed {
             self.max_msg_size_allowed = Some(max_msg_size);
@@ -448,42 +413,6 @@ fn parse_public_addr(public_addr: &str) -> Result<SocketAddr, String> {
     }
 
     Ok(public_addr)
-}
-
-/// Overwrites connection info at file.
-///
-/// The file is written to the `current_bin_dir()` with the appropriate file name.
-pub async fn set_connection_info(genesis_key: bls::PublicKey, contact: SocketAddr) -> Result<()> {
-    let genesis_key_hex = hex::encode(genesis_key.to_bytes());
-    write_file(CONNECTION_INFO_FILE, &(genesis_key_hex, vec![contact])).await
-}
-
-/// Writes connection info to file for use by clients (and joining nodes when local network).
-///
-/// The file is written to the `current_bin_dir()` with the appropriate file name.
-pub async fn add_connection_info(contact: SocketAddr) -> Result<()> {
-    let (genesis_key_hex, mut bootstrap_nodes) = read_conn_info_from_file().await?;
-    let _prev = bootstrap_nodes.insert(contact);
-    write_file(CONNECTION_INFO_FILE, &(genesis_key_hex, bootstrap_nodes)).await
-}
-
-/// Reads the default node config file.
-async fn read_conn_info_from_file() -> Result<(String, BTreeSet<SocketAddr>)> {
-    let path = project_dirs()?.join(CONNECTION_INFO_FILE);
-
-    match fs::read(&path).await {
-        Ok(content) => {
-            debug!("Reading connection info from {}", path.display());
-            let config = serde_json::from_slice(&content)?;
-            Ok(config)
-        }
-        Err(error) => {
-            if error.kind() == std::io::ErrorKind::NotFound {
-                debug!("No connection info file available at {}", path.display());
-            }
-            Err(error.into())
-        }
-    }
 }
 
 async fn write_file<T: ?Sized>(file: &str, config: &T) -> Result<()>

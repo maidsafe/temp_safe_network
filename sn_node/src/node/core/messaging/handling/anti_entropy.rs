@@ -363,7 +363,7 @@ impl Node {
             section_key
         );
 
-        if dst_section_key == &self.network_knowledge.section_key() {
+        if dst_section_key == &section_key {
             // Destination section key matches our current section key
             return Ok(None);
         }

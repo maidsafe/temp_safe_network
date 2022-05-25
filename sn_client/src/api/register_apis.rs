@@ -583,7 +583,7 @@ mod tests {
     async fn ae_checks_register_test() -> Result<()> {
         init_logger();
         let _outer_span = tracing::info_span!("ae_checks_register_test").entered();
-        let client = create_test_client_with(None, None, None, false).await?;
+        let client = create_test_client_with(None, None, None).await?;
 
         let name = xor_name::rand::random();
         let tag = 15000;

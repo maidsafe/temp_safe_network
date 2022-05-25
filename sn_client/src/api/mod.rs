@@ -23,13 +23,12 @@ use sn_interface::{
         data::{CmdError, DataQuery, DataQueryVariant, RegisterQuery, ServiceMsg},
         ServiceAuth, WireMsg,
     },
-    network_knowledge::{prefix_map::NetworkPrefixMap, utils::read_prefix_map_from_disk},
-    types::{Chunk, Keypair, Peer, PublicKey, RegisterAddress},
+    network_knowledge::utils::read_prefix_map_from_disk,
+    types::{Chunk, Keypair, PublicKey, RegisterAddress},
 };
 
 use bytes::Bytes;
-use itertools::Itertools;
-use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
+use std::sync::Arc;
 use tokio::{
     sync::{mpsc::Receiver, RwLock},
     time::Duration,
@@ -79,20 +78,8 @@ impl Client {
     #[instrument(skip_all, level = "debug", name = "New client")]
     pub async fn new(
         config: ClientConfig,
-        bootstrap_nodes: BTreeSet<SocketAddr>,
         optional_keypair: Option<Keypair>,
         dbc_owner: Option<Owner>,
-    ) -> Result<Self, Error> {
-        Client::create_with(config, bootstrap_nodes, optional_keypair, dbc_owner, true).await
-    }
-
-    #[instrument]
-    pub(crate) async fn create_with(
-        config: ClientConfig,
-        bootstrap_nodes: BTreeSet<SocketAddr>,
-        optional_keypair: Option<Keypair>,
-        dbc_owner: Option<Owner>,
-        read_prefixmap: bool,
     ) -> Result<Self, Error> {
         let keypair = match optional_keypair {
             Some(id) => {
@@ -109,32 +96,7 @@ impl Client {
             }
         };
 
-        let home_dir = dirs_next::home_dir().ok_or(Error::CouldNotReadHomeDir)?;
-
-        // Read NetworkPrefixMap from `.safe/prefix_map` if present else check client root dir
-        let prefix_map = if read_prefixmap {
-            match read_prefix_map_from_disk(
-                &home_dir.join(format!(".safe/prefix_maps/{:?}", config.genesis_key)),
-            )
-            .await
-            {
-                Ok(prefix_map) => prefix_map,
-                Err(e) => {
-                    warn!("Could not read PrefixMap at '.safe/prefix_maps': {:?}", e);
-                    info!(
-                        "Creating a fresh PrefixMap with GenesisKey {:?}",
-                        config.genesis_key
-                    );
-                    NetworkPrefixMap::new(config.genesis_key)
-                }
-            }
-        } else {
-            NetworkPrefixMap::new(config.genesis_key)
-        };
-
-        if config.genesis_key != prefix_map.genesis_key() {
-            return Err(Error::GenesisKeyMismatch);
-        }
+        let prefix_map = read_prefix_map_from_disk().await?;
 
         // Incoming error notifiers
         let (err_sender, err_receiver) = tokio::sync::mpsc::channel::<CmdError>(10);
@@ -145,16 +107,16 @@ impl Client {
         // on a public key of our choice.
         debug!(
             "Creating new session with genesis key: {:?} ",
-            config.genesis_key
+            prefix_map.genesis_key()
         );
         debug!(
             "Creating new session with genesis key (in hex format): {} ",
-            hex::encode(config.genesis_key.to_bytes())
+            hex::encode(prefix_map.genesis_key().to_bytes())
         );
 
         // Create a session with the network
         let session = Session::new(
-            config.genesis_key,
+            prefix_map.genesis_key(),
             config.qp2p,
             err_sender,
             config.local_addr,
@@ -204,20 +166,17 @@ impl Client {
 
         let (random_dst_addr, auth, serialised_cmd) = generate_probe_msg(&client, client_pk)?;
 
-        // either use our known prefixmap elders, or fallback to plain node config file
+        // get bootstrap nodes
         let bootstrap_nodes = {
-            if let Some(sap) = prefix_map.closest_or_opposite(&random_dst_addr, None) {
-                sap.elders_vec()
-            } else {
-                // these peers will be nonsense peers, and dropped after we connect. Replaced by whatever SectionAuthorityProvider peers we have received
-                // therefore we use a random name for them initially
-                bootstrap_nodes
-                    .iter()
-                    .copied()
-                    .map(|socket| Peer::new(xor_name::rand::random(), socket))
-                    .collect_vec()
-            }
+            let sap = prefix_map
+                .closest_or_opposite(&xor_name::rand::random(), None)
+                .ok_or(Error::NoNetworkKnowledge)?;
+            sap.elders_vec()
         };
+        debug!(
+            "Make contact with the bootstrap nodes: {:?}",
+            bootstrap_nodes
+        );
 
         let mut attempts = 0;
         let mut initial_probe = client
@@ -335,7 +294,7 @@ mod tests {
         let full_id = Keypair::new_ed25519();
         let pk = full_id.public_key();
 
-        let client = create_test_client_with(Some(full_id), None, None, true).await?;
+        let client = create_test_client_with(Some(full_id), None, None).await?;
         assert_eq!(pk, client.public_key());
 
         Ok(())
@@ -371,7 +330,7 @@ mod tests {
             "81ebce8339cb2a6e5cbf8b748215ba928acff7f92557b3acfb09a5b25e920d20",
         )?;
 
-        let client = create_test_client_with(None, Some(dbc_owner.clone()), None, true).await?;
+        let client = create_test_client_with(None, Some(dbc_owner.clone()), None).await?;
         assert_eq!(dbc_owner, client.dbc_owner());
         Ok(())
     }

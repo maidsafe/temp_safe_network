@@ -29,10 +29,7 @@
 
 #[cfg(not(feature = "tokio-console"))]
 use sn_interface::LogFormatter;
-use sn_node::node::{
-    add_connection_info, set_connection_info, Config, Error as NodeError, Event, MembershipEvent,
-    NodeApi,
-};
+use sn_node::node::{Config, Error as NodeError, Event, MembershipEvent, NodeApi};
 
 use color_eyre::{Section, SectionExt};
 #[cfg(not(feature = "tokio-console"))]
@@ -314,7 +311,7 @@ async fn run_node(config: Config) -> Result<()> {
     let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
 
-    let (node, mut event_stream) = loop {
+    let (_node, mut event_stream) = loop {
         match NodeApi::new(&config, join_timeout).await {
             Ok(result) => break result,
             Err(NodeError::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
@@ -367,23 +364,6 @@ async fn run_node(config: Config) -> Result<()> {
         }
         sleep(bootstrap_retry_duration).await;
     };
-
-    let our_conn_info = node.our_connection_info().await;
-
-    if config.is_first() {
-        let genesis_key = node.genesis_key().await;
-        set_connection_info(genesis_key, our_conn_info)
-            .await
-            .unwrap_or_else(|err| {
-                error!("Unable to write our connection info to disk: {:?}", err);
-            });
-    } else {
-        add_connection_info(our_conn_info)
-            .await
-            .unwrap_or_else(|err| {
-                error!("Unable to add our connection info to disk: {:?}", err);
-            });
-    }
 
     // Simulate failed node starts, and ensure that
     #[cfg(feature = "chaos")]

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{read_prefix_map_from_disk, UsedRecipientSaps};
+use super::UsedRecipientSaps;
 use crate::comm::{Comm, DeliveryStatus, MsgEvent};
 
 use crate::node::{messages::WireMsgUtils, Error, Result};
@@ -47,16 +47,12 @@ pub(crate) async fn join_network(
     comm: &Comm,
     incoming_msgs: &mut mpsc::Receiver<MsgEvent>,
     bootstrap_addr: SocketAddr,
-    genesis_key: BlsPublicKey,
+    prefix_map: NetworkPrefixMap,
     join_timeout: Duration,
 ) -> Result<(NodeInfo, NetworkKnowledge)> {
     let (outgoing_msgs_sender, outgoing_msgs_receiver) = mpsc::channel(1);
 
     let span = trace_span!("bootstrap");
-
-    // Read prefix map from cache if available
-    let prefix_map = read_prefix_map_from_disk(genesis_key).await?;
-
     let joiner = Joiner::new(node, outgoing_msgs_sender, incoming_msgs, prefix_map);
 
     debug!("=========> attempting bootstrap to {bootstrap_addr}");

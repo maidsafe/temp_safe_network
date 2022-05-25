@@ -9,7 +9,7 @@
 //! `sn_node` provides the interface to Safe routing.  The resulting executable is the node
 //! for the Safe network.
 
-use sn_client::{utils::test_utils::read_network_conn_info, Client, ClientConfig};
+use sn_client::{Client, ClientConfig};
 use sn_interface::types::utils::random_bytes;
 use sn_launch_tool::Launch;
 
@@ -170,12 +170,8 @@ pub async fn run_split() -> Result<()> {
 
     sleep(interval_duration).await;
 
-    // now we read the data
-    let (genesis_key, bootstrap_nodes) =
-        read_network_conn_info().context("Could not read network bootstrap".to_string())?;
-
-    let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
-    let client = Client::new(config, bootstrap_nodes, None, None).await?;
+    let config = ClientConfig::new(None, None, None, None, None, None).await;
+    let client = Client::new(config, None, None).await?;
 
     for (address, hash) in all_data_put {
         println!("...reading bytes at address {:?} ...", address);
@@ -206,14 +202,8 @@ pub async fn run_split() -> Result<()> {
 }
 
 async fn upload_data() -> Result<(XorName, [u8; 32])> {
-    // Now we upload the data.
-    println!("Reading network bootstrap information...");
-    let (genesis_key, bootstrap_nodes) =
-        read_network_conn_info().context("Could not read network bootstrap".to_string())?;
-
-    println!("Creating a Client to connect to {:?}", bootstrap_nodes);
-    let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
-    let client = Client::new(config, bootstrap_nodes, None, None).await?;
+    let config = ClientConfig::new(None, None, None, None, None, None).await;
+    let client = Client::new(config, None, None).await?;
 
     let bytes = random_bytes(1024 * 1024 * 10);
 

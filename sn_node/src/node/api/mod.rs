@@ -34,12 +34,13 @@ use crate::UsedSpace;
 
 use sn_interface::{
     messaging::{system::SystemMsg, DstLocation, WireMsg},
-    network_knowledge::{NodeInfo, SectionAuthorityProvider, MIN_ADULT_AGE},
+    network_knowledge::{
+        utils::read_prefix_map_from_disk, NodeInfo, SectionAuthorityProvider, MIN_ADULT_AGE,
+    },
     types::{keys::ed25519, log_markers::LogMarker, PublicKey as TypesPublicKey},
 };
 
 use ed25519_dalek::PublicKey;
-use itertools::Itertools;
 use rand_07::rngs::OsRng;
 use secured_linked_list::SecuredLinkedList;
 use std::{
@@ -191,29 +192,25 @@ impl NodeApi {
 
             (node, comm)
         } else {
-            let genesis_key_str = config.genesis_key.as_ref().ok_or_else(|| {
-                Error::Configuration("Network's genesis key was not provided.".to_string())
-            })?;
-            let genesis_key = TypesPublicKey::bls_from_hex(genesis_key_str)?
-                .bls()
-                .ok_or_else(|| {
-                    Error::Configuration(
-                        "Unexpectedly failed to obtain genesis key from configuration.".to_string(),
-                    )
-                })?;
-
             let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE);
             let node_name = ed25519::name(&keypair.public);
             info!("{} Bootstrapping as a new node.", node_name);
 
+            let prefix_map = read_prefix_map_from_disk().await?;
+            let section_elders = {
+                let sap = prefix_map
+                    .closest_or_opposite(&xor_name::rand::random(), None)
+                    .ok_or_else(|| {
+                        Error::Configuration("Could not obtain closest SAP".to_string())
+                    })?;
+                sap.elders_vec()
+            };
+            let bootstrap_nodes: Vec<SocketAddr> =
+                section_elders.iter().map(|node| node.addr()).collect();
+
             let (comm, bootstrap_addr) = Comm::bootstrap(
                 local_addr,
-                config
-                    .hard_coded_contacts
-                    .iter()
-                    .copied()
-                    .collect_vec()
-                    .as_slice(),
+                bootstrap_nodes.as_slice(),
                 config.network_config().clone(),
                 monitoring.clone(),
                 connection_event_tx,
@@ -225,7 +222,7 @@ impl NodeApi {
                 std::process::id(),
                 comm.socket_addr(),
                 bootstrap_addr,
-                genesis_key
+                prefix_map.genesis_key()
             );
 
             let joining_node = NodeInfo::new(keypair, comm.socket_addr());
@@ -234,7 +231,7 @@ impl NodeApi {
                 &comm,
                 &mut connection_event_rx,
                 bootstrap_addr,
-                genesis_key,
+                prefix_map,
                 join_timeout,
             )
             .await?;

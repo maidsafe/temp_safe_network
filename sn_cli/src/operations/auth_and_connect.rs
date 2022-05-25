@@ -70,12 +70,10 @@ pub async fn connect(safe: &mut Safe, config: &Config, timeout: Duration) -> Res
         info!("No credentials found for CLI, connecting with read-only access...");
     }
 
-    let (_, bootstrap_contacts) = config.read_current_node_config().await?;
     let client_cfg = client_config_path();
 
     match safe
         .connect(
-            bootstrap_contacts.clone(),
             app_keypair.clone(),
             client_cfg.as_deref(),
             Some(timeout),
@@ -86,15 +84,9 @@ pub async fn connect(safe: &mut Safe, config: &Config, timeout: Duration) -> Res
         Ok(()) => Ok(()),
         Err(_) if found_app_keypair => {
             warn!("Credentials found for CLI are invalid, connecting with read-only access...");
-            safe.connect(
-                bootstrap_contacts,
-                None,
-                None,
-                Some(timeout),
-                config.dbc_owner.clone(),
-            )
-            .await
-            .wrap_err("Failed to connect with read-only access")
+            safe.connect(None, None, Some(timeout), config.dbc_owner.clone())
+                .await
+                .wrap_err("Failed to connect with read-only access")
         }
         Err(err) => return Err(eyre!("Failed to connect: {}", err)),
     }

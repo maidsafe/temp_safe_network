@@ -6,34 +6,20 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{ipc::NodeConfig, Safe, SafeUrl};
+use crate::{Safe, SafeUrl};
 
 use sn_dbc::Owner;
-use sn_interface::types::{Keypair, PublicKey};
+use sn_interface::types::Keypair;
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Context, Result};
 use bls::SecretKey;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use std::{
-    collections::{BTreeSet, HashMap},
-    env::var,
-    fs,
-    net::SocketAddr,
-    ops::Index,
-    sync::Once,
-};
+use std::{collections::HashMap, env::var, ops::Index, sync::Once};
 use tracing_subscriber::{fmt, EnvFilter};
 
 // Environment variable which can be set with the auth credentials
 // to be used for all sn_api tests
 const TEST_AUTH_CREDENTIALS: &str = "TEST_AUTH_CREDENTIALS";
-
-// Environment variable which can be set with the bootstrapping contacts
-// to be used for all sn_api tests
-const TEST_BOOTSTRAPPING_PEERS: &str = "TEST_BOOTSTRAPPING_PEERS";
-
-// Default file in home directory where bootstrapping contacts are usually found
-const DEFAULT_PEER_FILE_IN_HOME: &str = ".safe/node/node_connection_info.config";
 
 static INIT: Once = Once::new();
 
@@ -105,18 +91,7 @@ pub async fn new_safe_instance() -> Result<Safe> {
         })?,
         Err(_) => Keypair::new_ed25519(),
     };
-
-    let bootstrap_contacts = get_bootstrap_contacts()?;
-    let safe = Safe::connected(
-        bootstrap_contacts,
-        Some(credentials),
-        None,
-        None,
-        None,
-        None,
-    )
-    .await?;
-
+    let safe = Safe::connected(Some(credentials), None, None, None, None).await?;
     Ok(safe)
 }
 
@@ -135,16 +110,8 @@ pub async fn new_safe_instance_with_dbc_owner(secret_key: &str) -> Result<(Safe,
     let sk: SecretKey = bincode::deserialize(secret_key.as_bytes())
         .with_context(|| "Failed to deserialize secret key for DBC owner")?;
     let dbc_owner = Owner::from(sk);
-    let bootstrap_contacts = get_bootstrap_contacts()?;
-    let safe = Safe::connected(
-        bootstrap_contacts,
-        Some(credentials),
-        None,
-        None,
-        None,
-        Some(dbc_owner.clone()),
-    )
-    .await?;
+    let safe =
+        Safe::connected(Some(credentials), None, None, None, Some(dbc_owner.clone())).await?;
 
     Ok((safe, dbc_owner))
 }
@@ -152,9 +119,7 @@ pub async fn new_safe_instance_with_dbc_owner(secret_key: &str) -> Result<(Safe,
 // Instantiate a Safe instance with read-only access
 pub async fn new_read_only_safe_instance() -> Result<Safe> {
     init_logger();
-    let bootstrap_contacts = get_bootstrap_contacts()?;
-    let safe = Safe::connected(bootstrap_contacts, None, None, None, None, None).await?;
-
+    let safe = Safe::connected(None, None, None, None, None).await?;
     Ok(safe)
 }
 
@@ -165,59 +130,6 @@ pub fn random_nrs_name() -> String {
         .take(15)
         .map(char::from)
         .collect()
-}
-
-fn read_default_peers_from_file() -> Result<(String, BTreeSet<SocketAddr>)> {
-    let default_peer_file = match dirs_next::home_dir() {
-        None => bail!(
-            "Failed to obtain local home directory where to read {} from",
-            DEFAULT_PEER_FILE_IN_HOME
-        ),
-        Some(mut paths) => {
-            paths.push(DEFAULT_PEER_FILE_IN_HOME);
-            paths
-        }
-    };
-
-    let raw_json = fs::read_to_string(&default_peer_file).with_context(|| {
-        format!(
-            "Failed to read bootstraping contacts list from file: {:?}",
-            &default_peer_file
-        )
-    })?;
-
-    let info: (String, BTreeSet<SocketAddr>) =
-        serde_json::from_str(&raw_json).with_context(|| {
-            format!(
-                "Failed to parse bootstraping contacts list from file: {:?}",
-                &default_peer_file
-            )
-        })?;
-
-    Ok(info)
-}
-
-fn get_bootstrap_contacts() -> Result<NodeConfig> {
-    let (genesis_key_hex, bootstrap_contacts) = match var(TEST_BOOTSTRAPPING_PEERS) {
-        Ok(val) => serde_json::from_str(&val).with_context(|| {
-            format!(
-                "Failed to parse bootstraping contacts list from {} env var",
-                TEST_BOOTSTRAPPING_PEERS
-            )
-        })?,
-        Err(_) => {
-            // read default peers from the file we normally use for peers
-            read_default_peers_from_file()?
-        }
-    };
-
-    let genesis_key = PublicKey::bls_from_hex(&genesis_key_hex)?
-        .bls()
-        .ok_or_else(|| {
-            anyhow::anyhow!("Unexpectedly failed to obtain network's (BLS) genesis key.")
-        })?;
-
-    Ok((genesis_key, bootstrap_contacts))
 }
 
 #[macro_export]

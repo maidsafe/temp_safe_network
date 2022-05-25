@@ -40,8 +40,6 @@ pub struct ClientConfig {
     pub local_addr: SocketAddr,
     /// Path to local storage.
     pub root_dir: PathBuf,
-    /// Network's genesis key
-    pub genesis_key: bls::PublicKey,
     /// QuicP2p options.
     pub qp2p: QuicP2pConfig,
     /// The amount of time to wait for responses to queries before giving up and returning an error.
@@ -66,7 +64,6 @@ impl ClientConfig {
     pub async fn new(
         root_dir: Option<&Path>,
         local_addr: Option<SocketAddr>,
-        genesis_key: bls::PublicKey,
         config_file_path: Option<&Path>,
         query_timeout: Option<Duration>,
         cmd_timeout: Option<Duration>,
@@ -147,7 +144,6 @@ impl ClientConfig {
         Self {
             local_addr: local_addr.unwrap_or_else(|| SocketAddr::from(DEFAULT_LOCAL_ADDR)),
             root_dir: root_dir.clone(),
-            genesis_key,
             qp2p,
             query_timeout,
             cmd_timeout,
@@ -221,14 +217,12 @@ mod tests {
             .map(char::from)
             .collect();
         let config_filepath = root_dir.join(&cfg_filename);
-        let genesis_key = bls::SecretKey::random().public_key();
 
         // In the absence of a config file, the config handler
         // should initialize bootstrap_cache_dir only
         let config = ClientConfig::new(
             Some(&root_dir),
             None,
-            genesis_key,
             Some(&config_filepath),
             None,
             None,
@@ -272,7 +266,6 @@ mod tests {
         let expected_config = ClientConfig {
             local_addr: (Ipv4Addr::UNSPECIFIED, 0).into(),
             root_dir: root_dir.clone(),
-            genesis_key,
             qp2p: QuicP2pConfig {
                 ..Default::default()
             },
@@ -286,20 +279,12 @@ mod tests {
         create_dir_all(&root_dir).await?;
         let mut file = File::create(&config_filepath)?;
 
-        let config_on_disk = ClientConfig::new(
-            None,
-            None,
-            genesis_key,
-            Some(&config_filepath),
-            None,
-            None,
-            None,
-        )
-        .await;
+        let config_on_disk =
+            ClientConfig::new(None, None, Some(&config_filepath), None, None, None).await;
         serde_json::to_writer_pretty(&mut file, &config_on_disk)?;
         file.sync_all()?;
 
-        let read_cfg = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
+        let read_cfg = ClientConfig::new(None, None, None, None, None, None).await;
         assert_eq!(serialize(&config_on_disk)?, serialize(&read_cfg)?);
 
         Ok(())

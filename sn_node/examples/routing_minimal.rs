@@ -54,17 +54,6 @@ use tracing_subscriber::EnvFilter;
 /// Minimal example node.
 #[derive(Debug, StructOpt)]
 struct Options {
-    /// Socket address (e.g. 203.0.113.45:6789) of a node(s) to bootstrap against. Multiple
-    /// contacts can be specified by passing the option multiple times. If omitted, will try to use
-    /// contacts cached from previous run, if any.
-    #[structopt(
-        short,
-        long,
-        name = "bootstrap-contact",
-        value_name = "SOCKET_ADDRESS",
-        required_unless = "first"
-    )]
-    bootstrap_contacts: Vec<SocketAddr>,
     /// Whether this is the first node ("genesis node") of the network. Only one node can be first.
     #[structopt(short, long, conflicts_with = "bootstrap-contact")]
     first: bool,
@@ -106,18 +95,10 @@ async fn main() -> Result<()> {
     init_log(opts.verbosity);
 
     let handles: Vec<_> = if opts.count <= 1 {
-        let handle =
-            start_single_node(opts.first, opts.bootstrap_contacts, opts.ip, opts.port).await?;
+        let handle = start_single_node(opts.first, opts.ip, opts.port).await?;
         iter::once(handle).collect()
     } else {
-        start_multiple_nodes(
-            opts.count,
-            opts.first,
-            opts.bootstrap_contacts,
-            opts.ip,
-            opts.port,
-        )
-        .await?
+        start_multiple_nodes(opts.count, opts.first, opts.ip, opts.port).await?
     };
     let _res = join_all(handles).await;
 
@@ -127,11 +108,10 @@ async fn main() -> Result<()> {
 // Starts a single node and block until it terminates.
 async fn start_single_node(
     first: bool,
-    contacts: Vec<SocketAddr>,
     ip: Option<IpAddr>,
     port: Option<u16>,
 ) -> Result<JoinHandle<()>> {
-    let (_contact, handle) = start_node(0, first, contacts, ip, port).await?;
+    let (_contact, handle) = start_node(0, first, ip, port).await?;
     Ok(handle)
 }
 
@@ -142,14 +122,12 @@ async fn start_single_node(
 async fn start_multiple_nodes(
     count: usize,
     first: bool,
-    mut contacts: Vec<SocketAddr>,
     ip: Option<IpAddr>,
     base_port: Option<u16>,
 ) -> Result<Vec<JoinHandle<()>>> {
     let mut handles = Vec::new();
     let first_index = if first {
-        let (first_contact, first_handle) = start_node(0, true, vec![], ip, base_port).await?;
-        contacts.push(first_contact);
+        let (_, first_handle) = start_node(0, true, ip, base_port).await?;
         handles.push(first_handle);
         1
     } else {
@@ -157,8 +135,7 @@ async fn start_multiple_nodes(
     };
 
     for index in first_index..count {
-        let (_contact_info, handle) =
-            start_node(index, false, contacts.clone(), ip, base_port).await?;
+        let (_contact_info, handle) = start_node(index, false, ip, base_port).await?;
         handles.push(handle);
     }
     Ok(handles)
@@ -168,7 +145,6 @@ async fn start_multiple_nodes(
 async fn start_node(
     index: usize,
     first: bool,
-    bootstrap_nodes: Vec<SocketAddr>,
     ip: Option<IpAddr>,
     base_port: Option<u16>,
 ) -> Result<(SocketAddr, JoinHandle<()>)> {
@@ -190,7 +166,6 @@ async fn start_node(
     let config = Config {
         first,
         local_addr: Some(SocketAddr::new(ip, local_port)),
-        hard_coded_contacts: bootstrap_nodes.into_iter().collect(),
         root_dir: Some(root),
         ..Default::default()
     };
