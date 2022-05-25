@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1653468713094,
+  "lastUpdate": 1653473155521,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -4007,6 +4007,78 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/single chunks",
             "value": 189966,
             "range": "± 10871",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "5e82ef3d0e78898f9ffac8bebe4970c4d26e608f",
+          "message": "Merge #1198 #1204\n\n1198: chore: remove test-utils references from readme r=joshuef a=RolandSherwin\n\n\n\n1204: fix: publish sn_interface befor dysfunction now we depend on sn_int t… r=Yoga07 a=joshuef\n\n…here\r\n\r\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\n\nCo-authored-by: RolandSherwin <RolandSherwin@protonmail.com>\nCo-authored-by: Josh Wilson <joshuef@gmail.com>",
+          "timestamp": "2022-05-25T08:22:15Z",
+          "tree_id": "320ed5714f1c050f5a00dde3768191ce8673a78e",
+          "url": "https://github.com/maidsafe/safe_network/commit/5e82ef3d0e78898f9ffac8bebe4970c4d26e608f"
+        },
+        "date": 1653473154171,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10892536554,
+            "range": "± 10783985827",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3963227835,
+            "range": "± 1127043171",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 11366797453,
+            "range": "± 13853128637",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10031545703,
+            "range": "± 3382855681",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3174224570,
+            "range": "± 1154801652",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 5147968447,
+            "range": "± 2663147537",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single registers",
+            "value": 17444,
+            "range": "± 819",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single chunks",
+            "value": 284922,
+            "range": "± 11611",
             "unit": "ns/iter"
           }
         ]
