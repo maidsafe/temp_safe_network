@@ -8,7 +8,9 @@
 
 use crate::{ipc::NodeConfig, Safe, SafeUrl};
 use anyhow::{anyhow, bail, Context, Result};
+use bls::SecretKey;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use sn_dbc::Owner;
 use sn_interface::types::{Keypair, PublicKey};
 use std::{
     collections::{BTreeSet, HashMap},
@@ -103,16 +105,53 @@ pub async fn new_safe_instance() -> Result<Safe> {
     };
 
     let bootstrap_contacts = get_bootstrap_contacts()?;
-    let safe = Safe::connected(bootstrap_contacts, Some(credentials), None, None, None).await?;
+    let safe = Safe::connected(
+        bootstrap_contacts,
+        Some(credentials),
+        None,
+        None,
+        None,
+        None,
+    )
+    .await?;
 
     Ok(safe)
+}
+
+pub async fn new_safe_instance_with_dbc_owner(secret_key: &str) -> Result<(Safe, Owner)> {
+    init_logger();
+    let credentials = match var(TEST_AUTH_CREDENTIALS) {
+        Ok(val) => serde_json::from_str(&val).with_context(|| {
+            format!(
+                "Failed to parse credentials read from {} env var",
+                TEST_AUTH_CREDENTIALS
+            )
+        })?,
+        Err(_) => Keypair::new_ed25519(),
+    };
+
+    let sk: SecretKey = bincode::deserialize(secret_key.as_bytes())
+        .with_context(|| "Failed to deserialize secret key for DBC owner")?;
+    let dbc_owner = Owner::from(sk);
+    let bootstrap_contacts = get_bootstrap_contacts()?;
+    let safe = Safe::connected(
+        bootstrap_contacts,
+        Some(credentials),
+        None,
+        None,
+        None,
+        Some(dbc_owner.clone()),
+    )
+    .await?;
+
+    Ok((safe, dbc_owner))
 }
 
 // Instantiate a Safe instance with read-only access
 pub async fn new_read_only_safe_instance() -> Result<Safe> {
     init_logger();
     let bootstrap_contacts = get_bootstrap_contacts()?;
-    let safe = Safe::connected(bootstrap_contacts, None, None, None, None).await?;
+    let safe = Safe::connected(bootstrap_contacts, None, None, None, None, None).await?;
 
     Ok(safe)
 }

@@ -79,15 +79,22 @@ pub async fn connect(safe: &mut Safe, config: &Config, timeout: Duration) -> Res
             app_keypair.clone(),
             client_cfg.as_deref(),
             Some(timeout),
+            config.dbc_owner.clone(),
         )
         .await
     {
         Ok(()) => Ok(()),
         Err(_) if found_app_keypair => {
             warn!("Credentials found for CLI are invalid, connecting with read-only access...");
-            safe.connect(bootstrap_contacts, None, None, Some(timeout))
-                .await
-                .wrap_err("Failed to connect with read-only access")
+            safe.connect(
+                bootstrap_contacts,
+                None,
+                None,
+                Some(timeout),
+                config.dbc_owner.clone(),
+            )
+            .await
+            .wrap_err("Failed to connect with read-only access")
         }
         Err(err) => return Err(eyre!("Failed to connect: {}", err)),
     }
