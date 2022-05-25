@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1653499117080,
+  "lastUpdate": 1653503591067,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -4151,6 +4151,78 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/single chunks",
             "value": 266576,
             "range": "± 14439",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "e42a2e3c212597e68238451a5bb4a8725c4761be",
+          "message": "Merge #1202\n\n1202: Allow handover re-consensus when elders agree on an empty set r=davidrusu a=grumbach\n\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\r\nFixes  #1186\r\n\r\n- generations for handover\r\n- AE for handover \r\n- empty consensus handling\r\n\n\nCo-authored-by: grumbach <anselmega@gmail.com>",
+          "timestamp": "2022-05-25T16:54:04Z",
+          "tree_id": "8f2e6d2eb36ed053bd433d8a8ab02bbcb44127a0",
+          "url": "https://github.com/maidsafe/safe_network/commit/e42a2e3c212597e68238451a5bb4a8725c4761be"
+        },
+        "date": 1653503589704,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10674878843,
+            "range": "± 13638485774",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3802507267,
+            "range": "± 3392952056",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 8725453105,
+            "range": "± 130857901",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10030943979,
+            "range": "± 2216036232",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3193165510,
+            "range": "± 1196465545",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4566378665,
+            "range": "± 1942694836",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single registers",
+            "value": 13907,
+            "range": "± 480",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single chunks",
+            "value": 210202,
+            "range": "± 2943",
             "unit": "ns/iter"
           }
         ]
