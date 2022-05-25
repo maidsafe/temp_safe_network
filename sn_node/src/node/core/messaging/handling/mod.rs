@@ -496,7 +496,8 @@ impl Node {
                 trace!("Handling msg: Dkg-FailureAgreement from {}", sender);
                 self.handle_dkg_failure_agreement(&src_name, &sig_set).await
             }
-            SystemMsg::HandoverVote(vote) => self.handle_handover_msg(vote).await,
+            SystemMsg::HandoverVotes(votes) => self.handle_handover_msg(sender, votes).await,
+            SystemMsg::HandoverAE(gen) => self.handle_handover_anti_entropy(sender, gen).await,
             SystemMsg::JoinRequest(join_request) => {
                 trace!("Handling msg: JoinRequest from {}", sender);
                 self.handle_join_request(sender, *join_request).await

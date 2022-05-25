@@ -161,7 +161,9 @@ pub enum SystemMsg {
     /// a DKG failure.
     DkgFailureAgreement(DkgFailureSigSet),
     /// Section handover consensus vote message
-    HandoverVote(SignedVote<SapCandidate>),
+    HandoverVotes(Vec<SignedVote<SapCandidate>>),
+    /// Handover Anti-Entropy request
+    HandoverAE(Generation),
     /// Message containing a single `Proposal` to be aggregated in the proposal aggregator.
     Propose {
         /// The content of the proposal

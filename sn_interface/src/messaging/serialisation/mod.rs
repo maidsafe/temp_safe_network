@@ -115,7 +115,8 @@ impl MsgType {
                     | SystemMsg::StartConnectivityTest(_)
                     | SystemMsg::MembershipVotes(_)
                     | SystemMsg::MembershipAE(_)
-                    | SystemMsg::HandoverVote(_),
+                    | SystemMsg::HandoverAE(_)
+                    | SystemMsg::HandoverVotes(_),
                 ..
             } => JOIN_RELOCATE_MSG_PRIORITY,
 
