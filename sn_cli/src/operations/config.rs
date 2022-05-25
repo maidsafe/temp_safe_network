@@ -6,10 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use bls::SecretKey;
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Help, Report, Result};
 use comfy_table::Table;
 use serde::{Deserialize, Serialize};
 use sn_api::{NodeConfig, PublicKey};
+use sn_dbc::Owner;
 use std::{
     collections::{BTreeMap, BTreeSet},
     default::Default,
@@ -110,6 +112,7 @@ pub struct Config {
     settings: Settings,
     pub cli_config_path: PathBuf,
     pub node_config_path: PathBuf,
+    pub dbc_owner: Option<Owner>,
 }
 
 impl Config {
@@ -159,10 +162,14 @@ impl Config {
             Settings::default()
         };
 
+        let mut dbc_owner_sk_path = pb.clone();
+        dbc_owner_sk_path.push("dbc_sk");
+        let dbc_owner = Config::get_dbc_owner(&dbc_owner_sk_path).await?;
         let config = Config {
             settings,
             cli_config_path: cli_config_path.clone(),
             node_config_path,
+            dbc_owner,
         };
         config.write_settings_to_file().await.wrap_err_with(|| {
             format!("Unable to create config at '{}'", cli_config_path.display())
@@ -353,9 +360,19 @@ impl Config {
         println!("{table}");
     }
 
-    //
-    // Private helpers
-    //
+    ///
+    /// Private helpers
+    ///
+
+    async fn get_dbc_owner(dbc_sk_path: &PathBuf) -> Result<Option<Owner>> {
+        if dbc_sk_path.exists() {
+            let hex = std::fs::read_to_string(dbc_sk_path)?;
+            let sk: SecretKey = bincode::deserialize(hex.as_bytes()).map_err(|e| eyre!(e))?;
+            return Ok(Some(Owner::from(sk)));
+        }
+        Ok(None)
+    }
+
     async fn cache_node_config(
         &self,
         network_name: &str,
@@ -450,7 +467,9 @@ mod constructor {
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
         let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
-
+        let dbc_owner_sk_file = tmp_dir.child(".safe/cli/dbc_sk");
+        dbc_owner_sk_file
+            .write_str("3917ad935714cf1e71b9b5e2831684811e83acc6c10f030031fe886292152e83")?;
         let config = Config::new(
             PathBuf::from(cli_config_file.path()),
             PathBuf::from(node_config_file.path()),
@@ -460,6 +479,7 @@ mod constructor {
         assert_eq!(config.cli_config_path, cli_config_file.path());
         assert_eq!(config.node_config_path, node_config_file.path());
         assert_eq!(config.settings.networks.len(), 0);
+        assert!(config.dbc_owner.is_some());
         Ok(())
     }
 

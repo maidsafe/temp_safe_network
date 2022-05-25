@@ -36,6 +36,7 @@ use super::{common, constants, Error, Result};
 use crate::NodeConfig;
 
 use sn_client::{Client, ClientConfig, DEFAULT_OPERATION_TIMEOUT};
+use sn_dbc::Owner;
 use sn_interface::types::Keypair;
 use tracing::debug;
 
@@ -68,6 +69,7 @@ impl Safe {
         config_path: Option<&Path>,
         xorurl_base: Option<XorUrlBase>,
         timeout: Option<Duration>,
+        dbc_owner: Option<Owner>,
     ) -> Result<Self> {
         let mut safe = Self {
             client: None,
@@ -75,7 +77,7 @@ impl Safe {
             dry_run_mode: false,
         };
 
-        safe.connect(bootstrap_config, keypair, config_path, timeout)
+        safe.connect(bootstrap_config, keypair, config_path, timeout, dbc_owner)
             .await?;
 
         Ok(safe)
@@ -88,6 +90,7 @@ impl Safe {
         keypair: Option<Keypair>,
         config_path: Option<&Path>,
         timeout: Option<Duration>,
+        dbc_owner: Option<Owner>,
     ) -> Result<()> {
         debug!("Connecting to SAFE Network...");
 
@@ -108,7 +111,7 @@ impl Safe {
         .await;
 
         self.client = Some(
-            Client::new(config, bootstrap_config.1, keypair, None)
+            Client::new(config, bootstrap_config.1, keypair, dbc_owner)
                 .await
                 .map_err(|err| {
                     Error::ConnectionError(format!(
