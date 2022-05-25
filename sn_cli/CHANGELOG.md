@@ -4,11 +4,56 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.55.0 (2022-05-25)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 2 days passed between releases.
+ - 0 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #1195 ([`c6e6e32`](https://github.com/maidsafe/safe_network/commit/c6e6e324164028c6c15a78643783a9f86679f39e))
+</details>
+
 ## v0.54.0 (2022-05-21)
+
+### Chore
+
+ - <csr-id-cf21d66b9b726123e0a4320cd68481b67f7af03d/> sn_dysfunction-0.2.0/sn_client-0.63.0/sn_node-0.59.0/sn_api-0.61.0/sn_cli-0.54.0
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 3 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_dysfunction-0.2.0/sn_client-0.63.0/sn_node-0.59.0/sn_api-0.61.0/sn_cli-0.54.0 ([`cf21d66`](https://github.com/maidsafe/safe_network/commit/cf21d66b9b726123e0a4320cd68481b67f7af03d))
+</details>
 
 ## v0.53.1 (2022-05-18)
 
 <csr-id-07504faeda6cbfd0b27abea25facde992398ecf9/>
+<csr-id-9b06304f46e1a1bda90a0fc6ff82edc928c2529d/>
 
 ### Chore
 
@@ -90,9 +135,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - change default node max cpacity to 10GB ([`e17baff`](https://github.com/maidsafe/safe_network/commit/e17baffdc356d244075a97e9422d5ffab2ca46c7))
     - Merge #1128 ([`e49d382`](https://github.com/maidsafe/safe_network/commit/e49d38239b3a8c468616ad3782e1208316e9b5e0))
 </details>
-
-<csr-unknown>
-When cat command is used with a Wallet, it lists all spendable balances found in it,as long as the user has permissions to read it as it’s expected to be a private Multimap.<csr-unknown/>
 
 ## v0.52.0 (2022-04-23)
 
@@ -759,6 +801,8 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 ## v0.47.1 (2022-02-04)
 
 <csr-id-86975f228f31303597a707e158005e44c86de1cc/>
+<csr-id-9af70e7785c9329d8262de99bda68c4ad79d5154/>
+<csr-id-a58f6c5019e73ffbfa0f29965aa0fa62b026ece7/>
 
 ### Chore
 
@@ -998,6 +1042,10 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 <csr-id-ad2e30cf52cd8be01c00353d722ea1107c43a641/>
 <csr-id-923930acb3769cfa7047954a1fee1853ec9e3062/>
 <csr-id-57749b7d0671423fe205447bc84d9f8bfc99f54b/>
+<csr-id-3b5ce194213a7090ee83c02b0043700cda230796/>
+<csr-id-20f416cb7d0960a1d8d6f167a1ad1eed33ed6a7b/>
+<csr-id-7a7752f830785ec39d301e751dc75f228d43d595/>
+<csr-id-155ee032ee56cbbb34928f2d14529273ccb69559/>
 
 ### Other
 
@@ -1098,6 +1146,10 @@ When cat command is used with a Wallet, it lists all spendable balances found in
 <csr-id-99d012ef529df78ef4c84f5e6ea99d3a77414797/>
 <csr-id-155ee032ee56cbbb34928f2d14529273ccb69559/>
 <csr-id-a64c7e0414b77f545cb8cdbf64af0fb7212d1f2e/>
+<csr-id-c790077bebca691f974000278d5525f4b011b8a7/>
+<csr-id-bebdae9d52d03bd13b679ee19446452990d1e2cf/>
+<csr-id-5f7000c5ec5895fb3f4c4a17a74ada52bb873fc7/>
+<csr-id-0a70425fb314de4c165da54fdc29a127ae900d81/>
 
 ### Chore
 
