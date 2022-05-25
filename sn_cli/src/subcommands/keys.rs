@@ -264,12 +264,8 @@ mod create_command {
         let keypair =
             keypair.ok_or_else(|| eyre!("The command should have generated a keypair"))?;
         match keypair {
-            Keypair::Ed25519(_) => {
-                return Ok(());
-            }
-            _ => {
-                return Err(eyre!("The command should generate a Ed25519 keypair"));
-            }
+            Keypair::Ed25519(_) => Ok(()),
+            _ => Err(eyre!("The command should generate a Ed25519 keypair")),
         }
     }
 }

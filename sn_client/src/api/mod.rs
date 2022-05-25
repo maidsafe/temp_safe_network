@@ -293,9 +293,9 @@ mod tests {
     use super::*;
     use crate::utils::test_utils::{
         create_test_client, create_test_client_with, get_dbc_owner_from_secret_key_hex,
-        init_test_logger,
     };
     use eyre::Result;
+    use sn_interface::init_logger;
     use sn_interface::types::utils::random_bytes;
     use sn_interface::types::Scope;
     use std::{
