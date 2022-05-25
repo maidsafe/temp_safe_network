@@ -205,7 +205,11 @@ impl Membership {
         let signed_vote = self.sign_vote(vote)?;
 
         self.validate_proposals(&signed_vote, prefix)?;
-        if let Err(e) = self.consensus.detect_byzantine_voters(&signed_vote) {
+        if let Err(e) = signed_vote.detect_byzantine_faults(
+            &self.consensus.elders,
+            &self.consensus.votes,
+            &self.consensus.processed_votes_cache,
+        ) {
             error!("Attempted invalid proposal: {e:?}");
             return Err(Error::InvalidProposal);
         }

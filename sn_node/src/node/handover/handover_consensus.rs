@@ -40,8 +40,12 @@ impl Handover {
         };
         let signed_vote = self.sign_vote(vote)?;
         self.validate_proposals(&signed_vote)?;
-        self.consensus
-            .detect_byzantine_voters(&signed_vote)
+        signed_vote
+            .detect_byzantine_faults(
+                &self.consensus.elders,
+                &self.consensus.votes,
+                &self.consensus.processed_votes_cache,
+            )
             .map_err(|_| Error::FaultyProposal)?;
         self.cast_vote(signed_vote)
     }
