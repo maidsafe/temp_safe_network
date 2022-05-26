@@ -63,7 +63,16 @@ fn main() -> Result<()> {
             .stack_size(16 * 1024 * 1024)
             .spawn(move || {
                 let rt = tokio::runtime::Runtime::new()?;
-                rt.block_on(run_node())?;
+                match rt.block_on(run_node()) {
+                    Ok(_) => {}
+                    Err(error) => {
+                        error!("{error}")
+                    }
+                };
+                rt.shutdown_timeout(Duration::from_secs(2));
+
+                // let rt = tokio::runtime::Runtime::new()?;
+                // rt.block_on(run_node())?;
                 Ok(())
             })
             .wrap_err("Failed to spawn node thread")?;
@@ -276,8 +285,7 @@ async fn run_node() -> Result<()> {
 
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
     let (node, mut event_stream) = loop {
-        let node_setup = NodeApi::new(&config, bootstrap_retry_duration).await;
-        match node_setup {
+        match NodeApi::new(&config, bootstrap_retry_duration).await {
             Ok(result) => break result,
             Err(Error::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
                 return Err(error).suggestion(
@@ -321,15 +329,12 @@ async fn run_node() -> Result<()> {
                     "unknown".to_string()
                 };
 
-                error!("{e}");
-                let err = format!(
+                return Err(e).wrap_err(format!(
                     "Cannot start node (log path: {}). If this is the first node on the network pass the local \
-                    address to be used using --first", log_path);
-                warn!("{err}");
-                return Err(e).wrap_err(err);
+                    address to be used using --first", log_path)
+                );
             }
         }
-        drop(node_setup);
         sleep(bootstrap_retry_duration).await;
     };
 
