@@ -611,7 +611,7 @@ jobs:
           package: sn_cli
           release: true
           test-threads: 10
-        timeout-minutes: 80
+        timeout-minutes: 25
 
       - name: Are nodes still running...?
         shell: bash
