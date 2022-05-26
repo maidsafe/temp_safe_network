@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1653572130080,
+  "lastUpdate": 1653583592028,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -4295,6 +4295,78 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/single chunks",
             "value": 202708,
             "range": "± 5925",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "joshuef@gmail.com",
+            "name": "Josh Wilson",
+            "username": "joshuef"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "77d962abb97f8b00e9295419079b43224ca67341",
+          "message": "fix: shutdown runtime in node loop\n\nthis should hopefully shutdown any bg processes running which may be blocking ports on reconnect\n\nCo-authored-by: David Rusu <david.rusu@maidsafe.net>",
+          "timestamp": "2022-05-26T18:19:41+02:00",
+          "tree_id": "22511c2f72965aa85c22e9be55e4f94a3aafc5cc",
+          "url": "https://github.com/maidsafe/safe_network/commit/77d962abb97f8b00e9295419079b43224ca67341"
+        },
+        "date": 1653583591456,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10494057124,
+            "range": "± 11950525715",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3762241576,
+            "range": "± 1014426604",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 8478328061,
+            "range": "± 274936849",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10031061976,
+            "range": "± 4102343",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3143799096,
+            "range": "± 1119518312",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4580146631,
+            "range": "± 899492640",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single registers",
+            "value": 13740,
+            "range": "± 745",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single chunks",
+            "value": 200696,
+            "range": "± 1649",
             "unit": "ns/iter"
           }
         ]
