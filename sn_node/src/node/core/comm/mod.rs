@@ -69,6 +69,7 @@ impl Comm {
         config: qp2p::Config,
         receive_msg: mpsc::Sender<MsgEvent>,
     ) -> Result<(Self, SocketAddr)> {
+        debug!("Starting bootstrap process");
         // Bootstrap to the network returning the connection to a node.
         let (our_endpoint, incoming_connections, bootstrap_node) =
             Endpoint::new_peer(local_addr, bootstrap_nodes, config).await?;

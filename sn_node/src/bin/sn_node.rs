@@ -276,7 +276,8 @@ async fn run_node() -> Result<()> {
 
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
     let (node, mut event_stream) = loop {
-        match NodeApi::new(&config, bootstrap_retry_duration).await {
+        let node_setup = NodeApi::new(&config, bootstrap_retry_duration).await;
+        match node_setup {
             Ok(result) => break result,
             Err(Error::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
                 return Err(error).suggestion(
@@ -320,12 +321,15 @@ async fn run_node() -> Result<()> {
                     "unknown".to_string()
                 };
 
-                return Err(e).wrap_err(format!(
+                error!("{e}");
+                let err = format!(
                     "Cannot start node (log path: {}). If this is the first node on the network pass the local \
-                    address to be used using --first", log_path)
-                );
+                    address to be used using --first", log_path);
+                warn!("{err}");
+                return Err(e).wrap_err(err);
             }
         }
+        drop(node_setup);
         sleep(bootstrap_retry_duration).await;
     };
 
