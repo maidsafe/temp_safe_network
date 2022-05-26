@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1653503591067,
+  "lastUpdate": 1653572130080,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -4223,6 +4223,78 @@ window.BENCHMARK_DATA = {
             "name": "read-sampling/single chunks",
             "value": 210202,
             "range": "± 2943",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "c08fbb94e9306a00cdd24db9be73f903cb1f3362",
+          "message": "Merge #1210\n\n1210: chore: explicitly drop Node on join retry r=joshuef a=joshuef\n\nAdd more logs to aid debugging\r\n\r\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\n\nCo-authored-by: Josh Wilson <joshuef@gmail.com>",
+          "timestamp": "2022-05-26T11:50:57Z",
+          "tree_id": "990ca83f0faf67ceaef31622d2dc09d1714a3db8",
+          "url": "https://github.com/maidsafe/safe_network/commit/c08fbb94e9306a00cdd24db9be73f903cb1f3362"
+        },
+        "date": 1653572129359,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 16934387257,
+            "range": "± 6853278743",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3733997664,
+            "range": "± 79586206",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 8624279748,
+            "range": "± 7076849952",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10032349656,
+            "range": "± 5964826",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3138284088,
+            "range": "± 960065581",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4412817351,
+            "range": "± 1585598129",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single registers",
+            "value": 13152,
+            "range": "± 323",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/single chunks",
+            "value": 202708,
+            "range": "± 5925",
             "unit": "ns/iter"
           }
         ]
