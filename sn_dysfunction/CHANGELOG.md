@@ -5,15 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.4.0 (2022-05-27)
+
 ## v0.3.0 (2022-05-25)
+
+### Chore
+
+ - <csr-id-ef56cf9cf8de45a9f13c2510c63de245b12aeae8/> sn_interface-0.4.0/sn_dysfunction-0.3.0/sn_client-0.64.0/sn_node-0.60.0/sn_api-0.62.0/sn_cli-0.55.0
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 2 days passed between releases.
- - 0 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 3 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -23,10 +29,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.4.0/sn_dysfunction-0.3.0/sn_client-0.64.0/sn_node-0.60.0/sn_api-0.62.0/sn_cli-0.55.0 ([`ef56cf9`](https://github.com/maidsafe/safe_network/commit/ef56cf9cf8de45a9f13c2510c63de245b12aeae8))
     - Merge #1195 ([`c6e6e32`](https://github.com/maidsafe/safe_network/commit/c6e6e324164028c6c15a78643783a9f86679f39e))
 </details>
 
+## v0.2.0 (2022-05-21)
+
+<csr-id-cf21d66b9b726123e0a4320cd68481b67f7af03d/>
+<csr-id-24125eb3603a14c22e208964cbecac16915161ae/>
+<csr-id-ef798150deb88efac1dcfe9a3cd0f2cebe1e4682/>
+
+### Chore
+
+ - <csr-id-cf21d66b9b726123e0a4320cd68481b67f7af03d/> sn_dysfunction-0.2.0/sn_client-0.63.0/sn_node-0.59.0/sn_api-0.61.0/sn_cli-0.54.0
+ - <csr-id-24125eb3603a14c22e208964cbecac16915161ae/> ensure op writes use mut
+   Dysfunction op writes were pulling from the dashmap but not using mut
+   which could perhaps lead to a deadlock as we lock over the entry value
+
+### Chore (BREAKING)
+
+ - <csr-id-ef798150deb88efac1dcfe9a3cd0f2cebe1e4682/> add Display for OperationId
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release over the course of 3 calendar days.
+ - 10 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_dysfunction-0.2.0/sn_client-0.63.0/sn_node-0.59.0/sn_api-0.61.0/sn_cli-0.54.0 ([`cf21d66`](https://github.com/maidsafe/safe_network/commit/cf21d66b9b726123e0a4320cd68481b67f7af03d))
+    - add Display for OperationId ([`ef79815`](https://github.com/maidsafe/safe_network/commit/ef798150deb88efac1dcfe9a3cd0f2cebe1e4682))
+    - ensure op writes use mut ([`24125eb`](https://github.com/maidsafe/safe_network/commit/24125eb3603a14c22e208964cbecac16915161ae))
+</details>
+
 ## v0.1.3 (2022-05-11)
+
+<csr-id-66638f508ad4df12b757672df589ba8ad09fbdfc/>
 
 ### Chore
 
@@ -252,41 +300,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - update readme ([`15a0d35`](https://github.com/maidsafe/safe_network/commit/15a0d354fd804f8f44735b09c22f9e456211c067))
     - add dysfunction tests to ci ([`2e6d78c`](https://github.com/maidsafe/safe_network/commit/2e6d78c13c137e422d3714e8c113aeb4c0b597a3))
     - rename dysfunction -> sn_dysfunction ([`aafb6d2`](https://github.com/maidsafe/safe_network/commit/aafb6d2a458fc4e2dc94ea3a08cb519fe52bc131))
-</details>
-
-## v0.2.0 (2022-05-21)
-
-### Chore
-
- - <csr-id-cf21d66b9b726123e0a4320cd68481b67f7af03d/> sn_dysfunction-0.2.0/sn_client-0.63.0/sn_node-0.59.0/sn_api-0.61.0/sn_cli-0.54.0
- - <csr-id-24125eb3603a14c22e208964cbecac16915161ae/> ensure op writes use mut
-   Dysfunction op writes were pulling from the dashmap but not using mut
-   which could perhaps lead to a deadlock as we lock over the entry value
-
-### Chore (BREAKING)
-
- - <csr-id-ef798150deb88efac1dcfe9a3cd0f2cebe1e4682/> add Display for OperationId
-
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 3 commits contributed to the release over the course of 3 calendar days.
- - 10 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_dysfunction-0.2.0/sn_client-0.63.0/sn_node-0.59.0/sn_api-0.61.0/sn_cli-0.54.0 ([`cf21d66`](https://github.com/maidsafe/safe_network/commit/cf21d66b9b726123e0a4320cd68481b67f7af03d))
-    - add Display for OperationId ([`ef79815`](https://github.com/maidsafe/safe_network/commit/ef798150deb88efac1dcfe9a3cd0f2cebe1e4682))
-    - ensure op writes use mut ([`24125eb`](https://github.com/maidsafe/safe_network/commit/24125eb3603a14c22e208964cbecac16915161ae))
 </details>
 
 ## v0.1.0 (2022-03-25)
