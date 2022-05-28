@@ -111,8 +111,7 @@ async fn start_single_node(
     ip: Option<IpAddr>,
     port: Option<u16>,
 ) -> Result<JoinHandle<()>> {
-    let (_contact, handle) = start_node(0, first, ip, port).await?;
-    Ok(handle)
+    start_node(0, first, ip, port).await
 }
 
 // Starts `count` nodes and blocks until all of them terminate.
@@ -127,7 +126,7 @@ async fn start_multiple_nodes(
 ) -> Result<Vec<JoinHandle<()>>> {
     let mut handles = Vec::new();
     let first_index = if first {
-        let (_, first_handle) = start_node(0, true, ip, base_port).await?;
+        let first_handle = start_node(0, true, ip, base_port).await?;
         handles.push(first_handle);
         1
     } else {
@@ -135,7 +134,7 @@ async fn start_multiple_nodes(
     };
 
     for index in first_index..count {
-        let (_contact_info, handle) = start_node(index, false, ip, base_port).await?;
+        let handle = start_node(index, false, ip, base_port).await?;
         handles.push(handle);
     }
     Ok(handles)
@@ -147,7 +146,7 @@ async fn start_node(
     first: bool,
     ip: Option<IpAddr>,
     base_port: Option<u16>,
-) -> Result<(SocketAddr, JoinHandle<()>)> {
+) -> Result<JoinHandle<()>> {
     let ip = ip.unwrap_or_else(|| Ipv4Addr::LOCALHOST.into());
     let local_port = base_port
         .map(|base_port| {
@@ -176,18 +175,11 @@ async fn start_node(
         .await
         .expect("Failed to instantiate a Node");
 
-    let contact_info = node.our_connection_info().await;
-
-    info!(
-        "Node #{} connected - name: {}, contact: {}",
-        index,
-        node.name().await,
-        contact_info
-    );
+    info!("Node #{} connected - name: {}", index, node.name().await,);
 
     let handle = run_node(index, node, event_receiver);
 
-    Ok((contact_info, handle))
+    Ok(handle)
 }
 
 // Spawns a task to run the node until terminated.

@@ -445,7 +445,7 @@ fn smoke() {
     // NOTE: IF this value is being changed due to a change in the config,
     // the change in config also be handled in Config::merge()
     // and in examples/config_handling.rs
-    let expected_size = 456;
+    let expected_size = 408;
 
     assert_eq!(std::mem::size_of::<Config>(), expected_size);
 }

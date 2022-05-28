@@ -167,7 +167,6 @@ pub async fn run_split() -> Result<()> {
         .wrap_err("Error adding nodes to the testnet")?;
 
     let interval_duration = Duration::from_millis(*interval_as_int);
-
     sleep(interval_duration).await;
 
     let config = ClientConfig::new(None, None, None, None, None, None).await;
