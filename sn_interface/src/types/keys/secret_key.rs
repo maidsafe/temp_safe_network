@@ -23,6 +23,8 @@ use std::fmt::{self, Debug, Display, Formatter};
 pub enum SecretKey {
     /// Ed25519 secretkey.
     Ed25519(ed25519_dalek::SecretKey),
+    /// BLS secret key.
+    Bls(SerdeSecret<bls::SecretKey>),
     /// BLS secretkey share.
     BlsShare(SerdeSecret<bls::SecretKeyShare>),
 }

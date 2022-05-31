@@ -98,6 +98,7 @@ impl Signing for Keypair {
     fn id(&self) -> OwnerType {
         match self {
             Keypair::Ed25519(pair) => OwnerType::Single(PublicKey::Ed25519(pair.public)),
+            Keypair::Bls(pair) => OwnerType::Single(PublicKey::Bls(pair.public)),
             Keypair::BlsShare(share) => OwnerType::Multi(share.public_key_set.clone()),
         }
     }
@@ -115,9 +116,8 @@ impl Signing for Keypair {
 /// Wrapper for different keypair types.
 #[derive(Serialize, Deserialize, Clone, custom_debug::Debug)]
 pub enum Keypair {
-    /// Ed25519 keypair.
     Ed25519(#[debug(skip)] Arc<ed25519_dalek::Keypair>),
-    /// BLS keypair share.
+    Bls(Arc<BlsKeypair>),
     BlsShare(Arc<BlsKeypairShare>),
 }
 
@@ -130,6 +130,7 @@ impl PartialEq for Keypair {
                 keypair.to_bytes().to_vec() == other_keypair.to_bytes().to_vec()
             }
             (Self::BlsShare(keypair), Self::BlsShare(other_keypair)) => keypair == other_keypair,
+            (Self::Bls(keypair), Self::Bls(other_keypair)) => keypair == other_keypair,
             _ => false,
         }
     }
@@ -144,6 +145,16 @@ impl Keypair {
         let mut rng = rand_07::thread_rng();
         let keypair = ed25519_dalek::Keypair::generate(&mut rng);
         Self::Ed25519(Arc::new(keypair))
+    }
+
+    pub fn new_bls() -> Self {
+        let sk = bls::SecretKey::random();
+        let pk = sk.public_key();
+        let keypair = BlsKeypair {
+            secret: SerdeSecret(sk),
+            public: pk,
+        };
+        Self::Bls(Arc::new(keypair))
     }
 
     /// Constructs a BLS keypair share.
@@ -164,6 +175,7 @@ impl Keypair {
     pub fn public_key(&self) -> PublicKey {
         match self {
             Self::Ed25519(keypair) => PublicKey::Ed25519(keypair.public),
+            Self::Bls(keypair) => PublicKey::Bls(keypair.public),
             Self::BlsShare(keypair) => PublicKey::BlsShare(keypair.public),
         }
     }
@@ -180,6 +192,7 @@ impl Keypair {
                     )),
                 }
             }
+            Self::Bls(keypair) => Ok(SecretKey::Bls(keypair.secret.clone())),
             Self::BlsShare(keypair) => Ok(SecretKey::BlsShare(keypair.secret.clone())),
         }
     }
@@ -188,6 +201,7 @@ impl Keypair {
     pub fn sign(&self, data: &[u8]) -> Signature {
         match self {
             Self::Ed25519(keypair) => Signature::Ed25519(keypair.sign(data)),
+            Self::Bls(keypair) => Signature::Bls(keypair.secret.sign(data)),
             Self::BlsShare(keypair) => Signature::BlsShare(SignatureShare {
                 index: keypair.index,
                 share: keypair.secret.sign(data),
@@ -221,36 +235,52 @@ pub struct BlsKeypairShare {
     pub public_key_set: PublicKeySet,
 }
 
+/// BLS keypair.
+#[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
+pub struct BlsKeypair {
+    pub public: bls::PublicKey,
+    pub secret: SerdeSecret<bls::SecretKey>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::super::utils;
     use super::*;
 
-    fn gen_keypairs() -> Vec<Keypair> {
-        let mut rng = rand::thread_rng();
-        let bls_secret_key = bls::SecretKeySet::random(1, &mut rng);
-        vec![
-            Keypair::new_ed25519(),
-            Keypair::new_bls_share(
-                0,
-                bls_secret_key.secret_key_share(0),
-                bls_secret_key.public_keys(),
-            ),
-        ]
+    #[test]
+    fn should_serialise_an_ed25519_keypair() -> Result<()> {
+        let keypair = Keypair::new_ed25519();
+        let encoded = utils::serialise(&keypair)?;
+        let decoded: Keypair = utils::deserialise(&encoded)?;
+        assert_eq!(decoded, keypair);
+        Ok(())
     }
 
-    // Test serialising and deserialising key pairs.
     #[test]
-    fn serialisation_key_pair() -> Result<()> {
-        let keypairs = gen_keypairs();
+    fn should_serialise_a_bls_keypair() -> Result<()> {
+        let keypair = Keypair::new_bls();
+        let encoded = utils::serialise(&keypair)?;
+        let decoded: Keypair = utils::deserialise(&encoded)?;
+        assert_eq!(decoded, keypair);
+        Ok(())
+    }
 
-        for keypair in keypairs {
-            let encoded = utils::serialise(&keypair)?;
-            let decoded: Keypair = utils::deserialise(&encoded)?;
+    #[test]
+    fn should_serialise_a_bls_share() -> Result<()> {
+        let bls_secret_key = bls::SecretKeySet::random(1, &mut rand::thread_rng());
+        let keypair = Keypair::new_bls_share(
+            0,
+            bls_secret_key.secret_key_share(0),
+            bls_secret_key.public_keys(),
+        );
+        let encoded = utils::serialise(&keypair)?;
+        let decoded: Keypair = utils::deserialise(&encoded)?;
+        assert_eq!(decoded, keypair);
+        Ok(())
+    }
 
-            assert_eq!(decoded, keypair);
-        }
-
+    #[test]
+    fn should_convert_ed25519_keypair_to_hex() -> Result<()> {
         Ok(())
     }
 }
