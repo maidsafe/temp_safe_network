@@ -21,7 +21,7 @@ pub(crate) use lru_cache::LruCache;
 use std::path::Path;
 pub use used_space::UsedSpace;
 
-pub(crate) const SLED_FLUSH_TIME_MS: Option<u64> = Some(10000);
+pub(crate) const SLED_FLUSH_TIME_MS: Option<u64> = Some(5000);
 
 pub(crate) trait Subdir {
     fn subdir() -> &'static Path;
