@@ -43,8 +43,6 @@ pub use authd_client::*;
 #[cfg(any(feature = "authenticator", feature = "authd_client"))]
 pub use common::auth_types::*;
 
-pub use common::{ed_sk_from_hex, sk_to_hex};
-
 pub use errors::{Error, Result};
 
 pub use safeurl::*;

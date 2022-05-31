@@ -12,7 +12,7 @@ use color_eyre::{eyre::eyre, eyre::WrapErr, Result};
 use sn_api::{Keypair, Safe};
 use std::{
     fs::{create_dir_all, File},
-    io::{Read, Write},
+    io::Write,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -59,7 +59,7 @@ pub async fn authorise_cli(
 pub async fn connect(safe: &mut Safe, config: &Config, timeout: Duration) -> Result<()> {
     debug!("Connecting...");
 
-    let app_keypair = if let Ok((_, keypair)) = read_credentials(config) {
+    let app_keypair = if let Ok((_, keypair)) = read_credentials(safe, config) {
         keypair
     } else {
         None
@@ -113,36 +113,16 @@ pub fn create_credentials_file(config: &Config) -> Result<(File, PathBuf)> {
     Ok((file, file_path))
 }
 
-pub fn read_credentials(config: &Config) -> Result<(PathBuf, Option<Keypair>)> {
-    let (_, file_path) = get_credentials_file_path(config)?;
-
-    let keypair = if let Ok(mut file) = File::open(&file_path) {
-        let mut credentials = String::new();
-        match file.read_to_string(&mut credentials) {
-            Ok(_) if credentials.is_empty() => None,
-            Ok(_) => {
-                let keypair = serde_json::from_str(&credentials).with_context(|| {
-                    format!(
-                        "Unable to parse the credentials read from {}",
-                        file_path.display(),
-                    )
-                })?;
-                Some(keypair)
-            }
-            Err(err) => {
-                debug!(
-                    "Unable to read credentials from {}: {}",
-                    file_path.display(),
-                    err
-                );
-                None
-            }
+pub fn read_credentials(safe: &Safe, config: &Config) -> Result<(PathBuf, Option<Keypair>)> {
+    let (_, path) = get_credentials_file_path(config)?;
+    let keypair = match safe.deserialize_keypair(&path) {
+        Ok(kp) => Some(kp),
+        Err(e) => {
+            debug!("Unable to read credentials from {}: {}", path.display(), e);
+            None
         }
-    } else {
-        None
     };
-
-    Ok((file_path, keypair))
+    Ok((path, keypair))
 }
 
 #[allow(dead_code)]
@@ -156,17 +136,17 @@ pub fn clear_credentials(config: &Config) -> Result<()> {
     Ok(())
 }
 
-///
-/// Private helpers
-///
-
-fn get_credentials_file_path(config: &Config) -> Result<(PathBuf, PathBuf)> {
+pub fn get_credentials_file_path(config: &Config) -> Result<(PathBuf, PathBuf)> {
     let mut pb = config.cli_config_path.clone();
     pb.pop();
     let credentials_folder = pb;
     let file_path = credentials_folder.join(AUTH_CREDENTIALS_FILENAME);
     Ok((credentials_folder, file_path))
 }
+
+///
+/// Private helpers
+///
 
 fn client_config_path() -> Option<PathBuf> {
     let mut client_cfg_path = dirs_next::home_dir()?;
