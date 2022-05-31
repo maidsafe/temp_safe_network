@@ -3477,6 +3477,7 @@ name = "sn_api"
 version = "0.63.0"
 dependencies = [
  "anyhow",
+ "assert_fs",
  "assert_matches",
  "bincode",
  "blsttc",
@@ -3493,6 +3494,7 @@ dependencies = [
  "mime_guess",
  "multibase",
  "pbkdf2",
+ "predicates",
  "proptest",
  "qjsonrpc",
  "rand 0.7.3",

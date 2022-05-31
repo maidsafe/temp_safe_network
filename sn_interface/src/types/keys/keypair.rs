@@ -15,6 +15,7 @@
 use super::super::{Error, Result};
 use super::super::{PublicKey, SecretKey, Signature, SignatureShare};
 
+use crate::types::errors::convert_bincode_error;
 use bls::{self, serde_impl::SerdeSecret, PublicKeySet};
 use bytes::Bytes;
 use ed25519_dalek::Signer;
@@ -208,6 +209,26 @@ impl Keypair {
             }),
         }
     }
+
+    pub fn to_hex(&self) -> Result<(String, String)> {
+        let pk = self.public_key();
+        let pk_hex = match pk {
+            PublicKey::Ed25519(key) => hex::encode(key.to_bytes()),
+            PublicKey::Bls(key) => hex::encode(key.to_bytes()),
+            PublicKey::BlsShare(key) => hex::encode(key.to_bytes()),
+        };
+        let sk = self.secret_key()?;
+        let sk_hex = match sk {
+            SecretKey::Ed25519(key) => hex::encode(key.to_bytes()),
+            SecretKey::Bls(key) => {
+                let mut bytes = bincode::serialize(&key).map_err(convert_bincode_error)?;
+                bytes.reverse();
+                hex::encode(bytes)
+            }
+            SecretKey::BlsShare(key) => key.inner().reveal(),
+        };
+        Ok((pk_hex, sk_hex))
+    }
 }
 
 impl From<ed25519_dalek::SecretKey> for Keypair {
@@ -246,6 +267,7 @@ pub struct BlsKeypair {
 mod tests {
     use super::super::super::utils;
     use super::*;
+    use crate::types::errors::convert_bincode_error;
 
     #[test]
     fn should_serialise_an_ed25519_keypair() -> Result<()> {
@@ -280,7 +302,40 @@ mod tests {
     }
 
     #[test]
-    fn should_convert_ed25519_keypair_to_hex() -> Result<()> {
+    fn to_hex_should_convert_ed25519_keypair_to_hex() -> Result<()> {
+        let keypair = Keypair::new_ed25519();
+        let pk = keypair.public_key();
+
+        let (pk_hex, sk_hex) = keypair.to_hex()?;
+
+        let pk_from_hex = PublicKey::ed25519_from_hex(&pk_hex)?;
+        let result = SecretKey::ed25519_from_hex(&sk_hex);
+        // Two SecretKey types can't be compared, so just assert that parsing the string from hex
+        // was successful.
+        assert!(result.is_ok());
+        assert_eq!(pk, pk_from_hex);
+        Ok(())
+    }
+
+    #[test]
+    #[ignore = "there is a problem with decoding the secret key hex representation"]
+    fn to_hex_should_convert_bls_keypair_to_hex() -> Result<()> {
+        let keypair = Keypair::new_bls();
+        let pk = keypair.public_key();
+
+        let (pk_hex, sk_hex) = keypair.to_hex()?;
+
+        let pk_from_hex = PublicKey::bls_from_hex(&pk_hex)?;
+        let sk_bytes = match hex::decode(&sk_hex) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                return Err(Error::Serialisation(e.to_string()));
+            }
+        };
+
+        // We can't compare two SecretKey types, so just test the deserialization works ok.
+        let _: SecretKey = bincode::deserialize(&sk_bytes).map_err(convert_bincode_error)?;
+        assert_eq!(pk, pk_from_hex);
         Ok(())
     }
 }

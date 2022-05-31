@@ -34,44 +34,7 @@ pub mod auth_types {
     pub type AuthedAppsList = Vec<AuthedApp>;
 }
 
-pub fn parse_hex(hex_str: &str) -> Vec<u8> {
-    let mut hex_bytes = hex_str
-        .as_bytes()
-        .iter()
-        .filter_map(|b| match b {
-            b'0'..=b'9' => Some(b - b'0'),
-            b'a'..=b'f' => Some(b - b'a' + 10),
-            b'A'..=b'F' => Some(b - b'A' + 10),
-            _ => None,
-        })
-        .fuse();
-
-    let mut bytes = Vec::new();
-    while let (Some(h), Some(l)) = (hex_bytes.next(), hex_bytes.next()) {
-        bytes.push(h << 4 | l)
-    }
-    bytes
-}
-
-pub fn ed_sk_from_hex(hex_str: &str) -> Result<ed25519_dalek::SecretKey> {
-    let sk_bytes = parse_hex(hex_str);
-    ed25519_dalek::SecretKey::from_bytes(&sk_bytes).map_err(|_| {
-        Error::InvalidInput("Failed to deserialize provided Ed25519 secret key".to_string())
-    })
-}
-
-// Get hex string of a SecretKey
-pub fn sk_to_hex(sk: sn_interface::types::SecretKey) -> String {
-    match sk {
-        sn_interface::types::SecretKey::Ed25519(sk) => {
-            sk.to_bytes().iter().map(|b| format!("{:02x}", b)).collect()
-        }
-        //SecretKey::Bls(sk) => sk.inner().reveal(), // FIXME: it includes bls in the text
-        sn_interface::types::SecretKey::BlsShare(sk) => sk.inner().reveal(), // FIXME: it includes bls in the text
-    }
-}
-
-// Send a request to authd using JSON-RPC over QUIC
+/// Send a request to authd using JSON-RPC over QUIC.
 pub async fn send_authd_request<T>(
     cert_path: &Path,
     dst_endpoint: &str,
@@ -98,7 +61,6 @@ where
             .handle()
             .clone(),
     };
-
     let mut outgoing_conn = {
         let _ = runtime.enter();
         qjsonrpc_client

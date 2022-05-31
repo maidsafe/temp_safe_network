@@ -32,10 +32,9 @@ pub enum SecretKey {
 impl SecretKey {
     /// Construct a secret key from a hex string
     ///
-    /// Similar to public key, it is often useful in user
-    /// facing apps to be able to set your own secret
-    /// key without depending on both the ed25519_dalek
-    /// and hex crates just to reimplement this function
+    /// Similar to public key, it is often useful in user facing apps to be able to set your own
+    /// secret key without depending on both the ed25519_dalek and hex crates just to reimplement
+    /// this function.
     pub fn ed25519_from_hex(hex: &str) -> Result<Self> {
         let bytes = hex::decode(hex).map_err(|err| {
             Error::FailedToParse(format!(
@@ -50,6 +49,33 @@ impl SecretKey {
             ))
         })?;
         Ok(Self::Ed25519(ed25519_sk))
+    }
+
+    pub fn bls(&self) -> Option<bls::SecretKey> {
+        if let Self::Bls(key) = self {
+            Some(key.0.clone())
+        } else {
+            None
+        }
+    }
+
+    pub fn bls_share(&self) -> Option<bls::SecretKeyShare> {
+        if let Self::BlsShare(key) = self {
+            Some(key.0.clone())
+        } else {
+            None
+        }
+    }
+
+    pub fn ed25519(&self) -> Option<ed25519_dalek::SecretKey> {
+        if let Self::Ed25519(key) = self {
+            match ed25519_dalek::SecretKey::from_bytes(&key.to_bytes()) {
+                Ok(sk) => Some(sk),
+                Err(_) => None,
+            }
+        } else {
+            None
+        }
     }
 }
 

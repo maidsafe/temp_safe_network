@@ -10,6 +10,7 @@
 // ------ The following is what's meant to be the public API -------
 
 pub mod files;
+pub mod keys;
 pub mod multimap;
 pub mod nrs;
 pub mod register;
@@ -26,7 +27,6 @@ pub use xor_name::{XorName, XOR_NAME_LEN};
 mod auth;
 mod consts;
 mod helpers;
-mod keys;
 
 #[cfg(test)]
 mod test_helpers;
@@ -129,11 +129,6 @@ impl Safe {
     /// Resturns true if we already have a connection with the network
     pub fn is_connected(&self) -> bool {
         self.client.is_some()
-    }
-
-    /// Generate a new random Ed25519 keypair
-    pub fn new_keypair(&self) -> Keypair {
-        Keypair::new_ed25519()
     }
 
     // Private helper to obtain the Client instance

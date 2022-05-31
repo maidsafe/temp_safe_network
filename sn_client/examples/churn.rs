@@ -176,7 +176,7 @@ pub async fn run_split() -> Result<()> {
         read_network_conn_info().context("Could not read network bootstrap".to_string())?;
 
     let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
-    let client = Client::new(config, bootstrap_nodes, None).await?;
+    let client = Client::new(config, bootstrap_nodes, None, None).await?;
 
     for (address, hash) in all_data_put {
         println!("...reading bytes at address {:?} ...", address);
@@ -214,7 +214,7 @@ async fn upload_data() -> Result<(BytesAddress, [u8; 32])> {
 
     println!("Creating a Client to connect to {:?}", bootstrap_nodes);
     let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
-    let client = Client::new(config, bootstrap_nodes, None).await?;
+    let client = Client::new(config, bootstrap_nodes, None, None).await?;
 
     let bytes = random_bytes(1024 * 1024 * 10);
 
