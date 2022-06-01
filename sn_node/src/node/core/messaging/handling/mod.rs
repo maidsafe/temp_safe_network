@@ -48,7 +48,7 @@ use xor_name::XorName;
 
 // Message handling
 impl Node {
-    #[instrument(skip(self, original_bytes))]
+    #[instrument(skip(self, wire_msg, original_bytes))]
     pub(crate) async fn handle_msg(
         &self,
         sender: Peer,
@@ -312,6 +312,7 @@ impl Node {
                 section_signed,
                 proof_chain,
                 members,
+                membership_decisions,
             } => {
                 trace!("Handling msg: AE-Update from {}: {:?}", sender, msg_id,);
                 self.handle_anti_entropy_update_msg(
@@ -319,6 +320,7 @@ impl Node {
                     section_signed,
                     proof_chain,
                     members,
+                    membership_decisions,
                 )
                 .await
             }
@@ -513,13 +515,7 @@ impl Node {
                 self.handle_join_as_relocated_request(sender, *join_request, known_keys)
                     .await
             }
-            SystemMsg::MembershipVotes(votes) => {
-                let mut cmds = vec![];
-                cmds.extend(self.handle_membership_votes(sender, votes).await?);
-
-                Ok(cmds)
-            }
-            SystemMsg::MembershipAE(gen) => self.handle_membership_anti_entropy(sender, gen).await,
+            SystemMsg::MembershipVote(vote) => self.handle_membership_vote(sender, vote).await,
             SystemMsg::Propose {
                 proposal,
                 sig_share,

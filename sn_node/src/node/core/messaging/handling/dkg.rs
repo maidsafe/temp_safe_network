@@ -56,7 +56,8 @@ impl Node {
             peers.push(peer);
         }
 
-        let membership_generation = if let Some(membership) = &*self.membership.read().await {
+        let membership_generation = if let Some(membership) = self.membership.read().await.as_ref()
+        {
             membership.generation()
         } else {
             // 0 is the genesis. Which avoids DKG entirely

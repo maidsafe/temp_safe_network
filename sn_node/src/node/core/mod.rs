@@ -439,7 +439,7 @@ impl Node {
         info!(
             "ELDER CANDIDATES {}: {:?}",
             elder_candidates.len(),
-            elder_candidates
+            BTreeSet::from_iter(elder_candidates.iter().map(|n| n.name))
         );
 
         if elder_candidates
@@ -592,6 +592,9 @@ impl Node {
                 // if not elder
                 let mut handover_voting = self.handover_voting.write().await;
                 *handover_voting = None;
+
+                let mut membership = self.membership.write().await;
+                *membership = None;
             }
 
             if new.is_elder || old.is_elder {
@@ -718,22 +721,25 @@ impl Node {
     }
 
     pub(super) async fn log_section_stats(&self) {
-        if let Some(m) = self.membership.read().await.as_ref() {
-            let adults = self.network_knowledge.adults().await.len();
-
-            let elders = self
-                .network_knowledge
-                .authority_provider()
-                .await
-                .elder_count();
-
-            let membership_adults = m.current_section_members().len() - elders;
-            let prefix = self.network_knowledge.prefix().await;
-
-            debug!("{prefix:?}: {elders} Elders, {adults}~{membership_adults} Adults.");
+        let membership_members = if let Some(m) = self.membership.read().await.as_ref() {
+            m.current_section_members()
         } else {
             debug!("log_section_stats: No membership instance");
+            Default::default()
         };
+
+        let adults = self.network_knowledge.adults().await.len();
+
+        let elders = self
+            .network_knowledge
+            .authority_provider()
+            .await
+            .elder_count();
+
+        let membership_adults = membership_members.len() - elders;
+        let prefix = self.network_knowledge.prefix().await;
+
+        debug!("{prefix:?}: {elders} Elders, {adults}~{membership_adults} Adults.");
     }
 }
 

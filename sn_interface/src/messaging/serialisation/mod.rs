@@ -113,8 +113,7 @@ impl MsgType {
                     | SystemMsg::JoinAsRelocatedRequest(_)
                     | SystemMsg::Propose { .. }
                     | SystemMsg::StartConnectivityTest(_)
-                    | SystemMsg::MembershipVotes(_)
-                    | SystemMsg::MembershipAE(_)
+                    | SystemMsg::MembershipVote(_)
                     | SystemMsg::HandoverAE(_)
                     | SystemMsg::HandoverVotes(_),
                 ..

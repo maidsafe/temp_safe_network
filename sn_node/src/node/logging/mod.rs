@@ -29,9 +29,10 @@ pub(super) async fn run_system_logger(ctx: LogCtx, print_resources_usage: bool) 
         loop {
             let _instant = interval.tick().await;
             system.refresh_all();
-            const HIGH_MEM_LOAD: u64 = 500000;
-            if system.used_memory() > HIGH_MEM_LOAD {
-                warn!("========================>>> HIGH MEM LOAD");
+            const LOW_MEM_THRESHOLD: u64 = 100_000;
+            let available_memory = system.available_memory();
+            if available_memory < LOW_MEM_THRESHOLD {
+                warn!("========================>>> LOW MEMORY: {available_memory}KB AVAILABLE");
             }
             log(&mut system, &ctx, print_resources_usage).await;
         }

@@ -791,6 +791,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             members: BTreeSet::default(),
             section_signed: signed_new_sap.sig,
             proof_chain: chain,
+            membership_decisions: Vec::new(),
         },
         src_section_pk,
     )?;
@@ -853,6 +854,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
         section_signed: section_signed_our_section_auth.sig,
         proof_chain: SecuredLinkedList::new(bogus_section_pk),
         members: BTreeSet::default(),
+        membership_decisions: Vec::new(),
     };
 
     let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);

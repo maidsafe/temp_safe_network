@@ -11,6 +11,7 @@ use crate::node::{
     core::{Node, StateSnapshot},
     Result,
 };
+use sn_consensus::Generation;
 use sn_interface::messaging::system::{NodeCmd, SystemMsg};
 use sn_interface::types::{log_markers::LogMarker, Peer};
 
@@ -22,12 +23,15 @@ impl Node {
     pub(crate) async fn send_ae_update_to_our_section(&self) -> Vec<Cmd> {
         let our_name = self.info.read().await.name();
         let nodes: Vec<_> = self
-            .network_knowledge
-            .section_members()
+            .membership
+            .read()
             .await
+            .as_ref()
+            .map(|m| m.current_section_members())
+            .unwrap_or_default()
             .into_iter()
-            .filter(|info| info.name() != our_name)
-            .map(|info| *info.peer())
+            .filter(|(name, _)| name != &our_name)
+            .map(|(_, info)| info.peer())
             .collect();
 
         if nodes.is_empty() {
@@ -40,7 +44,7 @@ impl Node {
 
         let our_prefix = self.network_knowledge.prefix().await;
 
-        self.send_ae_update_to_nodes(nodes, &our_prefix, previous_pk)
+        self.send_ae_update_to_nodes(nodes, &our_prefix, previous_pk, 0)
             .await
     }
 
@@ -48,28 +52,27 @@ impl Node {
     pub(crate) async fn send_ae_update_to_nodes(
         &self,
         recipients: Vec<Peer>,
-        prefix: &Prefix,
-        section_pk: BlsPublicKey,
+        recipient_prefix: &Prefix,
+        recipient_section_pk: BlsPublicKey,
+        recipient_generation: Generation,
     ) -> Vec<Cmd> {
-        let node_msg = match self.generate_ae_update_msg(section_pk).await {
-            Ok(node_msg) => node_msg,
-            Err(err) => {
-                warn!("Failed to generate AE-Update msg to send: {:?}", err);
-                return vec![];
-            }
-        };
+        let node_msg = self
+            .generate_ae_update_msg(recipient_section_pk, recipient_generation)
+            .await;
 
         let our_section_key = self.network_knowledge.section_key().await;
         match self
-            .send_direct_msg_to_nodes(recipients.clone(), node_msg, prefix.name(), our_section_key)
+            .send_direct_msg_to_nodes(
+                recipients.clone(),
+                node_msg,
+                recipient_prefix.name(),
+                our_section_key,
+            )
             .await
         {
             Ok(cmd) => vec![cmd],
-            Err(err) => {
-                error!(
-                    "Failed to send AE update to ({:?}) {:?}: {:?}",
-                    prefix, recipients, err
-                );
+            Err(e) => {
+                error!("Failed to send AE update to ({recipient_prefix:?}) {recipients:?}: {e:?}");
                 vec![]
             }
         }
@@ -148,6 +151,7 @@ impl Node {
                     promoted_sibling_elders,
                     &sibling_prefix,
                     previous_section_key,
+                    0, // Send all membeship decisions
                 )
                 .await,
             );
@@ -161,7 +165,11 @@ impl Node {
 
     // Private helper to generate AntiEntropyUpdate message to update
     // a peer abot our SAP, with proof_chain and members list.
-    async fn generate_ae_update_msg(&self, dst_section_key: BlsPublicKey) -> Result<SystemMsg> {
+    async fn generate_ae_update_msg(
+        &self,
+        dst_section_key: BlsPublicKey,
+        dst_membership_gen: Generation,
+    ) -> SystemMsg {
         let signed_sap = self
             .network_knowledge
             .section_signed_authority_provider()
@@ -178,6 +186,13 @@ impl Node {
             self.network_knowledge.section_chain().await
         };
 
+        let membership_decisions = if let Some(membership) = self.membership.read().await.as_ref() {
+            membership.anti_entropy(dst_membership_gen)
+        } else {
+            info!("AntiEntropy - Not an elder");
+            vec![]
+        };
+
         let members = self
             .network_knowledge
             .section_signed_members()
@@ -186,11 +201,12 @@ impl Node {
             .map(|state| state.clone().into_authed_msg())
             .collect();
 
-        Ok(SystemMsg::AntiEntropyUpdate {
+        SystemMsg::AntiEntropyUpdate {
             section_auth: signed_sap.value.to_msg(),
             section_signed: signed_sap.sig,
             proof_chain,
             members,
-        })
+            membership_decisions,
+        }
     }
 }
