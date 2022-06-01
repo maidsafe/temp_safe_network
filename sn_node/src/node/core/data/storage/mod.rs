@@ -9,11 +9,8 @@
 mod chunks;
 mod registers;
 
-use crate::{dbs::Result, node::core::Node, UsedSpace};
+use crate::{dbs::Result, UsedSpace};
 
-use itertools::Itertools;
-
-use sn_interface::data_copy_count;
 use sn_interface::messaging::{
     data::{DataQuery, Error, RegisterQuery, RegisterStoreExport, StorageLevel},
     system::NodeQueryResponse,
@@ -27,12 +24,8 @@ pub(crate) use chunks::ChunkStorage;
 pub(crate) use registers::RegisterStorage;
 
 use sn_dbc::SpentProofShare;
-use std::{collections::BTreeSet,
-    path::Path,
-    sync::Arc,
-};
+use std::{path::Path, sync::Arc};
 use tokio::sync::RwLock;
-use xor_name::XorName;
 
 /// Operations on data.
 #[derive(Clone, Debug)]
@@ -213,72 +206,6 @@ impl DataStorage {
             .into_iter()
             .map(ReplicatedDataAddress::Register);
         Ok(reg_keys.chain(chunk_keys).collect())
-    }
-
-    pub(crate) async fn get_for_replication(
-        &self,
-        data_address: ReplicatedDataAddress,
-    ) -> Result<ReplicatedData> {
-        self.get_from_local_store(&data_address).await
-    }
-}
-
-fn compute_holders(
-    addr: &ReplicatedDataAddress,
-    adult_list: &BTreeSet<XorName>,
-) -> BTreeSet<XorName> {
-    adult_list
-        .iter()
-        .sorted_by(|lhs, rhs| addr.name().cmp_distance(lhs, rhs))
-        .take(data_copy_count())
-        .cloned()
-        .collect()
-}
-
-impl Node {
-    // on adults
-    async fn get_replica_targets(
-        &self,
-        address: &ReplicatedDataAddress,
-        new_adults: &BTreeSet<XorName>,
-        lost_adults: &BTreeSet<XorName>,
-        remaining: &BTreeSet<XorName>,
-    ) -> Option<(ReplicatedData, BTreeSet<XorName>)> {
-        let storage = self.data_storage.clone();
-
-        let old_adult_list = remaining.union(lost_adults).copied().collect();
-        let new_adult_list = remaining.union(new_adults).copied().collect();
-        let new_holders = compute_holders(address, &new_adult_list);
-
-        debug!("New holders len: {:?}", new_holders.len());
-        let old_holders = compute_holders(address, &old_adult_list);
-
-        let new_adult_is_holder = !new_holders.is_disjoint(new_adults);
-        let lost_old_holder = !old_holders.is_disjoint(lost_adults);
-
-        if new_adult_is_holder || lost_old_holder {
-            info!("Replicating data at {:?}", address);
-            trace!(
-                "New Adult is Holder? {}, Lost Adult was holder? {}",
-                new_adult_is_holder,
-                lost_old_holder
-            );
-            let data = match storage.get_from_local_store(address).await {
-                Ok(data) => {
-                    info!("Data found for replication: {address:?}");
-                    Ok(data)
-                }
-                Err(error) => {
-                    warn!("Error finding {address:?} for replication: {error:?}");
-                    Err(error)
-                }
-            }
-            .ok()?;
-
-            Some((data, new_holders))
-        } else {
-            None
-        }
     }
 }
 
