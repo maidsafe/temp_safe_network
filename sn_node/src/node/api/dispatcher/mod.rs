@@ -242,6 +242,20 @@ impl Dispatcher {
                 recipients,
                 wire_msg,
             } => self.send_msg(&recipients, recipients.len(), wire_msg).await,
+            Cmd::SendAntiEntropyToNodes {
+                recipients,
+                recipient_prefix,
+                recipient_public_key,
+                recipient_generation,
+            } => Ok(self
+                .node
+                .send_ae_update_to_nodes(
+                    recipients,
+                    &recipient_prefix,
+                    recipient_public_key,
+                    recipient_generation,
+                )
+                .await),
             Cmd::EnqueueDataForReplication {
                 // throttle_duration,
                 recipient,

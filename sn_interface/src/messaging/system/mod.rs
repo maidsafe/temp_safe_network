@@ -22,7 +22,7 @@ pub use msg_authority::NodeMsgAuthorityUtils;
 pub use node_msgs::{NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse};
 pub use node_state::{MembershipState, NodeState, RelocateDetails};
 pub use signed::{KeyedSig, SigShare};
-use sn_consensus::{Generation, SignedVote};
+use sn_consensus::{Decision, Generation, SignedVote};
 
 /// List of peers of a section
 pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
@@ -82,7 +82,9 @@ pub enum SystemMsg {
         /// Our section chain truncated from the triggering msg's dst section_key (or genesis key for full proof)
         proof_chain: SecuredLinkedList,
         /// Section members
-        members: SectionPeers,
+        members: SectionPeers, // TODO: remove this field
+        /// Membership decisions truncated since the triggering msg's membership generation
+        membership_decisions: Vec<Decision<NodeState>>,
     },
     /// Probes the network by sending a message to a random or chosen dst triggering an AE flow.
     AntiEntropyProbe,
@@ -93,9 +95,7 @@ pub enum SystemMsg {
     /// Send from a section to the node to be immediately relocated.
     Relocate(SectionAuth<NodeState>),
     /// Membership Votes, in order they should be processed in.
-    MembershipVotes(Vec<SignedVote<NodeState>>),
-    /// Membership Anti-Entropy request
-    MembershipAE(Generation),
+    MembershipVote(SignedVote<NodeState>),
     /// Sent from a bootstrapping peer to the section requesting to join as a new member
     JoinRequest(Box<JoinRequest>),
     /// Response to a `JoinRequest`

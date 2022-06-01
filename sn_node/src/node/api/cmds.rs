@@ -17,6 +17,7 @@ use sn_interface::{
     types::ReplicatedDataAddress,
 };
 
+use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use custom_debug::Debug;
 use sn_consensus::Generation;
@@ -26,6 +27,7 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
     time::Duration,
 };
+use xor_name::Prefix;
 
 /// Internal cmds for a node.
 #[allow(clippy::large_enum_variant)]
@@ -86,6 +88,13 @@ pub(crate) enum Cmd {
         delivery_group_size: usize,
         wire_msg: WireMsg,
     },
+    /// Send an AE message
+    SendAntiEntropyToNodes {
+        recipients: Vec<Peer>,
+        recipient_prefix: Prefix,
+        recipient_public_key: BlsPublicKey,
+        recipient_generation: Generation,
+    },
     /// Schedule a timeout after the given duration. When the timeout expires, a `HandleTimeout`
     /// cmd is raised. The token is used to identify the timeout.
     ScheduleTimeout { duration: Duration, token: u64 },
@@ -128,6 +137,14 @@ impl fmt::Display for Cmd {
                     wire_msg.msg_id(),
                     wire_msg.payload_debug
                 )
+            }
+            Cmd::SendAntiEntropyToNodes {
+                recipients,
+                recipient_prefix,
+                recipient_public_key,
+                recipient_generation,
+            } => {
+                write!(f, "SendAEtoNodes {recipients:?}, {recipient_prefix:?}, {recipient_public_key:?}, {recipient_generation}")
             }
             Cmd::SignOutgoingSystemMsg { .. } => write!(f, "SignOutgoingSystemMsg"),
             Cmd::EnqueueDataForReplication { .. } => write!(f, "ThrottledSendBatchMsgs"),

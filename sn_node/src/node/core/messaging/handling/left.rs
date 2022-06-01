@@ -68,9 +68,22 @@ impl Node {
             let our_adults = self.network_knowledge.adults().await;
             let our_prefix = self.network_knowledge.prefix().await;
             let our_section_pk = self.network_knowledge.section_key().await;
+            let our_generation = self
+                .membership
+                .read()
+                .await
+                .as_ref()
+                .map(|m| m.generation())
+                .unwrap_or(0);
+
             cmds.extend(
-                self.send_ae_update_to_nodes(our_adults, &our_prefix, our_section_pk)
-                    .await,
+                self.send_ae_update_to_nodes(
+                    our_adults,
+                    &our_prefix,
+                    our_section_pk,
+                    our_generation.saturating_sub(1),
+                )
+                .await,
             );
         }
 

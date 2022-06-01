@@ -7,8 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{api::cmds::Cmd, core::Node, messages::WireMsgUtils, Error, Event, Result};
+use sn_consensus::Decision;
 use sn_interface::messaging::{
-    system::{KeyedSig, SectionAuth, SectionPeers, SystemMsg},
+    system::{KeyedSig, NodeState, SectionAuth, SectionPeers, SystemMsg},
     MsgId, MsgType, SrcLocation, WireMsg,
 };
 
@@ -31,7 +32,26 @@ impl Node {
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
         members: SectionPeers,
+        membership_decisions: Vec<Decision<NodeState>>,
     ) -> Result<Vec<Cmd>> {
+        let mut cmds = vec![];
+
+        if let Some(membership) = self.membership.write().await.as_mut() {
+            info!(
+                "AntiEntropy - Handling {} decisions",
+                membership_decisions.len()
+            );
+            for decision in membership_decisions {
+                let res = membership.handle_decision(decision);
+                info!("AntiEntropy - Handled decision: {res:?}");
+            }
+        } else {
+            info!(
+                "AntiEntropy - dropping {} membership decisions",
+                membership_decisions.len()
+            );
+        };
+
         let snapshot = self.state_snapshot().await;
 
         let our_name = self.info.read().await.name();
@@ -52,7 +72,7 @@ impl Node {
             .await?;
 
         // always run this, only changes will trigger events
-        let mut cmds = self.update_self_for_new_node_state(snapshot).await?;
+        cmds.extend(self.update_self_for_new_node_state(snapshot).await?);
         cmds.extend(self.try_reorganize_data().await?);
 
         Ok(cmds)
@@ -836,6 +856,7 @@ mod tests {
                 section_signed: self.other_sap.sig.clone(),
                 proof_chain,
                 members: BTreeSet::new(),
+                membership_decisions: Vec::new(),
             };
 
             let auth_proof = AuthorityProof(SectionAuthMsg {
