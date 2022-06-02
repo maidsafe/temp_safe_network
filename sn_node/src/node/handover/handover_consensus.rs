@@ -13,9 +13,7 @@ use sn_consensus::NodeId;
 
 use super::errors::{Error, Result};
 
-use sn_interface::messaging::system::SectionAuth;
 use sn_interface::network_knowledge::SapCandidate;
-use sn_interface::network_knowledge::SectionAuthorityProvider;
 
 #[derive(Debug, Clone)]
 pub(crate) struct Handover {
@@ -183,23 +181,9 @@ impl Handover {
             .try_for_each(|prop| self.validate_proposal(prop))
     }
 
-    pub(crate) fn check_candidates_validity(
-        &self,
-        _sap: &SectionAuth<SectionAuthorityProvider>,
-    ) -> Result<()> {
-        // check that the candidates are the oldest in their membership gen
-        // NB TODO check that the sap is valid (either latest candidates or in recent history)
-        if true {
-            Ok(())
-        } else {
-            Err(Error::InvalidSapCandidates)
-        }
-    }
-
     pub(crate) fn validate_proposal(&self, proposal: SapCandidate) -> Result<()> {
         match proposal {
             SapCandidate::ElderHandover(single_sap) => {
-                self.check_candidates_validity(&single_sap)?;
                 // single handover, must be same prefix
                 if single_sap.prefix() == self.section_prefix {
                     Ok(())
@@ -208,8 +192,6 @@ impl Handover {
                 }
             }
             SapCandidate::SectionSplit(sap1, sap2) => {
-                self.check_candidates_validity(&sap1)?;
-                self.check_candidates_validity(&sap2)?;
                 // section split, must be 2 distinct children prefixes
                 let our_p = &self.section_prefix;
                 let p1 = sap1.prefix();

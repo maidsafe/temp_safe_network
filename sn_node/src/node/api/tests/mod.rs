@@ -362,7 +362,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     let elders = nodes.iter().map(NodeInfo::peer);
     let members = nodes.iter().map(|n| NodeState::joined(n.peer(), None));
     let section_auth =
-        SectionAuthorityProvider::new(elders, Prefix::default(), members, sk_set.public_keys());
+        SectionAuthorityProvider::new(elders, Prefix::default(), members, sk_set.public_keys(), 0);
     let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
     let section = NetworkKnowledge::new(*chain.root_key(), chain, signed_sap, None)?;
@@ -774,8 +774,13 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
         .cloned()
         .chain(vec![new_peer]);
 
-    let new_sap =
-        SectionAuthorityProvider::new(new_elders, old_sap.prefix(), members, sk_set2.public_keys());
+    let new_sap = SectionAuthorityProvider::new(
+        new_elders,
+        old_sap.prefix(),
+        members,
+        sk_set2.public_keys(),
+        0,
+    );
     let new_section_elders: BTreeSet<_> = new_sap.names();
     let signed_new_sap = section_signed(sk2, new_sap.clone())?;
 
@@ -1103,6 +1108,7 @@ async fn handle_elders_update() -> Result<()> {
         Prefix::default(),
         members.clone(),
         sk_set0.public_keys(),
+        0,
     );
 
     let (section0, section_key_share) = create_section(&sk_set0, &sap0).await?;
@@ -1127,6 +1133,7 @@ async fn handle_elders_update() -> Result<()> {
         Prefix::default(),
         members,
         sk_set1.public_keys(),
+        0,
     );
     let elder_names1: BTreeSet<_> = sap1.names();
 
@@ -1259,6 +1266,7 @@ async fn handle_demote_during_split() -> Result<()> {
         Prefix::default(),
         members.clone(),
         sk_set_v0.public_keys(),
+        0,
     );
     let (section, section_key_share) = create_section(&sk_set_v0, &section_auth_v0).await?;
 
@@ -1318,6 +1326,7 @@ async fn handle_demote_during_split() -> Result<()> {
         prefix0,
         members.clone(),
         sk_set_v1_p0.public_keys(),
+        0,
     );
 
     let signed_sap = section_signed(sk_set_v1_p0.secret_key(), section_auth)?;
@@ -1330,6 +1339,7 @@ async fn handle_demote_during_split() -> Result<()> {
         prefix1,
         members,
         sk_set_v1_p1.public_keys(),
+        0,
     );
 
     let signed_sap = section_signed(sk_set_v1_p1.secret_key(), section_auth)?;

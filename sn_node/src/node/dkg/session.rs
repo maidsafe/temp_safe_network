@@ -364,6 +364,7 @@ impl Session {
         let section_auth = SectionAuthorityProvider::from_dkg_session(
             self.session_id.clone(),
             outcome.public_key_set.clone(),
+            self.generation,
         );
 
         let outcome = SectionKeyShare {

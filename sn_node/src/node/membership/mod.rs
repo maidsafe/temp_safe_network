@@ -2,10 +2,12 @@ use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
 use bls_dkg::{PublicKeySet, SecretKeyShare};
 use core::fmt::Debug;
+use sn_interface::messaging::system::DkgSessionId;
 use sn_interface::{
     messaging::system::{MembershipState, NodeState},
-    network_knowledge::SectionAuthorityProvider,
+    network_knowledge::{partition_by_prefix, recommended_section_size, SectionAuthorityProvider},
 };
+
 use thiserror::Error;
 use xor_name::{Prefix, XorName};
 
@@ -26,6 +28,60 @@ pub enum Error {
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Error>;
+
+fn get_split_info(
+    prefix: Prefix,
+    members: BTreeMap<XorName, NodeState>,
+) -> Option<(BTreeSet<NodeState>, BTreeSet<NodeState>)> {
+    let (zero, one) = partition_by_prefix(&prefix, members.keys().copied())?;
+
+    // make sure the sections contain enough entries
+    let split_threshold = recommended_section_size();
+    if zero.len() < split_threshold || one.len() < split_threshold {
+        return None;
+    }
+
+    Some((
+        BTreeSet::from_iter(zero.into_iter().map(|n| members[&n].clone())),
+        BTreeSet::from_iter(one.into_iter().map(|n| members[&n].clone())),
+    ))
+}
+
+/// Checks if we can split the section
+/// If we have enough nodes for both subsections, returns the DkgSessionId's
+pub(crate) fn try_split_dkg(
+    members: BTreeMap<XorName, NodeState>,
+    sap: &SectionAuthorityProvider,
+    chain_len: u64,
+) -> Option<(DkgSessionId, DkgSessionId)> {
+    let prefix = sap.prefix();
+
+    let (zero, one) = get_split_info(prefix, members)?;
+
+    // get elders for section ...0
+    let zero_prefix = prefix.pushed(false);
+    let zero_elders = elder_candidates(zero.iter().cloned(), sap);
+
+    // get elders for section ...1
+    let one_prefix = prefix.pushed(true);
+    let one_elders = elder_candidates(one.iter().cloned(), sap);
+
+    // create the DKG session IDs
+    let zero_id = DkgSessionId {
+        prefix: zero_prefix,
+        elders: BTreeMap::from_iter(zero_elders.iter().map(|node| (node.name, node.addr))),
+        section_chain_len: chain_len,
+        bootstrap_members: zero,
+    };
+    let one_id = DkgSessionId {
+        prefix: one_prefix,
+        elders: BTreeMap::from_iter(one_elders.iter().map(|node| (node.name, node.addr))),
+        section_chain_len: chain_len,
+        bootstrap_members: one,
+    };
+
+    Some((zero_id, one_id))
+}
 
 /// Returns the nodes that should be candidates to become the next elders, sorted by names.
 pub(crate) fn elder_candidates(

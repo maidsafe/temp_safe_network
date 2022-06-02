@@ -84,6 +84,7 @@ impl DkgVoter {
             let section_auth = SectionAuthorityProvider::from_dkg_session(
                 session_id,
                 secret_key_set.public_keys(),
+                generation,
             );
             return Ok(vec![Cmd::HandleDkgOutcome {
                 section_auth,

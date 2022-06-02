@@ -92,7 +92,7 @@ pub const fn supermajority(group_size: usize) -> usize {
     1 + group_size * 2 / 3
 }
 
-pub fn split(
+pub fn partition_by_prefix(
     prefix: &Prefix,
     nodes: impl IntoIterator<Item = XorName>,
 ) -> Option<(BTreeSet<XorName>, BTreeSet<XorName>)> {
@@ -118,7 +118,7 @@ pub fn section_has_room_for_node(
     // We multiply by two to allow a buffer for when nodes are joining sequentially.
     let split_section_size_cap = recommended_section_size() * 2;
 
-    match split(prefix, members) {
+    match partition_by_prefix(prefix, members) {
         Some((zeros, ones)) => {
             let n_zeros = zeros.len();
             let n_ones = ones.len();
@@ -743,6 +743,7 @@ fn create_first_section_authority_provider(
         Prefix::default(),
         [NodeState::joined(peer, None)],
         pk_set.clone(),
+        0,
     );
     let sig = create_first_sig(pk_set, sk_share, &section_auth)?;
     Ok(SectionAuth::new(section_auth, sig))

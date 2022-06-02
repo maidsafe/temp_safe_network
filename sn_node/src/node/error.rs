@@ -160,6 +160,18 @@ pub enum Error {
     /// Request Handover Anti Entropy
     #[error("RequestHandoverAntiEntropy {0}")]
     RequestHandoverAntiEntropy(u64),
+    /// Missing Membership Instance when checking a Handover vote's SAP
+    #[error("MissingMembershipInstance")]
+    MissingMembershipInstance,
+    /// Failed to get previous SAP in chain when checking a Handover vote's SAP
+    #[error("FailedToGetPreviousSAP")]
+    FailedToGetPreviousSAP,
+    /// Invalid Elder Candidates in Handover vote's SAP
+    #[error("InvalidElderCandidates")]
+    InvalidElderCandidates,
+    /// Invalid Split Candidates in Handover vote's SAP
+    #[error("InvalidSplitCandidates")]
+    InvalidSplitCandidates,
 }
 
 impl From<qp2p::ClientEndpointError> for Error {
