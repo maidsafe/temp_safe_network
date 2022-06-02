@@ -26,7 +26,7 @@ const WALLET_TYPE_TAG: u64 = 1_000;
 pub type WalletSpendableDbcs = BTreeMap<String, (Dbc, EntryHash)>;
 
 impl Safe {
-    /// Create an empty Wallet on Safe and return its XOR-URL
+    /// Create an empty wallet and return its XOR-URL.
     pub async fn wallet_create(&self) -> Result<XorUrl> {
         // A Wallet is stored on a Private Register
         let xorurl = self
@@ -39,7 +39,7 @@ impl Safe {
         Ok(safeurl.to_string())
     }
 
-    /// Deposit a DBC into a Wallet to make it a spendable balance. It will be mapped to
+    /// Deposit a DBC into a wallet to make it a spendable balance. It will be mapped to
     /// a friendly name if provided, otherwise the hash of the DBC content will be used by default.
     /// Returns the friendly name set to it.
     pub async fn wallet_deposit(
@@ -49,12 +49,12 @@ impl Safe {
         dbc: &Dbc,
     ) -> Result<String> {
         if !dbc.is_bearer() {
-            return Err(Error::InvalidInput("Only bearer DBC's are supported at this point by the Wallet. Please deposit a bearer DBC's.".to_string()));
+            return Err(Error::InvalidInput("Only bearer DBC's are supported at this point by the wallet. Please deposit a bearer DBC's.".to_string()));
         }
 
         // TODO: check the input DBCs were spent and all other sort of verifications,
         // perhaps all optional, and we may want a separate API to also do these verifications
-        // for the user to perform them without depositing the DBC into a Wallet.
+        // for the user to perform them without depositing the DBC into a wallet.
 
         let safeurl = self.parse_and_resolve_url(wallet_url).await?;
 
@@ -74,33 +74,33 @@ impl Safe {
         Ok(spendable_name)
     }
 
-    /// Fetch a Wallet from a Url performing all type of URL resolution required.
-    /// Return the set of spendable DBCs found in the Wallet.
+    /// Fetch a wallet from a Url performing all type of URL resolution required.
+    /// Return the set of spendable DBCs found in the wallet.
     pub async fn wallet_get(&self, wallet_url: &str) -> Result<WalletSpendableDbcs> {
         let safeurl = self.parse_and_resolve_url(wallet_url).await?;
         debug!("Wallet URL was parsed and resolved to: {}", safeurl);
         self.fetch_wallet(&safeurl).await
     }
 
-    /// Fetch a Wallet from a SafeUrl without performing any type of URL resolution
+    /// Fetch a wallet from a SafeUrl without performing any type of URL resolution
     pub(crate) async fn fetch_wallet(&self, safeurl: &SafeUrl) -> Result<WalletSpendableDbcs> {
         let entries = match self.fetch_multimap(safeurl).await {
             Ok(entries) => entries,
             Err(Error::AccessDenied(_)) => {
                 return Err(Error::AccessDenied(format!(
-                    "Couldn't read Wallet found at \"{}\"",
+                    "Couldn't read wallet found at \"{}\"",
                     safeurl
                 )))
             }
             Err(Error::ContentNotFound(_)) => {
                 return Err(Error::ContentNotFound(format!(
-                    "No Wallet found at {}",
+                    "No wallet found at {}",
                     safeurl
                 )))
             }
             Err(err) => {
                 return Err(Error::ContentError(format!(
-                    "Failed to read balances from Wallet: {}",
+                    "Failed to read balances from wallet: {}",
                     err
                 )))
             }
@@ -115,7 +115,7 @@ impl Safe {
             let dbc: Dbc = match rmp_serde::from_slice(&dbc_bytes) {
                 Ok(dbc) => dbc,
                 Err(err) => {
-                    warn!("Ignoring entry found in Wallet since it cannot be deserialised as a valid DBC: {:?}", err);
+                    warn!("Ignoring entry found in wallet since it cannot be deserialised as a valid DBC: {:?}", err);
                     continue;
                 }
             };
@@ -127,9 +127,9 @@ impl Safe {
         Ok(balances)
     }
 
-    /// Check the total balance of a Wallet found at a given XOR-URL
+    /// Check the total balance of a wallet found at a given XOR-URL
     pub async fn wallet_balance(&self, wallet_url: &str) -> Result<Token> {
-        debug!("Finding total Wallet balance for: {}", wallet_url);
+        debug!("Finding total wallet balance for: {}", wallet_url);
 
         // Let's get the list of balances from the Wallet
         let balances = self.wallet_get(wallet_url).await?;
@@ -143,7 +143,7 @@ impl Safe {
             let balance = match dbc.amount_secrets_bearer() {
                 Ok(amount_secrets) => Token::from_nano(amount_secrets.amount()),
                 Err(err) => {
-                    warn!("Ignoring amount from DBC found in Wallet due to error in revealing secret amount: {:?}", err);
+                    warn!("Ignoring amount from DBC found in wallet due to error in revealing secret amount: {:?}", err);
                     continue;
                 }
             };
@@ -163,17 +163,28 @@ impl Safe {
         Ok(total_balance)
     }
 
-    /// Reissue a Bearer-DBC from a Wallet returning the output DBC, and automatically depositing
-    /// the change DBC into the source wallet.
-    /// Spent DBCs are marked as removed from the source Wallet, but since all entries are kept in
-    /// the history of the Wallet, they can still be retrieved eventually if desired by the user.
-    pub async fn wallet_reissue(&self, wallet_url: &str, amount: &str) -> Result<Dbc> {
+    /// Reissue a DBC from a wallet and return the output DBC.
+    ///
+    /// If you pass `None` for the `owner_public_key` argument, the output DBC will be a bearer. If
+    /// the public key is specified, the output DBC will be owned by the person in possession of the
+    /// secret key corresponding to the public key.
+    ///
+    /// If there is change from the transaction, the change DBC will be deposited in the source
+    /// wallet.
+    ///
+    /// Spent DBCs are marked as removed from the source wallet, but since all entries are kept in
+    /// the history, they can still be retrieved if desired by the user.
+    pub async fn wallet_reissue(
+        &self,
+        wallet_url: &str,
+        amount: &str,
+        owner_public_key: Option<bls::PublicKey>,
+    ) -> Result<Dbc> {
         debug!(
-            "Reissuing Bearer-DBCs from Wallet at {}, for an amount of {} tokens",
+            "Reissuing DBC from wallet at {} for an amount of {} tokens",
             wallet_url, amount
         );
 
-        // Parse and validate the output amount is valid
         let output_amount = parse_tokens_amount(amount)?;
         if output_amount.as_nano() == 0 {
             return Err(Error::InvalidAmount(
@@ -181,7 +192,6 @@ impl Safe {
             ));
         }
 
-        // Resolve Wallet URL and obtain the list of spendable DBCs that can be used in this Tx
         let safeurl = self.parse_and_resolve_url(wallet_url).await?;
         let spendable_dbcs = self.fetch_wallet(&safeurl).await?;
 
@@ -231,7 +241,12 @@ impl Safe {
 
         // We can now reissue the output DBCs
         let (output_dbc, change_dbc) = self
-            .reissue_dbcs(input_dbcs_to_spend, output_amount, change_amount)
+            .reissue_dbcs(
+                input_dbcs_to_spend,
+                output_amount,
+                change_amount,
+                owner_public_key,
+            )
             .await?;
 
         if let Some(change_dbc) = change_dbc {
@@ -246,7 +261,11 @@ impl Safe {
         Ok(output_dbc)
     }
 
-    /// Private helper to insert a DBC into the Wallet's underlying Multimap
+    ///
+    /// Private helpers
+    ///
+
+    /// Insert a DBC into the wallet's underlying `Multimap`.
     async fn insert_dbc_into_wallet(
         &self,
         safeurl: &SafeUrl,
@@ -254,12 +273,12 @@ impl Safe {
         spendable_name: String,
     ) -> Result<()> {
         if !dbc.is_bearer() {
-            return Err(Error::InvalidInput("Only bearer DBC's are supported at this point by the Wallet. Please deposit a bearer DBC's.".to_string()));
+            return Err(Error::InvalidInput("Only bearer DBC's are supported at this point by the wallet. Please deposit a bearer DBC's.".to_string()));
         }
 
         let dbc_bytes = Bytes::from(rmp_serde::to_vec_named(dbc).map_err(|err| {
             Error::Serialisation(format!(
-                "Failed to serialise DBC to insert it into the Wallet: {:?}",
+                "Failed to serialise DBC to insert it into the wallet: {:?}",
                 err
             ))
         })?);
@@ -274,28 +293,31 @@ impl Safe {
         Ok(())
     }
 
-    /// Private helper to reissue DBCs using the sn_dbc API,
-    /// and logging the spent input DBCs on the network.
-    /// Return the output DBC, and the change DBC if there is one.
+    /// Reissue DBCs and log the spent input DBCs on the network. Return the output DBC and the
+    /// change DBC if there is one.
     async fn reissue_dbcs(
         &self,
         input_dbcs: Vec<Dbc>,
         output_amount: Token,
         change_amount: Token,
+        public_key: Option<bls::PublicKey>,
     ) -> Result<(Dbc, Option<Dbc>)> {
-        // TODO: support for non-bearer DBCs, and allow to provide a recipient's pk
-        let client = self.get_safe_client()?;
-        let owner = Owner::from_random_secret_key(&mut rng::thread_rng());
-        let owneronce = OwnerOnce::from_owner_base(owner, &mut rng::thread_rng());
+        let output_owner = if let Some(pk) = public_key {
+            let owner = Owner::from(pk);
+            OwnerOnce::from_owner_base(owner, &mut rng::thread_rng())
+        } else {
+            let owner = Owner::from_random_secret_key(&mut rng::thread_rng());
+            OwnerOnce::from_owner_base(owner, &mut rng::thread_rng())
+        };
 
         // TODO: enable the use ot decoys
         let mut tx_builder = TransactionBuilder::default()
             .set_decoys_per_input(0)
             .set_require_all_decoys(false)
             .add_inputs_dbc_bearer(input_dbcs.iter())?
-            .add_output_by_amount(output_amount.as_nano(), owneronce);
+            .add_output_by_amount(output_amount.as_nano(), output_owner);
 
-        // If there is a change, issue the change DBC
+        let client = self.get_safe_client()?;
         let change_owneronce =
             OwnerOnce::from_owner_base(client.dbc_owner(), &mut rng::thread_rng());
         if change_amount.as_nano() > 0 {
@@ -319,7 +341,6 @@ impl Safe {
         let mut output_dbc = None;
         let mut change_dbc = None;
         for (dbc, owneronce, _) in dbcs {
-            // If there is a change DBC store it in the source Wallet
             if change_owneronce == owneronce && change_amount.as_nano() > 0 {
                 change_dbc = Some(dbc);
             } else {
@@ -329,7 +350,7 @@ impl Safe {
 
         match output_dbc {
             None => Err(Error::DbcReissueError(
-                "Unexpectedly failed to generate output DBC. No balance were spent from the Wallet.".to_string(),
+                "Unexpectedly failed to generate output DBC. No balance were spent from the wallet.".to_string(),
             )),
             Some(dbc) => Ok((dbc, change_dbc)),
         }
@@ -343,6 +364,7 @@ mod tests {
         new_read_only_safe_instance, new_safe_instance, new_safe_instance_with_dbc_owner,
     };
     use anyhow::{anyhow, Result};
+    use sn_dbc::Owner;
 
     // TODO: allow to set an amount and SK to generate a DBC with,
     // instead of deserialising a hard-coded serialised DBC.
@@ -531,7 +553,7 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-2"), &dbc)
             .await?;
 
-        let output_dbc = safe.wallet_reissue(&wallet_xorurl, "2.35").await?;
+        let output_dbc = safe.wallet_reissue(&wallet_xorurl, "2.35", None).await?;
 
         let output_balance = output_dbc
             .amount_secrets_bearer()
@@ -565,7 +587,7 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc)
             .await?;
 
-        let output_dbc = safe.wallet_reissue(&wallet_xorurl, "1").await?;
+        let output_dbc = safe.wallet_reissue(&wallet_xorurl, "1", None).await?;
 
         let output_balance = output_dbc
             .amount_secrets_bearer()
@@ -602,13 +624,41 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc)
             .await?;
 
-        let _ = safe.wallet_reissue(&wallet_xorurl, "1").await?;
+        let _ = safe.wallet_reissue(&wallet_xorurl, "1", None).await?;
         let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
 
         let (change_dbc_read, _) = wallet_balances
             .get("change-dbc")
             .ok_or_else(|| anyhow!("Couldn't read change DBC from fetched wallet"))?;
         assert_eq!(*change_dbc_read.owner_base(), dbc_owner);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wallet_reissue_with_owned_dbc() -> Result<()> {
+        let safe = new_safe_instance().await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+
+        let dbc = new_dbc(DBC_WITH_1_530_000_000)?;
+        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc)
+            .await?;
+
+        let pk_bytes = hex::decode("b66bd668e7a28fc7fd5b0ad6360ece29ae4010263f3858f4c5ee96e1d112724f7607bd3629c17aaf7459ef50bd25adcc")?;
+        let pk_bytes: [u8; bls::PK_SIZE] = pk_bytes.try_into().unwrap_or_else(|v: Vec<u8>| {
+            panic!(
+                "Expected vec of length {} but received vec of length {}",
+                bls::PK_SIZE,
+                v.len()
+            )
+        });
+        let pk = bls::PublicKey::from_bytes(pk_bytes)?;
+        let owner = Owner::from(pk);
+        let output_dbc = safe.wallet_reissue(&wallet_xorurl, "1", Some(pk)).await?;
+
+        // We have verified transaction details in other tests. In this test, we're just concerned
+        // with the owner being assigned correctly.
+        assert_eq!(owner, *output_dbc.owner_base());
 
         Ok(())
     }
@@ -622,7 +672,7 @@ mod tests {
         safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc"), &dbc)
             .await?;
 
-        match safe.wallet_reissue(&wallet_xorurl, "2.55").await {
+        match safe.wallet_reissue(&wallet_xorurl, "2.55", None).await {
             Err(Error::NotEnoughBalance(msg)) => {
                 assert_eq!(msg, "1.530000000");
                 Ok(())
@@ -637,7 +687,7 @@ mod tests {
         let safe = new_safe_instance().await?;
         let wallet_xorurl = safe.wallet_create().await?;
 
-        match safe.wallet_reissue(&wallet_xorurl, "0").await {
+        match safe.wallet_reissue(&wallet_xorurl, "0", None).await {
             Err(Error::InvalidAmount(msg)) => {
                 assert_eq!(
                     msg,
@@ -669,7 +719,7 @@ mod tests {
             .await?;
 
         // Now check we can still reissue from the Wallet and the corrupted entry is ignored
-        let _ = safe.wallet_reissue(&wallet_xorurl, "0.4").await?;
+        let _ = safe.wallet_reissue(&wallet_xorurl, "0.4", None).await?;
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
         assert_eq!(current_balance, Token::from_nano(1_130_000_000));
 
@@ -687,7 +737,7 @@ mod tests {
 
         // Now check thaat after reissuing with the total balance,
         // there is no change deposited in the Wallet, i.e. Wallet is empty with 0 balance
-        let _ = safe.wallet_reissue(&wallet_xorurl, "12.23").await?;
+        let _ = safe.wallet_reissue(&wallet_xorurl, "12.23", None).await?;
 
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
         assert_eq!(current_balance, Token::zero());
@@ -708,7 +758,7 @@ mod tests {
         safe.wallet_deposit(&wallet1_xorurl, Some("deposited-dbc"), &dbc)
             .await?;
 
-        let output_dbc = safe.wallet_reissue(&wallet1_xorurl, "0.25").await?;
+        let output_dbc = safe.wallet_reissue(&wallet1_xorurl, "0.25", None).await?;
 
         safe.wallet_deposit(&wallet2_xorurl, Some("reissued-dbc"), &output_dbc)
             .await?;

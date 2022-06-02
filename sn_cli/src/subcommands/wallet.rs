@@ -100,7 +100,7 @@ pub async fn wallet_commander(
             Ok(())
         }
         WalletSubCommands::Reissue { amount, from } => {
-            let dbc = safe.wallet_reissue(&from, &amount).await?;
+            let dbc = safe.wallet_reissue(&from, &amount, None).await?;
             let dbc_hex = dbc_to_hex(&dbc)?;
 
             if OutputFmt::Pretty == output_fmt {
