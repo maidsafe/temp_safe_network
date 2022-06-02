@@ -143,11 +143,7 @@ impl SectionAuthorityProvider {
         }
     }
 
-    pub fn from_dkg_session(
-        session_id: DkgSessionId,
-        pk_set: PublicKeySet,
-        membership_gen: Generation,
-    ) -> Self {
+    pub fn from_dkg_session(session_id: DkgSessionId, pk_set: PublicKeySet) -> Self {
         Self::new(
             session_id.elder_peers(),
             session_id.prefix,
@@ -157,7 +153,7 @@ impl SectionAuthorityProvider {
                 .cloned()
                 .map(|n| n.into_state()),
             pk_set,
-            membership_gen,
+            session_id.membership_gen,
         )
     }
 

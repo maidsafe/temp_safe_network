@@ -24,7 +24,6 @@ use bls_dkg::key_gen::{
     message::Message as DkgMessage, Error as DkgError, KeyGen, MessageAndTarget, Phase,
 };
 use itertools::Itertools;
-use sn_consensus::Generation;
 use std::{
     collections::{BTreeMap, BTreeSet},
     iter, mem,
@@ -53,8 +52,6 @@ pub(crate) struct Session {
     // Retry sending messages when they timeout
     pub(crate) last_message_broadcast: Vec<(XorName, DkgMessage)>,
     pub(crate) retries: usize,
-    // Membership generation
-    pub(crate) generation: Generation,
 }
 
 fn is_dkg_behind(expected: Phase, actual: Phase) -> bool {
@@ -364,7 +361,6 @@ impl Session {
         let section_auth = SectionAuthorityProvider::from_dkg_session(
             self.session_id.clone(),
             outcome.public_key_set.clone(),
-            self.generation,
         );
 
         let outcome = SectionKeyShare {
@@ -373,7 +369,7 @@ impl Session {
             secret_key_share: outcome.secret_key_share,
         };
 
-        let generation = self.generation;
+        let generation = self.session_id.membership_gen;
 
         Ok(vec![Cmd::HandleDkgOutcome {
             section_auth,
@@ -545,7 +541,7 @@ mod tests {
             membership_gen: 0,
         };
 
-        let cmds = voter.start(&node, session_id, section_pk, 0).await?;
+        let cmds = voter.start(&node, session_id, section_pk).await?;
         assert_matches!(&cmds[..], &[Cmd::HandleDkgOutcome { .. }]);
 
         Ok(())
@@ -592,7 +588,6 @@ mod tests {
                 &actor.node,
                 session_id.clone(),
                 section_pk,
-                0,
             ))?;
 
             for cmd in cmds {

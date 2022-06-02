@@ -56,8 +56,6 @@ impl Node {
             peers.push(peer);
         }
 
-        let membership_generation = session_id.membership_gen;
-
         trace!("Received DkgStart for {:?}", session_id);
         self.dkg_sessions
             .write()
@@ -71,7 +69,6 @@ impl Node {
                 &self.info.read().await.clone(),
                 session_id,
                 self.network_knowledge().section_key().await,
-                membership_generation,
             )
             .await?;
         Ok(cmds)
