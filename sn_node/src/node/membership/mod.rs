@@ -31,7 +31,7 @@ pub(crate) type Result<T> = std::result::Result<T, Error>;
 
 fn get_split_info(
     prefix: Prefix,
-    members: BTreeMap<XorName, NodeState>,
+    members: &BTreeMap<XorName, NodeState>,
 ) -> Option<(BTreeSet<NodeState>, BTreeSet<NodeState>)> {
     let (zero, one) = partition_by_prefix(&prefix, members.keys().copied())?;
 
@@ -50,9 +50,10 @@ fn get_split_info(
 /// Checks if we can split the section
 /// If we have enough nodes for both subsections, returns the DkgSessionId's
 pub(crate) fn try_split_dkg(
-    members: BTreeMap<XorName, NodeState>,
+    members: &BTreeMap<XorName, NodeState>,
     sap: &SectionAuthorityProvider,
-    chain_len: u64,
+    section_chain_len: u64,
+    membership_gen: Generation,
 ) -> Option<(DkgSessionId, DkgSessionId)> {
     let prefix = sap.prefix();
 
@@ -70,14 +71,16 @@ pub(crate) fn try_split_dkg(
     let zero_id = DkgSessionId {
         prefix: zero_prefix,
         elders: BTreeMap::from_iter(zero_elders.iter().map(|node| (node.name, node.addr))),
-        section_chain_len: chain_len,
+        section_chain_len,
         bootstrap_members: zero,
+        membership_gen,
     };
     let one_id = DkgSessionId {
         prefix: one_prefix,
         elders: BTreeMap::from_iter(one_elders.iter().map(|node| (node.name, node.addr))),
-        section_chain_len: chain_len,
+        section_chain_len,
         bootstrap_members: one,
+        membership_gen,
     };
 
     Some((zero_id, one_id))

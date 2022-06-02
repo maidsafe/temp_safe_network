@@ -542,6 +542,7 @@ mod tests {
             elders,
             section_chain_len: 0,
             bootstrap_members,
+            membership_gen: 0,
         };
 
         let cmds = voter.start(&node, session_id, section_pk, 0).await?;
@@ -567,6 +568,7 @@ mod tests {
         let mut rng = SmallRng::seed_from_u64(seed);
         let section_pk = bls::SecretKey::random().public_key();
         let mut messages = Vec::new();
+        let dummy_gen = 0;
 
         let session_id = DkgSessionId {
             prefix: Prefix::default(),
@@ -577,6 +579,7 @@ mod tests {
                     .iter()
                     .map(|n| NodeState::joined(n.name(), n.addr, None)),
             ),
+            membership_gen: dummy_gen,
         };
 
         let mut actors: HashMap<_, _> = nodes

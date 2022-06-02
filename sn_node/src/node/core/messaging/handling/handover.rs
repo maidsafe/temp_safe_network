@@ -104,7 +104,7 @@ impl Node {
     }
 
     async fn check_elder_handover_candidates(&self, sap: &SectionAuthorityProvider) -> Result<()> {
-        // in regular handover the prefix is the same as the previous
+        // in regular handover the previous SAP's prefix is the same
         let previous_gen_sap = self.get_sap_for_prefix(sap.prefix()).await?;
         let members = self.get_members_at_gen(sap.membership_gen()).await?;
         let received_candidates: BTreeSet<&Peer> = sap.elders().collect();
@@ -117,6 +117,7 @@ impl Node {
                 .collect();
         let expected_candidates: BTreeSet<&Peer> = expected_peers.iter().collect();
         if received_candidates != expected_candidates {
+            debug!("InvalidElderCandidates: received SAP at gen {} with candidates {:#?}, expected candidates {:#?}", sap.membership_gen(), received_candidates, expected_candidates);
             return Err(Error::InvalidElderCandidates);
         }
         Ok(())
@@ -127,18 +128,21 @@ impl Node {
         sap1: &SectionAuthorityProvider,
         sap2: &SectionAuthorityProvider,
     ) -> Result<()> {
-        // in split handover, the previous prefix is prefix.popped()
+        // in split handover, the previous SAP's prefix is prefix.popped()
         // we use gen/prefix from sap1, both SAPs in a split have the same generation
         // and the same ancestor prefix
         let prev_prefix = sap1.prefix().popped();
         let previous_gen_sap = self.get_sap_for_prefix(prev_prefix).await?;
         let members = self.get_members_at_gen(sap1.membership_gen()).await?;
         let dummy_chain_len = 0;
+        let dummy_gen = 0;
 
         let received_candidates1: BTreeSet<&Peer> = sap1.elders().collect();
         let received_candidates2: BTreeSet<&Peer> = sap2.elders().collect();
 
-        if let Some((dkg1, dkg2)) = try_split_dkg(members, &previous_gen_sap, dummy_chain_len) {
+        if let Some((dkg1, dkg2)) =
+            try_split_dkg(&members, &previous_gen_sap, dummy_chain_len, dummy_gen)
+        {
             let expected_peers1: BTreeSet<Peer> =
                 dkg1.elders.iter().map(|(n, a)| Peer::new(*n, *a)).collect();
             let expected_peers2: BTreeSet<Peer> =

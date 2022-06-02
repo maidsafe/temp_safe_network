@@ -322,21 +322,6 @@ impl Node {
         }
     }
 
-    async fn get_current_section_members(
-        &self,
-        excluded_names: &BTreeSet<XorName>,
-    ) -> BTreeMap<XorName, NodeState> {
-        match self.membership.read().await.as_ref() {
-            Some(m) => m
-                .current_section_members()
-                .iter()
-                .filter(|(name, _node_state)| !excluded_names.contains(*name))
-                .map(|(n, s)| (*n, s.clone()))
-                .collect(),
-            None => BTreeMap::new(),
-        }
-    }
-
     /// Generate a new section info(s) based on the current set of members,
     /// excluding any member matching a name in the provided `excluded_names` set.
     /// Returns a set of candidate DkgSessionId's.
@@ -346,15 +331,29 @@ impl Node {
     ) -> Vec<DkgSessionId> {
         let sap = self.network_knowledge.authority_provider().await;
         let chain_len = self.network_knowledge.chain_len().await;
-        let members = self.get_current_section_members(excluded_names).await;
-        if members.is_empty() {
-            warn!("While trying to promote and demote elders, current section members was empty.");
-            return vec![];
-        }
+
+        // get current gen and members
+        let current_gen;
+        let members: BTreeMap<XorName, NodeState> =
+            if let Some(m) = self.membership.read().await.as_ref() {
+                current_gen = m.generation();
+                m.current_section_members()
+                    .iter()
+                    .filter(|(name, _node_state)| !excluded_names.contains(*name))
+                    .map(|(n, s)| (*n, s.clone()))
+                    .collect()
+            } else {
+                error!(
+                "attempted to promote and demote elders when we don't have a membership instance"
+            );
+                return vec![];
+            };
 
         // Try splitting
         trace!("{}", LogMarker::SplitAttempt);
-        if let Some((zero_dkg_id, one_dkg_id)) = try_split_dkg(members, &sap, chain_len) {
+        if let Some((zero_dkg_id, one_dkg_id)) =
+            try_split_dkg(&members, &sap, chain_len, current_gen)
+        {
             debug!(
                 "Upon section split attempt, section size: zero {:?}, one {:?}",
                 zero_dkg_id.bootstrap_members.len(),
@@ -367,16 +366,6 @@ impl Node {
         // Candidates for elders out of all the nodes in the section, even out of the
         // relocating nodes if there would not be enough instead.
         let sap = self.network_knowledge.authority_provider().await;
-
-        let members = if let Some(m) = self.membership.read().await.as_ref() {
-            m.current_section_members()
-        } else {
-            error!(
-                "attempted to promote and demote elders when we don't have a membership instance"
-            );
-            return vec![];
-        };
-
         let elder_candidates = elder_candidates(
             members
                 .values()
@@ -387,7 +376,8 @@ impl Node {
         let current_elders = BTreeSet::from_iter(sap.elders().copied());
 
         info!(
-            "ELDER CANDIDATES {}: {:?}",
+            "ELDER CANDIDATES (current gen:{}) {}: {:?}",
+            current_gen,
             elder_candidates.len(),
             elder_candidates
         );
@@ -422,6 +412,7 @@ impl Node {
                 ),
                 section_chain_len: chain_len,
                 bootstrap_members: BTreeSet::from_iter(members.into_values()),
+                membership_gen: current_gen,
             };
             vec![session_id]
         }
