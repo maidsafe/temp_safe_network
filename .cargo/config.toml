@@ -9,3 +9,7 @@ rustflags = [
 rustflags = [
     "-C", "link-arg=-Wl,--stack,0x800000"
 ]
+
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=/nix/store/3slpwfg89nnm1h6p9fxl77wpxfq6dka5-mold-1.2.1/bin/mold"]
