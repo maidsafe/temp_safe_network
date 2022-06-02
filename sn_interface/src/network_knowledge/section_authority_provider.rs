@@ -65,7 +65,7 @@ pub struct SectionAuthorityProvider {
     public_key_set: PublicKeySet,
     elders: BTreeSet<Peer>,
     members: BTreeSet<NodeState>,
-    membership_gen: u64,
+    membership_gen: Generation,
 }
 
 /// SectionAuthorityProvider candidates for handover consensus to vote on
