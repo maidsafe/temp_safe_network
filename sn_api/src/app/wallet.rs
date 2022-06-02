@@ -334,6 +334,8 @@ impl Safe {
             // TODO: spend DBCs in parallel spawning tasks
             client.spend_dbc(keyimage, tx).await?;
             let spent_proof_shares = client.spent_proof_shares(keyimage).await?;
+            // The `add_spent_proof_share` function already updated the `dbc_builder` object.
+            // No need to update the object outside manually.
             dbc_builder = dbc_builder.add_spent_proof_shares(spent_proof_shares.into_iter());
         }
 

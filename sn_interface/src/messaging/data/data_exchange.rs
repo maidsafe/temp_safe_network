@@ -31,7 +31,6 @@ pub struct RegisterStoreExport(pub Vec<ReplicatedRegisterLog>);
 pub struct ReplicatedRegisterLog {
     ///
     pub address: RegisterAddress,
-    /// section sig over address.id()
     /// This is a duplicated entry as it should exist in first cmd
     pub section_auth: SectionAuth,
     ///
