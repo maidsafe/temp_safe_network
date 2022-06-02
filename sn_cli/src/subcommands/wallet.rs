@@ -17,31 +17,32 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug)]
 pub enum WalletSubCommands {
     #[structopt(name = "create")]
-    /// Create a new Wallet
+    /// Create a new wallet
     Create {},
     #[structopt(name = "balance")]
-    /// Query a Wallet's total balance
+    /// Query a wallet's balance
     Balance {
-        /// The target Wallet to check the total balance
+        /// The URL of wallet to query
         target: Option<String>,
     },
     #[structopt(name = "deposit")]
-    /// Deposit a spendable DBC into a Wallet
+    /// Deposit a spendable DBC in a wallet
     Deposit {
-        /// The target Wallet to deposit the spendable DBC on
-        target: String,
+        /// The URL of the wallet for the deposit
+        wallet_url: String,
         /// The name to give this spendable DBC
         #[structopt(long = "name")]
         name: Option<String>,
-        /// The DBC to desposit (hex encoded)
-        dbc: String,
+        /// A hex encoded DBC to deposit
+        #[structopt(long = "dbc")]
+        dbc: Option<String>,
     },
     #[structopt(name = "reissue")]
-    /// Reissue a DBC from a Wallet to a SafeKey
+    /// Reissue a DBC from a wallet to a SafeKey
     Reissue {
-        /// Number of safecoins to reissue
+        /// The amount to reissue
         amount: String,
-        /// Source Wallet URL
+        /// The URL of wallet to reissue from
         #[structopt(long = "from")]
         from: String,
     },
@@ -54,7 +55,6 @@ pub async fn wallet_commander(
 ) -> Result<()> {
     match cmd {
         WalletSubCommands::Create {} => {
-            // Create wallet
             let wallet_xorurl = safe.wallet_create().await?;
 
             if OutputFmt::Pretty == output_fmt {
@@ -68,7 +68,7 @@ pub async fn wallet_commander(
         WalletSubCommands::Balance { target } => {
             let target = get_from_arg_or_stdin(
                 target,
-                Some("...awaiting Wallet address/location from STDIN stream..."),
+                Some("...awaiting wallet address/location from STDIN stream..."),
             )?;
 
             let balance = safe.wallet_balance(&target).await?;
@@ -84,17 +84,29 @@ pub async fn wallet_commander(
 
             Ok(())
         }
-        WalletSubCommands::Deposit { target, name, dbc } => {
-            let dbc = dbc_from_hex(&dbc)?;
-            let the_name = safe.wallet_deposit(&target, name.as_deref(), &dbc).await?;
+        WalletSubCommands::Deposit {
+            wallet_url,
+            name,
+            dbc,
+        } => {
+            let dbc = if let Some(dbc) = dbc {
+                dbc_from_hex(&dbc)?
+            } else {
+                let dbc_hex = get_from_arg_or_stdin(dbc, None)?;
+                println!("{}", dbc_hex);
+                dbc_from_hex(dbc_hex.trim())?
+            };
+            let the_name = safe
+                .wallet_deposit(&wallet_url, name.as_deref(), &dbc)
+                .await?;
 
             if OutputFmt::Pretty == output_fmt {
                 println!(
-                    "Spendable DBC deposited with name '{}' in Wallet located at \"{}\"",
-                    the_name, target
+                    "Spendable DBC deposited with name '{}' in wallet located at \"{}\"",
+                    the_name, wallet_url
                 );
             } else {
-                println!("{}", serialise_output(&(target, the_name), output_fmt));
+                println!("{}", serialise_output(&(wallet_url, the_name), output_fmt));
             }
 
             Ok(())

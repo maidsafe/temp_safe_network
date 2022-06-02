@@ -34,14 +34,15 @@ fn calling_safe_wallet_deposit() -> Result<()> {
             "deposit",
             "--name",
             "my-first-dbc",
-            &wallet_xorurl,
+            "--dbc",
             DBC_WITH_12_230_000_000,
+            &wallet_xorurl,
         ],
         Some(0),
     )?
     .assert()
     .stdout(format!(
-        "Spendable DBC deposited with name '{}' in Wallet located at \"{}\"\n",
+        "Spendable DBC deposited with name '{}' in wallet located at \"{}\"\n",
         "my-first-dbc", wallet_xorurl
     ))
     .success();
@@ -60,8 +61,9 @@ fn calling_safe_wallet_balance() -> Result<()> {
             "deposit",
             "--name",
             "my-first-dbc",
-            &wallet_xorurl,
+            "--dbc",
             DBC_WITH_12_230_000_000,
+            &wallet_xorurl,
         ],
         Some(0),
     )?;
@@ -88,8 +90,9 @@ fn calling_safe_wallet_reissue() -> Result<()> {
             "deposit",
             "--name",
             "my-first-dbc",
-            &wallet_xorurl,
+            "--dbc",
             DBC_WITH_12_230_000_000,
+            &wallet_xorurl,
         ],
         Some(0),
     )?;
@@ -118,8 +121,9 @@ fn calling_safe_wallet_deposit_reissued() -> Result<()> {
             "deposit",
             "--name",
             "my-first-dbc",
-            &wallet_xorurl,
+            "--dbc",
             DBC_WITH_12_230_000_000,
+            &wallet_xorurl,
         ],
         Some(0),
     )?;
@@ -142,8 +146,9 @@ fn calling_safe_wallet_deposit_reissued() -> Result<()> {
             "deposit",
             "--name",
             "reissued-dbc",
-            &wallet_xorurl,
+            "--dbc",
             &reissued_dbc,
+            &wallet_xorurl,
         ],
         Some(0),
     )?;
