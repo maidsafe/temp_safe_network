@@ -18,22 +18,6 @@ pub(crate) type Result<T, E = Error> = result::Result<T, E>;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
-    /// Received an invalid section prefix when checking handover candidate's section prefix
-    /// The candidate's section prefix is supposed to be identical to ours for a handover
-    #[error("Invalid Section Prefix For Handover Candidate")]
-    InvalidSectionPrefixForCandidate,
-
-    /// Received invalid split sections candidates
-    /// The candidates are supposed to be 2 distinct children prefixes for our section:
-    /// Example: for section 10, the candidates are supposed to be 101, 100
-    #[error("Invalid Section Prefix For Handover Split Candidate")]
-    InvalidSectionPrefixForSplitCandidates,
-
-    /// Received invalid SAP candidates
-    /// The candidates are supposed to be the oldest nodes in their generation
-    #[error("Invalid SAP Candidates")]
-    InvalidSapCandidates,
-
     /// Proposal is faulty
     #[error("Faulty Proposal")]
     FaultyProposal,

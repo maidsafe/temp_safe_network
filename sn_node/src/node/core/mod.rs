@@ -197,9 +197,8 @@ impl Node {
             let secret_key = (key.index as u8, key.secret_key_share);
             let elders = key.public_key_set;
             let n_elders = network_knowledge.elders().await.len();
-            let section_prefix = network_knowledge.prefix().await;
 
-            let handover_data = Handover::from(secret_key, elders, n_elders, section_prefix);
+            let handover_data = Handover::from(secret_key, elders, n_elders);
             Some(handover_data)
         } else {
             None
@@ -446,7 +445,6 @@ impl Node {
             .authority_provider()
             .await
             .elder_count();
-        let section_prefix = self.network_knowledge.prefix().await;
 
         // reset split barrier for
         let mut split_barrier = self.split_barrier.write().await;
@@ -457,7 +455,6 @@ impl Node {
             (key.index as u8, key.secret_key_share),
             key.public_key_set,
             n_elders,
-            section_prefix,
         ));
 
         Ok(())

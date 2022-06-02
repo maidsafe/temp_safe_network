@@ -161,6 +161,36 @@ impl Node {
         }
     }
 
+    async fn check_sap_candidate_prefix(&self, sap_candidate: &SapCandidate) -> Result<()> {
+        let section_prefix = self.network_knowledge.prefix().await;
+        match sap_candidate {
+            SapCandidate::ElderHandover(single_sap) => {
+                // single handover, must be same prefix
+                if single_sap.prefix() == section_prefix {
+                    Ok(())
+                } else {
+                    Err(Error::InvalidSectionPrefixForCandidate)
+                }
+            }
+            SapCandidate::SectionSplit(sap1, sap2) => {
+                // section split, must be 2 distinct children prefixes
+                let our_p = &section_prefix;
+                let p1 = sap1.prefix();
+                let p2 = sap2.prefix();
+                if p1.is_extension_of(our_p)
+                    && p2.is_extension_of(our_p)
+                    && p1.bit_count() == our_p.bit_count() + 1
+                    && p2.bit_count() == our_p.bit_count() + 1
+                    && p1 != p2
+                {
+                    Ok(())
+                } else {
+                    Err(Error::InvalidSectionPrefixForSplitCandidates)
+                }
+            }
+        }
+    }
+
     /// Checks if the elder candidates in the SAP match the oldest elders in the corresponding
     /// membership generation this SAP was proposed at
     /// Also checks the SAP signature
@@ -169,6 +199,7 @@ impl Node {
         sap_candidate: &SapCandidate,
         gen: Generation,
     ) -> Result<()> {
+        self.check_sap_candidate_prefix(sap_candidate).await?;
         match sap_candidate {
             SapCandidate::ElderHandover(authed_sap) => {
                 self.check_sap_sig(authed_sap, gen)?;

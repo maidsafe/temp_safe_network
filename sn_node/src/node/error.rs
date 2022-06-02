@@ -172,6 +172,15 @@ pub enum Error {
     /// Invalid Split Candidates in Handover vote's SAP
     #[error("InvalidSplitCandidates")]
     InvalidSplitCandidates,
+    /// Received an invalid section prefix when checking handover candidate's section prefix
+    /// The candidate's section prefix is supposed to be identical to ours for a handover
+    #[error("Invalid Section Prefix For Handover Candidate")]
+    InvalidSectionPrefixForCandidate,
+    /// Received invalid split sections candidates
+    /// The candidates are supposed to be 2 distinct children prefixes for our section:
+    /// Example: for section 10, the candidates are supposed to be 101, 100
+    #[error("Invalid Section Prefix For Handover Split Candidate")]
+    InvalidSectionPrefixForSplitCandidates,
 }
 
 impl From<qp2p::ClientEndpointError> for Error {
