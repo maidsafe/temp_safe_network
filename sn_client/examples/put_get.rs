@@ -14,10 +14,11 @@ use tracing::{debug, warn};
 
 use sn_client::{Client, ClientConfig, Error, Result};
 use sn_interface::init_logger;
-use sn_interface::types::{utils::random_bytes, BytesAddress, Scope};
+use sn_interface::types::{utils::random_bytes, Scope};
 use tiny_keccak::{Hasher, Sha3};
 
 use sn_client::utils::test_utils::read_network_conn_info;
+use xor_name::XorName;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -140,7 +141,7 @@ pub async fn run_chunk_soak() -> Result<()> {
 }
 
 #[allow(dead_code)]
-async fn upload_data_using_fresh_client(iteration: usize) -> Result<(BytesAddress, [u8; 32])> {
+async fn upload_data_using_fresh_client(iteration: usize) -> Result<(XorName, [u8; 32])> {
     // Now we upload the data.
     let (genesis_key, bootstrap_nodes) =
         read_network_conn_info().map_err(|_e| Error::NoNetworkKnowledge)?;
@@ -150,10 +151,7 @@ async fn upload_data_using_fresh_client(iteration: usize) -> Result<(BytesAddres
     upload_data_using_client(client, iteration).await
 }
 
-async fn upload_data_using_client(
-    client: Client,
-    iteration: usize,
-) -> Result<(BytesAddress, [u8; 32])> {
+async fn upload_data_using_client(client: Client, iteration: usize) -> Result<(XorName, [u8; 32])> {
     let one_mb = 1024 * 1024;
     // start small and build up
     let bytes = random_bytes(one_mb * iteration);

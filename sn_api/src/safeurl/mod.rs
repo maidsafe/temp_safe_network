@@ -16,7 +16,7 @@ mod xorurl_media_types;
 pub use errors::{Error, Result};
 use multibase::{decode as base_decode, encode as base_encode, Base};
 use serde::{Deserialize, Serialize};
-use sn_interface::types::{BytesAddress, DataAddress, RegisterAddress, Scope};
+use sn_interface::types::{DataAddress, RegisterAddress, Scope};
 use std::fmt;
 use tracing::{info, trace, warn};
 use url::Url;
@@ -509,7 +509,7 @@ impl SafeUrl {
 
         let address = match xorurl_bytes[4] {
             0 => DataAddress::SafeKey(xor_name),
-            1 => DataAddress::Bytes(BytesAddress::new(xor_name, scope)),
+            1 => DataAddress::Bytes(xor_name),
             2 => DataAddress::Register(RegisterAddress::new(xor_name, scope, type_tag)),
             other => {
                 return Err(Error::InvalidXorUrl(format!(
@@ -1007,7 +1007,7 @@ impl SafeUrl {
 
     /// A non-member bytes encoder function for convenience
     pub fn encode_bytes(
-        address: BytesAddress,
+        address: XorName,
         content_type: ContentType,
         base: XorUrlBase,
     ) -> Result<String> {
@@ -1210,7 +1210,7 @@ mod tests {
     use super::*;
     use color_eyre::{eyre::bail, eyre::eyre, Result};
     use rand::Rng;
-    use sn_interface::types::{register::EntryHash, BytesAddress};
+    use sn_interface::types::register::EntryHash;
 
     macro_rules! verify_expected_result {
             ($result:expr, $pattern:pat $(if $cond:expr)?) => {
@@ -1304,7 +1304,7 @@ mod tests {
     #[test]
     fn test_url_base32_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let address = DataAddress::bytes(xor_name, Scope::Public);
+        let address = DataAddress::bytes(xor_name);
 
         let xorurl = SafeUrl::encode(
             address,
@@ -1328,11 +1328,7 @@ mod tests {
     #[test]
     fn test_url_base32z_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = SafeUrl::encode_bytes(
-            BytesAddress::Public(xor_name),
-            ContentType::Raw,
-            XorUrlBase::Base32z,
-        )?;
+        let xorurl = SafeUrl::encode_bytes(xor_name, ContentType::Raw, XorUrlBase::Base32z)?;
         let base32z_xorurl = "safe://hyryyyyybgr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3y";
         assert_eq!(xorurl, base32z_xorurl);
         Ok(())
@@ -1366,11 +1362,7 @@ mod tests {
     fn test_url_default_base_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let base32z_xorurl = "safe://hyryyyyybgr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3y";
-        let xorurl = SafeUrl::encode_bytes(
-            BytesAddress::Public(xor_name),
-            ContentType::Raw,
-            DEFAULT_XORURL_BASE,
-        )?;
+        let xorurl = SafeUrl::encode_bytes(xor_name, ContentType::Raw, DEFAULT_XORURL_BASE)?;
         assert_eq!(xorurl, base32z_xorurl);
         Ok(())
     }
@@ -1385,7 +1377,7 @@ mod tests {
         let query_string = "k1=v1&k2=v2";
         let query_string_v = format!("{}&v={}", query_string, content_version);
         let fragment = "myfragment";
-        let address = DataAddress::bytes(xor_name, Scope::Public);
+        let address = DataAddress::bytes(xor_name);
         let xorurl = SafeUrl::encode(
             address,
             None,
@@ -1442,7 +1434,7 @@ mod tests {
     fn test_url_decoding_with_subname() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let type_tag: u64 = 0x0eef;
-        let address = DataAddress::bytes(xor_name, Scope::Public);
+        let address = DataAddress::bytes(xor_name);
 
         let xorurl_with_subname = SafeUrl::encode(
             address,
@@ -1479,7 +1471,7 @@ mod tests {
     fn encode_bytes_should_set_media_type() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let xorurl = SafeUrl::encode_bytes(
-            BytesAddress::Public(xor_name),
+            xor_name,
             ContentType::MediaType("text/html".to_string()),
             XorUrlBase::Base32z,
         )?;
@@ -1496,7 +1488,7 @@ mod tests {
     fn encode_bytes_should_set_data_type() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let xorurl = SafeUrl::encode_bytes(
-            BytesAddress::Public(xor_name),
+            xor_name,
             ContentType::MediaType("text/html".to_string()),
             XorUrlBase::Base32z,
         )?;
@@ -1527,7 +1519,7 @@ mod tests {
     fn test_url_too_short() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let xorurl = SafeUrl::encode_bytes(
-            BytesAddress::Public(xor_name),
+            xor_name,
             ContentType::MediaType("text/html".to_string()),
             XorUrlBase::Base32z,
         )?;

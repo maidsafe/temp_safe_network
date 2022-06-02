@@ -12,8 +12,9 @@ use bytes::Bytes;
 use rayon::prelude::*;
 use self_encryption::{DataMap, EncryptedChunk};
 use serde::{Deserialize, Serialize};
-use sn_interface::types::{BytesAddress, Chunk, Encryption};
+use sn_interface::types::{Chunk, Encryption};
 use std::path::Path;
+use xor_name::XorName;
 
 #[derive(Serialize, Deserialize)]
 pub(crate) enum DataMapLevel {
@@ -29,7 +30,7 @@ pub(crate) enum DataMapLevel {
 pub(crate) fn encrypt_from_path(
     path: &Path,
     encryption: Option<&impl Encryption>,
-) -> Result<(BytesAddress, Vec<Chunk>)> {
+) -> Result<(XorName, Vec<Chunk>)> {
     let (data_map, encrypted_chunks) = encrypt_file(path)?;
     pack(data_map, encrypted_chunks, encryption)
 }
@@ -37,7 +38,7 @@ pub(crate) fn encrypt_from_path(
 pub(crate) fn encrypt_large(
     data: Bytes,
     encryption: Option<&impl Encryption>,
-) -> Result<(BytesAddress, Vec<Chunk>)> {
+) -> Result<(XorName, Vec<Chunk>)> {
     let (data_map, encrypted_chunks) = encrypt_data(data)?;
     pack(data_map, encrypted_chunks, encryption)
 }
@@ -50,7 +51,7 @@ pub(crate) fn pack(
     data_map: DataMap,
     encrypted_chunks: Vec<EncryptedChunk>,
     encryption: Option<&impl Encryption>,
-) -> Result<(BytesAddress, Vec<Chunk>)> {
+) -> Result<(XorName, Vec<Chunk>)> {
     // Produces a chunk out of the first secret key, which is validated for its size.
     // If the chunk is too big, it is self-encrypted and the resulting (additional level) secret key is put into a chunk.
     // The above step is repeated as many times as required until the chunk size is valid.
@@ -74,12 +75,7 @@ pub(crate) fn pack(
             chunks.reverse();
             chunks.push(chunk);
             // returns the address of the last datamap, and all the chunks produced
-            let address = if encryption.is_some() {
-                BytesAddress::Private(name)
-            } else {
-                BytesAddress::Public(name)
-            };
-            break (address, chunks);
+            break (name, chunks);
         } else {
             let serialized_chunk = Bytes::from(serialize(&chunk)?);
             let (data_map, next_encrypted_chunks) =

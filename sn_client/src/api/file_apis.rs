@@ -12,7 +12,7 @@ use super::{
 };
 use crate::{api::data::DataMapLevel, utils::encryption, Error, Result};
 use sn_interface::messaging::data::{DataCmd, DataQuery, QueryResponse};
-use sn_interface::types::{BytesAddress, Chunk, ChunkAddress, Encryption, PublicKey, Scope};
+use sn_interface::types::{Chunk, ChunkAddress, PublicKey, Scope};
 
 use bincode::deserialize;
 use bytes::Bytes;
@@ -23,29 +23,18 @@ use tokio::task;
 use tracing::trace;
 use xor_name::XorName;
 
-struct HeadChunk {
-    chunk: Chunk,
-    address: BytesAddress,
-}
-
 impl Client {
     #[instrument(skip(self), level = "debug")]
     /// Reads [`Bytes`] from the network, whose contents are contained within on or more chunks.
-    pub async fn read_bytes(&self, address: BytesAddress) -> Result<Bytes> {
-        let chunk = self.get_chunk(address.name()).await?;
+    pub async fn read_bytes(&self, address: XorName) -> Result<Bytes> {
+        let chunk = self.get_chunk(&address).await?;
 
         // first try to deserialize a LargeFile, if it works, we go and seek it
-        if let Ok(data_map) = self
-            .unpack_head_chunk(HeadChunk {
-                chunk: chunk.clone(),
-                address,
-            })
-            .await
-        {
+        if let Ok(data_map) = self.unpack_chunk(chunk.clone()).await {
             self.read_all(data_map).await
         } else {
             // if an error occurs, we assume it's a SmallFile
-            self.get_bytes(chunk, address.scope())
+            Ok(chunk.value().clone())
         }
     }
 
@@ -63,12 +52,7 @@ impl Client {
     /// TODO: update once data types are crdt compliant
     ///
     #[instrument(skip_all, level = "trace")]
-    pub async fn read_from(
-        &self,
-        address: BytesAddress,
-        position: usize,
-        length: usize,
-    ) -> Result<Bytes>
+    pub async fn read_from(&self, address: XorName, position: usize, length: usize) -> Result<Bytes>
     where
         Self: Sized,
     {
@@ -79,24 +63,18 @@ impl Client {
             &position,
         );
 
-        let chunk = self.get_chunk(address.name()).await?;
+        let chunk = self.get_chunk(&address).await?;
 
         // First try to deserialize a LargeFile, if it works, we go and seek it.
         // If an error occurs, we consider it to be a SmallFile.
-        if let Ok(data_map) = self
-            .unpack_head_chunk(HeadChunk {
-                chunk: chunk.clone(),
-                address,
-            })
-            .await
-        {
+        if let Ok(data_map) = self.unpack_chunk(chunk.clone()).await {
             return self.seek(data_map, position, length).await;
         }
 
         // The error above is ignored to avoid leaking the storage format detail of SmallFiles and LargeFiles.
         // The basic idea is that we're trying to deserialize as one, and then the other.
         // The cost of it is that some errors will not be seen without a refactor.
-        let mut bytes = self.get_bytes(chunk, address.scope())?;
+        let mut bytes = chunk.value().clone();
 
         let _ = bytes.split_to(position);
         bytes.truncate(length);
@@ -136,13 +114,13 @@ impl Client {
 
     /// Tries to chunk the bytes, returning an address and chunks, without storing anything to network.
     #[instrument(skip_all, level = "trace")]
-    pub fn chunk_bytes(&self, bytes: Bytes, scope: Scope) -> Result<(BytesAddress, Vec<Chunk>)> {
+    pub fn chunk_bytes(&self, bytes: Bytes, scope: Scope) -> Result<(XorName, Vec<Chunk>)> {
         if let Ok(file) = LargeFile::new(bytes.clone()) {
             Self::encrypt_large(file, scope, self.public_key())
         } else {
             let file = SmallFile::new(bytes)?;
-            let (address, chunk) = Self::package_small(file, scope, self.public_key())?;
-            Ok((address, vec![chunk]))
+            let chunk = Self::package_small(file, scope, self.public_key())?;
+            Ok((*chunk.name(), vec![chunk]))
         }
     }
 
@@ -153,7 +131,7 @@ impl Client {
         file: LargeFile,
         scope: Scope,
         public_key: PublicKey,
-    ) -> Result<(BytesAddress, Vec<Chunk>)> {
+    ) -> Result<(XorName, Vec<Chunk>)> {
         let owner = encryption(scope, public_key);
         encrypt_large(file.bytes(), owner.as_ref())
     }
@@ -161,29 +139,19 @@ impl Client {
     /// Packages a [`SmallFile`] and returns the resulting address and the chunk.
     /// The chunk content will be in plain text if it has public scope, or encrypted if it is instead private.
     /// Does not store anything to the network.
-    fn package_small(
-        file: SmallFile,
-        scope: Scope,
-        public_key: PublicKey,
-    ) -> Result<(BytesAddress, Chunk)> {
+    fn package_small(file: SmallFile, scope: Scope, public_key: PublicKey) -> Result<Chunk> {
         let encryption = encryption(scope, public_key);
         let chunk = to_chunk(file.bytes(), encryption.as_ref())?;
         if chunk.value().len() >= self_encryption::MIN_ENCRYPTABLE_BYTES {
             return Err(Error::SmallFilePaddingNeeded);
         }
-        let name = *chunk.name();
-        let address = if encryption.is_some() {
-            BytesAddress::Private(name)
-        } else {
-            BytesAddress::Public(name)
-        };
-        Ok((address, chunk))
+        Ok(chunk)
     }
 
     /// Directly writes [`Bytes`] to the network in the
     /// form of immutable chunks, without any batching.
     #[instrument(skip(self, bytes), level = "debug")]
-    pub async fn upload(&self, bytes: Bytes, scope: Scope) -> Result<BytesAddress> {
+    pub async fn upload(&self, bytes: Bytes, scope: Scope) -> Result<XorName> {
         if let Ok(file) = LargeFile::new(bytes.clone()) {
             self.upload_large(file, scope).await
         } else {
@@ -196,11 +164,7 @@ impl Client {
     /// form of immutable chunks, without any batching.
     /// It also attempts to verify that all the data was uploaded to the network before returning.
     #[instrument(skip_all, level = "trace")]
-    pub async fn upload_and_verify(
-        &self,
-        bytes: Bytes,
-        scope: Scope,
-    ) -> Result<(BytesAddress, Bytes)> {
+    pub async fn upload_and_verify(&self, bytes: Bytes, scope: Scope) -> Result<(XorName, Bytes)> {
         let address = self.upload(bytes, scope).await?;
 
         // let's now try to retrieve it
@@ -212,7 +176,7 @@ impl Client {
     /// Calculates a LargeFile's/SmallFile's address from self encrypted chunks,
     /// without storing them onto the network.
     #[instrument(skip(bytes), level = "debug")]
-    pub fn calculate_address(bytes: Bytes, scope: Scope) -> Result<BytesAddress> {
+    pub fn calculate_address(bytes: Bytes, scope: Scope) -> Result<XorName> {
         // we use just a random BLS public key as the owner
         let public_key = PublicKey::Bls(bls::SecretKey::random().public_key());
         if let Ok(file) = LargeFile::new(bytes.clone()) {
@@ -220,15 +184,15 @@ impl Client {
             Ok(head_address)
         } else {
             let file = SmallFile::new(bytes)?;
-            let (address, _chunk) = Self::package_small(file, scope, public_key)?;
-            Ok(address)
+            let chunk = Self::package_small(file, scope, public_key)?;
+            Ok(*chunk.name())
         }
     }
 
     /// Directly writes a [`LargeFile`] to the network in the
     /// form of immutable self encrypted chunks, without any batching.
     #[instrument(skip_all, level = "trace")]
-    async fn upload_large(&self, large: LargeFile, scope: Scope) -> Result<BytesAddress> {
+    async fn upload_large(&self, large: LargeFile, scope: Scope) -> Result<XorName> {
         let (head_address, all_chunks) = Self::encrypt_large(large, scope, self.public_key())?;
 
         let tasks = all_chunks.into_iter().map(|chunk| {
@@ -253,8 +217,9 @@ impl Client {
     /// Directly writes a [`SmallFile`] to the network in the
     /// form of a single chunk, without any batching.
     #[instrument(skip_all, level = "trace")]
-    async fn upload_small(&self, small: SmallFile, scope: Scope) -> Result<BytesAddress> {
-        let (address, chunk) = Self::package_small(small, scope, self.public_key())?;
+    async fn upload_small(&self, small: SmallFile, scope: Scope) -> Result<XorName> {
+        let chunk = Self::package_small(small, scope, self.public_key())?;
+        let address = *chunk.name();
         self.send_cmd(DataCmd::StoreChunk(chunk)).await?;
         Ok(address)
     }
@@ -340,16 +305,13 @@ impl Client {
         }
     }
 
-    /// Extracts a file DataMapLevel from a head chunk.
+    /// Extracts a file DataMapLevel from a chunk.
     /// If the DataMapLevel is not the first level mapping directly to the user's contents,
     /// the process repeats itself until it obtains the first level DataMapLevel.
     #[instrument(skip_all, level = "trace")]
-    async fn unpack_head_chunk(&self, chunk: HeadChunk) -> Result<DataMap> {
-        let HeadChunk { mut chunk, address } = chunk;
+    async fn unpack_chunk(&self, mut chunk: Chunk) -> Result<DataMap> {
         loop {
-            let bytes = self.get_bytes(chunk, address.scope())?;
-
-            match deserialize(&bytes)? {
+            match deserialize(chunk.value())? {
                 DataMapLevel::First(data_map) => {
                     return Ok(data_map);
                 }
@@ -358,18 +320,6 @@ impl Client {
                     chunk = deserialize(&serialized_chunk)?;
                 }
             }
-        }
-    }
-
-    /// If scope == Scope::Private, decrypts contents with the client encryption keys.
-    /// Else returns the content bytes.
-    #[instrument(skip_all, level = "trace")]
-    fn get_bytes(&self, chunk: Chunk, scope: Scope) -> Result<Bytes> {
-        if matches!(scope, Scope::Public) {
-            Ok(chunk.value().clone())
-        } else {
-            let owner = encryption(scope, self.public_key()).ok_or(Error::NoEncryptionObject)?;
-            Ok(owner.decrypt(chunk.value().clone())?)
         }
     }
 }
@@ -383,7 +333,7 @@ mod tests {
         Client,
     };
     use sn_interface::types::log_markers::LogMarker;
-    use sn_interface::types::{utils::random_bytes, BytesAddress, Keypair, Scope};
+    use sn_interface::types::{utils::random_bytes, Keypair, Scope};
 
     use bytes::Bytes;
     use eyre::Result;
@@ -391,6 +341,7 @@ mod tests {
     use std::time::Duration;
     use tokio::time::Instant;
     use tracing::{instrument::Instrumented, Instrument};
+    use xor_name::XorName;
 
     const LARGE_FILE_SIZE_MIN: usize = self_encryption::MIN_ENCRYPTABLE_BYTES;
 
@@ -805,7 +756,7 @@ mod tests {
 
     async fn read_from_pos(
         file: &LargeFile,
-        address: BytesAddress,
+        address: XorName,
         pos: usize,
         len: usize,
         client: &Client,

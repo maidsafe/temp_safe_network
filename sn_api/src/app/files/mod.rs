@@ -23,13 +23,13 @@ use files_map::add_or_update_file_item;
 use log::{debug, info, warn};
 use relative_path::RelativePath;
 use sn_client::Client;
-use sn_interface::types::BytesAddress;
 use std::{
     collections::{BTreeMap, HashSet},
     iter::FromIterator,
     path::{Path, PathBuf},
     str,
 };
+use xor_name::XorName;
 
 pub(crate) use files_map::{file_map_for_path, get_file_link_and_metadata};
 pub(crate) use metadata::FileMeta;
@@ -684,22 +684,16 @@ impl Safe {
     /// Fetch a file from a SafeUrl without performing any type of URL resolution
     pub(crate) async fn fetch_data(&self, safe_url: &SafeUrl, range: Range) -> Result<Bytes> {
         match (safe_url.data_type(), safe_url.scope()) {
-            (DataType::File, Scope::Public) => {
-                self.get_bytes(BytesAddress::Public(safe_url.xorname()), range)
-                    .await
-            }
-            (DataType::File, Scope::Private) => {
-                self.get_bytes(BytesAddress::Private(safe_url.xorname()), range)
-                    .await
-            }
+            (DataType::File, Scope::Public) => self.get_bytes(safe_url.xorname(), range).await,
+            (DataType::File, Scope::Private) => self.get_bytes(safe_url.xorname(), range).await,
             (other, _) => {
                 return Err(Error::ContentError(format!("{}", other)));
             }
         }
     }
 
-    async fn get_bytes(&self, address: BytesAddress, range: Range) -> Result<Bytes> {
-        debug!("Attempting to fetch data from {:?}", address.name());
+    async fn get_bytes(&self, address: XorName, range: Range) -> Result<Bytes> {
+        debug!("Attempting to fetch data from {:?}", address);
         let client = self.get_safe_client()?;
         let data = if let Some((start, end)) = range {
             let start = start.map(|start_index| start_index as usize).unwrap_or(0);
@@ -716,7 +710,7 @@ impl Safe {
         debug!(
             "{} bytes of data successfully retrieved from: {:?}",
             data.len(),
-            address.name()
+            address
         );
 
         Ok(data)

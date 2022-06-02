@@ -19,13 +19,14 @@ use structopt::StructOpt;
 use tokio::fs::create_dir_all;
 use tokio::time::{sleep, Duration};
 use tracing::{debug, info};
+use xor_name::XorName;
 
 use tiny_keccak::{Hasher, Sha3};
 
 use eyre::{eyre, Context, Result};
 use sn_client::{utils::test_utils::read_network_conn_info, Client, ClientConfig};
 
-use sn_interface::types::{utils::random_bytes, BytesAddress, Scope};
+use sn_interface::types::{utils::random_bytes, Scope};
 
 #[cfg(not(target_os = "windows"))]
 const SAFE_NODE_EXECUTABLE: &str = "sn_node";
@@ -204,7 +205,7 @@ pub async fn run_split() -> Result<()> {
     Ok(())
 }
 
-async fn upload_data() -> Result<(BytesAddress, [u8; 32])> {
+async fn upload_data() -> Result<(XorName, [u8; 32])> {
     // Now we upload the data.
     println!("Reading network bootstrap information...");
     let (genesis_key, bootstrap_nodes) =
