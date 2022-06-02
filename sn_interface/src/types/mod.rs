@@ -30,8 +30,8 @@ pub use connections::{PeerLinks, SendToOneError};
 
 pub use crate::messaging::data::{RegisterCmd, ReplicatedRegisterLog, ReplicatedSpentbookLog};
 pub use address::{
-    BytesAddress, ChunkAddress, DataAddress, RegisterAddress, ReplicatedDataAddress,
-    SafeKeyAddress, Scope, SpentbookAddress,
+    BytesAddress, ChunkAddress, DataAddress, RegisterAddress, ReplicatedDataAddress, Scope,
+    SpentbookAddress,
 };
 pub use cache::Cache;
 pub use chunk::{Chunk, MAX_CHUNK_SIZE_IN_BYTES};

@@ -16,7 +16,7 @@ mod xorurl_media_types;
 pub use errors::{Error, Result};
 use multibase::{decode as base_decode, encode as base_encode, Base};
 use serde::{Deserialize, Serialize};
-use sn_interface::types::{BytesAddress, DataAddress, RegisterAddress, SafeKeyAddress, Scope};
+use sn_interface::types::{BytesAddress, DataAddress, RegisterAddress, Scope};
 use std::fmt;
 use tracing::{info, trace, warn};
 use url::Url;
@@ -508,7 +508,7 @@ impl SafeUrl {
         let type_tag: u64 = u64::from_be_bytes(type_tag_bytes);
 
         let address = match xorurl_bytes[4] {
-            0 => DataAddress::SafeKey(SafeKeyAddress::new(xor_name, scope)),
+            0 => DataAddress::SafeKey(xor_name),
             1 => DataAddress::Bytes(BytesAddress::new(xor_name, scope)),
             2 => DataAddress::Register(RegisterAddress::new(xor_name, scope, type_tag)),
             other => {
@@ -992,7 +992,7 @@ impl SafeUrl {
     /// A non-member SafeKey encoder function for convenience
     pub fn encode_safekey(xor_name: XorName, base: XorUrlBase) -> Result<String> {
         SafeUrl::encode(
-            DataAddress::SafeKey(SafeKeyAddress::new(xor_name, Scope::Public)),
+            DataAddress::SafeKey(xor_name),
             None,
             0,
             ContentType::Raw,

@@ -8,15 +8,12 @@
 
 mod bytes;
 mod register;
-mod safe_key;
 mod spentbook;
 
 #[allow(unreachable_pub)]
 pub use self::bytes::BytesAddress;
 #[allow(unreachable_pub)]
 pub use register::RegisterAddress;
-#[allow(unreachable_pub)]
-pub use safe_key::SafeKeyAddress;
 #[allow(unreachable_pub)]
 pub use spentbook::SpentbookAddress;
 
@@ -37,7 +34,7 @@ pub enum Scope {
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub enum DataAddress {
     ///
-    SafeKey(SafeKeyAddress),
+    SafeKey(XorName),
     ///
     Bytes(BytesAddress),
     ///
@@ -50,7 +47,7 @@ impl DataAddress {
     /// The xorname.
     pub fn name(&self) -> &XorName {
         match self {
-            Self::SafeKey(address) => address.name(),
+            Self::SafeKey(address) => address,
             Self::Bytes(address) => address.name(),
             Self::Register(address) => address.name(),
             Self::Spentbook(address) => address.name(),
@@ -69,7 +66,7 @@ impl DataAddress {
     /// Returns true if public.
     pub fn is_public(self) -> bool {
         match self {
-            Self::SafeKey(address) => address.is_public(),
+            Self::SafeKey(_) => true,
             Self::Bytes(address) => address.is_public(),
             Self::Register(address) => address.is_public(),
             Self::Spentbook(_) => true,
@@ -102,8 +99,8 @@ impl DataAddress {
     }
 
     ///
-    pub fn safe_key(name: XorName, scope: Scope) -> DataAddress {
-        DataAddress::SafeKey(SafeKeyAddress::new(name, scope))
+    pub fn safe_key(name: XorName) -> DataAddress {
+        DataAddress::SafeKey(name)
     }
 
     ///
