@@ -109,7 +109,6 @@ impl Node {
         let members = self.get_members_at_gen(sap.membership_gen()).await?;
         let received_candidates: BTreeSet<&Peer> = sap.elders().collect();
 
-        // NB TODO deal with excluded_names?
         let expected_peers: BTreeSet<Peer> =
             elder_candidates(members.values().cloned(), &previous_gen_sap)
                 .iter()
