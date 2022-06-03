@@ -149,9 +149,14 @@ impl Node {
             let expected_candidates1: BTreeSet<&Peer> = expected_peers1.iter().collect();
             let expected_candidates2: BTreeSet<&Peer> = expected_peers2.iter().collect();
 
-            if received_candidates1 != expected_candidates1
-                || received_candidates2 != expected_candidates2
+            // the order of these SAPs is not absolute, so we try both comparisons
+            if (received_candidates1 != expected_candidates1
+                || received_candidates2 != expected_candidates2)
+                && (received_candidates2 != expected_candidates1
+                    || received_candidates1 != expected_candidates2)
             {
+                debug!("InvalidElderCandidates: received SAP1 at gen {} with candidates {:#?}, expected candidates {:#?}", sap1.membership_gen(), received_candidates1, expected_candidates1);
+                debug!("InvalidElderCandidates: received SAP2 at gen {} with candidates {:#?}, expected candidates {:#?}", sap2.membership_gen(), received_candidates2, expected_candidates2);
                 return Err(Error::InvalidElderCandidates);
             }
             Ok(())
