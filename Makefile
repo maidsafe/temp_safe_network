@@ -174,7 +174,6 @@ ci-unit-tests:
 
 ci-e2e-tests:
 	cargo nextest run --profile ci --release --package sn_client --test-threads 2
-	cargo nextest run --profile ci --release --package sn_client --test-threads 2 ae_checks
 	cd sn_client && cargo run --release --example client_files
 
 ci-test-suite: ci-unit-tests ci-e2e-tests
