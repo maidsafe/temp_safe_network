@@ -11,6 +11,7 @@ use crate::{messaging::SectionAuthorityProvider, types::Peer};
 use ed25519_dalek::{PublicKey, Signature};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use sn_consensus::Generation;
 use std::{
     borrow::Borrow,
     collections::{BTreeMap, BTreeSet},
@@ -34,6 +35,8 @@ pub struct DkgSessionId {
     pub section_chain_len: u64,
     /// The bootstrap members for the next Membership instance.
     pub bootstrap_members: BTreeSet<NodeState>,
+    /// The membership generation this SAP was instantiated at
+    pub membership_gen: Generation,
 }
 
 impl DkgSessionId {

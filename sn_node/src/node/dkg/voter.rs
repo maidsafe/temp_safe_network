@@ -23,7 +23,6 @@ use sn_interface::types::{keys::ed25519, Peer};
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};
 use dashmap::DashMap;
-use sn_consensus::Generation;
 use std::{collections::BTreeSet, sync::Arc};
 use xor_name::XorName;
 
@@ -63,7 +62,6 @@ impl DkgVoter {
         node: &NodeInfo,
         session_id: DkgSessionId,
         section_pk: BlsPublicKey,
-        generation: Generation,
     ) -> Result<Vec<Cmd>> {
         if self.sessions.contains_key(&session_id.hash()) {
             trace!("DKG already in progress for {session_id:?}");
@@ -112,7 +110,6 @@ impl DkgVoter {
                     complete: false,
                     last_message_broadcast: vec![],
                     retries: 0,
-                    generation,
                 };
 
                 let mut cmds = vec![];

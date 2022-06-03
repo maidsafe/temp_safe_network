@@ -15,6 +15,7 @@ mod register_apis;
 pub use register_apis::RegisterWriteAheadLog;
 
 use crate::{connections::Session, errors::Error, ClientConfig};
+use sn_dbc::{rng, Owner};
 use sn_interface::messaging::{
     data::{CmdError, DataQuery, RegisterQuery, ServiceMsg},
     ServiceAuth, WireMsg,
@@ -48,6 +49,7 @@ type ChunksCache = LRUCache<Chunk, CHUNK_CACHE_SIZE>;
 #[derive(Clone, Debug)]
 pub struct Client {
     keypair: Keypair,
+    dbc_owner: Owner,
     #[allow(dead_code)]
     incoming_errors: Arc<RwLock<Receiver<CmdError>>>,
     session: Session,
@@ -76,8 +78,9 @@ impl Client {
         config: ClientConfig,
         bootstrap_nodes: BTreeSet<SocketAddr>,
         optional_keypair: Option<Keypair>,
+        dbc_owner: Option<Owner>,
     ) -> Result<Self, Error> {
-        Client::create_with(config, bootstrap_nodes, optional_keypair, true).await
+        Client::create_with(config, bootstrap_nodes, optional_keypair, dbc_owner, true).await
     }
 
     #[instrument]
@@ -85,6 +88,7 @@ impl Client {
         config: ClientConfig,
         bootstrap_nodes: BTreeSet<SocketAddr>,
         optional_keypair: Option<Keypair>,
+        dbc_owner: Option<Owner>,
         read_prefixmap: bool,
     ) -> Result<Self, Error> {
         let keypair = match optional_keypair {
@@ -158,6 +162,8 @@ impl Client {
 
         let client = Self {
             keypair,
+            dbc_owner: dbc_owner
+                .unwrap_or_else(|| Owner::from_random_secret_key(&mut rng::thread_rng())),
             session,
             incoming_errors: Arc::new(RwLock::new(err_receiver)),
             query_timeout: config.query_timeout,
@@ -273,13 +279,23 @@ impl Client {
     pub fn public_key(&self) -> PublicKey {
         self.keypair().public_key()
     }
+
+    /// Return the client's DBC owner, which will be a secret key.
+    ///
+    /// This can then be used to sign output DBCs during a DBC reissue.
+    pub fn dbc_owner(&self) -> Owner {
+        self.dbc_owner.clone()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::utils::test_utils::{create_test_client, create_test_client_with, init_logger};
+    use crate::utils::test_utils::{
+        create_test_client, create_test_client_with, get_dbc_owner_from_secret_key_hex,
+    };
     use eyre::Result;
+    use sn_interface::init_logger;
     use sn_interface::types::utils::random_bytes;
     use sn_interface::types::Scope;
     use std::{
@@ -317,7 +333,7 @@ mod tests {
         let full_id = Keypair::new_ed25519();
         let pk = full_id.public_key();
 
-        let client = create_test_client_with(Some(full_id), None, true).await?;
+        let client = create_test_client_with(Some(full_id), None, None, true).await?;
         assert_eq!(pk, client.public_key());
 
         Ok(())
@@ -344,5 +360,18 @@ mod tests {
 
         fn require_send<T: Send>(_t: T) {}
         require_send(create_test_client());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn client_create_with_dbc_owner() -> Result<()> {
+        init_logger();
+        let dbc_owner = get_dbc_owner_from_secret_key_hex(
+            "81ebce8339cb2a6e5cbf8b748215ba928acff7f92557b3acfb09a5b25e920d20",
+        )
+        .await?;
+
+        let client = create_test_client_with(None, Some(dbc_owner.clone()), None, true).await?;
+        assert_eq!(dbc_owner, client.dbc_owner());
+        Ok(())
     }
 }

@@ -158,9 +158,10 @@ impl Node {
         origin: Peer,
     ) -> Result<Vec<Cmd>> {
         if self.is_not_elder().await {
-            error!("Received unexpected message while Adult");
+            error!("Received unexpected message while Adult: {:?}", msg_id);
             return Ok(vec![]);
         }
+
         // extract the data from the request
         let data = match msg {
             // These reads/writes are for adult nodes...

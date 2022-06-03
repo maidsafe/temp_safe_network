@@ -56,13 +56,6 @@ impl Node {
             peers.push(peer);
         }
 
-        let membership_generation = if let Some(membership) = &*self.membership.read().await {
-            membership.generation()
-        } else {
-            // 0 is the genesis. Which avoids DKG entirely
-            1_u64
-        };
-
         trace!("Received DkgStart for {:?}", session_id);
         self.dkg_sessions
             .write()
@@ -76,7 +69,6 @@ impl Node {
                 &self.info.read().await.clone(),
                 session_id,
                 self.network_knowledge().section_key().await,
-                membership_generation,
             )
             .await?;
         Ok(cmds)

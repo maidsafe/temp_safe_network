@@ -5,14 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.60.0 (2022-05-25)
+## v0.61.1 (2022-06-01)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 2 days passed between releases.
+ - 4 days passed between releases.
  - 0 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -23,7 +23,198 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1192 ([`f9fc2a7`](https://github.com/maidsafe/safe_network/commit/f9fc2a76f083ba5161c8c4eef9013c53586b4693))
+</details>
+
+## v0.61.0 (2022-05-27)
+
+### Chore
+
+ - <csr-id-e5fcd032e1dd904e05bc23e119af1d06e3b85a06/> sn_interface-0.5.0/sn_dysfunction-0.4.0/sn_client-0.65.0/sn_node-0.61.0/sn_api-0.63.0/sn_cli-0.56.0
+ - <csr-id-05fcc31c13a2a09da83027655bd8feb1e31660d1/> explicitly drop Node on join retry
+   Add more logs to aid debugging
+ - <csr-id-f82864be6f72876dc5ad5d38ca4cc104fbdcdde7/> improve data storage benches, more runs, more data
+ - <csr-id-b9e5db241f437f9bb8fd03ca9080a0331757b9a5/> cleanup of churn test
+ - <csr-id-f9700e3b6bb8b2b9949f33d627c99974c355ca2b/> split out dispatcher periodic code
+   Just clean up the dispatcher file, splitting
+   out all the periodic checks etc into their
+   own file, leaving the bones of dispatcher in one
+   place
+ - <csr-id-7544945e15e3df18d5bf666ab7c8fbcee0766d06/> cleanup commented code
+ - <csr-id-ea9906fda233cc1299c64d703267fb3b250364c2/> dont cleanup section elder PeerLinks
+
+### New Features
+
+ - <csr-id-0c449a731b22eb25e616d83182899e12aba95d7f/> handover AE, empty consensus handling, generations
+
+### Bug Fixes
+
+ - <csr-id-77d962abb97f8b00e9295419079b43224ca67341/> shutdown runtime in node loop
+   this should hopefully shutdown any bg processes running which may be blocking ports on reconnect
+ - <csr-id-5b6a88a017988b7f4b10534167e1f67b3d2b0e71/> remove avoidable error case
+ - <csr-id-0e51f043cf7c7fa117c433de41c6c66213cb1442/> update DstLocation for all send_msg in node/comms
+
+### Other
+
+ - <csr-id-14c92fb0f18fc40176963ca5290914442d340256/> add more intesive churn data integrity test
+   The network split test doesnt cover the basic 'new nodes added' membership case. This churn test now does that.
+
+### Test
+
+ - <csr-id-f65a35128c4b4fa76bc97c089f313633a8e43f79/> unit test for empty set decision
+
+### New Features (BREAKING)
+
+ - <csr-id-294549ebc998d11a2f3621e2a9fd20a0dd9bcce5/> remove sus node flows, replicate data per data
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 19 commits contributed to the release over the course of 2 calendar days.
+ - 2 days passed between releases.
+ - 14 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.5.0/sn_dysfunction-0.4.0/sn_client-0.65.0/sn_node-0.61.0/sn_api-0.63.0/sn_cli-0.56.0 ([`e5fcd03`](https://github.com/maidsafe/safe_network/commit/e5fcd032e1dd904e05bc23e119af1d06e3b85a06))
+    - shutdown runtime in node loop ([`77d962a`](https://github.com/maidsafe/safe_network/commit/77d962abb97f8b00e9295419079b43224ca67341))
+    - Merge branch 'main' into Chore-ImproveDataStorageBench ([`9904a7a`](https://github.com/maidsafe/safe_network/commit/9904a7a3b53a81248379c44bf4e88688d278582f))
+    - explicitly drop Node on join retry ([`05fcc31`](https://github.com/maidsafe/safe_network/commit/05fcc31c13a2a09da83027655bd8feb1e31660d1))
+    - improve data storage benches, more runs, more data ([`f82864b`](https://github.com/maidsafe/safe_network/commit/f82864be6f72876dc5ad5d38ca4cc104fbdcdde7))
+    - Merge #1202 ([`e42a2e3`](https://github.com/maidsafe/safe_network/commit/e42a2e3c212597e68238451a5bb4a8725c4761be))
+    - unit test for empty set decision ([`f65a351`](https://github.com/maidsafe/safe_network/commit/f65a35128c4b4fa76bc97c089f313633a8e43f79))
+    - remove avoidable error case ([`5b6a88a`](https://github.com/maidsafe/safe_network/commit/5b6a88a017988b7f4b10534167e1f67b3d2b0e71))
+    - handover AE, empty consensus handling, generations ([`0c449a7`](https://github.com/maidsafe/safe_network/commit/0c449a731b22eb25e616d83182899e12aba95d7f))
+    - Merge #1208 ([`6c9b851`](https://github.com/maidsafe/safe_network/commit/6c9b851dd5bab8b2f5d9b3ef1db72d198706ac9d))
+    - cleanup of churn test ([`b9e5db2`](https://github.com/maidsafe/safe_network/commit/b9e5db241f437f9bb8fd03ca9080a0331757b9a5))
+    - update DstLocation for all send_msg in node/comms ([`0e51f04`](https://github.com/maidsafe/safe_network/commit/0e51f043cf7c7fa117c433de41c6c66213cb1442))
+    - add more intesive churn data integrity test ([`14c92fb`](https://github.com/maidsafe/safe_network/commit/14c92fb0f18fc40176963ca5290914442d340256))
+    - split out dispatcher periodic code ([`f9700e3`](https://github.com/maidsafe/safe_network/commit/f9700e3b6bb8b2b9949f33d627c99974c355ca2b))
+    - remove sus node flows, replicate data per data ([`294549e`](https://github.com/maidsafe/safe_network/commit/294549ebc998d11a2f3621e2a9fd20a0dd9bcce5))
+    - Merge #1198 #1204 ([`5e82ef3`](https://github.com/maidsafe/safe_network/commit/5e82ef3d0e78898f9ffac8bebe4970c4d26e608f))
+    - Merge branch 'main' into bump-consensus-2.0.0 ([`a1c592a`](https://github.com/maidsafe/safe_network/commit/a1c592a71247660e7372e019e5f9a6ea23299e0f))
+    - cleanup commented code ([`7544945`](https://github.com/maidsafe/safe_network/commit/7544945e15e3df18d5bf666ab7c8fbcee0766d06))
+    - dont cleanup section elder PeerLinks ([`ea9906f`](https://github.com/maidsafe/safe_network/commit/ea9906fda233cc1299c64d703267fb3b250364c2))
+</details>
+
+## v0.60.0 (2022-05-25)
+
+### Chore
+
+ - <csr-id-ef56cf9cf8de45a9f13c2510c63de245b12aeae8/> sn_interface-0.4.0/sn_dysfunction-0.3.0/sn_client-0.64.0/sn_node-0.60.0/sn_api-0.62.0/sn_cli-0.55.0
+ - <csr-id-392e522c69803fddbeb3cd9e1cbae8060188578f/> bump consensus 1.16.0 -> 2.0.0
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.4.0/sn_dysfunction-0.3.0/sn_client-0.64.0/sn_node-0.60.0/sn_api-0.62.0/sn_cli-0.55.0 ([`ef56cf9`](https://github.com/maidsafe/safe_network/commit/ef56cf9cf8de45a9f13c2510c63de245b12aeae8))
+    - bump consensus 1.16.0 -> 2.0.0 ([`392e522`](https://github.com/maidsafe/safe_network/commit/392e522c69803fddbeb3cd9e1cbae8060188578f))
     - Merge #1195 ([`c6e6e32`](https://github.com/maidsafe/safe_network/commit/c6e6e324164028c6c15a78643783a9f86679f39e))
+</details>
+
+## v0.59.0 (2022-05-21)
+
+<csr-id-cf21d66b9b726123e0a4320cd68481b67f7af03d/>
+<csr-id-48ffebf35093b68923d2139f12fc946d94ae4f4a/>
+<csr-id-7aad3458b8efc7b01a6c97280b3fb59c45dd0228/>
+<csr-id-cf1c11ab576810cc6e063331def6f3a9a95fe663/>
+<csr-id-0a7adcab104dcda7baed80e2dd96913d6f93e541/>
+<csr-id-9b06304f46e1a1bda90a0fc6ff82edc928c2529d/>
+<csr-id-07504faeda6cbfd0b27abea25facde992398ecf9/>
+<csr-id-8e2731d8b7923a9050451b31ef3a92f892d2d6d3/>
+<csr-id-f2742d92b3c3b56ed80732aa1d6943885fcd4317/>
+<csr-id-cb733fd4b1ed642da73f1e9db4fc3d8a1ec49a2b/>
+
+### Chore
+
+ - <csr-id-cf21d66b9b726123e0a4320cd68481b67f7af03d/> sn_dysfunction-0.2.0/sn_client-0.63.0/sn_node-0.59.0/sn_api-0.61.0/sn_cli-0.54.0
+ - <csr-id-48ffebf35093b68923d2139f12fc946d94ae4f4a/> clippy after rebase
+ - <csr-id-7aad3458b8efc7b01a6c97280b3fb59c45dd0228/> make section probe interval 5mins
+ - <csr-id-cf1c11ab576810cc6e063331def6f3a9a95fe663/> cleanup unused import
+ - <csr-id-0a7adcab104dcda7baed80e2dd96913d6f93e541/> benchmarking data storage
+   Adds basic, 1 key data storage benchmarks.
+   
+   Currently this fails for registers...
+ - <csr-id-9b06304f46e1a1bda90a0fc6ff82edc928c2529d/> sn_interface-0.2.4/sn_client-0.62.3/sn_api-0.60.2/sn_cli-0.53.1
+ - <csr-id-07504faeda6cbfd0b27abea25facde992398ecf9/> upgrade blsttc to v5.2.0 and rand to v0.8
+
+### New Features
+
+ - <csr-id-910e1078b6db0cd740547ea1ad92592d3365a616/> rejoins through events
+ - <csr-id-fa0d4036d86ca78956b79b22154d076dc850121b/> Revert "feat: node in an Arc Rwlock and factor out join code"
+   This reverts commit e0b0a83946cec21bbb8bd8e98513c326009d0bc4.
+ - <csr-id-2c12b4993f06c9c696475404e37f4e080d01a3b0/> node in an Arc Rwlock and factor out join code
+ - <csr-id-941703e23a53d8d894d5a9a7a253ad1735e900e0/> error triggering on churn join miss
+ - <csr-id-fe073bc0674c2099b7cd3f30ac744ea6172e24c2/> section probing for all nodes every 120s
+
+### Bug Fixes
+
+ - <csr-id-06591a11458adb5cfd917cc1239371acf4f8834f/> prevent deadlock in lru cache impl.
+   We were locking over the queue, and then attempting to purge the queue
+   within the self.priority() func, which required a lock
+
+### Refactor
+
+ - <csr-id-8e2731d8b7923a9050451b31ef3a92f892d2d6d3/> de-dupe init_test_logger
+ - <csr-id-f2742d92b3c3b56ed80732aa1d6943885fcd4317/> cargo test works without feature flag
+ - <csr-id-cb733fd4b1ed642da73f1e9db4fc3d8a1ec49a2b/> move NodeState validations to NodeState struct
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 19 commits contributed to the release over the course of 4 calendar days.
+ - 4 days passed between releases.
+ - 16 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_dysfunction-0.2.0/sn_client-0.63.0/sn_node-0.59.0/sn_api-0.61.0/sn_cli-0.54.0 ([`cf21d66`](https://github.com/maidsafe/safe_network/commit/cf21d66b9b726123e0a4320cd68481b67f7af03d))
+    - de-dupe init_test_logger ([`8e2731d`](https://github.com/maidsafe/safe_network/commit/8e2731d8b7923a9050451b31ef3a92f892d2d6d3))
+    - cargo test works without feature flag ([`f2742d9`](https://github.com/maidsafe/safe_network/commit/f2742d92b3c3b56ed80732aa1d6943885fcd4317))
+    - Merge branch 'main' into move-membership-history-to-network-knowledge ([`57de06b`](https://github.com/maidsafe/safe_network/commit/57de06b828191e093de06750f94fe6f500890112))
+    - move NodeState validations to NodeState struct ([`cb733fd`](https://github.com/maidsafe/safe_network/commit/cb733fd4b1ed642da73f1e9db4fc3d8a1ec49a2b))
+    - clippy after rebase ([`48ffebf`](https://github.com/maidsafe/safe_network/commit/48ffebf35093b68923d2139f12fc946d94ae4f4a))
+    - make section probe interval 5mins ([`7aad345`](https://github.com/maidsafe/safe_network/commit/7aad3458b8efc7b01a6c97280b3fb59c45dd0228))
+    - rejoins through events ([`910e107`](https://github.com/maidsafe/safe_network/commit/910e1078b6db0cd740547ea1ad92592d3365a616))
+    - Revert "feat: node in an Arc Rwlock and factor out join code" ([`fa0d403`](https://github.com/maidsafe/safe_network/commit/fa0d4036d86ca78956b79b22154d076dc850121b))
+    - node in an Arc Rwlock and factor out join code ([`2c12b49`](https://github.com/maidsafe/safe_network/commit/2c12b4993f06c9c696475404e37f4e080d01a3b0))
+    - error triggering on churn join miss ([`941703e`](https://github.com/maidsafe/safe_network/commit/941703e23a53d8d894d5a9a7a253ad1735e900e0))
+    - section probing for all nodes every 120s ([`fe073bc`](https://github.com/maidsafe/safe_network/commit/fe073bc0674c2099b7cd3f30ac744ea6172e24c2))
+    - cleanup unused import ([`cf1c11a`](https://github.com/maidsafe/safe_network/commit/cf1c11ab576810cc6e063331def6f3a9a95fe663))
+    - prevent deadlock in lru cache impl. ([`06591a1`](https://github.com/maidsafe/safe_network/commit/06591a11458adb5cfd917cc1239371acf4f8834f))
+    - benchmarking data storage ([`0a7adca`](https://github.com/maidsafe/safe_network/commit/0a7adcab104dcda7baed80e2dd96913d6f93e541))
+    - sn_interface-0.2.4/sn_client-0.62.3/sn_api-0.60.2/sn_cli-0.53.1 ([`9b06304`](https://github.com/maidsafe/safe_network/commit/9b06304f46e1a1bda90a0fc6ff82edc928c2529d))
+    - upgrade blsttc to v5.2.0 and rand to v0.8 ([`07504fa`](https://github.com/maidsafe/safe_network/commit/07504faeda6cbfd0b27abea25facde992398ecf9))
+    - Merge #1189 ([`00f41b4`](https://github.com/maidsafe/safe_network/commit/00f41b4a96bcc172d91620aa0da0cb799db5483c))
+    - Merge #1150 ([`afda86c`](https://github.com/maidsafe/safe_network/commit/afda86c5bd759f6a19cb921c356fad51f76daecd))
 </details>
 
 ## v0.58.20 (2022-05-17)
@@ -33,6 +224,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-332e8f126e0e9351e8698ce2604e6fdd8ce6f7b5/>
 <csr-id-f863e07357fab813246ee92ad62adf59e476312a/>
 <csr-id-07504faeda6cbfd0b27abea25facde992398ecf9/>
+<csr-id-e25fb53a299dd5daa755799c36a316e4b011f4d7/>
+<csr-id-7bac8dfa016ac9ab2fc58c2ae6de02261fc9dc1a/>
 
 ### Chore
 
@@ -142,6 +335,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.58.18 (2022-05-12)
 
 <csr-id-a49a007ef8fde53a346403824f09eb0fd25e1109/>
+<csr-id-00dc9c0ba9afb6de038dda9e20a10e6727a0b0e6/>
 
 ### Chore
 
@@ -247,6 +441,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-id-61ba367c308a846cb3f1ae065b1fbbdfb85838e4/>
 <csr-id-bd04335d3ee074610ffd5fd4daff15a080b6353d/>
+<csr-id-26db0aaf0acba424c6a93b49e066f036baa42e8b/>
+<csr-id-ae9aeeb94f55f29849c8c5fe1b05419b96fac6e9/>
 
 ### Chore
 
@@ -1097,79 +1293,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Bug Fixes
 
  - <csr-id-ddd45b7cc73bbacea19f5c93519ae16a74cc01cc/> add MIN_PENDING_OPS threshold for liveness checks
-
-## v0.59.0 (2022-05-21)
-
-### Chore
-
- - <csr-id-cf21d66b9b726123e0a4320cd68481b67f7af03d/> sn_dysfunction-0.2.0/sn_client-0.63.0/sn_node-0.59.0/sn_api-0.61.0/sn_cli-0.54.0
- - <csr-id-48ffebf35093b68923d2139f12fc946d94ae4f4a/> clippy after rebase
- - <csr-id-7aad3458b8efc7b01a6c97280b3fb59c45dd0228/> make section probe interval 5mins
- - <csr-id-cf1c11ab576810cc6e063331def6f3a9a95fe663/> cleanup unused import
- - <csr-id-0a7adcab104dcda7baed80e2dd96913d6f93e541/> benchmarking data storage
-   Adds basic, 1 key data storage benchmarks.
-   
-   Currently this fails for registers...
- - <csr-id-9b06304f46e1a1bda90a0fc6ff82edc928c2529d/> sn_interface-0.2.4/sn_client-0.62.3/sn_api-0.60.2/sn_cli-0.53.1
- - <csr-id-07504faeda6cbfd0b27abea25facde992398ecf9/> upgrade blsttc to v5.2.0 and rand to v0.8
-
-### New Features
-
- - <csr-id-910e1078b6db0cd740547ea1ad92592d3365a616/> rejoins through events
- - <csr-id-fa0d4036d86ca78956b79b22154d076dc850121b/> Revert "feat: node in an Arc Rwlock and factor out join code"
-   This reverts commit e0b0a83946cec21bbb8bd8e98513c326009d0bc4.
- - <csr-id-2c12b4993f06c9c696475404e37f4e080d01a3b0/> node in an Arc Rwlock and factor out join code
- - <csr-id-941703e23a53d8d894d5a9a7a253ad1735e900e0/> error triggering on churn join miss
- - <csr-id-fe073bc0674c2099b7cd3f30ac744ea6172e24c2/> section probing for all nodes every 120s
-
-### Bug Fixes
-
- - <csr-id-06591a11458adb5cfd917cc1239371acf4f8834f/> prevent deadlock in lru cache impl.
-   We were locking over the queue, and then attempting to purge the queue
-   within the self.priority() func, which required a lock
-
-### Refactor
-
- - <csr-id-8e2731d8b7923a9050451b31ef3a92f892d2d6d3/> de-dupe init_test_logger
- - <csr-id-f2742d92b3c3b56ed80732aa1d6943885fcd4317/> cargo test works without feature flag
- - <csr-id-cb733fd4b1ed642da73f1e9db4fc3d8a1ec49a2b/> move NodeState validations to NodeState struct
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 19 commits contributed to the release over the course of 4 calendar days.
- - 4 days passed between releases.
- - 16 commits where understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_dysfunction-0.2.0/sn_client-0.63.0/sn_node-0.59.0/sn_api-0.61.0/sn_cli-0.54.0 ([`cf21d66`](https://github.com/maidsafe/safe_network/commit/cf21d66b9b726123e0a4320cd68481b67f7af03d))
-    - de-dupe init_test_logger ([`8e2731d`](https://github.com/maidsafe/safe_network/commit/8e2731d8b7923a9050451b31ef3a92f892d2d6d3))
-    - cargo test works without feature flag ([`f2742d9`](https://github.com/maidsafe/safe_network/commit/f2742d92b3c3b56ed80732aa1d6943885fcd4317))
-    - Merge branch 'main' into move-membership-history-to-network-knowledge ([`57de06b`](https://github.com/maidsafe/safe_network/commit/57de06b828191e093de06750f94fe6f500890112))
-    - move NodeState validations to NodeState struct ([`cb733fd`](https://github.com/maidsafe/safe_network/commit/cb733fd4b1ed642da73f1e9db4fc3d8a1ec49a2b))
-    - clippy after rebase ([`48ffebf`](https://github.com/maidsafe/safe_network/commit/48ffebf35093b68923d2139f12fc946d94ae4f4a))
-    - make section probe interval 5mins ([`7aad345`](https://github.com/maidsafe/safe_network/commit/7aad3458b8efc7b01a6c97280b3fb59c45dd0228))
-    - rejoins through events ([`910e107`](https://github.com/maidsafe/safe_network/commit/910e1078b6db0cd740547ea1ad92592d3365a616))
-    - Revert "feat: node in an Arc Rwlock and factor out join code" ([`fa0d403`](https://github.com/maidsafe/safe_network/commit/fa0d4036d86ca78956b79b22154d076dc850121b))
-    - node in an Arc Rwlock and factor out join code ([`2c12b49`](https://github.com/maidsafe/safe_network/commit/2c12b4993f06c9c696475404e37f4e080d01a3b0))
-    - error triggering on churn join miss ([`941703e`](https://github.com/maidsafe/safe_network/commit/941703e23a53d8d894d5a9a7a253ad1735e900e0))
-    - section probing for all nodes every 120s ([`fe073bc`](https://github.com/maidsafe/safe_network/commit/fe073bc0674c2099b7cd3f30ac744ea6172e24c2))
-    - cleanup unused import ([`cf1c11a`](https://github.com/maidsafe/safe_network/commit/cf1c11ab576810cc6e063331def6f3a9a95fe663))
-    - prevent deadlock in lru cache impl. ([`06591a1`](https://github.com/maidsafe/safe_network/commit/06591a11458adb5cfd917cc1239371acf4f8834f))
-    - benchmarking data storage ([`0a7adca`](https://github.com/maidsafe/safe_network/commit/0a7adcab104dcda7baed80e2dd96913d6f93e541))
-    - sn_interface-0.2.4/sn_client-0.62.3/sn_api-0.60.2/sn_cli-0.53.1 ([`9b06304`](https://github.com/maidsafe/safe_network/commit/9b06304f46e1a1bda90a0fc6ff82edc928c2529d))
-    - upgrade blsttc to v5.2.0 and rand to v0.8 ([`07504fa`](https://github.com/maidsafe/safe_network/commit/07504faeda6cbfd0b27abea25facde992398ecf9))
-    - Merge #1189 ([`00f41b4`](https://github.com/maidsafe/safe_network/commit/00f41b4a96bcc172d91620aa0da0cb799db5483c))
-    - Merge #1150 ([`afda86c`](https://github.com/maidsafe/safe_network/commit/afda86c5bd759f6a19cb921c356fad51f76daecd))
-</details>
 
 ## v0.58.0 (2022-02-17)
 

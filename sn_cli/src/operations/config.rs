@@ -9,7 +9,9 @@
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Help, Report, Result};
 use comfy_table::Table;
 use serde::{Deserialize, Serialize};
+use sn_api::keys::deserialize_keypair;
 use sn_api::{NodeConfig, PublicKey};
+use sn_dbc::Owner;
 use std::{
     collections::{BTreeMap, BTreeSet},
     default::Default,
@@ -110,6 +112,7 @@ pub struct Config {
     settings: Settings,
     pub cli_config_path: PathBuf,
     pub node_config_path: PathBuf,
+    pub dbc_owner: Option<Owner>,
 }
 
 impl Config {
@@ -159,10 +162,14 @@ impl Config {
             Settings::default()
         };
 
+        let mut dbc_owner_sk_path = pb.clone();
+        dbc_owner_sk_path.push("credentials");
+        let dbc_owner = Config::get_dbc_owner(&dbc_owner_sk_path).await?;
         let config = Config {
             settings,
             cli_config_path: cli_config_path.clone(),
             node_config_path,
+            dbc_owner,
         };
         config.write_settings_to_file().await.wrap_err_with(|| {
             format!("Unable to create config at '{}'", cli_config_path.display())
@@ -353,9 +360,22 @@ impl Config {
         println!("{table}");
     }
 
-    //
-    // Private helpers
-    //
+    ///
+    /// Private helpers
+    ///
+
+    async fn get_dbc_owner(dbc_sk_path: &PathBuf) -> Result<Option<Owner>> {
+        if dbc_sk_path.exists() {
+            let keypair = deserialize_keypair(dbc_sk_path)?;
+            let sk = keypair.secret_key()?.bls().ok_or_else(|| {
+                eyre!("The CLI keypair must be a BLS keypair.")
+                    .suggestion("Use the keys create command to generate a BLS keypair.")
+            })?;
+            return Ok(Some(Owner::from(sk)));
+        }
+        Ok(None)
+    }
+
     async fn cache_node_config(
         &self,
         network_name: &str,
@@ -442,14 +462,22 @@ mod constructor {
     use assert_fs::prelude::*;
     use color_eyre::{eyre::eyre, Result};
     use predicates::prelude::*;
+    use sn_api::{Keypair, Safe};
     use std::net::SocketAddr;
     use std::path::PathBuf;
 
     #[tokio::test]
     async fn fields_should_be_set_to_correct_values() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
-        let cli_config_file = tmp_dir.child(".safe/cli/config.json");
+        let cli_config_dir = tmp_dir.child(".safe/cli");
+        cli_config_dir.create_dir_all()?;
+
+        let cli_config_file = cli_config_dir.child("config.json");
         let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
+        let dbc_owner_sk_file = cli_config_dir.child("credentials");
+        let keypair = Keypair::new_bls();
+        let safe = Safe::dry_runner(None);
+        safe.serialize_keypair(&keypair, dbc_owner_sk_file.path())?;
 
         let config = Config::new(
             PathBuf::from(cli_config_file.path()),
@@ -460,6 +488,7 @@ mod constructor {
         assert_eq!(config.cli_config_path, cli_config_file.path());
         assert_eq!(config.node_config_path, node_config_file.path());
         assert_eq!(config.settings.networks.len(), 0);
+        assert!(config.dbc_owner.is_some());
         Ok(())
     }
 

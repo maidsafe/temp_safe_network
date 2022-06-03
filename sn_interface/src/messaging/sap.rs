@@ -9,6 +9,7 @@
 use bls::PublicKeySet;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use sn_consensus::Generation;
 use std::{
     borrow::Borrow,
     collections::BTreeMap,
@@ -36,6 +37,8 @@ pub struct SectionAuthorityProvider {
     pub elders: BTreeMap<XorName, SocketAddr>,
     /// The section members at the time of this elder churn.
     pub members: BTreeMap<XorName, NodeState>,
+    /// The membership generation this SAP was instantiated on
+    pub membership_gen: Generation,
 }
 
 impl Borrow<Prefix> for SectionAuthorityProvider {
@@ -48,8 +51,9 @@ impl Display for SectionAuthorityProvider {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(
             f,
-            "sap len:{} contains: {{{}}}/({:b})",
+            "sap len:{} generation:{} contains: {{{}}}/({:b})",
             self.elders.len(),
+            self.membership_gen,
             self.elders.keys().format(", "),
             self.prefix,
         )

@@ -24,7 +24,6 @@ use bls_dkg::key_gen::{
     message::Message as DkgMessage, Error as DkgError, KeyGen, MessageAndTarget, Phase,
 };
 use itertools::Itertools;
-use sn_consensus::Generation;
 use std::{
     collections::{BTreeMap, BTreeSet},
     iter, mem,
@@ -53,8 +52,6 @@ pub(crate) struct Session {
     // Retry sending messages when they timeout
     pub(crate) last_message_broadcast: Vec<(XorName, DkgMessage)>,
     pub(crate) retries: usize,
-    // Membership generation
-    pub(crate) generation: Generation,
 }
 
 fn is_dkg_behind(expected: Phase, actual: Phase) -> bool {
@@ -372,7 +369,7 @@ impl Session {
             secret_key_share: outcome.secret_key_share,
         };
 
-        let generation = self.generation;
+        let generation = self.session_id.membership_gen;
 
         Ok(vec![Cmd::HandleDkgOutcome {
             section_auth,
@@ -541,9 +538,10 @@ mod tests {
             elders,
             section_chain_len: 0,
             bootstrap_members,
+            membership_gen: 0,
         };
 
-        let cmds = voter.start(&node, session_id, section_pk, 0).await?;
+        let cmds = voter.start(&node, session_id, section_pk).await?;
         assert_matches!(&cmds[..], &[Cmd::HandleDkgOutcome { .. }]);
 
         Ok(())
@@ -566,6 +564,7 @@ mod tests {
         let mut rng = SmallRng::seed_from_u64(seed);
         let section_pk = bls::SecretKey::random().public_key();
         let mut messages = Vec::new();
+        let dummy_gen = 0;
 
         let session_id = DkgSessionId {
             prefix: Prefix::default(),
@@ -576,6 +575,7 @@ mod tests {
                     .iter()
                     .map(|n| NodeState::joined(n.name(), n.addr, None)),
             ),
+            membership_gen: dummy_gen,
         };
 
         let mut actors: HashMap<_, _> = nodes
@@ -588,7 +588,6 @@ mod tests {
                 &actor.node,
                 session_id.clone(),
                 section_pk,
-                0,
             ))?;
 
             for cmd in cmds {

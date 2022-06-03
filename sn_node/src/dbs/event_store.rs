@@ -23,8 +23,16 @@ impl<'a, TEvent: Debug + Serialize + DeserializeOwned> EventStore<TEvent>
 where
     TEvent: 'a,
 {
+    /// Create a new event store
     pub(crate) fn new(id: &XorName, db: Db) -> Result<Self> {
-        let tree = db.open_tree(id)?;
+        let tree = match db.open_tree(id) {
+            Ok(x) => x,
+            Err(error) => {
+                println!("sled db error: {:?}", error);
+                return Err(Error::from(error));
+            }
+        };
+
         Ok(Self {
             tree,
             _phantom: PhantomData::default(),

@@ -38,12 +38,9 @@ pub enum PublicKey {
 }
 
 impl PublicKey {
-    /// Construct and ed25519 public key from
-    /// a hex-encoded string.
+    /// Construct and ed25519 public key from a hex-encoded string.
     ///
-    /// It is often useful
-    /// to parse such raw strings in user-facing
-    /// apps like CLI
+    /// It is often useful to parse such raw strings in user-facing apps like CLI.
     pub fn ed25519_from_hex(hex: &str) -> Result<Self> {
         let bytes = hex::decode(hex).map_err(|err| {
             Error::FailedToParse(format!(
@@ -60,12 +57,9 @@ impl PublicKey {
         Ok(Self::from(pk))
     }
 
-    /// Construct and ed25519 public key from
-    /// a hex-encoded string.
+    /// Construct a BLS public key from a hex-encoded string.
     ///
-    /// It is often useful
-    /// to parse such raw strings in user-facing
-    /// apps like CLI
+    /// It is often useful to parse such raw strings in user-facing apps like CLI.
     pub fn bls_from_hex(hex: &str) -> Result<Self> {
         let bytes = hex::decode(hex).map_err(|err| {
             Error::FailedToParse(format!(
@@ -87,7 +81,7 @@ impl PublicKey {
         Ok(Self::from(pk))
     }
 
-    /// Returns the bytes of the underlying public key
+    /// Returns the bytes of the underlying public key.
     pub fn to_bytes(self) -> Vec<u8> {
         match self {
             PublicKey::Ed25519(pub_key) => pub_key.to_bytes().into(),
@@ -243,7 +237,7 @@ impl UpperHex for PublicKey {
 pub mod tests {
     use super::utils;
     use super::*;
-    use bls::{self};
+    use bls;
 
     fn gen_keypairs() -> Vec<Keypair> {
         let mut rng = rand::thread_rng();

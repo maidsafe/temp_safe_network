@@ -62,7 +62,6 @@ jobs:
 
     - uses: EmbarkStudios/cargo-deny-action@v1
 
-
   lint:
       runs-on: ubuntu-latest
       env:
@@ -109,7 +108,6 @@ jobs:
       - shell: bash
         if: steps.sn_changes.outputs.src == 'true'
         run: cargo clippy --all-targets --all-features
-
 
   unit:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -298,8 +296,6 @@ jobs:
           path: ~/.safe/node/local-test-network/**/*.log*
         if: failure()
         continue-on-error: true
-
-
 
   e2e-split:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
@@ -601,7 +597,6 @@ jobs:
       - name: Generate keys for test run
         run: cargo run --package sn_cli --release -- keys create --for-cli
 
-
       - name: Run CLI tests
         uses: maidsafe/cargo-nextest@main
         with:
@@ -634,7 +629,6 @@ jobs:
           path: ~/.safe/node/local-test-network/**/*.log*
         if: failure()
         continue-on-error: true
-
 
   # This is required for publishing test results that come from forks. The actual publishing of the
   # results occurs in another workflow that will be triggered when this one finishes. Uploading this

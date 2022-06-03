@@ -12,6 +12,7 @@ use sn_interface::types::keys::ed25519::{self, Digest256, Keypair, Verifier};
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::SocketAddr;
 
+use sn_consensus::Generation;
 use tiny_keccak::{Hasher, Sha3};
 use xor_name::{Prefix, XorName};
 
@@ -22,6 +23,7 @@ pub(crate) trait DkgSessionIdUtils {
         elder: BTreeMap<XorName, SocketAddr>,
         generation: u64,
         bootstrap_members: BTreeSet<NodeState>,
+        membership_gen: Generation,
     ) -> Self;
 }
 
@@ -29,8 +31,9 @@ impl DkgSessionIdUtils for DkgSessionId {
     fn new(
         prefix: Prefix,
         elders: BTreeMap<XorName, SocketAddr>,
-        generation: u64,
+        section_chain_len: u64,
         bootstrap_members: BTreeSet<NodeState>,
+        membership_gen: Generation,
     ) -> Self {
         assert!(elders
             .keys()
@@ -40,8 +43,9 @@ impl DkgSessionIdUtils for DkgSessionId {
         Self {
             prefix,
             elders,
-            section_chain_len: generation,
+            section_chain_len,
             bootstrap_members,
+            membership_gen,
         }
     }
 }
