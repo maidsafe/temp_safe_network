@@ -112,7 +112,6 @@ impl RegisterStorage {
             })
             .partition(|r| r.is_ok());
 
-        println!("ok got");
         if !err.is_empty() {
             for e in err {
                 error!("{:?}", e);
