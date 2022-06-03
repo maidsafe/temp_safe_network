@@ -97,10 +97,10 @@ impl Node {
     }
 
     async fn get_sap_for_prefix(&self, prefix: Prefix) -> Result<SectionAuthorityProvider> {
-        match self.network_knowledge.prefix_map().get(&prefix) {
-            Some(sap) => Ok(sap),
-            None => Err(Error::FailedToGetPreviousSAP),
-        }
+        self.network_knowledge
+            .prefix_map()
+            .get(&prefix)
+            .ok_or(Error::FailedToGetSAPforPrefix(prefix))
     }
 
     async fn check_elder_handover_candidates(&self, sap: &SectionAuthorityProvider) -> Result<()> {

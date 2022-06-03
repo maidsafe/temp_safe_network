@@ -163,9 +163,9 @@ pub enum Error {
     /// Missing Membership Instance when checking a Handover vote's SAP
     #[error("MissingMembershipInstance")]
     MissingMembershipInstance,
-    /// Failed to get previous SAP in chain when checking a Handover vote's SAP
-    #[error("FailedToGetPreviousSAP")]
-    FailedToGetPreviousSAP,
+    /// Failed to get parent SAP in chain when checking a Handover vote's SAP
+    #[error("FailedToGetSAPforPrefix {0:?}")]
+    FailedToGetSAPforPrefix(Prefix),
     /// Invalid Elder Candidates in Handover vote's SAP
     #[error("InvalidElderCandidates")]
     InvalidElderCandidates,
