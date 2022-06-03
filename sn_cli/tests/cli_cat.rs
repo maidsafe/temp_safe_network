@@ -320,8 +320,9 @@ fn calling_safe_cat_wallet() -> Result<()> {
             "deposit",
             "--name",
             "my-first-dbc",
-            &wallet_xorurl,
+            "--dbc",
             DBC_WITH_12_230_000_000,
+            &wallet_xorurl,
         ],
         Some(0),
     )?;
@@ -329,7 +330,7 @@ fn calling_safe_cat_wallet() -> Result<()> {
     safe_cmd(["cat", &wallet_xorurl], Some(0))?
         .assert()
         .stdout(predicate::str::contains(format!(
-            "Spendable balances of Wallet at \"{}\":",
+            "Spendable balances of wallet at \"{}\":",
             wallet_xorurl
         )))
         .stdout(predicate::str::contains("my-first-dbc"))

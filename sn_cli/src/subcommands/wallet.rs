@@ -7,10 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    helpers::{dbc_from_hex, dbc_to_hex, get_from_arg_or_stdin, serialise_output},
+    helpers::{get_from_arg_or_stdin, serialise_output},
     OutputFmt,
 };
-use color_eyre::Result;
+use color_eyre::{eyre::eyre, Help, Result};
 use sn_api::Safe;
 use structopt::StructOpt;
 
@@ -38,13 +38,18 @@ pub enum WalletSubCommands {
         dbc: Option<String>,
     },
     #[structopt(name = "reissue")]
-    /// Reissue a DBC from a wallet to a SafeKey
+    /// Reissue a DBC from a wallet to a SafeKey.
     Reissue {
         /// The amount to reissue
         amount: String,
         /// The URL of wallet to reissue from
         #[structopt(long = "from")]
         from: String,
+        /// To reissue the DBC to a particular owner, provide their public key. This should be a
+        /// hex-encoded BLS key. Otherwise the DBC will be reissued as bearer, meaning anyone can
+        /// spend it.
+        #[structopt(long = "public-key")]
+        public_key_hex: Option<String>,
     },
 }
 
@@ -90,11 +95,11 @@ pub async fn wallet_commander(
             dbc,
         } => {
             let dbc = if let Some(dbc) = dbc {
-                dbc_from_hex(&dbc)?
+                sn_dbc::Dbc::from_hex(&dbc)?
             } else {
                 let dbc_hex = get_from_arg_or_stdin(dbc, None)?;
                 println!("{}", dbc_hex);
-                dbc_from_hex(dbc_hex.trim())?
+                sn_dbc::Dbc::from_hex(dbc_hex.trim())?
             };
             let the_name = safe
                 .wallet_deposit(&wallet_url, name.as_deref(), &dbc)
@@ -111,15 +116,36 @@ pub async fn wallet_commander(
 
             Ok(())
         }
-        WalletSubCommands::Reissue { amount, from } => {
-            let dbc = safe.wallet_reissue(&from, &amount, None).await?;
-            let dbc_hex = dbc_to_hex(&dbc)?;
+        WalletSubCommands::Reissue {
+            amount,
+            from,
+            public_key_hex,
+        } => {
+            let pk = if let Some(pk_hex) = public_key_hex.clone() {
+                let pk_bytes = hex::decode(pk_hex)?;
+                let pk_bytes: [u8; bls::PK_SIZE] = pk_bytes.try_into().map_err(|_| {
+                    eyre!("Could not decode supplied public key").suggestion(
+                        "Verify that this is a hex encoded BLS key. \
+                            You can use the `keys create` command to see the format of the key.",
+                    )
+                })?;
+                Some(bls::PublicKey::from_bytes(pk_bytes)?)
+            } else {
+                None
+            };
+            let dbc = safe.wallet_reissue(&from, &amount, pk).await?;
+            let dbc_hex = dbc.to_hex()?;
 
             if OutputFmt::Pretty == output_fmt {
-                println!("Success. Reissued DBC with {} safecoins:", amount);
+                println!("Reissued DBC with {} safecoins.", amount);
                 println!("-------- DBC DATA --------");
                 println!("{}", dbc_hex);
                 println!("--------------------------");
+                if let Some(pk_hex) = public_key_hex {
+                    println!("This DBC is owned by public key {}", pk_hex);
+                } else {
+                    println!("This is a bearer DBC that can be spent by anyone.");
+                }
             } else {
                 println!("{}", dbc_hex);
             }
