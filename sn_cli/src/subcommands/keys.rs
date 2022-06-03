@@ -22,7 +22,7 @@ pub enum KeysSubCommands {
         show_sk: bool,
     },
     #[structopt(name = "create")]
-    /// Create a new SafeKey. Currently generates an Ed25519 keypair.
+    /// Create a new SafeKey in BLS format.
     Create {
         /// Set this flag to output the generated keypair to file at ~/.safe/cli/credentials. The
         /// CLI will then sign all commands using this keypair.
@@ -109,7 +109,7 @@ mod create_command {
     use sn_api::{Keypair, Safe};
 
     #[tokio::test]
-    async fn should_create_ed25519_keypair() -> Result<()> {
+    async fn should_create_bls_keypair() -> Result<()> {
         let config_dir = assert_fs::TempDir::new()?;
         let credentials_file = config_dir.child(".safe/cli/credentials");
         let cli_config_file = config_dir.child(".safe/cli/config.json");
