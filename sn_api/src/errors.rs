@@ -11,6 +11,7 @@ use super::nrs::NrsMap;
 use super::safeurl::{Error as UrlError, SafeUrl, XorUrl};
 use sn_client::Error as ClientError;
 use sn_dbc::Error as DbcError;
+use sn_interface::types::Error as InterfaceError;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -111,6 +112,11 @@ pub enum Error {
     /// DbcError
     #[error("DbcError: {0}")]
     DbcError(#[from] DbcError),
+    /// InterfaceError
+    #[error("InterfaceError: {0}")]
+    InterfaceError(#[from] InterfaceError),
+    #[error("IoError: {0}")]
+    IoError(#[from] std::io::Error),
     /// UnversionedContentError
     #[error("UnversionedContentError: {0}")]
     UnversionedContentError(String),

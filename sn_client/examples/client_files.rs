@@ -25,7 +25,7 @@ async fn main() -> Result<()> {
         hex::encode(genesis_key.to_bytes())
     );
     let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
-    let client = Client::new(config, bootstrap_nodes, None).await?;
+    let client = Client::new(config, bootstrap_nodes, None, None).await?;
 
     let pk = client.public_key();
     println!("Client Public Key: {}", pk);

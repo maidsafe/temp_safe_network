@@ -8,20 +8,24 @@
 
 use super::read_network_conn_info;
 use crate::{Client, ClientConfig};
-use eyre::Result;
+use bls::SecretKey;
+use eyre::{eyre, Result};
+use sn_dbc::Owner;
 use sn_interface::types::Keypair;
 use std::time::Duration;
 use tempfile::tempdir;
 
-/// Create a test client without providing any specific keypair, bootstrap_config, or timeout.
+/// Create a test client without providing any specific keypair, DBC owner, bootstrap_config, or
+/// timeout.
 pub async fn create_test_client() -> Result<Client> {
-    create_test_client_with(None, None, false).await
+    create_test_client_with(None, None, None, false).await
 }
 
 /// Create a test client optionally providing keypair and/or bootstrap_config
 /// If no keypair is provided, a check is run that a balance has been generated for the client
 pub async fn create_test_client_with(
     optional_keypair: Option<Keypair>,
+    dbc_owner: Option<Owner>,
     timeout: Option<u64>,
     read_prefix_map: bool,
 ) -> Result<Client> {
@@ -46,9 +50,21 @@ pub async fn create_test_client_with(
         config,
         bootstrap_nodes,
         optional_keypair.clone(),
+        dbc_owner.clone(),
         read_prefix_map,
     )
     .await?;
 
     Ok(client)
+}
+
+/// Given a BLS secret key as a hex string, it will be deserialised to a `SecretKey`, which will
+/// then be used as the basis for an `Owner`.
+///
+/// The conversion method was copied from the `mint-repl` example in `sn_dbc`.
+pub async fn get_dbc_owner_from_secret_key_hex(secret_key_hex: &str) -> Result<Owner> {
+    let mut decoded_bytes = hex::decode(secret_key_hex).map_err(|e| eyre!(e))?;
+    decoded_bytes.reverse(); // convert from big endian to little endian
+    let sk: SecretKey = bincode::deserialize(&decoded_bytes).map_err(|e| eyre!(e))?;
+    Ok(Owner::from(sk))
 }

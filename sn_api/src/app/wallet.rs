@@ -284,8 +284,9 @@ impl Safe {
         change_amount: Token,
     ) -> Result<(Dbc, Option<Dbc>)> {
         // TODO: support for non-bearer DBCs, and allow to provide a recipient's pk
-        let recipient_owner = Owner::from_random_secret_key(&mut rng::thread_rng());
-        let owneronce = OwnerOnce::from_owner_base(recipient_owner, &mut rng::thread_rng());
+        let client = self.get_safe_client()?;
+        let owner = Owner::from_random_secret_key(&mut rng::thread_rng());
+        let owneronce = OwnerOnce::from_owner_base(owner, &mut rng::thread_rng());
 
         // TODO: enable the use ot decoys
         let mut tx_builder = TransactionBuilder::default()
@@ -295,8 +296,8 @@ impl Safe {
             .add_output_by_amount(output_amount.as_nano(), owneronce);
 
         // If there is a change, issue the change DBC
-        let change_owner = Owner::from_random_secret_key(&mut rng::thread_rng());
-        let change_owneronce = OwnerOnce::from_owner_base(change_owner, &mut rng::thread_rng());
+        let change_owneronce =
+            OwnerOnce::from_owner_base(client.dbc_owner(), &mut rng::thread_rng());
         if change_amount.as_nano() > 0 {
             tx_builder =
                 tx_builder.add_output_by_amount(change_amount.as_nano(), change_owneronce.clone());
@@ -338,7 +339,9 @@ impl Safe {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::test_helpers::{new_read_only_safe_instance, new_safe_instance};
+    use crate::app::test_helpers::{
+        new_read_only_safe_instance, new_safe_instance, new_safe_instance_with_dbc_owner,
+    };
     use anyhow::{anyhow, Result};
 
     // TODO: allow to set an amount and SK to generate a DBC with,
@@ -517,7 +520,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_wallet_reissue() -> Result<()> {
+    async fn test_wallet_reissue_with_multiple_input_dbcs() -> Result<()> {
         let safe = new_safe_instance().await?;
         let wallet_xorurl = safe.wallet_create().await?;
 
@@ -549,6 +552,63 @@ mod tests {
             .amount_secrets_bearer()
             .map_err(|err| anyhow!("Couldn't read balance from change DBC fetched: {:?}", err))?;
         assert_eq!(change.amount(), 11_410_000_000);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wallet_reissue_with_single_input_dbc() -> Result<()> {
+        let safe = new_safe_instance().await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+
+        let dbc = new_dbc(DBC_WITH_1_530_000_000)?;
+        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc)
+            .await?;
+
+        let output_dbc = safe.wallet_reissue(&wallet_xorurl, "1").await?;
+
+        let output_balance = output_dbc
+            .amount_secrets_bearer()
+            .map_err(|err| anyhow!("Couldn't read balance from output DBC: {:?}", err))?;
+        assert_eq!(output_balance.amount(), 1_000_000_000);
+
+        let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
+        assert_eq!(current_balance, Token::from_nano(530_000_000));
+
+        let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
+
+        assert_eq!(wallet_balances.len(), 1);
+
+        let (change_dbc_read, _) = wallet_balances
+            .get("change-dbc")
+            .ok_or_else(|| anyhow!("Couldn't read change DBC from fetched wallet"))?;
+        let change = change_dbc_read
+            .amount_secrets_bearer()
+            .map_err(|err| anyhow!("Couldn't read balance from change DBC fetched: {:?}", err))?;
+        assert_eq!(change.amount(), 530_000_000);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wallet_reissue_with_persistent_dbc_owner() -> Result<()> {
+        let (safe, dbc_owner) = new_safe_instance_with_dbc_owner(
+            "3917ad935714cf1e71b9b5e2831684811e83acc6c10f030031fe886292152e83",
+        )
+        .await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+
+        let dbc = new_dbc(DBC_WITH_1_530_000_000)?;
+        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc)
+            .await?;
+
+        let _ = safe.wallet_reissue(&wallet_xorurl, "1").await?;
+        let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
+
+        let (change_dbc_read, _) = wallet_balances
+            .get("change-dbc")
+            .ok_or_else(|| anyhow!("Couldn't read change DBC from fetched wallet"))?;
+        assert_eq!(*change_dbc_read.owner_base(), dbc_owner);
 
         Ok(())
     }

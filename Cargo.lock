@@ -3477,6 +3477,7 @@ name = "sn_api"
 version = "0.63.0"
 dependencies = [
  "anyhow",
+ "assert_fs",
  "assert_matches",
  "bincode",
  "blsttc",
@@ -3493,6 +3494,7 @@ dependencies = [
  "mime_guess",
  "multibase",
  "pbkdf2",
+ "predicates",
  "proptest",
  "qjsonrpc",
  "rand 0.7.3",
@@ -3557,6 +3559,7 @@ dependencies = [
  "serde_yaml",
  "sn_api",
  "sn_cmd_test_utilities",
+ "sn_dbc",
  "sn_launch_tool",
  "structopt",
  "tokio",
@@ -3609,6 +3612,7 @@ dependencies = [
  "serde_json",
  "signature",
  "sled",
+ "sn_dbc",
  "sn_interface",
  "sn_launch_tool",
  "structopt",
