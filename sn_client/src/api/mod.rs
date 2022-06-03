@@ -183,12 +183,11 @@ impl Client {
             // Generate a random query to send a dummy message
             let random_dst_addr = xor_name::rand::random();
             let serialised_cmd = {
-                let msg = ServiceMsg::Query(DataQuery::Register(RegisterQuery::Get(
-                    RegisterAddress::Public {
+                let msg =
+                    ServiceMsg::Query(DataQuery::Register(RegisterQuery::Get(RegisterAddress {
                         name: random_dst_addr,
                         tag: 1,
-                    },
-                )));
+                    })));
                 WireMsg::serialize_msg_payload(&msg)?
             };
             let signature = client.keypair.sign(&serialised_cmd);
@@ -298,7 +297,6 @@ mod tests {
     use eyre::Result;
     use sn_interface::init_logger;
     use sn_interface::types::utils::random_bytes;
-    use sn_interface::types::Scope;
     use std::{
         collections::HashSet,
         net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -347,7 +345,7 @@ mod tests {
         let client = create_test_client().await?;
         tokio::time::sleep(tokio::time::Duration::from_secs(40)).await;
         let bytes = random_bytes(self_encryption::MIN_ENCRYPTABLE_BYTES / 2);
-        let _ = client.upload(bytes, Scope::Public).await?;
+        let _ = client.upload(bytes).await?;
         Ok(())
     }
 

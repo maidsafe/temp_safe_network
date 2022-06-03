@@ -147,16 +147,9 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe)
                     println!("XOR-URL: {}", xorurl);
                     println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
-                    println!("Native data type: {:?} Register", safeurl.scope());
+                    println!("Native data type: Register");
                 }
-                SafeData::PrivateRegister {
-                    xorurl,
-                    resolved_from,
-                    xorname,
-                    type_tag,
-                    ..
-                }
-                | SafeData::PublicRegister {
+                SafeData::Register {
                     xorurl,
                     resolved_from,
                     xorname,
@@ -168,8 +161,7 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe)
                     println!("XOR-URL: {}", xorurl);
                     println!("Type tag: {}", type_tag);
                     println!("XOR name: 0x{}", xorname_to_hex(xorname));
-                    let safeurl = SafeUrl::from_xorurl(xorurl)?;
-                    println!("Native data type: {:?} Register", safeurl.scope());
+                    println!("Native data type: Register");
                 }
             }
         }

@@ -16,8 +16,7 @@ use sn_interface::messaging::{
     system::NodeQueryResponse,
 };
 use sn_interface::types::{
-    register::User, RegisterAddress, ReplicatedData, ReplicatedDataAddress, SPENTBOOK_TYPE_SCOPE,
-    SPENTBOOK_TYPE_TAG,
+    register::User, RegisterAddress, ReplicatedData, ReplicatedDataAddress, SPENTBOOK_TYPE_TAG,
 };
 
 pub(crate) use chunks::ChunkStorage;
@@ -110,8 +109,7 @@ impl DataStorage {
                     }
                 };
 
-                let reg_addr =
-                    RegisterAddress::new(read.dst_name(), SPENTBOOK_TYPE_SCOPE, SPENTBOOK_TYPE_TAG);
+                let reg_addr = RegisterAddress::new(read.dst_name(), SPENTBOOK_TYPE_TAG);
 
                 match self
                     .registers
@@ -169,8 +167,7 @@ impl DataStorage {
                 .await
                 .map(ReplicatedData::RegisterLog),
             ReplicatedDataAddress::Spentbook(addr) => {
-                let reg_addr =
-                    RegisterAddress::new(*addr.name(), SPENTBOOK_TYPE_SCOPE, SPENTBOOK_TYPE_TAG);
+                let reg_addr = RegisterAddress::new(*addr.name(), SPENTBOOK_TYPE_TAG);
                 self.registers
                     .get_register_replica(&reg_addr)
                     .await
@@ -185,8 +182,7 @@ impl DataStorage {
             ReplicatedDataAddress::Chunk(addr) => self.chunks.remove_chunk(addr).await,
             ReplicatedDataAddress::Register(addr) => self.registers.remove_register(addr).await,
             ReplicatedDataAddress::Spentbook(addr) => {
-                let reg_addr =
-                    RegisterAddress::new(*addr.name(), SPENTBOOK_TYPE_SCOPE, SPENTBOOK_TYPE_TAG);
+                let reg_addr = RegisterAddress::new(*addr.name(), SPENTBOOK_TYPE_TAG);
                 self.registers.remove_register(&reg_addr).await
             }
         }

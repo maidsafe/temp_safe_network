@@ -123,7 +123,7 @@ impl Safe {
                     BTreeSet::new()
                 };
 
-                let safe_data = SafeData::PublicRegister {
+                let safe_data = SafeData::Register {
                     xorurl: input_url.to_xorurl_string(),
                     xorname: input_url.xorname(),
                     type_tag: input_url.type_tag(),
@@ -134,7 +134,7 @@ impl Safe {
             }
             DataType::Spentbook => {
                 // TODO: perhaps define a new SafeData::Spentbook
-                let safe_data = SafeData::PublicRegister {
+                let safe_data = SafeData::Register {
                     xorurl: input_url.to_xorurl_string(),
                     xorname: input_url.xorname(),
                     type_tag: input_url.type_tag(),

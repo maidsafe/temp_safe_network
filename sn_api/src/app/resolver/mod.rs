@@ -243,7 +243,7 @@ mod tests {
     use crate::{
         app::files,
         app::test_helpers::{new_safe_instance, random_nrs_name, TestDataFilesContainer},
-        SafeUrl, Scope,
+        SafeUrl,
     };
     use anyhow::{anyhow, bail, Context, Result};
     use bytes::Bytes;
@@ -441,9 +441,7 @@ mod tests {
     async fn test_fetch_public_file() -> Result<()> {
         let safe = new_safe_instance().await?;
         let data = Bytes::from("Something super immutable");
-        let xorurl = safe
-            .store_public_bytes(data.clone(), Some("text/plain"))
-            .await?;
+        let xorurl = safe.store_bytes(data.clone(), Some("text/plain")).await?;
 
         let safe_url = SafeUrl::from_url(&xorurl)?;
         let content = safe.fetch(&xorurl, None).await?;
@@ -478,9 +476,7 @@ mod tests {
     async fn test_fetch_public_file_from_nrs_url() -> Result<()> {
         let safe = new_safe_instance().await?;
         let data = Bytes::from("Something super immutable");
-        let xorurl = safe
-            .store_public_bytes(data.clone(), Some("text/plain"))
-            .await?;
+        let xorurl = safe.store_bytes(data.clone(), Some("text/plain")).await?;
 
         let safe_url = SafeUrl::from_url(&xorurl)?;
         let site_name = random_nrs_name();
@@ -522,7 +518,7 @@ mod tests {
         let saved_data = Bytes::from("Something super immutable");
         let size = saved_data.len();
         let xorurl = safe
-            .store_public_bytes(saved_data.clone(), Some("text/plain"))
+            .store_bytes(saved_data.clone(), Some("text/plain"))
             .await?;
 
         // Fetch first half and match
@@ -615,7 +611,7 @@ mod tests {
         let xorname = xor_name::rand::random();
         let type_tag = 575_756_443;
         let xorurl = SafeUrl::encode(
-            DataAddress::register(xorname, Scope::Public, type_tag),
+            DataAddress::register(xorname, type_tag),
             None,
             type_tag,
             ContentType::MediaType("text/html".to_string()),
@@ -651,10 +647,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_fetch_public_file_with_path() -> Result<()> {
+    async fn test_fetch_file_with_path() -> Result<()> {
         let safe = new_safe_instance().await?;
         let data = Bytes::from("Something super immutable");
-        let xorurl = safe.store_public_bytes(data.clone(), None).await?;
+        let xorurl = safe.store_bytes(data.clone(), None).await?;
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         let path = "/some_relative_filepath";
@@ -671,9 +667,7 @@ mod tests {
         };
 
         // test the same but a file with some media type
-        let xorurl = safe
-            .store_public_bytes(data.clone(), Some("text/plain"))
-            .await?;
+        let xorurl = safe.store_bytes(data.clone(), Some("text/plain")).await?;
 
         let mut safe_url = SafeUrl::from_url(&xorurl)?;
         safe_url.set_path("/some_relative_filepath");

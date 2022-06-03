@@ -18,15 +18,6 @@ use super::{utils, Result};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
-/// We also encode the data scope - i.e. accessibility on the SAFE Network.
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Deserialize, Serialize)]
-pub enum Scope {
-    #[allow(missing_docs)]
-    Public = 0x00,
-    #[allow(missing_docs)]
-    Private = 0x01,
-}
-
 /// An address of data on the network
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub enum DataAddress {
@@ -51,30 +42,6 @@ impl DataAddress {
         }
     }
 
-    /// The address scope
-    pub fn scope(&self) -> Scope {
-        if self.is_public() {
-            Scope::Public
-        } else {
-            Scope::Private
-        }
-    }
-
-    /// Returns true if public.
-    pub fn is_public(self) -> bool {
-        match self {
-            Self::SafeKey(_) => true,
-            Self::Bytes(_) => true,
-            Self::Register(address) => address.is_public(),
-            Self::Spentbook(_) => true,
-        }
-    }
-
-    /// Returns true if private.
-    pub fn is_private(self) -> bool {
-        !self.is_public()
-    }
-
     /// Returns the Address serialised and encoded in z-base-32.
     pub fn encode_to_zbase32(&self) -> Result<String> {
         utils::encode(&self)
@@ -86,8 +53,8 @@ impl DataAddress {
     }
 
     ///
-    pub fn register(name: XorName, scope: Scope, tag: u64) -> DataAddress {
-        DataAddress::Register(RegisterAddress::new(name, scope, tag))
+    pub fn register(name: XorName, tag: u64) -> DataAddress {
+        DataAddress::Register(RegisterAddress::new(name, tag))
     }
 
     ///

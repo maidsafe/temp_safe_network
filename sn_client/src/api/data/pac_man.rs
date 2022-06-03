@@ -12,7 +12,7 @@ use bytes::Bytes;
 use rayon::prelude::*;
 use self_encryption::{DataMap, EncryptedChunk};
 use serde::{Deserialize, Serialize};
-use sn_interface::types::{Chunk, Encryption};
+use sn_interface::types::Chunk;
 use std::path::Path;
 use xor_name::XorName;
 
@@ -27,20 +27,14 @@ pub(crate) enum DataMapLevel {
 }
 
 #[allow(unused)]
-pub(crate) fn encrypt_from_path(
-    path: &Path,
-    encryption: Option<&impl Encryption>,
-) -> Result<(XorName, Vec<Chunk>)> {
+pub(crate) fn encrypt_from_path(path: &Path) -> Result<(XorName, Vec<Chunk>)> {
     let (data_map, encrypted_chunks) = encrypt_file(path)?;
-    pack(data_map, encrypted_chunks, encryption)
+    pack(data_map, encrypted_chunks)
 }
 
-pub(crate) fn encrypt_large(
-    data: Bytes,
-    encryption: Option<&impl Encryption>,
-) -> Result<(XorName, Vec<Chunk>)> {
+pub(crate) fn encrypt_large(data: Bytes) -> Result<(XorName, Vec<Chunk>)> {
     let (data_map, encrypted_chunks) = encrypt_data(data)?;
-    pack(data_map, encrypted_chunks, encryption)
+    pack(data_map, encrypted_chunks)
 }
 
 /// Returns the top-most chunk address through which the entire
@@ -50,7 +44,6 @@ pub(crate) fn encrypt_large(
 pub(crate) fn pack(
     data_map: DataMap,
     encrypted_chunks: Vec<EncryptedChunk>,
-    encryption: Option<&impl Encryption>,
 ) -> Result<(XorName, Vec<Chunk>)> {
     // Produces a chunk out of the first secret key, which is validated for its size.
     // If the chunk is too big, it is self-encrypted and the resulting (additional level) secret key is put into a chunk.
@@ -61,14 +54,8 @@ pub(crate) fn pack(
     let mut chunks = vec![];
     let mut chunk_content = pack_data_map(DataMapLevel::First(data_map))?;
 
-    // appeasing of compiler inference shenanigans..
-    // no need to encrypt what is self-encrypted, thus we pass in `None` for those cases
-    // (however, the compiler could not infer type from the `None`)
-    let mut no_encryption = encryption; // copy the original variable
-    let _value = no_encryption.take(); // make it None
-
     let (address, additional_chunks) = loop {
-        let chunk = to_chunk(chunk_content, encryption)?;
+        let chunk = to_chunk(chunk_content);
         // If datamap chunk is less that 1MB return it so it can be directly sent to the network
         if chunk.validate_size() {
             let name = *chunk.name();
@@ -80,20 +67,11 @@ pub(crate) fn pack(
             let serialized_chunk = Bytes::from(serialize(&chunk)?);
             let (data_map, next_encrypted_chunks) =
                 self_encryption::encrypt(serialized_chunk).map_err(Error::SelfEncryption)?;
-            let expected_total = chunks.len() + next_encrypted_chunks.len();
             chunks = next_encrypted_chunks
                 .par_iter()
-                .map(|c| to_chunk(c.content.clone(), no_encryption)) // no need to encrypt what is self-encrypted
-                .flatten()
+                .map(|c| to_chunk(c.content.clone())) // no need to encrypt what is self-encrypted
                 .chain(chunks)
                 .collect();
-            if expected_total > chunks.len() {
-                // as we flatten above, we need to check outcome here
-                return Err(Error::NotAllDataWasChunked {
-                    expected: expected_total,
-                    chunked: chunks.len(),
-                });
-            }
             chunk_content = pack_data_map(DataMapLevel::Additional(data_map))?;
         }
     };
@@ -101,8 +79,7 @@ pub(crate) fn pack(
     let expected_total = encrypted_chunks.len() + additional_chunks.len();
     let all_chunks: Vec<_> = encrypted_chunks
         .par_iter()
-        .map(|c| to_chunk(c.content.clone(), no_encryption)) // no need to encrypt what is self-encrypted
-        .flatten() // swallows errors!
+        .map(|c| to_chunk(c.content.clone())) // no need to encrypt what is self-encrypted
         .chain(additional_chunks)
         .collect();
 
@@ -117,21 +94,8 @@ pub(crate) fn pack(
     Ok((address, all_chunks))
 }
 
-pub(crate) fn to_chunk(
-    chunk_content: Bytes,
-    encryption: Option<&impl Encryption>,
-) -> Result<Chunk> {
-    let chunk: Chunk = if let Some(encryption) = encryption {
-        // If this is a DataMapLevel: strictly, we do not need to encrypt this if it's not going to be the
-        // last level, since it will then instead be self-encrypted.
-        // But we can just as well do it, for now.. (which also lets us avoid some edge case handling).
-        let encrypted_content = encryption.encrypt(chunk_content)?;
-        Chunk::new(encrypted_content)
-    } else {
-        Chunk::new(chunk_content)
-    };
-
-    Ok(chunk)
+pub(crate) fn to_chunk(chunk_content: Bytes) -> Chunk {
+    Chunk::new(chunk_content)
 }
 
 fn pack_data_map(data_map: DataMapLevel) -> Result<Bytes> {

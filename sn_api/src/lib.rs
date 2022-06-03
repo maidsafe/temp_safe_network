@@ -21,9 +21,7 @@ mod errors;
 mod safeurl;
 
 // re-export these useful types from sn_data_types
-pub use sn_interface::types::{
-    DataAddress, Keypair, PublicKey, RegisterAddress, Scope, SecretKey, Token,
-};
+pub use sn_interface::types::{DataAddress, Keypair, PublicKey, RegisterAddress, SecretKey, Token};
 
 #[cfg(feature = "app")]
 pub use app::*;

@@ -14,7 +14,7 @@ use tracing::{debug, warn};
 
 use sn_client::{Client, ClientConfig, Error, Result};
 use sn_interface::init_logger;
-use sn_interface::types::{utils::random_bytes, Scope};
+use sn_interface::types::utils::random_bytes;
 use tiny_keccak::{Hasher, Sha3};
 
 use sn_client::utils::test_utils::read_network_conn_info;
@@ -169,7 +169,7 @@ async fn upload_data_using_client(client: Client, iteration: usize) -> Result<(X
     println!("Storing bytes.len : {bytes_len:?} w/ hash {:?}", output);
 
     let start_putting = Instant::now();
-    let address = client.upload(bytes, Scope::Public).await?;
+    let address = client.upload(bytes).await?;
     let duration = start_putting.elapsed();
 
     println!(

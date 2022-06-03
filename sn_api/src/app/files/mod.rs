@@ -13,7 +13,7 @@ mod realpath;
 
 use crate::{
     app::consts::*, app::nrs::VersionHash, resolver::Range, ContentType, DataType, Error, Result,
-    Safe, SafeUrl, Scope, XorUrl,
+    Safe, SafeUrl, XorUrl,
 };
 use bytes::{Buf, Bytes};
 use file_system::{
@@ -62,12 +62,7 @@ impl Safe {
     pub async fn files_container_create(&self) -> Result<XorUrl> {
         // Build a Register creation operation
         let xorurl = self
-            .register_create(
-                None,
-                FILES_CONTAINER_TYPE_TAG,
-                false,
-                ContentType::FilesContainer,
-            )
+            .register_create(None, FILES_CONTAINER_TYPE_TAG, ContentType::FilesContainer)
             .await?;
 
         Ok(xorurl)
@@ -407,7 +402,7 @@ impl Safe {
         let (safe_url, current_version, current_files_map) =
             validate_files_add_params(self, "", url, update_nrs).await?;
 
-        let new_file_xorurl = self.store_public_bytes(data, None).await?;
+        let new_file_xorurl = self.store_bytes(data, None).await?;
 
         let dst_path = Path::new(safe_url.path());
         let (processed_files, new_files_map, success_count) =
@@ -585,7 +580,7 @@ impl Safe {
         Ok(new_version)
     }
 
-    /// # Store a public file
+    /// # Store a file
     ///
     /// Store files onto the network. The data will be saved as one or more chunks,
     /// depending on the size of the data. If it's less than 3072 bytes, it'll be stored in a single chunk,
@@ -599,35 +594,12 @@ impl Safe {
     /// # rt.block_on(async {
     /// #   safe.connect(None, None, None).await.unwrap();
     ///     let data = b"Something super good";
-    ///     let xorurl = safe.store_public_data(data, Some("text/plain")).await.unwrap();
-    ///     let received_data = safe.files_get_public(&xorurl, None).await.unwrap();
+    ///     let xorurl = safe.store_data(data, Some("text/plain")).await.unwrap();
+    ///     let received_data = safe.files_get(&xorurl, None).await.unwrap();
     ///     assert_eq!(received_data, data);
     /// # });
     /// ```
-    pub async fn store_public_bytes(
-        &self,
-        bytes: Bytes,
-        media_type: Option<&str>,
-    ) -> Result<XorUrl> {
-        self.store_bytes(bytes, media_type, Scope::Public).await
-    }
-
-    /// Store a private file
-    pub async fn store_private_bytes(
-        &self,
-        bytes: Bytes,
-        media_type: Option<&str>,
-    ) -> Result<XorUrl> {
-        self.store_bytes(bytes, media_type, Scope::Private).await
-    }
-
-    // Private helper to store a public/private file
-    async fn store_bytes(
-        &self,
-        bytes: Bytes,
-        media_type: Option<&str>,
-        scope: Scope,
-    ) -> Result<XorUrl> {
+    pub async fn store_bytes(&self, bytes: Bytes, media_type: Option<&str>) -> Result<XorUrl> {
         let content_type = media_type.map_or_else(
             || Ok(ContentType::Raw),
             |media_type_str| {
@@ -647,11 +619,11 @@ impl Safe {
                 "Calculating network address for {} bytes of data",
                 bytes.len()
             );
-            Client::calculate_address(bytes, scope)?
+            Client::calculate_address(bytes)?
         } else {
             debug!("Storing {} bytes of data", bytes.len());
             let client = self.get_safe_client()?;
-            let (address, _) = client.upload_and_verify(bytes, scope).await?;
+            let (address, _) = client.upload_and_verify(bytes).await?;
             address
         };
         let xorurl = SafeUrl::encode_bytes(address, content_type, self.xorurl_base)?;
@@ -670,8 +642,8 @@ impl Safe {
     /// # rt.block_on(async {
     /// #   safe.connect(None, None, None).await.unwrap();
     ///     let data = b"Something super good";
-    ///     let xorurl = safe.files_store_public(data, None).await.unwrap();
-    ///     let received_data = safe.files_get_public(&xorurl, None).await.unwrap();
+    ///     let xorurl = safe.files_store(data, None).await.unwrap();
+    ///     let received_data = safe.files_get(&xorurl, None).await.unwrap();
     ///     assert_eq!(received_data, data);
     /// # });
     /// ```
@@ -683,10 +655,9 @@ impl Safe {
 
     /// Fetch a file from a SafeUrl without performing any type of URL resolution
     pub(crate) async fn fetch_data(&self, safe_url: &SafeUrl, range: Range) -> Result<Bytes> {
-        match (safe_url.data_type(), safe_url.scope()) {
-            (DataType::File, Scope::Public) => self.get_bytes(safe_url.xorname(), range).await,
-            (DataType::File, Scope::Private) => self.get_bytes(safe_url.xorname(), range).await,
-            (other, _) => {
+        match safe_url.data_type() {
+            DataType::File => self.get_bytes(safe_url.xorname(), range).await,
+            other => {
                 return Err(Error::ContentError(format!("{}", other)));
             }
         }
@@ -728,7 +699,7 @@ impl Safe {
         })?;
 
         let files_map_xorurl = self
-            .store_public_bytes(Bytes::from(serialised_files_map), None)
+            .store_bytes(Bytes::from(serialised_files_map), None)
             .await?;
 
         Ok(files_map_xorurl)
@@ -1340,7 +1311,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_files_store_public() -> Result<()> {
+    async fn test_files_store() -> Result<()> {
         let safe = new_safe_instance().await?;
         let random_content: String = thread_rng()
             .sample_iter(&Alphanumeric)
@@ -1349,7 +1320,7 @@ mod tests {
             .collect();
 
         let file_xorurl = safe
-            .store_public_bytes(Bytes::from(random_content.to_owned()), None)
+            .store_bytes(Bytes::from(random_content.to_owned()), None)
             .await?;
 
         let retrieved = retry_loop!(safe.files_get(&file_xorurl, None));
@@ -2660,7 +2631,7 @@ mod tests {
             .ok_or_else(|| anyhow!("files container was unexpectedly empty"))?;
 
         let data = Bytes::from("0123456789");
-        let file_xorurl = retry_loop!(safe.store_public_bytes(data.clone(), None));
+        let file_xorurl = retry_loop!(safe.store_bytes(data.clone(), None));
         let new_filename = Path::new("/new_filename_test.md");
 
         let mut url_with_path = SafeUrl::from_xorurl(&xorurl)?;
@@ -2706,7 +2677,7 @@ mod tests {
 
         // let's add another file but with the same name
         let data = Bytes::from("9876543210");
-        let other_file_xorurl = retry_loop!(safe.store_public_bytes(data.clone(), None));
+        let other_file_xorurl = retry_loop!(safe.store_bytes(data.clone(), None));
         let (version2_content, new_processed_files) = retry_loop!(safe.files_container_add(
             &other_file_xorurl,
             &url_with_path.to_string(),

@@ -28,10 +28,7 @@ pub type WalletSpendableDbcs = BTreeMap<String, (Dbc, EntryHash)>;
 impl Safe {
     /// Create an empty wallet and return its XOR-URL.
     pub async fn wallet_create(&self) -> Result<XorUrl> {
-        // A Wallet is stored on a Private Register
-        let xorurl = self
-            .multimap_create(None, WALLET_TYPE_TAG, /*private = */ true)
-            .await?;
+        let xorurl = self.multimap_create(None, WALLET_TYPE_TAG).await?;
 
         let mut safeurl = SafeUrl::from_url(&xorurl)?;
         safeurl.set_content_type(ContentType::Wallet)?;
@@ -283,7 +280,7 @@ impl Safe {
             ))
         })?);
 
-        let dbc_xorurl = self.store_private_bytes(dbc_bytes, None).await?;
+        let dbc_xorurl = self.store_bytes(dbc_bytes, None).await?;
 
         let entry = (spendable_name.into_bytes(), dbc_xorurl.into_bytes());
         let _entry_hash = self
@@ -532,9 +529,7 @@ mod tests {
 
         // We insert an entry (to its underlying data type, i.e. the Multimap) which is
         // not a valid serialised DBC, thus making part of its content incompatible/corrupted.
-        let corrupted_dbc_xorurl = safe
-            .store_private_bytes(Bytes::from_static(b"bla"), None)
-            .await?;
+        let corrupted_dbc_xorurl = safe.store_bytes(Bytes::from_static(b"bla"), None).await?;
         let entry = (b"corrupted-dbc".to_vec(), corrupted_dbc_xorurl.into_bytes());
         safe.multimap_insert(&wallet_xorurl, entry, BTreeSet::default())
             .await?;
@@ -716,9 +711,7 @@ mod tests {
 
         // We insert an entry (to its underlying data type, i.e. the Multimap) which is
         // not a valid serialised DBC, thus making part of its content incompatible/corrupted.
-        let corrupted_dbc_xorurl = safe
-            .store_private_bytes(Bytes::from_static(b"bla"), None)
-            .await?;
+        let corrupted_dbc_xorurl = safe.store_bytes(Bytes::from_static(b"bla"), None).await?;
         let entry = (b"corrupted-dbc".to_vec(), corrupted_dbc_xorurl.into_bytes());
         safe.multimap_insert(&wallet_xorurl, entry, BTreeSet::default())
             .await?;

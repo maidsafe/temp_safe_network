@@ -26,7 +26,7 @@ use tiny_keccak::{Hasher, Sha3};
 use eyre::{eyre, Context, Result};
 use sn_client::{utils::test_utils::read_network_conn_info, Client, ClientConfig};
 
-use sn_interface::types::{utils::random_bytes, Scope};
+use sn_interface::types::utils::random_bytes;
 
 #[cfg(not(target_os = "windows"))]
 const SAFE_NODE_EXECUTABLE: &str = "sn_node";
@@ -224,7 +224,7 @@ async fn upload_data() -> Result<(XorName, [u8; 32])> {
 
     println!("Storing bytes w/ hash {:?}", output);
 
-    let address = client.upload(bytes, Scope::Public).await?;
+    let address = client.upload(bytes).await?;
     println!("Bytes stored at address: {:?}", address);
 
     let delay = 2;

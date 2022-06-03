@@ -16,7 +16,7 @@ mod xorurl_media_types;
 pub use errors::{Error, Result};
 use multibase::{decode as base_decode, encode as base_encode, Base};
 use serde::{Deserialize, Serialize};
-use sn_interface::types::{DataAddress, RegisterAddress, Scope};
+use sn_interface::types::{DataAddress, RegisterAddress};
 use std::fmt;
 use tracing::{info, trace, warn};
 use url::Url;
@@ -402,11 +402,7 @@ impl SafeUrl {
     pub fn from_nrsurl(nrsurl: &str) -> Result<Self> {
         let parts = UrlParts::parse(nrsurl, false)?;
         let hashed_name = Self::xor_name_from_nrs_string(&parts.top_name);
-        let address = DataAddress::Register(RegisterAddress::new(
-            hashed_name,
-            Scope::Public,
-            NRS_MAP_TYPE_TAG,
-        ));
+        let address = DataAddress::Register(RegisterAddress::new(hashed_name, NRS_MAP_TYPE_TAG));
 
         Self::new(
             address,
@@ -485,17 +481,6 @@ impl SafeUrl {
             content_type
         );
 
-        let scope = match xorurl_bytes[3] {
-            0 => Scope::Public,
-            1 => Scope::Private,
-            other => {
-                return Err(Error::InvalidXorUrl(format!(
-                    "Invalid scope encoded in the XOR-URL string: {}",
-                    other
-                )))
-            }
-        };
-
         let mut xor_name = XorName::default();
         xor_name
             .0
@@ -510,7 +495,7 @@ impl SafeUrl {
         let address = match xorurl_bytes[4] {
             0 => DataAddress::SafeKey(xor_name),
             1 => DataAddress::Bytes(xor_name),
-            2 => DataAddress::Register(RegisterAddress::new(xor_name, scope, type_tag)),
+            2 => DataAddress::Register(RegisterAddress::new(xor_name, type_tag)),
             other => {
                 return Err(Error::InvalidXorUrl(format!(
                     "Invalid data type encoded in the XOR-URL string: {}",
@@ -629,11 +614,6 @@ impl SafeUrl {
     /// returns XorUrl type tag
     pub fn type_tag(&self) -> u64 {
         self.type_tag
-    }
-
-    /// returns XorUrl scope
-    pub fn scope(&self) -> Scope {
-        self.address().scope()
     }
 
     /// returns path portion of URL, percent encoded (unmodified).
@@ -851,7 +831,6 @@ impl SafeUrl {
     // XOR-URL encoding format (var length from 37 to 45 bytes):
     // 1 byte for encoding version
     // 2 bytes for content type (enough to start including some MIME types also)
-    // 1 byte for scope
     // 1 byte for data type
     // 32 bytes for XoR Name
     // and up to 8 bytes for type_tag
@@ -904,9 +883,6 @@ impl SafeUrl {
         let mut cid_vec: Vec<u8> = vec![XOR_URL_VERSION_1 as u8];
 
         cid_vec.extend_from_slice(&self.content_type_u16.to_be_bytes());
-
-        // push the scope byte
-        cid_vec.push(self.address().scope() as u8);
 
         // push the data type byte
         cid_vec.push(self.data_type() as u8);
@@ -1029,12 +1005,11 @@ impl SafeUrl {
     pub fn encode_register(
         xor_name: XorName,
         type_tag: u64,
-        scope: Scope,
         content_type: ContentType,
         base: XorUrlBase,
     ) -> Result<String> {
         SafeUrl::encode(
-            DataAddress::Register(RegisterAddress::new(xor_name, scope, type_tag)),
+            DataAddress::Register(RegisterAddress::new(xor_name, type_tag)),
             None,
             type_tag,
             content_type,
@@ -1226,7 +1201,7 @@ mod tests {
         // Tests some errors when calling Self::new()
 
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let address = DataAddress::register(xor_name, Scope::Public, NRS_MAP_TYPE_TAG);
+        let address = DataAddress::register(xor_name, NRS_MAP_TYPE_TAG);
 
         // test: "Media-type '{}' not supported. You can use 'ContentType::Raw' as the 'content_type' for this type of content",
         let result = SafeUrl::new(
@@ -1340,7 +1315,6 @@ mod tests {
         let xorurl = SafeUrl::encode_register(
             xor_name,
             4_584_545,
-            Scope::Public,
             ContentType::FilesContainer,
             XorUrlBase::Base64,
         )?;
@@ -1352,7 +1326,6 @@ mod tests {
         assert_eq!(XOR_URL_VERSION_1, url.encoding_version());
         assert_eq!(xor_name, url.xorname());
         assert_eq!(4_584_545, url.type_tag());
-        assert_eq!(Scope::Public, url.scope());
         assert_eq!(DataType::Register, url.data_type());
         assert_eq!(ContentType::FilesContainer, url.content_type());
         Ok(())
@@ -1396,7 +1369,6 @@ mod tests {
         assert_eq!(XOR_URL_VERSION_1, url.encoding_version());
         assert_eq!(xor_name, url.xorname());
         assert_eq!(type_tag, url.type_tag());
-        assert_eq!(Scope::Public, url.scope());
         assert_eq!(DataType::File, url.data_type());
         assert_eq!(ContentType::Raw, url.content_type());
         assert_eq!(Some(content_version), url.content_version());
@@ -1409,13 +1381,8 @@ mod tests {
     fn test_url_decoding_with_path() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let type_tag: u64 = 0x0eef;
-        let xorurl = SafeUrl::encode_register(
-            xor_name,
-            type_tag,
-            Scope::Public,
-            ContentType::Wallet,
-            XorUrlBase::Base32z,
-        )?;
+        let xorurl =
+            SafeUrl::encode_register(xor_name, type_tag, ContentType::Wallet, XorUrlBase::Base32z)?;
 
         let xorurl_with_path = format!("{}/subfolder/file", xorurl);
         let url_with_path = SafeUrl::from_url(&xorurl_with_path)?;
@@ -1424,7 +1391,6 @@ mod tests {
         assert_eq!(XOR_URL_VERSION_1, url_with_path.encoding_version());
         assert_eq!(xor_name, url_with_path.xorname());
         assert_eq!(type_tag, url_with_path.type_tag());
-        assert_eq!(Scope::Public, url_with_path.scope());
         assert_eq!(DataType::Register, url_with_path.data_type());
         assert_eq!(ContentType::Wallet, url_with_path.content_type());
         Ok(())

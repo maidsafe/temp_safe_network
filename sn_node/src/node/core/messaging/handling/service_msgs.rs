@@ -18,7 +18,7 @@ use sn_interface::messaging::{
 };
 use sn_interface::types::{
     log_markers::LogMarker,
-    register::{PublicPermissions, PublicPolicy, Register, User},
+    register::{Permissions, Policy, Register, User},
     Keypair, Peer, PublicKey, RegisterCmd, ReplicatedData, SPENTBOOK_TYPE_TAG,
 };
 
@@ -282,12 +282,13 @@ fn gen_register_cmd(
 ) -> Result<RegisterCmd> {
     // TODO: use the node's own keypair and section key share for signatures
     let mut permissions = BTreeMap::new();
-    let _ = permissions.insert(User::Anyone, PublicPermissions::new(true));
+    let _ = permissions.insert(User::Anyone, Permissions::new(true));
     let keypair = Keypair::new_ed25519();
     let owner = User::Key(keypair.public_key());
-    let policy = PublicPolicy { owner, permissions };
+    let policy = Policy { owner, permissions };
 
     let mut register = Register::new(
+        owner,
         XorName::from_content(&key_image.to_bytes()),
         SPENTBOOK_TYPE_TAG,
         policy.into(),
