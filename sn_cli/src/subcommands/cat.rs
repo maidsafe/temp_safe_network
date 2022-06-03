@@ -110,8 +110,7 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
             let safeurl = SafeUrl::from_xorurl(xorurl)?;
             if safeurl.content_type() == ContentType::Wallet {
                 if OutputFmt::Pretty == output_fmt {
-                    // Render Wallet listing spendable balances
-                    println!("Spendable balances of Wallet at \"{}\":", xorurl);
+                    println!("Spendable balances of wallet at \"{}\":", xorurl);
                     let table = gen_wallet_table(safe, data).await?;
                     println!("{table}");
                 } else {

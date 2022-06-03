@@ -162,7 +162,7 @@ pub async fn gen_wallet_table(safe: &Safe, multimap: &Multimap) -> Result<Table>
         let dbc: Dbc = match rmp_serde::from_slice(&dbc_bytes) {
             Ok(dbc) => dbc,
             Err(err) => {
-                warn!("Ignoring entry found in Wallet since it cannot be deserialised as a valid DBC: {:?}", err);
+                warn!("Ignoring entry found in wallet since it cannot be deserialised as a valid DBC: {:?}", err);
                 continue;
             }
         };
@@ -170,13 +170,13 @@ pub async fn gen_wallet_table(safe: &Safe, multimap: &Multimap) -> Result<Table>
         let balance = match dbc.amount_secrets_bearer() {
             Ok(amount_secrets) => Token::from_nano(amount_secrets.amount()),
             Err(err) => {
-                warn!("Ignoring amount from DBC found in Wallet due to error in revealing secret amount: {:?}", err);
+                warn!("Ignoring amount from DBC found in wallet due to error in revealing secret amount: {:?}", err);
                 continue;
             }
         };
 
         let spendable_name = std::str::from_utf8(key)?.to_string();
-        let hex_dbc = dbc_to_hex(&dbc)?;
+        let hex_dbc = dbc.to_hex()?;
         let hex_dbc = format!("{}...{}", &hex_dbc[..8], &hex_dbc[hex_dbc.len() - 8..]);
 
         table.add_row(&vec![spendable_name, balance.to_string(), hex_dbc]);
@@ -219,24 +219,6 @@ pub fn print_nrs_map(nrs_map: &NrsMap) {
     summary.iter().for_each(|(pub_name, link)| {
         println!("{}: {}", pub_name, link);
     });
-}
-
-pub fn dbc_from_hex(dbc_hex: &str) -> Result<Dbc> {
-    let mut dbc_str =
-        hex::decode(dbc_hex).map_err(|err| eyre!("Couldn't hex-decode DBC: {:?}", err))?;
-
-    // TODO: use MsgPack instead of bincode
-    dbc_str.reverse();
-    bincode::deserialize(&dbc_str).map_err(|err| eyre!("Couldn't deserialise DBC: {:?}", err))
-}
-
-pub fn dbc_to_hex(dbc: &Dbc) -> Result<String> {
-    // TODO: use MsgPack instead of bincode
-    let mut serialised_dbc =
-        bincode::serialize(dbc).map_err(|err| eyre!("Couldn't serialise DBC: {:?}", err))?;
-    serialised_dbc.reverse();
-
-    Ok(hex::encode(serialised_dbc))
 }
 
 // returns singular or plural version of string, based on count.

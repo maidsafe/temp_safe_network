@@ -14,7 +14,7 @@ use sn_cmd_test_utilities::util::{
 };
 
 #[test]
-fn calling_safe_wallet_create() -> Result<()> {
+fn wallet_create_should_create_a_wallet() -> Result<()> {
     safe_cmd(["wallet", "create"], Some(0))?
         .assert()
         .stdout(predicate::str::contains("Wallet created at"))
@@ -24,7 +24,7 @@ fn calling_safe_wallet_create() -> Result<()> {
 }
 
 #[test]
-fn calling_safe_wallet_deposit() -> Result<()> {
+fn wallet_deposit_should_deposit_a_dbc() -> Result<()> {
     let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
 
@@ -51,7 +51,7 @@ fn calling_safe_wallet_deposit() -> Result<()> {
 }
 
 #[test]
-fn calling_safe_wallet_balance() -> Result<()> {
+fn wallet_balance_should_report_the_balance_of_a_wallet() -> Result<()> {
     let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
 
@@ -80,7 +80,7 @@ fn calling_safe_wallet_balance() -> Result<()> {
 }
 
 #[test]
-fn calling_safe_wallet_reissue() -> Result<()> {
+fn wallet_reissue_should_reissue_a_bearer_dbc_from_a_deposited_dbc() -> Result<()> {
     let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
 
@@ -103,7 +103,10 @@ fn calling_safe_wallet_reissue() -> Result<()> {
     )?
     .assert()
     .stdout(predicate::str::contains(
-        "Success. Reissued DBC with 7.15 safecoins",
+        "Reissued DBC with 7.15 safecoins.",
+    ))
+    .stdout(predicate::str::contains(
+        "This is a bearer DBC that can be spent by anyone.",
     ))
     .success();
 
@@ -111,9 +114,10 @@ fn calling_safe_wallet_reissue() -> Result<()> {
 }
 
 #[test]
-fn calling_safe_wallet_deposit_reissued() -> Result<()> {
+fn wallet_reissue_should_reissue_an_owned_dbc_from_a_deposited_dbc() -> Result<()> {
     let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+    let pk_hex = "84da738d24dbf226bdcf4a9e27ac8a9f1beaa7c527f46774fb645b8d88850c0dab2159c2d646c35c53cf2fa940a9d6f3";
 
     safe_cmd(
         [
@@ -128,40 +132,27 @@ fn calling_safe_wallet_deposit_reissued() -> Result<()> {
         Some(0),
     )?;
 
-    let reissued_dbc = safe_cmd_stdout(
-        [
-            "wallet",
-            "reissue",
-            "1.33",
-            "--json",
-            "--from",
-            &wallet_xorurl,
-        ],
-        Some(0),
-    )?;
-
     safe_cmd(
         [
             "wallet",
-            "deposit",
-            "--name",
-            "reissued-dbc",
-            "--dbc",
-            &reissued_dbc,
+            "reissue",
+            "7.15",
+            "--from",
             &wallet_xorurl,
+            "--public-key",
+            pk_hex,
         ],
         Some(0),
-    )?;
-
-    // Let's check the balance to make sure the deposited DBC was being
-    // serialised (by the reissue cmd) and deserialised (by the deposit cmd) correctly
-    safe_cmd(["wallet", "balance", &wallet_xorurl], Some(0))?
-        .assert()
-        .stdout(format!(
-            "Wallet at \"{}\" has a total balance of 12.230000000 safecoins\n",
-            wallet_xorurl
-        ))
-        .success();
+    )?
+    .assert()
+    .stdout(predicate::str::contains(
+        "Reissued DBC with 7.15 safecoins.",
+    ))
+    .stdout(predicate::str::contains(format!(
+        "This DBC is owned by public key {}",
+        pk_hex
+    )))
+    .success();
 
     Ok(())
 }

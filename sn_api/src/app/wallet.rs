@@ -507,7 +507,7 @@ mod tests {
             Err(Error::AccessDenied(msg)) => {
                 assert_eq!(
                     msg,
-                    format!("Couldn't read Wallet found at \"{}\"", wallet_xorurl)
+                    format!("Couldn't read wallet found at \"{}\"", wallet_xorurl)
                 );
                 Ok(())
             }
