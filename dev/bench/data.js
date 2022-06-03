@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1654000036676,
+  "lastUpdate": 1654292101507,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -4499,6 +4499,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4675089130,
             "range": "± 990621377",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "e53f832b677b0489d1a578f8ee6564f054c6c288",
+          "message": "Merge #1218\n\n1218: Reissue DBC to a Particular Owner r=davidrusu a=jacderida\n\n- cd85844f9 **feat!: reissue dbc to a particular owner**\r\n\r\n  BREAKING CHANGE: the `wallet_reissue` API is extended to add an `owner_public_key` argument. This is\r\n  an `Option<bls::PublicKey>`. To reissue to a bearer DBC, use `None`, but to reissue to a particular\r\n  owner, specify the key.\r\n\r\n  I've also taken an opportunity to update the API documentation a little. In the doc comments and\r\n  logging output, I changed \"Wallet\" references to \"wallet\": in this context, \"wallet\" is not a proper\r\n  noun, so it shouldn't be capitalised (unless it happens to be at the start of a sentence). If you\r\n  wanted to refer to the type `Wallet`, that would be capitalised, but it should also be referred to\r\n  using enclosing backticks.\r\n\r\n- a1c6aebe6 **feat!: wallet deposit read input dbc from stdin**\r\n\r\n  BREAKING CHANGE: the positional `dbc` argument is changed to an optional argument.\r\n\r\n  The DBC hex representation is 8000+ characters long, so this gives the user the option to provide\r\n  the large input DBC from a file, like so:\r\n  ```\r\n  safe wallet deposit <safe-url> < ~/.safe/input_dbc\r\n  ```\r\n\r\n  Bash seems to allow you to provide this huge argument on the command line, but it doesn't work in\r\n  Fish, which is the shell I use.\r\n\r\n- e548388c6 **chore: upgrade sn_dbc to 3.2.0**\r\n\r\n  This new release has utilities for serializing/deserializing `Dbc` to/from hex.\r\n\r\n- 0d97494f7 **feat: add public key argument for owned dbcs**\r\n\r\n  The `wallet reissue` command now has an additional optional argument, `--public-key`, which allows\r\n  the user to reissue a DBC to be owned by the holder of that public key. The key should be BLS\r\n  hex-encoded.\r\n\r\n  The `wallet deposit` command will now require extension to provide the secret key when depositing an\r\n  owned DBC. This will be done as a separate piece of work.\r\n\r\n  Some additional changes were made in support or to tidy CLI-related code:\r\n  * The conversion of DBCs to/from hex were removed from the CLI since this is now done on the `Dbc`\r\n    type.\r\n  * A CLI test that existed to test the above conversion code was removed since it's no longer\r\n    necessary.\r\n  * The naming scheme for the CLI wallet tests were elaborated and the redundant \"calling_safe\"\r\n    prefixes were removed.\r\n\n\nCo-authored-by: Chris O'Neil <chriso83@protonmail.com>",
+          "timestamp": "2022-06-03T20:02:54Z",
+          "tree_id": "1febecc7f1a4becd9495ec5b28e8f1af9fd043d3",
+          "url": "https://github.com/maidsafe/safe_network/commit/e53f832b677b0489d1a578f8ee6564f054c6c288"
+        },
+        "date": 1654292100678,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10668875103,
+            "range": "± 8597810207",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3867483170,
+            "range": "± 386182566",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 9456625787,
+            "range": "± 15720540333",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10032997509,
+            "range": "± 5846599",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3174696058,
+            "range": "± 1126790722",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4794462788,
+            "range": "± 963112963",
             "unit": "ns/iter"
           }
         ]
