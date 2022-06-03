@@ -381,7 +381,7 @@ jobs:
       - name: Is the network split and ready?
         shell: bash
         run: ./resources/scripts/network_is_ready.sh
-        timeout-minutes: 10
+        timeout-minutes: 5
 
       - name: Print Network Log Stats after nodes joined
         shell: bash
