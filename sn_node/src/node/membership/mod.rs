@@ -79,8 +79,7 @@ pub(crate) fn elder_candidates(
 pub(crate) struct Membership {
     consensus: Consensus<NodeState>,
     bootstrap_members: BTreeSet<NodeState>,
-    gen: Generation,
-    history: BTreeMap<Generation, Decision<NodeState>>,
+    history: Vec<Decision<NodeState>>,
 }
 
 impl Membership {
@@ -93,17 +92,16 @@ impl Membership {
         Membership {
             consensus: Consensus::from(secret_key, elders, n_elders),
             bootstrap_members,
-            gen: 0,
-            history: BTreeMap::default(),
+            history: Vec::new(),
         }
     }
 
     pub(crate) fn generation(&self) -> Generation {
-        self.gen
+        self.history.len() as Generation
     }
 
     pub(crate) fn vote_generation(&self) -> Generation {
-        self.gen + 1
+        self.generation() + 1
     }
 
     pub(crate) fn voters_public_key_set(&self) -> &PublicKeySet {
@@ -121,18 +119,20 @@ impl Membership {
     }
 
     pub(crate) fn current_section_members(&self) -> BTreeMap<XorName, NodeState> {
-        self.section_members(self.gen).unwrap_or_default()
+        self.section_members(self.generation()).unwrap_or_default()
     }
 
     pub(crate) fn section_members(&self, gen: Generation) -> Result<BTreeMap<XorName, NodeState>> {
         let mut members =
             BTreeMap::from_iter(self.bootstrap_members.iter().cloned().map(|n| (n.name, n)));
 
-        if gen == 0 {
-            return Ok(members);
+        if gen > self.generation() {
+            return Err(Error::Consensus(sn_consensus::Error::InvalidGeneration(
+                gen,
+            )));
         }
 
-        for (history_gen, decision) in self.history.iter() {
+        for decision in self.history.iter().take(gen as usize) {
             for (node_state, _sig) in decision.proposals.iter() {
                 match node_state.state {
                     MembershipState::Joined => {
@@ -150,15 +150,9 @@ impl Membership {
                     }
                 }
             }
-
-            if history_gen == &gen {
-                return Ok(members);
-            }
         }
 
-        Err(Error::Consensus(sn_consensus::Error::InvalidGeneration(
-            gen,
-        )))
+        Ok(members)
     }
 
     pub(crate) fn propose(
@@ -189,14 +183,7 @@ impl Membership {
 
     pub(crate) fn anti_entropy(&self, from_gen: Generation) -> Vec<Decision<NodeState>> {
         info!("Membership - AntiEntropy for {from_gen:?}");
-        Vec::from_iter(
-            self
-                .history
-                .iter() // history is a BTreeSet, .iter() is ordered by generation
-                .filter(move |(gen, _)| **gen >= from_gen)
-                .map(|(_, decision)| decision)
-                .cloned(),
-        )
+        Vec::from_iter(self.history.iter().skip(from_gen as usize).cloned())
     }
 
     pub(crate) fn id(&self) -> NodeId {
@@ -289,8 +276,7 @@ impl Membership {
     fn terminate_consensus(&mut self, decision: Decision<NodeState>) {
         info!("Membership - terminating consensus {decision:#?}");
         assert_eq!(self.vote_generation(), decision.generation().unwrap());
-        let _ = self.history.insert(self.vote_generation(), decision);
-        self.gen = self.vote_generation();
+        let _ = self.history.push(decision);
         self.consensus = Consensus::from(
             self.consensus.secret_key.clone(),
             self.consensus.elders.clone(),
