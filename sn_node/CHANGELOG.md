@@ -5,15 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.62.0 (2022-06-05)
+
 ## v0.61.1 (2022-06-01)
+
+### Chore
+
+ - <csr-id-6f32e0363546fd2e39fefc78fff68ff99be04fea/> sn_node-0.61.1
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 4 days passed between releases.
- - 0 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 5 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -23,10 +29,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_node-0.61.1 ([`6f32e03`](https://github.com/maidsafe/safe_network/commit/6f32e0363546fd2e39fefc78fff68ff99be04fea))
     - Merge #1192 ([`f9fc2a7`](https://github.com/maidsafe/safe_network/commit/f9fc2a76f083ba5161c8c4eef9013c53586b4693))
 </details>
 
 ## v0.61.0 (2022-05-27)
+
+<csr-id-e5fcd032e1dd904e05bc23e119af1d06e3b85a06/>
+<csr-id-05fcc31c13a2a09da83027655bd8feb1e31660d1/>
+<csr-id-f82864be6f72876dc5ad5d38ca4cc104fbdcdde7/>
+<csr-id-b9e5db241f437f9bb8fd03ca9080a0331757b9a5/>
+<csr-id-f9700e3b6bb8b2b9949f33d627c99974c355ca2b/>
+<csr-id-7544945e15e3df18d5bf666ab7c8fbcee0766d06/>
+<csr-id-ea9906fda233cc1299c64d703267fb3b250364c2/>
+<csr-id-14c92fb0f18fc40176963ca5290914442d340256/>
+<csr-id-f65a35128c4b4fa76bc97c089f313633a8e43f79/>
 
 ### Chore
 
@@ -67,7 +84,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-294549ebc998d11a2f3621e2a9fd20a0dd9bcce5/> remove sus node flows, replicate data per data
 
-
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
@@ -106,6 +122,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.60.0 (2022-05-25)
+
+<csr-id-ef56cf9cf8de45a9f13c2510c63de245b12aeae8/>
+<csr-id-392e522c69803fddbeb3cd9e1cbae8060188578f/>
 
 ### Chore
 
