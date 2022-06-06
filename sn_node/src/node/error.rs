@@ -160,6 +160,27 @@ pub enum Error {
     /// Request Handover Anti Entropy
     #[error("RequestHandoverAntiEntropy {0}")]
     RequestHandoverAntiEntropy(u64),
+    /// Missing Membership Instance when checking a Handover vote's SAP
+    #[error("MissingMembershipInstance")]
+    MissingMembershipInstance,
+    /// Failed to get parent SAP in chain when checking a Handover vote's SAP
+    #[error("FailedToGetSAPforPrefix {0:?}")]
+    FailedToGetSAPforPrefix(Prefix),
+    /// Invalid Elder Candidates in Handover vote's SAP
+    #[error("InvalidElderCandidates")]
+    InvalidElderCandidates,
+    /// Invalid Split Candidates in Handover vote's SAP
+    #[error("InvalidSplitCandidates")]
+    InvalidSplitCandidates,
+    /// Received an invalid section prefix when checking handover candidate's section prefix
+    /// The candidate's section prefix is supposed to be identical to ours for a handover
+    #[error("Invalid Section Prefix For Handover Candidate")]
+    InvalidSectionPrefixForCandidate,
+    /// Received invalid split sections candidates
+    /// The candidates are supposed to be 2 distinct children prefixes for our section:
+    /// Example: for section 10, the candidates are supposed to be 101, 100
+    #[error("Invalid Section Prefix For Handover Split Candidate")]
+    InvalidSectionPrefixForSplitCandidates,
 }
 
 impl From<qp2p::ClientEndpointError> for Error {

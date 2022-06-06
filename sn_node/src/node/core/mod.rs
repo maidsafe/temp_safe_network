@@ -28,8 +28,7 @@ pub(crate) use proposal::Proposal;
 pub(crate) use relocation::{check as relocation_check, ChurnId};
 use sn_interface::{
     network_knowledge::{
-        recommended_section_size, split, supermajority, NetworkKnowledge, NodeInfo,
-        SectionKeyShare, SectionKeysProvider,
+        supermajority, NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider,
     },
     types::keys::ed25519::Digest256,
 };
@@ -42,6 +41,7 @@ use super::{
 use crate::node::{
     error::{Error, Result},
     membership::elder_candidates,
+    membership::try_split_dkg,
 };
 use sn_interface::messaging::{
     data::OperationId,
@@ -197,9 +197,8 @@ impl Node {
             let secret_key = (key.index as u8, key.secret_key_share);
             let elders = key.public_key_set;
             let n_elders = network_knowledge.elders().await.len();
-            let section_prefix = network_knowledge.prefix().await;
 
-            let handover_data = Handover::from(secret_key, elders, n_elders, section_prefix);
+            let handover_data = Handover::from(secret_key, elders, n_elders);
             Some(handover_data)
         } else {
             None
@@ -322,86 +321,6 @@ impl Node {
         }
     }
 
-    pub(crate) async fn get_split_info(
-        &self,
-        prefix: Prefix,
-    ) -> Option<(BTreeSet<NodeState>, BTreeSet<NodeState>)> {
-        let members = self
-            .membership
-            .read()
-            .await
-            .as_ref()?
-            .current_section_members();
-
-        // TODO: super::split(..) should return (BTreeSet<NodeState>, BTreeSet<NodeState>)
-        //       instead of (BTreeSet<XorName>, BTreeSet<XorName>);
-        let (zero, one) = split(&prefix, members.keys().copied())?;
-
-        // If none of the two new sections would contain enough entries, return `None`.
-        let split_threshold = recommended_section_size();
-        if zero.len() < split_threshold || one.len() < split_threshold {
-            return None;
-        }
-
-        Some((
-            BTreeSet::from_iter(zero.into_iter().map(|n| members[&n].clone())),
-            BTreeSet::from_iter(one.into_iter().map(|n| members[&n].clone())),
-        ))
-    }
-
-    // Tries to split our section.
-    // If we have enough nodes for both subsections, returns the DkgSessionId's
-    // of the two subsections. Otherwise returns `None`.
-    async fn try_split(
-        &self,
-        excluded_names: &BTreeSet<XorName>,
-    ) -> Option<(DkgSessionId, DkgSessionId)> {
-        trace!("{}", LogMarker::SplitAttempt);
-        let prefix = self.network_knowledge.prefix().await;
-
-        let (zero, one) = self.get_split_info(prefix).await?;
-        debug!(
-            "Upon section split attempt, section size: zero {:?}, one {:?}",
-            zero.len(),
-            one.len()
-        );
-
-        let sap = self.network_knowledge.authority_provider().await;
-
-        let zero_prefix = prefix.pushed(false);
-        let zero_elders = elder_candidates(
-            zero.iter()
-                .cloned()
-                .filter(|name| !excluded_names.contains(&name.name)),
-            &sap,
-        );
-
-        let one_prefix = prefix.pushed(true);
-        let one_elders = elder_candidates(
-            one.iter()
-                .cloned()
-                .filter(|name| !excluded_names.contains(&name.name)),
-            &sap,
-        );
-
-        let generation = self.network_knowledge.chain_len().await;
-
-        let zero_id = DkgSessionId {
-            prefix: zero_prefix,
-            elders: BTreeMap::from_iter(zero_elders.iter().map(|node| (node.name, node.addr))),
-            section_chain_len: generation,
-            bootstrap_members: zero,
-        };
-        let one_id = DkgSessionId {
-            prefix: one_prefix,
-            elders: BTreeMap::from_iter(one_elders.iter().map(|node| (node.name, node.addr))),
-            section_chain_len: generation,
-            bootstrap_members: one,
-        };
-
-        Some((zero_id, one_id))
-    }
-
     /// Generate a new section info(s) based on the current set of members,
     /// excluding any member matching a name in the provided `excluded_names` set.
     /// Returns a set of candidate DkgSessionId's.
@@ -409,7 +328,36 @@ impl Node {
         &self,
         excluded_names: &BTreeSet<XorName>,
     ) -> Vec<DkgSessionId> {
-        if let Some((zero_dkg_id, one_dkg_id)) = self.try_split(excluded_names).await {
+        let sap = self.network_knowledge.authority_provider().await;
+        let chain_len = self.network_knowledge.chain_len().await;
+
+        // get current gen and members
+        let current_gen;
+        let members: BTreeMap<XorName, NodeState> =
+            if let Some(m) = self.membership.read().await.as_ref() {
+                current_gen = m.generation();
+                m.current_section_members()
+                    .iter()
+                    .filter(|(name, _node_state)| !excluded_names.contains(*name))
+                    .map(|(n, s)| (*n, s.clone()))
+                    .collect()
+            } else {
+                error!(
+                "attempted to promote and demote elders when we don't have a membership instance"
+            );
+                return vec![];
+            };
+
+        // Try splitting
+        trace!("{}", LogMarker::SplitAttempt);
+        if let Some((zero_dkg_id, one_dkg_id)) =
+            try_split_dkg(&members, &sap, chain_len, current_gen)
+        {
+            debug!(
+                "Upon section split attempt, section size: zero {:?}, one {:?}",
+                zero_dkg_id.bootstrap_members.len(),
+                one_dkg_id.bootstrap_members.len()
+            );
             info!("Splitting {:?} {:?}", zero_dkg_id, one_dkg_id);
             return vec![zero_dkg_id, one_dkg_id];
         }
@@ -417,16 +365,6 @@ impl Node {
         // Candidates for elders out of all the nodes in the section, even out of the
         // relocating nodes if there would not be enough instead.
         let sap = self.network_knowledge.authority_provider().await;
-
-        let members = if let Some(m) = self.membership.read().await.as_ref() {
-            m.current_section_members()
-        } else {
-            error!(
-                "attempted to promote and demote elders when we don't have a membership instance"
-            );
-            return vec![];
-        };
-
         let elder_candidates = elder_candidates(
             members
                 .values()
@@ -437,7 +375,8 @@ impl Node {
         let current_elders = BTreeSet::from_iter(sap.elders().copied());
 
         info!(
-            "ELDER CANDIDATES {}: {:?}",
+            "ELDER CANDIDATES (current gen:{}) {}: {:?}",
+            current_gen,
             elder_candidates.len(),
             elder_candidates
         );
@@ -462,7 +401,7 @@ impl Node {
             trace!("section_peers {:?}", members);
             vec![]
         } else {
-            let generation = self.network_knowledge.chain_len().await;
+            let chain_len = self.network_knowledge.chain_len().await;
             let session_id = DkgSessionId {
                 prefix: sap.prefix(),
                 elders: BTreeMap::from_iter(
@@ -470,8 +409,9 @@ impl Node {
                         .into_iter()
                         .map(|node| (node.name, node.addr)),
                 ),
-                section_chain_len: generation,
+                section_chain_len: chain_len,
                 bootstrap_members: BTreeSet::from_iter(members.into_values()),
+                membership_gen: current_gen,
             };
             vec![session_id]
         }
@@ -505,7 +445,6 @@ impl Node {
             .authority_provider()
             .await
             .elder_count();
-        let section_prefix = self.network_knowledge.prefix().await;
 
         // reset split barrier for
         let mut split_barrier = self.split_barrier.write().await;
@@ -516,7 +455,6 @@ impl Node {
             (key.index as u8, key.secret_key_share),
             key.public_key_set,
             n_elders,
-            section_prefix,
         ));
 
         Ok(())

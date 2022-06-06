@@ -14,6 +14,7 @@ use crate::messaging::{
     SectionAuthorityProvider as SectionAuthorityProviderMsg,
 };
 use crate::types::Peer;
+use sn_consensus::Generation;
 use xor_name::{Prefix, XorName};
 
 use bls::{PublicKey, PublicKeySet};
@@ -64,6 +65,7 @@ pub struct SectionAuthorityProvider {
     public_key_set: PublicKeySet,
     elders: BTreeSet<Peer>,
     members: BTreeSet<NodeState>,
+    membership_gen: Generation,
 }
 
 /// SectionAuthorityProvider candidates for handover consensus to vote on
@@ -86,9 +88,10 @@ impl Display for SectionAuthorityProvider {
             .collect();
         write!(
             f,
-            "Sap {:?}  elder len:{} contains: {{{:?}}})",
+            "Sap {:?}  elder len:{} gen:{} contains: {{{:?}}})",
             self.prefix,
             self.elders.len(),
+            self.membership_gen,
             elders_info,
         )
     }
@@ -120,7 +123,13 @@ impl<'de> serde::Deserialize<'de> for SectionAuthorityProvider {
 
 impl SectionAuthorityProvider {
     /// Creates a new `SectionAuthorityProvider` with the given members, prefix and public keyset.
-    pub fn new<E, M>(elders: E, prefix: Prefix, members: M, pk_set: PublicKeySet) -> Self
+    pub fn new<E, M>(
+        elders: E,
+        prefix: Prefix,
+        members: M,
+        pk_set: PublicKeySet,
+        membership_gen: Generation,
+    ) -> Self
     where
         E: IntoIterator<Item = Peer>,
         M: IntoIterator<Item = NodeState>,
@@ -130,6 +139,7 @@ impl SectionAuthorityProvider {
             public_key_set: pk_set,
             elders: elders.into_iter().collect(),
             members: members.into_iter().collect(),
+            membership_gen,
         }
     }
 
@@ -143,6 +153,7 @@ impl SectionAuthorityProvider {
                 .cloned()
                 .map(|n| n.into_state()),
             pk_set,
+            session_id.membership_gen,
         )
     }
 
@@ -157,6 +168,10 @@ impl SectionAuthorityProvider {
 
     pub fn members(&self) -> impl Iterator<Item = &NodeState> + '_ {
         self.members.iter()
+    }
+
+    pub fn membership_gen(&self) -> Generation {
+        self.membership_gen
     }
 
     /// A convenience function since we often use SAP elders as recipients.
@@ -208,6 +223,7 @@ impl SectionAuthorityProvider {
                 .iter()
                 .map(|state| (state.name(), state.to_msg()))
                 .collect(),
+            membership_gen: self.membership_gen,
         }
     }
 }
@@ -232,6 +248,7 @@ impl SectionAuthorityProviderMsg {
                 .into_iter()
                 .map(|(_name, state)| state.into_state()),
             self.public_key_set,
+            self.membership_gen,
         )
     }
 }
@@ -303,7 +320,7 @@ pub mod test_utils {
         let members = nodes.iter().map(|i| NodeState::joined(i.peer(), None));
         let secret_key_set = SecretKeySet::random();
         let section_auth =
-            SectionAuthorityProvider::new(elders, prefix, members, secret_key_set.public_keys());
+            SectionAuthorityProvider::new(elders, prefix, members, secret_key_set.public_keys(), 0);
 
         (section_auth, nodes, secret_key_set)
     }
