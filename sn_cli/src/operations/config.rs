@@ -6,16 +6,22 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use bls::PublicKey as BlsPublicKey;
+use bytes::Bytes;
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Help, Report, Result};
 use comfy_table::Table;
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
-use sn_api::{NodeConfig, PublicKey, Safe};
+use sn_api::{NetworkPrefixMap, Safe};
 use sn_dbc::Owner;
+#[cfg(unix)]
+use std::os::unix::fs::symlink;
+#[cfg(windows)]
+use std::os::windows::fs::symlink_file;
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     default::Default,
     fmt,
-    net::SocketAddr,
     path::{Path, PathBuf},
     thread,
     time::Duration,
@@ -23,8 +29,9 @@ use std::{
 use structopt::StructOpt;
 use tokio::fs;
 use tracing::debug;
+use url::Url;
 
-const CONFIG_NETWORKS_DIRNAME: &str = "networks";
+const REMOTE_RETRY_COUNT: usize = 3;
 
 /// Provides an interface for calling a launcher tool for launching and joining the network.
 ///
@@ -69,34 +76,51 @@ impl NetworkLauncher for SnLaunchToolNetworkLauncher {
     }
 }
 
+// ok so, fetch everythign and store it into prefix_maps_path. have an Some(BlsPublicKey) along with Local and Remote,
+// which if present means that prefix map has been downloaded and available in that folder.
 #[derive(Deserialize, Debug, Serialize, Clone)]
 pub enum NetworkInfo {
-    /// The node configuration is a genesis key, which is a BLS public key, and a set of nodes
-    /// participating in the network, which are an IPv4 and port address pair.
-    NodeConfig(NodeConfig),
-    /// A URL or file path where the network connection information can be fetched/read from.
-    ConnInfoLocation(String),
+    /// Genesis key of a PrefixMap at prefix_maps_path
+    GenesisKey(BlsPublicKey),
+    /// The Optional genesis key denotes that the PrefixMap has been copied to prefix_maps_path
+    Local(PathBuf, Option<BlsPublicKey>),
+    Remote(String, Option<BlsPublicKey>),
 }
 
 impl fmt::Display for NetworkInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::NodeConfig(addresses) => write!(f, "{:?}", addresses),
-            Self::ConnInfoLocation(url) => write!(f, "{}", url),
+            Self::GenesisKey(genesis_key) => write!(f, "{:?}", genesis_key),
+            Self::Local(path, genesis_key) => {
+                if let Some(gk) = genesis_key {
+                    write!(f, "{:?} from {:?}", gk, path)
+                } else {
+                    write!(f, "{:?}", path)
+                }
+            }
+            Self::Remote(url, genesis_key) => {
+                if let Some(gk) = genesis_key {
+                    write!(f, "{:?} from {:?}", gk, url)
+                } else {
+                    write!(f, "{}", url)
+                }
+            }
         }
     }
 }
 
 impl NetworkInfo {
-    pub async fn matches(&self, node_config: &NodeConfig) -> bool {
+    pub async fn matches(&self, genesis_key: &BlsPublicKey) -> bool {
         match self {
-            Self::NodeConfig(nc) => nc == node_config,
-            Self::ConnInfoLocation(config_location) => {
-                match retrieve_node_config(config_location).await {
-                    Ok(info) => info == *node_config,
-                    Err(_) => false,
-                }
-            }
+            Self::GenesisKey(gk) => gk == genesis_key,
+            Self::Local(_, genesis_key_opt) => match genesis_key_opt {
+                Some(gk) => gk == genesis_key,
+                None => false,
+            },
+            Self::Remote(_, genesis_key_opt) => match genesis_key_opt {
+                Some(gk) => gk == genesis_key,
+                None => false,
+            },
         }
     }
 }
@@ -110,12 +134,17 @@ pub struct Settings {
 pub struct Config {
     settings: Settings,
     pub cli_config_path: PathBuf,
-    pub node_config_path: PathBuf,
+    pub prefix_maps_dir: PathBuf,
+    pub prefix_map_symlink_name: String,
     pub dbc_owner: Option<Owner>,
 }
 
 impl Config {
-    pub async fn new(cli_config_path: PathBuf, node_config_path: PathBuf) -> Result<Config> {
+    pub async fn new(
+        cli_config_path: PathBuf,
+        prefix_maps_dir: PathBuf,
+        prefix_map_symlink_name: String,
+    ) -> Result<Config> {
         let mut pb = cli_config_path.clone();
         pb.pop();
         fs::create_dir_all(pb.as_path()).await?;
@@ -161,13 +190,16 @@ impl Config {
             Settings::default()
         };
 
+        fs::create_dir_all(prefix_maps_dir.as_path()).await?;
         let mut dbc_owner_sk_path = pb.clone();
         dbc_owner_sk_path.push("credentials");
         let dbc_owner = Config::get_dbc_owner(&dbc_owner_sk_path).await?;
+
         let config = Config {
             settings,
             cli_config_path: cli_config_path.clone(),
-            node_config_path,
+            prefix_maps_dir,
+            prefix_map_symlink_name,
             dbc_owner,
         };
         config.write_settings_to_file().await.wrap_err_with(|| {
@@ -176,92 +208,201 @@ impl Config {
         Ok(config)
     }
 
-    pub async fn read_current_node_config(&self) -> Result<(PathBuf, NodeConfig)> {
-        let current_conn_info = fs::read(&self.node_config_path).await.wrap_err_with(|| {
-            eyre!("There doesn't seem to be any node configuration setup in your system.")
-                .suggestion(
-                    "A node config will be created if you join a network or launch your own.",
-                )
-        })?;
-        let node_config = deserialise_node_config(&current_conn_info).wrap_err_with(|| {
-            eyre!(format!(
-                "Unable to read current network connection information from '{}'.",
-                self.node_config_path.display()
-            ))
-            .suggestion(
-                "This file is likely not a node configuration file.\
-                Please point towards another file with a valid node configuration.",
-            )
-        })?;
-        Ok((self.node_config_path.clone(), node_config))
-    }
-
-    pub async fn get_network_info(&self, name: &str) -> Result<NodeConfig> {
-        match self.settings.networks.get(name) {
-            Some(NetworkInfo::ConnInfoLocation(config_location)) => {
-                println!(
-                    "Fetching '{}' network connection information from '{}' ...",
-                    name, config_location
-                );
-
-                let node_config = retrieve_node_config(config_location).await?;
-                Ok(node_config)
-            },
-            Some(NetworkInfo::NodeConfig(addresses)) => Ok(addresses.clone()),
-            None => bail!("No network with name '{}' was found in the config. Please use the networks 'add'/'set' subcommand to add it", name)
+    /// Sync the hashmap and the prefix_map_dir
+    pub async fn sync(&mut self) -> Result<()> {
+        let mut dir_files: BTreeMap<String, bool> = BTreeMap::new();
+        let mut prefix_maps_dir = fs::read_dir(&self.prefix_maps_dir).await?;
+        while let Some(entry) = prefix_maps_dir.next_entry().await? {
+            // check excludes symlink
+            if entry.metadata().await?.is_file() {
+                let filename = entry
+                    .file_name()
+                    .into_string()
+                    .map_err(|_| eyre!("Error converting OsString to String"))?;
+                dir_files.insert(filename, false);
+            }
         }
+
+        // get NetworkPrefixMap from cli_config if they are not in prefix_maps_dir
+        let mut remove_list: Vec<String> = Vec::new();
+        for (network_name, net_info) in self.settings.networks.iter_mut() {
+            match net_info {
+                NetworkInfo::GenesisKey(genesis_key) => {
+                    match dir_files.get_mut(format!("{:?}", genesis_key).as_str()) {
+                        Some(present) => {
+                            *present = true;
+                        }
+                        // remove entry from cli_config as there's no way to fetch the PrefixMap
+                        None => {
+                            remove_list.push(network_name.clone());
+                        }
+                    }
+                }
+                NetworkInfo::Local(path, ref mut genesis_key) => {
+                    match genesis_key {
+                        Some(gk) => match dir_files.get_mut(format!("{:?}", gk).as_str()) {
+                            Some(present) => *present = true,
+                            None => {
+                                if let Ok(prefix_map) = retrieve_local_prefix_map(path).await {
+                                    let path = self
+                                        .prefix_maps_dir
+                                        .join(format!("{:?}", prefix_map.genesis_key()));
+                                    write_prefix_map(&path, &prefix_map).await?;
+                                    *genesis_key = Some(prefix_map.genesis_key());
+                                } else {
+                                    remove_list.push(network_name.clone());
+                                }
+                            }
+                        },
+                        // PrefixMap has not been fetched, fetch it
+                        None => {
+                            if let Ok(prefix_map) = retrieve_local_prefix_map(path).await {
+                                let path = self
+                                    .prefix_maps_dir
+                                    .join(format!("{:?}", prefix_map.genesis_key()));
+                                write_prefix_map(&path, &prefix_map).await?;
+                                *genesis_key = Some(prefix_map.genesis_key());
+                            } else {
+                                remove_list.push(network_name.clone());
+                            }
+                        }
+                    }
+                }
+                NetworkInfo::Remote(url, ref mut genesis_key) => match genesis_key {
+                    Some(gk) => match dir_files.get_mut(format!("{:?}", gk).as_str()) {
+                        Some(present) => *present = true,
+                        None => {
+                            let url = Url::parse(url)?;
+                            if let Ok(prefix_map) = retrieve_remote_prefix_map(&url).await {
+                                let path = self
+                                    .prefix_maps_dir
+                                    .join(format!("{:?}", prefix_map.genesis_key()));
+                                write_prefix_map(&path, &prefix_map).await?;
+                                *genesis_key = Some(prefix_map.genesis_key());
+                            } else {
+                                remove_list.push(network_name.clone());
+                            }
+                        }
+                    },
+                    None => {
+                        let url = Url::parse(url)?;
+                        if let Ok(prefix_map) = retrieve_remote_prefix_map(&url).await {
+                            let path = self
+                                .prefix_maps_dir
+                                .join(format!("{:?}", prefix_map.genesis_key()));
+                            write_prefix_map(&path, &prefix_map).await?;
+                            *genesis_key = Some(prefix_map.genesis_key());
+                        } else {
+                            remove_list.push(network_name.clone());
+                        }
+                    }
+                },
+            }
+        }
+        for network in remove_list {
+            self.settings.networks.remove(network.as_str());
+        }
+
+        // add unaccounted NetworkPrefixMap from prefix_maps_dir to cli_config
+        for (filename, present) in dir_files.iter() {
+            if !present {
+                let path = self.prefix_maps_dir.join(filename);
+                if let Ok(prefix_map) = retrieve_local_prefix_map(&path).await {
+                    let genesis_key = prefix_map.genesis_key();
+                    self.settings.networks.insert(
+                        format!("{:?}", genesis_key),
+                        NetworkInfo::GenesisKey(genesis_key),
+                    );
+                }
+                // else remove the prefix_map if not NetworkPrefixMap type?
+            }
+        }
+        self.write_settings_to_file().await?;
+        Ok(())
     }
+
+    pub async fn read_default_prefix_map(&self) -> Result<NetworkPrefixMap> {
+        let default_path = self.prefix_maps_dir.join(&self.prefix_map_symlink_name);
+        if !default_path.is_symlink() {
+            return Err(eyre!("The file {:?} should be a symlink", &default_path));
+        }
+        let prefix_map = retrieve_local_prefix_map(&default_path)
+            .await
+            .wrap_err_with(|| {
+                eyre!("There doesn't seem to be any default NetworkPrefixMap symlink").suggestion(
+                    "A NetworkPrefixMap will be created if you join a network or launch your own.",
+                )
+            })?;
+        Ok(prefix_map)
+    }
+
+    // pub async fn get_prefix_map(&mut self, name: &str) -> Result<NetworkPrefixMap> {
+    //     match self.settings.networks.get(name) {
+    //         Some(NetworkInfo::GenesisKey(genesis_key)) => {
+    //             let path = self.prefix_maps_dir.join(format!("{:?}", genesis_key));
+    //             Ok(retrieve_local_prefix_map(&path).await?)
+    //         }
+    //         Some(NetworkInfo::Local(stored_path, ref mut genesis_key)) => {
+    //             let prefix_map = if let Some(gk) = genesis_key {
+    //                 let path = self.prefix_maps_dir.join(format!("{:?}", gk));
+    //                 retrieve_local_prefix_map(&path).await?
+    //             } else {
+    //                 // LATER: not remove? because sync just tries once. (remote was unavailable?)
+    //                 // because genesis_key should be present at this point, but try to fetch it & write
+    //                 let prefix_map = retrieve_local_prefix_map(&stored_path).await?;
+    //                 let path = self.prefix_maps_dir.join(format!("{:?}", prefix_map.genesis_key()));
+    //                 write_prefix_map(&path, &prefix_map).await?;
+    //                 *genesis_key = Some(prefix_map.genesis_key());
+    //                 prefix_map
+    //             };
+    //             Ok(prefix_map)
+    //         }
+    //         Some(NetworkInfo::Remote(stored_url, ref mut genesis_key)) => {
+    //             let prefix_map = if let Some(gk) = genesis_key {
+    //                 let path = self.prefix_maps_dir.join(format!("{:?}", gk));
+    //                 retrieve_local_prefix_map(&path).await?
+    //             } else {
+    //                 let url = Url::parse(&stored_url)?;
+    //                 let prefix_map = retrieve_remote_prefix_map(&url).await?;
+    //                 let path = self.prefix_maps_dir.join(format!("{:?}", prefix_map.genesis_key()));
+    //                 write_prefix_map(&path, &prefix_map).await?;
+    //                 *genesis_key = Some(prefix_map.genesis_key());
+    //                 prefix_map
+    //             };
+    //             Ok(prefix_map)
+    //         }
+    //         None => bail!("No network with name '{}' was found in the config. Please use the networks 'add'/'set' subcommand to add it", name)
+    //     }
+    // }
 
     pub fn networks_iter(&self) -> impl Iterator<Item = (&String, &NetworkInfo)> {
         self.settings.networks.iter()
     }
-
     pub async fn add_network(
         &mut self,
         name: &str,
-        net_info: Option<NetworkInfo>,
+        mut net_info: NetworkInfo,
     ) -> Result<NetworkInfo> {
-        let net_info = if let Some(info) = net_info {
-            info
-        } else {
-            // Cache current network connection info
-            let (_, node_config) = self.read_current_node_config().await?;
-            let cache_path = self.cache_node_config(name, &node_config).await?;
-            println!(
-                "Caching current network connection information into '{}'",
-                cache_path.display()
-            );
-            NetworkInfo::ConnInfoLocation(cache_path.display().to_string())
-        };
-
-        match &net_info {
-            NetworkInfo::NodeConfig(_) => {}
-            NetworkInfo::ConnInfoLocation(location) => {
-                let is_invalid_location = match url::Url::parse(location) {
-                    Err(_) => true,
-                    Ok(location) => !location.has_host(),
-                };
-
-                if is_invalid_location {
-                    // The location is not a valid URL, so try and parse it as a file.
-                    let pb = PathBuf::from(Path::new(&location));
-                    if !pb.is_file() {
-                        return Err(eyre!("The config location must use an existing file path.")
-                            .suggestion(
-                                "Please choose an existing file with a network configuration.",
-                            ));
-                    }
-                    deserialise_node_config(&fs::read(pb.as_path()).await?).wrap_err_with(
-                        || {
-                            eyre!("The file must contain a valid network configuration.")
-                                .suggestion(
-                                "Please choose another file with a valid network configuration.",
-                            )
-                        },
-                    )?;
-                }
+        match net_info {
+            NetworkInfo::GenesisKey(_) => {}
+            NetworkInfo::Local(ref path, ref mut genesis_key) => {
+                let prefix_map = retrieve_local_prefix_map(path).await?;
+                let path = self
+                    .prefix_maps_dir
+                    .join(format!("{:?}", prefix_map.genesis_key()));
+                write_prefix_map(&path, &prefix_map).await?;
+                *genesis_key = Some(prefix_map.genesis_key());
             }
-        }
+            NetworkInfo::Remote(ref url, ref mut genesis_key) => {
+                let url = Url::parse(url)?;
+                let prefix_map = retrieve_remote_prefix_map(&url).await?;
+                let path = self
+                    .prefix_maps_dir
+                    .join(format!("{:?}", prefix_map.genesis_key()));
+                write_prefix_map(&path, &prefix_map).await?;
+                *genesis_key = Some(prefix_map.genesis_key());
+            }
+        };
         self.settings
             .networks
             .insert(name.to_string(), net_info.clone());
@@ -274,82 +415,89 @@ impl Config {
 
     pub async fn remove_network(&mut self, name: &str) -> Result<()> {
         match self.settings.networks.remove(name) {
-            Some(NetworkInfo::ConnInfoLocation(location)) => {
+            Some(NetworkInfo::GenesisKey(genesis_key)) => {
                 self.write_settings_to_file().await?;
-                debug!("Network '{}' removed from config", name);
-                println!("Network '{}' was removed from the config", name);
-                let mut config_local_path = self.cli_config_path.clone();
-                config_local_path.pop();
-                config_local_path.push(CONFIG_NETWORKS_DIRNAME);
-                if PathBuf::from(&location).starts_with(config_local_path) {
+                let prefix_map_path = self.prefix_maps_dir.join(format!("{:?}", genesis_key));
+                if fs::remove_file(&prefix_map_path).await.is_err() {
                     println!(
-                        "Removing cached network connection information from '{}'",
-                        location
-                    );
-
-                    if let Err(err) = fs::remove_file(&location).await {
+                        "Failed to remove NetworkPrefixMap from {}",
+                        prefix_map_path.display()
+                    )
+                }
+            }
+            Some(NetworkInfo::Local(_, genesis_key)) => {
+                self.write_settings_to_file().await?;
+                if let Some(gk) = genesis_key {
+                    let prefix_map_path = self.prefix_maps_dir.join(format!("{:?}", gk));
+                    if fs::remove_file(&prefix_map_path).await.is_err() {
                         println!(
-                            "Failed to remove cached network connection information from '{}': {}",
-                            location, err
-                        );
+                            "Failed to remove NetworkPrefixMap from {}",
+                            prefix_map_path.display()
+                        )
+                    }
+                }
+                // if None, then the file is not present, since we sync during config init
+            }
+            Some(NetworkInfo::Remote(_, genesis_key)) => {
+                self.write_settings_to_file().await?;
+                if let Some(gk) = genesis_key {
+                    let prefix_map_path = self.prefix_maps_dir.join(format!("{:?}", gk));
+                    if fs::remove_file(&prefix_map_path).await.is_err() {
+                        println!(
+                            "Failed to remove NetworkPrefixMap from {}",
+                            prefix_map_path.display()
+                        )
                     }
                 }
             }
-            Some(NetworkInfo::NodeConfig(_)) => {
-                self.write_settings_to_file().await?;
-                debug!("Network '{}' removed from config", name);
-                println!("Network '{}' was removed from the config", name);
-            }
             None => println!("No network with name '{}' was found in config", name),
         }
+        debug!("Network '{}' removed from config", name);
+        println!("Network '{}' was removed from the config", name);
 
         Ok(())
     }
 
     pub async fn clear(&mut self) -> Result<()> {
         self.settings = Settings::default();
-        self.write_settings_to_file().await
+        self.write_settings_to_file().await?;
+        // delete all prefix_maps
+        let mut prefix_maps_dir = fs::read_dir(&self.prefix_maps_dir).await?;
+        while let Some(entry) = prefix_maps_dir.next_entry().await? {
+            fs::remove_file(entry.path()).await?;
+        }
+        Ok(())
     }
 
     pub async fn switch_to_network(&self, name: &str) -> Result<()> {
-        let mut base_path = self.node_config_path.clone();
-        base_path.pop();
-
-        if !base_path.exists() {
-            println!(
-                "Creating '{}' folder for network connection info",
-                base_path.display()
-            );
-            fs::create_dir_all(&base_path)
-                .await
-                .wrap_err("Couldn't create folder for network connection info")?;
-        }
-
-        let contacts = self.get_network_info(name).await?;
-        let conn_info = serialise_node_config(&contacts)?;
-        fs::write(&self.node_config_path, conn_info)
-            .await
-            .wrap_err_with(|| {
-                format!(
-                    "Unable to write network connection info in '{}'",
-                    base_path.display(),
-                )
-            })
+        match self.settings.networks.get(name) {
+            Some(NetworkInfo::GenesisKey(genesis_key)) => self.update_prefix_map_symlink(genesis_key).await?,
+            Some(NetworkInfo::Local(_, genesis_key)) => {
+                if let Some(gk) = genesis_key {
+                    self.update_prefix_map_symlink(gk).await?;
+                }
+                // if None, then the file is not present, since we sync during config init
+            }
+            Some(NetworkInfo::Remote(_, genesis_key)) => {
+                if let Some(gk) = genesis_key {
+                    self.update_prefix_map_symlink(gk).await?;
+                }
+            }
+            None => bail!("No network with name '{}' was found in the config. Please use the networks 'add'/'set' subcommand to add it", name)
+        };
+        Ok(())
     }
 
     pub async fn print_networks(&self) {
         let mut table = Table::new();
         table.add_row(&vec!["Networks"]);
         table.add_row(&vec!["Current", "Network name", "Connection info"]);
-        let current_node_config = match self.read_current_node_config().await {
-            Ok((_, current_conn_info)) => Some(current_conn_info),
-            Err(_) => None, // we simply ignore the error, none of the networks is currently active/set in the system
-        };
+        let current_prefix_map = self.read_default_prefix_map().await;
 
         for (network_name, net_info) in self.networks_iter() {
             let mut current = "";
-            if let Some(node_config) = &current_node_config {
-                if net_info.matches(node_config).await {
+            if let Ok(prefix_map) = &current_prefix_map {
+                if net_info.matches(&prefix_map.genesis_key()).await {
                     current = "*";
                 }
             }
@@ -371,30 +519,6 @@ impl Config {
         Ok(None)
     }
 
-    async fn cache_node_config(
-        &self,
-        network_name: &str,
-        node_config: &NodeConfig,
-    ) -> Result<PathBuf> {
-        let mut pb = self.cli_config_path.clone();
-        pb.pop();
-        pb.push(CONFIG_NETWORKS_DIRNAME);
-        if !pb.exists() {
-            println!(
-                "Creating '{}' folder for networks connection info cache",
-                pb.display()
-            );
-            fs::create_dir_all(&pb)
-                .await
-                .wrap_err("Couldn't create folder for networks information cache")?;
-        }
-
-        pb.push(format!("{}_node_connection_info.config", network_name));
-        let conn_info = serialise_node_config(node_config)?;
-        fs::write(&pb, conn_info).await?;
-        Ok(pb)
-    }
-
     async fn write_settings_to_file(&self) -> Result<()> {
         let serialised_settings = serde_json::to_string(&self.settings)
             .wrap_err("Failed to serialise config settings")?;
@@ -413,42 +537,100 @@ impl Config {
         );
         Ok(())
     }
-}
 
-async fn retrieve_node_config(location: &str) -> Result<NodeConfig> {
-    let is_remote_location = location.starts_with("http");
-    let contacts_bytes = if is_remote_location {
-        let resp = reqwest::get(location).await.wrap_err_with(|| {
-            format!("Failed to fetch connection information from '{}'", location)
+    async fn update_prefix_map_symlink(&self, genesis_key: &BlsPublicKey) -> Result<()> {
+        let prefix_map_file = self.prefix_maps_dir.join(format!("{:?}", genesis_key));
+        let default_prefix = self.prefix_maps_dir.join(&self.prefix_map_symlink_name);
+
+        if fs::read_link(&default_prefix).await.is_ok() {
+            fs::remove_file(&default_prefix).await.wrap_err_with(|| {
+                format!(
+                    "Error removing previous PrefixMap symlink: {:?}",
+                    default_prefix.display()
+                )
+            })?;
+        }
+        debug!(
+            "Creating symlink for PrefixMap from {:?} to {:?}",
+            prefix_map_file.display(),
+            default_prefix.display()
+        );
+        #[cfg(unix)]
+        symlink(&prefix_map_file, &default_prefix).wrap_err_with(|| {
+            format!(
+                "Error creating PrefixMap symlink from {:?} to {:?}",
+                prefix_map_file.display(),
+                default_prefix.display()
+            )
         })?;
-
-        let conn_info = resp.text().await.wrap_err_with(|| {
-            format!("Failed to fetch connection information from '{}'", location)
+        #[cfg(windows)]
+        symlink_file(prefix_map_file, default_prefix).wrap_err_with(|| {
+            format!(
+                "Error creating PrefixMap symlink from {:?} to {:?}",
+                prefix_map_file.display(),
+                default_prefix.display()
+            )
         })?;
-
-        conn_info.as_bytes().to_vec()
-    } else {
-        // Fetch it from a local file then
-        fs::read(location).await.wrap_err_with(|| {
-            format!("Unable to read connection information from '{}'", location)
-        })?
-    };
-
-    deserialise_node_config(&contacts_bytes)
+        Ok(())
+    }
 }
 
-fn deserialise_node_config(bytes: &[u8]) -> Result<NodeConfig> {
-    let deserialized: (String, BTreeSet<SocketAddr>) = serde_json::from_slice(bytes)?;
-    let genesis_key = PublicKey::bls_from_hex(&deserialized.0)?
-        .bls()
-        .ok_or_else(|| eyre!("Unexpectedly failed to obtain (BLS) genesis key."))?;
-    Ok((genesis_key, deserialized.1))
+async fn write_prefix_map(path: &PathBuf, prefix_map: &NetworkPrefixMap) -> Result<()> {
+    let serialized = serialise_prefix_map(prefix_map)?;
+    fs::write(path, serialized)
+        .await
+        .wrap_err_with(|| format!("Unable to write NetworkPrefixMap to '{}'", path.display()))?;
+    debug!("NetworkPrefixMap written at {:?}", path.display(),);
+    Ok(())
 }
 
-pub fn serialise_node_config(node_config: &NodeConfig) -> Result<String> {
-    let genesis_key_hex = hex::encode(node_config.0.to_bytes());
-    serde_json::to_string(&(genesis_key_hex, node_config.1.clone()))
-        .wrap_err_with(|| "Failed to serialise network connection info")
+async fn retrieve_local_prefix_map(location: &PathBuf) -> Result<NetworkPrefixMap> {
+    let bytes = fs::read(location).await.wrap_err_with(|| {
+        format!(
+            "Unable to read connection information from '{:?}'",
+            location
+        )
+    })?;
+    deserialise_prefix_map(&bytes)
+}
+
+async fn retrieve_remote_prefix_map(url: &Url) -> Result<NetworkPrefixMap> {
+    let mut retry = REMOTE_RETRY_COUNT;
+    let mut bytes: Option<Bytes> = None;
+    let mut status: StatusCode;
+    loop {
+        let resp = reqwest::get(url.to_string()).await?;
+        status = resp.status();
+        if status.is_client_error() || status.is_server_error() {
+            if retry <= 1 {
+                break;
+            } else {
+                retry -= 1;
+                continue;
+            }
+        }
+        bytes = Some(resp.bytes().await?);
+        break;
+    }
+    match bytes {
+        Some(b) => deserialise_prefix_map(&b[..]),
+        None => Err(eyre!(
+            "{:?}: Failed to fetch connection information (after {} retries) from '{}'",
+            status,
+            REMOTE_RETRY_COUNT,
+            url
+        )),
+    }
+}
+
+fn deserialise_prefix_map(bytes: &[u8]) -> Result<NetworkPrefixMap> {
+    let prefix_map: NetworkPrefixMap =
+        rmp_serde::from_slice(bytes).wrap_err_with(|| "Failed to deserialize NetworkPrefixMap")?;
+    Ok(prefix_map)
+}
+
+fn serialise_prefix_map(prefix_map: &NetworkPrefixMap) -> Result<Vec<u8>> {
+    rmp_serde::to_vec(prefix_map).wrap_err_with(|| "Failed to serialise NetworkPrefixMap")
 }
 
 #[cfg(test)]
@@ -459,7 +641,6 @@ mod constructor {
     use color_eyre::{eyre::eyre, Result};
     use predicates::prelude::*;
     use sn_api::Safe;
-    use std::net::SocketAddr;
     use std::path::PathBuf;
 
     #[tokio::test]
@@ -467,21 +648,25 @@ mod constructor {
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_dir = tmp_dir.child(".safe/cli");
         cli_config_dir.create_dir_all()?;
+        let prefix_maps_dir = tmp_dir.child(".safe/prefix_maps");
+        prefix_maps_dir.create_dir_all()?;
+        let prefix_map_symlink_name = String::from("default");
 
         let cli_config_file = cli_config_dir.child("config.json");
-        let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
         let dbc_owner_sk_file = cli_config_dir.child("credentials");
         let sk = SecretKey::random();
         Safe::serialize_bls_key(&sk, dbc_owner_sk_file.path())?;
 
         let config = Config::new(
             PathBuf::from(cli_config_file.path()),
-            PathBuf::from(node_config_file.path()),
+            PathBuf::from(prefix_maps_dir.path()),
+            prefix_map_symlink_name.clone(),
         )
         .await?;
 
         assert_eq!(config.cli_config_path, cli_config_file.path());
-        assert_eq!(config.node_config_path, node_config_file.path());
+        assert_eq!(config.prefix_maps_dir, prefix_maps_dir.path());
+        assert_eq!(config.prefix_map_symlink_name, prefix_map_symlink_name);
         assert_eq!(config.settings.networks.len(), 0);
         assert!(config.dbc_owner.is_some());
         Ok(())
@@ -492,15 +677,18 @@ mod constructor {
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_dir = tmp_dir.child(".safe/cli");
         let cli_config_file = cli_config_dir.child("config.json");
-        let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
+        let prefix_maps_dir = tmp_dir.child(".safe/prefix_maps");
+        let prefix_map_symlink_name = String::from("default");
 
         let _ = Config::new(
             PathBuf::from(cli_config_file.path()),
-            PathBuf::from(node_config_file.path()),
+            PathBuf::from(prefix_maps_dir.path()),
+            prefix_map_symlink_name,
         )
         .await?;
 
         cli_config_dir.assert(predicate::path::is_dir());
+        prefix_maps_dir.assert(predicate::path::is_dir());
         Ok(())
     }
 
@@ -508,10 +696,13 @@ mod constructor {
     async fn given_config_file_does_not_exist_then_it_should_be_created() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
-        let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
+        let prefix_maps_dir = tmp_dir.child(".safe/prefix_maps");
+        let prefix_map_symlink_name = String::from("default");
+
         let _ = Config::new(
             PathBuf::from(cli_config_file.path()),
-            PathBuf::from(node_config_file.path()),
+            PathBuf::from(prefix_maps_dir.path()),
+            prefix_map_symlink_name,
         )
         .await?;
 
@@ -522,47 +713,65 @@ mod constructor {
 
     #[tokio::test]
     async fn given_config_file_exists_then_the_settings_should_be_read() -> Result<()> {
+        // add all 3 NetworkInfo variants
         let serialized_config = r#"
-        {
-            "networks": {
-                "existing_network": {
-                    "NodeConfig":[
-                        [140,44,196,143,12,92,218,53,190,33,205,167,109,183,94,205,16,140,197,200,96,112,136,218,221,16,57,54,204,60,58,93,199,119,26,17,105,232,33,188,163,194,145,223,194,95,92,54],
-                        ["127.0.0.1:12000","127.0.0.2:12000"]
-                    ]
-                }
-            }
-        }"#;
+        {"networks":{
+          "PublicKey(030f..2825)":{
+             "GenesisKey":[163,15,109,28,26,203,211,208,156,251,90,71,98,171,89,225,173,18,189,187,66,56,137,52,206,69,88,213,185,223,247,133,212,173,29,138,164,236,216,174,167,242,223,192,203,23,81,32]
+          },
+          "testnet":{
+            "Remote":["https://roland-misc.s3.us-west-002.backblazeb2.com/PublicKey(180e..9f94)", [184,14,65,176,22,141,197,197,59,59,175,225,114,243,33,235,247,134,37,206,29,62,209,84,186,163,231,227,3,125,85,157,243,242,100,25,186,58,234,66,176,213,74,222,214,161,152,6]]
+          }
+        }}"#;
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
         cli_config_file.write_str(serialized_config)?;
-        let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
+        let prefix_maps_dir = tmp_dir.child(".safe/prefix_maps");
+        let prefix_map_symlink_name = String::from("default");
         let config = Config::new(
             PathBuf::from(cli_config_file.path()),
-            PathBuf::from(node_config_file.path()),
+            PathBuf::from(prefix_maps_dir.path()),
+            prefix_map_symlink_name,
         )
         .await?;
 
-        let (network_name, network_info) = config
-            .networks_iter()
+        assert_eq!(config.networks_iter().count(), 2);
+
+        let mut iter = config.networks_iter();
+
+        // first network
+        let (network_name, network_info) = iter
             .next()
             .ok_or_else(|| eyre!("failed to obtain item from networks list"))?;
-        assert_eq!(config.networks_iter().count(), 1);
-        assert_eq!(network_name, "existing_network");
+        assert_eq!(network_name, "PublicKey(030f..2825)");
         match network_info {
-            NetworkInfo::NodeConfig((_, contacts)) => {
-                assert_eq!(contacts.len(), 2);
-
-                let node: SocketAddr = "127.0.0.1:12000".parse()?;
-                assert_eq!(contacts.get(&node), Some(&node));
-                let node: SocketAddr = "127.0.0.2:12000".parse()?;
-                assert_eq!(contacts.get(&node), Some(&node));
+            NetworkInfo::GenesisKey(genesis_key) => {
+                let genesis_key_str = format!("{:?}", genesis_key);
+                assert_eq!(genesis_key_str, *network_name);
             }
-            NetworkInfo::ConnInfoLocation(_) => {
-                return Err(eyre!("connection info doesn't apply to this test"));
+            _ => {
+                return Err(eyre!(
+                    "The network information should be of type NetworkInfo::GenesisKey"
+                ));
             }
         }
 
+        // second network
+        let (network_name, network_info) = iter
+            .next()
+            .ok_or_else(|| eyre!("failed to obtain item from networks list"))?;
+        assert_eq!(network_name, "testnet");
+        match network_info {
+            NetworkInfo::Remote(_, genesis_key) => {
+                let genesis_key_str = format!("{:?}", genesis_key);
+                assert_eq!(genesis_key_str, String::from("Some(PublicKey(180e..9f94))"));
+            }
+            _ => {
+                return Err(eyre!(
+                    "The network information should be of type NetworkInfo::Remote"
+                ));
+            }
+        }
         Ok(())
     }
 
@@ -571,594 +780,202 @@ mod constructor {
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
         cli_config_file.touch()?;
-        let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
+        let prefix_maps_dir = tmp_dir.child(".safe/prefix_maps");
+        let prefix_map_symlink_name = String::from("default");
         let config = Config::new(
             PathBuf::from(cli_config_file.path()),
-            PathBuf::from(node_config_file.path()),
+            PathBuf::from(prefix_maps_dir.path()),
+            prefix_map_symlink_name.clone(),
         )
         .await?;
 
         assert_eq!(0, config.settings.networks.len());
         assert_eq!(cli_config_file.path(), config.cli_config_path.as_path());
-        assert_eq!(node_config_file.path(), config.node_config_path.as_path());
+        assert_eq!(prefix_maps_dir.path(), config.prefix_maps_dir.as_path());
 
         Ok(())
     }
 }
 
 #[cfg(test)]
-mod read_current_node_config {
-    use super::Config;
+mod read_prefix_map {
+    use super::{retrieve_remote_prefix_map, write_prefix_map, Config};
     use assert_fs::prelude::*;
     use color_eyre::Result;
-    use std::net::SocketAddr;
     use std::path::PathBuf;
+    use tokio::fs;
+    use url::Url;
 
     #[tokio::test]
-    async fn given_existing_node_config_then_it_should_be_read() -> Result<()> {
-        let genesis_key_hex = "89505bbfcac9335a7639a1dca9ed027b98be46b03953e946e53695f678c827f18f6fc22dc888de2bce9078f3fce55095";
-        let serialized_node_config = r#"
-        [
-            "89505bbfcac9335a7639a1dca9ed027b98be46b03953e946e53695f678c827f18f6fc22dc888de2bce9078f3fce55095",
-            [
-                "127.0.0.1:33314",
-                "127.0.0.1:38932",
-                "127.0.0.1:39132",
-                "127.0.0.1:47795",
-                "127.0.0.1:49976",
-                "127.0.0.1:53018",
-                "127.0.0.1:53421",
-                "127.0.0.1:54002",
-                "127.0.0.1:54386",
-                "127.0.0.1:55890",
-                "127.0.0.1:57956"
-            ]
-        ]"#;
-
+    async fn given_prefix_map_symlink_it_should_be_read() -> Result<()> {
+        let remote =
+            Url::parse("https://roland-misc.s3.us-west-002.backblazeb2.com/PublicKey(180e..9f94)")?;
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
-        let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
-        node_config_file.write_str(serialized_node_config)?;
+        let prefix_maps_dir = tmp_dir.child(".safe/prefix_maps");
+        let prefix_map_symlink_name = String::from("default");
         let config = Config::new(
             PathBuf::from(cli_config_file.path()),
-            PathBuf::from(node_config_file.path()),
+            PathBuf::from(prefix_maps_dir.path()),
+            prefix_map_symlink_name,
         )
         .await?;
 
-        let (node_config_path, node_config) = config.read_current_node_config().await?;
+        let prefix_map = retrieve_remote_prefix_map(&remote).await?;
+        let prefix_map_path = config
+            .prefix_maps_dir
+            .join(format!("{:?}", prefix_map.genesis_key()));
+        write_prefix_map(&prefix_map_path, &prefix_map).await?;
+        config
+            .update_prefix_map_symlink(&prefix_map.genesis_key())
+            .await?;
 
-        let genesis_key = node_config.0;
-        let retrieved_genesis_key_hex = hex::encode(genesis_key.to_bytes());
-        let nodes = node_config.1;
-        assert_eq!(genesis_key_hex, retrieved_genesis_key_hex);
-        assert_eq!(node_config_file.path(), node_config_path);
-        assert_eq!(nodes.len(), 11);
-
-        let node: SocketAddr = "127.0.0.1:33314".parse()?;
-        assert_eq!(nodes.get(&node), Some(&node));
+        let retrieved_prefix_map = config.read_default_prefix_map().await?;
+        assert_eq!(retrieved_prefix_map, prefix_map);
+        assert_eq!(retrieved_prefix_map.genesis_key(), prefix_map.genesis_key());
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn given_no_existing_node_config_file_the_result_should_be_an_error() -> Result<()> {
+    async fn given_no_prefix_map_symlink_it_should_be_an_error() -> Result<()> {
+        let remote =
+            Url::parse("https://roland-misc.s3.us-west-002.backblazeb2.com/PublicKey(180e..9f94)")?;
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
-        let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
+        let prefix_maps_dir = tmp_dir.child(".safe/prefix_maps");
+        let prefix_map_symlink_name = String::from("default");
         let config = Config::new(
             PathBuf::from(cli_config_file.path()),
-            PathBuf::from(node_config_file.path()),
+            PathBuf::from(prefix_maps_dir.path()),
+            prefix_map_symlink_name,
         )
         .await?;
 
-        let result = config.read_current_node_config().await;
-
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "There doesn't seem to be any node configuration setup in your system."
-        );
+        let prefix_map = retrieve_remote_prefix_map(&remote).await?;
+        let prefix_map_path = config
+            .prefix_maps_dir
+            .join(format!("{:?}", prefix_map.genesis_key()));
+        write_prefix_map(&prefix_map_path, &prefix_map).await?;
+        let retrieved_prefix_map = config.read_default_prefix_map().await;
+        assert!(retrieved_prefix_map.is_err(), "Symlink should not exist");
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn given_node_config_path_points_to_non_node_config_file_the_result_should_be_an_error(
-    ) -> Result<()> {
+    async fn given_no_prefix_map_file_it_should_be_an_error() -> Result<()> {
+        let remote =
+            Url::parse("https://roland-misc.s3.us-west-002.backblazeb2.com/PublicKey(180e..9f94)")?;
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
-        let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
-        node_config_file.write_str("this is not a node config file")?;
+        let prefix_maps_dir = tmp_dir.child(".safe/prefix_maps");
+        let prefix_map_symlink_name = String::from("default");
         let config = Config::new(
             PathBuf::from(cli_config_file.path()),
-            PathBuf::from(node_config_file.path()),
+            PathBuf::from(prefix_maps_dir.path()),
+            prefix_map_symlink_name,
         )
         .await?;
 
-        let result = config.read_current_node_config().await;
-
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            format!(
-                "Unable to read current network connection information from '{}'.",
-                node_config_file.path().display()
-            )
+        let prefix_map = retrieve_remote_prefix_map(&remote).await?;
+        let prefix_map_path = config
+            .prefix_maps_dir
+            .join(format!("{:?}", prefix_map.genesis_key()));
+        write_prefix_map(&prefix_map_path, &prefix_map).await?;
+        config
+            .update_prefix_map_symlink(&prefix_map.genesis_key())
+            .await?;
+        fs::remove_file(&prefix_map_path).await?;
+        let retrieved_prefix_map = config.read_default_prefix_map().await;
+        assert!(
+            retrieved_prefix_map.is_err(),
+            "PrefixMap pointed by the symlink should not be exist"
         );
+
         Ok(())
     }
 }
 
 #[cfg(test)]
-mod add_network {
-    use super::{Config, NetworkInfo};
+mod sync_prefix_maps_and_settings {
+    use super::{retrieve_remote_prefix_map, write_prefix_map, Config};
     use assert_fs::prelude::*;
-    use color_eyre::{
-        eyre::{bail, eyre},
-        Result,
-    };
-    use predicates::prelude::*;
-    use std::collections::BTreeSet;
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-    use std::path::{Path, PathBuf};
+    use color_eyre::Result;
+    use path::PathBuf;
+    use std::path;
+    use url::Url;
 
     #[tokio::test]
-    async fn given_network_info_not_supplied_then_current_network_config_will_be_cached(
-    ) -> Result<()> {
-        let serialized_node_config = r#"
-        [
-            "89505bbfcac9335a7639a1dca9ed027b98be46b03953e946e53695f678c827f18f6fc22dc888de2bce9078f3fce55095",
-            [
-                "127.0.0.1:33314",
-                "127.0.0.1:38932",
-                "127.0.0.1:39132",
-                "127.0.0.1:47795",
-                "127.0.0.1:49976",
-                "127.0.0.1:53018",
-                "127.0.0.1:53421",
-                "127.0.0.1:54002",
-                "127.0.0.1:54386",
-                "127.0.0.1:55890",
-                "127.0.0.1:57956"
-            ]
-        ]"#;
-
+    async fn empty_cli_config_file_should_be_populated_by_existing_prefix_maps() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let cli_config_file = tmp_dir.child(".safe/cli/config.json");
-        let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
-        let new_network_file =
-            tmp_dir.child(".safe/cli/networks/new_network_node_connection_info.config");
-        node_config_file.write_str(serialized_node_config)?;
+        let prefix_maps_dir = tmp_dir.child(".safe/prefix_maps");
+        let prefix_map_symlink_name = String::from("default");
         let mut config = Config::new(
             PathBuf::from(cli_config_file.path()),
-            PathBuf::from(node_config_file.path()),
+            PathBuf::from(prefix_maps_dir.path()),
+            prefix_map_symlink_name,
         )
         .await?;
 
-        let result = config.add_network("new_network", None).await;
-
-        assert!(result.is_ok());
-        new_network_file.assert(predicate::path::is_file());
-
-        let network = config
-            .networks_iter()
-            .next()
-            .ok_or_else(|| eyre!("failed to read network from config"))?;
-        let network_name = network.0;
-        let network_info = network.1;
-        assert_eq!(network_name, "new_network");
-        match network_info {
-            NetworkInfo::NodeConfig(_) => {
-                return Err(eyre!("node config doesn't apply to this test"));
-            }
-            NetworkInfo::ConnInfoLocation(conn_info_path) => {
-                let path = Path::new(conn_info_path);
-                assert_eq!(path, new_network_file.path());
-            }
+        let remotes: Vec<&str> = vec![
+            "https://roland-misc.s3.us-west-002.backblazeb2.com/PublicKey(180e..9f94)",
+            "https://roland-misc.s3.us-west-002.backblazeb2.com/PublicKey(030f..2825)",
+            "https://roland-misc.s3.us-west-002.backblazeb2.com/PublicKey(11d7..ffcc)",
+            "https://roland-misc.s3.us-west-002.backblazeb2.com/PublicKey(17bd..a48d)",
+        ];
+        for remote in &remotes {
+            let prefix_map = retrieve_remote_prefix_map(&Url::parse(remote)?).await?;
+            let prefix_map_path = config
+                .prefix_maps_dir
+                .join(format!("{:?}", prefix_map.genesis_key()));
+            write_prefix_map(&prefix_map_path, &prefix_map).await?;
+            config
+                .update_prefix_map_symlink(&prefix_map.genesis_key())
+                .await?;
         }
+        config.sync().await?;
+        assert_eq!(config.settings.networks.len(), remotes.len());
         Ok(())
     }
 
     #[tokio::test]
-    async fn given_no_pre_existing_config_and_a_file_path_is_used_then_a_network_should_be_saved(
-    ) -> Result<()> {
-        let existing_node_config = r#"
-        [
-          "89505bbfcac9335a7639a1dca9ed027b98be46b03953e946e53695f678c827f18f6fc22dc888de2bce9078f3fce55095",
-          [
-            "127.0.0.1:33314",
-            "127.0.0.1:38932",
-            "127.0.0.1:39132",
-            "127.0.0.1:47795",
-            "127.0.0.1:49976",
-            "127.0.0.1:53018",
-            "127.0.0.1:53421",
-            "127.0.0.1:54002",
-            "127.0.0.1:54386",
-            "127.0.0.1:55890",
-            "127.0.0.1:57956"
-          ]
-        ]"#;
-
-        let config_dir = assert_fs::TempDir::new()?;
-        let cli_config_file = config_dir.child(".safe/cli/config.json");
-        let node_config_file = config_dir.child("saved_connection_info.config");
-        node_config_file.write_str(existing_node_config)?;
-        let mut config = Config::new(
-            cli_config_file.path().to_path_buf(),
-            node_config_file.path().to_path_buf(),
-        )
-        .await?;
-
-        let result = config
-            .add_network(
-                "new_network",
-                Some(NetworkInfo::ConnInfoLocation(
-                    node_config_file.path().display().to_string(),
-                )),
-            )
-            .await;
-
-        assert!(result.is_ok());
-        cli_config_file.assert(predicate::path::is_file());
-
-        assert_eq!(config.networks_iter().count(), 1);
-
-        let network = config
-            .networks_iter()
-            .next()
-            .ok_or_else(|| eyre!("failed to read network from config"))?;
-        let network_name = network.0;
-        let network_info = network.1;
-        assert_eq!(network_name, "new_network");
-        match network_info {
-            NetworkInfo::NodeConfig(_) => {
-                bail!("node config doesn't apply to this test");
-            }
-            NetworkInfo::ConnInfoLocation(path) => {
-                assert_eq!(*path, node_config_file.path().display().to_string());
-            }
-        }
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn given_no_pre_existing_config_and_a_non_existent_file_path_is_used_then_the_result_should_be_an_error(
-    ) -> Result<()> {
-        let config_dir = assert_fs::TempDir::new()?.into_persistent();
-        let cli_config_file = config_dir.child(".safe/cli/config.json");
-        let node_config_file = config_dir.child(".safe/node/node_connection_info.config");
-        let mut config = Config::new(
-            cli_config_file.path().to_path_buf(),
-            node_config_file.path().to_path_buf(),
-        )
-        .await?;
-
-        let result = config
-            .add_network(
-                "new_network",
-                Some(NetworkInfo::ConnInfoLocation(
-                    node_config_file.path().display().to_string(),
-                )),
-            )
-            .await;
-
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "The config location must use an existing file path."
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn given_no_pre_existing_config_and_a_file_that_is_not_a_network_config_is_used_then_the_result_should_be_an_error(
-    ) -> Result<()> {
-        let config_dir = assert_fs::TempDir::new()?;
-        let cli_config_file = config_dir.child(".safe/cli/config.json");
-        let node_config_file = config_dir.child(
-            Path::new(".safe")
-                .join("node")
-                .join("node_connection_info.config"),
-        );
-        node_config_file.write_str("file that is not a network config")?;
-        let mut config = Config::new(
-            cli_config_file.path().to_path_buf(),
-            node_config_file.path().to_path_buf(),
-        )
-        .await?;
-
-        let result = config
-            .add_network(
-                "new_network",
-                Some(NetworkInfo::ConnInfoLocation(
-                    node_config_file.path().display().to_string(),
-                )),
-            )
-            .await;
-
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "The file must contain a valid network configuration."
-        );
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn given_no_pre_existing_config_and_a_url_is_used_then_a_network_should_be_saved(
-    ) -> Result<()> {
-        let config_dir = assert_fs::TempDir::new()?;
-        let cli_config_file = config_dir.child(".safe/cli/config.json");
-        let node_config_file = config_dir.child(".safe/node/node_connection_info.config");
-        let mut config = Config::new(
-            cli_config_file.path().to_path_buf(),
-            node_config_file.path().to_path_buf(),
-        )
-        .await?;
-        let url = "https://sn-node.s3.eu-west-2.amazonaws.com/config/node_connection_info.config";
-
-        let result = config
-            .add_network(
-                "new_network",
-                Some(NetworkInfo::ConnInfoLocation(String::from(url))),
-            )
-            .await;
-
-        assert!(result.is_ok());
-        cli_config_file.assert(predicate::path::is_file());
-
-        assert_eq!(config.networks_iter().count(), 1);
-
-        let network = config
-            .networks_iter()
-            .next()
-            .ok_or_else(|| eyre!("failed to read network from config"))?;
-        let network_name = network.0;
-        let network_info = network.1;
-        assert_eq!(network_name, "new_network");
-        match network_info {
-            NetworkInfo::NodeConfig(_) => {
-                bail!("node config doesn't apply to this test");
-            }
-            NetworkInfo::ConnInfoLocation(url) => {
-                assert_eq!(*url, String::from(url));
-            }
-        }
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn given_a_pre_existing_config_and_a_network_with_the_same_name_exists_then_the_existing_network_should_be_overwritten(
-    ) -> Result<()> {
-        // Arrange
-        // Setup existing config.
+    async fn prefix_maps_should_be_fetched_from_cli_config_file() -> Result<()> {
         let serialized_config = r#"
-        {
-            "networks": {
-                "existing_network": {
-                    "NodeConfig":[
-                        [140,44,196,143,12,92,218,53,190,33,205,167,109,183,94,205,16,140,197,200,96,112,136,218,221,16,57,54,204,60,58,93,199,119,26,17,105,232,33,188,163,194,145,223,194,95,92,54],
-                        ["127.0.0.1:12000","127.0.0.2:12000"]
-                    ]
-                }
-            }
-        }"#;
-        let config_dir = assert_fs::TempDir::new()?;
-        let cli_config_file = config_dir.child(".safe/cli/config.json");
-        let node_config_file = config_dir.child(".safe/node/node_connection_info.config");
+        {"networks":{
+          "network_1":{
+            "Remote":["https://roland-misc.s3.us-west-002.backblazeb2.com/PublicKey(180e..9f94)", null]
+          },
+          "network_2":{
+            "Remote":["https://roland-misc.s3.us-west-002.backblazeb2.com/PublicKey(030f..2825)", null]
+          },
+          "network_3":{
+            "Remote":["https://roland-misc.s3.us-west-002.backblazeb2.com/PublicKey(11d7..ffcc)", null]
+          },
+          "network_4":{
+            "Remote":["https://roland-misc.s3.us-west-002.backblazeb2.com/PublicKey(17bd..a48d)", null]
+          }
+        }}"#;
+        let tmp_dir = assert_fs::TempDir::new()?;
+        let cli_config_file = tmp_dir.child(".safe/cli/config.json");
         cli_config_file.write_str(serialized_config)?;
+        let prefix_maps_dir = tmp_dir.child(".safe/prefix_maps");
+        let prefix_map_symlink_name = String::from("default");
         let mut config = Config::new(
-            cli_config_file.path().to_path_buf(),
-            node_config_file.path().to_path_buf(),
+            PathBuf::from(cli_config_file.path()),
+            PathBuf::from(prefix_maps_dir.path()),
+            prefix_map_symlink_name,
         )
         .await?;
-
-        // Setup new network info.
-        let secret_key = bls::SecretKey::random();
-        let genesis_key = hex::encode(secret_key.public_key().to_bytes());
-        let mut nodes: BTreeSet<SocketAddr> = BTreeSet::new();
-        nodes.insert(SocketAddr::new(
-            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
-            12000,
-        ));
-        nodes.insert(SocketAddr::new(
-            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
-            12000,
-        ));
-
-        // Act
-        let result = config
-            .add_network(
-                "existing_network",
-                Some(NetworkInfo::NodeConfig((secret_key.public_key(), nodes))),
-            )
-            .await;
-
-        // Assert
-        // We still only have 1 network, but the node config was overwritten.
-        assert!(result.is_ok());
-        assert_eq!(config.networks_iter().count(), 1);
-
-        let network = config
-            .networks_iter()
-            .next()
-            .ok_or_else(|| eyre!("failed to read network from config"))?;
-        let network_name = network.0;
-        let network_info = network.1;
-        assert_eq!(network_name, "existing_network");
-        match network_info {
-            NetworkInfo::NodeConfig(node_config) => {
-                assert_eq!(node_config.1.len(), 2);
-
-                let node: SocketAddr = "10.0.0.1:12000".parse()?;
-                assert_eq!(node_config.1.get(&node), Some(&node));
-                let node: SocketAddr = "10.0.0.2:12000".parse()?;
-                assert_eq!(node_config.1.get(&node), Some(&node));
-
-                let public_key = node_config.0;
-                assert_eq!(hex::encode(public_key.to_bytes()), genesis_key);
-            }
-            NetworkInfo::ConnInfoLocation(_) => {
-                bail!("connection info doesn't apply to this test");
-            }
+        let paths = dbg!(std::fs::read_dir(&prefix_maps_dir)?);
+        for path in paths {
+            println!("Name: {}", path.unwrap().path().display())
         }
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn given_a_pre_existing_config_and_a_new_node_config_is_specified_then_a_new_network_should_be_added(
-    ) -> Result<()> {
-        let serialized_config = r#"
-        {
-            "networks": {
-                "existing_network": {
-                    "NodeConfig":[
-                        [140,44,196,143,12,92,218,53,190,33,205,167,109,183,94,205,16,140,197,200,96,112,136,218,221,16,57,54,204,60,58,93,199,119,26,17,105,232,33,188,163,194,145,223,194,95,92,54],
-                        ["127.0.0.1:12000","127.0.0.2:12000"]
-                    ]
-                }
-            }
-        }"#;
-        let config_dir = assert_fs::TempDir::new()?;
-        let cli_config_file = config_dir.child(".safe/cli/config.json");
-        let node_config_file = config_dir.child(".safe/node/node_connection_info.config");
-        cli_config_file.write_str(serialized_config)?;
-        let mut config = Config::new(
-            cli_config_file.path().to_path_buf(),
-            node_config_file.path().to_path_buf(),
-        )
-        .await?;
-
-        // Setup new network info.
-        let secret_key = bls::SecretKey::random();
-        let genesis_key = hex::encode(secret_key.public_key().to_bytes());
-        let mut nodes: BTreeSet<SocketAddr> = BTreeSet::new();
-        nodes.insert(SocketAddr::new(
-            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
-            12000,
-        ));
-        nodes.insert(SocketAddr::new(
-            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
-            12000,
-        ));
-
-        // Act
-        let result = config
-            .add_network(
-                "new_network",
-                Some(NetworkInfo::NodeConfig((secret_key.public_key(), nodes))),
-            )
-            .await;
-
-        // Assert
-        assert!(result.is_ok());
-        assert_eq!(config.networks_iter().count(), 2);
-
-        let network = config
-            .networks_iter()
-            .nth(1)
-            .ok_or_else(|| eyre!("failed to read network from config"))?;
-        let network_name = network.0;
-        let network_info = network.1;
-        assert_eq!(network_name, "new_network");
-        match network_info {
-            NetworkInfo::NodeConfig(node_config) => {
-                assert_eq!(node_config.1.len(), 2);
-
-                let node: SocketAddr = "10.0.0.1:12000".parse()?;
-                assert_eq!(node_config.1.get(&node), Some(&node));
-                let node: SocketAddr = "10.0.0.2:12000".parse()?;
-                assert_eq!(node_config.1.get(&node), Some(&node));
-
-                let public_key = node_config.0;
-                assert_eq!(hex::encode(public_key.to_bytes()), genesis_key);
-            }
-            NetworkInfo::ConnInfoLocation(_) => {
-                bail!("connection info doesn't apply to this test");
-            }
-        }
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn given_a_pre_existing_config_and_a_conn_info_location_is_specified_then_a_new_network_should_be_added(
-    ) -> Result<()> {
-        // Arrange
-        let serialized_config = r#"
-        {
-            "networks": {
-                "existing_network": {
-                    "NodeConfig":[
-                        [140,44,196,143,12,92,218,53,190,33,205,167,109,183,94,205,16,140,197,200,96,112,136,218,221,16,57,54,204,60,58,93,199,119,26,17,105,232,33,188,163,194,145,223,194,95,92,54],
-                        ["127.0.0.1:12000","127.0.0.2:12000"]
-                    ]
-                }
-            }
-        }"#;
-        let serialized_node_config = r#"
-        [
-            "89505bbfcac9335a7639a1dca9ed027b98be46b03953e946e53695f678c827f18f6fc22dc888de2bce9078f3fce55095",
-            [
-                "127.0.0.1:33314",
-                "127.0.0.1:38932",
-                "127.0.0.1:39132",
-                "127.0.0.1:47795",
-                "127.0.0.1:49976",
-                "127.0.0.1:53018",
-                "127.0.0.1:53421",
-                "127.0.0.1:54002",
-                "127.0.0.1:54386",
-                "127.0.0.1:55890",
-                "127.0.0.1:57956"
-            ]
-        ]"#;
-        let config_dir = assert_fs::TempDir::new()?;
-        let cli_config_file = config_dir.child(".safe/cli/config.json");
-        let node_config_file = config_dir.child(".safe/node/node_connection_info.config");
-        let existing_node_config_file = config_dir.child("node_connection_info.config");
-        existing_node_config_file.write_str(serialized_node_config)?;
-        cli_config_file.write_str(serialized_config)?;
-        let mut config = Config::new(
-            cli_config_file.path().to_path_buf(),
-            node_config_file.path().to_path_buf(),
-        )
-        .await?;
-
-        // Act
-        let result = config
-            .add_network(
-                "new_network",
-                Some(NetworkInfo::ConnInfoLocation(
-                    existing_node_config_file.path().display().to_string(),
-                )),
-            )
-            .await;
-
-        // Assert
-        assert!(result.is_ok());
-        assert_eq!(config.networks_iter().count(), 2);
-
-        let network = config
-            .networks_iter()
-            .nth(1)
-            .ok_or_else(|| eyre!("failed to read network from config"))?;
-        let network_name = network.0;
-        let network_info = network.1;
-        assert_eq!(network_name, "new_network");
-        match network_info {
-            NetworkInfo::NodeConfig(_) => {
-                return Err(eyre!("node config doesn't apply to this test"));
-            }
-            NetworkInfo::ConnInfoLocation(path) => {
-                assert_eq!(
-                    *path,
-                    existing_node_config_file.path().display().to_string()
-                );
-            }
+        config.sync().await?;
+        let paths = dbg!(std::fs::read_dir(prefix_maps_dir)?);
+        for path in paths {
+            println!("Name: {}", path.unwrap().path().display())
         }
 
         Ok(())

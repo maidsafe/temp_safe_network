@@ -8,8 +8,10 @@
 
 use crate::operations::config::{Config, NetworkInfo};
 use color_eyre::Result;
+use std::path::PathBuf;
 use structopt::StructOpt;
 use tracing::debug;
+use url::Url;
 
 #[derive(StructOpt, Debug)]
 pub enum ConfigSubCommands {
@@ -30,8 +32,8 @@ pub enum SettingAddCmd {
     Network {
         /// Network name
         network_name: String,
-        /// Location of the network connection information. If this argument is not passed, it takes current network connection information and caches it
-        config_location: Option<String>,
+        /// Local or Remote location to fetch the NetworkPrefixMap
+        prefix_location: String,
     },
     // #[structopt(name = "contact")]
     // Contact {
@@ -60,14 +62,18 @@ pub async fn config_commander(cmd: Option<ConfigSubCommands>, config: &mut Confi
     match cmd {
         Some(ConfigSubCommands::Add(SettingAddCmd::Network {
             network_name,
-            config_location,
+            prefix_location,
         })) => {
-            config
-                .add_network(
-                    &network_name,
-                    config_location.map(NetworkInfo::ConnInfoLocation),
-                )
-                .await?;
+            if Url::parse(prefix_location.as_str()).is_ok() {
+                config
+                    .add_network(&network_name, NetworkInfo::Remote(prefix_location, None))
+                    .await?;
+            } else {
+                let path = PathBuf::from(prefix_location);
+                config
+                    .add_network(&network_name, NetworkInfo::Local(path, None))
+                    .await?;
+            }
         }
         // Some(ConfigSubCommands::Add(SettingAddCmd::Contact { name, safeid })) => {}
         Some(ConfigSubCommands::Remove(SettingRemoveCmd::Network { network_name })) => {

@@ -55,7 +55,7 @@ use tracing_subscriber::EnvFilter;
 #[derive(Debug, StructOpt)]
 struct Options {
     /// Whether this is the first node ("genesis node") of the network. Only one node can be first.
-    #[structopt(short, long, conflicts_with = "bootstrap-contact")]
+    #[structopt(short, long)]
     first: bool,
     /// IP address to bind to. Default is localhost which is fine when spawning example nodes
     /// on a single machine. If one wants to run nodes on multiple machines, an address that is

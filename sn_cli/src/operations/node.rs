@@ -9,7 +9,6 @@
 use super::helpers::download_and_install_node;
 use crate::operations::config::NetworkLauncher;
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
-use sn_api::NodeConfig;
 use std::{
     fs::create_dir_all,
     io::{self, Write},
@@ -62,16 +61,7 @@ pub fn node_version(node_path: Option<PathBuf>) -> Result<()> {
     }
 }
 
-pub fn node_install(
-    node_config_dir_path: PathBuf,
-    node_override_dir_path: Option<PathBuf>,
-    version: Option<String>,
-) -> Result<()> {
-    let target_dir_path = if let Some(override_dir_path) = node_override_dir_path {
-        override_dir_path
-    } else {
-        node_config_dir_path
-    };
+pub fn node_install(target_dir_path: PathBuf, version: Option<String>) -> Result<()> {
     let _ =
         download_and_install_node(target_dir_path, SN_NODE_EXECUTABLE, "safe_network", version)?;
     Ok(())
@@ -107,7 +97,6 @@ pub fn node_join(
     node_directory_path: PathBuf,
     node_data_dir_name: &str,
     verbosity: u8,
-    node_config: NodeConfig,
     local_addr: Option<SocketAddr>,
     public_addr: Option<SocketAddr>,
     clear_data: bool,
@@ -139,19 +128,6 @@ pub fn node_join(
         println!("V: {}", v);
         verbosity_arg.push_str(&v);
         sn_launch_tool_args.push(verbosity_arg);
-    }
-    sn_launch_tool_args.push("--genesis-key".to_string());
-    let genesis_key = hex::encode(node_config.0.to_bytes());
-    sn_launch_tool_args.push(genesis_key);
-
-    sn_launch_tool_args.push("--hard-coded-contacts".to_string());
-    let contacts = &node_config.1;
-    let contacts_list = contacts
-        .iter()
-        .map(|c| c.to_string())
-        .collect::<Vec<String>>();
-    for peer in &contacts_list {
-        sn_launch_tool_args.push(peer.to_string());
     }
 
     network_launcher.join(sn_launch_tool_args)?;
