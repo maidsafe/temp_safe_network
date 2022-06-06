@@ -34,7 +34,7 @@ use structopt::{clap::AppSettings::ColoredHelp, StructOpt};
 use tracing::debug;
 
 const DEFAULT_OPERATION_TIMEOUT_SECS: u64 = 120; // 2mins
-
+const DEFAULT_PREFIX_SYMLINK_NAME: &str = "default";
 const SN_CLI_QUERY_TIMEOUT: &str = "SN_CLI_QUERY_TIMEOUT";
 
 #[derive(StructOpt, Debug)]
@@ -176,13 +176,19 @@ async fn get_config() -> Result<Config> {
         dirs_next::home_dir().ok_or_else(|| eyre!("Couldn't find user's home directory"))?;
     default_config_path.push(".safe");
     let config_path =
-        std::env::var("SN_CLI_CONFIG_PATH").map_or(default_config_path, PathBuf::from);
+        std::env::var("SN_CLI_CONFIG_PATH").map_or(default_config_path.clone(), PathBuf::from);
 
     let mut cli_config_path = config_path.clone();
     cli_config_path.push("cli");
     cli_config_path.push("config.json");
-    let mut node_config_path = config_path;
-    node_config_path.push("node");
-    node_config_path.push("node_connection_info.config");
-    Config::new(cli_config_path, node_config_path).await
+    let mut prefix_maps_dir = default_config_path;
+    prefix_maps_dir.push("prefix_maps");
+    let mut config = Config::new(
+        cli_config_path,
+        prefix_maps_dir,
+        DEFAULT_PREFIX_SYMLINK_NAME.to_string(),
+    )
+    .await?;
+    config.sync().await?;
+    Ok(config)
 }

@@ -10,6 +10,7 @@
 use crate::{Error, Result};
 use ::time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
+pub use sn_interface::network_knowledge::prefix_map::NetworkPrefixMap;
 use sn_interface::types::{Error as SafeNdError, PublicKey, Token};
 use std::{
     str::{self, FromStr},

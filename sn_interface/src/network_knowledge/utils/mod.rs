@@ -20,18 +20,15 @@ pub const DEFAULT_PREFIX_SYMLINK_NAME: &str = "default";
 pub async fn compare_and_write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap) -> Result<()> {
     // Open or create `$User/.safe/prefix_maps` dir
     let prefix_map_dir = get_prefix_map_dir()?;
-
     tokio::fs::create_dir_all(prefix_map_dir.clone())
         .await
         .map_err(|_| {
             Error::DirectoryHandling("Could not read '.safe/prefix_maps' directory".to_string())
         })?;
-
     let prefix_map_file = prefix_map_dir.join(format!("{:?}", prefix_map.genesis_key()));
 
     // Check if the prefixMap is already present and is latest to the provided Map.
     let disk_map = read_prefix_map_from_disk().await.ok();
-
     let mut update_symlink: bool = false;
     if let Some(old_map) = disk_map {
         // if symlink points to a different PrefixMap
@@ -72,7 +69,7 @@ pub async fn compare_and_write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap)
 }
 
 pub async fn read_prefix_map_from_disk() -> Result<NetworkPrefixMap> {
-    // Read NetworkPrefixMap from disk if present else create a new one
+    // Read NetworkPrefixMap from disk
     let path = get_prefix_map_dir()?.join(DEFAULT_PREFIX_SYMLINK_NAME);
     match File::open(&path).await {
         Ok(mut prefix_map_file) => {

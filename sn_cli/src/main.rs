@@ -21,6 +21,7 @@ use tracing::{self, debug};
 use tracing_subscriber::filter::EnvFilter;
 
 extern crate comfy_table;
+extern crate core;
 
 #[allow(dead_code)]
 const APP_ID: &str = "net.maidsafe.cli";
