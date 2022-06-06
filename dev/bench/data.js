@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1654292101507,
+  "lastUpdate": 1654498580632,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -4559,6 +4559,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4794462788,
             "range": "± 963112963",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "2f2604325d533357bad7d917315cf4cba0b2d3c0",
+          "message": "Merge #1217\n\n1217: feat: handover sap elder checks with membership knowledge r=joshuef a=grumbach\n\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\r\nSquashed version of PR #1215  \r\nhttps://github.com/maidsafe/safe_network/pull/1215 \n\nCo-authored-by: grumbach <anselmega@gmail.com>\nCo-authored-by: Anselme <anselmega@gmail.com>",
+          "timestamp": "2022-06-06T05:17:59Z",
+          "tree_id": "94a735f10839b61bd05a6fde406559d445f5c482",
+          "url": "https://github.com/maidsafe/safe_network/commit/2f2604325d533357bad7d917315cf4cba0b2d3c0"
+        },
+        "date": 1654498579287,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 19920333426,
+            "range": "± 12015110995",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 6175017996,
+            "range": "± 4059856155",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 10012005335,
+            "range": "± 423994206",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10040388388,
+            "range": "± 2218480054",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3165311613,
+            "range": "± 1549762671",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 4888834415,
+            "range": "± 1309212446",
             "unit": "ns/iter"
           }
         ]
