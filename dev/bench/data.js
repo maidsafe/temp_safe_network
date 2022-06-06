@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1654498580632,
+  "lastUpdate": 1654538315176,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -4619,6 +4619,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4888834415,
             "range": "± 1309212446",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "992c4951670afc769feea7e6cd38db021aed88a7",
+          "message": "Merge #1214\n\n1214: Gabriel spentbook PR1143 r=maqi a=maqi\n\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\r\nThis PR is mainly based on the PR 1143 to complete the rebase and conflicts resolving work to get merged for the initial work.\r\nThere is a list of detailed future work in the PR comment of PR 1143, which worth to be noted.\r\n\r\nCloses https://github.com/maidsafe/safe_network/pull/1143\r\n\n\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>\nCo-authored-by: qima <qi.ma@maidsafe.net>\nCo-authored-by: joshuef <joshuef@gmail.com>",
+          "timestamp": "2022-06-06T16:15:41Z",
+          "tree_id": "4cc9f1df90890dae168866b614fef6710234d69d",
+          "url": "https://github.com/maidsafe/safe_network/commit/992c4951670afc769feea7e6cd38db021aed88a7"
+        },
+        "date": 1654538313832,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 29498467146,
+            "range": "± 11750789104",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3898408195,
+            "range": "± 4305207951",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 9819099031,
+            "range": "± 1922748649",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 8870901065,
+            "range": "± 1632426334",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 3159080018,
+            "range": "± 24270211",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 6360998459,
+            "range": "± 1633884850",
             "unit": "ns/iter"
           }
         ]
