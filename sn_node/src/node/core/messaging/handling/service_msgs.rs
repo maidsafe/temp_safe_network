@@ -6,17 +6,27 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{api::cmds::Cmd, core::Node, Result};
+use crate::node::{api::cmds::Cmd, core::Node, Error, Result};
 use sn_interface::data_copy_count;
 use sn_interface::messaging::{
-    data::{CmdError, DataCmd, DataQuery, Error as ErrorMsg, ServiceMsg},
+    data::{
+        CmdError, DataCmd, DataQuery, EditRegister, Error as ErrorMsg, ServiceMsg,
+        SignedRegisterEdit, SpentbookCmd,
+    },
     system::{NodeQueryResponse, SystemMsg},
     AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
 };
 use sn_interface::types::{
-    log_markers::LogMarker, register::User, Peer, PublicKey, ReplicatedData,
+    log_markers::LogMarker,
+    register::{PublicPermissions, PublicPolicy, Register, User},
+    Keypair, Peer, PublicKey, RegisterCmd, ReplicatedData, SPENTBOOK_TYPE_TAG,
 };
 
+use bytes::Bytes;
+use sn_dbc::{
+    Hash, IndexedSignatureShare, KeyImage, RingCtTransaction, SpentProofContent, SpentProofShare,
+};
+use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
 impl Node {
@@ -36,6 +46,7 @@ impl Node {
             .query(query, User::Key(auth.public_key))
             .await;
 
+        trace!("data query response at adult is: {:?}", response);
         let msg = SystemMsg::NodeQueryResponse {
             response,
             correlation_id,
@@ -59,7 +70,6 @@ impl Node {
     /// Forms a response to send to the requester
     pub(crate) async fn handle_data_query_response_at_elder(
         &self,
-        // msg_id: MsgId,
         correlation_id: MsgId,
         response: NodeQueryResponse,
         user: EndUser,
@@ -67,13 +77,13 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         let msg_id = MsgId::new();
         let mut cmds = vec![];
+        let op_id = response.operation_id()?;
         debug!(
-            "Handling data read @ elders, received from {:?} ",
-            sending_node_pk
+            "Handling data read @ elders, received from {:?}, op id: {:?}",
+            sending_node_pk, op_id
         );
 
         let node_id = XorName::from(sending_node_pk);
-        let op_id = response.operation_id()?;
 
         let querys_peers = self.pending_data_queries.remove(&op_id).await;
         // Clear expired queries from the cache.
@@ -157,20 +167,23 @@ impl Node {
         auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
     ) -> Result<Vec<Cmd>> {
-        if self.is_not_elder().await {
-            error!("Received unexpected message while Adult: {:?}", msg_id);
-            return Ok(vec![]);
-        }
-
         // extract the data from the request
         let data = match msg {
             // These reads/writes are for adult nodes...
             ServiceMsg::Cmd(DataCmd::Register(cmd)) => ReplicatedData::RegisterWrite(cmd),
+            ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend { key_image, tx })) => {
+                // generate and sign spent proof share
+                let spent_proof_share = self.gen_spent_proof_share(&key_image, &tx).await?;
+
+                // store spent proof share to adults
+                let reg_cmd = gen_register_cmd(&key_image, &spent_proof_share)?;
+                ReplicatedData::SpentbookWrite(reg_cmd)
+            }
             ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => ReplicatedData::Chunk(chunk),
             ServiceMsg::Query(query) => {
                 return self
                     .read_data_from_adults(query, msg_id, auth, origin)
-                    .await
+                    .await;
             }
             _ => {
                 warn!(
@@ -214,7 +227,94 @@ impl Node {
             return Ok(vec![]);
         }
 
+        if self.is_not_elder().await {
+            error!("Received unexpected message while Adult: {:?}", msg_id);
+            return Ok(vec![]);
+        }
+
         self.handle_service_msg_received(msg_id, msg, auth, user)
             .await
     }
+
+    // Private helper to generate spent proof share
+    async fn gen_spent_proof_share(
+        &self,
+        key_image: &KeyImage,
+        tx: &RingCtTransaction,
+    ) -> Result<SpentProofShare> {
+        // TODO:
+        // 1- perform all validations on the key image and tx received
+        // 2- if everything is ok then sign the spent proof
+
+        let sap = self.network_knowledge.authority_provider().await;
+        let current_section_key = sap.section_key();
+        let spentbook_pks = sap.public_key_set();
+
+        // FIXME!!!: populate with real commitments taken from tx
+        let public_commitments = vec![];
+
+        let content = SpentProofContent {
+            key_image: *key_image,
+            transaction_hash: Hash::from(tx.hash()),
+            public_commitments,
+        };
+
+        let (index, sig_share) = self
+            .section_keys_provider
+            .sign_with(content.hash().as_ref(), &current_section_key)
+            .await?;
+        let spentbook_sig_share = IndexedSignatureShare::new(index as u64, sig_share);
+
+        Ok(SpentProofShare {
+            content,
+            spentbook_pks,
+            spentbook_sig_share,
+        })
+    }
+}
+
+// Helper to generate the RegisterCmd to write the SpentProofShare
+// as an entry in the Spentbook (Register).
+// TODO: store not only the SpentProofShare but also the linked Tx
+fn gen_register_cmd(
+    key_image: &KeyImage,
+    spent_proof_share: &SpentProofShare,
+) -> Result<RegisterCmd> {
+    // TODO: use the node's own keypair and section key share for signatures
+    let mut permissions = BTreeMap::new();
+    let _ = permissions.insert(User::Anyone, PublicPermissions::new(true));
+    let keypair = Keypair::new_ed25519();
+    let owner = User::Key(keypair.public_key());
+    let policy = PublicPolicy { owner, permissions };
+
+    let mut register = Register::new(
+        XorName::from_content(&key_image.to_bytes()),
+        SPENTBOOK_TYPE_TAG,
+        policy.into(),
+        u16::MAX,
+    );
+
+    let entry = Bytes::from(rmp_serde::to_vec_named(spent_proof_share).map_err(|err| {
+        Error::SpentbookError(format!(
+            "Failed to serialise SpentProofShare to insert it into the spentbook (Register): {:?}",
+            err
+        ))
+    })?);
+
+    let (_, op) = register.write(entry.to_vec(), BTreeSet::default())?;
+    let op = EditRegister {
+        address: *register.address(),
+        edit: op,
+    };
+
+    let signature = keypair.sign(&bincode::serialize(&op)?);
+    let signed_edit = SignedRegisterEdit {
+        op,
+        auth: ServiceAuth {
+            public_key: keypair.public_key(),
+            signature,
+        },
+    };
+
+    Ok(RegisterCmd::Edit(signed_edit))
 }

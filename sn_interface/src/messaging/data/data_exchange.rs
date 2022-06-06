@@ -9,7 +9,7 @@
 use super::RegisterCmd;
 use crate::{
     messaging::SectionAuth,
-    types::{Error, RegisterAddress as Address, Result},
+    types::{Error, RegisterAddress, Result, SpentbookAddress},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -30,7 +30,22 @@ pub struct RegisterStoreExport(pub Vec<ReplicatedRegisterLog>);
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReplicatedRegisterLog {
     ///
-    pub address: Address,
+    pub address: RegisterAddress,
+    /// This is a duplicated entry as it should exist in first cmd
+    pub section_auth: SectionAuth,
+    ///
+    pub op_log: Vec<RegisterCmd>,
+}
+
+/// Data to be exchanged between Spentbook stores.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SpentbookStoreExport(pub Vec<ReplicatedSpentbookLog>);
+
+/// Register data exchange.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReplicatedSpentbookLog {
+    ///
+    pub address: SpentbookAddress,
     /// section sig over address.id()
     /// This is a duplicated entry as it should exist in first cmd
     pub section_auth: SectionAuth,

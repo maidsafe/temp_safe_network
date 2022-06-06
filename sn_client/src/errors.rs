@@ -153,6 +153,9 @@ pub enum Error {
     /// Bincode error
     #[error(transparent)]
     Serialisation(#[from] Box<bincode::ErrorKind>),
+    /// Dbc error
+    #[error(transparent)]
+    Dbc(#[from] sn_dbc::Error),
     /// Could not retrieve all chunks required to decrypt the data. (expected, error)
     #[error("Not all chunks were retrieved, expected {expected}, retrieved {retrieved}.")]
     NotEnoughChunksRetrieved {

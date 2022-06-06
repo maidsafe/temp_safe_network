@@ -179,6 +179,11 @@ impl SectionAuthorityProvider {
         self.elders.iter().cloned().collect()
     }
 
+    // Returns a copy of the public key set
+    pub fn public_key_set(&self) -> PublicKeySet {
+        self.public_key_set.clone()
+    }
+
     /// Returns the number of elders in the section.
     pub fn elder_count(&self) -> usize {
         self.elders.len()

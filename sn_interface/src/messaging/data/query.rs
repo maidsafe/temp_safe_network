@@ -7,9 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{
-    chunk_operation_id, register::RegisterQuery, Error, OperationId, QueryResponse, Result,
+    chunk_operation_id, register::RegisterQuery, spentbook::SpentbookQuery, Error, OperationId,
+    QueryResponse, Result,
 };
-use crate::types::{ChunkAddress, ReplicatedDataAddress as DataAddress};
+use crate::types::{ChunkAddress, ReplicatedDataAddress, SpentbookAddress};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -34,6 +35,11 @@ pub enum DataQuery {
     ///
     /// [`Register`]: crate::types::register::Register
     Register(RegisterQuery),
+    #[cfg(feature = "spentbook")]
+    /// [`Spentbook`] read operation.
+    ///
+    /// [`Spentbook`]: crate::types::spentbook::Spentbook
+    Spentbook(SpentbookQuery),
 }
 
 impl DataQuery {
@@ -46,6 +52,8 @@ impl DataQuery {
             GetChunk(_) => Ok(QueryResponse::GetChunk(Err(error))),
             #[cfg(feature = "registers")]
             Register(q) => q.error(error),
+            #[cfg(feature = "spentbook")]
+            Spentbook(q) => q.error(error),
         }
     }
 
@@ -57,16 +65,22 @@ impl DataQuery {
             GetChunk(address) => *address.name(),
             #[cfg(feature = "registers")]
             Register(q) => q.dst_name(),
+            #[cfg(feature = "spentbook")]
+            Spentbook(q) => q.dst_name(),
         }
     }
 
     /// Returns the address of the data
-    pub fn address(&self) -> DataAddress {
+    pub fn address(&self) -> ReplicatedDataAddress {
         match self {
             #[cfg(feature = "chunks")]
-            DataQuery::GetChunk(address) => DataAddress::Chunk(*address),
+            DataQuery::GetChunk(address) => ReplicatedDataAddress::Chunk(*address),
             #[cfg(feature = "registers")]
-            DataQuery::Register(read) => DataAddress::Register(read.dst_address()),
+            DataQuery::Register(read) => ReplicatedDataAddress::Register(read.dst_address()),
+            #[cfg(feature = "spentbook")]
+            DataQuery::Spentbook(read) => {
+                ReplicatedDataAddress::Spentbook(SpentbookAddress::new(*read.dst_address().name()))
+            }
         }
     }
 
@@ -80,6 +94,8 @@ impl DataQuery {
             DataQuery::GetChunk(address) => chunk_operation_id(address),
             #[cfg(feature = "registers")]
             DataQuery::Register(read) => read.operation_id(),
+            #[cfg(feature = "spentbook")]
+            DataQuery::Spentbook(read) => read.operation_id(),
         }
     }
 }

@@ -126,7 +126,7 @@ impl Safe {
         Ok(())
     }
 
-    /// Resturns true if we already have a connection with the network
+    /// Returns true if we already have a connection with the network
     pub fn is_connected(&self) -> bool {
         self.client.is_some()
     }

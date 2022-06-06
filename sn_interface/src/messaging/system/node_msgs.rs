@@ -18,6 +18,7 @@ use crate::types::{
 };
 
 use serde::{Deserialize, Serialize};
+use sn_dbc::SpentProofShare;
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -101,16 +102,16 @@ pub enum NodeQuery {
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum NodeQueryResponse {
-    #[cfg(feature = "chunks")]
     //
     // ===== Chunk =====
     //
+    #[cfg(feature = "chunks")]
     /// Response to [`ChunkRead::Get`].
     GetChunk(Result<Chunk>),
-    #[cfg(feature = "registers")]
     //
     // ===== Register Data =====
     //
+    #[cfg(feature = "registers")]
     /// Response to [`RegisterQuery::Get`].
     GetRegister((Result<Register>, OperationId)),
     #[cfg(feature = "registers")]
@@ -128,6 +129,12 @@ pub enum NodeQueryResponse {
     #[cfg(feature = "registers")]
     /// Response to [`RegisterQuery::GetUserPermissions`].
     GetRegisterUserPermissions((Result<Permissions>, OperationId)),
+    //
+    // ===== Spentbook Data =====
+    //
+    #[cfg(feature = "spentbook")]
+    /// Response to [`SpentbookQuery::SpentProofShares`].
+    SpentProofShares((Result<Vec<SpentProofShare>>, OperationId)),
     //
     // ===== Other =====
     //
@@ -153,6 +160,8 @@ impl NodeQueryResponse {
             GetRegisterPolicy(res) => QueryResponse::GetRegisterPolicy(res),
             #[cfg(feature = "registers")]
             GetRegisterUserPermissions(res) => QueryResponse::GetRegisterUserPermissions(res),
+            #[cfg(feature = "spentbook")]
+            SpentProofShares(res) => QueryResponse::SpentProofShares(res),
             FailedToCreateOperationId => QueryResponse::FailedToCreateOperationId,
         }
     }

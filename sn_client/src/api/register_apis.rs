@@ -25,7 +25,7 @@ use xor_name::XorName;
 ///
 /// Batches up register write operation before publishing them up to the network, in order.
 /// Can also be used as a way to implement dry runs:
-/// nothing is uploaded to the network as long as the wal is not published.
+/// nothing is uploaded to the network as long as the WAL is not published.
 /// Batches can be republished without duplication risks thanks to the CRDT nature of registers.
 pub type RegisterWriteAheadLog = Vec<DataCmd>;
 

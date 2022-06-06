@@ -16,9 +16,10 @@ pub use policy::{
 };
 pub use reg_crdt::EntryHash;
 
+pub(crate) use reg_crdt::{CrdtOperation, RegisterCrdt};
+
 use super::{Error, Result};
-use crate::{types::RegisterAddress as Address, types::Scope};
-use reg_crdt::{CrdtOperation, RegisterCrdt};
+use crate::{types::RegisterAddress, types::Scope};
 use self_encryption::MIN_ENCRYPTABLE_BYTES;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -37,7 +38,7 @@ pub type RegisterOp<T> = CrdtOperation<T>;
 #[derive(Clone, Eq, PartialEq, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub struct Register {
     authority: User,
-    crdt: RegisterCrdt,
+    pub(super) crdt: RegisterCrdt, // Temporarily exposed to 'super' till spentbook fully implemented.
     policy: Policy,
     cap: u16,
 }
@@ -46,9 +47,9 @@ impl Register {
     ///
     pub fn new(name: XorName, tag: u64, policy: Policy, cap: u16) -> Self {
         let address = if matches!(policy, Policy::Public(_)) {
-            Address::Public { name, tag }
+            RegisterAddress::Public { name, tag }
         } else {
-            Address::Private { name, tag }
+            RegisterAddress::Private { name, tag }
         };
         Self {
             authority: *policy.owner(),
@@ -77,7 +78,7 @@ impl Register {
 
         Self {
             authority,
-            crdt: RegisterCrdt::new(Address::Public { name, tag }),
+            crdt: RegisterCrdt::new(RegisterAddress::Public { name, tag }),
             policy: policy.into(),
             cap,
         }
@@ -102,7 +103,7 @@ impl Register {
 
         Self {
             authority,
-            crdt: RegisterCrdt::new(Address::Private { name, tag }),
+            crdt: RegisterCrdt::new(RegisterAddress::Private { name, tag }),
             policy: policy.into(),
             cap,
         }
@@ -119,7 +120,7 @@ impl Register {
     }
 
     /// Return the address.
-    pub fn address(&self) -> &Address {
+    pub fn address(&self) -> &RegisterAddress {
         self.crdt.address()
     }
 
@@ -233,7 +234,7 @@ mod tests {
         },
         utils, Error, Keypair, Result,
     };
-    use crate::{types::RegisterAddress as Address, types::Scope};
+    use crate::{types::RegisterAddress, types::Scope};
     use proptest::prelude::*;
     use rand_07::{rngs::OsRng, seq::SliceRandom, thread_rng, Rng};
     use std::{
@@ -258,7 +259,7 @@ mod tests {
         assert_eq!(register.owner(), authority);
         assert_eq!(register.replica_authority(), authority);
 
-        let address = Address::new(name, Scope::Public, tag);
+        let address = RegisterAddress::new(name, Scope::Public, tag);
         assert_eq!(*register.address(), address);
     }
 
@@ -278,7 +279,7 @@ mod tests {
         assert_eq!(register.owner(), authority);
         assert_eq!(register.replica_authority(), authority);
 
-        let address = Address::new(name, Scope::Private, tag);
+        let address = RegisterAddress::new(name, Scope::Private, tag);
         assert_eq!(*register.address(), address);
     }
 

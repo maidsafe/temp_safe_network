@@ -181,6 +181,9 @@ pub enum Error {
     /// Example: for section 10, the candidates are supposed to be 101, 100
     #[error("Invalid Section Prefix For Handover Split Candidate")]
     InvalidSectionPrefixForSplitCandidates,
+    /// Spentbook error
+    #[error("Spentbook Error: {0}")]
+    SpentbookError(String),
 }
 
 impl From<qp2p::ClientEndpointError> for Error {

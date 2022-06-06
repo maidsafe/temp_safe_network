@@ -12,7 +12,7 @@ use crate::messaging::{data::OperationId, SectionAuth};
 use crate::types::register::{EntryHash, Register};
 use crate::types::{
     register::{Entry, Policy, RegisterOp, User},
-    RegisterAddress as Address,
+    RegisterAddress,
 };
 use tiny_keccak::{Hasher, Sha3};
 
@@ -28,14 +28,14 @@ pub enum RegisterQuery {
     /// This should eventually lead to a [`GetRegister`] response.
     ///
     /// [`GetRegister`]: QueryResponse::GetRegister
-    Get(Address),
+    Get(RegisterAddress),
     /// Retrieve the current entries from the [`Register`] at the given address.
     ///
     /// Multiple entries occur on concurrent writes. This should eventually lead to a
     /// [`ReadRegister`] response.
     ///
     /// [`ReadRegister`]: QueryResponse::ReadRegister
-    Read(Address),
+    Read(RegisterAddress),
     /// Get an entry from a [`Register`] on the Network by its hash
     ///
     /// This should eventually lead to a [`GetRegisterEntry`] response.
@@ -43,7 +43,7 @@ pub enum RegisterQuery {
     /// [`GetEntry`]: QueryResponse::GetRegisterEntry
     GetEntry {
         /// Register address.
-        address: Address,
+        address: RegisterAddress,
         /// The hash of the entry.
         hash: EntryHash,
     },
@@ -52,7 +52,7 @@ pub enum RegisterQuery {
     /// This should eventually lead to a [`GetRegisterPolicy`] response.
     ///
     /// [`GetRegisterPolicy`]: QueryResponse::GetRegisterPolicy
-    GetPolicy(Address),
+    GetPolicy(RegisterAddress),
     /// Retrieve the permissions of a given user for the [`Register`] at the given address.
     ///
     /// This should eventually lead to a [`GetRegisterUserPermissions`] response.
@@ -60,7 +60,7 @@ pub enum RegisterQuery {
     /// [`GetRegisterUserPermissions`]: QueryResponse::GetRegisterUserPermissions
     GetUserPermissions {
         /// Register address.
-        address: Address,
+        address: RegisterAddress,
         /// User to get permissions for.
         user: User,
     },
@@ -69,7 +69,7 @@ pub enum RegisterQuery {
     /// This should eventually lead to a [`GetRegisterOwner`] response.
     ///
     /// [`GetRegisterOwner`]: QueryResponse::GetRegisterOwner
-    GetOwner(Address),
+    GetOwner(RegisterAddress),
 }
 
 /// A [`Register`] cmd that is stored in a log on Adults.
@@ -137,7 +137,7 @@ impl CreateRegister {
     }
 
     ///
-    pub fn address(&self) -> Address {
+    pub fn address(&self) -> RegisterAddress {
         use CreateRegister::*;
         match self {
             Populated(reg) => *reg.address(),
@@ -145,12 +145,12 @@ impl CreateRegister {
                 policy, name, tag, ..
             } => {
                 if let Policy::Public { .. } = policy {
-                    Address::Public {
+                    RegisterAddress::Public {
                         name: *name,
                         tag: *tag,
                     }
                 } else {
-                    Address::Private {
+                    RegisterAddress::Private {
                         name: *name,
                         tag: *tag,
                     }
@@ -164,20 +164,20 @@ impl CreateRegister {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct ExtendRegister {
     /// The address of the [`Register`] to extend.
-    pub address: Address,
+    pub address: RegisterAddress,
     /// The size to extend the [`Register`] with.
     pub extend_with: u16,
 }
 
 ///
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct DeleteRegister(pub Address);
+pub struct DeleteRegister(pub RegisterAddress);
 
 ///
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct EditRegister {
     /// The address of the [`Register`] to edit.
-    pub address: Address,
+    pub address: RegisterAddress,
     /// The operation to perform.
     pub edit: RegisterOp<Entry>,
 }
@@ -231,28 +231,28 @@ pub struct SignedRegisterDelete {
 
 impl SignedRegisterCreate {
     /// Returns the dst address of the register.
-    pub fn dst_address(&self) -> Address {
+    pub fn dst_address(&self) -> RegisterAddress {
         self.op.address()
     }
 }
 
 impl SignedRegisterEdit {
     /// Returns the dst address of the register.
-    pub fn dst_address(&self) -> &Address {
+    pub fn dst_address(&self) -> &RegisterAddress {
         &self.op.address
     }
 }
 
 impl SignedRegisterDelete {
     /// Returns the dst address of the register.
-    pub fn dst_address(&self) -> &Address {
+    pub fn dst_address(&self) -> &RegisterAddress {
         &self.op.0
     }
 }
 
 impl SignedRegisterExtend {
     /// Returns the dst address of the register.
-    pub fn dst_address(&self) -> &Address {
+    pub fn dst_address(&self) -> &RegisterAddress {
         &self.op.address
     }
 }
@@ -289,7 +289,7 @@ impl RegisterQuery {
     }
 
     /// Returns the dst address for the request. (Scoped to Private/Public)
-    pub fn dst_address(&self) -> Address {
+    pub fn dst_address(&self) -> RegisterAddress {
         match self {
             RegisterQuery::Get(ref address)
             | RegisterQuery::Read(ref address)
@@ -347,7 +347,7 @@ impl RegisterCmd {
     // }
 
     /// Returns the dst address of the register.
-    pub fn dst_address(&self) -> Address {
+    pub fn dst_address(&self) -> RegisterAddress {
         match self {
             Self::Create { cmd, .. } => cmd.dst_address(),
             Self::Edit(cmd) => *cmd.dst_address(),

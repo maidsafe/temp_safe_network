@@ -112,12 +112,7 @@ impl Session {
         let _ = self.pending_cmds.insert(msg_id, sender);
         trace!("Inserted channel for cmd {:?}", msg_id);
 
-        let res = send_msg(self.clone(), elders, wire_msg, msg_id).await;
-
-        if res.as_ref().is_err() {
-            // shortcircuit the ack awaiting
-            return res;
-        }
+        send_msg(self.clone(), elders, wire_msg, msg_id).await?;
 
         let expected_acks = std::cmp::max(1, elders_len * 2 / 3);
 
@@ -179,7 +174,7 @@ impl Session {
         }
 
         trace!("Wait for any cmd response/reaction (AE msgs eg), is over)");
-        res
+        Ok(())
     }
 
     #[instrument(skip_all, level = "debug")]

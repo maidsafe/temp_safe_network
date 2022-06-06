@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{CmdError, Error, RegisterCmd};
+use super::{CmdError, Error, RegisterCmd, SpentbookCmd};
 use crate::types::Chunk;
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
@@ -30,6 +30,11 @@ pub enum DataCmd {
     ///
     /// [`Register`]: crate::types::register::Register
     Register(RegisterCmd),
+    #[cfg(feature = "spentbook")]
+    /// [`Spentbook`] write operation.
+    ///
+    /// [`Spentbook`]: crate::types::spentbook::Spentbook
+    Spentbook(SpentbookCmd),
 }
 
 impl DataCmd {
@@ -42,6 +47,8 @@ impl DataCmd {
             StoreChunk(_) => CmdError::Data(error),
             #[cfg(feature = "registers")]
             Register(c) => c.error(error),
+            #[cfg(feature = "spentbook")]
+            Spentbook(c) => c.error(error),
         }
     }
 
@@ -53,6 +60,8 @@ impl DataCmd {
             StoreChunk(c) => *c.name(),
             #[cfg(feature = "registers")]
             Register(c) => c.name(), // TODO: c.dst_id(), as to not co-locate private and public and different tags of same name.
+            #[cfg(feature = "spentbook")]
+            Spentbook(c) => c.name(),
         }
     }
 }
