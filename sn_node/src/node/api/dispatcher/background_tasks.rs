@@ -27,7 +27,7 @@ const BACKPRESSURE_INTERVAL: Duration = Duration::from_secs(60);
 const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
 const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(120);
 const DATA_BATCH_INTERVAL: Duration = Duration::from_secs(1);
-const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(60);
+const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(10);
 
 impl Dispatcher {
     pub(crate) async fn start_network_probing(self: Arc<Self>) {
@@ -218,6 +218,7 @@ impl Dispatcher {
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
             loop {
+                debug!("Performing dysfunction checks");
                 let _instant = interval.tick().await;
 
                 let unresponsive_nodes = match dispatcher.node.get_dysfunctional_node_names().await
@@ -230,7 +231,7 @@ impl Dispatcher {
                 };
 
                 if !unresponsive_nodes.is_empty() {
-                    debug!("{:?} : {unresponsive_nodes:?}", LogMarker::ProposeOffline);
+                    debug!("Dysfunctional nodes found: {:?} : {unresponsive_nodes:?}", LogMarker::ProposeOffline);
                     let cmd = Cmd::ProposeOffline(unresponsive_nodes);
                     if let Err(e) = dispatcher
                         .clone()

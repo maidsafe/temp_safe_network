@@ -55,6 +55,9 @@ fn main() -> Result<()> {
     #[cfg(feature = "tokio-console")]
     console_subscriber::init();
 
+    let our_pid = std::process::id();
+
+
     // loops ready to catch any ChurnJoinMiss
     loop {
         // start runtime
@@ -66,16 +69,14 @@ fn main() -> Result<()> {
                 match rt.block_on(run_node()) {
                     Ok(_) => {}
                     Err(error) => {
-                        error!("{error}")
+                        println!("Error at run node PID:{our_pid}: {error}");
+                        return Err(error)
                     }
                 };
                 rt.shutdown_timeout(Duration::from_secs(2));
-
-                // let rt = tokio::runtime::Runtime::new()?;
-                // rt.block_on(run_node())?;
                 Ok(())
             })
-            .wrap_err("Failed to spawn node thread")?;
+            .wrap_err("Failed to spawn node (PID:{our_pid}) thread")?;
 
         // join it
         match handle.join() {
@@ -83,9 +84,9 @@ fn main() -> Result<()> {
                 return result;
             }
             Err(error) => {
-                warn!("Error coming out of node start: {error:?}");
+                println!("(PID:{our_pid}): Error coming out of node start: {error:?}");
                 if let Some(Error::ChurnJoinMiss) = error.downcast_ref::<Error>() {
-                    warn!("Received churn join miss, restarting node...");
+                    println!("(PID:{our_pid}): Received churn join miss, restarting node...");
                     continue;
                 }
                 // thread panic errors cannot be converted to `eyre::Report` as they are not `Sync`, so
@@ -285,28 +286,12 @@ async fn run_node() -> Result<()> {
 
     let log = format!("The network is not accepting nodes right now. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds");
 
+    let our_pid = std::process::id();
 
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
     let (node, mut event_stream) = loop {
         match NodeApi::new(&config, bootstrap_retry_duration).await {
             Ok(result) => {
-
-
-            // use rand::Rng;
-            // let mut rng = rand::thread_rng();
-            // let x: f32 = rng.gen_range(0.0..1.0);
-
-            // // println!("Integer: {}", rng.gen_range(0..10));
-            // println!("Float: {}", x);
-
-            // if x > 0.8 {
-            //     debug!("====>FAIL");
-
-            //     // continue;
-            //     return Err(Error::Configuration("RANDOM FAIL...DO WE SURVIVE?".to_string()));
-            // }
-
-
                 break result
             },
             Err(Error::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
@@ -323,7 +308,7 @@ async fn run_node() -> Result<()> {
                 );
             }
             Err(Error::TryJoinLater) => {
-                println!("{}", log);
+                println!("(PID:{our_pid}): {}", log);
                 info!("{}", log);
             }
             Err(Error::NodeNotReachable(addr)) => {
@@ -335,17 +320,17 @@ async fn run_node() -> Result<()> {
                     https://safenetforum.org/",
                     addr
                 );
-                println!("{}", err_msg);
-                error!("{}", err_msg);
+                println!("(PID:{our_pid}): {}", err_msg);
+                error!("(PID:{our_pid}): {}", err_msg);
                 exit(1);
             }
             Err(Error::JoinTimeout) => {
                 let message = format!("Encountered a timeout while trying to join the network. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds.");
-                println!("{}", &message);
-                error!("{}", &message);
+                println!("(PID:{our_pid}): {}", &message);
+                error!("(PID:{our_pid}): {}", &message);
             }
             Err(e) => {
-                error!("Problem during node start: {e}");
+                error!("(PID:{our_pid}): Problem during node start: {e}");
                 let log_path = if let Some(path) = config.log_dir() {
                     format!("{}", path.display())
                 } else {
@@ -353,7 +338,7 @@ async fn run_node() -> Result<()> {
                 };
 
                 return Err(e).wrap_err(format!(
-                    "Cannot start node (log path: {}). If this is the first node on the network pass the local \
+                    "(PID:{our_pid}): Cannot start node (log path: {}). If this is the first node on the network pass the local \
                     address to be used using --first", log_path)
                 );
             }
@@ -368,7 +353,7 @@ async fn run_node() -> Result<()> {
         set_connection_info(genesis_key, our_conn_info)
             .await
             .unwrap_or_else(|err| {
-                error!("Unable to write our connection info to disk: {:?}", err);
+                error!("(PID:{our_pid}): Unable to write our connection info to disk: {:?}", err);
             });
     } else {
         add_connection_info(our_conn_info)
@@ -383,16 +368,14 @@ async fn run_node() -> Result<()> {
     let mut rng = rand::thread_rng();
     let x: f64 = rng.gen_range(0.0..1.0);
 
-    // println!("Integer: {}", rng.gen_range(0..10));
-    // println!("ChurnFloat: {}", x);
-
-
     if !config.is_first() && x > 0.6 {
-        println!("ChurnFloat: {}", x);
+        println!("(PID:{our_pid}): ChurnFloat: {}", x);
 
-        warn!("CHAOS Churn JOIN FAIL");
-        return Err(Error::ChurnJoinMiss).suggestion("dont have chaos enabled");
-        // .suggestion("look into this")
+        warn!("[Chaos] (PID:{our_pid}): ChurnJoinMiss");
+        // if we dont do thi the network launch tool sees
+        sleep(Duration::from_secs(3)).await;
+
+        return Err(Error::ChurnJoinMiss).map_err(ErrReport::msg);
     }
 
     // This just keeps the node going as long as routing goes
