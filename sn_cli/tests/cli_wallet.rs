@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use assert_cmd::prelude::*;
+use assert_fs::prelude::*;
 use color_eyre::Result;
 use predicates::prelude::*;
 use sn_cmd_test_utilities::util::{
@@ -46,6 +47,100 @@ fn wallet_deposit_should_deposit_a_dbc() -> Result<()> {
         "my-first-dbc", wallet_xorurl
     ))
     .success();
+
+    Ok(())
+}
+
+#[test]
+fn wallet_deposit_should_deposit_a_dbc_from_a_file() -> Result<()> {
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let dbc_data_file = tmp_data_dir.child("dbc_with_12_300_000_000");
+    dbc_data_file.write_str(DBC_WITH_12_230_000_000)?;
+
+    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--name",
+            "my-first-dbc",
+            "--dbc",
+            &dbc_data_file.path().display().to_string(),
+            &wallet_xorurl,
+        ],
+        Some(0),
+    )?
+    .assert()
+    .stdout(format!(
+        "Spendable DBC deposited with name '{}' in wallet located at \"{}\"\n",
+        "my-first-dbc", wallet_xorurl
+    ))
+    .success();
+
+    Ok(())
+}
+
+#[test]
+fn wallet_deposit_should_fail_with_suggestion_when_file_does_not_contain_dbc_data() -> Result<()> {
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let dbc_data_file = tmp_data_dir.child("dbc_with_12_300_000_000");
+    dbc_data_file.write_str("this file does not have dbc data")?;
+
+    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--name",
+            "my-first-dbc",
+            "--dbc",
+            &dbc_data_file.path().display().to_string(),
+            &wallet_xorurl,
+        ],
+        Some(1),
+    )?
+    .assert()
+    .stderr(predicate::str::contains(
+        "This file does not appear to have DBC data.",
+    ))
+    .stderr(predicate::str::contains(
+        "Please select another file with valid hex-encoded DBC data.",
+    ))
+    .failure();
+
+    Ok(())
+}
+
+#[test]
+fn wallet_deposit_should_fail_with_suggestion_when_path_is_directory() -> Result<()> {
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--name",
+            "my-first-dbc",
+            "--dbc",
+            &tmp_data_dir.path().display().to_string(),
+            &wallet_xorurl,
+        ],
+        Some(1),
+    )?
+    .assert()
+    .stderr(predicate::str::contains(
+        "The path supplied refers to a directory.",
+    ))
+    .stderr(predicate::str::contains(
+        "A file path must be specified for the DBC data.",
+    ))
+    .failure();
 
     Ok(())
 }
