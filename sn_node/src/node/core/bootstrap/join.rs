@@ -187,7 +187,8 @@ impl<'a> Join<'a> {
                     }
 
                     trace!(
-                        "This node has been approved to join the network at {:?}!",
+                        "This node {} has been approved to join the network at {:?}!",
+                        node_state.name,
                         section_auth.prefix,
                     );
 

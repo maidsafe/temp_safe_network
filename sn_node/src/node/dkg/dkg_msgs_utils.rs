@@ -132,6 +132,10 @@ impl DkgFailureSigSetUtils for DkgFailureSigSet {
 // `N - supermajority(N) + 1` signeds, because that already makes a supermajority agreement on a
 // successful outcome impossible.
 fn has_failure_agreement(num_participants: usize, num_votes: usize) -> bool {
+    // we need to log dkg and membership gen, dkg session id...
+    //
+
+    debug!("DKG failure outcome votes {num_votes}, participants: {num_participants}");
     num_votes > num_participants - supermajority(num_participants)
 }
 
