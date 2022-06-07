@@ -404,7 +404,7 @@ impl<'a> Join<'a> {
             }
         }
 
-        info!("Sending {:?} to {:?}", join_request, recipients);
+        info!("Sending JoinReq {:?} to {:?}", join_request, recipients);
 
         let node_msg = SystemMsg::JoinRequest(Box::new(join_request));
         let wire_msg = WireMsg::single_src(
@@ -417,10 +417,17 @@ impl<'a> Join<'a> {
             section_key,
         )?;
 
-        let _res = self
+        let res = self
             .outgoing_msgs
             .send((wire_msg, recipients.to_vec()))
             .await;
+
+        match res {
+            Ok(_) => {},
+            Err(error) => {
+                error!("Error sending JoinReq: {error}");
+            }
+        }
 
         Ok(())
     }

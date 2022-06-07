@@ -228,6 +228,7 @@ impl Node {
             trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);
 
             trace!("Sending {node_msg:?} to {peer}");
+
             return Ok(vec![
                 self.send_direct_msg(peer, node_msg, self.network_knowledge.section_key().await)
                     .await?,
