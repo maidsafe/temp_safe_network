@@ -222,7 +222,7 @@ jobs:
       - name: publish sn_client
         run: |
           commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_client"* ]]; then
+          if [[ $commit_message == *"sn_client-"* ]]; then
             ./resources/scripts/publish_crate_with_retries.sh "sn_client"
           fi
       - name: publish sn_api
@@ -234,6 +234,6 @@ jobs:
       - name: publish sn_cli
         run: |
           commit_message="${{ github.event.head_commit.message }}"
-          if [[ $commit_message == *"sn_cli"* ]]; then
+          if [[ $commit_message == *"sn_cli-"* ]]; then
             ./resources/scripts/publish_crate_with_retries.sh "sn_cli"
           fi
