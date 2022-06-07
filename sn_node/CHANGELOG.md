@@ -5,9 +5,82 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.62.1 (2022-06-07)
+
+### Chore
+
+ - <csr-id-a8aa4e749670db3a930f2351ac46b5dd7d72041e/> resolve issue after rebase
+ - <csr-id-d4088d4c5d26904187fa8b08fa6a9c9f8b04c5b2/> remove accidental log commit
+
+### New Features
+
+ - <csr-id-dbda86be03f912079776be514828ff5fd034830c/> first version of Spentbook messaging, storage, and client API
+   - Storage is implemented using Register as the underlying data type. To be changed when
+     actual SpentBook native data type is put in place.
+   - First version of sn_client API for Spentbook messages.
+   - sn_client::spent_proof_shares API to fetch spent proof shares.
+   - sn_client::spend_dbc API to request Elders to store the spent proof shares.
+   - Serialise SpentProofShare to store it as an entry in the underlying Register.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release.
+ - 1 day passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge branch 'main' into Gabriel_Spentbook_PR1143 ([`0eda02a`](https://github.com/maidsafe/safe_network/commit/0eda02ac126be4f088af6bf9e7247c8496a389ba))
+    - resolve issue after rebase ([`a8aa4e7`](https://github.com/maidsafe/safe_network/commit/a8aa4e749670db3a930f2351ac46b5dd7d72041e))
+    - first version of Spentbook messaging, storage, and client API ([`dbda86b`](https://github.com/maidsafe/safe_network/commit/dbda86be03f912079776be514828ff5fd034830c))
+    - remove accidental log commit ([`d4088d4`](https://github.com/maidsafe/safe_network/commit/d4088d4c5d26904187fa8b08fa6a9c9f8b04c5b2))
+    - Merge #1217 ([`2f26043`](https://github.com/maidsafe/safe_network/commit/2f2604325d533357bad7d917315cf4cba0b2d3c0))
+</details>
+
 ## v0.62.0 (2022-06-05)
 
+### New Features
+
+ - <csr-id-95de2ffe6f57ae0e6cebf123da3e9b6c3ad84aaf/> handover sap elder checks with membership knowledge
+
+### Chore
+
+ - <csr-id-1bf7dfb3ce8b14cbed7a4a8ed98c8310653a2da9/> sn_interface-0.6.0/sn_dysfunction-0.5.0/sn_client-0.66.0/sn_node-0.62.0/sn_api-0.64.0/sn_cli-0.57.0
+ - <csr-id-ebb8f26a394f595b725fdf52e1a588c1f8136562/> improve error msg and style
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release over the course of 1 calendar day.
+ - 3 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.6.0/sn_dysfunction-0.5.0/sn_client-0.66.0/sn_node-0.62.0/sn_api-0.64.0/sn_cli-0.57.0 ([`1bf7dfb`](https://github.com/maidsafe/safe_network/commit/1bf7dfb3ce8b14cbed7a4a8ed98c8310653a2da9))
+    - improve error msg and style ([`ebb8f26`](https://github.com/maidsafe/safe_network/commit/ebb8f26a394f595b725fdf52e1a588c1f8136562))
+    - Merge branch 'main' into handover_byz_sap_check_squashed ([`6769996`](https://github.com/maidsafe/safe_network/commit/6769996e3ea78a6be306437193687b422a21ce80))
+    - handover sap elder checks with membership knowledge ([`95de2ff`](https://github.com/maidsafe/safe_network/commit/95de2ffe6f57ae0e6cebf123da3e9b6c3ad84aaf))
+</details>
+
 ## v0.61.1 (2022-06-01)
+
+<csr-id-6f32e0363546fd2e39fefc78fff68ff99be04fea/>
 
 ### Chore
 

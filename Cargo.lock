@@ -3474,7 +3474,7 @@ checksum = "f2dd574626839106c320a323308629dcb1acfc96e32a8cba364ddc61ac23ee83"
 
 [[package]]
 name = "sn_api"
-version = "0.64.0"
+version = "0.64.1"
 dependencies = [
  "anyhow",
  "assert_fs",
@@ -3572,7 +3572,7 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.66.0"
+version = "0.66.1"
 dependencies = [
  "backoff 0.4.0",
  "base64 0.13.0",
@@ -3698,7 +3698,7 @@ dependencies = [
 
 [[package]]
 name = "sn_interface"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "backoff 0.4.0",
  "base64 0.13.0",
@@ -3771,7 +3771,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.62.0"
+version = "0.62.1"
 dependencies = [
  "assert_matches",
  "backoff 0.4.0",

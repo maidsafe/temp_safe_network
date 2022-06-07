@@ -5,9 +5,171 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.64.1 (2022-06-07)
+
+### Chore
+
+ - <csr-id-24299786ba730e467c10946c8c152936b96148f8/> address some review comments
+
+### New Features
+
+ - <csr-id-dbda86be03f912079776be514828ff5fd034830c/> first version of Spentbook messaging, storage, and client API
+   - Storage is implemented using Register as the underlying data type. To be changed when
+     actual SpentBook native data type is put in place.
+   - First version of sn_client API for Spentbook messages.
+   - sn_client::spent_proof_shares API to fetch spent proof shares.
+   - sn_client::spend_dbc API to request Elders to store the spent proof shares.
+   - Serialise SpentProofShare to store it as an entry in the underlying Register.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release.
+ - 1 day passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge branch 'main' into Gabriel_Spentbook_PR1143 ([`0eda02a`](https://github.com/maidsafe/safe_network/commit/0eda02ac126be4f088af6bf9e7247c8496a389ba))
+    - address some review comments ([`2429978`](https://github.com/maidsafe/safe_network/commit/24299786ba730e467c10946c8c152936b96148f8))
+    - first version of Spentbook messaging, storage, and client API ([`dbda86b`](https://github.com/maidsafe/safe_network/commit/dbda86be03f912079776be514828ff5fd034830c))
+    - Merge #1217 ([`2f26043`](https://github.com/maidsafe/safe_network/commit/2f2604325d533357bad7d917315cf4cba0b2d3c0))
+</details>
+
+## v0.64.0 (2022-06-05)
+
+### Chore
+
+ - <csr-id-1bf7dfb3ce8b14cbed7a4a8ed98c8310653a2da9/> sn_interface-0.6.0/sn_dysfunction-0.5.0/sn_client-0.66.0/sn_node-0.62.0/sn_api-0.64.0/sn_cli-0.57.0
+ - <csr-id-c12e2269e3a537d96422bed96a4459a0add07deb/> upgrade sn_dbc to 3.2.0
+   This new release has utilities for serializing/deserializing `Dbc` to/from hex.
+ - <csr-id-e548388c693cfb71b270cf9e370b2f9b463044c5/> upgrade sn_dbc to 3.2.0
+   This new release has utilities for serializing/deserializing `Dbc` to/from hex.
+
+### New Features
+
+ - <csr-id-4c6e6cff474d306e6632f004c6cf05729c7ced16/> add public key argument for owned dbcs
+   The `wallet reissue` command now has an additional optional argument, `--public-key`, which allows
+   the user to reissue a DBC to be owned by the holder of that public key. The key should be BLS
+   hex-encoded.
+   
+   The `wallet deposit` command will now require extension to provide the secret key when depositing an
+   owned DBC. This will be done as a separate piece of work.
+   
+   Some additional changes were made in support or to tidy CLI-related code:
+   * The conversion of DBCs to/from hex were removed from the CLI since this is now done on the `Dbc`
+     type.
+   * A CLI test that existed to test the above conversion code was removed since it's no longer
+     necessary.
+   * The naming scheme for the CLI wallet tests were elaborated and the redundant "calling_safe"
+     prefixes were removed.
+ - <csr-id-0e9980f5358a0aca5d40d607dfdc6de120e6412b/> add public key argument for owned dbcs
+   The `wallet reissue` command now has an additional optional argument, `--public-key`, which allows
+   the user to reissue a DBC to be owned by the holder of that public key. The key should be BLS
+   hex-encoded.
+   
+   The `wallet deposit` command will now require extension to provide the secret key when depositing an
+   owned DBC. This will be done as a separate piece of work.
+   
+   Some additional changes were made in support or to tidy CLI-related code:
+   * The conversion of DBCs to/from hex were removed from the CLI since this is now done on the `Dbc`
+     type.
+   * A CLI test that existed to test the above conversion code was removed since it's no longer
+     necessary.
+   * The naming scheme for the CLI wallet tests were elaborated and the redundant "calling_safe"
+     prefixes were removed.
+ - <csr-id-95de2ffe6f57ae0e6cebf123da3e9b6c3ad84aaf/> handover sap elder checks with membership knowledge
+ - <csr-id-1048c5e3d2196aed7de89a7938d6fc01c1843502/> use persistent dbc owner in sn_api
+   The network connection functions in the CLI are updated to pass the persistent DBC Owner. This is
+   based on the existence of a key that was created with the new `create-dbc-owner` command. If the key
+   exists, the connection will use the persistent DBC owner; if `None` is passed, a random key will be
+   generated.
+   
+   During a reissue, the change DBC is then assigned the owner from the client. We don't yet assign the
+   output DBC this owner, because we're still only supporting bearer DBCs. This may change for owned
+   DBCs, which should come soon.
+   
+   I split the wallet reissue test out into a couple: one with a single input DBC and one with
+   multiple. The original test had multiple inputs, but it seemed it was worth checking that the
+   reissue would function if there were also just a single input.
+
+### New Features (BREAKING)
+
+ - <csr-id-92c53f186d2a63c6333b4d7b1016bb55edf74e42/> reissue dbc to a particular owner
+
+ - <csr-id-cd85844f9f6402aba02f28fbedf92c7ee234e315/> reissue dbc to a particular owner
+
+ - <csr-id-f03fb7e35319dbb9e4745e3cb36c7913c4f220ac/> cli will now use bls keys
+
+ - <csr-id-48006b73547778bc08b077717e04fd5efb562eaf/> extend client with dbc owner field
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 13 commits contributed to the release over the course of 4 calendar days.
+ - 8 days passed between releases.
+ - 11 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.6.0/sn_dysfunction-0.5.0/sn_client-0.66.0/sn_node-0.62.0/sn_api-0.64.0/sn_cli-0.57.0 ([`1bf7dfb`](https://github.com/maidsafe/safe_network/commit/1bf7dfb3ce8b14cbed7a4a8ed98c8310653a2da9))
+    - add public key argument for owned dbcs ([`4c6e6cf`](https://github.com/maidsafe/safe_network/commit/4c6e6cff474d306e6632f004c6cf05729c7ced16))
+    - upgrade sn_dbc to 3.2.0 ([`c12e226`](https://github.com/maidsafe/safe_network/commit/c12e2269e3a537d96422bed96a4459a0add07deb))
+    - reissue dbc to a particular owner ([`92c53f1`](https://github.com/maidsafe/safe_network/commit/92c53f186d2a63c6333b4d7b1016bb55edf74e42))
+    - add public key argument for owned dbcs ([`0e9980f`](https://github.com/maidsafe/safe_network/commit/0e9980f5358a0aca5d40d607dfdc6de120e6412b))
+    - upgrade sn_dbc to 3.2.0 ([`e548388`](https://github.com/maidsafe/safe_network/commit/e548388c693cfb71b270cf9e370b2f9b463044c5))
+    - Merge branch 'main' into handover_byz_sap_check_squashed ([`6769996`](https://github.com/maidsafe/safe_network/commit/6769996e3ea78a6be306437193687b422a21ce80))
+    - handover sap elder checks with membership knowledge ([`95de2ff`](https://github.com/maidsafe/safe_network/commit/95de2ffe6f57ae0e6cebf123da3e9b6c3ad84aaf))
+    - reissue dbc to a particular owner ([`cd85844`](https://github.com/maidsafe/safe_network/commit/cd85844f9f6402aba02f28fbedf92c7ee234e315))
+    - cli will now use bls keys ([`f03fb7e`](https://github.com/maidsafe/safe_network/commit/f03fb7e35319dbb9e4745e3cb36c7913c4f220ac))
+    - use persistent dbc owner in sn_api ([`1048c5e`](https://github.com/maidsafe/safe_network/commit/1048c5e3d2196aed7de89a7938d6fc01c1843502))
+    - extend client with dbc owner field ([`48006b7`](https://github.com/maidsafe/safe_network/commit/48006b73547778bc08b077717e04fd5efb562eaf))
+    - Merge #1192 ([`f9fc2a7`](https://github.com/maidsafe/safe_network/commit/f9fc2a76f083ba5161c8c4eef9013c53586b4693))
+</details>
+
 ## v0.63.0 (2022-05-27)
 
+### Chore
+
+ - <csr-id-e5fcd032e1dd904e05bc23e119af1d06e3b85a06/> sn_interface-0.5.0/sn_dysfunction-0.4.0/sn_client-0.65.0/sn_node-0.61.0/sn_api-0.63.0/sn_cli-0.56.0
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 2 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.5.0/sn_dysfunction-0.4.0/sn_client-0.65.0/sn_node-0.61.0/sn_api-0.63.0/sn_cli-0.56.0 ([`e5fcd03`](https://github.com/maidsafe/safe_network/commit/e5fcd032e1dd904e05bc23e119af1d06e3b85a06))
+</details>
+
 ## v0.62.0 (2022-05-25)
+
+<csr-id-ef56cf9cf8de45a9f13c2510c63de245b12aeae8/>
 
 ### Chore
 
