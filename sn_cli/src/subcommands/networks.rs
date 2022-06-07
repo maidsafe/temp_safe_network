@@ -70,7 +70,10 @@ pub async fn networks_commander(
             match matched_network {
                 Some(name) => {
                     println!("'{}' network matched!", name);
-                    println!("The default NetworkPrefixMap at '{:?}' matches '{}' network as per current config", config.prefix_maps_dir.join(&config.prefix_map_symlink_name), name);
+                    println!(
+                        "The default NetworkPrefixMap matches '{}' network as per current config",
+                        name
+                    );
                 }
                 None => {
                     // should not be possible due to sync?

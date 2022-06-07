@@ -16,6 +16,7 @@ use std::path::PathBuf;
 use tokio::fs::{read_link, remove_file, File};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 pub const DEFAULT_PREFIX_SYMLINK_NAME: &str = "default";
+pub const SN_PREFIX_MAP_DIR: &str = "SN_PREFIX_MAP_DIR";
 
 pub async fn compare_and_write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap) -> Result<()> {
     // Open or create `$User/.safe/prefix_maps` dir
@@ -128,8 +129,14 @@ pub async fn update_prefix_map_symlink(genesis_key: &bls::PublicKey) -> Result<(
 }
 
 fn get_prefix_map_dir() -> Result<PathBuf> {
-    Ok(dirs_next::home_dir()
-        .ok_or_else(|| Error::DirectoryHandling("Could not read '.safe' directory".to_string()))?
-        .join(".safe")
-        .join("prefix_maps"))
+    if let Ok(dir) = std::env::var(SN_PREFIX_MAP_DIR) {
+        Ok(PathBuf::from(dir))
+    } else {
+        Ok(dirs_next::home_dir()
+            .ok_or_else(|| {
+                Error::DirectoryHandling("Could not read '.safe' directory".to_string())
+            })?
+            .join(".safe")
+            .join("prefix_maps"))
+    }
 }

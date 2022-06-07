@@ -76,6 +76,7 @@ criterion = "~0.3"
 walkdir = "2.3.1"
 multibase = "~0.9.1"
 xor_name = "4.0.1"
+futures = "0.3.21"
 
 [dev-dependencies.sn_cmd_test_utilities]
 path = "../sn_cmd_test_utilities"
