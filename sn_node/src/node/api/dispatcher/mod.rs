@@ -308,25 +308,37 @@ impl Dispatcher {
         }
     }
 
+    /// send a message to peers, they can be ndoes or clients.
+    /// If we attempt to send a message to ourselves, we will be removed from the recipients list
     async fn send_msg(
         &self,
         recipients: &[Peer],
         delivery_group_size: usize,
         wire_msg: WireMsg,
     ) -> Result<Vec<Cmd>> {
+        let us_as_peer = self.node.info.read().await.peer();
+
+        let mut final_recipients = vec![];
+        for peer in recipients.iter() {
+            if peer == &us_as_peer {
+                warn!("Attempt to message ourselves. The message to ourselves, has been dropped: {wire_msg:?}");
+                continue;
+            }
+            final_recipients.push(*peer)
+        }
         let cmds = match wire_msg.msg_kind() {
             AuthKind::Node(_) | AuthKind::NodeBlsShare(_) => {
-                self.deliver_msgs(recipients, delivery_group_size, wire_msg)
+                self.deliver_msgs(final_recipients.as_slice(), delivery_group_size, wire_msg)
                     .await?
             }
             AuthKind::Service(_) => {
                 // we should never be sending such a msg to more than one recipient
                 // need refactors further up to solve in a nicer way
-                if recipients.len() > 1 {
+                if final_recipients.len() > 1 {
                     warn!("Unexpected number of client recipients {:?} for msg {:?}. Only sending to first.",
-                    recipients.len(), wire_msg);
+                    final_recipients.len(), wire_msg);
                 }
-                if let Some(recipient) = recipients.get(0) {
+                if let Some(recipient) = final_recipients.get(0) {
                     if let Err(err) = self
                         .node
                         .comm
