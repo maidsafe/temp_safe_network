@@ -166,6 +166,7 @@ impl Debug for FileRotateAppender {
 async fn run_node() -> Result<()> {
     let config = Config::new().await?;
 
+
     if let Some(c) = &config.completions() {
         let shell = c.parse().map_err(|err: String| eyre!(err))?;
         let buf = gen_completions_for_shell(shell).map_err(|err| eyre!(err))?;
@@ -286,7 +287,26 @@ async fn run_node() -> Result<()> {
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
     let (node, mut event_stream) = loop {
         match NodeApi::new(&config, bootstrap_retry_duration).await {
-            Ok(result) => break result,
+            Ok(result) => {
+
+
+            use rand::Rng;
+            let mut rng = rand::thread_rng();
+            let x = rng.gen_range(0.0..1.0);
+
+            // println!("Integer: {}", rng.gen_range(0..10));
+            println!("Float: {}", x);
+
+            if x > 0.8 {
+                debug!("====>FAIL");
+
+                // continue;
+                return Err(Error::Configuration("RANDOM FAIL...DO WE SURVIVE?".to_string())).suggestion("look into this")
+            }
+
+
+                break result
+            },
             Err(Error::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
                 return Err(error).suggestion(
                     "You can disable port forwarding by supplying --skip-auto-port-forwarding. Without port\n\

@@ -70,6 +70,21 @@ impl NodeApi {
 
     /// Initialize a new node.
     pub async fn new(config: &Config, joining_timeout: Duration) -> Result<(Self, EventStream)> {
+
+
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    let x = rng.gen_range(0.0..1.0);
+
+    // println!("Integer: {}", rng.gen_range(0..10));
+    println!("Float: {}", x);
+
+    if x > 0.8 {
+        return Err(Error::Configuration("RANDOM FAIL...DO WE SURVIVE?".to_string())).suggestion("look into this")
+    }
+
+
+
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
         tokio::fs::create_dir_all(root_dir).await?;
