@@ -17,7 +17,7 @@ use system::Process;
 use tokio::time::MissedTickBehavior;
 use tracing::trace;
 
-const LOG_INTERVAL: Duration = std::time::Duration::from_secs(10);
+const LOG_INTERVAL: Duration = std::time::Duration::from_secs(60);
 
 pub(super) async fn run_system_logger(ctx: LogCtx, print_resources_usage: bool) {
     let mut system = System::new_all();

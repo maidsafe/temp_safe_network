@@ -48,7 +48,7 @@ use tracing_subscriber::filter::EnvFilter;
 
 #[cfg(not(feature = "tokio-console"))]
 const MODULE_NAME: &str = "sn_node";
-const BOOTSTRAP_RETRY_TIME_SEC: u64 = 5;
+const BOOTSTRAP_RETRY_TIME_SEC: u64 = 35;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -83,6 +83,7 @@ fn main() -> Result<()> {
                 return result;
             }
             Err(error) => {
+                warn!("Error coming out of node start: {error:?}");
                 if let Some(Error::ChurnJoinMiss) = error.downcast_ref::<Error>() {
                     warn!("Received churn join miss, restarting node...");
                     continue;
@@ -284,25 +285,26 @@ async fn run_node() -> Result<()> {
 
     let log = format!("The network is not accepting nodes right now. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds");
 
+
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
     let (node, mut event_stream) = loop {
         match NodeApi::new(&config, bootstrap_retry_duration).await {
             Ok(result) => {
 
 
-            use rand::Rng;
-            let mut rng = rand::thread_rng();
-            let x = rng.gen_range(0.0..1.0);
+            // use rand::Rng;
+            // let mut rng = rand::thread_rng();
+            // let x: f32 = rng.gen_range(0.0..1.0);
 
-            // println!("Integer: {}", rng.gen_range(0..10));
-            println!("Float: {}", x);
+            // // println!("Integer: {}", rng.gen_range(0..10));
+            // println!("Float: {}", x);
 
-            if x > 0.8 {
-                debug!("====>FAIL");
+            // if x > 0.8 {
+            //     debug!("====>FAIL");
 
-                // continue;
-                return Err(Error::Configuration("RANDOM FAIL...DO WE SURVIVE?".to_string())).suggestion("look into this")
-            }
+            //     // continue;
+            //     return Err(Error::Configuration("RANDOM FAIL...DO WE SURVIVE?".to_string()));
+            // }
 
 
                 break result
@@ -343,6 +345,7 @@ async fn run_node() -> Result<()> {
                 error!("{}", &message);
             }
             Err(e) => {
+                error!("Problem during node start: {e}");
                 let log_path = if let Some(path) = config.log_dir() {
                     format!("{}", path.display())
                 } else {
@@ -373,6 +376,23 @@ async fn run_node() -> Result<()> {
             .unwrap_or_else(|err| {
                 error!("Unable to add our connection info to disk: {:?}", err);
             });
+    }
+
+
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    let x: f64 = rng.gen_range(0.0..1.0);
+
+    // println!("Integer: {}", rng.gen_range(0..10));
+    // println!("ChurnFloat: {}", x);
+
+
+    if !config.is_first() && x > 0.6 {
+        println!("ChurnFloat: {}", x);
+
+        warn!("CHAOS Churn JOIN FAIL");
+        return Err(Error::ChurnJoinMiss).suggestion("dont have chaos enabled");
+        // .suggestion("look into this")
     }
 
     // This just keeps the node going as long as routing goes

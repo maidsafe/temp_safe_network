@@ -74,14 +74,24 @@ impl NodeApi {
 
     use rand::Rng;
     let mut rng = rand::thread_rng();
-    let x = rng.gen_range(0.0..1.0);
+    let x: f64 = rng.gen_range(0.0..1.0);
 
     // println!("Integer: {}", rng.gen_range(0..10));
     println!("Float: {}", x);
 
-    if x > 0.8 {
-        return Err(Error::Configuration("RANDOM FAIL...DO WE SURVIVE?".to_string())).suggestion("look into this")
-    }
+    // if x > 0.8 {
+
+    //     warn!("SIMULATED JOIN FAIL");
+    //     return Err(Error::JoinTimeout);
+    //     // .suggestion("look into this")
+    // }
+
+    // if x > 0.8 {
+
+    //     warn!("FAILHERE");
+    //     return Err(Error::Configuration("RANDOM FAIL...DO WE SURVIVE?".to_string()));
+    //     // .suggestion("look into this")
+    // }
 
 
 
@@ -129,6 +139,15 @@ impl NodeApi {
         );
 
         run_system_logger(LogCtx::new(api.dispatcher.clone()), config.resource_logs).await;
+
+        if !config.is_first() && x > 0.8 {
+            println!("CHaos join    Float: {}", x);
+
+            warn!("CHAOS JOIN FAIL");
+            return Err(Error::JoinTimeout);
+            // .suggestion("look into this")
+        }
+
 
         Ok((api, network_events))
     }
