@@ -12,6 +12,7 @@ use super::{
 };
 use color_eyre::{eyre::eyre, Help, Result};
 use sn_api::Safe;
+use std::path::Path;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -33,7 +34,9 @@ pub enum WalletSubCommands {
         /// The name to give this spendable DBC
         #[structopt(long = "name")]
         name: Option<String>,
-        /// A hex encoded DBC to deposit
+        /// A path to a file containing hex encoded DBC data, or you can supply the data directly.
+        /// Depending on the shell or OS in use, due to the length of the data string, supplying
+        /// directly may not work.
         #[structopt(long = "dbc")]
         dbc: Option<String>,
     },
@@ -95,7 +98,22 @@ pub async fn wallet_commander(
             dbc,
         } => {
             let dbc = if let Some(dbc) = dbc {
-                sn_dbc::Dbc::from_hex(&dbc)?
+                let path = Path::new(&dbc);
+                if path.exists() {
+                    if path.is_dir() {
+                        return Err(eyre!("The path supplied refers to a directory.")
+                            .suggestion("A file path must be specified for the DBC data."));
+                    }
+                    let dbc_data = std::fs::read_to_string(path)?;
+                    sn_dbc::Dbc::from_hex(&dbc_data).map_err(|e| {
+                        eyre!(e.to_string()).suggestion(
+                            "This file does not appear to have DBC data. \
+                            Please select another file with valid hex-encoded DBC data.",
+                        )
+                    })?
+                } else {
+                    sn_dbc::Dbc::from_hex(&dbc)?
+                }
             } else {
                 let dbc_hex = get_from_arg_or_stdin(dbc, None)?;
                 println!("{}", dbc_hex);
