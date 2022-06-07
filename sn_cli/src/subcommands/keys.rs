@@ -99,7 +99,6 @@ mod create_command {
         let config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-            "default".to_string(),
         )
         .await?;
 
@@ -123,7 +122,6 @@ mod create_command {
         let config = Config::new(
             cli_config_file.path().to_path_buf(),
             node_config_file.path().to_path_buf(),
-            "default".to_string(),
         )
         .await?;
 
