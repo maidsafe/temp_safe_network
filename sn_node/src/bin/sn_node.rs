@@ -61,22 +61,44 @@ fn main() -> Result<()> {
     // loops ready to catch any ChurnJoinMiss
     loop {
         // start runtime
-        let handle = std::thread::Builder::new()
+        let handle_res = std::thread::Builder::new()
             .name("sn_node".to_string())
             .stack_size(16 * 1024 * 1024)
             .spawn(move || {
                 let rt = tokio::runtime::Runtime::new()?;
-                match rt.block_on(run_node()) {
-                    Ok(_) => {}
+                let res =  rt.block_on(run_node()) {
+                    Ok(_) => Ok(())
                     Err(error) => {
-                        println!("Error at run node PID:{our_pid}: {error}");
-                        return Err(error)
+                        println!("=====>>>> Error at run node PID:{our_pid}: {error}");
+                        Err(error)
                     }
                 };
+                println!("runing shutdown timer");
                 rt.shutdown_timeout(Duration::from_secs(2));
-                Ok(())
+                println!("shutdown timer done");
+                res
             })
             .wrap_err("Failed to spawn node (PID:{our_pid}) thread")?;
+
+        // we have one error case if immediate
+
+        // let handle = match handle_res {
+        //     Ok(handle) => handle,
+        //     Err(error) => {
+        //         println!("handle join error: {error:?}");
+
+        //         return Err(error);
+        //         // println!("==============>>>(PID:{our_pid}): Error coming out of node start: {error:?}");
+        //         // if let Some(Error::ChurnJoinMiss) = error.downcast_ref::<Error>() {
+        //         //     println!("(PID:{our_pid}): Received churn join miss, restarting node...");
+        //         //     continue;
+        //         // }
+
+        //                    // thread panic errors cannot be converted to `eyre::Report` as they are not `Sync`, so
+        //         // the best thing to do is propagate the panic.
+        //         // std::panic::resume_unwind(error)
+        //     }
+        // };
 
         // join it
         match handle.join() {

@@ -38,7 +38,7 @@ const DKG_PROGRESS_INTERVAL: Duration = Duration::from_secs(6);
 const MAX_TIMEOUT_RETRIES: usize = 3;
 
 // Data for a DKG participant.
-pub(crate) struct Session {
+pub(crate) struct DkgSession {
     pub(crate) session_id: DkgSessionId,
     pub(crate) participant_index: usize,
     pub(crate) key_gen: KeyGen,
@@ -63,7 +63,7 @@ fn is_dkg_behind(expected: Phase, actual: Phase) -> bool {
     }
 }
 
-impl Session {
+impl DkgSession {
     pub(crate) fn timer_token(&self) -> u64 {
         self.timer_token
     }

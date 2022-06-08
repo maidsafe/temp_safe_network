@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{api::cmds::Cmd, dkg::session::Session, messages::WireMsgUtils, Result};
+use crate::node::{api::cmds::Cmd, dkg::session::DkgSession, messages::WireMsgUtils, Result};
 use sn_interface::{
     messaging::{
         system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
@@ -44,7 +44,7 @@ use xor_name::XorName;
 /// is currently not a responsibility of this module.
 #[derive(Clone)]
 pub(crate) struct DkgVoter {
-    sessions: Arc<DashMap<Digest256, Session>>,
+    sessions: Arc<DashMap<Digest256, DkgSession>>,
 }
 
 impl Default for DkgVoter {
@@ -101,7 +101,7 @@ impl DkgVoter {
             Ok((key_gen, messages)) => {
                 trace!("DKG starting for {session_id:?}");
 
-                let mut session = Session {
+                let mut session = DkgSession {
                     key_gen,
                     session_id: session_id.clone(),
                     participant_index,
