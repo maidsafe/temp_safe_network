@@ -505,7 +505,7 @@ impl Session {
         let a_close_sap = self.network.closest_or_opposite(&dst_address, None);
         let the_close_sap = a_close_sap.clone().map(|auth| auth.value);
         // Get DataSection elders details.
-        let (mut elders, section_pk) = if let Some(sap) = a_close_sap {
+        let (elders, section_pk) = if let Some(sap) = a_close_sap {
             let sap_elders = sap.elders_vec();
 
             trace!("SAP elders found {:?}", sap_elders);
@@ -526,11 +526,6 @@ impl Session {
                 section_pk,
             });
         }
-
-        elders.shuffle(&mut OsRng);
-
-        // now we use only the required count
-        let elders = elders.into_iter().take(targets_count).collect();
 
         Ok((section_pk, elders))
     }
