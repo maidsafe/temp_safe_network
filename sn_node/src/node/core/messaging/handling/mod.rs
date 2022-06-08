@@ -43,7 +43,6 @@ use sn_interface::types::{log_markers::LogMarker, Peer, PublicKey};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
-use sn_dysfunction::IssueType;
 use xor_name::XorName;
 
 // Message handling
