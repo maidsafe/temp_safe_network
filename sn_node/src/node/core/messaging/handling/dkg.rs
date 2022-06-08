@@ -280,7 +280,6 @@ impl Node {
     }
 
     pub(crate) async fn handle_dkg_failure(&self, failure_set: DkgFailureSigSet) -> Result<Cmd> {
-
         // track those failed participants
         for name in &failure_set.failed_participants {
             self.log_knowledge_issue(*name).await?;

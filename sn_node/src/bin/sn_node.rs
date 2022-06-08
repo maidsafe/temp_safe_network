@@ -57,6 +57,7 @@ fn main() -> Result<()> {
 
     let our_pid = std::process::id();
 
+    // TODO: log dkg start, and remove incoming acks.
 
     // loops ready to catch any ChurnJoinMiss
     loop {
@@ -66,8 +67,8 @@ fn main() -> Result<()> {
             .stack_size(16 * 1024 * 1024)
             .spawn(move || {
                 let rt = tokio::runtime::Runtime::new()?;
-                let res =  rt.block_on(run_node()) {
-                    Ok(_) => Ok(())
+                let res = match rt.block_on(run_node()) {
+                    Ok(_) => Ok(()),
                     Err(error) => {
                         println!("=====>>>> Error at run node PID:{our_pid}: {error}");
                         Err(error)
@@ -101,7 +102,7 @@ fn main() -> Result<()> {
         // };
 
         // join it
-        match handle.join() {
+        match handle_res.join() {
             Ok(result) => {
                 return result;
             }
@@ -189,7 +190,6 @@ impl Debug for FileRotateAppender {
 }
 async fn run_node() -> Result<()> {
     let config = Config::new().await?;
-
 
     if let Some(c) = &config.completions() {
         let shell = c.parse().map_err(|err: String| eyre!(err))?;
@@ -313,9 +313,7 @@ async fn run_node() -> Result<()> {
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
     let (node, mut event_stream) = loop {
         match NodeApi::new(&config, bootstrap_retry_duration).await {
-            Ok(result) => {
-                break result
-            },
+            Ok(result) => break result,
             Err(Error::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
                 return Err(error).suggestion(
                     "You can disable port forwarding by supplying --skip-auto-port-forwarding. Without port\n\
@@ -375,7 +373,10 @@ async fn run_node() -> Result<()> {
         set_connection_info(genesis_key, our_conn_info)
             .await
             .unwrap_or_else(|err| {
-                error!("(PID:{our_pid}): Unable to write our connection info to disk: {:?}", err);
+                error!(
+                    "(PID:{our_pid}): Unable to write our connection info to disk: {:?}",
+                    err
+                );
             });
     } else {
         add_connection_info(our_conn_info)
@@ -384,7 +385,6 @@ async fn run_node() -> Result<()> {
                 error!("Unable to add our connection info to disk: {:?}", err);
             });
     }
-
 
     use rand::Rng;
     let mut rng = rand::thread_rng();

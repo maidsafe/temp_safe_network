@@ -70,7 +70,6 @@ impl NodeApi {
 
     /// Initialize a new node.
     pub async fn new(config: &Config, joining_timeout: Duration) -> Result<(Self, EventStream)> {
-
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
         tokio::fs::create_dir_all(root_dir).await?;

@@ -424,7 +424,7 @@ impl<'a> Join<'a> {
             .await;
 
         match res {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(error) => {
                 error!("Error sending JoinReq: {error}");
             }
