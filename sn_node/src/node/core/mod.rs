@@ -298,6 +298,14 @@ impl Node {
             .map_err(Error::from)
     }
 
+    /// Log a knowledge/dkg issue
+    pub(crate) async fn log_knowledge_issue(&self, name: XorName) -> Result<()> {
+        self.dysfunction_tracking
+            .track_issue(name, IssueType::Knowledge)
+            .await
+            .map_err(Error::from)
+    }
+
     pub(crate) async fn write_prefix_map(&self) {
         info!("Writing our latest PrefixMap to disk");
         // TODO: Make this serialization human readable
