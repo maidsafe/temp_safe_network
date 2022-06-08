@@ -528,7 +528,7 @@ impl Node {
                     trace!("Adult handling a Propose msg from {}: {:?}", sender, msg_id);
                 }
 
-                trace!("Handling msg: Propose from {}: {:?}", sender, msg_id);
+                trace!("HandlingProposal msg: {proposal:?} from {}: {:?}", sender, msg_id);
 
                 // lets convert our message into a usable proposal for core
                 let core_proposal = match proposal {
