@@ -105,7 +105,7 @@ pub async fn wallet_commander(
                             .suggestion("A file path must be specified for the DBC data."));
                     }
                     let dbc_data = std::fs::read_to_string(path)?;
-                    sn_dbc::Dbc::from_hex(&dbc_data).map_err(|e| {
+                    sn_dbc::Dbc::from_hex(dbc_data.trim()).map_err(|e| {
                         eyre!(e.to_string()).suggestion(
                             "This file does not appear to have DBC data. \
                             Please select another file with valid hex-encoded DBC data.",

@@ -83,6 +83,37 @@ fn wallet_deposit_should_deposit_a_dbc_from_a_file() -> Result<()> {
 }
 
 #[test]
+fn wallet_deposit_should_deposit_a_dbc_from_a_file_with_whitespace_at_the_end() -> Result<()> {
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let dbc_data_file = tmp_data_dir.child("dbc_with_12_300_000_000");
+    dbc_data_file.write_str(&format!("{}  \n", DBC_WITH_12_230_000_000))?;
+
+    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--name",
+            "my-first-dbc",
+            "--dbc",
+            &dbc_data_file.path().display().to_string(),
+            &wallet_xorurl,
+        ],
+        Some(0),
+    )?
+    .assert()
+    .stdout(format!(
+        "Spendable DBC deposited with name '{}' in wallet located at \"{}\"\n",
+        "my-first-dbc", wallet_xorurl
+    ))
+    .success();
+
+    Ok(())
+}
+
+#[test]
 fn wallet_deposit_should_fail_with_suggestion_when_file_does_not_contain_dbc_data() -> Result<()> {
     let tmp_data_dir = assert_fs::TempDir::new()?;
     let dbc_data_file = tmp_data_dir.child("dbc_with_12_300_000_000");
