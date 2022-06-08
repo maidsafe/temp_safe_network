@@ -4,9 +4,202 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.57.1 (2022-06-08)
+
+### New Features
+
+ - <csr-id-80e27349fb4ebeb19be3aa3e5ae9f2d8d8095313/> dbc arg can refer to file or dbc data
+   The `--dbc` argument for the `wallet deposit` command is extended so it can refer to either a file
+   path or DBC data. It will be tested first for an existing file path, otherwise it will fall back to
+   being interpreted as DBC data.
+   
+   Some people have been having trouble with pasting DBC data directly via the command line, depending
+   on what OS or shell is in use. You can still also pass the data via stdin, but that's only available
+   on Linux or macOS.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - dbc arg can refer to file or dbc data ([`80e2734`](https://github.com/maidsafe/safe_network/commit/80e27349fb4ebeb19be3aa3e5ae9f2d8d8095313))
+    - Merge #1217 ([`2f26043`](https://github.com/maidsafe/safe_network/commit/2f2604325d533357bad7d917315cf4cba0b2d3c0))
+</details>
+
+## v0.57.0 (2022-06-05)
+
+### Chore
+
+ - <csr-id-1bf7dfb3ce8b14cbed7a4a8ed98c8310653a2da9/> sn_interface-0.6.0/sn_dysfunction-0.5.0/sn_client-0.66.0/sn_node-0.62.0/sn_api-0.64.0/sn_cli-0.57.0
+ - <csr-id-c12e2269e3a537d96422bed96a4459a0add07deb/> upgrade sn_dbc to 3.2.0
+   This new release has utilities for serializing/deserializing `Dbc` to/from hex.
+ - <csr-id-e548388c693cfb71b270cf9e370b2f9b463044c5/> upgrade sn_dbc to 3.2.0
+   This new release has utilities for serializing/deserializing `Dbc` to/from hex.
+ - <csr-id-e2f854435451e30ac93098501b9e224fe51c5e5a/> some review feedback
+   Removed references to ed25519 in the `keys` command documentation and also removed a redundant test
+   run in the Makefile target that emulates the CI tests.
+ - <csr-id-210c54e8814877c15d87150248fe3858e83eeee8/> remove use of test-utils from test runs
+   After doing a rebase from main, the test-utils feature was removed. I updated the testing targets
+   and also replaced bad references to logger initialisation functions.
+
+### New Features
+
+ - <csr-id-4c6e6cff474d306e6632f004c6cf05729c7ced16/> add public key argument for owned dbcs
+   The `wallet reissue` command now has an additional optional argument, `--public-key`, which allows
+   the user to reissue a DBC to be owned by the holder of that public key. The key should be BLS
+   hex-encoded.
+   
+   The `wallet deposit` command will now require extension to provide the secret key when depositing an
+   owned DBC. This will be done as a separate piece of work.
+   
+   Some additional changes were made in support or to tidy CLI-related code:
+   * The conversion of DBCs to/from hex were removed from the CLI since this is now done on the `Dbc`
+     type.
+   * A CLI test that existed to test the above conversion code was removed since it's no longer
+     necessary.
+   * The naming scheme for the CLI wallet tests were elaborated and the redundant "calling_safe"
+     prefixes were removed.
+ - <csr-id-0e9980f5358a0aca5d40d607dfdc6de120e6412b/> add public key argument for owned dbcs
+   The `wallet reissue` command now has an additional optional argument, `--public-key`, which allows
+   the user to reissue a DBC to be owned by the holder of that public key. The key should be BLS
+   hex-encoded.
+   
+   The `wallet deposit` command will now require extension to provide the secret key when depositing an
+   owned DBC. This will be done as a separate piece of work.
+   
+   Some additional changes were made in support or to tidy CLI-related code:
+   * The conversion of DBCs to/from hex were removed from the CLI since this is now done on the `Dbc`
+     type.
+   * A CLI test that existed to test the above conversion code was removed since it's no longer
+     necessary.
+   * The naming scheme for the CLI wallet tests were elaborated and the redundant "calling_safe"
+     prefixes were removed.
+ - <csr-id-95de2ffe6f57ae0e6cebf123da3e9b6c3ad84aaf/> handover sap elder checks with membership knowledge
+ - <csr-id-1048c5e3d2196aed7de89a7938d6fc01c1843502/> use persistent dbc owner in sn_api
+   The network connection functions in the CLI are updated to pass the persistent DBC Owner. This is
+   based on the existence of a key that was created with the new `create-dbc-owner` command. If the key
+   exists, the connection will use the persistent DBC owner; if `None` is passed, a random key will be
+   generated.
+   
+   During a reissue, the change DBC is then assigned the owner from the client. We don't yet assign the
+   output DBC this owner, because we're still only supporting bearer DBCs. This may change for owned
+   DBCs, which should come soon.
+   
+   I split the wallet reissue test out into a couple: one with a single input DBC and one with
+   multiple. The original test had multiple inputs, but it seemed it was worth checking that the
+   reissue would function if there were also just a single input.
+ - <csr-id-58ff1978c2772968290eccc73049ce114d02efbb/> command to generate secret key for dbc owner
+   A new `keys create-dbc-owner` command is added to generate a secret key for use with reissuing DBCs.
+   The key gets serialised to a file in `~/.safe/cli`. It will be read from here when making
+   connections to the network.
+   
+   This commit also features various other changes. Originally I had two separate commits, but I
+   accidentally amended a previous commit and couldn't separate the content.
+   
+   The `keys create` command is using functions from a module related to authentication to determine
+   where to write the keys it generates. These functions directly specified a credential file's
+   location at the user's home directory. To help unit testing, I refactored this to provide the
+   location from the `Config` struct. Previously I refactored `networks` commands in a similar fashion.
+   The result is, during the unit test, the `assert_fs` library will create a temp directory for the
+   config and so the user's real home directory won't be manipulated during the test suite. `assert_fs`
+   will also remove the temp directory at the end of each test.
+   
+   With this change in place, I provided a couple of unit tests for the `keys create` command. This
+   command doesn't hit the network, so integration tests aren't necessary. There are only really two
+   code paths to go through: one for writing the keypair to file and one for not doing so.
+   
+   I didn't test the `keys show` command because it mostly just prints information to the console,
+   and at this stage I don't know how to capture that for a unit test (or if it's even possible).
+   
+   Finally, I tidied up some commented out code that doesn't seem to apply any more, and added some
+   additional documentation for the commands to try and make their intent a bit clearer.
+
+### New Features (BREAKING)
+
+ - <csr-id-ee04cceb08aa88b2e49c0c7b2fd5f405d86f37f6/> wallet deposit read input dbc from stdin
+
+ - <csr-id-92c53f186d2a63c6333b4d7b1016bb55edf74e42/> reissue dbc to a particular owner
+
+ - <csr-id-a1c6aebe66507b8f837b1a1aaca5aeb34cde28c7/> wallet deposit read input dbc from stdin
+
+ - <csr-id-cd85844f9f6402aba02f28fbedf92c7ee234e315/> reissue dbc to a particular owner
+
+ - <csr-id-f03fb7e35319dbb9e4745e3cb36c7913c4f220ac/> cli will now use bls keys
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 16 commits contributed to the release over the course of 4 calendar days.
+ - 8 days passed between releases.
+ - 15 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.6.0/sn_dysfunction-0.5.0/sn_client-0.66.0/sn_node-0.62.0/sn_api-0.64.0/sn_cli-0.57.0 ([`1bf7dfb`](https://github.com/maidsafe/safe_network/commit/1bf7dfb3ce8b14cbed7a4a8ed98c8310653a2da9))
+    - add public key argument for owned dbcs ([`4c6e6cf`](https://github.com/maidsafe/safe_network/commit/4c6e6cff474d306e6632f004c6cf05729c7ced16))
+    - upgrade sn_dbc to 3.2.0 ([`c12e226`](https://github.com/maidsafe/safe_network/commit/c12e2269e3a537d96422bed96a4459a0add07deb))
+    - wallet deposit read input dbc from stdin ([`ee04cce`](https://github.com/maidsafe/safe_network/commit/ee04cceb08aa88b2e49c0c7b2fd5f405d86f37f6))
+    - reissue dbc to a particular owner ([`92c53f1`](https://github.com/maidsafe/safe_network/commit/92c53f186d2a63c6333b4d7b1016bb55edf74e42))
+    - add public key argument for owned dbcs ([`0e9980f`](https://github.com/maidsafe/safe_network/commit/0e9980f5358a0aca5d40d607dfdc6de120e6412b))
+    - upgrade sn_dbc to 3.2.0 ([`e548388`](https://github.com/maidsafe/safe_network/commit/e548388c693cfb71b270cf9e370b2f9b463044c5))
+    - handover sap elder checks with membership knowledge ([`95de2ff`](https://github.com/maidsafe/safe_network/commit/95de2ffe6f57ae0e6cebf123da3e9b6c3ad84aaf))
+    - wallet deposit read input dbc from stdin ([`a1c6aeb`](https://github.com/maidsafe/safe_network/commit/a1c6aebe66507b8f837b1a1aaca5aeb34cde28c7))
+    - reissue dbc to a particular owner ([`cd85844`](https://github.com/maidsafe/safe_network/commit/cd85844f9f6402aba02f28fbedf92c7ee234e315))
+    - some review feedback ([`e2f8544`](https://github.com/maidsafe/safe_network/commit/e2f854435451e30ac93098501b9e224fe51c5e5a))
+    - cli will now use bls keys ([`f03fb7e`](https://github.com/maidsafe/safe_network/commit/f03fb7e35319dbb9e4745e3cb36c7913c4f220ac))
+    - remove use of test-utils from test runs ([`210c54e`](https://github.com/maidsafe/safe_network/commit/210c54e8814877c15d87150248fe3858e83eeee8))
+    - use persistent dbc owner in sn_api ([`1048c5e`](https://github.com/maidsafe/safe_network/commit/1048c5e3d2196aed7de89a7938d6fc01c1843502))
+    - command to generate secret key for dbc owner ([`58ff197`](https://github.com/maidsafe/safe_network/commit/58ff1978c2772968290eccc73049ce114d02efbb))
+    - Merge #1192 ([`f9fc2a7`](https://github.com/maidsafe/safe_network/commit/f9fc2a76f083ba5161c8c4eef9013c53586b4693))
+</details>
+
 ## v0.56.0 (2022-05-27)
 
+### Chore
+
+ - <csr-id-e5fcd032e1dd904e05bc23e119af1d06e3b85a06/> sn_interface-0.5.0/sn_dysfunction-0.4.0/sn_client-0.65.0/sn_node-0.61.0/sn_api-0.63.0/sn_cli-0.56.0
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 2 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.5.0/sn_dysfunction-0.4.0/sn_client-0.65.0/sn_node-0.61.0/sn_api-0.63.0/sn_cli-0.56.0 ([`e5fcd03`](https://github.com/maidsafe/safe_network/commit/e5fcd032e1dd904e05bc23e119af1d06e3b85a06))
+</details>
+
 ## v0.55.0 (2022-05-25)
+
+<csr-id-ef56cf9cf8de45a9f13c2510c63de245b12aeae8/>
 
 ### Chore
 
