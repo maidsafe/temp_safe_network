@@ -231,7 +231,10 @@ impl Dispatcher {
                 };
 
                 if !unresponsive_nodes.is_empty() {
-                    debug!("Dysfunctional nodes found: {:?} : {unresponsive_nodes:?}", LogMarker::ProposeOffline);
+                    debug!(
+                        "Dysfunctional nodes found: {:?} : {unresponsive_nodes:?}",
+                        LogMarker::ProposeOffline
+                    );
                     let cmd = Cmd::ProposeOffline(unresponsive_nodes);
                     if let Err(e) = dispatcher
                         .clone()

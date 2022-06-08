@@ -16,6 +16,7 @@ static RECENT_ISSUE_DURATION: Duration = Duration::from_secs(60 * 15);
 static CONN_WEIGHTING: f32 = 2.0;
 static OP_WEIGHTING: f32 = 1.0;
 static KNOWLEDGE_WEIGHTING: f32 = 3.0;
+static DKG_WEIGHTING: f32 = 5.0;
 
 /// Z-score value above which a node is dysfunctional
 static DYSFUNCTIONAL_DEVIATION: f32 = 1.1;
@@ -24,6 +25,8 @@ static DYSFUNCTIONAL_DEVIATION: f32 = 1.1;
 /// Represents the different type of issues that can be recorded by the Dysfunction Detection
 /// system.
 pub enum IssueType {
+    /// Represents a Dkg issue to be tracked by Dysfunction Detection.
+    Dkg,
     /// Represents a communication issue to be tracked by Dysfunction Detection.
     Communication,
     /// Represents a knowledge issue to be tracked by Dysfunction Detection.
@@ -35,6 +38,7 @@ pub enum IssueType {
 #[derive(Debug)]
 pub struct ScoreResults {
     pub communication_scores: BTreeMap<XorName, f32>,
+    pub dkg_scores: BTreeMap<XorName, f32>,
     pub knowledge_scores: BTreeMap<XorName, f32>,
     pub op_scores: BTreeMap<XorName, f32>,
 }
@@ -63,6 +67,7 @@ impl DysfunctionDetection {
         let mut communication_scores = BTreeMap::new();
         let mut knowledge_scores = BTreeMap::new();
         let mut op_scores = BTreeMap::new();
+        let mut dkg_scores = BTreeMap::new();
 
         let adults = self
             .adults
@@ -72,6 +77,11 @@ impl DysfunctionDetection {
             .copied()
             .collect::<Vec<XorName>>();
         for node in adults.iter() {
+            let _ = dkg_scores.insert(
+                *node,
+                self.calculate_node_score(node, adults.clone(), &IssueType::Dkg)
+                    .await,
+            );
             let _ = communication_scores.insert(
                 *node,
                 self.calculate_node_score(node, adults.clone(), &IssueType::Communication)
@@ -94,6 +104,7 @@ impl DysfunctionDetection {
         }
         ScoreResults {
             communication_scores,
+            dkg_scores,
             knowledge_scores,
             op_scores,
         }
@@ -132,6 +143,14 @@ impl DysfunctionDetection {
                 };
                 count
             }
+            IssueType::Dkg => {
+                let count = if let Some(entry) = self.dkg_issues.get(node) {
+                    entry.value().read().await.len()
+                } else {
+                    1
+                };
+                count
+            }
             IssueType::Knowledge => {
                 let count = if let Some(entry) = self.knowledge_issues.get(node) {
                     entry.value().read().await.len()
@@ -157,6 +176,7 @@ impl DysfunctionDetection {
         let scores = self.calculate_scores().await;
         let ops_scores = scores.op_scores;
         let conn_scores = scores.communication_scores;
+        let dkg_scores = scores.dkg_scores;
         let knowledge_scores = scores.knowledge_scores;
 
         let mut pre_z_scores = BTreeMap::default();
@@ -170,19 +190,23 @@ impl DysfunctionDetection {
             let node_conn_score = *conn_scores.get(&name).unwrap_or(&1.0);
             let node_conn_score = node_conn_score * CONN_WEIGHTING;
 
+            let node_dkg_score = *dkg_scores.get(&name).unwrap_or(&1.0);
+            let node_dkg_score = node_dkg_score * DKG_WEIGHTING;
+
             let node_knowledge_score = *knowledge_scores.get(&name).unwrap_or(&1.0);
             let node_knowledge_score = node_knowledge_score * KNOWLEDGE_WEIGHTING;
 
             trace!("Conns score: {name}, {node_conn_score}");
             trace!("Knowledge score: {name}, {node_knowledge_score}");
-            let final_score = ops_score + node_conn_score + node_knowledge_score;
+            trace!("Dkg score: {name}, {node_dkg_score}");
+            let final_score = ops_score + node_conn_score + node_knowledge_score + node_dkg_score;
 
             scores_only.push(final_score);
             let _prev = pre_z_scores.insert(name, final_score);
         }
 
-        let mean = get_mean_of(&scores_only); //.unwrap_or(1.0);
-        let std_dev = std_deviation(&scores_only); //.unwrap_or(1.0);
+        let mean = get_mean_of(&scores_only);
+        let std_dev = std_deviation(&scores_only);
 
         trace!("avg weighted score across all nodes: {mean:?}");
         trace!("std dev: {std_dev:?}");
@@ -219,6 +243,11 @@ impl DysfunctionDetection {
         }
 
         for node in self.knowledge_issues.iter() {
+            let mut issues = node.value().write().await;
+            issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
+        }
+
+        for node in self.dkg_issues.iter() {
             let mut issues = node.value().write().await;
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
@@ -260,9 +289,6 @@ mod tests {
     use sn_interface::messaging::data::OperationId;
     use tokio::runtime::Runtime;
     use xor_name::{rand::random as random_xorname, XorName};
-    // use proptest_derive::Arbitrary;
-    use crate::tests::init_test_logger;
-    use eyre::bail;
 
     fn issue_type_strategy() -> impl Strategy<Value = IssueType> {
         prop_oneof![
@@ -296,6 +322,9 @@ mod tests {
                     .calculate_scores()
                     .await;
                 match issue_type {
+                    IssueType::Dkg => {
+                        assert_eq!(score_results.dkg_scores.len(), adult_count);
+                    },
                     IssueType::Communication => {
                         assert_eq!(score_results.communication_scores.len(), adult_count);
                     },
@@ -325,6 +354,9 @@ mod tests {
                     .calculate_scores()
                     .await;
                 let scores = match issue_type {
+                    IssueType::Dkg => {
+                        score_results.dkg_scores
+                    },
                     IssueType::Communication => {
                         score_results.communication_scores
                     },
@@ -443,6 +475,9 @@ mod tests {
                 let scores = match issue_type {
                     IssueType::Communication => {
                         score_results.communication_scores
+                    },
+                    IssueType::Dkg => {
+                        score_results.dkg_scores
                     },
                     IssueType::Knowledge => {
                         score_results.knowledge_scores
