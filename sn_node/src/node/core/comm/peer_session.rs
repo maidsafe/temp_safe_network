@@ -89,6 +89,7 @@ impl PeerSession {
         self.link.add(conn).await
     }
 
+    #[instrument(skip(self, msg_bytes, msg_priority))]
     pub(crate) async fn send(
         &self,
         msg_id: MsgId,
@@ -105,10 +106,9 @@ impl PeerSession {
         let job = SendJob {
             msg_id,
             msg_bytes,
-            retries: 0,
+            retries: 3,
             reporter,
         };
-
         let _ = self.msg_queue.write().await.push(job, msg_priority);
 
         Ok(watcher)
@@ -133,6 +133,7 @@ impl PeerSession {
         *self.disconnnected.read().await
     }
 
+    #[instrument(skip_all)]
     async fn keep_sending(&self) {
         loop {
             if self.disconnected().await {
@@ -173,6 +174,7 @@ impl PeerSession {
 
                     break; // this means we will stop all sending to this peer!
                 }
+
                 if let Err(err) = self.link.send(job.msg_bytes.clone()).await {
                     job.retries += 1;
                     if err.is_local_close() {
@@ -181,6 +183,7 @@ impl PeerSession {
                     } else {
                         job.reporter
                             .send(SendStatus::TransientError(format!("{:?}", err)));
+
                         let _ = self.msg_queue.write().await.push(job, prio);
                     }
                 } else {

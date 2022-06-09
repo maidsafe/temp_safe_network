@@ -55,6 +55,7 @@ pub(crate) async fn join_network(
 
     let state = Join::new(node, outgoing_msgs_sender, incoming_msgs, prefix_map);
 
+    debug!("=========> attempting bootstrap to {bootstrap_addr}");
     future::join(
         state.run(bootstrap_addr),
         send_messages(outgoing_msgs_receiver, comm),
@@ -113,6 +114,11 @@ impl<'a> Join<'a> {
     async fn run(self, bootstrap_addr: SocketAddr) -> Result<(NodeInfo, NetworkKnowledge)> {
         // Use our XorName as we do not know their name or section key yet.
         let bootstrap_peer = Peer::new(self.node.name(), bootstrap_addr);
+
+        trace!(
+            "Bootstrap run, prefixmap as we have it: {:?}",
+            self.prefix_map
+        );
         let genesis_key = self.prefix_map.genesis_key();
 
         let (target_section_key, recipients) =

@@ -43,7 +43,6 @@ use sn_interface::types::{log_markers::LogMarker, Peer, PublicKey};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
-use sn_dysfunction::IssueType;
 use xor_name::XorName;
 
 // Message handling
@@ -147,10 +146,7 @@ impl Node {
 
                                     if known_elders.contains(&sender.name()) {
                                         // we track a dysfunction against our elder here
-                                        self.dysfunction_tracking
-                                            .track_issue(sender.name(), IssueType::Knowledge)
-                                            .await
-                                            .map_err(Error::from)?;
+                                        self.log_knowledge_issue(sender.name()).await?;
                                     }
 
                                     // short circuit and send those AE responses
@@ -555,6 +551,9 @@ impl Node {
             }
             SystemMsg::DkgStart(session_id) => {
                 trace!("Handling msg: Dkg-Start {:?} from {}", session_id, sender);
+                self.dysfunction_tracking
+                    .dkg_ack_fulfilled(&sender.name())
+                    .await;
                 let our_name = self.info.read().await.name();
                 if !session_id.contains_elder(our_name) {
                     return Ok(vec![]);
@@ -580,6 +579,9 @@ impl Node {
                     message,
                     sender
                 );
+                self.dysfunction_tracking
+                    .dkg_ack_fulfilled(&sender.name())
+                    .await;
                 self.handle_dkg_msg(session_id, message, sender).await
             }
             SystemMsg::DkgFailureObservation {
@@ -594,6 +596,10 @@ impl Node {
                 message,
                 session_id,
             } => {
+                self.dysfunction_tracking
+                    .dkg_ack_fulfilled(&sender.name())
+                    .await;
+
                 self.handle_dkg_not_ready(
                     sender,
                     message,
@@ -607,6 +613,10 @@ impl Node {
                 message,
                 session_id,
             } => {
+                self.dysfunction_tracking
+                    .dkg_ack_fulfilled(&sender.name())
+                    .await;
+
                 self.handle_dkg_retry(&session_id, message_history, message, sender)
                     .await
             }

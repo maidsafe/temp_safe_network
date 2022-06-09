@@ -118,6 +118,7 @@ impl Link {
     /// Send a message to the peer using the given configuration.
     ///
     /// See [`send`](Self::send) if you want to send with the default configuration.
+    #[instrument(skip_all)]
     pub async fn send_with<F: Fn(qp2p::Connection, IncomingMsgs)>(
         &self,
         msg: Bytes,

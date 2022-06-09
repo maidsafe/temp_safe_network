@@ -22,6 +22,7 @@ use self::peer_session::{PeerSession, SendWatcher};
 
 use crate::node::core::comm::peer_session::SendStatus;
 use crate::node::error::{Error, Result};
+use sn_dysfunction::DysfunctionDetection;
 use sn_interface::messaging::WireMsg;
 use sn_interface::types::Peer;
 
@@ -68,7 +69,7 @@ impl Comm {
         config: qp2p::Config,
         receive_msg: mpsc::Sender<MsgEvent>,
     ) -> Result<(Self, SocketAddr)> {
-        debug!("Starting bootstrap process");
+        debug!("Starting bootstrap process with bootstrap nodes: {bootstrap_nodes:?}");
         // Bootstrap to the network returning the connection to a node.
         let (our_endpoint, incoming_connections, bootstrap_node) =
             Endpoint::new_peer(local_addr, bootstrap_nodes, config).await?;
@@ -87,7 +88,11 @@ impl Comm {
         self.our_endpoint.public_addr()
     }
 
-    pub(crate) async fn cleanup_peers(&self, retain_peers: Vec<Peer>) {
+    pub(crate) async fn cleanup_peers(
+        &self,
+        retain_peers: Vec<Peer>,
+        dysfunction: DysfunctionDetection,
+    ) -> Result<()> {
         let mut peers_to_cleanup = vec![];
         for entry in self.sessions.iter() {
             let peer = entry.key();
@@ -95,14 +100,16 @@ impl Comm {
 
             session.remove_expired().await;
 
-            if retain_peers.contains(peer) {
-                continue;
-            }
-
             let is_connected = session.is_connected().await;
 
             if !is_connected {
-                peers_to_cleanup.push(*peer);
+                if !retain_peers.contains(peer) {
+                    peers_to_cleanup.push(*peer);
+                }
+
+                dysfunction
+                    .track_issue(peer.name(), sn_dysfunction::IssueType::Communication)
+                    .await?;
             }
         }
 
@@ -120,6 +127,7 @@ impl Comm {
         }
 
         debug!("PeerLink count post-cleanup: ${:?}", self.sessions.len());
+        Ok(())
     }
 
     /// Fake function used as replacement for testing only.
@@ -437,43 +445,41 @@ impl Comm {
     }
 
     /// Get a PeerSession if it already exists, otherwise create and insert
+    #[instrument(skip(self))]
     async fn get_or_create(&self, peer: &Peer) -> PeerSession {
-        match self.sessions.get(peer) {
-            Some(entry) => entry.value().clone(),
-            // not in list, go ahead and create + insert
-            None => {
-                let link = Link::new(*peer, self.our_endpoint.clone(), self.msg_listener.clone());
-                let session = PeerSession::new(link);
-                let _ = self.sessions.insert(*peer, session.clone());
-                session
-            }
+        if let Some(entry) = self.sessions.get(peer) {
+            return entry.value().clone();
         }
+
+        let link = Link::new(*peer, self.our_endpoint.clone(), self.msg_listener.clone());
+        let session = PeerSession::new(link);
+        let _ = self.sessions.insert(*peer, session.clone());
+        session
     }
 
     /// Any number of incoming qp2p:Connections can be added.
     /// We will eventually converge to the same one in our comms with the peer.
     async fn add_incoming(&self, peer: &Peer, conn: qp2p::Connection) {
-        {
-            if let Some(entry) = self.sessions.get(peer) {
-                // peer already exists
-                let peer_session = entry.value();
-                // add to it
-                peer_session.add(conn).await;
-            } else {
-                let link = Link::new_with(
-                    *peer,
-                    self.our_endpoint.clone(),
-                    self.msg_listener.clone(),
-                    conn,
-                )
-                .await;
-                let session = PeerSession::new(link);
-                let _ = self.sessions.insert(*peer, session);
-            }
+        if let Some(entry) = self.sessions.get(peer) {
+            // peer already exists
+            let peer_session = entry.value();
+            // add to it
+            peer_session.add(conn).await;
+        } else {
+            let link = Link::new_with(
+                *peer,
+                self.our_endpoint.clone(),
+                self.msg_listener.clone(),
+                conn,
+            )
+            .await;
+            let session = PeerSession::new(link);
+            let _ = self.sessions.insert(*peer, session);
         }
     }
 
     // Helper to send a message to a single recipient.
+    #[instrument(skip(self, wire_msg))]
     async fn send_to_one(
         &self,
         recipient: Peer,
@@ -495,7 +501,6 @@ impl Comm {
             msg_id,
             recipient,
         );
-
         let peer = self.get_or_create(&recipient).await;
         let result = peer.send(msg_id, msg_priority, msg_bytes).await;
 

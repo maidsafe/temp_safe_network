@@ -192,7 +192,7 @@ impl Node {
         debug!("{}", LogMarker::TriggeringPromotionAndDemotion);
         let mut cmds = vec![];
         // TODO: move `promote_and_demote_elders` to Membership
-        for session_id in self.promote_and_demote_elders(excluded_names).await {
+        for session_id in self.promote_and_demote_elders(excluded_names).await? {
             cmds.extend(self.send_dkg_start(session_id).await?);
         }
 

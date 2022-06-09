@@ -25,9 +25,9 @@ const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 #[cfg(feature = "back-pressure")]
 const BACKPRESSURE_INTERVAL: Duration = Duration::from_secs(60);
 const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
-const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(20); // does this need to be longer than bootstrap retry?
+const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(120);
 const DATA_BATCH_INTERVAL: Duration = Duration::from_secs(1);
-const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(60);
+const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(15);
 
 impl Dispatcher {
     pub(crate) async fn start_network_probing(self: Arc<Self>) {

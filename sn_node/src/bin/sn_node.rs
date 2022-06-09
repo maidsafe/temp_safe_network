@@ -363,7 +363,7 @@ async fn run_node(config: Config) -> Result<()> {
                 exit(1);
             }
             Err(NodeError::JoinTimeout) => {
-                let message = format!("(PID:{our_pid}): Encountered a timeout while trying to join the network. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds.");
+                let message = format!("(PID: {our_pid}): Encountered a timeout while trying to join the network. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds.");
                 println!("{}", &message);
                 error!("{}", &message);
             }
@@ -409,13 +409,13 @@ async fn run_node(config: Config) -> Result<()> {
 
         if !config.is_first() && x > 0.6 {
             println!(
-                "[Chaos] (PID:{our_pid}): Startup chaos crash w/ x of: {}",
+                "[Chaos] (PID: {our_pid}): Startup chaos crash w/ x of: {}",
                 x
             );
 
             // tiny sleep so testnet doesn't detect a fauly node and exit
             sleep(Duration::from_secs(1)).await;
-            warn!("[Chaos] (PID:{our_pid}): ChaoticStartupCrash");
+            warn!("[Chaos] (PID: {our_pid}): ChaoticStartupCrash");
             return Err(NodeError::ChaoticStartupCrash).map_err(ErrReport::msg);
         }
     }

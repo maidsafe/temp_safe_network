@@ -1,0 +1,16 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 0809db9148d9eed3ceb4545a057653d76174f50d296d680f4d830e2a536a72c7 # shrinks to good_nodes = 7, bad_nodes = 1, issue_count = 0, issue_type = Communication
+cc 2e86c64e85cb9ef9ded36a8cf3a0c1f9de72c9b0708754bb656abda339d5c330 # shrinks to good_nodes = 7, bad_nodes = 1, issue_count = 500, issue_type = Communication
+cc 5f2a17e284296f41a1d2923295c0c080989dc9b1ce06b50e514eb5253f843725 # shrinks to good_nodes = 7, bad_nodes = 2, issue_count = 1000, issue_type = Communication
+cc f5eff14b65a454003725ba22bcb319b6cded3502752bc4191e766303c744eb8d # shrinks to good_nodes = 7, bad_nodes = 6, issue_count = 1000, issue_type = Communication
+cc 5766209e6dd5374ed41b3b1e5fadc33588bb5814ec01f29d6424f7646840aba4 # shrinks to good_nodes = 12, bad_nodes = 4, issue_count = 1941, issue_type = Knowledge
+cc 84f9ac5e920d87060f47d9b989c6bcf57bd39d679efc7cdf1ead651b7f85a4a5 # shrinks to good_nodes = 18, bad_nodes = 6, issue_count = 3571, issue_type = Knowledge
+cc 960d7adfa6a54c07fca494aeda40fca6edf973ab657de1c7b9a35c7279d012b4 # shrinks to good_nodes = 18, bad_nodes = 5, issue_count = 1994, issue_type = Knowledge
+cc d020be7e19ad1299e89ac22b58e33cf4c173b8340b7e700d7494d768e4ed07dc # shrinks to good_nodes = 20, bad_nodes = 6, issue_count = 1063, issue_type = PendingRequestOperation(Some(OpId-4c73ad..))
+cc 431f58262fc80eee37c76d2d47244c45a4382a5d19f7481b0d3887e70bdbec44 # shrinks to good_nodes = 20, bad_nodes = 6, issue_count = 1968, issue_type = Knowledge
+cc 2cebe98b0b3287054764b94fc83bc59088d032e2ec2a2f7fd0a615c56d874d9c # shrinks to good_nodes = 21, bad_nodes = 6, issue_count = 1258, issue_type = Communication
