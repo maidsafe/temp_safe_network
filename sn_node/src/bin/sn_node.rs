@@ -28,9 +28,14 @@
 )]
 
 use color_eyre::{Section, SectionExt};
-use eyre::{eyre, ErrReport, Result, WrapErr};
+#[cfg(not(feature = "tokio-console"))]
+use eyre::Error;
+
+use eyre::{eyre, Context, ErrReport, Result};
 use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
-use sn_node::node::{add_connection_info, set_connection_info, Config, Error, Event, NodeApi};
+use sn_node::node::{
+    add_connection_info, set_connection_info, Config, Error as NodeError, Event, NodeApi,
+};
 
 use self_update::{cargo_crate_version, Status};
 #[cfg(not(feature = "tokio-console"))]
@@ -40,9 +45,11 @@ use std::{io::Write, process::exit};
 use structopt::{clap, StructOpt};
 use tokio::sync::RwLockReadGuard;
 use tokio::time::{sleep, Duration};
-use tracing::{self, error, info, trace, warn};
+use tracing::{self, debug, error, info, trace, warn};
 
+#[cfg(not(feature = "tokio-console"))]
 use tracing_appender::non_blocking::WorkerGuard;
+
 #[cfg(not(feature = "tokio-console"))]
 use tracing_subscriber::filter::EnvFilter;
 
@@ -55,44 +62,168 @@ fn main() -> Result<()> {
     #[cfg(feature = "tokio-console")]
     console_subscriber::init();
 
-    // loops ready to catch any ChurnJoinMiss
-    loop {
-        // start runtime
-        let handle = std::thread::Builder::new()
-            .name("sn_node".to_string())
-            .stack_size(16 * 1024 * 1024)
-            .spawn(move || {
-                let rt = tokio::runtime::Runtime::new()?;
-                match rt.block_on(run_node()) {
-                    Ok(_) => {}
-                    Err(error) => {
-                        error!("{error}")
-                    }
-                };
-                rt.shutdown_timeout(Duration::from_secs(2));
+    // first, let's grab the config. We do this outwith of the node, so we can init logging
+    // with the config, and so it can persists across node restarts
+    let config_rt = tokio::runtime::Runtime::new()?;
+    let config = config_rt.block_on(Config::new())?;
+    // shut down this runtime, we do not need it anymore
+    config_rt.shutdown_timeout(Duration::from_secs(1));
 
-                // let rt = tokio::runtime::Runtime::new()?;
-                // rt.block_on(run_node())?;
-                Ok(())
-            })
-            .wrap_err("Failed to spawn node thread")?;
+    trace!("Initial node config: {config:?}");
 
-        // join it
-        match handle.join() {
-            Ok(result) => {
-                return result;
+    // This is our node runtime thread. Do all operations within here!
+    // We need this runtime, vs tokio::main so we can easily cancel it and all spawned tasks
+    let handle = std::thread::Builder::new()
+        .name("sn_node".to_string())
+        // stack size on windows was too small at times, so we increase it here
+        .stack_size(16 * 1024 * 1024)
+        .spawn(move || {
+            // start logging in this thread for all node work
+            // it should be heald through all node restarts
+            #[cfg(not(feature = "tokio-console"))]
+            let _guard = init_node_logging(config).map_err(Error::from)?;
+
+            loop {
+                create_runtime_and_node()?;
             }
-            Err(error) => {
-                if let Some(Error::ChurnJoinMiss) = error.downcast_ref::<Error>() {
-                    warn!("Received churn join miss, restarting node...");
-                    continue;
-                }
-                // thread panic errors cannot be converted to `eyre::Report` as they are not `Sync`, so
-                // the best thing to do is propagate the panic.
-                std::panic::resume_unwind(error)
-            }
+
+        })
+        .wrap_err("Failed to spawn node thread")?;
+
+    // join the runtime thread so we hold the main thread open until completion
+    match handle.join() {
+        Ok(result) => result,
+        Err(error) => {
+            // An error here means we cannot simply restart the ndoe runtime
+            println!("Error from sn_node thread: {error:?}");
+            // thread panic errors cannot be converted to `eyre::Report` as they are not `Sync`, so
+            // the best thing to do is propagate the panic.
+            std::panic::resume_unwind(error)
         }
     }
+}
+
+/// Create a tokio runtime per `run_node` instance.
+///
+fn create_runtime_and_node() -> Result<()> {
+    info!("Node runtime started");
+
+    // start a new runtime for a node.
+    let rt = tokio::runtime::Runtime::new()?;
+    let res = rt.block_on(async move {
+        // pull config again in case it has been updated meanwhile
+        let config = Config::new().await?;
+        // we want logging to persist
+        // loops ready to catch any ChurnJoinMiss
+        let res = match run_node(config).await {
+            Ok(result) => {
+                info!("Node has finished running, no runtime errors were reported");
+                Ok(result)
+            }
+            Err(error) => {
+                warn!("Node instance finished with an error. Restarting node...");
+                Err(error)
+            }
+        };
+
+        res
+    });
+
+    info!("Shutting down node runtime");
+
+    // doesn't really matter the outcome here.
+    rt.shutdown_timeout(Duration::from_secs(2));
+    debug!("Node runtime should be shutdown now");
+    res
+}
+
+/// Inits node logging, returning the global node guard if required.
+/// This guard should be held for the life of the program.
+///
+/// Logging should be instantiated only once.
+#[cfg(not(feature = "tokio-console"))]
+fn init_node_logging(config: Config) -> Result<Option<WorkerGuard>> {
+    // ==============
+    // Set up logging
+    // ==============
+
+    let mut _optional_guard: Option<WorkerGuard> = None;
+
+    let filter = match EnvFilter::try_from_env("RUST_LOG") {
+        Ok(filter) => filter,
+        // If we have an error (ie RUST_LOG not set or otherwise), we check the verbosity flags
+        Err(_) => {
+            // we manually determine level filter instead of using tracing EnvFilter.
+            let level_filter = config.verbose();
+            let module_filter = format!("{}={}", MODULE_NAME, level_filter)
+                .parse()
+                .wrap_err("BUG: invalid module filter constructed")?;
+            EnvFilter::from_default_env().add_directive(module_filter)
+        }
+    };
+
+    _optional_guard = if let Some(log_dir) = config.log_dir() {
+        println!("Starting logging to directory: {:?}", log_dir);
+
+        let mut content_limit = ContentLimit::BytesSurpassed(config.logs_max_bytes);
+        if config.logs_max_lines > 0 {
+            content_limit = ContentLimit::Lines(config.logs_max_lines);
+        }
+
+        // FileRotate crate changed `0 means for all` to `0 means only original`
+        // Here set the retained value to be same as uncompressed in case of 0.
+        let logs_retained = if config.logs_retained == 0 {
+            config.logs_uncompressed
+        } else {
+            config.logs_retained
+        };
+        let file_appender = FileRotateAppender::make_rotate_appender(
+            log_dir,
+            "sn_node.log",
+            AppendCount::new(logs_retained),
+            content_limit,
+            Compression::OnRotate(config.logs_uncompressed),
+        );
+
+        // configure how tracing non-blocking works: https://tracing.rs/tracing_appender/non_blocking/struct.nonblockingbuilder#method.default
+        let non_blocking_builder = tracing_appender::non_blocking::NonBlockingBuilder::default();
+
+        let (non_blocking, guard) = non_blocking_builder
+                  // lose lines and keep perf, or exert backpressure?
+                  .lossy(false)
+                  // optionally change buffered lines limit
+                  // .buffered_lines_limit(buffered_lines_limit)
+                  .finish(file_appender);
+
+        let builder = tracing_subscriber::fmt()
+              // eg : RUST_LOG=my_crate=info,my_crate::my_mod=debug,[my_span]=trace
+                  .with_env_filter(filter)
+                  .with_thread_names(true)
+                  .with_ansi(false)
+                  .with_writer(non_blocking);
+
+        if config.json_logs {
+            builder.json().init();
+        } else {
+            builder.event_format(LogFormatter::default()).init();
+        }
+
+        Some(guard)
+    } else {
+        println!("Starting logging to stdout");
+
+        tracing_subscriber::fmt()
+            .with_thread_names(true)
+            .with_ansi(false)
+            .with_env_filter(filter)
+            .with_target(false)
+            .event_format(LogFormatter::default())
+            .init();
+
+        None
+    };
+
+    Ok(_optional_guard)
 }
 
 /// FileRotateAppender is a tracing_appender with extra logrotate features:
@@ -163,99 +294,13 @@ impl Debug for FileRotateAppender {
         f.debug_struct("FileRotateAppender").finish()
     }
 }
-async fn run_node() -> Result<()> {
-    let config = Config::new().await?;
-
+async fn run_node(config: Config) -> Result<()> {
     if let Some(c) = &config.completions() {
         let shell = c.parse().map_err(|err: String| eyre!(err))?;
         let buf = gen_completions_for_shell(shell).map_err(|err| eyre!(err))?;
         std::io::stdout().write_all(&buf)?;
 
         return Ok(());
-    }
-
-    // ==============
-    // Set up logging
-    // ==============
-
-    let mut _optional_guard: Option<WorkerGuard> = None;
-
-    #[cfg(not(feature = "tokio-console"))]
-    {
-        let filter = match EnvFilter::try_from_env("RUST_LOG") {
-            Ok(filter) => filter,
-            // If we have an error (ie RUST_LOG not set or otherwise), we check the verbosity flags
-            Err(_) => {
-                // we manually determine level filter instead of using tracing EnvFilter.
-                let level_filter = config.verbose();
-                let module_filter = format!("{}={}", MODULE_NAME, level_filter)
-                    .parse()
-                    .wrap_err("BUG: invalid module filter constructed")?;
-                EnvFilter::from_default_env().add_directive(module_filter)
-            }
-        };
-
-        _optional_guard = if let Some(log_dir) = config.log_dir() {
-            println!("Starting logging to directory: {:?}", log_dir);
-
-            let mut content_limit = ContentLimit::BytesSurpassed(config.logs_max_bytes);
-            if config.logs_max_lines > 0 {
-                content_limit = ContentLimit::Lines(config.logs_max_lines);
-            }
-
-            // FileRotate crate changed `0 means for all` to `0 means only original`
-            // Here set the retained value to be same as uncompressed in case of 0.
-            let logs_retained = if config.logs_retained == 0 {
-                config.logs_uncompressed
-            } else {
-                config.logs_retained
-            };
-            let file_appender = FileRotateAppender::make_rotate_appender(
-                log_dir,
-                "sn_node.log",
-                AppendCount::new(logs_retained),
-                content_limit,
-                Compression::OnRotate(config.logs_uncompressed),
-            );
-
-            // configure how tracing non-blocking works: https://tracing.rs/tracing_appender/non_blocking/struct.nonblockingbuilder#method.default
-            let non_blocking_builder =
-                tracing_appender::non_blocking::NonBlockingBuilder::default();
-
-            let (non_blocking, guard) = non_blocking_builder
-                // lose lines and keep perf, or exert backpressure?
-                .lossy(false)
-                // optionally change buffered lines limit
-                // .buffered_lines_limit(buffered_lines_limit)
-                .finish(file_appender);
-
-            let builder = tracing_subscriber::fmt()
-            // eg : RUST_LOG=my_crate=info,my_crate::my_mod=debug,[my_span]=trace
-                .with_env_filter(filter)
-                .with_thread_names(true)
-                .with_ansi(false)
-                .with_writer(non_blocking);
-
-            if config.json_logs {
-                builder.json().init();
-            } else {
-                builder.event_format(LogFormatter::default()).init();
-            }
-
-            Some(guard)
-        } else {
-            println!("Starting logging to stdout");
-
-            tracing_subscriber::fmt()
-                .with_thread_names(true)
-                .with_ansi(false)
-                .with_env_filter(filter)
-                .with_target(false)
-                .event_format(LogFormatter::default())
-                .init();
-
-            None
-        };
     }
 
     if config.update() || config.update_only() {
@@ -279,7 +324,7 @@ async fn run_node() -> Result<()> {
         Config::clap().get_name(),
         env!("CARGO_PKG_VERSION")
     );
-    info!("\n\n{}\n{}", message, "=".repeat(message.len()));
+    info!("\n{}\n{}", message, "=".repeat(message.len()));
 
     let log = format!("The network is not accepting nodes right now. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds");
 
@@ -287,7 +332,7 @@ async fn run_node() -> Result<()> {
     let (node, mut event_stream) = loop {
         match NodeApi::new(&config, bootstrap_retry_duration).await {
             Ok(result) => break result,
-            Err(Error::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
+            Err(NodeError::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
                 return Err(error).suggestion(
                     "You can disable port forwarding by supplying --skip-auto-port-forwarding. Without port\n\
                     forwarding, your machine must be publicly reachable by the given\n\
@@ -300,11 +345,11 @@ async fn run_node() -> Result<()> {
                         .header("Disable port forwarding or change your router settings"),
                 );
             }
-            Err(Error::TryJoinLater) => {
+            Err(NodeError::TryJoinLater) => {
                 println!("{}", log);
                 info!("{}", log);
             }
-            Err(Error::NodeNotReachable(addr)) => {
+            Err(NodeError::NodeNotReachable(addr)) => {
                 let err_msg = format!(
                     "Unfortunately we are unable to establish a connection to your machine ({}) either through a \
                     public IP address, or via IGD on your router. Please ensure that IGD is enabled on your router - \
@@ -317,7 +362,7 @@ async fn run_node() -> Result<()> {
                 error!("{}", err_msg);
                 exit(1);
             }
-            Err(Error::JoinTimeout) => {
+            Err(NodeError::JoinTimeout) => {
                 let message = format!("Encountered a timeout while trying to join the network. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds.");
                 println!("{}", &message);
                 error!("{}", &message);
@@ -359,7 +404,7 @@ async fn run_node() -> Result<()> {
     while let Some(event) = event_stream.next().await {
         trace!("Routing event! {:?}", event);
         if let Event::ChurnJoinMissError = event {
-            return Err(Error::ChurnJoinMiss).map_err(ErrReport::msg);
+            return Err(NodeError::ChurnJoinMiss).map_err(ErrReport::msg);
         }
     }
 
