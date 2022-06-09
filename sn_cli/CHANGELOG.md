@@ -4,7 +4,37 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.57.2 (2022-06-09)
+
+### Bug Fixes
+
+ - <csr-id-b55218435be43d84956d35539f541c21f5fcb988/> strip whitespace from dbc data file
+   It's possible for files to be written out with some whitespace or newline characters. These need to
+   be stripped away or the DBC data won't be interpreted correctly.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - strip whitespace from dbc data file ([`b552184`](https://github.com/maidsafe/safe_network/commit/b55218435be43d84956d35539f541c21f5fcb988))
+</details>
+
 ## v0.57.1 (2022-06-08)
+
+### Chore
+
+ - <csr-id-9aa666763c381ed589343e306c583f558d935251/> sn_cli-0.57.1
 
 ### New Features
 
@@ -21,9 +51,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release over the course of 1 calendar day.
+ - 3 commits contributed to the release over the course of 2 calendar days.
  - 2 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -33,11 +63,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_cli-0.57.1 ([`9aa6667`](https://github.com/maidsafe/safe_network/commit/9aa666763c381ed589343e306c583f558d935251))
     - dbc arg can refer to file or dbc data ([`80e2734`](https://github.com/maidsafe/safe_network/commit/80e27349fb4ebeb19be3aa3e5ae9f2d8d8095313))
     - Merge #1217 ([`2f26043`](https://github.com/maidsafe/safe_network/commit/2f2604325d533357bad7d917315cf4cba0b2d3c0))
 </details>
 
 ## v0.57.0 (2022-06-05)
+
+<csr-id-1bf7dfb3ce8b14cbed7a4a8ed98c8310653a2da9/>
+<csr-id-c12e2269e3a537d96422bed96a4459a0add07deb/>
+<csr-id-e548388c693cfb71b270cf9e370b2f9b463044c5/>
+<csr-id-e2f854435451e30ac93098501b9e224fe51c5e5a/>
+<csr-id-210c54e8814877c15d87150248fe3858e83eeee8/>
 
 ### Chore
 
@@ -55,6 +92,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### New Features
 
+<csr-id-0e9980f5358a0aca5d40d607dfdc6de120e6412b/>
+<csr-id-95de2ffe6f57ae0e6cebf123da3e9b6c3ad84aaf/>
+<csr-id-1048c5e3d2196aed7de89a7938d6fc01c1843502/>
+<csr-id-58ff1978c2772968290eccc73049ce114d02efbb/>
+
  - <csr-id-4c6e6cff474d306e6632f004c6cf05729c7ced16/> add public key argument for owned dbcs
    The `wallet reissue` command now has an additional optional argument, `--public-key`, which allows
    the user to reissue a DBC to be owned by the holder of that public key. The key should be BLS
@@ -65,78 +107,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
    
    Some additional changes were made in support or to tidy CLI-related code:
    * The conversion of DBCs to/from hex were removed from the CLI since this is now done on the `Dbc`
-     type.
-   * A CLI test that existed to test the above conversion code was removed since it's no longer
+   type.
+* A CLI test that existed to test the above conversion code was removed since it's no longer
      necessary.
-   * The naming scheme for the CLI wallet tests were elaborated and the redundant "calling_safe"
+* The naming scheme for the CLI wallet tests were elaborated and the redundant "calling_safe"
      prefixes were removed.
- - <csr-id-0e9980f5358a0aca5d40d607dfdc6de120e6412b/> add public key argument for owned dbcs
-   The `wallet reissue` command now has an additional optional argument, `--public-key`, which allows
-   the user to reissue a DBC to be owned by the holder of that public key. The key should be BLS
-   hex-encoded.
-   
-   The `wallet deposit` command will now require extension to provide the secret key when depositing an
-   owned DBC. This will be done as a separate piece of work.
-   
-   Some additional changes were made in support or to tidy CLI-related code:
-   * The conversion of DBCs to/from hex were removed from the CLI since this is now done on the `Dbc`
+* The conversion of DBCs to/from hex were removed from the CLI since this is now done on the `Dbc`
      type.
-   * A CLI test that existed to test the above conversion code was removed since it's no longer
+* A CLI test that existed to test the above conversion code was removed since it's no longer
      necessary.
-   * The naming scheme for the CLI wallet tests were elaborated and the redundant "calling_safe"
+* The naming scheme for the CLI wallet tests were elaborated and the redundant "calling_safe"
      prefixes were removed.
- - <csr-id-95de2ffe6f57ae0e6cebf123da3e9b6c3ad84aaf/> handover sap elder checks with membership knowledge
- - <csr-id-1048c5e3d2196aed7de89a7938d6fc01c1843502/> use persistent dbc owner in sn_api
-   The network connection functions in the CLI are updated to pass the persistent DBC Owner. This is
-   based on the existence of a key that was created with the new `create-dbc-owner` command. If the key
-   exists, the connection will use the persistent DBC owner; if `None` is passed, a random key will be
-   generated.
-   
-   During a reissue, the change DBC is then assigned the owner from the client. We don't yet assign the
-   output DBC this owner, because we're still only supporting bearer DBCs. This may change for owned
-   DBCs, which should come soon.
-   
-   I split the wallet reissue test out into a couple: one with a single input DBC and one with
-   multiple. The original test had multiple inputs, but it seemed it was worth checking that the
-   reissue would function if there were also just a single input.
- - <csr-id-58ff1978c2772968290eccc73049ce114d02efbb/> command to generate secret key for dbc owner
-   A new `keys create-dbc-owner` command is added to generate a secret key for use with reissuing DBCs.
-   The key gets serialised to a file in `~/.safe/cli`. It will be read from here when making
-   connections to the network.
-   
-   This commit also features various other changes. Originally I had two separate commits, but I
-   accidentally amended a previous commit and couldn't separate the content.
-   
-   The `keys create` command is using functions from a module related to authentication to determine
-   where to write the keys it generates. These functions directly specified a credential file's
-   location at the user's home directory. To help unit testing, I refactored this to provide the
-   location from the `Config` struct. Previously I refactored `networks` commands in a similar fashion.
-   The result is, during the unit test, the `assert_fs` library will create a temp directory for the
-   config and so the user's real home directory won't be manipulated during the test suite. `assert_fs`
-   will also remove the temp directory at the end of each test.
-   
-   With this change in place, I provided a couple of unit tests for the `keys create` command. This
-   command doesn't hit the network, so integration tests aren't necessary. There are only really two
-   code paths to go through: one for writing the keypair to file and one for not doing so.
-   
-   I didn't test the `keys show` command because it mostly just prints information to the console,
-   and at this stage I don't know how to capture that for a unit test (or if it's even possible).
-   
-   Finally, I tidied up some commented out code that doesn't seem to apply any more, and added some
-   additional documentation for the commands to try and make their intent a bit clearer.
 
 ### New Features (BREAKING)
 
  - <csr-id-ee04cceb08aa88b2e49c0c7b2fd5f405d86f37f6/> wallet deposit read input dbc from stdin
-
  - <csr-id-92c53f186d2a63c6333b4d7b1016bb55edf74e42/> reissue dbc to a particular owner
-
  - <csr-id-a1c6aebe66507b8f837b1a1aaca5aeb34cde28c7/> wallet deposit read input dbc from stdin
-
  - <csr-id-cd85844f9f6402aba02f28fbedf92c7ee234e315/> reissue dbc to a particular owner
-
  - <csr-id-f03fb7e35319dbb9e4745e3cb36c7913c4f220ac/> cli will now use bls keys
-
 
 ### Commit Statistics
 
@@ -172,7 +161,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - Merge #1192 ([`f9fc2a7`](https://github.com/maidsafe/safe_network/commit/f9fc2a76f083ba5161c8c4eef9013c53586b4693))
 </details>
 
+<csr-unknown>
+ add public key argument for owned dbcsThe wallet reissue command now has an additional optional argument, --public-key, which allowsthe user to reissue a DBC to be owned by the holder of that public key. The key should be BLShex-encoded.The wallet deposit command will now require extension to provide the secret key when depositing anowned DBC. This will be done as a separate piece of work.Some additional changes were made in support or to tidy CLI-related code: handover sap elder checks with membership knowledge use persistent dbc owner in sn_apiThe network connection functions in the CLI are updated to pass the persistent DBC Owner. This isbased on the existence of a key that was created with the new create-dbc-owner command. If the keyexists, the connection will use the persistent DBC owner; if None is passed, a random key will begenerated.During a reissue, the change DBC is then assigned the owner from the client. We don’t yet assign theoutput DBC this owner, because we’re still only supporting bearer DBCs. This may change for ownedDBCs, which should come soon.I split the wallet reissue test out into a couple: one with a single input DBC and one withmultiple. The original test had multiple inputs, but it seemed it was worth checking that thereissue would function if there were also just a single input. command to generate secret key for dbc ownerA new keys create-dbc-owner command is added to generate a secret key for use with reissuing DBCs.The key gets serialised to a file in ~/.safe/cli. It will be read from here when makingconnections to the network.This commit also features various other changes. Originally I had two separate commits, but Iaccidentally amended a previous commit and couldn’t separate the content.The keys create command is using functions from a module related to authentication to determinewhere to write the keys it generates. These functions directly specified a credential file’slocation at the user’s home directory. To help unit testing, I refactored this to provide thelocation from the Config struct. Previously I refactored networks commands in a similar fashion.The result is, during the unit test, the assert_fs library will create a temp directory for theconfig and so the user’s real home directory won’t be manipulated during the test suite. assert_fswill also remove the temp directory at the end of each test.With this change in place, I provided a couple of unit tests for the keys create command. Thiscommand doesn’t hit the network, so integration tests aren’t necessary. There are only really twocode paths to go through: one for writing the keypair to file and one for not doing so.I didn’t test the keys show command because it mostly just prints information to the console,and at this stage I don’t know how to capture that for a unit test (or if it’s even possible).Finally, I tidied up some commented out code that doesn’t seem to apply any more, and added someadditional documentation for the commands to try and make their intent a bit clearer.<csr-unknown/>
+
 ## v0.56.0 (2022-05-27)
+
+<csr-id-e5fcd032e1dd904e05bc23e119af1d06e3b85a06/>
 
 ### Chore
 
