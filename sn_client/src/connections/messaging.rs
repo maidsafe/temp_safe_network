@@ -9,12 +9,11 @@
 use super::{QueryResult, Session};
 
 use crate::{connections::CmdResponse, Error, Result};
-use sn_interface::at_least_one_correct_elder_for_sap;
 use sn_interface::messaging::{
     data::{CmdError, DataQuery, QueryResponse},
     AuthKind, DstLocation, MsgId, ServiceAuth, WireMsg,
 };
-use sn_interface::network_knowledge::prefix_map::NetworkPrefixMap;
+use sn_interface::network_knowledge::{prefix_map::NetworkPrefixMap, supermajority};
 use sn_interface::types::{Peer, PeerLinks, PublicKey, SendToOneError};
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -510,8 +509,8 @@ impl Session {
             let section_pk = sap.section_key();
             trace!("SAP elders found {:?}", sap_elders);
 
-            // stored at Adults, so only 1 correctly functioning Elder need to relay
-            let targets_count = at_least_one_correct_elder_for_sap(Some(sap.value));
+            // Supermajority of elders is expected.
+            let targets_count = supermajority(sap_elders.len());
 
             // any SAP that does not hold elders_count() is indicative of a broken network (after genesis)
             if sap_elders.len() < targets_count {
