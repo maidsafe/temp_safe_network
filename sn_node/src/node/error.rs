@@ -35,6 +35,9 @@ pub enum Error {
     AtMaxServiceCmdThroughput,
     #[error("Permit was not retrieved in 500 loops")]
     CouldNotGetPermitInTime,
+    #[cfg(feature = "chaos")]
+    #[error("[Chaos] feature flag induced a crash at startup")]
+    ChaoticStartupCrash,
     #[error("Node prioritisation semaphore was closed early.")]
     SemaphoreClosed,
     #[error("Only messages requiring auth accumulation should be sent via \"send_messages_to_all_nodes_or_directly_handle_for_accumulation\"")]
