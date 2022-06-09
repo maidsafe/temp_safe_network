@@ -40,7 +40,7 @@ use std::{io::Write, process::exit};
 use structopt::{clap, StructOpt};
 use tokio::sync::RwLockReadGuard;
 use tokio::time::{sleep, Duration};
-use tracing::{self, error, info, trace, warn};
+use tracing::{self, debug, error, info, trace, warn};
 
 use tracing_appender::non_blocking::WorkerGuard;
 #[cfg(not(feature = "tokio-console"))]
@@ -50,10 +50,17 @@ use tracing_subscriber::filter::EnvFilter;
 const MODULE_NAME: &str = "sn_node";
 const BOOTSTRAP_RETRY_TIME_SEC: u64 = 15;
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     color_eyre::install()?;
     #[cfg(feature = "tokio-console")]
     console_subscriber::init();
+
+    // get the node config
+    let config = Config::new().await?;
+
+    // start logging
+    let _optinal_guard = init_node_logging(config.clone());
 
     let our_pid = std::process::id();
 
@@ -61,51 +68,14 @@ fn main() -> Result<()> {
 
     // loops ready to catch any ChurnJoinMiss
     loop {
-        // start runtime
-        let handle_res = std::thread::Builder::new()
-            .name("sn_node".to_string())
-            .stack_size(16 * 1024 * 1024)
-            .spawn(move || {
-                let rt = tokio::runtime::Runtime::new()?;
-                let res = match rt.block_on(run_node()) {
-                    Ok(_) => Ok(()),
-                    Err(error) => {
-                        println!("=====>>>> Error at run node PID:{our_pid}: {error}");
-                        Err(error)
-                    }
-                };
-                println!("runing shutdown timer");
-                rt.shutdown_timeout(Duration::from_secs(2));
-                println!("shutdown timer done");
-                res
-            })
-            .wrap_err("Failed to spawn node (PID:{our_pid}) thread")?;
+        let config = config.clone();
 
-        // we have one error case if immediate
-
-        // let handle = match handle_res {
-        //     Ok(handle) => handle,
-        //     Err(error) => {
-        //         println!("handle join error: {error:?}");
-
-        //         return Err(error);
-        //         // println!("==============>>>(PID:{our_pid}): Error coming out of node start: {error:?}");
-        //         // if let Some(Error::ChurnJoinMiss) = error.downcast_ref::<Error>() {
-        //         //     println!("(PID:{our_pid}): Received churn join miss, restarting node...");
-        //         //     continue;
-        //         // }
-
-        //                    // thread panic errors cannot be converted to `eyre::Report` as they are not `Sync`, so
-        //         // the best thing to do is propagate the panic.
-        //         // std::panic::resume_unwind(error)
-        //     }
-        // };
-
-        // join it
-        match handle_res.join() {
-            Ok(result) => {
-                return result;
-            }
+        debug!("aaaaaa");
+        match run_node(config).await {
+            Ok(r) => {
+                debug!("bbbbb node run finished fine");
+                // Ok(r)
+            },
             Err(error) => {
                 println!("(PID:{our_pid}): Error coming out of node start: {error:?}");
                 if let Some(Error::ChurnJoinMiss) = error.downcast_ref::<Error>() {
@@ -114,9 +84,96 @@ fn main() -> Result<()> {
                 }
                 // thread panic errors cannot be converted to `eyre::Report` as they are not `Sync`, so
                 // the best thing to do is propagate the panic.
-                std::panic::resume_unwind(error)
+                // std::panic::resume_unwind(error);
+
+                // Err(error)
+
             }
         }
+
+        // // start runtime
+        // let handle_res = std::thread::Builder::new()
+        //     .name("sn_node".to_string())
+        //     .stack_size(16 * 1024 * 1024)
+        //     .spawn(move || {
+        //         let rt = tokio::runtime::Runtime::new()?;
+        //         let res = match rt.block_on(run_node(config)) {
+        //             Ok(_) => Ok(()),
+        //             Err(error) => {
+        //                 println!("=====>>>> Error at run node PID:{our_pid}");
+        //                 Err(error)
+        //             }
+        //         };
+        //         println!("runing shutdown timer");
+        //         rt.shutdown_timeout(Duration::from_secs(2));
+        //         println!("shutdown timer done");
+        //         res
+        //         // Ok(())
+        //     })?;
+            // .wrap_err("Failed to spawn node (PID:{our_pid}) thread");
+
+        // we have one error case if immediate
+
+        println!("!!!!!!!!!!!!!!!!!!! here?");
+
+        // let handle = match handle_res {
+        //     Ok(handle) => Ok(handle),
+        //     Err(error) => {
+        //         println!("handle join error: {error:?}");
+
+        //         // let error = error.downcast_ref::<Error>();
+
+        //         println!("testerrrr {error:?}");
+        //         println!("==============>>>(PID:{our_pid}): Error coming out of node start: {error:?}");
+        //         // if let Error::ChurnJoinMiss = error {
+        //         // // if let Some(Error::ChurnJoinMiss) = error {
+        //         //     println!("(PID:{our_pid}): Received churn join miss, restarting node...");
+        //         //     continue;
+        //         // }
+
+        //         Err(error).map_err(|err| eyre!(err))
+
+        //                    // thread panic errors cannot be converted to `eyre::Report` as they are not `Sync`, so
+        //         // the best thing to do is propagate the panic.
+        //         // std::panic::resume_unwind(error)
+        //     }
+        // }?;
+
+        // // join it
+        // match handle_res.join() {
+        //     Ok(result) => {
+
+        //         println!("???????????????? Result from spawned thread isssss {result:?}");
+        //         match result {
+        //             Ok(r) => {
+        //                 // Ok(r)
+        //             },
+        //             Err(error) => {
+        //                 println!("(PID:{our_pid}): Error coming out of node start: {error:?}");
+        //                 if let Some(Error::ChurnJoinMiss) = error.downcast_ref::<Error>() {
+        //                     println!("(PID:{our_pid}): Received churn join miss, restarting node...");
+        //                     continue;
+        //                 }
+        //                 // thread panic errors cannot be converted to `eyre::Report` as they are not `Sync`, so
+        //                 // the best thing to do is propagate the panic.
+        //                 // std::panic::resume_unwind(error);
+
+        //                 // Err(error)
+
+        //             }
+        //         }
+
+        //         // return result;
+        //         return Ok(())
+        //     }
+        //     Err(error) => {
+        //         println!("Error in thread spawning");
+        //                                 std::panic::resume_unwind(error);
+
+        //         // return eyre!(error)
+        //     }
+        // }
+
     }
 }
 
@@ -188,22 +245,17 @@ impl Debug for FileRotateAppender {
         f.debug_struct("FileRotateAppender").finish()
     }
 }
-async fn run_node() -> Result<()> {
-    let config = Config::new().await?;
 
-    if let Some(c) = &config.completions() {
-        let shell = c.parse().map_err(|err: String| eyre!(err))?;
-        let buf = gen_completions_for_shell(shell).map_err(|err| eyre!(err))?;
-        std::io::stdout().write_all(&buf)?;
-
-        return Ok(());
-    }
-
-    // ==============
+/// Inits node logging, returning the global node guard if required.
+/// This guard should be held for the life of the program.
+///
+/// Logging should be instantiated only once.
+fn init_node_logging(config: Config) -> Result<Option<WorkerGuard>> {
+  // ==============
     // Set up logging
     // ==============
 
-    let mut _optional_guard: Option<WorkerGuard> = None;
+    let mut optional_guard: Option<WorkerGuard> = None;
 
     #[cfg(not(feature = "tokio-console"))]
     {
@@ -220,7 +272,7 @@ async fn run_node() -> Result<()> {
             }
         };
 
-        _optional_guard = if let Some(log_dir) = config.log_dir() {
+        optional_guard = if let Some(log_dir) = config.log_dir() {
             println!("Starting logging to directory: {:?}", log_dir);
 
             let mut content_limit = ContentLimit::BytesSurpassed(config.logs_max_bytes);
@@ -281,7 +333,23 @@ async fn run_node() -> Result<()> {
 
             None
         };
+
     }
+
+    Ok(optional_guard)
+
+}
+
+async fn run_node(config: Config) -> Result<()> {
+
+    if let Some(c) = &config.completions() {
+        let shell = c.parse().map_err(|err: String| eyre!(err))?;
+        let buf = gen_completions_for_shell(shell).map_err(|err| eyre!(err))?;
+        std::io::stdout().write_all(&buf)?;
+
+        return Ok(());
+    }
+
 
     if config.update() || config.update_only() {
         match update() {
@@ -391,12 +459,12 @@ async fn run_node() -> Result<()> {
     let x: f64 = rng.gen_range(0.0..1.0);
 
     if !config.is_first() && x > 0.6 {
-        println!("(PID:{our_pid}): ChurnFloat: {}", x);
+        println!("[Chaos] (PID:{our_pid}): ChurnFloat: {}", x);
+
+        // if we dont do this the network launch tool sees us as inactive and kill severything atm...
+        // sleep(Duration::from_secs(3)).await;
 
         warn!("[Chaos] (PID:{our_pid}): ChurnJoinMiss");
-        // if we dont do thi the network launch tool sees
-        sleep(Duration::from_secs(3)).await;
-
         return Err(Error::ChurnJoinMiss).map_err(ErrReport::msg);
     }
 
