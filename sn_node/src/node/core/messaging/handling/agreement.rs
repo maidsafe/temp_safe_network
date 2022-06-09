@@ -61,7 +61,7 @@ impl Node {
             // This node is rejoin with same name.
             if old_info.state() != MembershipState::Left {
                 debug!(
-                    "Ignoring Online node {} - {:?} not Left.",
+                    "Ignoring Online node {} , Already a member (or has been) - {:?} not Left.",
                     new_info.name(),
                     old_info.state(),
                 );

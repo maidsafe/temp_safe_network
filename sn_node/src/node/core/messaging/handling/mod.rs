@@ -43,7 +43,6 @@ use sn_interface::types::{log_markers::LogMarker, Peer, PublicKey};
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
-use sn_dysfunction::IssueType;
 use xor_name::XorName;
 
 // Message handling
@@ -147,10 +146,7 @@ impl Node {
 
                                     if known_elders.contains(&sender.name()) {
                                         // we track a dysfunction against our elder here
-                                        self.dysfunction_tracking
-                                            .track_issue(sender.name(), IssueType::Knowledge)
-                                            .await
-                                            .map_err(Error::from)?;
+                                        self.log_knowledge_issue(sender.name()).await?;
                                     }
 
                                     // short circuit and send those AE responses

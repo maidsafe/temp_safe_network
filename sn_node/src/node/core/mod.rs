@@ -277,9 +277,9 @@ impl Node {
     }
 
     /// Removes any PeerLinks not from our section elders
-    pub(crate) async fn cleanup_non_elder_peers(&self) {
+    pub(crate) async fn cleanup_non_elder_peers(&self) -> Result<()> {
         let elders = self.network_knowledge.elders().await;
-        self.comm.cleanup_peers(elders).await
+        self.comm.cleanup_peers(elders, self.dysfunction_tracking.clone() ).await
     }
 
     /// returns names that are relatively dysfunctional
@@ -292,11 +292,31 @@ impl Node {
 
     /// Log a communication problem
     pub(crate) async fn log_comm_issue(&self, name: XorName) -> Result<()> {
+        trace!("Logging comms issue in dysfunction");
         self.dysfunction_tracking
             .track_issue(name, IssueType::Communication)
             .await
             .map_err(Error::from)
     }
+
+    /// Log a knowledge issue
+    pub(crate) async fn log_knowledge_issue(&self, name: XorName) -> Result<()> {
+        trace!("Logging Knowledge issue in dysfunction");
+        self.dysfunction_tracking
+            .track_issue(name, IssueType::Knowledge)
+            .await
+            .map_err(Error::from)
+    }
+
+    /// Log a dkg issue (ie, an initialised but unfinished dkg round for a given participant)
+    pub(crate) async fn log_dkg_issue(&self, name: XorName) -> Result<()> {
+        trace!("Logging Dkg Issue in dysfunction");
+        self.dysfunction_tracking
+            .track_issue(name, IssueType::Dkg)
+            .await
+            .map_err(Error::from)
+    }
+
 
     pub(crate) async fn write_prefix_map(&self) {
         info!("Writing our latest PrefixMap to disk");

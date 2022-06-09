@@ -24,6 +24,7 @@ use crate::node::core::comm::peer_session::SendStatus;
 use crate::node::error::{Error, Result};
 use sn_interface::messaging::WireMsg;
 use sn_interface::types::Peer;
+use sn_dysfunction::DysfunctionDetection;
 
 use bytes::Bytes;
 use futures::stream::{FuturesUnordered, StreamExt};
@@ -69,7 +70,7 @@ impl Comm {
         config: qp2p::Config,
         receive_msg: mpsc::Sender<MsgEvent>,
     ) -> Result<(Self, SocketAddr)> {
-        debug!("Starting bootstrap process");
+        debug!("Starting bootstrap process with bootstrap nodes: {bootstrap_nodes:?}");
         // Bootstrap to the network returning the connection to a node.
         let (our_endpoint, incoming_connections, bootstrap_node) =
             Endpoint::new_peer(local_addr, bootstrap_nodes, config).await?;
@@ -88,21 +89,25 @@ impl Comm {
         self.our_endpoint.public_addr()
     }
 
-    pub(crate) async fn cleanup_peers(&self, retain_peers: Vec<Peer>) {
-        let sessions = self.sessions.read().await;
+    pub(crate) async fn cleanup_peers(&self, retain_peers: Vec<Peer>, dysfunction: DysfunctionDetection ) -> Result<()> {
+        let mut peers_to_cleanup = vec![];
+        for entry in self.sessions.iter() {
+            let peer = entry.key();
+            let session = entry.value();
 
         let mut peers_to_cleanup = vec![];
         for (peer, session) in sessions.iter() {
             session.remove_expired().await;
 
-            if retain_peers.contains(peer) {
-                continue;
-            }
-
             let is_connected = session.is_connected().await;
 
             if !is_connected {
-                peers_to_cleanup.push(*peer);
+
+                if !retain_peers.contains(peer) {
+                    peers_to_cleanup.push(*peer);
+                }
+
+                dysfunction.track_issue(peer.name(), sn_dysfunction::IssueType::Communication ).await?;
             }
         }
 
@@ -124,10 +129,8 @@ impl Comm {
             }
         }
 
-        debug!(
-            "PeerLink count post-cleanup: ${:?}",
-            self.sessions.read().await.len()
-        );
+        debug!("PeerLink count post-cleanup: ${:?}", self.sessions.len());
+        Ok(())
     }
 
     /// Fake function used as replacement for testing only.

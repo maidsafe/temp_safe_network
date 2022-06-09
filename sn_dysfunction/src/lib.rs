@@ -70,11 +70,13 @@ pub(crate) type TimedTracker = Arc<DashMap<NodeIdentifier, Arc<RwLock<VecDeque<I
 pub struct DysfunctionDetection {
     /// The communication issues logged against a node, along with a timestamp.
     pub communication_issues: TimedTracker,
+    /// The dkg issues logged against a node, along with a timestamp to expire after some time.
+    pub dkg_issues: TimedTracker,
     /// The knowledge issues logged against a node, along with a timestamp.
     pub knowledge_issues: TimedTracker,
     /// The unfulfilled pending request operation issues logged against a node, along with an
     /// operation ID.
-    pub unfulfilled_ops: Arc<DashMap<NodeIdentifier, Arc<RwLock<Vec<OperationId>>>>>, // OperationId = [u8; 32]
+    pub unfulfilled_ops: Arc<DashMap<NodeIdentifier, Arc<RwLock<Vec<OperationId>>>>>,
     adults: Arc<RwLock<Vec<XorName>>>,
 }
 
@@ -83,6 +85,7 @@ impl DysfunctionDetection {
     pub fn new(our_adults: Vec<NodeIdentifier>) -> Self {
         Self {
             communication_issues: Arc::new(DashMap::new()),
+            dkg_issues: Arc::new(DashMap::new()),
             knowledge_issues: Arc::new(DashMap::new()),
             unfulfilled_ops: Arc::new(DashMap::new()),
             adults: Arc::new(RwLock::new(our_adults)),
@@ -95,6 +98,11 @@ impl DysfunctionDetection {
     pub async fn track_issue(&self, node_id: NodeIdentifier, issue_type: IssueType) -> Result<()> {
         debug!("Adding a new issue to the dysfunction tracker: {issue_type:?}");
         match issue_type {
+            IssueType::Dkg => {
+                let mut entry = self.dkg_issues.entry(node_id).or_default();
+                let mut queue = entry.value_mut().write().await;
+                queue.push_back(Instant::now());
+            }
             IssueType::Communication => {
                 let mut entry = self.communication_issues.entry(node_id).or_default();
                 let mut queue = entry.value_mut().write().await;
@@ -121,7 +129,7 @@ impl DysfunctionDetection {
         Ok(())
     }
 
-    /// Removes a pending_operation from the node liveness records
+    /// Removes a pending_operation from the node liveness records. Returns true if a record was removed
     pub async fn request_operation_fulfilled(
         &self,
         node_id: &NodeIdentifier,
@@ -163,6 +171,31 @@ impl DysfunctionDetection {
         has_removed
     }
 
+    /// Removes a DKG session from the node liveness records. Returns true if a record was removed
+    pub async fn dkg_ack_fulfilled(&self, node_id: &NodeIdentifier) -> bool {
+        // TODO: do we remove one at random? Does it matter?
+        trace!("Attempting to remove logged dkg session for {:?}", node_id,);
+        let mut has_removed = false;
+
+        if let Some(entry) = self.dkg_issues.get(node_id) {
+            let v = entry.value();
+
+            // only remove the first instance from the vec
+            let prev = v.write().await.pop_front();
+
+            if prev.is_some() {
+                has_removed = true;
+            }
+
+            if has_removed {
+                trace!("Pending dkg session removed for node: {:?}", node_id,);
+            } else {
+                trace!("No Pending dkg session found for node: {:?}", node_id);
+            }
+        }
+        has_removed
+    }
+
     /// Gets the unfulfilled operation IDs for a given node.
     ///
     /// This is for convenience, to wrap reading the concurrent data structure that stores the
@@ -189,7 +222,7 @@ impl DysfunctionDetection {
 
     /// Add a new node to the tracker and recompute closest nodes.
     pub async fn add_new_node(&self, adult: XorName) {
-        debug!("Adding new adult:{adult} to DysfunctionDetection tracker");
+        info!("Adding new adult:{adult} to DysfunctionDetection tracker");
         self.adults.write().await.push(adult);
     }
 
@@ -221,6 +254,35 @@ pub(crate) fn get_mean_of(data: &[f32]) -> Option<f32> {
         Some(sum / count as f32)
     } else {
         None
+    }
+}
+
+// fn mean(data: &[i32]) -> Option<f32> {
+//     let sum = data.iter().sum::<i32>() as f32;
+//     let count = data.len();
+
+//     match count {
+//         positive if positive > 0 => Some(sum / count as f32),
+//         _ => None,
+//     }
+// }
+
+fn std_deviation(data: &[f32]) -> Option<f32> {
+    match (get_mean_of(data), data.len()) {
+        (Some(data_mean), count) if count > 0 => {
+            let variance = data
+                .iter()
+                .map(|value| {
+                    let diff = data_mean - *value;
+
+                    diff * diff
+                })
+                .sum::<f32>()
+                / count as f32;
+
+            Some(variance.sqrt())
+        }
+        _ => None,
     }
 }
 

@@ -58,9 +58,16 @@ impl SectionPeers {
         name: &XorName,
     ) -> Option<SectionAuth<NodeState>> {
         if let Some(member) = self.members.get(name).map(|state| state.value().clone()) {
+            debug!("!!!!!!!!!! {name} It's a member of section_peers!");
             Some(member)
         } else {
-            self.archive.get(name).map(|state| state.value().clone())
+            let res = self.archive.get(name).map(|state| state.value().clone());
+
+            if res.is_some() {
+                debug!("{name} is in the archive!!!?");
+            }
+
+            res
         }
     }
 
