@@ -160,7 +160,7 @@ jobs:
           release: true
 
       - name: Run node unit tests
-        timeout-minutes: 15
+        timeout-minutes: 20
         uses: maidsafe/cargo-nextest@main
         with:
           test-run-name: unit-tests-${{ matrix.os }}

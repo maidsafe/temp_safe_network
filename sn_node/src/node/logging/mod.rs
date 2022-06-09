@@ -29,10 +29,6 @@ pub(super) async fn run_system_logger(ctx: LogCtx, print_resources_usage: bool) 
         loop {
             let _instant = interval.tick().await;
             system.refresh_all();
-            const HIGH_MEM_LOAD: u64 = 500000;
-            if system.used_memory() > HIGH_MEM_LOAD {
-                warn!("========================>>> HIGH MEM LOAD");
-            }
             log(&mut system, &ctx, print_resources_usage).await;
         }
     });
