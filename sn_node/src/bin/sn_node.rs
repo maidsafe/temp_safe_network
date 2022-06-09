@@ -400,6 +400,25 @@ async fn run_node(config: Config) -> Result<()> {
             });
     }
 
+    // Simulate failed node starts, and ensure that
+    #[cfg(feature = "chaos")]
+    {
+        let our_pid = std::process::id();
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        let x: f64 = rng.gen_range(0.0..1.0);
+
+        if !config.is_first() && x > 0.6 {
+            println!(
+                "[Chaos] (PID:{our_pid}): Startup chaos crash w/ x of: {}",
+                x
+            );
+
+            warn!("[Chaos] (PID:{our_pid}): ChaoticStartupCrash");
+            return Err(NodeError::ChaoticStartupCrash).map_err(ErrReport::msg);
+        }
+    }
+
     // This just keeps the node going as long as routing goes
     while let Some(event) = event_stream.next().await {
         trace!("Routing event! {:?}", event);

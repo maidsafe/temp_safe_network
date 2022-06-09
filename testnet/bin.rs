@@ -101,14 +101,12 @@ async fn main() -> Result<()> {
         let mut build_args = vec!["build", "--release"];
 
         // Keep features consistent to avoid recompiling when possible
-        if cfg!(feature = "unstable-command-prioritisation") {
+        if cfg!(feature = "chaos") {
+            println!("*** Building testnet with CHAOS enabled. Watch out. ***");
             build_args.push("--features");
-            build_args.push("unstable-command-prioritisation");
+            build_args.push("chaos");
         }
-        if cfg!(feature = "unstable-no-connection-pooling") {
-            build_args.push("--features");
-            build_args.push("unstable-no-connection-pooling");
-        }
+
         if cfg!(feature = "unstable-wiremsg-debuginfo") {
             build_args.push("--features");
             build_args.push("unstable-wiremsg-debuginfo");
