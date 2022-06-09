@@ -503,30 +503,30 @@ impl Session {
 
     async fn get_cmd_elders(&self, dst_address: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
         let a_close_sap = self.network.closest_or_opposite(&dst_address, None);
-        // Get DataSection elders details.
-        let (elders, section_pk, the_close_sap) = if let Some(sap) = a_close_sap {
-            let sap_elders = sap.elders_vec();
 
+        // Get DataSection elders details.
+        if let Some(sap) = a_close_sap {
+            let sap_elders = sap.elders_vec();
+            let section_pk = sap.section_key();
             trace!("SAP elders found {:?}", sap_elders);
 
-            (sap_elders, sap.section_key(), Some(sap.value))
+            // stored at Adults, so only 1 correctly functioning Elder need to relay
+            let targets_count = at_least_one_correct_elder_for_sap(Some(sap.value));
+
+            // any SAP that does not hold elders_count() is indicative of a broken network (after genesis)
+            if sap_elders.len() < targets_count {
+                error!("Insufficient knowledge to send to address {:?}, elders for this section: {sap_elders:?} ({targets_count} needed), section PK is: {section_pk:?}", dst_address);
+                return Err(Error::InsufficientElderKnowledge {
+                    connections: sap_elders.len(),
+                    required: targets_count,
+                    section_pk,
+                });
+            }
+
+            Ok((section_pk, sap_elders))
         } else {
-            return Err(Error::NoNetworkKnowledge);
-        };
-
-        let targets_count = at_least_one_correct_elder_for_sap(the_close_sap); // stored at Adults, so only 1 correctly functioning Elder need to relay
-
-        // any SAP that does not hold elders_count() is indicative of a broken network (after genesis)
-        if elders.len() < targets_count {
-            error!("Insufficient knowledge to send to address {:?}, elders for this section: {elders:?} ({targets_count} needed), section PK is: {section_pk:?}", dst_address);
-            return Err(Error::InsufficientElderKnowledge {
-                connections: elders.len(),
-                required: targets_count,
-                section_pk,
-            });
+            Err(Error::NoNetworkKnowledge)
         }
-
-        Ok((section_pk, elders))
     }
 }
 
