@@ -18,15 +18,16 @@ use sn_dbc::{rng, Owner, OwnerOnce, TransactionBuilder};
 use sn_interface::types::Token;
 use std::collections::{BTreeMap, BTreeSet};
 
-// Type tag used for the Wallet
 const WALLET_TYPE_TAG: u64 = 1_000;
 
-/// Set of spendable DBC's mapped to their friendly name
-/// as defined/chosen by the user when depositing DBC's into a Wallet.
+/// Set of spendable DBCs mapped to their friendly name as defined/chosen by the user when
+/// depositing DBCs into a wallet.
 pub type WalletSpendableDbcs = BTreeMap<String, (Dbc, EntryHash)>;
 
 impl Safe {
     /// Create an empty wallet and return its XOR-URL.
+    ///
+    /// A wallet is stored on a private register.
     pub async fn wallet_create(&self) -> Result<XorUrl> {
         let xorurl = self.multimap_create(None, WALLET_TYPE_TAG).await?;
 
@@ -36,22 +37,38 @@ impl Safe {
         Ok(safeurl.to_string())
     }
 
-    /// Deposit a DBC into a wallet to make it a spendable balance. It will be mapped to
-    /// a friendly name if provided, otherwise the hash of the DBC content will be used by default.
-    /// Returns the friendly name set to it.
+    /// Deposit a DBC in a wallet to make it a spendable balance.
+    ///
+    /// A name can optionally be specified for the deposit. If it isn't, the hash of the DBC
+    /// content will be used.
+    ///
+    /// Returns the name that was set.
     pub async fn wallet_deposit(
         &self,
         wallet_url: &str,
         spendable_name: Option<&str>,
         dbc: &Dbc,
+        secret_key: Option<bls::SecretKey>,
     ) -> Result<String> {
-        if !dbc.is_bearer() {
-            return Err(Error::InvalidInput("Only bearer DBC's are supported at this point by the wallet. Please deposit a bearer DBC's.".to_string()));
-        }
-
         // TODO: check the input DBCs were spent and all other sort of verifications,
         // perhaps all optional, and we may want a separate API to also do these verifications
         // for the user to perform them without depositing the DBC into a wallet.
+        let dbc_to_deposit = if dbc.is_bearer() {
+            if secret_key.is_some() {
+                return Err(Error::DbcDepositError(
+                    "A secret key should not be supplied when depositing a bearer DBC".to_string(),
+                ));
+            }
+            dbc.clone()
+        } else if let Some(sk) = secret_key {
+            let mut owned_dbc = dbc.clone();
+            owned_dbc.to_bearer(&sk)?;
+            owned_dbc
+        } else {
+            return Err(Error::DbcDepositError(
+                "A secret key must be provided to deposit an owned DBC".to_string(),
+            ));
+        };
 
         let safeurl = self.parse_and_resolve_url(wallet_url).await?;
 
@@ -60,11 +77,11 @@ impl Safe {
             None => hex::encode(dbc.hash()),
         };
 
-        self.insert_dbc_into_wallet(&safeurl, dbc, spendable_name.clone())
+        self.insert_dbc_into_wallet(&safeurl, &dbc_to_deposit, spendable_name.clone())
             .await?;
 
         debug!(
-            "A spendable DBC deposited into Wallet at {}, with name: {}",
+            "A spendable DBC deposited into wallet at {}, with name: {}",
             safeurl, spendable_name
         );
 
@@ -194,7 +211,7 @@ impl Safe {
 
         // We'll combine one or more input DBCs and reissue:
         // - one output DBC for the recipient,
-        // - and a second DBC for the change, which will be stored in the source Wallet.
+        // - and a second DBC for the change, which will be stored in the source wallet.
         let mut input_dbcs_to_spend = Vec::<Dbc>::new();
         let mut input_dbcs_entries_hash = BTreeSet::<EntryHash>::new();
         let mut total_input_amount = 0;
@@ -203,7 +220,7 @@ impl Safe {
             let dbc_balance = match dbc.amount_secrets_bearer() {
                 Ok(amount_secrets) => Token::from_nano(amount_secrets.amount()),
                 Err(err) => {
-                    warn!("Ignoring input DBC found in Wallet (entry: {}) due to error in revealing secret amount: {:?}", name, err);
+                    warn!("Ignoring input DBC found in wallet (entry: {}) due to error in revealing secret amount: {:?}", name, err);
                     continue;
                 }
             };
@@ -251,7 +268,7 @@ impl Safe {
                 .await?;
         }
 
-        // (virtually) remove input DBCs in the source Wallet
+        // (virtually) remove input DBCs in the source wallet
         self.multimap_remove(&safeurl.to_string(), input_dbcs_entries_hash)
             .await?;
 
@@ -362,11 +379,8 @@ impl Safe {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        app::test_helpers::{
-            new_read_only_safe_instance, new_safe_instance, new_safe_instance_with_dbc_owner,
-        },
-        retry_loop,
+    use crate::app::test_helpers::{
+        new_read_only_safe_instance, new_safe_instance, new_safe_instance_with_dbc_owner,
     };
     use anyhow::{anyhow, Result};
     use sn_dbc::Owner;
@@ -396,12 +410,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_wallet_deposit() -> Result<()> {
+    async fn test_wallet_deposit_with_bearer_dbc() -> Result<()> {
         let safe = new_safe_instance().await?;
         let wallet_xorurl = safe.wallet_create().await?;
 
         let dbc = new_dbc(DBC_WITH_12_230_000_000)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
             .await?;
 
         let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
@@ -411,13 +425,177 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_wallet_deposit_with_name() -> Result<()> {
+        let safe = new_safe_instance().await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+
+        let dbc = new_dbc(DBC_WITH_12_230_000_000)?;
+        safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
+            .await?;
+
+        let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
+        assert!(wallet_balances.contains_key("my-dbc"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wallet_deposit_with_no_name() -> Result<()> {
+        let safe = new_safe_instance().await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+
+        let dbc = new_dbc(DBC_WITH_12_230_000_000)?;
+        let name = safe
+            .wallet_deposit(&wallet_xorurl, None, &dbc, None)
+            .await?;
+
+        let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
+        assert!(wallet_balances.contains_key(&name));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wallet_deposit_with_owned_dbc() -> Result<()> {
+        let safe = new_safe_instance().await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+        let pk = bls::PublicKey::from_hex(
+            "aa12ba9055367b2274c38073af13ace42310e1a13a948d73f7dee09d10bdabec4629082a1321d41e123212c47e0908e5",
+        )?;
+        let sk = bls::SecretKey::from_hex(
+            "18f5b51fafeaa74b50f2324c2c721e6facf524e3b8dbd0e67e5e4a794e64d84e",
+        )?;
+
+        let dbc = new_dbc(DBC_WITH_12_230_000_000)?;
+        safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
+            .await?;
+        let owned_dbc = safe
+            .wallet_reissue(&wallet_xorurl, "2.35", Some(pk))
+            .await?;
+        safe.wallet_deposit(
+            &wallet_xorurl,
+            Some("owned-dbc"),
+            &owned_dbc,
+            Some(sk.clone()),
+        )
+        .await?;
+
+        let owner = Owner::from(sk);
+        let balances = safe.wallet_get(&wallet_xorurl).await?;
+        let (owned_dbc, _) = balances
+            .get("owned-dbc")
+            .ok_or_else(|| anyhow!("Couldn't read DBC from wallet"))?;
+        assert_eq!(*owned_dbc.owner_base(), owner);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wallet_deposit_with_owned_dbc_without_providing_secret_key() -> Result<()> {
+        let safe = new_safe_instance().await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+        let pk = bls::PublicKey::from_hex(
+            "aa12ba9055367b2274c38073af13ace42310e1a13a948d73f7dee09d10bdabec4629082a1321d41e123212c47e0908e5",
+        )?;
+
+        let dbc = new_dbc(DBC_WITH_12_230_000_000)?;
+        safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
+            .await?;
+        let owned_dbc = safe
+            .wallet_reissue(&wallet_xorurl, "2.35", Some(pk))
+            .await?;
+        let result = safe
+            .wallet_deposit(&wallet_xorurl, Some("owned-dbc"), &owned_dbc, None)
+            .await;
+        match result {
+            Ok(_) => Err(anyhow!(
+                "This test case should result in an error".to_string()
+            )),
+            Err(Error::DbcDepositError(e)) => {
+                assert_eq!(e, "A secret key must be provided to deposit an owned DBC");
+                Ok(())
+            }
+            Err(_) => Err(anyhow!("This test should use a DbcDepositError".to_string())),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_wallet_deposit_with_bearer_dbc_and_secret_key() -> Result<()> {
+        let safe = new_safe_instance().await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+        let sk = bls::SecretKey::from_hex(
+            "18f5b51fafeaa74b50f2324c2c721e6facf524e3b8dbd0e67e5e4a794e64d84e",
+        )?;
+
+        let dbc = new_dbc(DBC_WITH_12_230_000_000)?;
+        let result = safe
+            .wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, Some(sk))
+            .await;
+        match result {
+            Ok(_) => Err(anyhow!(
+                "This test case should result in an error".to_string()
+            )),
+            Err(Error::DbcDepositError(e)) => {
+                assert_eq!(
+                    e,
+                    "A secret key should not be supplied when depositing a bearer DBC"
+                );
+                Ok(())
+            }
+            Err(_) => Err(anyhow!("This test should use a DbcDepositError".to_string())),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_wallet_reissue_with_deposited_owned_dbc() -> Result<()> {
+        let safe = new_safe_instance().await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+        let wallet2_xorurl = safe.wallet_create().await?;
+        let pk = bls::PublicKey::from_hex(
+            "aa12ba9055367b2274c38073af13ace42310e1a13a948d73f7dee09d10bdabec4629082a1321d41e123212c47e0908e5",
+        )?;
+        let sk = bls::SecretKey::from_hex(
+            "18f5b51fafeaa74b50f2324c2c721e6facf524e3b8dbd0e67e5e4a794e64d84e",
+        )?;
+
+        let dbc = new_dbc(DBC_WITH_12_230_000_000)?;
+        safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
+            .await?;
+        let owned_dbc = safe
+            .wallet_reissue(&wallet_xorurl, "2.35", Some(pk))
+            .await?;
+        // Deposit the owned DBC in another wallet because it's easier to ensure this owned DBC
+        // will be used as an input in the next reissue rather than having to be precise about
+        // balances.
+        safe.wallet_deposit(
+            &wallet2_xorurl,
+            Some("owned-dbc"),
+            &owned_dbc,
+            Some(sk.clone()),
+        )
+        .await?;
+
+        let result = safe.wallet_reissue(&wallet2_xorurl, "2", None).await;
+        match result {
+            Ok(_) => {
+                // For this case, we just want to make sure the reissue went through without an
+                // error, which means the owned DBC was used as an input. There are other test
+                // cases that verify balances are correct and so on, we don't need to do that again
+                // here.
+                Ok(())
+            }
+            Err(e) => Err(anyhow!(e)),
+        }
+    }
+
+    #[tokio::test]
     async fn test_wallet_balance() -> Result<()> {
         let safe = new_safe_instance().await?;
         let wallet_xorurl = safe.wallet_create().await?;
 
         // We deposit the first DBC with 12.23 amount
         let dbc1 = new_dbc(DBC_WITH_12_230_000_000)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc1)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc1, None)
             .await?;
 
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
@@ -425,7 +603,7 @@ mod tests {
 
         // ...and a second DBC with 1.53
         let dbc2 = new_dbc(DBC_WITH_1_530_000_000)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("my-second-dbc"), &dbc2)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-second-dbc"), &dbc2, None)
             .await?;
 
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
@@ -440,10 +618,10 @@ mod tests {
         let wallet_xorurl = safe.wallet_create().await?;
 
         let dbc1 = new_dbc(DBC_WITH_12_230_000_000)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc1)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc1, None)
             .await?;
         let dbc2 = new_dbc(DBC_WITH_MAX)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("my-second-dbc"), &dbc2)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-second-dbc"), &dbc2, None)
             .await?;
 
         match safe.wallet_balance(&wallet_xorurl).await {
@@ -468,10 +646,10 @@ mod tests {
         let wallet_xorurl = safe.wallet_create().await?;
 
         let dbc1 = new_dbc(DBC_WITH_1_530_000_000)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc1)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc1, None)
             .await?;
         let dbc2 = new_dbc(DBC_WITH_12_230_000_000)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("my-second-dbc"), &dbc2)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-second-dbc"), &dbc2, None)
             .await?;
 
         let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
@@ -505,7 +683,7 @@ mod tests {
         let wallet_xorurl = safe.wallet_create().await?;
 
         let dbc = new_dbc(DBC_WITH_1_530_000_000)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc, None)
             .await?;
 
         // test it fails to get a not owned wallet
@@ -529,7 +707,7 @@ mod tests {
         let wallet_xorurl = safe.wallet_create().await?;
 
         let dbc = new_dbc(DBC_WITH_1_530_000_000)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc, None)
             .await?;
 
         // We insert an entry (to its underlying data type, i.e. the Multimap) which is
@@ -552,10 +730,10 @@ mod tests {
         let wallet_xorurl = safe.wallet_create().await?;
 
         let dbc = new_dbc(DBC_WITH_1_530_000_000)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc)
+        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc, None)
             .await?;
         let dbc = new_dbc(DBC_WITH_12_230_000_000)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-2"), &dbc)
+        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-2"), &dbc, None)
             .await?;
 
         let output_dbc = safe.wallet_reissue(&wallet_xorurl, "2.35", None).await?;
@@ -589,7 +767,7 @@ mod tests {
         let wallet_xorurl = safe.wallet_create().await?;
 
         let dbc = new_dbc(DBC_WITH_1_530_000_000)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc)
+        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc, None)
             .await?;
 
         let output_dbc = safe.wallet_reissue(&wallet_xorurl, "1", None).await?;
@@ -626,7 +804,7 @@ mod tests {
         let wallet_xorurl = safe.wallet_create().await?;
 
         let dbc = new_dbc(DBC_WITH_1_530_000_000)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc)
+        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc, None)
             .await?;
 
         let _ = safe.wallet_reissue(&wallet_xorurl, "1", None).await?;
@@ -646,18 +824,13 @@ mod tests {
         let wallet_xorurl = safe.wallet_create().await?;
 
         let dbc = new_dbc(DBC_WITH_1_530_000_000)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc)
+        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc, None)
             .await?;
 
-        let pk_bytes = hex::decode("b66bd668e7a28fc7fd5b0ad6360ece29ae4010263f3858f4c5ee96e1d112724f7607bd3629c17aaf7459ef50bd25adcc")?;
-        let pk_bytes: [u8; bls::PK_SIZE] = pk_bytes.try_into().unwrap_or_else(|v: Vec<u8>| {
-            panic!(
-                "Expected vec of length {} but received vec of length {}",
-                bls::PK_SIZE,
-                v.len()
-            )
-        });
-        let pk = bls::PublicKey::from_bytes(pk_bytes)?;
+        let pk = bls::PublicKey::from_hex(
+            "a9e3531c4d5ce128410fe0a8d3963e492daf8a5854174f7a3d67cb1b2e4c80d7\
+            1be56533298a533a2b0712a4a006f648",
+        )?;
         let owner = Owner::from(pk);
         let output_dbc = safe.wallet_reissue(&wallet_xorurl, "1", Some(pk)).await?;
 
@@ -674,7 +847,7 @@ mod tests {
         let wallet_xorurl = safe.wallet_create().await?;
 
         let dbc = new_dbc(DBC_WITH_1_530_000_000)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc"), &dbc)
+        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc"), &dbc, None)
             .await?;
 
         match safe.wallet_reissue(&wallet_xorurl, "2.55", None).await {
@@ -711,7 +884,7 @@ mod tests {
         let wallet_xorurl = safe.wallet_create().await?;
 
         let dbc = new_dbc(DBC_WITH_1_530_000_000)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc, None)
             .await?;
 
         // We insert an entry (to its underlying data type, i.e. the Multimap) which is
@@ -721,7 +894,7 @@ mod tests {
         safe.multimap_insert(&wallet_xorurl, entry, BTreeSet::default())
             .await?;
 
-        // Now check we can still reissue from the Wallet and the corrupted entry is ignored
+        // Now check we can still reissue from the wallet and the corrupted entry is ignored
         let _ = safe.wallet_reissue(&wallet_xorurl, "0.4", None).await?;
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
         assert_eq!(current_balance, Token::from_nano(1_130_000_000));
@@ -735,12 +908,12 @@ mod tests {
         let wallet_xorurl = safe.wallet_create().await?;
 
         let dbc = new_dbc(DBC_WITH_12_230_000_000)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc)
+        safe.wallet_deposit(&wallet_xorurl, Some("my-first-dbc"), &dbc, None)
             .await?;
 
         // Now check thaat after reissuing with the total balance,
-        // there is no change deposited in the Wallet, i.e. Wallet is empty with 0 balance
-        let _ = retry_loop!(safe.wallet_reissue(&wallet_xorurl, "12.23", None));
+        // there is no change deposited in the wallet, i.e. wallet is empty with 0 balance
+        let _ = safe.wallet_reissue(&wallet_xorurl, "12.23", None).await?;
 
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
         assert_eq!(current_balance, Token::zero());
@@ -758,12 +931,12 @@ mod tests {
         let wallet2_xorurl = safe.wallet_create().await?;
 
         let dbc = new_dbc(DBC_WITH_1_530_000_000)?;
-        safe.wallet_deposit(&wallet1_xorurl, Some("deposited-dbc"), &dbc)
+        safe.wallet_deposit(&wallet1_xorurl, Some("deposited-dbc"), &dbc, None)
             .await?;
 
-        let output_dbc = retry_loop!(safe.wallet_reissue(&wallet1_xorurl, "0.25", None));
+        let output_dbc = safe.wallet_reissue(&wallet1_xorurl, "0.25", None).await?;
 
-        safe.wallet_deposit(&wallet2_xorurl, Some("reissued-dbc"), &output_dbc)
+        safe.wallet_deposit(&wallet2_xorurl, Some("reissued-dbc"), &output_dbc, None)
             .await?;
 
         let balance = safe.wallet_balance(&wallet2_xorurl).await?;

@@ -120,7 +120,7 @@ pub async fn wallet_commander(
                 sn_dbc::Dbc::from_hex(dbc_hex.trim())?
             };
             let the_name = safe
-                .wallet_deposit(&wallet_url, name.as_deref(), &dbc)
+                .wallet_deposit(&wallet_url, name.as_deref(), &dbc, None)
                 .await?;
 
             if OutputFmt::Pretty == output_fmt {

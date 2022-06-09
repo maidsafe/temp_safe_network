@@ -130,6 +130,9 @@ pub enum Error {
     /// DbcReissueError
     #[error("DbcReissueError: {0}")]
     DbcReissueError(String),
+    /// DbcReissueError
+    #[error("DbcDepositError: {0}")]
+    DbcDepositError(String),
     /// NotImplementedError
     #[error("NotImplementedError: {0}")]
     NotImplementedError(String),
