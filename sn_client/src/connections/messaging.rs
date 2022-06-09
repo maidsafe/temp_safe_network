@@ -503,14 +503,13 @@ impl Session {
 
     async fn get_cmd_elders(&self, dst_address: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
         let a_close_sap = self.network.closest_or_opposite(&dst_address, None);
-        let the_close_sap = a_close_sap.clone().map(|auth| auth.value);
         // Get DataSection elders details.
-        let (elders, section_pk) = if let Some(sap) = a_close_sap {
+        let (elders, section_pk, the_close_sap) = if let Some(sap) = a_close_sap {
             let sap_elders = sap.elders_vec();
 
             trace!("SAP elders found {:?}", sap_elders);
 
-            (sap_elders, sap.section_key())
+            (sap_elders, sap.section_key(), Some(sap.value))
         } else {
             return Err(Error::NoNetworkKnowledge);
         };
@@ -685,4 +684,61 @@ pub(crate) async fn create_safe_dir() -> Result<PathBuf, Error> {
         .map_err(|_| Error::CouldNotCreateSafeDir)?;
 
     Ok(root_dir)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use eyre::{eyre, Result};
+    use sn_interface::{
+        network_knowledge::test_utils::{gen_section_authority_provider, section_signed},
+        types::Keypair,
+    };
+    use std::net::Ipv4Addr;
+    use xor_name::Prefix;
+
+    fn prefix(s: &str) -> Result<Prefix> {
+        s.parse()
+            .map_err(|err| eyre!("failed to parse Prefix '{}': {}", s, err))
+    }
+
+    fn new_network_prefix_map() -> (NetworkPrefixMap, bls::SecretKey, bls::PublicKey) {
+        let genesis_sk = bls::SecretKey::random();
+        let genesis_pk = genesis_sk.public_key();
+
+        let map = NetworkPrefixMap::new(genesis_pk);
+
+        (map, genesis_sk, genesis_pk)
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn cmd_sent_to_all_elders() -> Result<()> {
+        let elders_len = 5;
+        let keypair = Keypair::new_ed25519();
+        let client_pk = keypair.public_key();
+        let (err_sender, _err_receiver) = channel::<CmdError>(10);
+
+        let prefix = prefix("0")?;
+        let (section_auth, _, secret_key_set) = gen_section_authority_provider(prefix, elders_len);
+        let sap0 = section_signed(secret_key_set.secret_key(), section_auth)?;
+        let (prefix_map, _genesis_sk, genesis_key) = new_network_prefix_map();
+        assert!(prefix_map.insert_without_chain(sap0));
+
+        let session = Session::new(
+            client_pk,
+            genesis_key,
+            QuicP2pConfig::default(),
+            err_sender,
+            SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)),
+            Duration::from_secs(10),
+            prefix_map,
+        )?;
+
+        let mut rng = rand::thread_rng();
+        let result = session.get_cmd_elders(XorName::random(&mut rng)).await?;
+        assert_eq!(result.0, secret_key_set.public_keys().public_key());
+        assert_eq!(result.1.len(), elders_len);
+
+        Ok(())
+    }
 }
