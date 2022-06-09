@@ -193,6 +193,11 @@ impl SectionAuthorityProvider {
         self.public_key_set.public_key()
     }
 
+    /// Key Set of the section
+    pub fn section_key_set(&self) -> &PublicKeySet {
+        &self.public_key_set
+    }
+
     // We prefer this over `From<...>` to make it easier to read the conversion.
     pub fn to_msg(&self) -> SectionAuthorityProviderMsg {
         SectionAuthorityProviderMsg {

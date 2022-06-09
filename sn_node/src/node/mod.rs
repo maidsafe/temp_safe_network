@@ -22,7 +22,6 @@ mod dkg;
 mod error;
 pub(crate) mod handover;
 mod logging;
-pub(crate) mod membership;
 mod messages;
 
 use sn_interface::types::Peer;

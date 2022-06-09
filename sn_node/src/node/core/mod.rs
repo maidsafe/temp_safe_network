@@ -12,6 +12,7 @@ mod comm;
 mod connectivity;
 mod data;
 mod delivery_group;
+mod membership;
 mod messaging;
 mod proposal;
 mod relocation;
@@ -26,6 +27,7 @@ pub(crate) use data::MIN_LEVEL_WHEN_FULL;
 pub(crate) use proposal::Proposal;
 #[cfg(test)]
 pub(crate) use relocation::{check as relocation_check, ChurnId};
+use sn_consensus::Consensus;
 use sn_interface::{
     network_knowledge::{
         recommended_section_size, split, supermajority, NetworkKnowledge, NodeInfo,
@@ -122,7 +124,7 @@ pub(crate) struct Node {
     dkg_voter: DkgVoter,
     relocate_state: Arc<RwLock<Option<Box<JoiningAsRelocated>>>>,
     // ======================== Elder only ========================
-    pub(crate) membership: Arc<RwLock<Option<Membership>>>,
+    pub(crate) membership: Arc<RwLock<Consensus<NodeState>>>,
     // Section handover consensus state (Some for Elders, None for others)
     pub(crate) handover_voting: Arc<RwLock<Option<Handover>>>,
     joins_allowed: Arc<RwLock<bool>>,

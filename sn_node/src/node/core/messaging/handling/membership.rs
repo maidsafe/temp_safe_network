@@ -9,7 +9,7 @@
 use std::collections::BTreeSet;
 use std::vec;
 
-use sn_consensus::{SignedVote, VoteResponse};
+use sn_consensus::{Ballot, SignedVote, Vote, VoteResponse};
 use sn_interface::messaging::system::{
     KeyedSig, MembershipState, NodeState, SectionAuth, SystemMsg,
 };
@@ -18,114 +18,154 @@ use sn_interface::types::{log_markers::LogMarker, Peer};
 use crate::node::api::cmds::Cmd;
 use crate::node::core::{Node, Result};
 use crate::node::membership::{self, VotingState};
+use crate::node::Error;
 
 // Message handling
 impl Node {
-    pub(crate) async fn propose_membership_change(
-        &self,
-        node_state: NodeState,
-    ) -> Result<Vec<Cmd>> {
-        info!(
-            "Proposing membership change: {} - {:?}",
-            node_state.name, node_state.state
-        );
-        let prefix = self.network_knowledge.prefix().await;
-        if let Some(membership) = self.membership.write().await.as_mut() {
-            let membership_vote = match membership.propose(node_state, &prefix) {
-                Ok(vote) => vote,
-                Err(e) => {
-                    warn!("Membership - failed to propose change: {e:?}");
-                    return Ok(vec![]);
-                }
-            };
+    /// Returns Ok(()) if the proposal is valid
+    async fn validate_proposals(&self, signed_vote: &SignedVote<NodeState>) -> Result<()> {
+        // signature validation serves two purposes:
+        // 1. detecting fraudulent votes.
+        // 2. ensuring this vote was meant for our current section key.
+        signed_vote.validate_signature(&self.network_knowledge.elders_public_key_set().await)?;
 
-            let cmds = self
-                .send_msg_to_our_elders(SystemMsg::MembershipVote(membership_vote))
-                .await?;
-            Ok(vec![cmds])
+        // Next, validate that we are in the correct membership generation to validate this vote.
+        self.network_knowledge
+            .verify_membership_vote_generation(signed_vote.vote.gen)
+            .await?;
+
+        // Finally, validate each proposal w.r.t. the network state.
+        let prefix = self.network_knowledge.prefix().await;
+        let member_names = BTreeSet::from_iter(
+            self.network_knowledge
+                .current_section_members()
+                .await
+                .into_keys(),
+        );
+
+        for proposal in signed_vote.proposals() {
+            proposal.into_state().validate(&prefix, &member_names)?;
+        }
+
+        Ok(())
+    }
+
+    pub async fn propose_membership_change(&self, node_state: NodeState) -> Result<Vec<Cmd>> {
+        info!("Proposing membership change {:?}", node_state);
+        if let Some(membership) = self.membership.write().await.as_mut() {
+            let signed_vote = membership.sign_vote(Vote {
+                gen: self.network_knowledge.membership_vote_generation().await,
+                ballot: Ballot::Propose(node_state),
+                faults: membership.faults(),
+            })?;
+
+            self.validate_proposals(&signed_vote).await?;
+
+            if let Err(e) = signed_vote.detect_byzantine_faults(
+                &membership.elders,
+                &membership.votes,
+                &membership.processed_votes_cache,
+            ) {
+                error!("Attempted invalid proposal: {e:?}");
+                return Err(Error::InvalidMembershipProposal);
+            }
+
+            let vote = membership.cast_vote(signed_vote)?;
+
+            Ok(vec![
+                self.send_msg_to_our_elders(SystemMsg::MembershipVote(vote))
+                    .await?,
+            ])
         } else {
-            error!("Membership - Failed to propose membership change, no membership instance");
-            Ok(vec![])
+            Err(Error::NotAnElder)
         }
     }
 
-    pub(crate) async fn handle_membership_vote(
+    pub async fn handle_signed_vote(
         &self,
         peer: Peer,
         signed_vote: SignedVote<NodeState>,
     ) -> Result<Vec<Cmd>> {
-        debug!(
-            "{:?} {signed_vote:?} from {peer}",
-            LogMarker::MembershipVotesBeingHandled
+        self.validate_proposals(&signed_vote).await?;
+
+        let vote_gen = signed_vote.vote.gen;
+
+        info!(
+            "Membership - accepted signed vote from voter {:?}",
+            signed_vote.voter
         );
-        let prefix = self.network_knowledge.prefix().await;
 
-        let mut cmds = vec![];
+        let section_key = self.network_knowledge.section_key().await;
 
-        let vote_response = if let Some(membership) = self.membership.write().await.as_mut() {
-            let public_key = membership.voters_public_key_set().public_key();
-            match membership.handle_signed_vote(signed_vote, &prefix) {
-                Ok(VotingState::Voting(vote_response)) => vote_response,
-                Ok(VotingState::Decided(decision, vote_response)) => {
-                    // process the membership change
-                    info!(
-                        "Handling Membership Decision {:?}",
-                        BTreeSet::from_iter(decision.proposals.keys())
-                    );
-                    for (state, signature) in &decision.proposals {
-                        let sig = KeyedSig {
-                            public_key,
-                            signature: signature.clone(),
-                        };
-                        if state.state == MembershipState::Joined {
-                            cmds.push(Cmd::HandleNewNodeOnline(SectionAuth {
-                                value: state.clone(),
-                                sig,
-                            }));
-                        } else {
-                            cmds.push(Cmd::HandleNodeLeft(SectionAuth {
-                                value: state.clone(),
-                                sig,
-                            }));
-                        }
-                    }
+        if let Some(membership) = self.membership.write().await.as_mut() {
+            assert_eq!(membership.elders.public_key(), section_key);
 
-                    vote_response
+            let vote_response = match membership.handle_signed_vote(signed_vote) {
+                Err(sn_interface::network_knowledge::Error::InvalidMembershipGeneration {
+                    request_gen,
+                    ..
+                }) => {
+                    info!("Membership - Vote from wrong generation, sending AE");
+                    return Ok(vec![Cmd::SendAntiEntropyToNodes {
+                        recipients: vec![peer],
+                        recipient_prefix: self.network_knowledge.prefix().await,
+                        recipient_public_key: section_key,
+                        recipient_generation: request_gen,
+                    }]);
                 }
-                Err(err) => match err {
-                    membership::Error::WrongGeneration(peer_gen) => {
-                        info!("Membership - Vote from wrong generation, sending AE");
-                        cmds.push(Cmd::SendAntiEntropyToNodes {
-                            recipients: vec![peer],
-                            recipient_prefix: prefix,
-                            recipient_public_key: public_key,
-                            recipient_generation: peer_gen,
-                        });
-                        return Ok(cmds);
-                    }
-                    e => {
-                        error!("Membership - error while processing vote {e:?}, dropping vote");
-                        return Ok(cmds);
-                    }
-                },
-            }
-        } else {
-            error!(
-                "Attempted to handle membership vote when we don't yet have a membership instance"
-            );
-            return Ok(cmds);
-        };
+                resp => resp?,
+            };
 
-        match vote_response {
-            VoteResponse::Broadcast(response_vote) => {
-                cmds.push(
-                    self.send_msg_to_our_elders(SystemMsg::MembershipVote(response_vote))
-                        .await?,
+            let mut cmds = vec![];
+
+            if let Some(decision) = membership.decision.clone() {
+                info!(
+                    "Membership - decided {:?}",
+                    BTreeSet::from_iter(decision.proposals.keys())
                 );
-            }
-            VoteResponse::WaitingForMoreVotes => (), //do nothing
-        };
 
-        Ok(cmds)
+                self.terminate_consensus(decision.clone());
+
+                info!(
+                    "Handling Membership Decision {:?}",
+                    BTreeSet::from_iter(decision.proposals.keys())
+                );
+
+                self.network_knowledge
+                    .handle_membership_decision(decision)
+                    .await?;
+                for (state, signature) in &decision.proposals {
+                    let sig = KeyedSig {
+                        public_key: section_key,
+                        signature: signature.clone(),
+                    };
+                    if state.state == MembershipState::Joined {
+                        cmds.push(Cmd::HandleNewNodeOnline(SectionAuth {
+                            value: state.clone(),
+                            sig,
+                        }));
+                    } else {
+                        cmds.push(Cmd::HandleNodeLeft(SectionAuth {
+                            value: state.clone(),
+                            sig,
+                        }));
+                    }
+                }
+            };
+
+            match vote_response {
+                VoteResponse::Broadcast(response_vote) => {
+                    cmds.push(
+                        self.send_msg_to_our_elders(SystemMsg::MembershipVote(response_vote))
+                            .await?,
+                    );
+                }
+                VoteResponse::WaitingForMoreVotes => (), // do nothing
+            };
+
+            Ok(cmds)
+        } else {
+            Err(Error::NotAnElder)
+        }
     }
 }

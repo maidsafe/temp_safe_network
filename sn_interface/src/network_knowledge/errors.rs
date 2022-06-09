@@ -11,6 +11,7 @@ use super::Prefix;
 use crate::types::{DataAddress, PublicKey};
 
 use secured_linked_list::error::Error as SecuredLinkedListError;
+use sn_consensus::Generation;
 use std::io;
 use std::net::SocketAddr;
 use thiserror::Error;
@@ -59,6 +60,13 @@ pub enum Error {
     InvalidSignatureShare,
     #[error("A node has invalid relocation details")]
     InvalidRelocationDetails,
+    #[error(
+        "Attempted a request with invalid generation {request_gen} (current_gen: {current_gen})"
+    )]
+    InvalidMembershipGeneration {
+        request_gen: Generation,
+        current_gen: Generation,
+    },
     #[error("The secret key share is missing for public key {0:?}")]
     MissingSecretKeyShare(bls::PublicKey),
     #[error("Failed to send a message to {0}, {1}")]
@@ -131,6 +139,8 @@ pub enum Error {
     /// Invalid node authority for a query response.
     #[error("Invalid node authority received for a QueryResponse message")]
     InvalidQueryResponseAuthority,
+    #[error("Consensus error {0}")]
+    Consensus(#[from] sn_consensus::Error),
     /// Sled error.
     #[error("Sled error:: {0}")]
     Sled(#[from] sled::Error),

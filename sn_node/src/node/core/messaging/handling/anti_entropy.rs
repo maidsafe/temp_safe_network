@@ -65,7 +65,7 @@ impl Node {
             .update_knowledge_if_valid(
                 signed_sap.clone(),
                 &proof_chain,
-                Some(members),
+                membership_decisions,
                 &our_name,
                 &self.section_keys_provider,
             )
@@ -236,7 +236,7 @@ impl Node {
             .update_knowledge_if_valid(
                 signed_sap.clone(),
                 &proof_chain,
-                None,
+                vec![],
                 &our_name,
                 &self.section_keys_provider,
             )

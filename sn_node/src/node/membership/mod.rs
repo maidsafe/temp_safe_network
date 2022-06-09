@@ -118,43 +118,6 @@ impl Membership {
         let _ = self.bootstrap_members.insert(state);
     }
 
-    pub(crate) fn current_section_members(&self) -> BTreeMap<XorName, NodeState> {
-        self.section_members(self.generation()).unwrap_or_default()
-    }
-
-    pub(crate) fn section_members(&self, gen: Generation) -> Result<BTreeMap<XorName, NodeState>> {
-        let mut members =
-            BTreeMap::from_iter(self.bootstrap_members.iter().cloned().map(|n| (n.name, n)));
-
-        if gen > self.generation() {
-            return Err(Error::Consensus(sn_consensus::Error::InvalidGeneration(
-                gen,
-            )));
-        }
-
-        for decision in self.history.iter().take(gen as usize) {
-            for (node_state, _sig) in decision.proposals.iter() {
-                match node_state.state {
-                    MembershipState::Joined => {
-                        let _ = members.insert(node_state.name, node_state.clone());
-                    }
-                    MembershipState::Left => {
-                        let _ = members.remove(&node_state.name);
-                    }
-                    MembershipState::Relocated(_) => {
-                        if let Entry::Vacant(e) = members.entry(node_state.name) {
-                            let _ = e.insert(node_state.clone());
-                        } else {
-                            let _ = members.remove(&node_state.name);
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(members)
-    }
-
     pub(crate) fn propose(
         &mut self,
         node_state: NodeState,
@@ -188,21 +151,6 @@ impl Membership {
 
     pub(crate) fn id(&self) -> NodeId {
         self.consensus.id()
-    }
-
-    pub(crate) fn handle_decision(&mut self, decision: Decision<NodeState>) -> Result<()> {
-        let decision_gen = decision.generation()?;
-        let our_gen = self.vote_generation();
-        info!("Membership - handling decision from generation {decision_gen} (our generation: {our_gen})");
-
-        if decision_gen != our_gen {
-            return Err(Error::WrongGeneration(decision_gen));
-        }
-
-        decision.validate(&self.consensus.elders)?;
-        self.terminate_consensus(decision);
-
-        Ok(())
     }
 
     pub(crate) fn handle_signed_vote(

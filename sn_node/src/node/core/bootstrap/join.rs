@@ -198,6 +198,7 @@ impl<'a> Join<'a> {
                         genesis_key,
                         section_chain,
                         section_auth,
+                        vec![],
                         Some(self.prefix_map),
                     )?;
 

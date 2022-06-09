@@ -115,6 +115,9 @@ pub enum Error {
     /// Key, Value pair not found.
     #[error("No such data: {0:?}")]
     NoSuchData(DataAddress),
+    /// Attempted an Elder action when not an elder.
+    #[error("Attempted an Elder action when not an Elder")]
+    NotAnElder,
     /// Chunk already exists for this node
     #[error("Data already exists at this node")]
     DataExists,
@@ -139,6 +142,8 @@ pub enum Error {
     /// Data owner provided is invalid.
     #[error("Provided PublicKey is not a valid owner. Provided PublicKey: {0}")]
     InvalidOwner(PublicKey),
+    #[error("Attempted an invalid membership proposal")]
+    InvalidMembershipProposal,
     /// Signature verification failed
     #[error("Invalid signature")]
     InvalidSignature,
