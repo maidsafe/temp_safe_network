@@ -105,7 +105,7 @@ impl PeerSession {
         let job = SendJob {
             msg_id,
             msg_bytes,
-            retries: 0,
+            retries: 3,
             reporter,
         };
 

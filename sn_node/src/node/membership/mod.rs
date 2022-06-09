@@ -255,7 +255,7 @@ impl Membership {
         node_state: NodeState,
         prefix: &Prefix,
     ) -> Result<SignedVote<NodeState>> {
-        info!("[{}] proposing {:?}", self.id(), node_state);
+        info!("[{}] proposing {:?} during gen: {}", self.id(), node_state, self.gen + 1);
         let vote = Vote {
             gen: self.gen + 1,
             ballot: Ballot::Propose(node_state),

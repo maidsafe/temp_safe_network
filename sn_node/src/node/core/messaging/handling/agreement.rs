@@ -150,7 +150,7 @@ impl Node {
         sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
         info!(
-            "Agreement - proposing membership change with node offline: {} at {}",
+            "Agreement reached - proposing membership change with node offline: {} at {}",
             node_state.name(),
             node_state.addr()
         );
