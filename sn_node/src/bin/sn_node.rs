@@ -255,7 +255,7 @@ fn init_node_logging(config: Config) -> Result<Option<WorkerGuard>> {
     // Set up logging
     // ==============
 
-    let mut optional_guard: Option<WorkerGuard> = None;
+    let mut _optional_guard: Option<WorkerGuard> = None;
 
     #[cfg(not(feature = "tokio-console"))]
     {
@@ -336,7 +336,7 @@ fn init_node_logging(config: Config) -> Result<Option<WorkerGuard>> {
 
     }
 
-    Ok(optional_guard)
+    Ok(_optional_guard)
 
 }
 
@@ -454,19 +454,19 @@ async fn run_node(config: Config) -> Result<()> {
             });
     }
 
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
-    let x: f64 = rng.gen_range(0.0..1.0);
+    // use rand::Rng;
+    // let mut rng = rand::thread_rng();
+    // let x: f64 = rng.gen_range(0.0..1.0);
 
-    if !config.is_first() && x > 0.6 {
-        println!("[Chaos] (PID:{our_pid}): ChurnFloat: {}", x);
+    // if !config.is_first() && x > 0.6 {
+    //     println!("[Chaos] (PID:{our_pid}): ChurnFloat: {}", x);
 
-        // if we dont do this the network launch tool sees us as inactive and kill severything atm...
-        // sleep(Duration::from_secs(3)).await;
+    //     // if we dont do this the network launch tool sees us as inactive and kill severything atm...
+    //     // sleep(Duration::from_secs(3)).await;
 
-        warn!("[Chaos] (PID:{our_pid}): ChurnJoinMiss");
-        return Err(Error::ChurnJoinMiss).map_err(ErrReport::msg);
-    }
+    //     warn!("[Chaos] (PID:{our_pid}): ChurnJoinMiss");
+    //     return Err(Error::ChurnJoinMiss).map_err(ErrReport::msg);
+    // }
 
     // This just keeps the node going as long as routing goes
     while let Some(event) = event_stream.next().await {
