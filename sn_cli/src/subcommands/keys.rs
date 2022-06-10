@@ -94,13 +94,7 @@ mod create_command {
     async fn should_create_bls_keypair() -> Result<()> {
         let config_dir = assert_fs::TempDir::new()?;
         let credentials_file = config_dir.child(".safe/cli/credentials");
-        let cli_config_file = config_dir.child(".safe/cli/config.json");
-        let node_config_file = config_dir.child(".safe/node/node_connection_info.config");
-        let config = Config::new(
-            cli_config_file.path().to_path_buf(),
-            node_config_file.path().to_path_buf(),
-        )
-        .await?;
+        let config = Config::create_config(&config_dir).await?;
 
         let result = key_commander(
             KeysSubCommands::Create { for_cli: false },
@@ -117,13 +111,7 @@ mod create_command {
     async fn should_create_bls_keypair_saved_to_credentials_file() -> Result<()> {
         let config_dir = assert_fs::TempDir::new()?;
         let credentials_file = config_dir.child(".safe/cli/credentials");
-        let cli_config_file = config_dir.child(".safe/cli/config.json");
-        let node_config_file = config_dir.child(".safe/node/node_connection_info.config");
-        let config = Config::new(
-            cli_config_file.path().to_path_buf(),
-            node_config_file.path().to_path_buf(),
-        )
-        .await?;
+        let config = Config::create_config(&config_dir).await?;
 
         let result = key_commander(
             KeysSubCommands::Create { for_cli: true },
