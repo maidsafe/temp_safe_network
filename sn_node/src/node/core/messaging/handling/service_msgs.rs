@@ -291,7 +291,7 @@ fn gen_register_cmd(
         owner,
         XorName::from_content(&key_image.to_bytes()),
         SPENTBOOK_TYPE_TAG,
-        policy.into(),
+        policy,
         u16::MAX,
     );
 

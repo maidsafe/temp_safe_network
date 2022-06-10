@@ -414,7 +414,7 @@ impl RegisterStorage {
         let policy = Policy { owner, permissions };
 
         let keypair = Keypair::new_ed25519();
-        let cmd = create_reg_w_policy(*address.name(), SPENTBOOK_TYPE_TAG, policy.into(), keypair)?;
+        let cmd = create_reg_w_policy(*address.name(), SPENTBOOK_TYPE_TAG, policy, keypair)?;
 
         match self.write(cmd).await {
             Ok(()) | Err(Error::DataExists) => Ok(()),
