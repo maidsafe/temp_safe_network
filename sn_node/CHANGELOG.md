@@ -5,30 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.62.1 (2022-06-07)
+## v0.62.2 (2022-06-10)
 
 ### Chore
 
- - <csr-id-a8aa4e749670db3a930f2351ac46b5dd7d72041e/> resolve issue after rebase
- - <csr-id-d4088d4c5d26904187fa8b08fa6a9c9f8b04c5b2/> remove accidental log commit
-
-### New Features
-
- - <csr-id-dbda86be03f912079776be514828ff5fd034830c/> first version of Spentbook messaging, storage, and client API
-   - Storage is implemented using Register as the underlying data type. To be changed when
-     actual SpentBook native data type is put in place.
-   - First version of sn_client API for Spentbook messages.
-   - sn_client::spent_proof_shares API to fetch spent proof shares.
-   - sn_client::spend_dbc API to request Elders to store the spent proof shares.
-   - Serialise SpentProofShare to store it as an entry in the underlying Register.
+ - <csr-id-aa05d4eac37ebf6969275555e787dd81f5f65de7/> cleanup unneeded logs
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release.
- - 1 day passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 2 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -38,6 +27,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - cleanup unneeded logs ([`aa05d4e`](https://github.com/maidsafe/safe_network/commit/aa05d4eac37ebf6969275555e787dd81f5f65de7))
+</details>
+
+## v0.62.1 (2022-06-07)
+
+<csr-id-a8aa4e749670db3a930f2351ac46b5dd7d72041e/>
+<csr-id-d4088d4c5d26904187fa8b08fa6a9c9f8b04c5b2/>
+
+### Chore
+
+ - <csr-id-a8aa4e749670db3a930f2351ac46b5dd7d72041e/> resolve issue after rebase
+ - <csr-id-d4088d4c5d26904187fa8b08fa6a9c9f8b04c5b2/> remove accidental log commit
+
+### Chore
+
+ - <csr-id-489904e325cfb8efca4289b05125904ad4029f3b/> sn_interface-0.6.1/sn_client-0.66.1/sn_node-0.62.1/sn_api-0.64.1
+
+### New Features
+
+ - <csr-id-dbda86be03f912079776be514828ff5fd034830c/> first version of Spentbook messaging, storage, and client API
+   - Storage is implemented using Register as the underlying data type. To be changed when
+   actual SpentBook native data type is put in place.
+- First version of sn_client API for Spentbook messages.
+- sn_client::spent_proof_shares API to fetch spent proof shares.
+- sn_client::spend_dbc API to request Elders to store the spent proof shares.
+- Serialise SpentProofShare to store it as an entry in the underlying Register.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.6.1/sn_client-0.66.1/sn_node-0.62.1/sn_api-0.64.1 ([`489904e`](https://github.com/maidsafe/safe_network/commit/489904e325cfb8efca4289b05125904ad4029f3b))
     - Merge branch 'main' into Gabriel_Spentbook_PR1143 ([`0eda02a`](https://github.com/maidsafe/safe_network/commit/0eda02ac126be4f088af6bf9e7247c8496a389ba))
     - resolve issue after rebase ([`a8aa4e7`](https://github.com/maidsafe/safe_network/commit/a8aa4e749670db3a930f2351ac46b5dd7d72041e))
     - first version of Spentbook messaging, storage, and client API ([`dbda86b`](https://github.com/maidsafe/safe_network/commit/dbda86be03f912079776be514828ff5fd034830c))
@@ -46,6 +79,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.62.0 (2022-06-05)
+
+<csr-id-1bf7dfb3ce8b14cbed7a4a8ed98c8310653a2da9/>
+<csr-id-ebb8f26a394f595b725fdf52e1a588c1f8136562/>
 
 ### New Features
 
