@@ -35,7 +35,7 @@ const URL_PROTOCOL: &str = "safe://";
 const URL_SCHEME: &str = "safe";
 const XOR_URL_VERSION_1: u64 = 0x1; // TODO: consider using 16 bits
 const XOR_URL_STR_MAX_LENGTH: usize = 44;
-const XOR_NAME_BYTES_OFFSET: usize = 5; // offset where to find the XoR name bytes
+const XOR_NAME_BYTES_OFFSET: usize = 4; // offset where to find the XoR name bytes
 const URL_VERSION_QUERY_NAME: &str = "v";
 
 /// The XOR-URL type
@@ -475,11 +475,7 @@ impl SafeUrl {
             },
         };
 
-        trace!(
-            "Attempting to match content type of URL: {}, {:?}",
-            &xorurl,
-            content_type
-        );
+        trace!("Attempting to match content type of URL: {xorurl}, {content_type:?}");
 
         let mut xor_name = XorName::default();
         xor_name
@@ -492,14 +488,13 @@ impl SafeUrl {
         type_tag_bytes[8 - type_tag_bytes_len..].copy_from_slice(&xorurl_bytes[type_tag_offset..]);
         let type_tag: u64 = u64::from_be_bytes(type_tag_bytes);
 
-        let address = match xorurl_bytes[4] {
+        let address = match xorurl_bytes[3] {
             0 => DataAddress::SafeKey(xor_name),
             1 => DataAddress::Bytes(xor_name),
             2 => DataAddress::Register(RegisterAddress::new(xor_name, type_tag)),
             other => {
                 return Err(Error::InvalidXorUrl(format!(
-                    "Invalid data type encoded in the XOR-URL string: {}",
-                    other
+                    "Invalid data type encoded in the XOR-URL string: {other}"
                 )))
             }
         };
