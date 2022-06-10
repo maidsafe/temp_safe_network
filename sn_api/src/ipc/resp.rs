@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{IpcError, NodeConfig};
+use super::IpcError;
 use sn_interface::types::Keypair;
 
 use serde::{Deserialize, Serialize};
@@ -17,8 +17,6 @@ use serde::{Deserialize, Serialize};
 pub enum IpcResp {
     /// Authentication.
     Auth(Result<AuthGranted, IpcError>),
-    /// Unregistered client.
-    Unregistered(Result<NodeConfig, IpcError>),
 }
 
 /// It represents the authentication response.
@@ -26,8 +24,4 @@ pub enum IpcResp {
 pub struct AuthGranted {
     /// The access keys.
     pub app_keypair: Keypair,
-
-    /// Network bootstrap information.
-    /// Useful to reuse bootstrap nodes and speed up access.
-    pub bootstrap_config: Option<NodeConfig>,
 }

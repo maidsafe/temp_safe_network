@@ -221,14 +221,10 @@ pub async fn node_commander(
 
 #[cfg(test)]
 mod test {
-    use crate::operations::config::{
-        test_utils::TEST_PREFIX_MAPS_FOLDER, Config, NetworkInfo, NetworkLauncher,
-    };
+    use crate::operations::config::{Config, NetworkLauncher};
     use color_eyre::eyre::eyre;
     use color_eyre::Report;
     use futures::executor::block_on;
-    use std::path::PathBuf;
-    use tokio::fs;
 
     pub struct FakeNetworkLauncher {
         pub launch_args: Vec<String>,
@@ -238,27 +234,14 @@ mod test {
     impl NetworkLauncher for FakeNetworkLauncher {
         fn launch(&mut self, args: Vec<String>, _interval: u64) -> Result<(), Report> {
             self.launch_args.extend(args);
-            let prefix_map_path = block_on(async {
-                let mut dir = fs::read_dir(PathBuf::from(TEST_PREFIX_MAPS_FOLDER)).await?;
-                while let Some(entry) = dir.next_entry().await? {
-                    if entry.metadata().await?.is_file() {
-                        return Ok(entry.path());
-                    }
-                }
-                return Err(eyre!(
-                    "Dummy PrefixMap not found in {}",
-                    TEST_PREFIX_MAPS_FOLDER
-                ));
-            })?;
-            // during actual launch, genesis node will write the prefix_map and update symlink
-            // so maybe do the same? (since inside node_commander, it reads the symlink and adds that
-            // network as baby-fleming
-            let _ = block_on(
-                self.config
-                    .add_network("baby-fleming", NetworkInfo::Local(prefix_map_path, None)),
-            )?;
-            block_on(self.config.switch_to_network("baby-fleming"))?;
-            Ok(())
+            block_on(async {
+                let mut file_name = self.config.store_dummy_prefix_maps(1).await?;
+                let file_name = file_name
+                    .pop()
+                    .ok_or_else(|| eyre!("file_name should have 1 value"))?;
+                self.config.update_prefix_map_symlink(file_name).await?;
+                Ok(())
+            })
         }
 
         fn join(&mut self, args: Vec<String>) -> Result<(), Report> {

@@ -3435,7 +3435,7 @@ dependencies = [
  "sn_api",
  "sn_cmd_test_utilities",
  "sn_dbc",
- "sn_launch_tool 0.9.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sn_launch_tool 0.9.9",
  "structopt",
  "tokio",
  "tracing",
@@ -3488,7 +3488,7 @@ dependencies = [
  "signature",
  "sn_dbc",
  "sn_interface",
- "sn_launch_tool 0.9.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sn_launch_tool 0.9.8",
  "structopt",
  "strum",
  "strum_macros",
@@ -3631,13 +3631,11 @@ dependencies = [
 [[package]]
 name = "sn_launch_tool"
 version = "0.9.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72683939002ed1a55ec4f49f2ea265c1a8cc896bcc8479bbff956281a3b98673"
+source = "git+https://github.com/RolandSherwin/sn_launch_tool?branch=prefix_map#bb1868b9a1e0e1f8187147d7592bd2a67c2a58c7"
 dependencies = [
  "color-eyre",
  "dirs-next 1.0.2",
  "eyre",
- "serde_json",
  "structopt",
  "tracing",
  "tracing-subscriber 0.3.11",
@@ -3645,8 +3643,9 @@ dependencies = [
 
 [[package]]
 name = "sn_launch_tool"
-version = "0.9.8"
-source = "git+https://github.com/RolandSherwin/sn_launch_tool?branch=prefix_map#bb1868b9a1e0e1f8187147d7592bd2a67c2a58c7"
+version = "0.9.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed0ee2674871b9ee1025f46e144a0a37e1d240f054a05db5eed7ffcb4278f0f1"
 dependencies = [
  "color-eyre",
  "dirs-next 1.0.2",
@@ -3920,7 +3919,7 @@ dependencies = [
  "console-subscriber",
  "dirs-next 2.0.0",
  "eyre",
- "sn_launch_tool 0.9.8 (git+https://github.com/RolandSherwin/sn_launch_tool?branch=prefix_map)",
+ "sn_launch_tool 0.9.8",
  "structopt",
  "tokio",
  "tracing",
