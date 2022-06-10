@@ -366,36 +366,20 @@ mod tests {
 
         let file = LargeFile::new(random_bytes(LARGE_FILE_SIZE_MIN))?;
 
-        // Store private file (also verifies that the file is stored)
-        let (private_address, read_data) = client.upload_and_verify(file.bytes()).await?;
+        // Store file (also verifies that the file is stored)
+        let (address, read_data) = client.upload_and_verify(file.bytes()).await?;
 
         compare(file.bytes(), read_data)?;
 
-        // Test storing private file with the same value.
-        // Should not conflict and return same address
-        let address = client
+        // Test storing file with the same value.
+        // Should not conflict and should return same address
+        let reupload_address = client
             .upload_large(file.clone())
             .instrument(tracing::info_span!(
                 "checking no conflict on same private upload"
             ))
             .await?;
-        assert_eq!(address, private_address);
-
-        // Test storing public file with the same value. Should not conflict.
-        let public_address = client
-            .upload_large(file.clone())
-            .instrument(tracing::info_span!("checking no conflict on public upload"))
-            .await?;
-
-        assert_ne!(public_address, private_address);
-
-        // Assert that the public file is stored.
-        let read_data = client
-            .read_bytes(public_address)
-            .instrument(tracing::info_span!("reading_public"))
-            .await?;
-
-        compare(file.bytes(), read_data)?;
+        assert_eq!(address, reupload_address);
 
         Ok(())
     }
@@ -599,7 +583,6 @@ mod tests {
         let size = LARGE_FILE_SIZE_MIN / 3;
         let _outer_span = tracing::info_span!("store_and_read_1kb", size).entered();
         let client = create_test_client().await?;
-        store_and_read(&client, size).await?;
         store_and_read(&client, size).await
     }
 
@@ -608,7 +591,6 @@ mod tests {
         init_logger();
         let _outer_span = tracing::info_span!("store_and_read_1mb").entered();
         let client = create_test_client().await?;
-        store_and_read(&client, 1024 * 1024).await?;
         store_and_read(&client, 1024 * 1024).await
     }
 

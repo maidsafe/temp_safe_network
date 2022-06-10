@@ -910,7 +910,7 @@ mod test {
             permissions: Default::default(),
         };
         Ok((
-            create_reg_w_policy(xor_name::rand::random(), 1, policy, keypair)?,
+            create_reg_w_policy(xor_name::rand::random(), 0, policy, keypair)?,
             authority,
         ))
     }
