@@ -5,19 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.62.2 (2022-06-10)
+## v0.62.3 (2022-06-11)
 
 ### Chore
 
- - <csr-id-aa05d4eac37ebf6969275555e787dd81f5f65de7/> cleanup unneeded logs
+ - <csr-id-fe2010fa66622cfcb52325ad6139bb1bf1783251/> add basic chaos to node startup
+   random crashes to ensure that the node startup looping is in effect
+
+### Bug Fixes
+
+ - <csr-id-155d66436b1cdb3c1520c17f0e827124f9e6cac5/> Node init and restart on error
+   Previously an error from the node was not triggering the restart of the
+   node instance. (eg, ChurnJoinMiss).
+   
+   Here, the node bin start process has been tweaked. Kepeing all
+   node processes within the sn_node spawned thread. But, each 'node'
+   with its own runtime, to aid in shutting down any background processes
+   between restarts.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 2 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -27,6 +38,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - add basic chaos to node startup ([`fe2010f`](https://github.com/maidsafe/safe_network/commit/fe2010fa66622cfcb52325ad6139bb1bf1783251))
+    - Node init and restart on error ([`155d664`](https://github.com/maidsafe/safe_network/commit/155d66436b1cdb3c1520c17f0e827124f9e6cac5))
+</details>
+
+## v0.62.2 (2022-06-10)
+
+<csr-id-aa05d4eac37ebf6969275555e787dd81f5f65de7/>
+
+### Chore
+
+ - <csr-id-aa05d4eac37ebf6969275555e787dd81f5f65de7/> cleanup unneeded logs
+
+### Chore
+
+ - <csr-id-6253530bf609e214de3a04433dcc260aa71721e0/> sn_node-0.62.2
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.62.2 ([`6253530`](https://github.com/maidsafe/safe_network/commit/6253530bf609e214de3a04433dcc260aa71721e0))
     - cleanup unneeded logs ([`aa05d4e`](https://github.com/maidsafe/safe_network/commit/aa05d4eac37ebf6969275555e787dd81f5f65de7))
 </details>
 
@@ -34,6 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-id-a8aa4e749670db3a930f2351ac46b5dd7d72041e/>
 <csr-id-d4088d4c5d26904187fa8b08fa6a9c9f8b04c5b2/>
+<csr-id-489904e325cfb8efca4289b05125904ad4029f3b/>
 
 ### Chore
 
@@ -49,10 +94,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-dbda86be03f912079776be514828ff5fd034830c/> first version of Spentbook messaging, storage, and client API
    - Storage is implemented using Register as the underlying data type. To be changed when
    actual SpentBook native data type is put in place.
-- First version of sn_client API for Spentbook messages.
-- sn_client::spent_proof_shares API to fetch spent proof shares.
-- sn_client::spend_dbc API to request Elders to store the spent proof shares.
-- Serialise SpentProofShare to store it as an entry in the underlying Register.
 
 ### Commit Statistics
 
@@ -77,6 +118,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - remove accidental log commit ([`d4088d4`](https://github.com/maidsafe/safe_network/commit/d4088d4c5d26904187fa8b08fa6a9c9f8b04c5b2))
     - Merge #1217 ([`2f26043`](https://github.com/maidsafe/safe_network/commit/2f2604325d533357bad7d917315cf4cba0b2d3c0))
 </details>
+
+<csr-unknown>
+First version of sn_client API for Spentbook messages.sn_client::spent_proof_shares API to fetch spent proof shares.sn_client::spend_dbc API to request Elders to store the spent proof shares.Serialise SpentProofShare to store it as an entry in the underlying Register.<csr-unknown/>
 
 ## v0.62.0 (2022-06-05)
 
