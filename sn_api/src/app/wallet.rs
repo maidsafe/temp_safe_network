@@ -494,6 +494,8 @@ mod tests {
         Ok(())
     }
 
+    /// Ignoring until we implement encryption support again.
+    #[ignore]
     #[tokio::test]
     async fn test_wallet_get_not_owned_wallet() -> Result<()> {
         let safe = new_safe_instance().await?;
