@@ -55,7 +55,7 @@ use tracing_subscriber::filter::EnvFilter;
 
 #[cfg(not(feature = "tokio-console"))]
 const MODULE_NAME: &str = "sn_node";
-const BOOTSTRAP_RETRY_TIME_SEC: u64 = 30;
+const BOOTSTRAP_RETRY_TIME_SEC: u64 = 15;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -109,8 +109,13 @@ fn create_runtime_and_node() -> Result<()> {
     info!("Node runtime started");
 
     // start a new runtime for a node.
-    let rt = tokio::runtime::Runtime::new()?;
-    let res = rt.block_on(async move {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .thread_name("sn_node")
+        .thread_stack_size(16 * 1024 * 1024)
+        .build()?;
+
+    let _res = rt.block_on(async move {
         // pull config again in case it has been updated meanwhile
         let config = Config::new().await?;
         // we want logging to persist
@@ -134,7 +139,7 @@ fn create_runtime_and_node() -> Result<()> {
     // doesn't really matter the outcome here.
     rt.shutdown_timeout(Duration::from_secs(2));
     debug!("Node runtime should be shutdown now");
-    res
+    Ok(())
 }
 
 /// Inits node logging, returning the global node guard if required.
