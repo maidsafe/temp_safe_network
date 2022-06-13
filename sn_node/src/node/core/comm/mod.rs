@@ -29,11 +29,10 @@ use bytes::Bytes;
 use futures::stream::{FuturesUnordered, StreamExt};
 use qp2p::{Endpoint, IncomingConnections};
 use std::time::Duration;
-use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
-use tokio::{
-    sync::{mpsc, RwLock},
-    task,
-};
+use std::{net::SocketAddr, sync::Arc};
+use tokio::{sync::mpsc, task};
+
+use dashmap::DashMap;
 
 // Communication component of the node to interact with other nodes.
 #[derive(Clone)]
@@ -42,7 +41,7 @@ pub(crate) struct Comm {
     msg_listener: MsgListener,
     #[cfg(feature = "back-pressure")]
     back_pressure: BackPressure,
-    sessions: Arc<RwLock<BTreeMap<Peer, PeerSession>>>,
+    sessions: Arc<DashMap<Peer, PeerSession>>,
 }
 
 impl Comm {
@@ -89,10 +88,11 @@ impl Comm {
     }
 
     pub(crate) async fn cleanup_peers(&self, retain_peers: Vec<Peer>) {
-        let sessions = self.sessions.read().await;
-
         let mut peers_to_cleanup = vec![];
-        for (peer, session) in sessions.iter() {
+        for entry in self.sessions.iter() {
+            let peer = entry.key();
+            let session = entry.value();
+
             session.remove_expired().await;
 
             if retain_peers.contains(peer) {
@@ -106,28 +106,20 @@ impl Comm {
             }
         }
 
-        // explicitly drop the read here.
-        drop(sessions);
-
         // cleanup any and all conns that are not connected
         // TODO: check if we need to remove client conns manually, or if we can assume they're disconnected...
         // Perhaps above a threshold we cleanup non-section conns?
         if !peers_to_cleanup.is_empty() {
             for peer in peers_to_cleanup {
-                let mut sessions_write_guard = self.sessions.write().await;
-                let perhaps_peer = sessions_write_guard.remove(&peer);
-                drop(sessions_write_guard);
+                let perhaps_peer = self.sessions.remove(&peer);
 
-                if let Some(session) = perhaps_peer {
+                if let Some((_peer, session)) = perhaps_peer {
                     session.disconnect().await
                 };
             }
         }
 
-        debug!(
-            "PeerLink count post-cleanup: ${:?}",
-            self.sessions.read().await.len()
-        );
+        debug!("PeerLink count post-cleanup: ${:?}", self.sessions.len());
     }
 
     /// Fake function used as replacement for testing only.
@@ -164,7 +156,7 @@ impl Comm {
     #[cfg(feature = "back-pressure")]
     /// Returns our caller-specific tolerated msgs per s, if the value has changed significantly.
     pub(crate) async fn tolerated_msgs_per_s(&self) -> Option<f64> {
-        let sessions = self.sessions.read().await.len();
+        let sessions = self.sessions.len();
         self.back_pressure.tolerated_msgs_per_s(sessions).await
     }
 
@@ -444,54 +436,30 @@ impl Comm {
         }
     }
 
-    async fn get(&self, id: &Peer) -> Option<PeerSession> {
-        let sessions = self.sessions.read().await;
-        sessions.get(id).cloned()
-    }
-
+    /// Get a PeerSession if it already exists, otherwise create and insert
     async fn get_or_create(&self, peer: &Peer) -> PeerSession {
-        if let Some(session) = self.get(peer).await {
-            return session;
-        }
-
-        // if peer is not in list, the entire list needs to be locked
-        // i.e. first comms to any node, will impact all sending at that instant..
-        // however, first comms should be a minor part of total time spent using link,
-        // so that is ok
-        let mut sessions = self.sessions.write().await;
-        let res = match sessions.get(peer).cloned() {
-            // someone else inserted in the meanwhile, so use that
-            Some(session) => session,
-            // still not in list, go ahead and create + insert
+        match self.sessions.get(peer) {
+            Some(entry) => entry.value().clone(),
+            // not in list, go ahead and create + insert
             None => {
                 let link = Link::new(*peer, self.our_endpoint.clone(), self.msg_listener.clone());
                 let session = PeerSession::new(link);
-                let _ = sessions.insert(*peer, session.clone());
+                let _ = self.sessions.insert(*peer, session.clone());
                 session
             }
-        };
-
-        res
+        }
     }
 
     /// Any number of incoming qp2p:Connections can be added.
     /// We will eventually converge to the same one in our comms with the peer.
     async fn add_incoming(&self, peer: &Peer, conn: qp2p::Connection) {
         {
-            let session = self.sessions.read().await;
-            if let Some(c) = session.get(peer) {
-                // peer exists, add to it
-                c.add(conn).await;
-                return;
-            }
-            // else still not in list, go ahead and insert
-        }
-        let mut sessions = self.sessions.write().await;
-        match sessions.get(peer) {
-            // someone else inserted in the meanwhile, add to it
-            Some(c) => c.add(conn).await,
-            // still not in list, go ahead and insert
-            None => {
+            if let Some(entry) = self.sessions.get(peer) {
+                // peer already exists
+                let peer_session = entry.value();
+                // add to it
+                peer_session.add(conn).await;
+            } else {
                 let link = Link::new_with(
                     *peer,
                     self.our_endpoint.clone(),
@@ -500,7 +468,7 @@ impl Comm {
                 )
                 .await;
                 let session = PeerSession::new(link);
-                let _ = sessions.insert(*peer, session);
+                let _ = self.sessions.insert(*peer, session);
             }
         }
     }
@@ -566,7 +534,7 @@ fn setup(our_endpoint: Endpoint, receive_msg: mpsc::Sender<MsgEvent>) -> (Comm, 
         msg_listener: msg_listener.clone(),
         #[cfg(feature = "back-pressure")]
         back_pressure: back_pressure.clone(),
-        sessions: Arc::new(RwLock::new(BTreeMap::new())),
+        sessions: Arc::new(DashMap::new()),
     };
 
     #[cfg(feature = "back-pressure")]
