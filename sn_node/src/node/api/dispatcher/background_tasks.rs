@@ -33,7 +33,7 @@ const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(60 * 10); // ev
 impl Dispatcher {
     pub(crate) async fn start_network_probing(self: Arc<Self>) {
         info!("Starting to probe network");
-        let _handle = tokio::spawn(async move {
+        let _handle = tokio::task::spawn_local(async move {
             let dispatcher = self.clone();
             let mut interval = tokio::time::interval(PROBE_INTERVAL);
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
@@ -64,7 +64,7 @@ impl Dispatcher {
 
     pub(crate) async fn start_section_probing(self: Arc<Self>) {
         info!("Starting to probe section");
-        let _handle = tokio::spawn(async move {
+        let _handle = tokio::task::spawn_local(async move {
             let dispatcher = self.clone();
             let mut interval = tokio::time::interval(SECTION_PROBE_INTERVAL);
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
@@ -95,7 +95,7 @@ impl Dispatcher {
 
     pub(crate) async fn start_cleaning_peer_links(self: Arc<Self>) {
         info!("Starting cleaning up network links");
-        let _handle = tokio::spawn(async move {
+        let _handle = tokio::task::spawn_local(async move {
             let dispatcher = self.clone();
             let mut interval = tokio::time::interval(LINK_CLEANUP_INTERVAL);
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
@@ -122,7 +122,7 @@ impl Dispatcher {
     pub(crate) async fn start_sending_any_data_batches(self: Arc<Self>) {
         info!("Starting sending any queued data for replication in batches");
 
-        let _handle: JoinHandle<Result<()>> = tokio::spawn(async move {
+        let _handle: JoinHandle<Result<()>> = tokio::task::spawn_local(async move {
             let dispatcher = self.clone();
             let mut interval = tokio::time::interval(DATA_BATCH_INTERVAL);
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
@@ -213,7 +213,7 @@ impl Dispatcher {
 
     pub(crate) async fn check_for_dysfunction_periodically(self: Arc<Self>) {
         info!("Starting dysfunction checking");
-        let _handle = tokio::spawn(async move {
+        let _handle = tokio::task::spawn_local(async move {
             let dispatcher = self.clone();
             let mut interval = tokio::time::interval(DYSFUNCTION_CHECK_INTERVAL);
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
@@ -255,7 +255,7 @@ impl Dispatcher {
     /// not be overloaded...
     pub(crate) async fn report_backpressure_to_our_section_periodically(self: Arc<Self>) {
         info!("Firing off backpressure reports");
-        let _handle = tokio::spawn(async move {
+        let _handle = tokio::task::spawn_local(async move {
             let dispatcher = self.clone();
             let mut interval = tokio::time::interval(BACKPRESSURE_INTERVAL);
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);

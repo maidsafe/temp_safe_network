@@ -754,7 +754,7 @@ mod test {
     use tempfile::tempdir;
     use xor_name::Prefix;
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_register_write() -> Result<()> {
         // setup store
         let store = new_store()?;
@@ -789,7 +789,7 @@ mod test {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_register_export() -> Result<()> {
         // setup store
         let store = new_store()?;
@@ -835,7 +835,7 @@ mod test {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_register_non_existing_entry() -> Result<()> {
         // setup store
         let store = new_store()?;
@@ -864,7 +864,7 @@ mod test {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_register_non_existing_permissions() -> Result<()> {
         // setup store
         let store = new_store()?;

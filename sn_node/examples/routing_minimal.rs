@@ -215,7 +215,7 @@ async fn start_node(
 
 // Spawns a task to run the node until terminated.
 fn run_node(index: usize, mut node: NodeApi, mut event_stream: EventStream) -> JoinHandle<()> {
-    tokio::spawn(async move {
+    tokio::task::spawn_local(async move {
         while let Some(event) = event_stream.next().await {
             if !handle_event(index, &mut node, event).await {
                 break;

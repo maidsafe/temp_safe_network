@@ -28,15 +28,15 @@
 )]
 
 #[cfg(not(feature = "tokio-console"))]
+use eyre::Error;
+use eyre::{eyre, Context, ErrReport, Result};
+#[cfg(not(feature = "tokio-console"))]
 use sn_interface::LogFormatter;
 use sn_node::node::{
     add_connection_info, set_connection_info, Config, Error as NodeError, Event, NodeApi,
 };
 
 use color_eyre::{Section, SectionExt};
-#[cfg(not(feature = "tokio-console"))]
-use eyre::Error;
-use eyre::{eyre, Context, ErrReport, Result};
 use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
 use self_update::{cargo_crate_version, Status};
 use std::{fmt::Debug, fs::File, io, io::Write, path::Path, process::exit};
@@ -55,7 +55,7 @@ use tracing_subscriber::filter::EnvFilter;
 
 #[cfg(not(feature = "tokio-console"))]
 const MODULE_NAME: &str = "sn_node";
-const BOOTSTRAP_RETRY_TIME_SEC: u64 = 30;
+const BOOTSTRAP_RETRY_TIME_SEC: u64 = 15;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -71,35 +71,11 @@ fn main() -> Result<()> {
 
     trace!("Initial node config: {config:?}");
 
-    // This is our node runtime thread. Do all operations within here!
-    // We need this runtime, vs tokio::main so we can easily cancel it and all spawned tasks
-    let handle = std::thread::Builder::new()
-        .name("sn_node".to_string())
-        // stack size on windows was too small at times, so we increase it here
-        .stack_size(16 * 1024 * 1024)
-        .spawn(move || {
-            // start logging in this thread for all node work
-            // it should be heald through all node restarts
-            #[cfg(not(feature = "tokio-console"))]
-            let _guard = init_node_logging(config).map_err(Error::from)?;
+    #[cfg(not(feature = "tokio-console"))]
+    let _guard = init_node_logging(config).map_err(Error::from)?;
 
-            loop {
-                create_runtime_and_node()?;
-            }
-
-        })
-        .wrap_err("Failed to spawn node thread")?;
-
-    // join the runtime thread so we hold the main thread open until completion
-    match handle.join() {
-        Ok(result) => result,
-        Err(error) => {
-            // An error here means we cannot simply restart the ndoe runtime
-            println!("Error from sn_node thread: {error:?}");
-            // thread panic errors cannot be converted to `eyre::Report` as they are not `Sync`, so
-            // the best thing to do is propagate the panic.
-            std::panic::resume_unwind(error)
-        }
+    loop {
+        create_runtime_and_node()?;
     }
 }
 
@@ -109,20 +85,33 @@ fn create_runtime_and_node() -> Result<()> {
     info!("Node runtime started");
 
     // start a new runtime for a node.
-    let rt = tokio::runtime::Runtime::new()?;
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .thread_name("sn_node")
+        // 16mb here for windows stack size, which was being exceeded previously
+        .thread_stack_size(16 * 1024 * 1024)
+        .build()?;
+
     let _res = rt.block_on(async move {
         // pull config again in case it has been updated meanwhile
         let config = Config::new().await?;
-        // we want logging to persist
-        // loops ready to catch any ChurnJoinMiss
-        match run_node(config).await {
-            Ok(_) => {
-                info!("Node has finished running, no runtime errors were reported");
-            }
-            Err(error) => {
-                warn!("Node instance finished with an error: {error:?}");
-            }
-        };
+
+        let local = tokio::task::LocalSet::new();
+
+        let _res = local
+            .run_until(async move {
+                // we want logging to persist
+                // loops ready to catch any ChurnJoinMiss
+                match run_node(config).await {
+                    Ok(_) => {
+                        info!("Node has finished running, no runtime errors were reported");
+                    }
+                    Err(error) => {
+                        warn!("Node instance finished with an error: {error:?}");
+                    }
+                };
+            })
+            .await;
 
         Result::<(), NodeError>::Ok(())
     });

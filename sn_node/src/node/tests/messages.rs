@@ -24,7 +24,7 @@ use utils::*;
 use xor_name::XorName;
 
 /*
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_messages_client_node() -> Result<()> {
     let (node, mut event_stream) = create_node(Config {
         first: true,
@@ -65,7 +65,7 @@ async fn test_messages_client_node() -> Result<()> {
     let query_clone = query.clone();
 
     // spawn node events listener
-    let node_handler = tokio::spawn(async move {
+    let node_handler = tokio::task::spawn_local(async move {
         while let Some(event) = event_stream.next().await {
             match event {
                 Event::ServiceMsgReceived { msg, user } => {
@@ -118,7 +118,7 @@ async fn test_messages_client_node() -> Result<()> {
     }
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_messages_between_nodes() -> Result<()> {
     let msg = b"hello!";
     let response = b"good bye!";
@@ -134,7 +134,7 @@ async fn test_messages_between_nodes() -> Result<()> {
     println!("spawning node handler");
 
     // spawn node events listener
-    let node_handler = tokio::spawn(async move {
+    let node_handler = tokio::task::spawn_local(async move {
         while let Some(event) = event_stream.next().await {
             match event {
                 Event::MessageReceived { content, src, .. } => {

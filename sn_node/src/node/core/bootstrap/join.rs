@@ -533,7 +533,7 @@ mod tests {
     use tokio::task;
     use xor_name::XorName;
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn join_as_adult() -> Result<()> {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
@@ -643,7 +643,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn join_receive_redirect_response() -> Result<()> {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
@@ -745,7 +745,7 @@ mod tests {
         }
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn join_invalid_redirect_response() -> Result<()> {
         init_logger();
         let _span = tracing::info_span!("join_invalid_redirect_response").entered();
@@ -839,7 +839,7 @@ mod tests {
         }
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn join_disallowed_response() -> Result<()> {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
@@ -893,7 +893,7 @@ mod tests {
         test_result
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn join_invalid_retry_prefix_response() -> Result<()> {
         init_logger();
         let _span = tracing::info_span!("join_invalid_retry_prefix_response").entered();

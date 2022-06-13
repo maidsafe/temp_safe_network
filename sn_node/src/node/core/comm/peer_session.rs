@@ -52,7 +52,7 @@ impl PeerSession {
         };
 
         let session_clone = session.clone();
-        let _ = tokio::task::spawn(async move { session_clone.keep_sending().await });
+        let _ = tokio::task::spawn_local(async move { session_clone.keep_sending().await });
 
         session
     }

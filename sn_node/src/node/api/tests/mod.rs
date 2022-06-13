@@ -64,7 +64,7 @@ use xor_name::{Prefix, XorName};
 
 static TEST_EVENT_CHANNEL_SIZE: usize = 20;
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     let prefix1 = Prefix::default().pushed(true);
     let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix1, elder_count());
@@ -144,7 +144,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result<()> {
     let prefix1 = Prefix::default().pushed(true);
     let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix1, elder_count());
@@ -230,7 +230,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result<()> {
     init_logger();
     let _span = tracing::info_span!("receive_join_request_from_relocated_node").entered();
@@ -316,7 +316,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn handle_agreement_on_online() -> Result<()> {
     let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
 
@@ -351,7 +351,7 @@ async fn handle_agreement_on_online() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
     init_logger();
     let sk_set = SecretKeySet::random();
@@ -587,27 +587,27 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn handle_agreement_on_online_of_rejoined_node_with_high_age_in_startup() -> Result<()> {
     handle_agreement_on_online_of_rejoined_node(NetworkPhase::Startup, 16).await
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn handle_agreement_on_online_of_rejoined_node_with_high_age_after_startup() -> Result<()> {
     handle_agreement_on_online_of_rejoined_node(NetworkPhase::Regular, 16).await
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn handle_agreement_on_online_of_rejoined_node_with_low_age_in_startup() -> Result<()> {
     handle_agreement_on_online_of_rejoined_node(NetworkPhase::Startup, 8).await
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn handle_agreement_on_online_of_rejoined_node_with_low_age_after_startup() -> Result<()> {
     handle_agreement_on_online_of_rejoined_node(NetworkPhase::Regular, 8).await
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     init_logger();
     let _span = tracing::info_span!("handle_agreement_on_offline_of_non_elder").entered();
@@ -655,7 +655,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn handle_agreement_on_offline_of_elder() -> Result<()> {
     let (section_auth, mut nodes, sk_set) = create_section_auth();
 
@@ -720,7 +720,7 @@ enum UntrustedMessageSource {
     Accumulation,
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 // Checking when we get AE info that is ahead of us we should handle it.
 async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     init_logger();
@@ -834,7 +834,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 // Checking when we send AE info to a section from untrusted section, we do not handle it and error out
 async fn untrusted_ae_msg_errors() -> Result<()> {
     init_logger();
@@ -909,7 +909,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn relocation_of_non_elder() -> Result<()> {
     relocation(RelocatedPeerRole::NonElder).await
 }
@@ -1000,12 +1000,12 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn node_msg_to_self() -> Result<()> {
     message_to_self(MessageDst::Node).await
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn section_msg_to_self() -> Result<()> {
     message_to_self(MessageDst::Section).await
 }
@@ -1082,7 +1082,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn handle_elders_update() -> Result<()> {
     init_logger();
     let _span = tracing::info_span!("handle_elders_update").entered();
@@ -1226,7 +1226,7 @@ async fn handle_elders_update() -> Result<()> {
 }
 
 // Test that demoted node still sends `Sync` messages on split.
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn handle_demote_during_split() -> Result<()> {
     init_logger();
     let _span = tracing::info_span!("handle_demote_during_split").entered();

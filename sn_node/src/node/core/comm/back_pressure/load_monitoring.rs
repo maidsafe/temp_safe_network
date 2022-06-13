@@ -84,7 +84,7 @@ impl LoadMonitoring {
             let period = *period;
             let clone = instance.clone();
             // kick off runner
-            let _ = tokio::task::spawn(async move {
+            let _ = tokio::task::spawn_local(async move {
                 clone.run_sampler(period).await;
             });
         }

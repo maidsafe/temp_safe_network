@@ -545,9 +545,9 @@ fn setup(our_endpoint: Endpoint, receive_msg: mpsc::Sender<MsgEvent>) -> (Comm, 
     };
 
     #[cfg(feature = "back-pressure")]
-    let _ = task::spawn(count_msgs(back_pressure, msg_counter));
+    let _ = task::spawn_local(count_msgs(back_pressure, msg_counter));
 
-    let _ = task::spawn(receive_conns(comm.clone(), conn_receiver));
+    let _ = task::spawn_local(receive_conns(comm.clone(), conn_receiver));
 
     (comm, msg_listener)
 }
@@ -571,7 +571,7 @@ async fn receive_conns(comm: Comm, mut conn_receiver: mpsc::Receiver<ListenerEve
 
 #[tracing::instrument(skip_all)]
 fn listen(msg_listener: MsgListener, mut incoming_connections: IncomingConnections) {
-    let _ = task::spawn(async move {
+    let _ = task::spawn_local(async move {
         while let Some((connection, incoming_msgs)) = incoming_connections.next().await {
             trace!(
                 "incoming_connection from {:?} with connection_id {:?}",
@@ -630,7 +630,7 @@ mod tests {
 
     const TIMEOUT: Duration = Duration::from_secs(1);
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn successful_send() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
         let comm = Comm::first_node(local_addr(), Config::default(), tx).await?;
@@ -665,7 +665,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn successful_send_to_subset() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
         let comm = Comm::first_node(local_addr(), Config::default(), tx).await?;
@@ -697,7 +697,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn failed_send() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
         let comm = Comm::first_node(
@@ -723,7 +723,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn successful_send_after_failed_attempts() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
         let comm = Comm::first_node(
@@ -755,7 +755,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn partially_successful_send() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
         let comm = Comm::first_node(
@@ -789,7 +789,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn send_after_reconnect() -> Result<()> {
         let (tx, _rx) = mpsc::channel(1);
         let send_comm = Comm::first_node(local_addr(), Config::default(), tx).await?;
@@ -849,7 +849,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn incoming_connection_lost() -> Result<()> {
         let (tx, mut rx0) = mpsc::channel(1);
         let comm0 = Comm::first_node(local_addr(), Config::default(), tx).await?;
@@ -906,7 +906,7 @@ mod tests {
 
         let (tx, rx) = mpsc::channel(1);
 
-        let _handle = tokio::spawn(async move {
+        let _handle = tokio::task::spawn_local(async move {
             while let Some((_, mut incoming_messages)) = incoming_connections.next().await {
                 while let Ok(Some(msg)) = incoming_messages.next().await {
                     let _ = tx.send(msg).await;
@@ -923,7 +923,7 @@ mod tests {
 
         // Keep the socket alive to keep the address bound, but don't read/write to it so any
         // attempt to connect to it will fail.
-        let _handle = tokio::spawn(async move {
+        let _handle = tokio::task::spawn_local(async move {
             debug!("get invalid peer");
             future::pending::<()>().await;
             let _ = socket;

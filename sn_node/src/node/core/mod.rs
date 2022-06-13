@@ -331,7 +331,7 @@ impl Node {
 
         let prefix_map = self.network_knowledge.prefix_map().clone();
 
-        let _ = tokio::spawn(async move {
+        let _ = tokio::task::spawn_local(async move {
             // Compare and write Prefix to `~/.safe/prefix_maps` dir
             if let Err(e) = compare_and_write_prefix_map_to_disk(&prefix_map).await {
                 error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);

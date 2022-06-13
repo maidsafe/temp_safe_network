@@ -227,7 +227,7 @@ impl Network {
         };
 
         // TODO: Fix this: future returned by `add_node` is not `Send`
-        //let _handle = task::spawn(add_node(id, config, event_tx));
+        //let _handle = task::spawn_local(add_node(id, config, event_tx));
         let _ = add_node(id, config, event_tx).await;
 
         self.try_print_status();
