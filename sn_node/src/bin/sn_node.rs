@@ -124,7 +124,7 @@ fn create_runtime_and_node() -> Result<()> {
             }
         };
 
-        Result::<(), Error>::Ok(())
+        Result::<(), NodeError>::Ok(())
     });
 
     info!("Shutting down node runtime");
