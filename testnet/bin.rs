@@ -47,7 +47,7 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
 const BASE_TRACING_DIRECTIVES: &str = "testnet=info,sn_launch_tool=debug";
 const NODES_DIR: &str = "local-test-network";
-const DEFAULT_INTERVAL: &str = "10000";
+const DEFAULT_INTERVAL: &str = "5000";
 const DEFAULT_NODE_COUNT: u32 = 30;
 
 #[derive(Debug, StructOpt)]
@@ -94,7 +94,7 @@ async fn main() -> Result<()> {
     // got resoved within the new version of Rust.
     #[cfg(not(target_os = "windows"))]
     // For Windows guys, rember to use
-    // `cargo build --release --features=test-utils --bins`
+    // `cargo build --release --bins`
     // before executing the testnet.exe.
     {
         let cmd_args = Cmd::from_args();
