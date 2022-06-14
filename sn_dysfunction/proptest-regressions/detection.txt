@@ -14,3 +14,5 @@ cc 960d7adfa6a54c07fca494aeda40fca6edf973ab657de1c7b9a35c7279d012b4 # shrinks to
 cc d020be7e19ad1299e89ac22b58e33cf4c173b8340b7e700d7494d768e4ed07dc # shrinks to good_nodes = 20, bad_nodes = 6, issue_count = 1063, issue_type = PendingRequestOperation(Some(OpId-4c73ad..))
 cc 431f58262fc80eee37c76d2d47244c45a4382a5d19f7481b0d3887e70bdbec44 # shrinks to good_nodes = 20, bad_nodes = 6, issue_count = 1968, issue_type = Knowledge
 cc 2cebe98b0b3287054764b94fc83bc59088d032e2ec2a2f7fd0a615c56d874d9c # shrinks to good_nodes = 21, bad_nodes = 6, issue_count = 1258, issue_type = Communication
+cc 6b03329bb1fb9be03b4151e5220185851dd272bd10353ad96e3678b814c4c581 # shrinks to good_nodes = 19, bad_nodes = 6, issue_count = 4005, issue_type = Communication
+cc b4559601eb25f3776c1689092a9f91d27aa514423a11cd2a9e337df326d5c264 # shrinks to good_nodes = 18, bad_nodes = 6, issue_count = 3030, issue_type = Communication

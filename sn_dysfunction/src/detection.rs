@@ -11,15 +11,15 @@ use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
 use std::time::Duration;
-static RECENT_ISSUE_DURATION: Duration = Duration::from_secs(60 * 15);
+static RECENT_ISSUE_DURATION: Duration = Duration::from_secs(60 * 10); // 10 minutes
 
-static CONN_WEIGHTING: f32 = 1.0;
+static CONN_WEIGHTING: f32 = 2.0;
 static OP_WEIGHTING: f32 = 1.0;
-static KNOWLEDGE_WEIGHTING: f32 = 3.0;
-static DKG_WEIGHTING: f32 = 5.0;
+static KNOWLEDGE_WEIGHTING: f32 = 2.0;
+static DKG_WEIGHTING: f32 = 4.0;
 
 /// Z-score value above which a node is dysfunctional
-static DYSFUNCTIONAL_DEVIATION: f32 = 1.1;
+static DYSFUNCTIONAL_DEVIATION: f32 = 1.2;
 
 #[derive(Clone, Debug)]
 /// Represents the different type of issues that can be recorded by the Dysfunction Detection
@@ -294,6 +294,7 @@ mod tests {
     fn issue_type_strategy() -> impl Strategy<Value = IssueType> {
         prop_oneof![
             Just(IssueType::Communication),
+            Just(IssueType::Dkg),
             Just(IssueType::Knowledge),
             (any::<[u8; 32]>())
                 .prop_map(|x| IssueType::PendingRequestOperation(Some(OperationId(x))))
@@ -385,7 +386,7 @@ mod tests {
         /// Test that gives a range of nodes and a few bad nodes,
         /// we then check that we can reliably detect those nodes
         fn pt_correct_amount_of_dysf_nodes_should_be_detected(
-            good_nodes in 7..50, bad_nodes in 1..7, issue_count in 1000..5000, issue_type in issue_type_strategy())
+            good_nodes in 7..50, bad_nodes in 1..7, issue_count in 2000..10000, issue_type in issue_type_strategy())
             {
 
             // finish early as we're over byzantine levels
@@ -397,8 +398,8 @@ mod tests {
             let _outer_span = tracing::info_span!("pt_correct_amount_of_dysf_nodes_should_be_detected").entered();
 
             // tolerances...
-            // So here a dysf node fails 30% of the time
-            const DYSF_SUCCESS_RATIO : f32 = 0.3;
+            // So here a dysf node fails 35% of the time
+            const DYSF_SUCCESS_RATIO : f32 = 0.35;
             const NORMAL_SUCCESS_RATIO: f32 = 0.95;
             use rand::seq::SliceRandom;
 
