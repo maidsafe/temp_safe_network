@@ -11,7 +11,7 @@ use crate::{Error, Result};
 use ::time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
 pub use sn_interface::network_knowledge::prefix_map::NetworkPrefixMap;
-pub use sn_interface::network_knowledge::utils::{DEFAULT_PREFIX_SYMLINK_NAME, SN_PREFIX_MAP_DIR};
+pub use sn_interface::network_knowledge::utils::{DEFAULT_PREFIX_HARDLINK_NAME, SN_PREFIX_MAP_DIR};
 use sn_interface::types::{Error as SafeNdError, PublicKey, Token};
 use std::{
     str::{self, FromStr},

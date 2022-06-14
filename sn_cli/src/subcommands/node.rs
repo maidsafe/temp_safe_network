@@ -7,15 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::operations::{
-    config::NetworkLauncher,
-    config::{Config, NetworkInfo},
+    config::{retrieve_local_prefix_map, Config, NetworkInfo, NetworkLauncher},
     node::*,
 };
 use color_eyre::{eyre::eyre, Result};
 use std::{net::SocketAddr, path::PathBuf};
 use structopt::StructOpt;
 
-use sn_api::DEFAULT_PREFIX_SYMLINK_NAME;
+use sn_api::DEFAULT_PREFIX_HARDLINK_NAME;
+
 const NODES_DATA_DIR_NAME: &str = "baby-fleming-nodes";
 const LOCAL_NODE_DIR_NAME: &str = "local-node";
 
@@ -206,8 +206,11 @@ pub async fn node_commander(
                 ip,
             )?;
             // add the network
-            let symlink_path = config.prefix_maps_dir.join(DEFAULT_PREFIX_SYMLINK_NAME);
-            let actual_path = tokio::fs::read_link(symlink_path).await?;
+            let default_prefix_map_path = config.prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME);
+            let prefix_map = retrieve_local_prefix_map(&default_prefix_map_path).await?;
+            let actual_path = config
+                .prefix_maps_dir
+                .join(format!("{:?}", prefix_map.genesis_key()));
             config
                 .add_network("baby-fleming", NetworkInfo::Local(actual_path, None))
                 .await?;
@@ -239,7 +242,7 @@ mod test {
                 let file_name = file_name
                     .pop()
                     .ok_or_else(|| eyre!("file_name should have 1 value"))?;
-                self.config.update_prefix_map_symlink(file_name).await?;
+                self.config.set_default_prefix_map(file_name).await?;
                 Ok(())
             })
         }
@@ -285,12 +288,10 @@ mod run_command {
         assert!(result.is_ok());
 
         assert!(launcher.launch_args.iter().any(|x| x == "--node-path"));
-        assert!(launcher.launch_args.iter().any(|x| x
-            == &custom_node_dir
-                .path()
-                .join(SN_NODE_EXECUTABLE)
-                .display()
-                .to_string()));
+        assert!(launcher
+            .launch_args
+            .iter()
+            .any(|x| PathBuf::from(x) == custom_node_dir.path().join(SN_NODE_EXECUTABLE)));
 
         Ok(())
     }
@@ -318,12 +319,10 @@ mod run_command {
 
         assert!(result.is_ok());
         assert!(launcher.launch_args.iter().any(|x| x == "--node-path"));
-        assert!(launcher.launch_args.iter().any(|x| x
-            == &node_dir
-                .path()
-                .join(SN_NODE_EXECUTABLE)
-                .display()
-                .to_string()));
+        assert!(launcher
+            .launch_args
+            .iter()
+            .any(|x| PathBuf::from(x) == node_dir.path().join(SN_NODE_EXECUTABLE)));
 
         Ok(())
     }
@@ -351,12 +350,10 @@ mod run_command {
 
         assert!(result.is_ok());
         assert!(launcher.launch_args.iter().any(|x| x == "--nodes-dir"));
-        assert!(launcher.launch_args.iter().any(|x| x
-            == &node_dir
-                .path()
-                .join(NODES_DATA_DIR_NAME)
-                .display()
-                .to_string()));
+        assert!(launcher
+            .launch_args
+            .iter()
+            .any(|x| PathBuf::from(x) == node_dir.path().join(NODES_DATA_DIR_NAME)));
 
         Ok(())
     }
@@ -383,12 +380,10 @@ mod run_command {
 
         assert!(result.is_ok());
         assert!(launcher.launch_args.iter().any(|x| x == "--nodes-dir"));
-        assert!(launcher.launch_args.iter().any(|x| x
-            == &custom_node_dir
-                .path()
-                .join(NODES_DATA_DIR_NAME)
-                .display()
-                .to_string()));
+        assert!(launcher
+            .launch_args
+            .iter()
+            .any(|x| PathBuf::from(x) == custom_node_dir.path().join(NODES_DATA_DIR_NAME)));
 
         Ok(())
     }
@@ -652,12 +647,10 @@ mod join_command {
 
         assert!(result.is_ok());
         assert!(launcher.launch_args.iter().any(|x| x == "--node-path"));
-        assert!(launcher.launch_args.iter().any(|x| x
-            == &custom_node_dir
-                .path()
-                .join(SN_NODE_EXECUTABLE)
-                .display()
-                .to_string()));
+        assert!(launcher
+            .launch_args
+            .iter()
+            .any(|x| PathBuf::from(x) == custom_node_dir.path().join(SN_NODE_EXECUTABLE)));
         Ok(())
     }
 
@@ -696,12 +689,10 @@ mod join_command {
 
         assert!(result.is_ok());
         assert!(launcher.launch_args.iter().any(|x| x == "--nodes-dir"));
-        assert!(launcher.launch_args.iter().any(|x| x
-            == &node_dir
-                .path()
-                .join(LOCAL_NODE_DIR_NAME)
-                .display()
-                .to_string()));
+        assert!(launcher
+            .launch_args
+            .iter()
+            .any(|x| PathBuf::from(x) == node_dir.path().join(LOCAL_NODE_DIR_NAME)));
         Ok(())
     }
 
@@ -741,12 +732,10 @@ mod join_command {
 
         assert!(result.is_ok());
         assert!(launcher.launch_args.iter().any(|x| x == "--nodes-dir"));
-        assert!(launcher.launch_args.iter().any(|x| x
-            == &custom_node_dir
-                .path()
-                .join(LOCAL_NODE_DIR_NAME)
-                .display()
-                .to_string()));
+        assert!(launcher
+            .launch_args
+            .iter()
+            .any(|x| PathBuf::from(x) == custom_node_dir.path().join(LOCAL_NODE_DIR_NAME)));
         Ok(())
     }
 
