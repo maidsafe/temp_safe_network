@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1654846281013,
+  "lastUpdate": 1655217989920,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -4979,6 +4979,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 4778992827,
             "range": "± 157566767",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "298662fa9d43f1f994dbdd22065b4ca67e3b7a03",
+          "message": "Merge #1236\n\n1236: refactor(safeurl): add from_* functions r=bochaco a=RolandSherwin\n\nFix #1231 \n\nCo-authored-by: RolandSherwin <RolandSherwin@protonmail.com>\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>",
+          "timestamp": "2022-06-14T12:30:05Z",
+          "tree_id": "c1986ed787811ee8fb4b953fa2173703076f3105",
+          "url": "https://github.com/maidsafe/safe_network/commit/298662fa9d43f1f994dbdd22065b4ca67e3b7a03"
+        },
+        "date": 1655217988304,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 8072009877,
+            "range": "± 10415621750",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 6422715936,
+            "range": "± 8014971754",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 18551736378,
+            "range": "± 12044755708",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 7586647092,
+            "range": "± 2187676578",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 5359201776,
+            "range": "± 133674735",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 11814575947,
+            "range": "± 739716737",
             "unit": "ns/iter"
           }
         ]
