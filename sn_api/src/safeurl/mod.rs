@@ -1290,7 +1290,7 @@ mod tests {
         )?;
 
         let base32_xorurl =
-            "safe://baeaaaaabgezdgnbvgy3tqojqgezdgnbvgy3tqojqgezdgnbvgy3tqojqgezkmmr4jvfde";
+            "safe://baeaaaajrgiztinjwg44dsmbrgiztinjwg44dsmbrgiztinjwg44dsmbrgktdepcnjiza";
         assert_eq!(xorurl, base32_xorurl);
         Ok(())
     }
@@ -1299,7 +1299,7 @@ mod tests {
     fn test_url_base32z_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let xorurl = SafeUrl::encode_bytes(xor_name, ContentType::Raw, XorUrlBase::Base32z)?;
-        let base32z_xorurl = "safe://hyryyyyybgr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3y";
+        let base32z_xorurl = "safe://hyryyyyjtge3uepjsghhd1cbtge3uepjsghhd1cbtge3uepjsghhd1cbtge";
         assert_eq!(xorurl, base32z_xorurl);
         Ok(())
     }
@@ -1313,7 +1313,7 @@ mod tests {
             ContentType::FilesContainer,
             XorUrlBase::Base64,
         )?;
-        let base64_xorurl = "safe://mAQACAAIxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMkX0YQ";
+        let base64_xorurl = "safe://mAQACAjEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyRfRh";
         assert_eq!(xorurl, base64_xorurl);
         let url = SafeUrl::from_url(base64_xorurl)?;
         assert_eq!(base64_xorurl, url.to_base(XorUrlBase::Base64));
@@ -1329,7 +1329,7 @@ mod tests {
     #[test]
     fn test_url_default_base_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let base32z_xorurl = "safe://hyryyyyybgr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3y";
+        let base32z_xorurl = "safe://hyryyyyjtge3uepjsghhd1cbtge3uepjsghhd1cbtge3uepjsghhd1cbtge";
         let xorurl = SafeUrl::encode_bytes(xor_name, ContentType::Raw, DEFAULT_XORURL_BASE)?;
         assert_eq!(xorurl, base32z_xorurl);
         Ok(())
@@ -1670,7 +1670,7 @@ mod tests {
     fn test_url_to_string() -> Result<()> {
         // These two are equivalent.  ie, the xorurl is the result of nrs.to_xorurl_string()
         let nrsurl = "safe://my.sub.domain/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe#somefragment";
-        let xorurl = "safe://my.sub.hyryygyynpm7tjdim96rdtz9kkyc758zqth5b3ynzya69njrjshgu7w84k3tomzy/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe#somefragment";
+        let xorurl = "safe://my.sub.hyryygyuk9cke7k99tyhp941od8q375wxgaqeyiag8za1jnpzbw9pb61sccn7a/path/my%20dir/my%20file.txt?this=that&this=other&color=blue&v=hyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy&name=John+Doe#somefragment";
 
         let nrs = SafeUrl::from_url(nrsurl)?;
         let xor = SafeUrl::from_url(xorurl)?;
