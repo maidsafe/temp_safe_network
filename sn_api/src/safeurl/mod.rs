@@ -532,6 +532,53 @@ impl SafeUrl {
         )
     }
 
+    pub fn from_safekey(xor_name: XorName) -> Result<Self> {
+        SafeUrl::new(
+            DataAddress::SafeKey(SafeKeyAddress::new(xor_name, Scope::Public)),
+            None,
+            0,
+            ContentType::Raw,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+    }
+
+    pub fn from_bytes(address: BytesAddress, content_type: ContentType) -> Result<Self> {
+        SafeUrl::new(
+            DataAddress::Bytes(address),
+            None,
+            0,
+            content_type,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+    }
+
+    pub fn from_register(
+        xor_name: XorName,
+        type_tag: u64,
+        scope: Scope,
+        content_type: ContentType,
+    ) -> Result<Self> {
+        SafeUrl::new(
+            DataAddress::Register(RegisterAddress::new(xor_name, scope, type_tag)),
+            None,
+            type_tag,
+            content_type,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+    }
+
     /// The url scheme.  Only 'safe' scheme is presently supported.
     pub fn scheme(&self) -> &str {
         URL_SCHEME
@@ -862,7 +909,7 @@ impl SafeUrl {
     /// This function may be called on an NrsUrl and
     /// the corresponding XorUrl will be returned.
     pub fn to_xorurl_string(&self) -> String {
-        self.to_base(DEFAULT_XORURL_BASE)
+        self.encode(DEFAULT_XORURL_BASE)
     }
 
     /// serializes the URL to an NrsUrl string.
@@ -882,20 +929,6 @@ impl SafeUrl {
         );
 
         Some(url)
-    }
-
-    /// serializes entire xorurl using a particular base encoding.
-    pub fn to_base(&self, base: XorUrlBase) -> String {
-        let name = self.name_to_base(base, true);
-
-        let query_string = self.query_string_with_separator();
-        let fragment = self.fragment_with_separator();
-
-        // serialize full xorurl
-        format!(
-            "{}{}{}{}{}",
-            URL_PROTOCOL, name, self.path, query_string, fragment
-        )
     }
 
     /// serializes name portion of xorurl using a particular base encoding.
@@ -960,90 +993,17 @@ impl SafeUrl {
         Self::from_url(&s).map(|_| ())
     }
 
-    /// A non-member encoder function for convenience in some cases
-    #[allow(clippy::too_many_arguments)]
-    pub fn encode(
-        address: DataAddress,
-        nrs_name: Option<&str>,
-        type_tag: u64,
-        content_type: ContentType,
-        path: Option<&str>,
-        sub_names: Option<Vec<String>>,
-        query_string: Option<&str>,
-        fragment: Option<&str>,
-        content_version: Option<VersionHash>,
-        base: XorUrlBase,
-    ) -> Result<String> {
-        let url = SafeUrl::new(
-            address,
-            nrs_name,
-            type_tag,
-            content_type,
-            path,
-            sub_names,
-            query_string,
-            fragment,
-            content_version,
-        )?;
+    /// serializes entire xorurl using a particular base encoding.
+    pub fn encode(&self, base: XorUrlBase) -> String {
+        let name = self.name_to_base(base, true);
 
-        Ok(url.to_base(base))
-    }
+        let query_string = self.query_string_with_separator();
+        let fragment = self.fragment_with_separator();
 
-    /// A non-member SafeKey encoder function for convenience
-    pub fn encode_safekey(xor_name: XorName, base: XorUrlBase) -> Result<String> {
-        SafeUrl::encode(
-            DataAddress::SafeKey(SafeKeyAddress::new(xor_name, Scope::Public)),
-            None,
-            0,
-            ContentType::Raw,
-            None,
-            None,
-            None,
-            None,
-            None,
-            base,
-        )
-    }
-
-    /// A non-member bytes encoder function for convenience
-    pub fn encode_bytes(
-        address: BytesAddress,
-        content_type: ContentType,
-        base: XorUrlBase,
-    ) -> Result<String> {
-        SafeUrl::encode(
-            DataAddress::Bytes(address),
-            None,
-            0,
-            content_type,
-            None,
-            None,
-            None,
-            None,
-            None,
-            base,
-        )
-    }
-
-    /// A non-member Register data URL encoder function for convenience
-    pub fn encode_register(
-        xor_name: XorName,
-        type_tag: u64,
-        scope: Scope,
-        content_type: ContentType,
-        base: XorUrlBase,
-    ) -> Result<String> {
-        SafeUrl::encode(
-            DataAddress::Register(RegisterAddress::new(xor_name, scope, type_tag)),
-            None,
-            type_tag,
-            content_type,
-            None,
-            None,
-            None,
-            None,
-            None,
-            base,
+        // serialize full xorurl
+        format!(
+            "{}{}{}{}{}",
+            URL_PROTOCOL, name, self.path, query_string, fragment
         )
     }
 
@@ -1306,7 +1266,7 @@ mod tests {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let address = DataAddress::bytes(xor_name, Scope::Public);
 
-        let xorurl = SafeUrl::encode(
+        let xorurl = SafeUrl::new(
             address,
             None,
             0xa632_3c4d_4a32,
@@ -1316,8 +1276,8 @@ mod tests {
             None,
             None,
             None,
-            XorUrlBase::Base32,
-        )?;
+        )?
+        .encode(XorUrlBase::Base32);
 
         let base32_xorurl =
             "safe://baeaaaaabgezdgnbvgy3tqojqgezdgnbvgy3tqojqgezdgnbvgy3tqojqgezkmmr4jvfde";
@@ -1328,11 +1288,8 @@ mod tests {
     #[test]
     fn test_url_base32z_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = SafeUrl::encode_bytes(
-            BytesAddress::Public(xor_name),
-            ContentType::Raw,
-            XorUrlBase::Base32z,
-        )?;
+        let xorurl = SafeUrl::from_bytes(BytesAddress::Public(xor_name), ContentType::Raw)?
+            .encode(XorUrlBase::Base32z);
         let base32z_xorurl = "safe://hyryyyyybgr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3y";
         assert_eq!(xorurl, base32z_xorurl);
         Ok(())
@@ -1341,17 +1298,17 @@ mod tests {
     #[test]
     fn test_url_base64_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = SafeUrl::encode_register(
+        let xorurl = SafeUrl::from_register(
             xor_name,
             4_584_545,
             Scope::Public,
             ContentType::FilesContainer,
-            XorUrlBase::Base64,
-        )?;
+        )?
+        .encode(XorUrlBase::Base64);
         let base64_xorurl = "safe://mAQACAAIxMjM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMkX0YQ";
         assert_eq!(xorurl, base64_xorurl);
         let url = SafeUrl::from_url(base64_xorurl)?;
-        assert_eq!(base64_xorurl, url.to_base(XorUrlBase::Base64));
+        assert_eq!(base64_xorurl, url.encode(XorUrlBase::Base64));
         assert_eq!("", url.path());
         assert_eq!(XOR_URL_VERSION_1, url.encoding_version());
         assert_eq!(xor_name, url.xorname());
@@ -1366,11 +1323,8 @@ mod tests {
     fn test_url_default_base_encoding() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let base32z_xorurl = "safe://hyryyyyybgr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3dgpbiga5uoqjogr3y";
-        let xorurl = SafeUrl::encode_bytes(
-            BytesAddress::Public(xor_name),
-            ContentType::Raw,
-            DEFAULT_XORURL_BASE,
-        )?;
+        let xorurl = SafeUrl::from_bytes(BytesAddress::Public(xor_name), ContentType::Raw)?
+            .encode(DEFAULT_XORURL_BASE);
         assert_eq!(xorurl, base32z_xorurl);
         Ok(())
     }
@@ -1386,7 +1340,7 @@ mod tests {
         let query_string_v = format!("{}&v={}", query_string, content_version);
         let fragment = "myfragment";
         let address = DataAddress::bytes(xor_name, Scope::Public);
-        let xorurl = SafeUrl::encode(
+        let xorurl = SafeUrl::new(
             address,
             None,
             type_tag,
@@ -1396,8 +1350,8 @@ mod tests {
             Some(query_string),
             Some(fragment),
             Some(content_version),
-            XorUrlBase::Base32z,
-        )?;
+        )?
+        .encode(XorUrlBase::Base32z);
         let url = SafeUrl::from_url(&xorurl)?;
 
         assert_eq!(subdirs, url.path());
@@ -1417,17 +1371,13 @@ mod tests {
     fn test_url_decoding_with_path() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
         let type_tag: u64 = 0x0eef;
-        let xorurl = SafeUrl::encode_register(
-            xor_name,
-            type_tag,
-            Scope::Public,
-            ContentType::Wallet,
-            XorUrlBase::Base32z,
-        )?;
+        let xorurl =
+            SafeUrl::from_register(xor_name, type_tag, Scope::Public, ContentType::Wallet)?
+                .encode(XorUrlBase::Base32z);
 
         let xorurl_with_path = format!("{}/subfolder/file", xorurl);
         let url_with_path = SafeUrl::from_url(&xorurl_with_path)?;
-        assert_eq!(xorurl_with_path, url_with_path.to_base(XorUrlBase::Base32z));
+        assert_eq!(xorurl_with_path, url_with_path.encode(XorUrlBase::Base32z));
         assert_eq!("/subfolder/file", url_with_path.path());
         assert_eq!(XOR_URL_VERSION_1, url_with_path.encoding_version());
         assert_eq!(xor_name, url_with_path.xorname());
@@ -1444,7 +1394,7 @@ mod tests {
         let type_tag: u64 = 0x0eef;
         let address = DataAddress::bytes(xor_name, Scope::Public);
 
-        let xorurl_with_subname = SafeUrl::encode(
+        let xorurl_with_subname = SafeUrl::new(
             address,
             None,
             type_tag,
@@ -1454,14 +1404,14 @@ mod tests {
             None,
             None,
             None,
-            XorUrlBase::Base32z,
-        )?;
+        )?
+        .encode(XorUrlBase::Base32z);
 
         assert!(xorurl_with_subname.contains("safe://sub."));
         let url_with_subname = SafeUrl::from_url(&xorurl_with_subname)?;
         assert_eq!(
             xorurl_with_subname,
-            url_with_subname.to_base(XorUrlBase::Base32z)
+            url_with_subname.encode(XorUrlBase::Base32z)
         );
         assert_eq!("", url_with_subname.path());
         assert_eq!(1, url_with_subname.encoding_version());
@@ -1478,13 +1428,12 @@ mod tests {
     #[test]
     fn encode_bytes_should_set_media_type() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = SafeUrl::encode_bytes(
+        let xorurl = SafeUrl::from_bytes(
             BytesAddress::Public(xor_name),
             ContentType::MediaType("text/html".to_string()),
-            XorUrlBase::Base32z,
-        )?;
-
-        let url = SafeUrl::from_url(&xorurl)?;
+        )?
+        .encode(XorUrlBase::Base32z);
+        let url = SafeUrl::from_url(xorurl.as_str())?;
         assert_eq!(
             ContentType::MediaType("text/html".to_string()),
             url.content_type()
@@ -1495,11 +1444,11 @@ mod tests {
     #[test]
     fn encode_bytes_should_set_data_type() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = SafeUrl::encode_bytes(
+        let xorurl = SafeUrl::from_bytes(
             BytesAddress::Public(xor_name),
             ContentType::MediaType("text/html".to_string()),
-            XorUrlBase::Base32z,
-        )?;
+        )?
+        .encode(XorUrlBase::Base32z);
 
         let url = SafeUrl::from_url(&xorurl)?;
         assert_eq!(url.data_type(), DataType::File);
@@ -1526,11 +1475,11 @@ mod tests {
     #[test]
     fn test_url_too_short() -> Result<()> {
         let xor_name = XorName(*b"12345678901234567890123456789012");
-        let xorurl = SafeUrl::encode_bytes(
+        let xorurl = SafeUrl::from_bytes(
             BytesAddress::Public(xor_name),
             ContentType::MediaType("text/html".to_string()),
-            XorUrlBase::Base32z,
-        )?;
+        )?
+        .encode(XorUrlBase::Base32z);
 
         // TODO: we need to add checksum to be able to detect even 1 single char change
         let len = xorurl.len() - 2;

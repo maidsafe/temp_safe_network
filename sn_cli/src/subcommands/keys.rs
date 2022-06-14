@@ -42,7 +42,7 @@ pub async fn key_commander(
             match read_credentials(safe, config)? {
                 (file_path, Some(keypair)) => {
                     let xorname = XorName::from(keypair.public_key());
-                    let xorurl = SafeUrl::encode_safekey(xorname, safe.xorurl_base)?;
+                    let xorurl = SafeUrl::from_safekey(xorname)?.encode(safe.xorurl_base);
                     let (pk_hex, sk_hex) = keypair.to_hex()?;
 
                     println!("Current CLI's SafeKey found at {}:", file_path.display());

@@ -614,7 +614,7 @@ mod tests {
         let safe = new_safe_instance().await?;
         let xorname = xor_name::rand::random();
         let type_tag = 575_756_443;
-        let xorurl = SafeUrl::encode(
+        let xorurl = SafeUrl::new(
             DataAddress::register(xorname, Scope::Public, type_tag),
             None,
             type_tag,
@@ -624,8 +624,8 @@ mod tests {
             None,
             None,
             None,
-            XorUrlBase::Base32z,
-        )?;
+        )?
+        .encode(XorUrlBase::Base32z);
 
         match safe.fetch(&xorurl, None).await {
             Ok(c) => {

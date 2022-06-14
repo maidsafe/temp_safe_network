@@ -654,7 +654,7 @@ impl Safe {
             let (address, _) = client.upload_and_verify(bytes, scope).await?;
             address
         };
-        let xorurl = SafeUrl::encode_bytes(address, content_type, self.xorurl_base)?;
+        let xorurl = SafeUrl::from_bytes(address, content_type)?.encode(self.xorurl_base);
 
         Ok(xorurl)
     }

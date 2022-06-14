@@ -43,8 +43,7 @@ impl Safe {
     pub fn new_keypair_with_pk_url(&self) -> Result<(Keypair, SafeUrl)> {
         let keypair = Keypair::new_bls();
         let xorname = XorName::from(keypair.public_key());
-        let url = SafeUrl::encode_safekey(xorname, self.xorurl_base)?;
-        let url = SafeUrl::from_url(&url)?;
+        let url = SafeUrl::from_safekey(xorname)?;
         Ok((keypair, url))
     }
 
@@ -97,8 +96,7 @@ mod tests {
         // This may seem a silly check, but it would be possible for that returned URL to point to
         // anything.
         let xorname = XorName::from(keypair.public_key());
-        let url2 = SafeUrl::encode_safekey(xorname, safe.xorurl_base)?;
-        let url2 = SafeUrl::from_url(&url2)?;
+        let url2 = SafeUrl::from_safekey(xorname)?;
         assert_eq!(url, url2);
 
         match keypair {
