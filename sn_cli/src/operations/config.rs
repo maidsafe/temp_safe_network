@@ -12,12 +12,8 @@ use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Help, Report, Result};
 use comfy_table::Table;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
-use sn_api::{NetworkPrefixMap, Safe, DEFAULT_PREFIX_SYMLINK_NAME};
+use sn_api::{NetworkPrefixMap, Safe, DEFAULT_PREFIX_HARDLINK_NAME};
 use sn_dbc::Owner;
-#[cfg(unix)]
-use std::os::unix::fs::symlink;
-#[cfg(windows)]
-use std::os::windows::fs::symlink_file;
 use std::{
     collections::BTreeMap,
     default::Default,
@@ -213,7 +209,9 @@ impl Config {
                     .file_name()
                     .into_string()
                     .map_err(|_| eyre!("Error converting OsString to String"))?;
-                dir_files_checklist.insert(filename, false);
+                if filename != *DEFAULT_PREFIX_HARDLINK_NAME {
+                    dir_files_checklist.insert(filename, false);
+                }
             }
         }
 
@@ -335,14 +333,11 @@ impl Config {
     }
 
     pub async fn read_default_prefix_map(&self) -> Result<NetworkPrefixMap> {
-        let default_path = self.prefix_maps_dir.join(DEFAULT_PREFIX_SYMLINK_NAME);
-        if !default_path.is_symlink() {
-            return Err(eyre!("The file {:?} should be a symlink", &default_path));
-        }
+        let default_path = self.prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME);
         let prefix_map = retrieve_local_prefix_map(&default_path)
             .await
             .wrap_err_with(|| {
-                eyre!("There doesn't seem to be any default NetworkPrefixMap symlink").suggestion(
+                eyre!("There doesn't seem to be any default NetworkPrefixMap").suggestion(
                     "A NetworkPrefixMap will be created if you join a network or launch your own.",
                 )
             })?;
@@ -484,16 +479,16 @@ impl Config {
 
     pub async fn switch_to_network(&self, name: &str) -> Result<()> {
         match self.settings.networks.get(name) {
-            Some(NetworkInfo::GenesisKey(genesis_key)) => self.update_prefix_map_symlink(format!("{:?}", genesis_key)).await?,
+            Some(NetworkInfo::GenesisKey(genesis_key)) => self.set_default_prefix_map(format!("{:?}", genesis_key)).await?,
             Some(NetworkInfo::Local(_, genesis_key)) => {
                 if let Some(gk) = genesis_key {
-                    self.update_prefix_map_symlink(format!("{:?}", gk)).await?;
+                    self.set_default_prefix_map(format!("{:?}", gk)).await?;
                 }
                 // if None, then the file is not present, since we sync during config init
             }
             Some(NetworkInfo::Remote(_, genesis_key)) => {
                 if let Some(gk) = genesis_key {
-                    self.update_prefix_map_symlink(format!("{:?}", gk)).await?;
+                    self.set_default_prefix_map(format!("{:?}", gk)).await?;
                 }
             }
             None => bail!("No network with name '{}' was found in the config. Please use the networks 'add'/'set' subcommand to add it", name)
@@ -551,39 +546,32 @@ impl Config {
         Ok(())
     }
 
-    pub async fn update_prefix_map_symlink(&self, genesis_key: String) -> Result<()> {
+    pub async fn set_default_prefix_map(&self, genesis_key: String) -> Result<()> {
         let prefix_map_file = self.prefix_maps_dir.join(genesis_key);
-        let default_prefix = self.prefix_maps_dir.join(DEFAULT_PREFIX_SYMLINK_NAME);
+        let default_prefix = self.prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME);
 
-        if fs::read_link(&default_prefix).await.is_ok() {
+        if default_prefix.exists() {
             fs::remove_file(&default_prefix).await.wrap_err_with(|| {
                 format!(
-                    "Error removing previous PrefixMap symlink: {:?}",
+                    "Error removing default PrefixMap hardlink: {:?}",
                     default_prefix.display()
                 )
             })?;
         }
         debug!(
-            "Creating symlink for PrefixMap from {:?} to {:?}",
+            "Creating hardlink for PrefixMap from {:?} to {:?}",
             prefix_map_file.display(),
             default_prefix.display()
         );
-        #[cfg(unix)]
-        symlink(&prefix_map_file, &default_prefix).wrap_err_with(|| {
-            format!(
-                "Error creating PrefixMap symlink from {:?} to {:?}",
-                prefix_map_file.display(),
-                default_prefix.display()
-            )
-        })?;
-        #[cfg(windows)]
-        symlink_file(&prefix_map_file, &default_prefix).wrap_err_with(|| {
-            format!(
-                "Error creating PrefixMap symlink from {:?} to {:?}",
-                prefix_map_file.display(),
-                default_prefix.display()
-            )
-        })?;
+        fs::hard_link(&prefix_map_file, &default_prefix)
+            .await
+            .wrap_err_with(|| {
+                format!(
+                    "Error creating hardlink from {:?} to {:?}",
+                    prefix_map_file.display(),
+                    default_prefix.display()
+                )
+            })?;
         Ok(())
     }
 }
@@ -597,7 +585,7 @@ pub async fn write_prefix_map(path: &PathBuf, prefix_map: &NetworkPrefixMap) -> 
     Ok(())
 }
 
-async fn retrieve_local_prefix_map(location: &PathBuf) -> Result<NetworkPrefixMap> {
+pub async fn retrieve_local_prefix_map(location: &PathBuf) -> Result<NetworkPrefixMap> {
     let bytes = fs::read(location).await.wrap_err_with(|| {
         format!(
             "Unable to read connection information from '{:?}'",
@@ -651,7 +639,7 @@ pub mod test_utils {
     use super::{Config, NetworkInfo};
     use assert_fs::{prelude::*, TempDir};
     use color_eyre::{eyre::eyre, Result};
-    use sn_api::SN_PREFIX_MAP_DIR;
+    use sn_api::{DEFAULT_PREFIX_HARDLINK_NAME, SN_PREFIX_MAP_DIR};
     use std::collections::BTreeMap;
     use std::{env, path::PathBuf};
     use tokio::fs;
@@ -696,7 +684,7 @@ pub mod test_utils {
                             .into_string()
                             .map_err(|_| eyre!("Error converting OsString to String"))?;
                         fs::copy(entry.path(), self.prefix_maps_dir.join(&filename)).await?;
-                        self.update_prefix_map_symlink(filename.clone()).await?;
+                        self.set_default_prefix_map(filename.clone()).await?;
                         filenames.push(filename);
                     }
                 } else {
@@ -777,12 +765,14 @@ pub mod test_utils {
                         .file_name()
                         .into_string()
                         .map_err(|_| eyre!("Error converting OsString to String"))?;
-                    let already_present = checklist.insert(filename, marking);
-                    // cannot insert new entries, can only update entries when marking=true
-                    if marking && already_present.is_none() {
-                        return Err(eyre!(
+                    if filename != *DEFAULT_PREFIX_HARDLINK_NAME {
+                        let already_present = checklist.insert(filename, marking);
+                        // cannot insert new entries, can only update entries when marking=true
+                        if marking && already_present.is_none() {
+                            return Err(eyre!(
                             "Trying to insert new entry when we are just making entries to be true"
                         ));
+                        }
                     }
                 }
             }
@@ -957,11 +947,11 @@ mod constructor {
 mod read_prefix_map {
     use super::Config;
     use color_eyre::{eyre::eyre, Result};
-    use sn_api::DEFAULT_PREFIX_SYMLINK_NAME;
+    use sn_api::DEFAULT_PREFIX_HARDLINK_NAME;
     use tokio::fs;
 
     #[tokio::test]
-    async fn given_prefix_map_symlink_it_should_be_read() -> Result<()> {
+    async fn given_default_prefix_map_it_should_be_read() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let config = Config::create_config(&tmp_dir).await?;
         let mut file_name = config.store_dummy_prefix_maps(1).await?;
@@ -979,14 +969,14 @@ mod read_prefix_map {
     }
 
     #[tokio::test]
-    async fn given_no_prefix_map_symlink_it_should_be_an_error() -> Result<()> {
+    async fn given_no_default_prefix_map_hardlink_it_should_be_an_error() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let config = Config::create_config(&tmp_dir).await?;
         let _ = config.store_dummy_prefix_maps(1).await?;
-        fs::remove_file(&config.prefix_maps_dir.join(DEFAULT_PREFIX_SYMLINK_NAME)).await?;
+        fs::remove_file(&config.prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME)).await?;
 
         let retrieved_prefix_map = config.read_default_prefix_map().await;
-        assert!(retrieved_prefix_map.is_err(), "Symlink should not exist");
+        assert!(retrieved_prefix_map.is_err(), "Hardlink should not exist");
 
         Ok(())
     }
@@ -995,17 +985,8 @@ mod read_prefix_map {
     async fn given_no_prefix_map_file_it_should_be_an_error() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let config = Config::create_config(&tmp_dir).await?;
-        let mut file_name = config.store_dummy_prefix_maps(1).await?;
-        let file_name = file_name
-            .pop()
-            .ok_or_else(|| eyre!("PrefixMap's filename should be present"))?;
-
-        fs::remove_file(&config.prefix_maps_dir.join(file_name)).await?;
         let retrieved_prefix_map = config.read_default_prefix_map().await;
-        assert!(
-            retrieved_prefix_map.is_err(),
-            "PrefixMap pointed by the symlink should not be exist"
-        );
+        assert!(retrieved_prefix_map.is_err(), "PrefixMap should not exist");
 
         Ok(())
     }
