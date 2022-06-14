@@ -50,7 +50,8 @@ impl Safe {
             Scope::Public
         };
 
-        let xorurl = SafeUrl::encode_register(xorname, tag, scope, content_type, self.xorurl_base)?;
+        let xorurl =
+            SafeUrl::from_register(xorname, tag, scope, content_type)?.encode(self.xorurl_base);
 
         // return early if dry_run_mode
         if self.dry_run_mode {
