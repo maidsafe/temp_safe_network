@@ -10,7 +10,6 @@ use criterion::{criterion_group, criterion_main, Criterion, SamplingMode};
 use eyre::Result;
 use sn_client::{utils::test_utils::read_network_conn_info, Client, ClientConfig, Error};
 use sn_interface::types::utils::random_bytes;
-use sn_interface::types::Scope;
 use tokio::runtime::Runtime;
 
 /// This bench requires a network already set up
@@ -19,7 +18,7 @@ async fn upload_and_read_bytes(size: usize) -> Result<(), Error> {
     let bytes = random_bytes(size);
     let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
     let client = Client::new(config, bootstrap_nodes, None, None).await?;
-    let address = client.upload(bytes.clone(), Scope::Public).await?;
+    let address = client.upload(bytes.clone()).await?;
 
     // let's make sure the public chunk is stored
     let received_bytes = client.read_bytes(address).await?;
@@ -34,7 +33,7 @@ async fn upload_only(size: usize) -> Result<(), Error> {
     let bytes = random_bytes(size);
     let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
     let client = Client::new(config, bootstrap_nodes, None, None).await?;
-    let _ = client.upload(bytes.clone(), Scope::Public).await?;
+    let _ = client.upload(bytes.clone()).await?;
 
     Ok(())
 }

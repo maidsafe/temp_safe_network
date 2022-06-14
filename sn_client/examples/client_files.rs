@@ -8,7 +8,7 @@
 
 use eyre::Result;
 use sn_client::{utils::test_utils::read_network_conn_info, Client, ClientConfig};
-use sn_interface::types::{utils::random_bytes, Scope};
+use sn_interface::types::utils::random_bytes;
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -33,7 +33,7 @@ async fn main() -> Result<()> {
     let bytes = random_bytes(self_encryption::MIN_ENCRYPTABLE_BYTES);
     println!("Storing {} bytes..", bytes.len());
 
-    let address = client.upload(bytes, Scope::Public).await?;
+    let address = client.upload(bytes).await?;
     println!("Bytes stored at address: {:?}", address);
 
     let delay = 5;

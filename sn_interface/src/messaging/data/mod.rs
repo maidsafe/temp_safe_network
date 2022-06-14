@@ -24,8 +24,8 @@ pub use self::{
     errors::{Error, Result},
     query::DataQuery,
     register::{
-        CreateRegister, DeleteRegister, EditRegister, ExtendRegister, RegisterCmd, RegisterQuery,
-        SignedRegisterCreate, SignedRegisterDelete, SignedRegisterEdit, SignedRegisterExtend,
+        CreateRegister, EditRegister, ExtendRegister, RegisterCmd, RegisterQuery,
+        SignedRegisterCreate, SignedRegisterEdit, SignedRegisterExtend,
     },
     spentbook::{SpentbookCmd, SpentbookQuery},
 };
@@ -269,7 +269,7 @@ impl QueryResponse {
                 Ok(chunk) => chunk_operation_id(chunk.address()),
                 Err(ErrorMsg::ChunkNotFound(name)) => chunk_operation_id(&ChunkAddress(*name)),
                 Err(ErrorMsg::DataNotFound(DataAddress::Bytes(address))) => {
-                    chunk_operation_id(&ChunkAddress(*address.name()))
+                    chunk_operation_id(&ChunkAddress(*address))
                 }
                 Err(ErrorMsg::DataNotFound(another_address)) => {
                     error!(

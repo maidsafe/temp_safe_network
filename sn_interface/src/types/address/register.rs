@@ -7,50 +7,28 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::super::{Result, XorName};
-use super::{DataAddress, Scope};
+use super::DataAddress;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
 /// Address of a Register, different from
 /// a ChunkAddress in that it also includes a tag.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
-pub enum RegisterAddress {
-    /// Public namespace.
-    Public {
-        /// Name.
-        name: XorName,
-        /// Tag.
-        tag: u64,
-    },
-    /// Private namespace.
-    Private {
-        /// Name.
-        name: XorName,
-        /// Tag.
-        tag: u64,
-    },
+pub struct RegisterAddress {
+    /// Name.
+    pub name: XorName,
+    /// Tag.
+    pub tag: u64,
 }
 
 impl RegisterAddress {
-    /// Constructs a new `RegisterAddress` given `name`, `scope`, and `tag`.
-    pub fn new(name: XorName, scope: Scope, tag: u64) -> Self {
-        match scope {
-            Scope::Public => Self::Public { name, tag },
-            Scope::Private => Self::Private { name, tag },
-        }
-    }
-
-    /// Returns the scope.
-    pub fn scope(&self) -> Scope {
-        match self {
-            Self::Public { .. } => Scope::Public,
-            Self::Private { .. } => Scope::Private,
-        }
+    /// Constructs a new `RegisterAddress` given `name` and `tag`.
+    pub fn new(name: XorName, tag: u64) -> Self {
+        Self { name, tag }
     }
 
     /// This is a unique identifier of the Register,
-    /// since it also encodes the Public | Private scope,
-    /// as well as the tag of the Address.
+    /// since it also encodes the tag of the Address.
     pub fn id(&self) -> Result<XorName> {
         Ok(XorName::from_content(self.encode_to_zbase32()?.as_bytes()))
     }
@@ -58,26 +36,12 @@ impl RegisterAddress {
     /// Returns the name.
     /// This is not a unique identifier.
     pub fn name(&self) -> &XorName {
-        match self {
-            Self::Public { ref name, .. } | Self::Private { ref name, .. } => name,
-        }
+        &self.name
     }
 
     /// Returns the tag.
     pub fn tag(&self) -> u64 {
-        match self {
-            Self::Public { tag, .. } | Self::Private { tag, .. } => *tag,
-        }
-    }
-
-    /// Returns true if public.
-    pub fn is_public(&self) -> bool {
-        matches!(self.scope(), Scope::Public)
-    }
-
-    /// Returns true if private.
-    pub fn is_private(&self) -> bool {
-        !self.is_public()
+        self.tag
     }
 
     /// Returns the Address serialised and encoded in z-base-32.

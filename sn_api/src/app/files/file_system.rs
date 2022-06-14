@@ -28,15 +28,14 @@ pub(crate) async fn upload_file_to_net(safe: &Safe, path: &Path) -> Result<XorUr
 
     let mut mime_type_for_xorurl = mime_guess::from_path(&path).first_raw();
     let result = match safe
-        .store_public_bytes(data.to_owned(), mime_type_for_xorurl)
+        .store_bytes(data.to_owned(), mime_type_for_xorurl)
         .await
     {
         Ok(xorurl) => Ok(xorurl),
         Err(Error::InvalidMediaType(_)) => {
             // Let's then upload it and set media-type to be simply raw content
             mime_type_for_xorurl = None;
-            safe.store_public_bytes(data.clone(), mime_type_for_xorurl)
-                .await
+            safe.store_bytes(data.clone(), mime_type_for_xorurl).await
         }
         other_err => other_err,
     };
@@ -47,9 +46,7 @@ pub(crate) async fn upload_file_to_net(safe: &Safe, path: &Path) -> Result<XorUr
         // Let's obtain the xorurl with using dry-run mode.
         // Use a dry runner only for this next operation
         let dry_runner = Safe::dry_runner(Some(safe.xorurl_base));
-        let xorurl = dry_runner
-            .store_public_bytes(data, mime_type_for_xorurl)
-            .await?;
+        let xorurl = dry_runner.store_bytes(data, mime_type_for_xorurl).await?;
 
         Err(Error::ContentUploadVerificationFailed(xorurl))
     } else {

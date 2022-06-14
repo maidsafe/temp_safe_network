@@ -146,9 +146,7 @@ fn calling_safe_dog_with_wallet_xorurl() -> Result<()> {
             "XOR-URL: {}",
             wallet_xorurl
         )))
-        .stdout(predicate::str::contains(
-            "Native data type: Private Register",
-        ));
+        .stdout(predicate::str::contains("Native data type: Register"));
 
     Ok(())
 }

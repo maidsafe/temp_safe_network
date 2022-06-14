@@ -26,14 +26,9 @@ const MULTIMAP_REMOVED_MARK: &[u8] = b"";
 
 impl Safe {
     /// Create a Multimap on the network
-    pub async fn multimap_create(
-        &self,
-        name: Option<XorName>,
-        type_tag: u64,
-        private: bool,
-    ) -> Result<XorUrl> {
+    pub async fn multimap_create(&self, name: Option<XorName>, type_tag: u64) -> Result<XorUrl> {
         debug!("Creating a Multimap");
-        self.register_create(name, type_tag, private, ContentType::Multimap)
+        self.register_create(name, type_tag, ContentType::Multimap)
             .await
     }
 
@@ -233,7 +228,7 @@ impl Safe {
 
 #[cfg(test)]
 mod tests {
-    use crate::{app::test_helpers::new_safe_instance, retry_loop, retry_loop_for_pattern};
+    use crate::{app::test_helpers::new_safe_instance, retry_loop_for_pattern};
     use anyhow::Result;
     use std::collections::BTreeSet;
 
@@ -241,15 +236,12 @@ mod tests {
     async fn test_multimap_create() -> Result<()> {
         let safe = new_safe_instance().await?;
 
-        let xorurl = safe.multimap_create(None, 25_000, false).await?;
-        let xorurl_priv = safe.multimap_create(None, 25_000, true).await?;
+        let xorurl = safe.multimap_create(None, 25_000).await?;
 
         let key = b"".to_vec();
         let received_data = safe.multimap_get_by_key(&xorurl, &key).await?;
-        let received_data_priv = safe.multimap_get_by_key(&xorurl_priv, &key).await?;
 
         assert_eq!(received_data, Default::default());
-        assert_eq!(received_data_priv, Default::default());
 
         Ok(())
     }
@@ -264,29 +256,19 @@ mod tests {
         let val2 = b"value2".to_vec();
         let key_val2 = (key.clone(), val2.clone());
 
-        let xorurl = safe.multimap_create(None, 25_000, false).await?;
-        let xorurl_priv = safe.multimap_create(None, 25_000, true).await?;
+        let xorurl = safe.multimap_create(None, 25_000).await?;
 
         let _ = safe.multimap_get_by_key(&xorurl, &key).await?;
-        let _ = safe.multimap_get_by_key(&xorurl_priv, &key).await?;
 
         let hash = safe
             .multimap_insert(&xorurl, key_val.clone(), BTreeSet::new())
             .await?;
-        let hash_priv = safe
-            .multimap_insert(&xorurl_priv, key_val.clone(), BTreeSet::new())
-            .await?;
 
         let received_data = retry_loop_for_pattern!(safe.multimap_get_by_key(&xorurl, &key), Ok(v) if !v.is_empty())?;
-        let received_data_priv = retry_loop_for_pattern!(safe.multimap_get_by_key(&xorurl_priv, &key), Ok(v) if !v.is_empty())?;
 
         assert_eq!(
             received_data,
             vec![(hash, key_val.clone())].into_iter().collect()
-        );
-        assert_eq!(
-            received_data_priv,
-            vec![(hash_priv, key_val.clone())].into_iter().collect()
         );
 
         // Let's now test an insert which replace the previous value for a key
@@ -294,23 +276,13 @@ mod tests {
         let hash2 = safe
             .multimap_insert(&xorurl, key_val2.clone(), hashes_to_replace)
             .await?;
-        let hashes_priv_to_replace = vec![hash_priv].into_iter().collect();
-        let hash_priv2 = safe
-            .multimap_insert(&xorurl_priv, key_val2.clone(), hashes_priv_to_replace)
-            .await?;
 
         let received_data = retry_loop_for_pattern!(safe.multimap_get_by_key(&xorurl, &key),
                                                     Ok(v) if v.iter().all(|(_, kv)| *kv != key_val))?;
-        let received_data_priv = retry_loop_for_pattern!(safe.multimap_get_by_key(&xorurl_priv, &key),
-                                                         Ok(v) if v.iter().all(|(_, kv)| *kv != key_val))?;
 
         assert_eq!(
             received_data,
             vec![(hash2, key_val2.clone())].into_iter().collect()
-        );
-        assert_eq!(
-            received_data_priv,
-            vec![(hash_priv2, key_val2.clone())].into_iter().collect()
         );
 
         Ok(())
@@ -326,11 +298,9 @@ mod tests {
         let val2 = b"value2".to_vec();
         let key_val2 = (key2.clone(), val2.clone());
 
-        let xorurl = safe.multimap_create(None, 25_000, false).await?;
-        let xorurl_priv = safe.multimap_create(None, 25_000, true).await?;
+        let xorurl = safe.multimap_create(None, 25_000).await?;
 
         let _ = safe.multimap_get_by_key(&xorurl, &key).await?;
-        let _ = safe.multimap_get_by_key(&xorurl_priv, &key).await?;
 
         let hash = safe
             .multimap_insert(&xorurl, key_val.clone(), BTreeSet::new())
@@ -339,82 +309,13 @@ mod tests {
             .multimap_insert(&xorurl, key_val2.clone(), BTreeSet::new())
             .await?;
 
-        let hash_priv = safe
-            .multimap_insert(&xorurl_priv, key_val.clone(), BTreeSet::new())
-            .await?;
-        let hash_priv2 = safe
-            .multimap_insert(&xorurl_priv, key_val2.clone(), BTreeSet::new())
-            .await?;
-
         let received_data = safe.multimap_get_by_hash(&xorurl, hash).await?;
-        let received_data_priv = safe.multimap_get_by_hash(&xorurl_priv, hash_priv).await?;
 
         assert_eq!(received_data, key_val.clone());
-        assert_eq!(received_data_priv, key_val);
 
         let received_data = safe.multimap_get_by_hash(&xorurl, hash2).await?;
-        let received_data_priv = safe.multimap_get_by_hash(&xorurl_priv, hash_priv2).await?;
 
         assert_eq!(received_data, key_val2.clone());
-        assert_eq!(received_data_priv, key_val2);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_multimap_remove() -> Result<()> {
-        let safe = new_safe_instance().await?;
-        let key = b"key".to_vec();
-        let val = b"value".to_vec();
-        let key_val = (key.clone(), val.clone());
-
-        let xorurl = safe.multimap_create(None, 25_000, false).await?;
-        let xorurl_priv = safe.multimap_create(None, 25_000, true).await?;
-
-        let _ = retry_loop!(safe.multimap_get_by_key(&xorurl, &key));
-        let _ = retry_loop!(safe.multimap_get_by_key(&xorurl_priv, &key));
-
-        let hash = safe
-            .multimap_insert(&xorurl, key_val.clone(), BTreeSet::new())
-            .await?;
-        let hash_priv = safe
-            .multimap_insert(&xorurl_priv, key_val, BTreeSet::new())
-            .await?;
-
-        let received_data = retry_loop_for_pattern!(safe.multimap_get_by_key(&xorurl, &key), Ok(v) if !v.is_empty())?;
-        let received_data_priv = retry_loop_for_pattern!(safe.multimap_get_by_key(&xorurl_priv, &key), Ok(v) if !v.is_empty())?;
-
-        assert_eq!(received_data.len(), 1);
-        let (read_hash, read_key_val) = received_data.into_iter().next().unwrap();
-        assert_eq!(
-            (read_hash, read_key_val),
-            (hash, (key.clone(), val.clone()))
-        );
-
-        let hashes_to_remove = vec![hash].into_iter().collect();
-        let removed_mark_hash = safe.multimap_remove(&xorurl, hashes_to_remove).await?;
-        assert_ne!(removed_mark_hash, hash);
-
-        assert_eq!(
-            retry_loop_for_pattern!(safe.multimap_get_by_key(&xorurl, &key),
-                                    Ok(entries) if entries.is_empty())?,
-            Default::default()
-        );
-
-        assert_eq!(received_data_priv.len(), 1);
-        let (read_hash, read_key_val) = received_data_priv.into_iter().next().unwrap();
-        assert_eq!((read_hash, read_key_val), (hash_priv, (key.clone(), val)));
-
-        let hashes_to_remove = vec![hash_priv].into_iter().collect();
-        let removed_mark_hash = safe.multimap_remove(&xorurl_priv, hashes_to_remove).await?;
-        assert_ne!(removed_mark_hash, hash_priv);
-
-        assert_eq!(
-            retry_loop_for_pattern!(
-                safe.multimap_get_by_key(&xorurl_priv, &key),
-                Ok(entries) if entries.is_empty())?,
-            Default::default()
-        );
 
         Ok(())
     }

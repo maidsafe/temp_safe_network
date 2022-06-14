@@ -28,10 +28,7 @@ pub type WalletSpendableDbcs = BTreeMap<String, (Dbc, EntryHash)>;
 impl Safe {
     /// Create an empty wallet and return its XOR-URL.
     pub async fn wallet_create(&self) -> Result<XorUrl> {
-        // A Wallet is stored on a Private Register
-        let xorurl = self
-            .multimap_create(None, WALLET_TYPE_TAG, /*private = */ true)
-            .await?;
+        let xorurl = self.multimap_create(None, WALLET_TYPE_TAG).await?;
 
         let mut safeurl = SafeUrl::from_url(&xorurl)?;
         safeurl.set_content_type(ContentType::Wallet)?;
@@ -283,7 +280,7 @@ impl Safe {
             ))
         })?);
 
-        let dbc_xorurl = self.store_private_bytes(dbc_bytes, None).await?;
+        let dbc_xorurl = self.store_bytes(dbc_bytes, None).await?;
 
         let entry = (spendable_name.into_bytes(), dbc_xorurl.into_bytes());
         let _entry_hash = self
@@ -365,8 +362,11 @@ impl Safe {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::test_helpers::{
-        new_read_only_safe_instance, new_safe_instance, new_safe_instance_with_dbc_owner,
+    use crate::{
+        app::test_helpers::{
+            new_read_only_safe_instance, new_safe_instance, new_safe_instance_with_dbc_owner,
+        },
+        retry_loop,
     };
     use anyhow::{anyhow, Result};
     use sn_dbc::Owner;
@@ -497,6 +497,8 @@ mod tests {
         Ok(())
     }
 
+    /// Ignoring until we implement encryption support again.
+    #[ignore]
     #[tokio::test]
     async fn test_wallet_get_not_owned_wallet() -> Result<()> {
         let safe = new_safe_instance().await?;
@@ -532,9 +534,7 @@ mod tests {
 
         // We insert an entry (to its underlying data type, i.e. the Multimap) which is
         // not a valid serialised DBC, thus making part of its content incompatible/corrupted.
-        let corrupted_dbc_xorurl = safe
-            .store_private_bytes(Bytes::from_static(b"bla"), None)
-            .await?;
+        let corrupted_dbc_xorurl = safe.store_bytes(Bytes::from_static(b"bla"), None).await?;
         let entry = (b"corrupted-dbc".to_vec(), corrupted_dbc_xorurl.into_bytes());
         safe.multimap_insert(&wallet_xorurl, entry, BTreeSet::default())
             .await?;
@@ -716,9 +716,7 @@ mod tests {
 
         // We insert an entry (to its underlying data type, i.e. the Multimap) which is
         // not a valid serialised DBC, thus making part of its content incompatible/corrupted.
-        let corrupted_dbc_xorurl = safe
-            .store_private_bytes(Bytes::from_static(b"bla"), None)
-            .await?;
+        let corrupted_dbc_xorurl = safe.store_bytes(Bytes::from_static(b"bla"), None).await?;
         let entry = (b"corrupted-dbc".to_vec(), corrupted_dbc_xorurl.into_bytes());
         safe.multimap_insert(&wallet_xorurl, entry, BTreeSet::default())
             .await?;
@@ -742,7 +740,7 @@ mod tests {
 
         // Now check thaat after reissuing with the total balance,
         // there is no change deposited in the Wallet, i.e. Wallet is empty with 0 balance
-        let _ = safe.wallet_reissue(&wallet_xorurl, "12.23", None).await?;
+        let _ = retry_loop!(safe.wallet_reissue(&wallet_xorurl, "12.23", None));
 
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
         assert_eq!(current_balance, Token::zero());
@@ -763,7 +761,7 @@ mod tests {
         safe.wallet_deposit(&wallet1_xorurl, Some("deposited-dbc"), &dbc)
             .await?;
 
-        let output_dbc = safe.wallet_reissue(&wallet1_xorurl, "0.25", None).await?;
+        let output_dbc = retry_loop!(safe.wallet_reissue(&wallet1_xorurl, "0.25", None));
 
         safe.wallet_deposit(&wallet2_xorurl, Some("reissued-dbc"), &output_dbc)
             .await?;

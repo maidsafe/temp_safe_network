@@ -120,9 +120,7 @@ pub async fn cat_commander(cmd: CatCommands, output_fmt: OutputFmt, safe: &Safe)
                 println!("Type of content not supported yet by 'cat' command.");
             }
         }
-        SafeData::PrivateRegister { .. }
-        | SafeData::NrsEntry { .. }
-        | SafeData::PublicRegister { .. } => {
+        SafeData::NrsEntry { .. } | SafeData::Register { .. } => {
             println!("Type of content not supported yet by 'cat' command.");
         }
     }

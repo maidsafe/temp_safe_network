@@ -70,14 +70,7 @@ pub enum SafeData {
         data: Multimap,
         resolved_from: String,
     },
-    PublicRegister {
-        xorurl: String,
-        xorname: XorName,
-        type_tag: u64,
-        data: BTreeSet<(EntryHash, Entry)>,
-        resolved_from: String,
-    },
-    PrivateRegister {
+    Register {
         xorurl: String,
         xorname: XorName,
         type_tag: u64,
@@ -96,8 +89,7 @@ impl SafeData {
             | NrsMapContainer { xorurl, .. }
             | NrsEntry { xorurl, .. }
             | Multimap { xorurl, .. }
-            | PublicRegister { xorurl, .. }
-            | PrivateRegister { xorurl, .. } => xorurl.clone(),
+            | Register { xorurl, .. } => xorurl.clone(),
         }
     }
 
@@ -109,8 +101,7 @@ impl SafeData {
             | PublicFile { resolved_from, .. }
             | NrsEntry { resolved_from, .. }
             | Multimap { resolved_from, .. }
-            | PublicRegister { resolved_from, .. }
-            | PrivateRegister { resolved_from, .. } => Some(resolved_from.clone()),
+            | Register { resolved_from, .. } => Some(resolved_from.clone()),
             NrsMapContainer { .. } => None,
         }
     }
@@ -122,8 +113,7 @@ impl SafeData {
             | Multimap { .. }
             | NrsMapContainer { .. }
             | PublicFile { .. }
-            | PublicRegister { .. }
-            | PrivateRegister { .. } => None,
+            | Register { .. } => None,
             FilesContainer { resolves_into, .. } => resolves_into.clone(),
             NrsEntry { resolves_into, .. } => Some(resolves_into.clone()),
         }
@@ -134,8 +124,7 @@ impl SafeData {
         match self {
             SafeKey { .. }
             | Multimap { .. }
-            | PublicRegister { .. }
-            | PrivateRegister { .. }
+            | Register { .. }
             | NrsMapContainer { .. }
             | NrsEntry { .. } => None,
             FilesContainer { metadata, .. } | PublicFile { metadata, .. } => metadata.clone(),

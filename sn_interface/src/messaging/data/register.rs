@@ -86,8 +86,6 @@ pub enum RegisterCmd {
     },
     /// Edit the [`Register`].
     Edit(SignedRegisterEdit),
-    /// Delete the [`Register`].
-    Delete(SignedRegisterDelete),
     /// Extend the size of the [`Register`].
     Extend {
         /// The user signed op.
@@ -141,21 +139,10 @@ impl CreateRegister {
         use CreateRegister::*;
         match self {
             Populated(reg) => *reg.address(),
-            Empty {
-                policy, name, tag, ..
-            } => {
-                if let Policy::Public { .. } = policy {
-                    RegisterAddress::Public {
-                        name: *name,
-                        tag: *tag,
-                    }
-                } else {
-                    RegisterAddress::Private {
-                        name: *name,
-                        tag: *tag,
-                    }
-                }
-            }
+            Empty { name, tag, .. } => RegisterAddress {
+                name: *name,
+                tag: *tag,
+            },
         }
     }
 }
@@ -168,10 +155,6 @@ pub struct ExtendRegister {
     /// The size to extend the [`Register`] with.
     pub extend_with: u16,
 }
-
-///
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct DeleteRegister(pub RegisterAddress);
 
 ///
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
@@ -215,20 +198,6 @@ pub struct SignedRegisterEdit {
     pub auth: crate::messaging::ServiceAuth,
 }
 
-/// A [`Register`] write operation.
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
-pub struct SignedRegisterDelete {
-    /// Delete a private [`Register`].
-    ///
-    /// This operation will result in an error if applied to a public register. Only private
-    /// registers can be deleted, and only by their current owner(s).
-    pub op: DeleteRegister,
-    /// A signature carrying authority to perform the operation.
-    ///
-    /// This will be verified against the register's owner and permissions.
-    pub auth: crate::messaging::ServiceAuth,
-}
-
 impl SignedRegisterCreate {
     /// Returns the dst address of the register.
     pub fn dst_address(&self) -> RegisterAddress {
@@ -240,13 +209,6 @@ impl SignedRegisterEdit {
     /// Returns the dst address of the register.
     pub fn dst_address(&self) -> &RegisterAddress {
         &self.op.address
-    }
-}
-
-impl SignedRegisterDelete {
-    /// Returns the dst address of the register.
-    pub fn dst_address(&self) -> &RegisterAddress {
-        &self.op.0
     }
 }
 
@@ -351,7 +313,6 @@ impl RegisterCmd {
         match self {
             Self::Create { cmd, .. } => cmd.dst_address(),
             Self::Edit(cmd) => *cmd.dst_address(),
-            Self::Delete(cmd) => *cmd.dst_address(),
             Self::Extend { cmd, .. } => *cmd.dst_address(),
         }
     }

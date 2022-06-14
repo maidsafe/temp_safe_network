@@ -6,17 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod bytes;
 mod register;
-mod safe_key;
 mod spentbook;
 
 #[allow(unreachable_pub)]
-pub use self::bytes::BytesAddress;
-#[allow(unreachable_pub)]
 pub use register::RegisterAddress;
-#[allow(unreachable_pub)]
-pub use safe_key::SafeKeyAddress;
 #[allow(unreachable_pub)]
 pub use spentbook::SpentbookAddress;
 
@@ -24,22 +18,13 @@ use super::{utils, Result};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
-/// We also encode the data scope - i.e. accessibility on the SAFE Network.
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Deserialize, Serialize)]
-pub enum Scope {
-    #[allow(missing_docs)]
-    Public = 0x00,
-    #[allow(missing_docs)]
-    Private = 0x01,
-}
-
 /// An address of data on the network
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub enum DataAddress {
     ///
-    SafeKey(SafeKeyAddress),
+    SafeKey(XorName),
     ///
-    Bytes(BytesAddress),
+    Bytes(XorName),
     ///
     Register(RegisterAddress),
     ///
@@ -50,35 +35,11 @@ impl DataAddress {
     /// The xorname.
     pub fn name(&self) -> &XorName {
         match self {
-            Self::SafeKey(address) => address.name(),
-            Self::Bytes(address) => address.name(),
+            Self::SafeKey(address) => address,
+            Self::Bytes(address) => address,
             Self::Register(address) => address.name(),
             Self::Spentbook(address) => address.name(),
         }
-    }
-
-    /// The address scope
-    pub fn scope(&self) -> Scope {
-        if self.is_public() {
-            Scope::Public
-        } else {
-            Scope::Private
-        }
-    }
-
-    /// Returns true if public.
-    pub fn is_public(self) -> bool {
-        match self {
-            Self::SafeKey(address) => address.is_public(),
-            Self::Bytes(address) => address.is_public(),
-            Self::Register(address) => address.is_public(),
-            Self::Spentbook(_) => true,
-        }
-    }
-
-    /// Returns true if private.
-    pub fn is_private(self) -> bool {
-        !self.is_public()
     }
 
     /// Returns the Address serialised and encoded in z-base-32.
@@ -92,18 +53,18 @@ impl DataAddress {
     }
 
     ///
-    pub fn register(name: XorName, scope: Scope, tag: u64) -> DataAddress {
-        DataAddress::Register(RegisterAddress::new(name, scope, tag))
+    pub fn register(name: XorName, tag: u64) -> DataAddress {
+        DataAddress::Register(RegisterAddress::new(name, tag))
     }
 
     ///
-    pub fn bytes(name: XorName, scope: Scope) -> DataAddress {
-        DataAddress::Bytes(BytesAddress::new(name, scope))
+    pub fn bytes(name: XorName) -> DataAddress {
+        DataAddress::Bytes(name)
     }
 
     ///
-    pub fn safe_key(name: XorName, scope: Scope) -> DataAddress {
-        DataAddress::SafeKey(SafeKeyAddress::new(name, scope))
+    pub fn safe_key(name: XorName) -> DataAddress {
+        DataAddress::SafeKey(name)
     }
 
     ///
@@ -166,12 +127,12 @@ impl ChunkAddress {
 
 #[cfg(test)]
 mod tests {
-    use crate::types::{BytesAddress, DataAddress, Result};
+    use crate::types::{DataAddress, Result};
 
     #[test]
     fn zbase32_encode_decode_chunk_address() -> Result<()> {
         let name = xor_name::rand::random();
-        let address = DataAddress::Bytes(BytesAddress::Public(name));
+        let address = DataAddress::Bytes(name);
         let encoded = address.encode_to_zbase32()?;
         let decoded = DataAddress::decode_from_zbase32(&encoded)?;
         assert_eq!(address, decoded);

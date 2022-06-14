@@ -10,8 +10,8 @@ use super::Client;
 
 use crate::Error;
 use sn_interface::messaging::data::{
-    CreateRegister, DataCmd, DataQuery, DeleteRegister, EditRegister, QueryResponse, RegisterCmd,
-    RegisterQuery, SignedRegisterCreate, SignedRegisterDelete, SignedRegisterEdit,
+    CreateRegister, DataCmd, DataQuery, EditRegister, QueryResponse, RegisterCmd, RegisterQuery,
+    SignedRegisterCreate, SignedRegisterEdit,
 };
 use sn_interface::types::{
     register::{Action, Entry, EntryHash, Permissions, Policy, Register, User},
@@ -59,11 +59,7 @@ impl Client {
         tag: u64,
         policy: Policy,
     ) -> Result<(Address, RegisterWriteAheadLog), Error> {
-        let address = if matches!(policy, Policy::Public(_)) {
-            Address::Public { name, tag }
-        } else {
-            Address::Private { name, tag }
-        };
+        let address = Address { name, tag };
 
         let op = CreateRegister::Empty {
             name,
@@ -89,39 +85,10 @@ impl Client {
         Ok((address, vec![cmd]))
     }
 
-    /// Delete Register
-    ///
-    /// Returns a write ahead log (WAL) of register operations, note that the changes are not uploaded to the
-    /// network until the WAL is published with `publish_register_ops`
-    ///
-    /// You're only able to delete a PrivateRegister. Public data can not be removed from the network.
-    #[instrument(skip(self), level = "debug")]
-    pub async fn delete_register(&self, address: Address) -> Result<RegisterWriteAheadLog, Error> {
-        let op = DeleteRegister(address);
-        let signature = self.keypair.sign(&bincode::serialize(&op)?);
-
-        let update = SignedRegisterDelete {
-            op,
-            auth: sn_interface::messaging::ServiceAuth {
-                public_key: self.keypair.public_key(),
-                signature,
-            },
-        };
-
-        let cmd = DataCmd::Register(RegisterCmd::Delete(update));
-
-        let batch = vec![cmd];
-
-        Ok(batch)
-    }
-
     /// Write to Register
     ///
     /// Returns a write ahead log (WAL) of register operations, note that the changes are not uploaded to the
     /// network until the WAL is published with `publish_register_ops`
-    ///
-    /// Public or private isn't important for writing, though the data you write will
-    /// be Public or Private according to the type of the targeted Register.
     #[instrument(skip(self, children), level = "debug")]
     pub async fn write_to_register(
         &self,
@@ -292,17 +259,13 @@ mod tests {
     use sn_interface::messaging::data::Error as ErrorMsg;
     use sn_interface::types::{
         log_markers::LogMarker,
-        register::{
-            Action, EntryHash, Permissions, Policy, PrivatePolicy, PublicPermissions, PublicPolicy,
-            User,
-        },
+        register::{Action, EntryHash, Permissions, Policy, User},
         Keypair,
     };
     use std::{
         collections::{BTreeMap, BTreeSet},
         time::Instant,
     };
-    use tokio::time::Duration;
     use tracing::Instrument;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -316,15 +279,11 @@ mod tests {
         let tag = 15000;
         let owner = User::Key(client.public_key());
 
-        // create a Private Register
-        let (address, mut batch) = client
-            .create_register(name, tag, private_policy(owner))
-            .await?;
+        // create a Register
+        let (address, mut batch) = client.create_register(name, tag, policy(owner)).await?;
 
-        // create a Public Register
-        let (address2, mut batch2) = client
-            .create_register(name, tag, public_policy(owner))
-            .await?;
+        // create a second Register
+        let (address2, mut batch2) = client.create_register(name, tag, policy(owner)).await?;
 
         // batch them up
         batch.append(&mut batch2);
@@ -334,19 +293,17 @@ mod tests {
         tokio::time::sleep(one_sec).await;
 
         // check they're both there
-        let priv_register = client.get_register(address).await?;
-        assert!(priv_register.is_private());
-        assert_eq!(*priv_register.name(), name);
-        assert_eq!(priv_register.tag(), tag);
-        assert_eq!(priv_register.size(), 0);
-        assert_eq!(priv_register.owner(), owner);
+        let register1 = client.get_register(address).await?;
+        assert_eq!(*register1.name(), name);
+        assert_eq!(register1.tag(), tag);
+        assert_eq!(register1.size(), 0);
+        assert_eq!(register1.owner(), owner);
 
-        let pub_register = client.get_register(address2).await?;
-        assert!(pub_register.is_public());
-        assert_eq!(*pub_register.name(), name);
-        assert_eq!(pub_register.tag(), tag);
-        assert_eq!(pub_register.size(), 0);
-        assert_eq!(pub_register.owner(), owner);
+        let register2 = client.get_register(address2).await?;
+        assert_eq!(*register2.name(), name);
+        assert_eq!(register2.tag(), tag);
+        assert_eq!(register2.size(), 0);
+        assert_eq!(register2.owner(), owner);
 
         Ok(())
     }
@@ -372,10 +329,8 @@ mod tests {
         let tag = 15000;
         let owner = User::Key(client.public_key());
 
-        // store a Private Register
-        let (_address, batch) = client
-            .create_register(name, tag, private_policy(owner))
-            .await?;
+        // store a Register
+        let (_address, batch) = client.create_register(name, tag, policy(owner)).await?;
         client.publish_register_ops(batch).await?;
 
         // small delay to ensure logs have written
@@ -399,9 +354,7 @@ mod tests {
         let tag = 10;
         let owner = User::Key(client.public_key());
 
-        let (address, batch) = client
-            .create_register(name, tag, public_policy(owner))
-            .await?;
+        let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
         client.publish_register_ops(batch).await?;
 
         let mut total = 0;
@@ -437,10 +390,8 @@ mod tests {
         let tag = 15000;
         let owner = User::Key(client.public_key());
 
-        // store a Private Register
-        let (address, batch) = client
-            .create_register(name, tag, private_policy(owner))
-            .await?;
+        // store a Register
+        let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
         client.publish_register_ops(batch).await?;
 
         let delay = tokio::time::Duration::from_secs(1);
@@ -448,22 +399,18 @@ mod tests {
 
         let register = client.get_register(address).await?;
 
-        assert!(register.is_private());
         assert_eq!(*register.name(), name);
         assert_eq!(register.tag(), tag);
         assert_eq!(register.size(), 0);
         assert_eq!(register.owner(), owner);
 
-        // store a Public Register
-        let (address, batch) = client
-            .create_register(name, tag, public_policy(owner))
-            .await?;
+        // store a second Register
+        let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
         client.publish_register_ops(batch).await?;
 
         tokio::time::sleep(delay).await;
         let register = client.get_register(address).await?;
 
-        assert!(register.is_public());
         assert_eq!(*register.name(), name);
         assert_eq!(register.tag(), tag);
         assert_eq!(register.size(), 0);
@@ -473,9 +420,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn register_private_permissions() -> Result<()> {
+    async fn register_permissions() -> Result<()> {
         init_logger();
-        let _outer_span = tracing::info_span!("test__register_private_permissions").entered();
+        let _outer_span = tracing::info_span!("test__register_permissions").entered();
 
         let client = create_test_client().await?;
 
@@ -484,65 +431,7 @@ mod tests {
         let owner = User::Key(client.public_key());
 
         let (address, batch) = client
-            .create_register(name, tag, private_policy(owner))
-            .await?;
-        client.publish_register_ops(batch).await?;
-
-        let delay = tokio::time::Duration::from_secs(1);
-        tokio::time::sleep(delay).await;
-
-        let register = client.get_register(address).await?;
-
-        assert_eq!(register.size(), 0);
-
-        tokio::time::sleep(delay).await;
-        let permissions = client
-            .get_register_permissions_for_user(address, owner)
-            .instrument(tracing::info_span!("first get perms for owner"))
-            .await?;
-
-        match permissions {
-            Permissions::Private(user_perms) => {
-                assert!(user_perms.is_allowed(Action::Read));
-                assert!(user_perms.is_allowed(Action::Write));
-            }
-            Permissions::Public(_) => bail!(
-                "Incorrect user permissions were returned: {:?}",
-                permissions
-            ),
-        }
-
-        let other_user = User::Key(Keypair::new_ed25519().public_key());
-
-        match client
-            .get_register_permissions_for_user(address, other_user)
-            .instrument(tracing::info_span!("get other user perms"))
-            .await
-        {
-            Ok(_) => bail!("Should not be able to retrieve an entry for a random user"),
-            Err(Error::ErrorMsg {
-                source: ErrorMsg::NoSuchEntry,
-                ..
-            }) => Ok(()),
-            Err(err) => Err(eyre!(
-                "Unexpected error returned when retrieving non-existing Register user permission: {:?}", err,
-            )),
-        }
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn register_public_permissions() -> Result<()> {
-        init_logger();
-        let _outer_span = tracing::info_span!("test__register_public_permissions").entered();
-
-        let client = create_test_client().await?;
-
-        let name = xor_name::rand::random();
-        let tag = 15000;
-        let owner = User::Key(client.public_key());
-
-        let (address, batch) = client
-            .create_register(name, tag, public_none_policy(owner)) // trying to set write perms to false for the owner (will not be reflected as long as the user is the owner, as an owner will have full authority)
+            .create_register(name, tag, none_policy(owner)) // trying to set write perms to false for the owner (will not be reflected as long as the user is the owner, as an owner will have full authority)
             .await?;
         client.publish_register_ops(batch).await?;
 
@@ -555,17 +444,8 @@ mod tests {
             .instrument(tracing::info_span!("get owner perms"))
             .await?;
 
-        match permissions {
-            // above the owner perms were set to more restrictive than full, we test below that
-            // write&read perms for the owner will always be true, as an owner will always have full authority (even if perms were explicitly set some other way)
-            Permissions::Public(user_perms) => {
-                assert_eq!(Some(true), user_perms.is_allowed(Action::Read));
-                assert_eq!(Some(true), user_perms.is_allowed(Action::Write));
-            }
-            Permissions::Private(_) => {
-                return Err(eyre!("Unexpectedly obtained incorrect user permissions",));
-            }
-        }
+        assert_eq!(Some(true), permissions.is_allowed(Action::Read));
+        assert_eq!(Some(true), permissions.is_allowed(Action::Write));
 
         let other_user = User::Key(Keypair::new_ed25519().public_key());
 
@@ -596,9 +476,7 @@ mod tests {
         let tag = 10;
         let owner = User::Key(client.public_key());
 
-        let (address, batch) = client
-            .create_register(name, tag, public_policy(owner))
-            .await?;
+        let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
         client.publish_register_ops(batch).await?;
 
         let value_1 = random_register_entry();
@@ -683,104 +561,13 @@ mod tests {
         let tag = 10;
         let owner = User::Key(client.public_key());
 
-        let (address, batch) = client
-            .create_register(name, tag, private_policy(owner))
-            .await?;
+        let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
         client.publish_register_ops(batch).await?;
 
         // Assert that the data is stored.
         let current_owner = client.get_register_owner(address).await?;
 
         assert_eq!(owner, current_owner);
-
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn register_can_delete_private() -> Result<()> {
-        init_logger();
-        let _outer_span = tracing::info_span!("test__register_can_delete_private").entered();
-
-        let mut client = create_test_client().await?;
-
-        let name = xor_name::rand::random();
-        let tag = 15000;
-        let owner = User::Key(client.public_key());
-
-        let (address, batch) = client
-            .create_register(name, tag, private_policy(owner))
-            .await?;
-        client.publish_register_ops(batch).await?;
-
-        let delay = tokio::time::Duration::from_secs(1);
-        tokio::time::sleep(delay).await;
-
-        let register = client.get_register(address).await?;
-
-        assert!(register.is_private());
-
-        let batch2 = client.delete_register(address).await?;
-        client.publish_register_ops(batch2).await?;
-
-        client.query_timeout = Duration::from_secs(5); // override with a short timeout
-        let mut res = client.get_register(address).await;
-        while res.is_ok() {
-            // attempt to delete register again (perhaps a message was dropped)
-            let batch3 = client.delete_register(address).await?;
-            client.publish_register_ops(batch3).await?;
-            tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
-            res = client.get_register(address).await;
-        }
-
-        match res {
-            Err(Error::NoResponse) => Ok(()),
-            Err(err) => Err(eyre!(
-                "Unexpected error returned when deleting a non-existing Private Register: {:?}",
-                err
-            )),
-            Ok(_data) => Err(eyre!("Unexpectedly retrieved a deleted Private Register!",)),
-        }
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn register_cannot_delete_public() -> Result<()> {
-        init_logger();
-        let _outer_span = tracing::info_span!("test__register_cannot_delete_public").entered();
-
-        let client = create_test_client().await?;
-
-        let name = xor_name::rand::random();
-        let tag = 15000;
-        let owner = User::Key(client.public_key());
-
-        // store a Public Register
-        let (address, batch) = client
-            .create_register(name, tag, public_policy(owner))
-            .await?;
-        client.publish_register_ops(batch).await?;
-
-        let delay = tokio::time::Duration::from_secs(1);
-        tokio::time::sleep(delay).await;
-
-        let register = client.get_register(address).await?;
-        assert!(register.is_public());
-
-        let batch2 = client.delete_register(address).await?;
-        match client.publish_register_ops(batch2).await {
-            Err(Error::ErrorCmd {
-                source: ErrorMsg::InvalidOperation(_),
-                ..
-            }) => {}
-            Err(err) => bail!(
-                "Unexpected error returned when attempting to delete a Public Register: {:?}",
-                err
-            ),
-            Ok(()) => {}
-        }
-
-        // Check that our data still exists.
-        let register = client.get_register(address).await?;
-        assert!(register.is_public());
 
         Ok(())
     }
@@ -795,15 +582,12 @@ mod tests {
         let tag = 15000;
         let owner = User::Key(client.public_key());
 
-        // store a Public Register
-        let (address, batch) = client
-            .create_register(name, tag, public_policy(owner))
-            .await?;
+        // store a Register
+        let (address, batch) = client.create_register(name, tag, policy(owner)).await?;
         client.publish_register_ops(batch).await?;
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-        let register = client.get_register(address).await?;
-        assert!(register.is_public());
+        let _register = client.get_register(address).await?;
 
         Ok(())
     }
@@ -813,19 +597,14 @@ mod tests {
         random_bytes.to_vec()
     }
 
-    fn private_policy(owner: User) -> Policy {
+    fn policy(owner: User) -> Policy {
         let permissions = BTreeMap::new();
-        Policy::Private(PrivatePolicy { owner, permissions })
+        Policy { owner, permissions }
     }
 
-    fn public_policy(owner: User) -> Policy {
-        let permissions = BTreeMap::new();
-        Policy::Public(PublicPolicy { owner, permissions })
-    }
-
-    fn public_none_policy(owner: User) -> Policy {
+    fn none_policy(owner: User) -> Policy {
         let mut permissions = BTreeMap::new();
-        let _ = permissions.insert(owner, PublicPermissions::new(None));
-        Policy::Public(PublicPolicy { owner, permissions })
+        let _ = permissions.insert(owner, Permissions::new(None));
+        Policy { owner, permissions }
     }
 }

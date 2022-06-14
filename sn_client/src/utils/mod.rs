@@ -9,39 +9,7 @@
 /// Common utility functions for writing test cases.
 pub mod test_utils;
 
-use bytes::Bytes;
 use rand::{self, distributions::Alphanumeric, rngs::OsRng, Rng};
-use sn_interface::types::{Encryption, PublicKey, Result as TypesResult, Scope};
-
-struct DummyEncryption {
-    public_key: PublicKey,
-}
-
-impl DummyEncryption {
-    pub(crate) fn new(public_key: PublicKey) -> Self {
-        Self { public_key }
-    }
-}
-
-impl Encryption for DummyEncryption {
-    fn public_key(&self) -> &PublicKey {
-        &self.public_key
-    }
-    fn encrypt(&self, data: Bytes) -> TypesResult<Bytes> {
-        Ok(data)
-    }
-    fn decrypt(&self, encrypted_data: Bytes) -> TypesResult<Bytes> {
-        Ok(encrypted_data)
-    }
-}
-
-///
-pub fn encryption(scope: Scope, public_key: PublicKey) -> Option<impl Encryption> {
-    match scope {
-        Scope::Public => None,
-        Scope::Private => Some(DummyEncryption::new(public_key)),
-    }
-}
 
 /// Generates a `String` from `length` random UTF-8 `char`s.  Note that the NULL character will be
 /// excluded to allow conversion to a `CString` if required, and that the actual `len()` of the

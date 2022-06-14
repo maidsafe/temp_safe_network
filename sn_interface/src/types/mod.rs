@@ -30,8 +30,7 @@ pub use connections::{PeerLinks, SendToOneError};
 
 pub use crate::messaging::data::{RegisterCmd, ReplicatedRegisterLog, ReplicatedSpentbookLog};
 pub use address::{
-    BytesAddress, ChunkAddress, DataAddress, RegisterAddress, ReplicatedDataAddress,
-    SafeKeyAddress, Scope, SpentbookAddress,
+    ChunkAddress, DataAddress, RegisterAddress, ReplicatedDataAddress, SpentbookAddress,
 };
 pub use cache::Cache;
 pub use chunk::{Chunk, MAX_CHUNK_SIZE_IN_BYTES};
@@ -52,9 +51,8 @@ use xor_name::XorName;
 #[cfg(any(test, feature = "test-utils"))]
 pub use keys::secret_key::test_utils::{keyed_signed, SecretKeySet};
 
-// TODO: temporary scope and type tag for spentbook since its underlying data type is
+// TODO: temporary type tag for spentbook since its underlying data type is
 // still not implemented, it uses a Public Register for now.
-pub const SPENTBOOK_TYPE_SCOPE: Scope = Scope::Public;
 pub const SPENTBOOK_TYPE_TAG: u64 = 0;
 
 ///

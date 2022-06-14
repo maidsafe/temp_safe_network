@@ -44,7 +44,7 @@ impl Safe {
         }
 
         let _ = self
-            .multimap_create(Some(nrs_xorname), NRS_MAP_TYPE_TAG, false)
+            .multimap_create(Some(nrs_xorname), NRS_MAP_TYPE_TAG)
             .await?;
 
         Ok(nrs_url)
@@ -564,7 +564,7 @@ mod tests {
         let safe = new_safe_instance().await?;
 
         let register_link = safe
-            .register_create(None, NRS_MAP_TYPE_TAG, false, ContentType::Raw)
+            .register_create(None, NRS_MAP_TYPE_TAG, ContentType::Raw)
             .await?;
         let mut register_url = SafeUrl::from_xorurl(&register_link)?;
         register_url.set_content_version(None);

@@ -11,7 +11,7 @@ use eyre::{Result, WrapErr};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use sn_interface::messaging::data::{CreateRegister, SignedRegisterCreate};
 use sn_interface::types::{
-    register::{Policy, PublicPolicy, User},
+    register::{Policy, User},
     Chunk, Keypair,
 };
 use sn_interface::types::{RegisterCmd, ReplicatedData};
@@ -197,7 +197,7 @@ fn custom_criterion() -> Criterion {
 
 fn public_policy(owner: User) -> Policy {
     let permissions = BTreeMap::new();
-    Policy::Public(PublicPolicy { owner, permissions })
+    Policy { owner, permissions }
 }
 
 pub fn create_random_register_replicated_data() -> ReplicatedData {

@@ -13,8 +13,6 @@ use sn_interface::messaging::{
     data::{CmdError, DataQuery, QueryResponse},
     AuthKind, DstLocation, MsgId, ServiceAuth, WireMsg,
 };
-use sn_interface::network_knowledge::{prefix_map::NetworkPrefixMap, supermajority};
-use sn_interface::types::{Peer, PeerLinks, PublicKey, SendToOneError};
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
@@ -23,6 +21,8 @@ use futures::future::join_all;
 use qp2p::{Close, Config as QuicP2pConfig, ConnectionError, Endpoint, SendError};
 use rand::{rngs::OsRng, seq::SliceRandom};
 use secured_linked_list::SecuredLinkedList;
+use sn_interface::network_knowledge::{prefix_map::NetworkPrefixMap, supermajority};
+use sn_interface::types::{Peer, PeerLinks, SendToOneError};
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::{
     sync::mpsc::{channel, Sender},
@@ -48,7 +48,6 @@ impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
     #[instrument(skip(err_sender), level = "debug")]
     pub(crate) fn new(
-        client_pk: PublicKey,
         genesis_key: bls::PublicKey,
         qp2p_config: QuicP2pConfig,
         err_sender: Sender<CmdError>,
@@ -89,12 +88,11 @@ impl Session {
 
         let msg_id = MsgId::new();
 
+        let elders_len = elders.len();
+
         debug!(
-            "Sending cmd w/id {:?}, from {}, to {} Elders w/ dst: {:?}",
-            msg_id,
+            "Sending cmd w/id {msg_id:?}, from {}, to {elders_len} Elders w/ dst: {dst_address:?}",
             endpoint.public_addr(),
-            elders.len(),
-            dst_address
         );
 
         let dst_location = DstLocation::Section {
@@ -105,7 +103,6 @@ impl Session {
         let msg_kind = AuthKind::Service(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
-        let elders_len = elders.len();
         // The insertion of channel will be executed AFTER the completion of the `send_message`.
         let (sender, mut receiver) = channel::<CmdResponse>(elders_len);
         let _ = self.pending_cmds.insert(msg_id, sender);
@@ -113,7 +110,7 @@ impl Session {
 
         send_msg(self.clone(), elders, wire_msg, msg_id).await?;
 
-        let expected_acks = std::cmp::max(1, elders_len * 2 / 3);
+        let expected_acks = elders_len * 2 / 3 + 1;
 
         // We are not wait for the receive of majority of cmd Acks.
         // This could be further strict to wait for ALL the Acks get received.
@@ -128,13 +125,8 @@ impl Session {
             match receiver.try_recv() {
                 Ok((src, None)) => {
                     received_ack += 1;
-                    trace!(
-                        "received CmdAck of {:?} from {:?}, so far {} / {}",
-                        msg_id,
-                        src,
-                        received_ack,
-                        expected_acks
-                    );
+                    trace!("received CmdAck of {msg_id:?} from {src:?}, so far {received_ack} / {expected_acks}");
+
                     if received_ack >= expected_acks {
                         let _ = self.pending_cmds.remove(&msg_id);
                         break;
@@ -689,9 +681,8 @@ pub(crate) async fn create_safe_dir() -> Result<PathBuf, Error> {
 mod tests {
     use super::*;
     use eyre::{eyre, Result};
-    use sn_interface::{
-        network_knowledge::test_utils::{gen_section_authority_provider, section_signed},
-        types::Keypair,
+    use sn_interface::network_knowledge::test_utils::{
+        gen_section_authority_provider, section_signed,
     };
     use std::net::Ipv4Addr;
     use xor_name::Prefix;
@@ -713,8 +704,6 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn cmd_sent_to_all_elders() -> Result<()> {
         let elders_len = 5;
-        let keypair = Keypair::new_ed25519();
-        let client_pk = keypair.public_key();
         let (err_sender, _err_receiver) = channel::<CmdError>(10);
 
         let prefix = prefix("0")?;
@@ -724,7 +713,6 @@ mod tests {
         assert!(prefix_map.insert_without_chain(sap0));
 
         let session = Session::new(
-            client_pk,
             genesis_key,
             QuicP2pConfig::default(),
             err_sender,

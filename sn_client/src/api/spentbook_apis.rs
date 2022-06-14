@@ -23,7 +23,7 @@ impl Client {
     //---------------------
 
     /// Spend a DBC's key image.
-    #[instrument(skip(self), level = "debug")]
+    #[instrument(skip(self, tx), level = "debug")]
     pub async fn spend_dbc(&self, key_image: KeyImage, tx: RingCtTransaction) -> Result<(), Error> {
         let cmd = SpentbookCmd::Spend { key_image, tx };
         self.send_cmd(DataCmd::Spentbook(cmd)).await
