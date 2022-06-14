@@ -13,7 +13,7 @@ use xor_name::XorName;
 use std::time::Duration;
 static RECENT_ISSUE_DURATION: Duration = Duration::from_secs(60 * 15);
 
-static CONN_WEIGHTING: f32 = 2.0;
+static CONN_WEIGHTING: f32 = 1.0;
 static OP_WEIGHTING: f32 = 1.0;
 static KNOWLEDGE_WEIGHTING: f32 = 3.0;
 static DKG_WEIGHTING: f32 = 5.0;
