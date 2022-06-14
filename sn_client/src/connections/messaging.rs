@@ -14,8 +14,6 @@ use sn_interface::messaging::{
     AuthKind, DstLocation, MsgId, ServiceAuth, WireMsg,
 };
 
-use sn_interface::network_knowledge::{prefix_map::NetworkPrefixMap, supermajority};
-use sn_interface::types::{Peer, PeerLinks, SendToOneError};
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
 use dashmap::DashMap;
@@ -23,6 +21,8 @@ use futures::future::join_all;
 use qp2p::{Close, Config as QuicP2pConfig, ConnectionError, Endpoint, SendError};
 use rand::{rngs::OsRng, seq::SliceRandom};
 use secured_linked_list::SecuredLinkedList;
+use sn_interface::network_knowledge::{prefix_map::NetworkPrefixMap, supermajority};
+use sn_interface::types::{Peer, PeerLinks, SendToOneError};
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::{
     sync::mpsc::{channel, Sender},
@@ -681,9 +681,8 @@ pub(crate) async fn create_safe_dir() -> Result<PathBuf, Error> {
 mod tests {
     use super::*;
     use eyre::{eyre, Result};
-    use sn_interface::{
-        network_knowledge::test_utils::{gen_section_authority_provider, section_signed},
-        types::Keypair,
+    use sn_interface::network_knowledge::test_utils::{
+        gen_section_authority_provider, section_signed,
     };
     use std::net::Ipv4Addr;
     use xor_name::Prefix;
@@ -705,8 +704,6 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn cmd_sent_to_all_elders() -> Result<()> {
         let elders_len = 5;
-        let keypair = Keypair::new_ed25519();
-        let client_pk = keypair.public_key();
         let (err_sender, _err_receiver) = channel::<CmdError>(10);
 
         let prefix = prefix("0")?;
@@ -716,7 +713,6 @@ mod tests {
         assert!(prefix_map.insert_without_chain(sap0));
 
         let session = Session::new(
-            client_pk,
             genesis_key,
             QuicP2pConfig::default(),
             err_sender,
