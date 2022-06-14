@@ -80,6 +80,12 @@ impl NetworkPrefixMap {
         true
     }
 
+    /// For testing purpose, we may need to populate a prefix_map without a proof chain.
+    #[cfg(any(test, feature = "test-utils"))]
+    pub fn insert_without_chain(&self, sap: SectionAuth<SectionAuthorityProvider>) -> bool {
+        self.insert(sap)
+    }
+
     /// Returns the known section that is closest to the given name,
     /// regardless of whether `name` belongs in that section or not.
     /// If provided, it excludes any section matching the passed prefix.

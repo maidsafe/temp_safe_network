@@ -9,14 +9,13 @@
 use super::{QueryResult, Session};
 
 use crate::{connections::CmdResponse, Error, Result};
-use sn_interface::at_least_one_correct_elder_for_sap;
 use sn_interface::messaging::{
     data::{CmdError, DataQuery, QueryResponse},
     AuthKind, DstLocation, MsgId, ServiceAuth, WireMsg,
 };
-use sn_interface::network_knowledge::prefix_map::NetworkPrefixMap;
-use sn_interface::types::{Peer, PeerLinks, SendToOneError};
 
+use sn_interface::network_knowledge::{prefix_map::NetworkPrefixMap, supermajority};
+use sn_interface::types::{Peer, PeerLinks, SendToOneError};
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
 use dashmap::DashMap;
@@ -495,36 +494,30 @@ impl Session {
 
     async fn get_cmd_elders(&self, dst_address: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
         let a_close_sap = self.network.closest_or_opposite(&dst_address, None);
-        let the_close_sap = a_close_sap.clone().map(|auth| auth.value);
-        // Get DataSection elders details.
-        let (mut elders, section_pk) = if let Some(sap) = a_close_sap {
-            let sap_elders = sap.elders_vec();
 
+        // Get DataSection elders details.
+        if let Some(sap) = a_close_sap {
+            let sap_elders = sap.elders_vec();
+            let section_pk = sap.section_key();
             trace!("SAP elders found {:?}", sap_elders);
 
-            (sap_elders, sap.section_key())
+            // Supermajority of elders is expected.
+            let targets_count = supermajority(sap_elders.len());
+
+            // any SAP that does not hold elders_count() is indicative of a broken network (after genesis)
+            if sap_elders.len() < targets_count {
+                error!("Insufficient knowledge to send to address {:?}, elders for this section: {sap_elders:?} ({targets_count} needed), section PK is: {section_pk:?}", dst_address);
+                return Err(Error::InsufficientElderKnowledge {
+                    connections: sap_elders.len(),
+                    required: targets_count,
+                    section_pk,
+                });
+            }
+
+            Ok((section_pk, sap_elders))
         } else {
-            return Err(Error::NoNetworkKnowledge);
-        };
-
-        let targets_count = at_least_one_correct_elder_for_sap(the_close_sap); // stored at Adults, so only 1 correctly functioning Elder need to relay
-
-        // any SAP that does not hold elders_count() is indicative of a broken network (after genesis)
-        if elders.len() < targets_count {
-            error!("Insufficient knowledge to send to address {:?}, elders for this section: {elders:?} ({targets_count} needed), section PK is: {section_pk:?}", dst_address);
-            return Err(Error::InsufficientElderKnowledge {
-                connections: elders.len(),
-                required: targets_count,
-                section_pk,
-            });
+            Err(Error::NoNetworkKnowledge)
         }
-
-        elders.shuffle(&mut OsRng);
-
-        // now we use only the required count
-        let elders = elders.into_iter().take(targets_count).collect();
-
-        Ok((section_pk, elders))
     }
 }
 
@@ -682,4 +675,61 @@ pub(crate) async fn create_safe_dir() -> Result<PathBuf, Error> {
         .map_err(|_| Error::CouldNotCreateSafeDir)?;
 
     Ok(root_dir)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use eyre::{eyre, Result};
+    use sn_interface::{
+        network_knowledge::test_utils::{gen_section_authority_provider, section_signed},
+        types::Keypair,
+    };
+    use std::net::Ipv4Addr;
+    use xor_name::Prefix;
+
+    fn prefix(s: &str) -> Result<Prefix> {
+        s.parse()
+            .map_err(|err| eyre!("failed to parse Prefix '{}': {}", s, err))
+    }
+
+    fn new_network_prefix_map() -> (NetworkPrefixMap, bls::SecretKey, bls::PublicKey) {
+        let genesis_sk = bls::SecretKey::random();
+        let genesis_pk = genesis_sk.public_key();
+
+        let map = NetworkPrefixMap::new(genesis_pk);
+
+        (map, genesis_sk, genesis_pk)
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn cmd_sent_to_all_elders() -> Result<()> {
+        let elders_len = 5;
+        let keypair = Keypair::new_ed25519();
+        let client_pk = keypair.public_key();
+        let (err_sender, _err_receiver) = channel::<CmdError>(10);
+
+        let prefix = prefix("0")?;
+        let (section_auth, _, secret_key_set) = gen_section_authority_provider(prefix, elders_len);
+        let sap0 = section_signed(secret_key_set.secret_key(), section_auth)?;
+        let (prefix_map, _genesis_sk, genesis_key) = new_network_prefix_map();
+        assert!(prefix_map.insert_without_chain(sap0));
+
+        let session = Session::new(
+            client_pk,
+            genesis_key,
+            QuicP2pConfig::default(),
+            err_sender,
+            SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)),
+            Duration::from_secs(10),
+            prefix_map,
+        )?;
+
+        let mut rng = rand::thread_rng();
+        let result = session.get_cmd_elders(XorName::random(&mut rng)).await?;
+        assert_eq!(result.0, secret_key_set.public_keys().public_key());
+        assert_eq!(result.1.len(), elders_len);
+
+        Ok(())
+    }
 }
