@@ -364,7 +364,7 @@ impl Config {
     /// Private helpers
     ///
 
-    async fn get_dbc_owner(dbc_sk_path: &PathBuf) -> Result<Option<Owner>> {
+    async fn get_dbc_owner(dbc_sk_path: &Path) -> Result<Option<Owner>> {
         if dbc_sk_path.exists() {
             let keypair = deserialize_keypair(dbc_sk_path)?;
             let sk = keypair.secret_key()?.bls().ok_or_else(|| {
