@@ -15,7 +15,7 @@ use sn_interface::messaging::{
     AuthKind, DstLocation, MsgId, ServiceAuth, WireMsg,
 };
 use sn_interface::network_knowledge::prefix_map::NetworkPrefixMap;
-use sn_interface::types::{Peer, PeerLinks, PublicKey, SendToOneError};
+use sn_interface::types::{Peer, PeerLinks, SendToOneError};
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
@@ -49,7 +49,6 @@ impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
     #[instrument(skip(err_sender), level = "debug")]
     pub(crate) fn new(
-        client_pk: PublicKey,
         genesis_key: bls::PublicKey,
         qp2p_config: QuicP2pConfig,
         err_sender: Sender<CmdError>,
@@ -90,12 +89,11 @@ impl Session {
 
         let msg_id = MsgId::new();
 
+        let elders_len = elders.len();
+
         debug!(
-            "Sending cmd w/id {:?}, from {}, to {} Elders w/ dst: {:?}",
-            msg_id,
+            "Sending cmd w/id {msg_id:?}, from {}, to {elders_len} Elders w/ dst: {dst_address:?}",
             endpoint.public_addr(),
-            elders.len(),
-            dst_address
         );
 
         let dst_location = DstLocation::Section {
@@ -106,7 +104,6 @@ impl Session {
         let msg_kind = AuthKind::Service(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
 
-        let elders_len = elders.len();
         // The insertion of channel will be executed AFTER the completion of the `send_message`.
         let (sender, mut receiver) = channel::<CmdResponse>(elders_len);
         let _ = self.pending_cmds.insert(msg_id, sender);
@@ -114,7 +111,7 @@ impl Session {
 
         send_msg(self.clone(), elders, wire_msg, msg_id).await?;
 
-        let expected_acks = std::cmp::max(1, elders_len * 2 / 3);
+        let expected_acks = elders_len * 2 / 3 + 1;
 
         // We are not wait for the receive of majority of cmd Acks.
         // This could be further strict to wait for ALL the Acks get received.
@@ -129,13 +126,8 @@ impl Session {
             match receiver.try_recv() {
                 Ok((src, None)) => {
                     received_ack += 1;
-                    trace!(
-                        "received CmdAck of {:?} from {:?}, so far {} / {}",
-                        msg_id,
-                        src,
-                        received_ack,
-                        expected_acks
-                    );
+                    trace!("received CmdAck of {msg_id:?} from {src:?}, so far {received_ack} / {expected_acks}");
+
                     if received_ack >= expected_acks {
                         let _ = self.pending_cmds.remove(&msg_id);
                         break;

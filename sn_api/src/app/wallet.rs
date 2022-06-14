@@ -362,8 +362,11 @@ impl Safe {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::test_helpers::{
-        new_read_only_safe_instance, new_safe_instance, new_safe_instance_with_dbc_owner,
+    use crate::{
+        app::test_helpers::{
+            new_read_only_safe_instance, new_safe_instance, new_safe_instance_with_dbc_owner,
+        },
+        retry_loop,
     };
     use anyhow::{anyhow, Result};
     use sn_dbc::Owner;
@@ -758,7 +761,7 @@ mod tests {
         safe.wallet_deposit(&wallet1_xorurl, Some("deposited-dbc"), &dbc)
             .await?;
 
-        let output_dbc = safe.wallet_reissue(&wallet1_xorurl, "0.25", None).await?;
+        let output_dbc = retry_loop!(safe.wallet_reissue(&wallet1_xorurl, "0.25", None));
 
         safe.wallet_deposit(&wallet2_xorurl, Some("reissued-dbc"), &output_dbc)
             .await?;
