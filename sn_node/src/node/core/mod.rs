@@ -319,6 +319,12 @@ impl Node {
             .map_err(Error::from)
     }
 
+    /// Log a dkg session as responded to
+    pub(crate) async fn log_dkg_session(&self, name: &XorName) {
+        trace!("Logging Dkg session as responded to in dysfunction");
+        self.dysfunction_tracking.dkg_ack_fulfilled(name).await;
+    }
+
     pub(crate) async fn write_prefix_map(&self) {
         info!("Writing our latest PrefixMap to disk");
         // TODO: Make this serialization human readable

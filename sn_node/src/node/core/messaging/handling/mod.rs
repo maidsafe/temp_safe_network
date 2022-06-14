@@ -551,9 +551,7 @@ impl Node {
             }
             SystemMsg::DkgStart(session_id) => {
                 trace!("Handling msg: Dkg-Start {:?} from {}", session_id, sender);
-                self.dysfunction_tracking
-                    .dkg_ack_fulfilled(&sender.name())
-                    .await;
+                self.log_dkg_session(&sender.name()).await;
                 let our_name = self.info.read().await.name();
                 if !session_id.contains_elder(our_name) {
                     return Ok(vec![]);
@@ -579,9 +577,7 @@ impl Node {
                     message,
                     sender
                 );
-                self.dysfunction_tracking
-                    .dkg_ack_fulfilled(&sender.name())
-                    .await;
+                self.log_dkg_session(&sender.name()).await;
                 self.handle_dkg_msg(session_id, message, sender).await
             }
             SystemMsg::DkgFailureObservation {
@@ -596,9 +592,7 @@ impl Node {
                 message,
                 session_id,
             } => {
-                self.dysfunction_tracking
-                    .dkg_ack_fulfilled(&sender.name())
-                    .await;
+                self.log_dkg_session(&sender.name()).await;
 
                 self.handle_dkg_not_ready(
                     sender,
@@ -613,9 +607,7 @@ impl Node {
                 message,
                 session_id,
             } => {
-                self.dysfunction_tracking
-                    .dkg_ack_fulfilled(&sender.name())
-                    .await;
+                self.log_dkg_session(&sender.name()).await;
 
                 self.handle_dkg_retry(&session_id, message_history, message, sender)
                     .await
