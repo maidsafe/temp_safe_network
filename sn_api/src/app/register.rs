@@ -40,7 +40,7 @@ impl Safe {
         let xorname = name.unwrap_or_else(xor_name::rand::random);
         info!("Xorname for new Register storage: {:?}", &xorname);
 
-        let xorurl = SafeUrl::encode_register(xorname, tag, content_type, self.xorurl_base)?;
+        let xorurl = SafeUrl::from_register(xorname, tag, content_type)?.encode(self.xorurl_base);
 
         // return early if dry_run_mode
         if self.dry_run_mode {

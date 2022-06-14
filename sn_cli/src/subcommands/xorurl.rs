@@ -76,7 +76,7 @@ pub async fn xorurl_commander(
                 .map_err(|_| eyre!("Invalid (Ed25519/BLS) public key bytes: {}", pk))?;
 
             let xorname = XorName::from(public_key);
-            let xorurl = SafeUrl::encode_safekey(xorname, xorurl_base)?;
+            let xorurl = SafeUrl::from_safekey(xorname)?.encode(xorurl_base);
 
             // Now let's just print out the SafeKey xorurl
             if OutputFmt::Pretty == output_fmt {
