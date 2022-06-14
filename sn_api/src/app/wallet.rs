@@ -740,7 +740,7 @@ mod tests {
 
         // Now check thaat after reissuing with the total balance,
         // there is no change deposited in the Wallet, i.e. Wallet is empty with 0 balance
-        let _ = safe.wallet_reissue(&wallet_xorurl, "12.23", None).await?;
+        let _ = retry_loop!(safe.wallet_reissue(&wallet_xorurl, "12.23", None));
 
         let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
         assert_eq!(current_balance, Token::zero());
