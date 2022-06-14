@@ -44,16 +44,6 @@ pub fn at_least_one_correct_elder() -> usize {
     max_num_faulty_elders() + 1
 }
 
-/// The least number of Elders to select, to be "guaranteed" one correctly functioning Elder.
-/// This number will be 3 with 7 Elders. And is relative to the provided SAP.
-pub fn at_least_one_correct_elder_for_sap(sap: Option<SectionAuthorityProvider>) -> usize {
-    if let Some(sap) = sap {
-        max_num_faulty_elders_for_sap(sap) + 1
-    } else {
-        max_num_faulty_elders() + 1
-    }
-}
-
 /// Get the expected chunk copy count for our network.
 /// Defaults to DEFAULT_DATA_COPY_COUNT, but can be overridden by the env var SN_DATA_COPY_COUNT.
 pub fn data_copy_count() -> usize {
