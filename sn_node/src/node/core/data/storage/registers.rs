@@ -406,17 +406,19 @@ impl RegisterStorage {
 
     /// Temporary helper function which makes sure there exists a Register for the spentbook,
     /// this shouldn't be required once we have a Spentbook data type.
-    pub(crate) async fn create_spentbook_register(&self, address: &RegisterAddress) -> Result<()> {
+    pub(crate) async fn create_spentbook_register(
+        &self,
+        address: &RegisterAddress,
+        pk: PublicKey,
+        keypair: Keypair,
+    ) -> Result<()> {
         trace!("Creating new spentbook register: {:?}", address);
 
-        // TODO: use the node's own keypair and section key share for signatures
         let mut permissions = BTreeMap::new();
         let _ = permissions.insert(User::Anyone, Permissions::new(true));
-        let pk = bls::SecretKey::random().public_key();
-        let owner = User::Key(PublicKey::Bls(pk));
+        let owner = User::Key(pk);
         let policy = Policy { owner, permissions };
 
-        let keypair = Keypair::new_ed25519();
         let cmd = create_reg_w_policy(*address.name(), SPENTBOOK_TYPE_TAG, policy, keypair)?;
 
         match self.write(cmd).await {

@@ -10,7 +10,7 @@ use sn_interface::{
     messaging::data::{CreateRegister, SignedRegisterCreate},
     types::{
         register::{Policy, User},
-        Chunk, Keypair, RegisterCmd, ReplicatedData,
+        Chunk, Keypair, PublicKey, RegisterCmd, ReplicatedData,
     },
 };
 use sn_node::{
@@ -39,12 +39,16 @@ fn main() -> Result<()> {
 }
 
 fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
+    let pk = PublicKey::Bls(bls::SecretKey::random().public_key());
+    let keypair = Keypair::new_ed25519();
+
     let mut group = c.benchmark_group("read-sampling");
 
     let runtime = Runtime::new().unwrap();
     pub const NONSENSE_CHUNK_SIZE: usize = 1024; // data size should not be important for keys() tests
 
     let size_ranges = [100, 500, 1_000];
+
     // TODO: re-enable when Sled has been removed
 
     // for size in size_ranges.iter() {
@@ -61,7 +65,7 @@ fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
     //             b.to_async(&runtime).iter(|| async {
     //                 for _ in 0..size {
     //                     let random_data = create_random_register_replicated_data();
-    //                     let _ = storage.store(&random_data).await;
+    //                     let _ = storage.store(&random_data, pk, keypair.clone()).await;
     //                 }
     //             })
     //         },
@@ -80,7 +84,7 @@ fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
                     let file = sn_interface::types::utils::random_bytes(NONSENSE_CHUNK_SIZE);
                     let random_data = ReplicatedData::Chunk(Chunk::new(file));
                     storage
-                        .store(&random_data)
+                        .store(&random_data, pk, keypair.clone())
                         .await
                         .expect("failed to write chunk {i}");
                 }
@@ -93,6 +97,9 @@ fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
 }
 
 fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
+    let pk = PublicKey::Bls(bls::SecretKey::random().public_key());
+    let keypair = Keypair::new_ed25519();
+
     let mut group = c.benchmark_group("read-sampling");
 
     let runtime = Runtime::new().unwrap();
@@ -113,7 +120,7 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
     //             let random_data = create_random_register_replicated_data();
 
     //             if runtime
-    //                 .block_on(storage.store(&random_data))
+    //                 .block_on(storage.store(&random_data, pk, keypair.clone()))
     //                 .context("could not store register")
     //                 .is_err()
     //             {
@@ -151,7 +158,7 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
                 let file = sn_interface::types::utils::random_bytes(NONSENSE_CHUNK_SIZE);
                 let random_data = ReplicatedData::Chunk(Chunk::new(file));
                 if runtime
-                    .block_on(storage.store(&random_data))
+                    .block_on(storage.store(&random_data, pk, keypair.clone()))
                     .context("could not store chunk")
                     .is_err()
                 {

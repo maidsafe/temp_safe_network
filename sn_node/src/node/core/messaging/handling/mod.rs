@@ -40,7 +40,7 @@ use sn_interface::{
         AuthorityProof, DstLocation, MsgId, MsgType, NodeMsgAuthority, SectionAuth, WireMsg,
     },
     network_knowledge::NetworkKnowledge,
-    types::{log_markers::LogMarker, Peer, PublicKey},
+    types::{log_markers::LogMarker, Keypair, Peer, PublicKey},
 };
 
 use bls::PublicKey as BlsPublicKey;
@@ -652,11 +652,18 @@ impl Node {
                 } else {
                     let mut cmds = vec![];
 
+                    let section_pk = PublicKey::Bls(self.network_knowledge.section_key().await);
+                    let own_keypair = Keypair::Ed25519(self.info.read().await.keypair.clone());
+
                     for data in data_collection {
                         // We are an adult here, so just store away!
                         // This may return a DatabaseFull error... but we should have reported storage increase
                         // well before this
-                        match self.data_storage.store(&data).await {
+                        match self
+                            .data_storage
+                            .store(&data, section_pk, own_keypair.clone())
+                            .await
+                        {
                             Ok(level_report) => {
                                 info!("Storage level report: {:?}", level_report);
                                 cmds.extend(self.record_storage_level_if_any(level_report).await);

@@ -21,7 +21,8 @@ use sn_interface::{
         system::NodeQueryResponse,
     },
     types::{
-        register::User, RegisterAddress, ReplicatedData, ReplicatedDataAddress, SPENTBOOK_TYPE_TAG,
+        register::User, Keypair, PublicKey, RegisterAddress, ReplicatedData, ReplicatedDataAddress,
+        SPENTBOOK_TYPE_TAG,
     },
 };
 
@@ -51,7 +52,12 @@ impl DataStorage {
 
     /// Store data in the local store
     #[instrument(skip(self))]
-    pub async fn store(&self, data: &ReplicatedData) -> Result<Option<StorageLevel>> {
+    pub async fn store(
+        &self,
+        data: &ReplicatedData,
+        pk_for_spent_book: PublicKey,
+        keypair_for_spent_book: Keypair,
+    ) -> Result<Option<StorageLevel>> {
         debug!("Replicating {data:?}");
         match data.clone() {
             ReplicatedData::Chunk(chunk) => self.chunks.store(&chunk).await?,
@@ -65,7 +71,11 @@ impl DataStorage {
                 // FIMXE: this is temporay logic to create a spentbook to make sure it exists.
                 // Spentbooks shall always exist, and the section nodes shall create them by default.
                 self.registers
-                    .create_spentbook_register(&cmd.dst_address())
+                    .create_spentbook_register(
+                        &cmd.dst_address(),
+                        pk_for_spent_book,
+                        keypair_for_spent_book,
+                    )
                     .await?;
 
                 // We now write the cmd received
@@ -216,8 +226,8 @@ mod tests {
     use sn_interface::{
         messaging::{data::DataQuery, system::NodeQueryResponse},
         types::{
-            register::User, utils::random_bytes, Chunk, ChunkAddress, ReplicatedData,
-            ReplicatedDataAddress,
+            register::User, utils::random_bytes, Chunk, ChunkAddress, Keypair, PublicKey,
+            ReplicatedData, ReplicatedDataAddress,
         },
     };
 
@@ -252,8 +262,11 @@ mod tests {
         let chunk = Chunk::new(bytes);
         let replicated_data = ReplicatedData::Chunk(chunk.clone());
 
+        let pk = PublicKey::Bls(bls::SecretKey::random().public_key());
+        let keypair = Keypair::new_ed25519();
+
         // Store the chunk
-        let _ = storage.store(&replicated_data).await?;
+        let _ = storage.store(&replicated_data, pk, keypair).await?;
 
         // Test local fetch
         let fetched_data = storage
@@ -329,6 +342,8 @@ mod tests {
         let used_space = UsedSpace::new(usize::MAX);
         let runtime = Runtime::new()?;
         let storage = DataStorage::new(path, used_space)?;
+        let owner_pk = PublicKey::Bls(bls::SecretKey::random().public_key());
+        let owner_keypair = Keypair::new_ed25519();
         for op in ops.into_iter() {
             match op {
                 Op::Store(flag, chunk_size) => {
@@ -351,7 +366,8 @@ mod tests {
                             ReplicatedData::Chunk(chunk)
                         }
                     };
-                    let _ = runtime.block_on(storage.store(&data))?;
+                    let _ =
+                        runtime.block_on(storage.store(&data, owner_pk, owner_keypair.clone()))?;
                     // If Get/Query is performed just after a Store op, half-written data is returned
                     // Adding some delay fixes it
                     thread::sleep(Duration::from_millis(15));

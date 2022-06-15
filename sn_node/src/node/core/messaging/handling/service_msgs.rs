@@ -178,8 +178,11 @@ impl Node {
                 // generate and sign spent proof share
                 let spent_proof_share = self.gen_spent_proof_share(&key_image, &tx).await?;
 
+                // use own keypair for generating the register command
+                let own_keypair = Keypair::Ed25519(self.info.read().await.keypair.clone());
+
                 // store spent proof share to adults
-                let reg_cmd = gen_register_cmd(&key_image, &spent_proof_share)?;
+                let reg_cmd = gen_register_cmd(&key_image, &spent_proof_share, own_keypair)?;
                 ReplicatedData::SpentbookWrite(reg_cmd)
             }
             ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => ReplicatedData::Chunk(chunk),
@@ -282,12 +285,11 @@ impl Node {
 fn gen_register_cmd(
     key_image: &KeyImage,
     spent_proof_share: &SpentProofShare,
+    own_keypair: Keypair,
 ) -> Result<RegisterCmd> {
-    // TODO: use the node's own keypair and section key share for signatures
     let mut permissions = BTreeMap::new();
     let _ = permissions.insert(User::Anyone, Permissions::new(true));
-    let keypair = Keypair::new_ed25519();
-    let owner = User::Key(keypair.public_key());
+    let owner = User::Key(own_keypair.public_key());
     let policy = Policy { owner, permissions };
 
     let mut register = Register::new(
@@ -311,11 +313,11 @@ fn gen_register_cmd(
         edit: op,
     };
 
-    let signature = keypair.sign(&bincode::serialize(&op)?);
+    let signature = own_keypair.sign(&bincode::serialize(&op)?);
     let signed_edit = SignedRegisterEdit {
         op,
         auth: ServiceAuth {
-            public_key: keypair.public_key(),
+            public_key: own_keypair.public_key(),
             signature,
         },
     };
