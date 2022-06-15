@@ -1,6 +1,6 @@
 [package]
 name = "sn_cli"
-version = "0.57.3"
+version = "0.57.4"
 description = "Safe CLI"
 authors = [
   "bochaco <gabrielviganotti@gmail.com>",
@@ -37,7 +37,7 @@ rcgen = "~0.7"
 relative-path = "1.3.2"
 reqwest = { version = "~0.11", default-features = false, features = [ "rustls-tls" ] }
 rmp-serde = "1.0.0"
-sn_api = { path = "../sn_api", version = "^0.64.2", default-features=false, features = ["app", "authd_client"] }
+sn_api = { path = "../sn_api", version = "^0.64.3", default-features=false, features = ["app", "authd_client"] }
 sn_dbc = { version = "4.0.0", features = [ "serdes" ] }
 sn_launch_tool = "~0.9.4"
 serde = "1.0.123"

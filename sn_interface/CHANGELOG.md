@@ -6,7 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## v0.6.3 (2022-06-15)
+
+### Chore
+
+ - <csr-id-4eb43fa884d7b047febb18c067ae905969a113bf/> upgrade blsttc to 6.0.0
+   There were various other crates that had to be upgraded in this process:
+   * secured_linked_list to v0.5.2 because it was also upgraded to reference v6.0.0 of blsttc
+   * bls_dkg to v0.10.3 because it was also upgraded to reference v6.0.0 of blsttc
+   * sn_consensus to v2.1.1 because it was also upgraded to reference v6.0.0 of blsttc
+   * sn_dbc to v4.0.0 because it was also upgraded to reference v6.0.0 of blsttc
+ - <csr-id-537b6c08447c15a056d8c79c8592106d9a40b672/> reduce comm error weighting
+
+### New Features
+
+ - <csr-id-7ccb02a7ded7579bb8645c918b9a6108b1b585af/> enable tracking of Dkg issues
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - upgrade blsttc to 6.0.0 ([`4eb43fa`](https://github.com/maidsafe/safe_network/commit/4eb43fa884d7b047febb18c067ae905969a113bf))
+    - reduce comm error weighting ([`537b6c0`](https://github.com/maidsafe/safe_network/commit/537b6c08447c15a056d8c79c8592106d9a40b672))
+    - enable tracking of Dkg issues ([`7ccb02a`](https://github.com/maidsafe/safe_network/commit/7ccb02a7ded7579bb8645c918b9a6108b1b585af))
+</details>
+
 ## v0.6.2 (2022-06-15)
+
+<csr-id-b818c3fd10a4e3304b2c5f84dac843397873cba6/>
 
 ### New Features
 
@@ -23,13 +61,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-b818c3fd10a4e3304b2c5f84dac843397873cba6/> cmd sent to all elders
 
+### Chore
+
+ - <csr-id-46246f155ab65f3fcd61381345f1a7f747dfe957/> sn_interface-0.6.2/sn_client-0.66.2/sn_node-0.62.4/sn_api-0.64.2/sn_cli-0.57.3
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 8 commits contributed to the release over the course of 1 calendar day.
- - 7 days passed between releases.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 9 commits contributed to the release over the course of 2 calendar days.
+ - 8 days passed between releases.
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -39,6 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.6.2/sn_client-0.66.2/sn_node-0.62.4/sn_api-0.64.2/sn_cli-0.57.3 ([`46246f1`](https://github.com/maidsafe/safe_network/commit/46246f155ab65f3fcd61381345f1a7f747dfe957))
     - Merge remote-tracking branch 'origin/main' into drusu/remove-private-data ([`2057273`](https://github.com/maidsafe/safe_network/commit/2057273509c2488cafc7f6db2ae69a99efc3b350))
     - Merge branch 'main' into drusu/remove-private-data ([`0cd2007`](https://github.com/maidsafe/safe_network/commit/0cd2007e442086d6eb2a39ad1f452e590fad46a9))
     - replace at_least_one_elders with supermajority for sending cmd ([`616d8cb`](https://github.com/maidsafe/safe_network/commit/616d8cb12bfc257f9b3609239790065ebced8fe3))
@@ -52,6 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.6.1 (2022-06-07)
 
 <csr-id-24299786ba730e467c10946c8c152936b96148f8/>
+<csr-id-489904e325cfb8efca4289b05125904ad4029f3b/>
 
 ### Chore
 
@@ -66,10 +110,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-dbda86be03f912079776be514828ff5fd034830c/> first version of Spentbook messaging, storage, and client API
    - Storage is implemented using Register as the underlying data type. To be changed when
    actual SpentBook native data type is put in place.
-- First version of sn_client API for Spentbook messages.
-- sn_client::spent_proof_shares API to fetch spent proof shares.
-- sn_client::spend_dbc API to request Elders to store the spent proof shares.
-- Serialise SpentProofShare to store it as an entry in the underlying Register.
 
 ### Commit Statistics
 
@@ -93,6 +133,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - first version of Spentbook messaging, storage, and client API ([`dbda86b`](https://github.com/maidsafe/safe_network/commit/dbda86be03f912079776be514828ff5fd034830c))
     - Merge #1217 ([`2f26043`](https://github.com/maidsafe/safe_network/commit/2f2604325d533357bad7d917315cf4cba0b2d3c0))
 </details>
+
+<csr-unknown>
+First version of sn_client API for Spentbook messages.sn_client::spent_proof_shares API to fetch spent proof shares.sn_client::spend_dbc API to request Elders to store the spent proof shares.Serialise SpentProofShare to store it as an entry in the underlying Register.<csr-unknown/>
 
 ## v0.6.0 (2022-06-05)
 

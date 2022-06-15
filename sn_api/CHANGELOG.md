@@ -5,7 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.64.3 (2022-06-15)
+
+### Chore
+
+ - <csr-id-4eb43fa884d7b047febb18c067ae905969a113bf/> upgrade blsttc to 6.0.0
+   There were various other crates that had to be upgraded in this process:
+   * secured_linked_list to v0.5.2 because it was also upgraded to reference v6.0.0 of blsttc
+   * bls_dkg to v0.10.3 because it was also upgraded to reference v6.0.0 of blsttc
+   * sn_consensus to v2.1.1 because it was also upgraded to reference v6.0.0 of blsttc
+   * sn_dbc to v4.0.0 because it was also upgraded to reference v6.0.0 of blsttc
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - upgrade blsttc to 6.0.0 ([`4eb43fa`](https://github.com/maidsafe/safe_network/commit/4eb43fa884d7b047febb18c067ae905969a113bf))
+</details>
+
 ## v0.64.2 (2022-06-15)
+
+<csr-id-0f00c8cf7caae190716c8fd57addd38b18a3a49b/>
 
 ### New Features
 
@@ -25,13 +56,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-0f00c8cf7caae190716c8fd57addd38b18a3a49b/> add from_safekey, from_register, from_bytes
 
+### Chore
+
+ - <csr-id-46246f155ab65f3fcd61381345f1a7f747dfe957/> sn_interface-0.6.2/sn_client-0.66.2/sn_node-0.62.4/sn_api-0.64.2/sn_cli-0.57.3
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 12 commits contributed to the release over the course of 1 calendar day.
- - 7 days passed between releases.
- - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 13 commits contributed to the release over the course of 1 calendar day.
+ - 8 days passed between releases.
+ - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -41,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.6.2/sn_client-0.66.2/sn_node-0.62.4/sn_api-0.64.2/sn_cli-0.57.3 ([`46246f1`](https://github.com/maidsafe/safe_network/commit/46246f155ab65f3fcd61381345f1a7f747dfe957))
     - Merge remote-tracking branch 'origin/main' into drusu/remove-private-data ([`2057273`](https://github.com/maidsafe/safe_network/commit/2057273509c2488cafc7f6db2ae69a99efc3b350))
     - Merge branch 'main' into simplify_safeurl ([`a0175ab`](https://github.com/maidsafe/safe_network/commit/a0175abfa15e558e54fbb25dc3baf49343f040ac))
     - Merge branch 'main' into drusu/remove-private-data ([`0cd2007`](https://github.com/maidsafe/safe_network/commit/0cd2007e442086d6eb2a39ad1f452e590fad46a9))
@@ -58,6 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.64.1 (2022-06-07)
 
 <csr-id-24299786ba730e467c10946c8c152936b96148f8/>
+<csr-id-489904e325cfb8efca4289b05125904ad4029f3b/>
 
 ### Chore
 
@@ -72,10 +109,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-dbda86be03f912079776be514828ff5fd034830c/> first version of Spentbook messaging, storage, and client API
    - Storage is implemented using Register as the underlying data type. To be changed when
    actual SpentBook native data type is put in place.
-- First version of sn_client API for Spentbook messages.
-- sn_client::spent_proof_shares API to fetch spent proof shares.
-- sn_client::spend_dbc API to request Elders to store the spent proof shares.
-- Serialise SpentProofShare to store it as an entry in the underlying Register.
 
 ### Commit Statistics
 
@@ -99,6 +132,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - first version of Spentbook messaging, storage, and client API ([`dbda86b`](https://github.com/maidsafe/safe_network/commit/dbda86be03f912079776be514828ff5fd034830c))
     - Merge #1217 ([`2f26043`](https://github.com/maidsafe/safe_network/commit/2f2604325d533357bad7d917315cf4cba0b2d3c0))
 </details>
+
+<csr-unknown>
+First version of sn_client API for Spentbook messages.sn_client::spent_proof_shares API to fetch spent proof shares.sn_client::spend_dbc API to request Elders to store the spent proof shares.Serialise SpentProofShare to store it as an entry in the underlying Register.<csr-unknown/>
 
 ## v0.64.0 (2022-06-05)
 
@@ -179,9 +215,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - extend client with dbc owner field ([`48006b7`](https://github.com/maidsafe/safe_network/commit/48006b73547778bc08b077717e04fd5efb562eaf))
     - Merge #1192 ([`f9fc2a7`](https://github.com/maidsafe/safe_network/commit/f9fc2a76f083ba5161c8c4eef9013c53586b4693))
 </details>
-
-<csr-unknown>
- add public key argument for owned dbcsThe wallet reissue command now has an additional optional argument, --public-key, which allowsthe user to reissue a DBC to be owned by the holder of that public key. The key should be BLShex-encoded.The wallet deposit command will now require extension to provide the secret key when depositing anowned DBC. This will be done as a separate piece of work.Some additional changes were made in support or to tidy CLI-related code: handover sap elder checks with membership knowledge use persistent dbc owner in sn_apiThe network connection functions in the CLI are updated to pass the persistent DBC Owner. This isbased on the existence of a key that was created with the new create-dbc-owner command. If the keyexists, the connection will use the persistent DBC owner; if None is passed, a random key will begenerated.During a reissue, the change DBC is then assigned the owner from the client. We don’t yet assign theoutput DBC this owner, because we’re still only supporting bearer DBCs. This may change for ownedDBCs, which should come soon.I split the wallet reissue test out into a couple: one with a single input DBC and one withmultiple. The original test had multiple inputs, but it seemed it was worth checking that thereissue would function if there were also just a single input.<csr-unknown/>
 
 ## v0.63.0 (2022-05-27)
 

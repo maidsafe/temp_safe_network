@@ -5,15 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.5.0 (2022-06-05)
+## v0.5.1 (2022-06-15)
+
+### Chore
+
+ - <csr-id-26e35cc2d1c5aab81c3479dd7948f7a7e586f817/> adjust some dysfunction weighting. decreas dkg
+ - <csr-id-537b6c08447c15a056d8c79c8592106d9a40b672/> reduce comm error weighting
+
+### New Features
+
+ - <csr-id-7ccb02a7ded7579bb8645c918b9a6108b1b585af/> enable tracking of Dkg issues
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release over the course of 3 calendar days.
- - 7 days passed between releases.
- - 0 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 4 commits contributed to the release over the course of 9 calendar days.
+ - 10 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -23,10 +32,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - adjust some dysfunction weighting. decreas dkg ([`26e35cc`](https://github.com/maidsafe/safe_network/commit/26e35cc2d1c5aab81c3479dd7948f7a7e586f817))
+    - reduce comm error weighting ([`537b6c0`](https://github.com/maidsafe/safe_network/commit/537b6c08447c15a056d8c79c8592106d9a40b672))
+    - enable tracking of Dkg issues ([`7ccb02a`](https://github.com/maidsafe/safe_network/commit/7ccb02a7ded7579bb8645c918b9a6108b1b585af))
+    - Merge #1217 ([`2f26043`](https://github.com/maidsafe/safe_network/commit/2f2604325d533357bad7d917315cf4cba0b2d3c0))
+</details>
+
+## v0.5.0 (2022-06-05)
+
+### Chore
+
+ - <csr-id-1bf7dfb3ce8b14cbed7a4a8ed98c8310653a2da9/> sn_interface-0.6.0/sn_dysfunction-0.5.0/sn_client-0.66.0/sn_node-0.62.0/sn_api-0.64.0/sn_cli-0.57.0
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release over the course of 4 calendar days.
+ - 8 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.6.0/sn_dysfunction-0.5.0/sn_client-0.66.0/sn_node-0.62.0/sn_api-0.64.0/sn_cli-0.57.0 ([`1bf7dfb`](https://github.com/maidsafe/safe_network/commit/1bf7dfb3ce8b14cbed7a4a8ed98c8310653a2da9))
     - Merge #1192 ([`f9fc2a7`](https://github.com/maidsafe/safe_network/commit/f9fc2a76f083ba5161c8c4eef9013c53586b4693))
 </details>
 
 ## v0.4.0 (2022-05-27)
+
+<csr-id-e5fcd032e1dd904e05bc23e119af1d06e3b85a06/>
 
 ### Chore
 

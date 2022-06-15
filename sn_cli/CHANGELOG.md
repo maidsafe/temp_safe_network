@@ -4,7 +4,38 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.57.4 (2022-06-15)
+
+### Chore
+
+ - <csr-id-4eb43fa884d7b047febb18c067ae905969a113bf/> upgrade blsttc to 6.0.0
+   There were various other crates that had to be upgraded in this process:
+   * secured_linked_list to v0.5.2 because it was also upgraded to reference v6.0.0 of blsttc
+   * bls_dkg to v0.10.3 because it was also upgraded to reference v6.0.0 of blsttc
+   * sn_consensus to v2.1.1 because it was also upgraded to reference v6.0.0 of blsttc
+   * sn_dbc to v4.0.0 because it was also upgraded to reference v6.0.0 of blsttc
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - upgrade blsttc to 6.0.0 ([`4eb43fa`](https://github.com/maidsafe/safe_network/commit/4eb43fa884d7b047febb18c067ae905969a113bf))
+</details>
+
 ## v0.57.3 (2022-06-15)
+
+<csr-id-0f00c8cf7caae190716c8fd57addd38b18a3a49b/>
 
 ### New Features
 
@@ -19,13 +50,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
  - <csr-id-0f00c8cf7caae190716c8fd57addd38b18a3a49b/> add from_safekey, from_register, from_bytes
 
+### Chore
+
+ - <csr-id-46246f155ab65f3fcd61381345f1a7f747dfe957/> sn_interface-0.6.2/sn_client-0.66.2/sn_node-0.62.4/sn_api-0.64.2/sn_cli-0.57.3
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 7 commits contributed to the release over the course of 1 calendar day.
- - 5 days passed between releases.
- - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 8 commits contributed to the release over the course of 2 calendar days.
+ - 6 days passed between releases.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -35,6 +70,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.6.2/sn_client-0.66.2/sn_node-0.62.4/sn_api-0.64.2/sn_cli-0.57.3 ([`46246f1`](https://github.com/maidsafe/safe_network/commit/46246f155ab65f3fcd61381345f1a7f747dfe957))
     - Merge remote-tracking branch 'origin/main' into drusu/remove-private-data ([`2057273`](https://github.com/maidsafe/safe_network/commit/2057273509c2488cafc7f6db2ae69a99efc3b350))
     - Merge branch 'main' into simplify_safeurl ([`a0175ab`](https://github.com/maidsafe/safe_network/commit/a0175abfa15e558e54fbb25dc3baf49343f040ac))
     - Merge branch 'main' into drusu/remove-private-data ([`0cd2007`](https://github.com/maidsafe/safe_network/commit/0cd2007e442086d6eb2a39ad1f452e590fad46a9))
@@ -45,6 +81,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 </details>
 
 ## v0.57.2 (2022-06-09)
+
+<csr-id-d05e7b3a97db73cdf84f74560056abe1f087820a/>
 
 ### Chore
 

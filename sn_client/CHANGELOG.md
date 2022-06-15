@@ -1113,7 +1113,39 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
+## v0.66.3 (2022-06-15)
+
+### Chore
+
+ - <csr-id-4eb43fa884d7b047febb18c067ae905969a113bf/> upgrade blsttc to 6.0.0
+   There were various other crates that had to be upgraded in this process:
+   * secured_linked_list to v0.5.2 because it was also upgraded to reference v6.0.0 of blsttc
+   * bls_dkg to v0.10.3 because it was also upgraded to reference v6.0.0 of blsttc
+   * sn_consensus to v2.1.1 because it was also upgraded to reference v6.0.0 of blsttc
+   * sn_dbc to v4.0.0 because it was also upgraded to reference v6.0.0 of blsttc
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - upgrade blsttc to 6.0.0 ([`4eb43fa`](https://github.com/maidsafe/safe_network/commit/4eb43fa884d7b047febb18c067ae905969a113bf))
+</details>
+
 ## v0.66.2 (2022-06-15)
+
+<csr-id-da58fdaa0d6849837e3e473cd7000edb92efe1f0/>
+<csr-id-b818c3fd10a4e3304b2c5f84dac843397873cba6/>
 
 ### New Features
 
@@ -1132,6 +1164,10 @@ needed, as they keypair itself contains the Arcs we need.
 
  - <csr-id-da58fdaa0d6849837e3e473cd7000edb92efe1f0/> minor refactor in sn_client messaging function
 
+### Chore
+
+ - <csr-id-46246f155ab65f3fcd61381345f1a7f747dfe957/> sn_interface-0.6.2/sn_client-0.66.2/sn_node-0.62.4/sn_api-0.64.2/sn_cli-0.57.3
+
 ### Test
 
  - <csr-id-b818c3fd10a4e3304b2c5f84dac843397873cba6/> cmd sent to all elders
@@ -1140,9 +1176,9 @@ needed, as they keypair itself contains the Arcs we need.
 
 <csr-read-only-do-not-edit/>
 
- - 11 commits contributed to the release over the course of 1 calendar day.
- - 7 days passed between releases.
- - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 12 commits contributed to the release over the course of 2 calendar days.
+ - 8 days passed between releases.
+ - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1152,6 +1188,7 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.6.2/sn_client-0.66.2/sn_node-0.62.4/sn_api-0.64.2/sn_cli-0.57.3 ([`46246f1`](https://github.com/maidsafe/safe_network/commit/46246f155ab65f3fcd61381345f1a7f747dfe957))
     - Merge remote-tracking branch 'origin/main' into drusu/remove-private-data ([`2057273`](https://github.com/maidsafe/safe_network/commit/2057273509c2488cafc7f6db2ae69a99efc3b350))
     - remove unused client_pk from Session::new(..) call ([`6c52f37`](https://github.com/maidsafe/safe_network/commit/6c52f37592fcda83243390565bd4fdefb821b9b4))
     - Merge branch 'main' into drusu/remove-private-data ([`0cd2007`](https://github.com/maidsafe/safe_network/commit/0cd2007e442086d6eb2a39ad1f452e590fad46a9))
@@ -1167,6 +1204,8 @@ needed, as they keypair itself contains the Arcs we need.
 
 ## v0.66.1 (2022-06-07)
 
+<csr-id-489904e325cfb8efca4289b05125904ad4029f3b/>
+
 ### Chore
 
  - <csr-id-489904e325cfb8efca4289b05125904ad4029f3b/> sn_interface-0.6.1/sn_client-0.66.1/sn_node-0.62.1/sn_api-0.64.1
@@ -1176,10 +1215,6 @@ needed, as they keypair itself contains the Arcs we need.
  - <csr-id-dbda86be03f912079776be514828ff5fd034830c/> first version of Spentbook messaging, storage, and client API
    - Storage is implemented using Register as the underlying data type. To be changed when
    actual SpentBook native data type is put in place.
-- First version of sn_client API for Spentbook messages.
-- sn_client::spent_proof_shares API to fetch spent proof shares.
-- sn_client::spend_dbc API to request Elders to store the spent proof shares.
-- Serialise SpentProofShare to store it as an entry in the underlying Register.
 
 ### Commit Statistics
 
@@ -1202,6 +1237,9 @@ needed, as they keypair itself contains the Arcs we need.
     - first version of Spentbook messaging, storage, and client API ([`dbda86b`](https://github.com/maidsafe/safe_network/commit/dbda86be03f912079776be514828ff5fd034830c))
     - Merge #1217 ([`2f26043`](https://github.com/maidsafe/safe_network/commit/2f2604325d533357bad7d917315cf4cba0b2d3c0))
 </details>
+
+<csr-unknown>
+First version of sn_client API for Spentbook messages.sn_client::spent_proof_shares API to fetch spent proof shares.sn_client::spend_dbc API to request Elders to store the spent proof shares.Serialise SpentProofShare to store it as an entry in the underlying Register.<csr-unknown/>
 
 ## v0.66.0 (2022-06-05)
 
