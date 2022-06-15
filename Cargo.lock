@@ -396,9 +396,9 @@ dependencies = [
 
 [[package]]
 name = "bls_dkg"
-version = "0.10.2"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a884ec529fbf542a46666b09f7581d27167013ca1189db578f4b9d962c32bf5"
+checksum = "defbd49a1a2f8ab594dfbf50d4b5066027128ef8aee77e5c12f41194fec86262"
 dependencies = [
  "aes 0.7.5",
  "bincode",
@@ -457,15 +457,16 @@ dependencies = [
 
 [[package]]
 name = "blsttc"
-version = "5.2.0"
+version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61b61b4b62f51c2203fd8e3166d054719ca540a0e4fb01b05f764d8cce5e4267"
+checksum = "614686247957f68bfda9f2409175490b2e46d8778b484d042bf26cf9f8fb3eca"
 dependencies = [
  "blst",
  "blstrs",
  "ff",
  "getrandom 0.2.6",
  "group",
+ "hex",
  "hex_fmt",
  "pairing",
  "rand 0.8.5",
@@ -981,14 +982,13 @@ dependencies = [
 
 [[package]]
 name = "dashmap"
-version = "5.3.4"
+version = "5.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3495912c9c1ccf2e18976439f4443f3fee0fd61f424ff99fde6a66b15ecb448f"
+checksum = "391b56fbd302e585b7a9494fb70e40949567b1cf9003a8e4a6041a1687c26573"
 dependencies = [
  "cfg-if 1.0.0",
  "hashbrown 0.12.1",
  "lock_api",
- "parking_lot_core 0.9.3",
  "serde",
 ]
 
@@ -3103,7 +3103,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfa0f585226d2e68097d4f95d113b15b83a82e819ab25717ec0590d9584ef366"
 dependencies = [
- "semver 1.0.10",
+ "semver 1.0.9",
 ]
 
 [[package]]
@@ -3187,9 +3187,9 @@ dependencies = [
 
 [[package]]
 name = "secured_linked_list"
-version = "0.5.1"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "173f7e9ec189f0cd8d349f73a7abbe954557b3ca848ce1289465feb27afa3c31"
+checksum = "19e061cddee0a14a0b0abec9eb1d26064ed96cd1bee1ec9a05e232cea2447509"
 dependencies = [
  "bincode",
  "blsttc",
@@ -3253,9 +3253,9 @@ dependencies = [
 
 [[package]]
 name = "semver"
-version = "1.0.10"
+version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a41d061efea015927ac527063765e73601444cdc344ba855bc7bd44578b25e1c"
+checksum = "8cb243bdfdb5936c8dc3c45762a19d12ab4550cdc753bc247637d4ec35a040fd"
 
 [[package]]
 name = "semver-parser"
@@ -3629,9 +3629,9 @@ dependencies = [
 
 [[package]]
 name = "sn_consensus"
-version = "2.1.0"
+version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "374362b956d03d65cd84c8f8f50c49b671c260b7304408933b799c3452c8047d"
+checksum = "7b853378b69e183aa1157180e77b7b240395100af1f1ebc234b27fb9818d4511"
 dependencies = [
  "bincode",
  "blsttc",
@@ -3643,9 +3643,9 @@ dependencies = [
 
 [[package]]
 name = "sn_dbc"
-version = "3.3.0"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de111a6c6650124aaaacefbaf846c856139c774af6882f3369a556d00694b5d5"
+checksum = "95d374fe6b8f0cc571d4038bab286d7383704a49abde9fda9485db9b7f681865"
 dependencies = [
  "bincode",
  "bls_ringct",
