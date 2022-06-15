@@ -6,11 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-pub use sn_interface::messaging::data::Error as ErrorMsg;
-
 use sn_interface::{
     messaging::{
-        data::{CmdError, OperationId, QueryResponse},
+        data::{CmdError, Error as ErrorMsg, OperationId, QueryResponse},
         Error as MessagingError, MsgId,
     },
     types::Error as DtError,

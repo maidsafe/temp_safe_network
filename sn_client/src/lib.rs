@@ -67,8 +67,9 @@ mod errors;
 // Export public API.
 pub use api::{Client, RegisterWriteAheadLog};
 pub use config_handler::{ClientConfig, DEFAULT_ACK_WAIT, DEFAULT_OPERATION_TIMEOUT};
-pub use errors::{Error, ErrorMsg, Result};
+pub use errors::{Error, Result};
 pub use qp2p::Config as QuicP2pConfig;
+pub use sn_interface::messaging::data::Error as ErrorMsg;
 
 /// Client trait and related constants.
 pub mod api;
