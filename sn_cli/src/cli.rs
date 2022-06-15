@@ -181,15 +181,12 @@ async fn get_config() -> Result<Config> {
     let mut cli_config_path = config_path.clone();
     cli_config_path.push("cli");
     cli_config_path.push("config.json");
-    let mut prefix_maps_dir = config_path;
-    prefix_maps_dir.push("prefix_maps");
-    let prefix_maps_dir_string = prefix_maps_dir
-        .to_path_buf()
-        .into_os_string()
-        .into_string()
-        .map_err(|e| eyre!("Error converting OsString to String, {:?}", e))?;
-    env::set_var(SN_PREFIX_MAP_DIR, prefix_maps_dir_string);
-    let mut config = Config::new(cli_config_path, prefix_maps_dir).await?;
+    let mut prefix_maps_path = config_path;
+    prefix_maps_path.push("prefix_maps");
+    let prefix_maps_path_string = prefix_maps_path.as_path().display().to_string();
+    dbg!(&prefix_maps_path_string);
+    env::set_var(SN_PREFIX_MAP_DIR, prefix_maps_path_string);
+    let mut config = Config::new(cli_config_path, prefix_maps_path).await?;
     config.sync().await?;
     Ok(config)
 }

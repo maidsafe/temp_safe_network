@@ -22,7 +22,7 @@ pub enum ConfigSubCommands {
     /// Remove a config setting
     Remove(SettingRemoveCmd),
     #[structopt(name = "clear")]
-    /// Remove all config settings
+    /// Remove all config settings and network maps
     Clear,
 }
 
@@ -32,7 +32,7 @@ pub enum SettingAddCmd {
     Network {
         /// Network name
         network_name: String,
-        /// Local or Remote location to fetch the NetworkPrefixMap
+        /// Local path or a remote URL to fetch the network map from
         prefix_location: String,
     },
     // #[structopt(name = "contact")]

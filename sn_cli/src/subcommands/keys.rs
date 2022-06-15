@@ -94,7 +94,7 @@ mod create_command {
     async fn should_create_bls_keypair() -> Result<()> {
         let config_dir = assert_fs::TempDir::new()?;
         let credentials_file = config_dir.child(".safe/cli/credentials");
-        let config = Config::create_config(&config_dir).await?;
+        let config = Config::create_config(&config_dir, None).await?;
 
         let result = key_commander(
             KeysSubCommands::Create { for_cli: false },
@@ -111,7 +111,7 @@ mod create_command {
     async fn should_create_bls_keypair_saved_to_credentials_file() -> Result<()> {
         let config_dir = assert_fs::TempDir::new()?;
         let credentials_file = config_dir.child(".safe/cli/credentials");
-        let config = Config::create_config(&config_dir).await?;
+        let config = Config::create_config(&config_dir, None).await?;
 
         let result = key_commander(
             KeysSubCommands::Create { for_cli: true },

@@ -22,14 +22,14 @@ pub enum NetworksSubCommands {
         network_name: String,
     },
     #[structopt(name = "check")]
-    /// Check current network configuration and try to match it to networks in the CLI config
+    /// Check where the default hardlink points and try to match it to the networks in the CLI config
     Check {},
     #[structopt(name = "add")]
-    /// Add a network to the CLI config using an existing network configuration file
+    /// Add a network to the CLI config using an existing network map
     Add {
-        /// Network name. If the network already exists in the config, it will be updated with the new location for the network connection information
+        /// Network name. If network_name already exists, then it's updated with the new network map
         network_name: String,
-        /// Local or Remote location to fetch the NetworkPrefixMap
+        /// Local path or a remote URL to fetch the network map from
         prefix_location: String,
     },
     #[structopt(name = "remove")]
@@ -56,7 +56,7 @@ pub async fn networks_commander(
             );
         }
         Some(NetworksSubCommands::Check {}) => {
-            println!("Checking current setup network connection information...");
+            println!("Checking current Network Map...");
             let prefix_map = config.read_default_prefix_map().await?;
             let mut matched_network = None;
             for (network_name, network_info) in config.networks_iter() {
@@ -71,7 +71,7 @@ pub async fn networks_commander(
                 Some(name) => {
                     println!("'{}' network matched!", name);
                     println!(
-                        "The default NetworkPrefixMap matches '{}' network as per current config",
+                        "The default Network Map matches '{}' network as per current config",
                         name
                     );
                 }
@@ -96,7 +96,7 @@ pub async fn networks_commander(
                     .await?
             };
             println!(
-                "Network '{}' was added to the list. Connection information is located at '{}'",
+                "Network '{}' was added to the list. Network Map is located at '{}'",
                 network_name, net_info
             );
         }

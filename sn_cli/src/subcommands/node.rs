@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::operations::{
-    config::{retrieve_local_prefix_map, Config, NetworkInfo, NetworkLauncher},
+    config::{Config, NetworkInfo, NetworkLauncher},
     node::*,
 };
 use color_eyre::{eyre::eyre, Result};
@@ -207,7 +207,7 @@ pub async fn node_commander(
             )?;
             // add the network
             let default_prefix_map_path = config.prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME);
-            let prefix_map = retrieve_local_prefix_map(&default_prefix_map_path).await?;
+            let prefix_map = Config::retrieve_local_prefix_map(&default_prefix_map_path).await?;
             let actual_path = config
                 .prefix_maps_dir
                 .join(format!("{:?}", prefix_map.genesis_key()));
@@ -269,7 +269,7 @@ mod run_command {
     async fn should_use_optionally_supplied_node_directory_path() -> Result<()> {
         let custom_node_dir = assert_fs::TempDir::new()?;
         let tmp_dir = assert_fs::TempDir::new()?;
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -301,7 +301,7 @@ mod run_command {
         let tmp_dir = assert_fs::TempDir::new()?;
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -332,7 +332,7 @@ mod run_command {
         let tmp_dir = assert_fs::TempDir::new()?;
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -362,7 +362,7 @@ mod run_command {
     async fn should_use_custom_node_data_directory_path() -> Result<()> {
         let custom_node_dir = assert_fs::TempDir::new()?;
         let tmp_dir = assert_fs::TempDir::new()?;
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -394,7 +394,7 @@ mod run_command {
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
         let node_data_dir = node_dir.child(NODES_DATA_DIR_NAME);
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -421,7 +421,7 @@ mod run_command {
         let tmp_dir = assert_fs::TempDir::new()?;
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -449,7 +449,7 @@ mod run_command {
         let tmp_dir = assert_fs::TempDir::new()?;
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -477,7 +477,7 @@ mod run_command {
         let tmp_dir = assert_fs::TempDir::new()?;
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -505,7 +505,7 @@ mod run_command {
         let tmp_dir = assert_fs::TempDir::new()?;
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -532,7 +532,7 @@ mod run_command {
         let tmp_dir = assert_fs::TempDir::new()?;
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
             launch_args: Vec::new(),
@@ -577,7 +577,7 @@ mod join_command {
         let tmp_dir = assert_fs::TempDir::new()?;
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
         let prefix_map_name = prefix_map_name
@@ -617,7 +617,7 @@ mod join_command {
         let tmp_dir = assert_fs::TempDir::new()?;
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
         let prefix_map_name = prefix_map_name
@@ -659,7 +659,7 @@ mod join_command {
         let tmp_dir = assert_fs::TempDir::new()?;
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
         let prefix_map_name = prefix_map_name
@@ -702,7 +702,7 @@ mod join_command {
         let tmp_dir = assert_fs::TempDir::new()?;
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
         let prefix_map_name = prefix_map_name
@@ -744,7 +744,7 @@ mod join_command {
         let tmp_dir = assert_fs::TempDir::new()?;
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
         let prefix_map_name = prefix_map_name
@@ -785,7 +785,7 @@ mod join_command {
         let tmp_dir = assert_fs::TempDir::new()?;
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
         let prefix_map_name = prefix_map_name
@@ -824,7 +824,7 @@ mod join_command {
         let tmp_dir = assert_fs::TempDir::new()?;
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
         let prefix_map_name = prefix_map_name
@@ -866,7 +866,7 @@ mod join_command {
         let tmp_dir = assert_fs::TempDir::new()?;
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
         let prefix_map_name = prefix_map_name
@@ -904,7 +904,7 @@ mod join_command {
         let tmp_dir = assert_fs::TempDir::new()?;
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
         let prefix_map_name = prefix_map_name
@@ -943,7 +943,7 @@ mod join_command {
         let node_dir = tmp_dir.child(".safe/node");
         node_dir.create_dir_all()?;
         let node_data_dir = node_dir.child(LOCAL_NODE_DIR_NAME);
-        let mut config = Config::create_config(&tmp_dir).await?;
+        let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
         let prefix_map_name = prefix_map_name
