@@ -277,9 +277,11 @@ impl Node {
     }
 
     /// Removes any PeerLinks not from our section elders
-    pub(crate) async fn cleanup_non_elder_peers(&self) {
+    pub(crate) async fn cleanup_non_elder_peers(&self) -> Result<()> {
         let elders = self.network_knowledge.elders().await;
-        self.comm.cleanup_peers(elders).await
+        self.comm
+            .cleanup_peers(elders, self.dysfunction_tracking.clone())
+            .await
     }
 
     /// returns names that are relatively dysfunctional
@@ -292,10 +294,35 @@ impl Node {
 
     /// Log a communication problem
     pub(crate) async fn log_comm_issue(&self, name: XorName) -> Result<()> {
+        trace!("Logging comms issue in dysfunction");
         self.dysfunction_tracking
             .track_issue(name, IssueType::Communication)
             .await
             .map_err(Error::from)
+    }
+
+    /// Log a knowledge issue
+    pub(crate) async fn log_knowledge_issue(&self, name: XorName) -> Result<()> {
+        trace!("Logging Knowledge issue in dysfunction");
+        self.dysfunction_tracking
+            .track_issue(name, IssueType::Knowledge)
+            .await
+            .map_err(Error::from)
+    }
+
+    /// Log a dkg issue (ie, an initialised but unfinished dkg round for a given participant)
+    pub(crate) async fn log_dkg_issue(&self, name: XorName) -> Result<()> {
+        trace!("Logging Dkg Issue in dysfunction");
+        self.dysfunction_tracking
+            .track_issue(name, IssueType::Dkg)
+            .await
+            .map_err(Error::from)
+    }
+
+    /// Log a dkg session as responded to
+    pub(crate) async fn log_dkg_session(&self, name: &XorName) {
+        trace!("Logging Dkg session as responded to in dysfunction");
+        self.dysfunction_tracking.dkg_ack_fulfilled(name).await;
     }
 
     pub(crate) async fn write_prefix_map(&self) {
@@ -327,7 +354,7 @@ impl Node {
     pub(super) async fn promote_and_demote_elders(
         &self,
         excluded_names: &BTreeSet<XorName>,
-    ) -> Vec<DkgSessionId> {
+    ) -> Result<Vec<DkgSessionId>> {
         let sap = self.network_knowledge.authority_provider().await;
         let chain_len = self.network_knowledge.chain_len().await;
 
@@ -345,7 +372,7 @@ impl Node {
                 error!(
                 "attempted to promote and demote elders when we don't have a membership instance"
             );
-                return vec![];
+                return Ok(vec![]);
             };
 
         // Try splitting
@@ -359,7 +386,16 @@ impl Node {
                 one_dkg_id.bootstrap_members.len()
             );
             info!("Splitting {:?} {:?}", zero_dkg_id, one_dkg_id);
-            return vec![zero_dkg_id, one_dkg_id];
+
+            // lets track ongoing DKG sessions
+            for candidate in zero_dkg_id.elders.keys() {
+                self.log_dkg_issue(*candidate).await?;
+            }
+            for candidate in one_dkg_id.elders.keys() {
+                self.log_dkg_issue(*candidate).await?;
+            }
+
+            return Ok(vec![zero_dkg_id, one_dkg_id]);
         }
 
         // Candidates for elders out of all the nodes in the section, even out of the
@@ -381,7 +417,7 @@ impl Node {
             elder_candidates
         );
 
-        if elder_candidates
+        let res = if elder_candidates
             .iter()
             .map(NodeState::peer)
             .eq(current_elders.iter())
@@ -413,8 +449,15 @@ impl Node {
                 bootstrap_members: BTreeSet::from_iter(members.into_values()),
                 membership_gen: current_gen,
             };
+            // track init of DKG
+            for candidate in session_id.elders.keys() {
+                self.log_dkg_issue(*candidate).await?;
+            }
+
             vec![session_id]
-        }
+        };
+
+        Ok(res)
     }
 
     async fn initialize_membership(&self, sap: SectionAuthorityProvider) -> Result<()> {

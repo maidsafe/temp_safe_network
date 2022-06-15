@@ -180,7 +180,7 @@ impl Dispatcher {
     async fn try_processing_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
         match cmd {
             Cmd::CleanupPeerLinks => {
-                self.node.cleanup_non_elder_peers().await;
+                self.node.cleanup_non_elder_peers().await?;
                 Ok(vec![])
             }
             Cmd::SignOutgoingSystemMsg { msg, dst } => {

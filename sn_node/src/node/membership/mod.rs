@@ -6,6 +6,7 @@ use sn_interface::messaging::system::DkgSessionId;
 use sn_interface::{
     messaging::system::{MembershipState, NodeState},
     network_knowledge::{partition_by_prefix, recommended_section_size, SectionAuthorityProvider},
+    types::log_markers::LogMarker,
 };
 
 use thiserror::Error;
@@ -326,6 +327,8 @@ impl Membership {
                     "Membership - decided {:?}",
                     BTreeSet::from_iter(decision.proposals.keys())
                 );
+
+                debug!("{}", LogMarker::VotedOffline);
                 let next_consensus = Consensus::from(
                     self.consensus.secret_key.clone(),
                     self.consensus.elders.clone(),

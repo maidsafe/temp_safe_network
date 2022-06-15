@@ -61,7 +61,7 @@ impl Node {
             // This node is rejoin with same name.
             if old_info.state() != MembershipState::Left {
                 debug!(
-                    "Ignoring Online node {} - {:?} not Left.",
+                    "Ignoring Online node {} , Already a member (or has been) - {:?} not Left.",
                     new_info.name(),
                     old_info.state(),
                 );
@@ -190,7 +190,7 @@ impl Node {
         //       elders excluded, this check here uses the empty set for the
         //       excluded_candidates which would prevent a dkg-retry from
         //       succeeding.
-        let dkg_sessions = self.promote_and_demote_elders(&BTreeSet::new()).await;
+        let dkg_sessions = self.promote_and_demote_elders(&BTreeSet::new()).await?;
 
         let agreeing_elders = BTreeSet::from_iter(signed_section_auth.names());
         if dkg_sessions

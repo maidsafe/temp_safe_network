@@ -110,23 +110,21 @@ fn create_runtime_and_node() -> Result<()> {
 
     // start a new runtime for a node.
     let rt = tokio::runtime::Runtime::new()?;
-    let res = rt.block_on(async move {
+    let _res = rt.block_on(async move {
         // pull config again in case it has been updated meanwhile
         let config = Config::new().await?;
         // we want logging to persist
         // loops ready to catch any ChurnJoinMiss
-        let res = match run_node(config).await {
-            Ok(result) => {
+        match run_node(config).await {
+            Ok(_) => {
                 info!("Node has finished running, no runtime errors were reported");
-                Ok(result)
             }
             Err(error) => {
-                warn!("Node instance finished with an error. Restarting node...");
-                Err(error)
+                warn!("Node instance finished with an error: {error:?}");
             }
         };
 
-        res
+        Result::<(), NodeError>::Ok(())
     });
 
     info!("Shutting down node runtime");
@@ -134,7 +132,7 @@ fn create_runtime_and_node() -> Result<()> {
     // doesn't really matter the outcome here.
     rt.shutdown_timeout(Duration::from_secs(2));
     debug!("Node runtime should be shutdown now");
-    res
+    Ok(())
 }
 
 /// Inits node logging, returning the global node guard if required.
@@ -326,6 +324,8 @@ async fn run_node(config: Config) -> Result<()> {
     );
     info!("\n{}\n{}", message, "=".repeat(message.len()));
 
+    let our_pid = std::process::id();
+
     let log = format!("The network is not accepting nodes right now. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds");
 
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
@@ -363,7 +363,7 @@ async fn run_node(config: Config) -> Result<()> {
                 exit(1);
             }
             Err(NodeError::JoinTimeout) => {
-                let message = format!("Encountered a timeout while trying to join the network. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds.");
+                let message = format!("(PID: {our_pid}): Encountered a timeout while trying to join the network. Retrying after {BOOTSTRAP_RETRY_TIME_SEC} seconds.");
                 println!("{}", &message);
                 error!("{}", &message);
             }
@@ -403,18 +403,19 @@ async fn run_node(config: Config) -> Result<()> {
     // Simulate failed node starts, and ensure that
     #[cfg(feature = "chaos")]
     {
-        let our_pid = std::process::id();
         use rand::Rng;
         let mut rng = rand::thread_rng();
         let x: f64 = rng.gen_range(0.0..1.0);
 
         if !config.is_first() && x > 0.6 {
             println!(
-                "[Chaos] (PID:{our_pid}): Startup chaos crash w/ x of: {}",
+                "[Chaos] (PID: {our_pid}): Startup chaos crash w/ x of: {}",
                 x
             );
 
-            warn!("[Chaos] (PID:{our_pid}): ChaoticStartupCrash");
+            // tiny sleep so testnet doesn't detect a fauly node and exit
+            sleep(Duration::from_secs(1)).await;
+            warn!("[Chaos] (PID: {our_pid}): ChaoticStartupCrash");
             return Err(NodeError::ChaoticStartupCrash).map_err(ErrReport::msg);
         }
     }

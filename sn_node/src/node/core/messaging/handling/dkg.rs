@@ -200,7 +200,7 @@ impl Node {
 
         let dkg_session = if let Some(dkg_session) = self
             .promote_and_demote_elders(&BTreeSet::new())
-            .await
+            .await?
             .into_iter()
             .find(|session_id| failure_set.verify(session_id))
         {
@@ -280,6 +280,11 @@ impl Node {
     }
 
     pub(crate) async fn handle_dkg_failure(&self, failure_set: DkgFailureSigSet) -> Result<Cmd> {
+        // track those failed participants
+        for name in &failure_set.failed_participants {
+            self.log_dkg_issue(*name).await?;
+        }
+
         let node_msg = SystemMsg::DkgFailureAgreement(failure_set);
         self.send_msg_to_our_elders(node_msg).await
     }

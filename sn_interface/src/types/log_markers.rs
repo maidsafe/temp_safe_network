@@ -35,6 +35,7 @@ pub enum LogMarker {
     ProposeOffline,
     AcceptedNodeAsOffline,
     IgnoredNodeAsOffline,
+    VotedOffline,
     // Messaging
     ServiceMsgToBeHandled,
     SystemMsgToBeHandled,
