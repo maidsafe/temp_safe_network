@@ -8,10 +8,11 @@
 
 use super::ipc::IpcError;
 use super::nrs::NrsMap;
-use super::safeurl::{Error as UrlError, SafeUrl, XorUrl};
+
 use sn_client::Error as ClientError;
 use sn_dbc::Error as DbcError;
 use sn_interface::types::Error as InterfaceError;
+use sn_url::{Error as UrlError, SafeUrl, XorUrl};
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;

@@ -10,6 +10,7 @@ use super::{Range, SafeData};
 use crate::app::{
     files::{self, FileInfo, FilesMap},
     multimap::Multimap,
+    register::EntryHash,
     DataType, Safe, SafeUrl,
 };
 use crate::{Error, Result};
@@ -31,7 +32,7 @@ impl Safe {
             let url_path = input_url.path_decoded()?;
             let target_path = target_url.path_decoded()?;
             target_url.set_path(&format!("{}{}", target_path, url_path));
-            let version = input_url.content_version().map(|v| v.entry_hash());
+            let version = input_url.content_version().map(|v| EntryHash(*v.bytes()));
             let safe_data = SafeData::NrsEntry {
                 xorurl: target_url.to_xorurl_string(),
                 public_name: input_url.public_name().to_string(),
@@ -62,13 +63,16 @@ impl Safe {
         let data: Multimap = if retrieve_data {
             match input_url.content_version() {
                 None => self.fetch_multimap(&input_url).await?,
-                Some(v) => vec![(
-                    v.entry_hash(),
-                    self.fetch_multimap_value_by_hash(&input_url, v.entry_hash())
-                        .await?,
-                )]
-                .into_iter()
-                .collect(),
+                Some(v) => {
+                    let entry_hash = EntryHash(*v.bytes());
+                    vec![(
+                        entry_hash,
+                        self.fetch_multimap_value_by_hash(&input_url, entry_hash)
+                            .await?,
+                    )]
+                    .into_iter()
+                    .collect()
+                }
             }
         } else {
             Multimap::new()
@@ -111,13 +115,15 @@ impl Safe {
                 let data = if retrieve_data {
                     match input_url.content_version() {
                         None => self.register_fetch_entries(&input_url).await?,
-                        Some(v) => vec![(
-                            v.entry_hash(),
-                            self.register_fetch_entry(&input_url, v.entry_hash())
-                                .await?,
-                        )]
-                        .into_iter()
-                        .collect(),
+                        Some(v) => {
+                            let entry_hash = EntryHash(*v.bytes());
+                            vec![(
+                                entry_hash,
+                                self.register_fetch_entry(&input_url, entry_hash).await?,
+                            )]
+                            .into_iter()
+                            .collect()
+                        }
                     }
                 } else {
                     BTreeSet::new()

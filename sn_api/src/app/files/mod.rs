@@ -12,8 +12,8 @@ mod metadata;
 mod realpath;
 
 use crate::{
-    app::consts::*, app::nrs::VersionHash, resolver::Range, ContentType, DataType, Error, Result,
-    Safe, SafeUrl, XorUrl,
+    app::consts::*, app::nrs::VersionHash, register::EntryHash, resolver::Range, ContentType,
+    DataType, Error, Result, Safe, SafeUrl, XorUrl,
 };
 use bytes::{Buf, Bytes};
 use file_system::{
@@ -126,7 +126,7 @@ impl Safe {
             client.publish_register_ops(reg_op).await?;
 
             // We return versioned xorurl
-            reg_url.set_content_version(Some(VersionHash::from(&entry_hash)));
+            reg_url.set_content_version(Some(VersionHash::new(entry_hash.0)));
 
             Ok((reg_url.to_string(), processed_files, files_map))
         }
@@ -164,7 +164,7 @@ impl Safe {
         debug!(
             "Fetching FilesContainer from {}, address type: {:?}",
             safe_url,
-            safe_url.address()
+            safe_url.data_type()
         );
 
         let entries = self
@@ -196,7 +196,7 @@ impl Safe {
         }
         let first_entry = entries.iter().next();
         let (version, files_map_xorurl) = if let Some((v, m)) = first_entry {
-            (v.into(), str::from_utf8(m)?)
+            (VersionHash::new(v.0), str::from_utf8(m)?)
         } else {
             warn!("FilesContainer found at \"{:?}\" was empty", safe_url);
             return Ok(None);
@@ -562,11 +562,14 @@ impl Safe {
 
         // append entry to register
         let entry = files_map_xorurl.as_bytes().to_vec();
-        let replace = current_version.iter().map(|e| e.entry_hash()).collect();
+        let replace = current_version
+            .iter()
+            .map(|v| EntryHash(*v.bytes()))
+            .collect();
         let entry_hash = &self
             .register_write(&safe_url.to_string(), entry, replace)
             .await?;
-        let new_version: VersionHash = entry_hash.into();
+        let new_version = VersionHash::new(entry_hash.0);
 
         if update_nrs {
             // We need to update the link in the NRS container as well,
@@ -626,7 +629,7 @@ impl Safe {
             let (address, _) = client.upload_and_verify(bytes).await?;
             address
         };
-        let xorurl = SafeUrl::from_bytes(address, content_type)?.encode(self.xorurl_base);
+        let xorurl = SafeUrl::from_file(address, content_type)?.encode(self.xorurl_base);
 
         Ok(xorurl)
     }
@@ -1208,7 +1211,6 @@ mod tests {
     use super::*;
     use crate::{
         app::test_helpers::{new_safe_instance, random_nrs_name},
-        register::EntryHash,
         retry_loop, retry_loop_for_pattern,
     };
     use anyhow::{anyhow, bail, Result};
@@ -2231,8 +2233,8 @@ mod tests {
             .is_none());
 
         // let's fetch invalid version
-        let random_hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
-        let version_hash = VersionHash::from(&random_hash);
+        let random_hash = rand::thread_rng().gen::<[u8; 32]>();
+        let version_hash = VersionHash::new(random_hash);
         safe_url.set_content_version(Some(version_hash));
         match safe.files_container_get(&safe_url.to_string()).await {
             Ok(_) => Err(anyhow!(

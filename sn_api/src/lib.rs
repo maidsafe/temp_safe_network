@@ -18,7 +18,6 @@ mod authenticator;
 mod common;
 mod constants;
 mod errors;
-mod safeurl;
 
 // re-export these useful types from sn_data_types
 pub use sn_interface::types::{DataAddress, Keypair, PublicKey, RegisterAddress, SecretKey, Token};
@@ -41,5 +40,3 @@ pub use authd_client::*;
 pub use common::auth_types::*;
 
 pub use errors::{Error, Result};
-
-pub use safeurl::*;

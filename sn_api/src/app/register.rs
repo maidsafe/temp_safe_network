@@ -8,7 +8,6 @@
 
 pub use sn_interface::types::register::{Entry, EntryHash};
 
-use crate::safeurl::{ContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe};
 use sn_interface::messaging::data::Error as ErrorMsg;
 
@@ -17,8 +16,9 @@ use rand::Rng;
 use sn_client::Error as ClientError;
 use sn_interface::types::{
     register::{Permissions, Policy, User},
-    DataAddress, Error as SafeNdError, RegisterAddress,
+    Error as SafeNdError, RegisterAddress,
 };
+use sn_url::{ContentType, DataType, SafeUrl, XorUrl};
 use std::collections::{BTreeMap, BTreeSet};
 use tracing::info;
 use xor_name::XorName;
@@ -93,11 +93,11 @@ impl Safe {
         debug!("Fetching Register entries from {}", url);
         let result = match url.content_version() {
             Some(v) => {
-                let hash = v.entry_hash();
-                debug!("Take entry with version hash: {:?}", hash);
-                self.register_fetch_entry(url, hash)
+                let entry_hash = EntryHash(*v.bytes());
+                debug!("Take entry with entry hash: {:?}", entry_hash);
+                self.register_fetch_entry(url, entry_hash)
                     .await
-                    .map(|entry| vec![(hash, entry)].into_iter().collect())
+                    .map(|entry| vec![(entry_hash, entry)].into_iter().collect())
             }
             None => {
                 debug!("No version so take latest entry from Register at: {}", url);
@@ -212,8 +212,8 @@ impl Safe {
     }
 
     pub(crate) fn get_register_address(&self, url: &SafeUrl) -> Result<RegisterAddress> {
-        let address = match url.address() {
-            DataAddress::Register(reg_address) => reg_address,
+        let address = match url.data_type() {
+            DataType::Register => RegisterAddress::new(url.xorname(), url.type_tag()),
             other => {
                 return Err(Error::ContentError(format!(
                     "The url {} has an {:?} address. \

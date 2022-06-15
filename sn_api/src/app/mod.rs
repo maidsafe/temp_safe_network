@@ -17,9 +17,9 @@ pub mod register;
 pub mod resolver;
 pub mod wallet;
 
-pub use crate::safeurl::*;
 pub use consts::DEFAULT_XORURL_BASE;
 pub use helpers::parse_tokens_amount;
+pub use sn_url::*;
 pub use xor_name::{XorName, XOR_NAME_LEN};
 
 // --------------------------------------------------------------------

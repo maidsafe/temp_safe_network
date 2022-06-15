@@ -10,12 +10,12 @@ pub use sn_dbc::Dbc;
 
 use super::helpers::parse_tokens_amount;
 use super::register::EntryHash;
-use crate::safeurl::{ContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe};
 use bytes::Bytes;
 use log::{debug, warn};
 use sn_dbc::{rng, Owner, OwnerOnce, TransactionBuilder};
 use sn_interface::types::Token;
+use sn_url::{ContentType, SafeUrl, XorUrl};
 use std::collections::{BTreeMap, BTreeSet};
 
 // Type tag used for the Wallet

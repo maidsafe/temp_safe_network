@@ -9,8 +9,8 @@
 mod nrs_map;
 
 pub use crate::app::multimap::Multimap;
-pub use crate::safeurl::{ContentType, DataType, VersionHash};
 pub use nrs_map::NrsMap;
+pub use sn_url::{ContentType, DataType, VersionHash};
 
 use crate::{app::Safe, register::EntryHash, Error, Result, SafeUrl};
 
@@ -212,12 +212,11 @@ impl Safe {
         if let Some(version) = version {
             if !multimap
                 .iter()
-                .any(|(h, _)| VersionHash::from(h) == version)
+                .any(|(h, _)| VersionHash::new(h.0) == version)
             {
-                let key_val = self
-                    .fetch_multimap_value_by_hash(&url, version.entry_hash())
-                    .await?;
-                multimap.insert((version.entry_hash(), key_val));
+                let entry_hash = EntryHash(*version.bytes());
+                let key_val = self.fetch_multimap_value_by_hash(&url, entry_hash).await?;
+                multimap.insert((entry_hash, key_val));
             }
         }
 
@@ -256,11 +255,10 @@ fn convert_multimap_to_nrs_set(
         let mut versioned_set: BTreeSet<(VersionHash, String, SafeUrl)> = multimap
             .clone()
             .into_iter()
-            .map(|x| {
-                let version = VersionHash::from(&x.0);
-                let kv = x.1;
-                let public_name = str::from_utf8(&kv.0)?;
-                let url = SafeUrl::from_url(str::from_utf8(&kv.1)?)?;
+            .map(|(entry_hash, (key, value))| {
+                let version = VersionHash::new(entry_hash.0);
+                let public_name = str::from_utf8(&key)?;
+                let url = SafeUrl::from_url(str::from_utf8(&value)?)?;
                 Ok((version, public_name.to_owned(), url))
             })
             .collect::<Result<BTreeSet<(VersionHash, String, SafeUrl)>>>()?;
@@ -307,7 +305,7 @@ fn get_nrs_map_from_set(set: &BTreeSet<(String, SafeUrl)>) -> Result<NrsMap> {
 }
 
 fn set_nrs_url_props(url: &mut SafeUrl, entry_hash: EntryHash) -> Result<()> {
-    url.set_content_version(Some(VersionHash::from(&entry_hash)));
+    url.set_content_version(Some(VersionHash::new(entry_hash.0)));
     url.set_content_type(ContentType::NrsMapContainer)?;
     Ok(())
 }

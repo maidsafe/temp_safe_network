@@ -42,6 +42,7 @@ sha3 = "~0.9"
 sn_client = { path = "../sn_client", version = "^0.66.3" }
 sn_dbc = { version = "4.0.0", features = ["serdes"] }
 sn_interface = { path = "../sn_interface", version = "^0.6.3" }
+sn_url = { git = "https://github.com/bochaco/sn_url.git", branch = "chore-merge-changes-from-fork" }
 thiserror = "1.0.23"
 time = { version = "~0.3.4", features = ["formatting"] }
 tiny-keccak = { version = "2.0.2", features = ["sha3"] }

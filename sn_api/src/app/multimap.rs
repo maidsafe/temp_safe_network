@@ -8,12 +8,12 @@
 
 use super::register::EntryHash;
 
-use crate::safeurl::{ContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe};
 
 use log::debug;
 use rand::Rng;
-use sn_interface::types::DataAddress;
+use sn_interface::types::RegisterAddress;
+use sn_url::{ContentType, DataType, SafeUrl, XorUrl};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -84,8 +84,8 @@ impl Safe {
 
         let data = serialised_entry.to_vec();
         let safeurl = SafeUrl::from_url(multimap_url)?;
-        let address = match safeurl.address() {
-            DataAddress::Register(reg_address) => reg_address,
+        let address = match safeurl.data_type() {
+            DataType::Register => RegisterAddress::new(safeurl.xorname(), safeurl.type_tag()),
             other => {
                 return Err(Error::InvalidXorUrl(format!(
                     "The Multimap Url {} has an {:?} address.\
@@ -119,8 +119,8 @@ impl Safe {
     ) -> Result<EntryHash> {
         debug!("Removing from Multimap at {}: {:?}", url, to_remove);
         let safeurl = SafeUrl::from_url(url)?;
-        let address = match safeurl.address() {
-            DataAddress::Register(reg_address) => reg_address,
+        let address = match safeurl.data_type() {
+            DataType::Register => RegisterAddress::new(safeurl.xorname(), safeurl.type_tag()),
             other => {
                 return Err(Error::InvalidXorUrl(format!(
                     "The multimap url {} has an {:?} address.\

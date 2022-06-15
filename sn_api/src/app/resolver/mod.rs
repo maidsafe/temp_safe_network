@@ -205,11 +205,11 @@ impl Safe {
         resolve_path: bool,
     ) -> Result<SafeData> {
         debug!(
-            "Resolving URL: {}, of content type: {:?}, and data type: {:?}, address {:?}",
+            "Resolving URL: {}, of content type: {:?}, and data type: {:?}, xor_name {:?}",
             input_url.to_xorurl_string(),
             input_url.content_type(),
             input_url.data_type(),
-            input_url.address()
+            input_url.xorname()
         );
 
         match input_url.content_type() {
@@ -247,7 +247,6 @@ mod tests {
     };
     use anyhow::{anyhow, bail, Context, Result};
     use bytes::Bytes;
-    use sn_interface::types::DataAddress;
     use std::io::Read;
 
     #[tokio::test]
@@ -610,16 +609,10 @@ mod tests {
         let safe = new_safe_instance().await?;
         let xorname = xor_name::rand::random();
         let type_tag = 575_756_443;
-        let xorurl = SafeUrl::new(
-            DataAddress::register(xorname, type_tag),
-            None,
+        let xorurl = SafeUrl::from_register(
+            xorname,
             type_tag,
             ContentType::MediaType("text/html".to_string()),
-            None,
-            None,
-            None,
-            None,
-            None,
         )?
         .encode(XorUrlBase::Base32z);
 
@@ -950,8 +943,10 @@ mod tests {
                 assert_eq!(*resolves_into, files_container["/testdata/test.md"]);
                 assert_eq!(*resolved_from, nrs_url.to_string());
 
-                let left = VersionHash::from(
-                    &version.ok_or_else(|| anyhow!("version should not be None"))?,
+                let left = VersionHash::new(
+                    version
+                        .map(|v| v.0)
+                        .ok_or_else(|| anyhow!("version should not be None"))?,
                 );
                 let right = nrs_url
                     .content_version()
