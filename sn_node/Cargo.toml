@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "sn_node"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
-version = "0.62.3"
+version = "0.62.4"
 
 
 
@@ -66,7 +66,7 @@ self_encryption = "~0.27.4"
 sn_consensus = "2.0.0"
 sn_dbc = { version = "3.2.0", features = ["serdes"] }
 sn_dysfunction = { path = "../sn_dysfunction", version = "^0.5.0" }
-sn_interface = { path = "../sn_interface", version = "^0.6.1" }
+sn_interface = { path = "../sn_interface", version = "^0.6.2" }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_bytes = "~0.11.5"
 serde_json = "1.0.53"
@@ -107,7 +107,7 @@ rand_xorshift = "~0.2.0"
 tokio-util = { version = "~0.6.7", features = ["time"] }
 walkdir = "2"
 yansi = "~0.5.0"
-sn_interface = { path = "../sn_interface", version = "^0.6.1", features= ["test-utils", "proptest"] }
+sn_interface = { path = "../sn_interface", version = "^0.6.2", features= ["test-utils", "proptest"] }
 
 [dev-dependencies.cargo-husky]
 version = "1.5.0"

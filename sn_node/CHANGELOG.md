@@ -5,12 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.62.4 (2022-06-15)
+
+### Chore
+
+ - <csr-id-08ea69a0084b0e8d8aea51f06b99af426a7255c9/> BREAKING CHANGE: removed private scope
+
+### New Features
+
+ - <csr-id-1b1cb77df6c2805ecfa741bb824b359214558929/> remove private registers
+
+### Bug Fixes
+
+ - <csr-id-60f5a68a1df6114b65d7c57099fea0347ba3d1dd/> some changes I missed in the initial private removal
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release over the course of 1 calendar day.
+ - 3 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge remote-tracking branch 'origin/main' into drusu/remove-private-data ([`2057273`](https://github.com/maidsafe/safe_network/commit/2057273509c2488cafc7f6db2ae69a99efc3b350))
+    - Merge branch 'main' into drusu/remove-private-data ([`0cd2007`](https://github.com/maidsafe/safe_network/commit/0cd2007e442086d6eb2a39ad1f452e590fad46a9))
+    - BREAKING CHANGE: removed private scope ([`08ea69a`](https://github.com/maidsafe/safe_network/commit/08ea69a0084b0e8d8aea51f06b99af426a7255c9))
+    - some changes I missed in the initial private removal ([`60f5a68`](https://github.com/maidsafe/safe_network/commit/60f5a68a1df6114b65d7c57099fea0347ba3d1dd))
+    - remove private registers ([`1b1cb77`](https://github.com/maidsafe/safe_network/commit/1b1cb77df6c2805ecfa741bb824b359214558929))
+</details>
+
 ## v0.62.3 (2022-06-11)
+
+<csr-id-fe2010fa66622cfcb52325ad6139bb1bf1783251/>
 
 ### Chore
 
  - <csr-id-fe2010fa66622cfcb52325ad6139bb1bf1783251/> add basic chaos to node startup
    random crashes to ensure that the node startup looping is in effect
+
+### Chore
+
+ - <csr-id-537767d0d33d3ba9ee530863761c7c3df102d00b/> sn_node-0.62.3
 
 ### Bug Fixes
 
@@ -27,8 +70,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -38,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_node-0.62.3 ([`537767d`](https://github.com/maidsafe/safe_network/commit/537767d0d33d3ba9ee530863761c7c3df102d00b))
     - add basic chaos to node startup ([`fe2010f`](https://github.com/maidsafe/safe_network/commit/fe2010fa66622cfcb52325ad6139bb1bf1783251))
     - Node init and restart on error ([`155d664`](https://github.com/maidsafe/safe_network/commit/155d66436b1cdb3c1520c17f0e827124f9e6cac5))
 </details>
@@ -45,6 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.62.2 (2022-06-10)
 
 <csr-id-aa05d4eac37ebf6969275555e787dd81f5f65de7/>
+<csr-id-6253530bf609e214de3a04433dcc260aa71721e0/>
 
 ### Chore
 
@@ -118,9 +164,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - remove accidental log commit ([`d4088d4`](https://github.com/maidsafe/safe_network/commit/d4088d4c5d26904187fa8b08fa6a9c9f8b04c5b2))
     - Merge #1217 ([`2f26043`](https://github.com/maidsafe/safe_network/commit/2f2604325d533357bad7d917315cf4cba0b2d3c0))
 </details>
-
-<csr-unknown>
-First version of sn_client API for Spentbook messages.sn_client::spent_proof_shares API to fetch spent proof shares.sn_client::spend_dbc API to request Elders to store the spent proof shares.Serialise SpentProofShare to store it as an entry in the underlying Register.<csr-unknown/>
 
 ## v0.62.0 (2022-06-05)
 

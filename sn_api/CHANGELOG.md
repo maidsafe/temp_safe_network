@@ -5,29 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.64.1 (2022-06-07)
-
-### Chore
-
- - <csr-id-24299786ba730e467c10946c8c152936b96148f8/> address some review comments
+## v0.64.2 (2022-06-15)
 
 ### New Features
 
- - <csr-id-dbda86be03f912079776be514828ff5fd034830c/> first version of Spentbook messaging, storage, and client API
-   - Storage is implemented using Register as the underlying data type. To be changed when
-     actual SpentBook native data type is put in place.
-   - First version of sn_client API for Spentbook messages.
-   - sn_client::spent_proof_shares API to fetch spent proof shares.
-   - sn_client::spend_dbc API to request Elders to store the spent proof shares.
-   - Serialise SpentProofShare to store it as an entry in the underlying Register.
+ - <csr-id-1b1cb77df6c2805ecfa741bb824b359214558929/> remove private registers
+ - <csr-id-f1829f99ef1415a83731f855757fbce9970fa4f0/> remove private data addresses
+ - <csr-id-8be2f2c9efac1623ea95ff1641c6b9bc22fad455/> remove private safe key addresses
+
+### Bug Fixes
+
+ - <csr-id-426ad4a0c15d0ef3554ec098081c118759bf44fb/> retry_loop on wallet tests
+ - <csr-id-d7bcc1012d81d2d73b35e59d636630fe77f532ab/> update test vectors now that private scope is gone
+ - <csr-id-fcec8ffaaf7cfb827db5338428b38a7b29cc67af/> add retry loop to wallet tests
+ - <csr-id-4cb31ffe40ac60ca4ce6233b7d61ddcc93d455a7/> hack: ignore private wallet test until encryption impl.
+ - <csr-id-d6c7887631eab05a1f423d7a136feee814318329/> fix skipped byte in SafeUrl parsing without scope
+
+### Refactor
+
+ - <csr-id-0f00c8cf7caae190716c8fd57addd38b18a3a49b/> add from_safekey, from_register, from_bytes
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release.
- - 1 day passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 12 commits contributed to the release over the course of 1 calendar day.
+ - 7 days passed between releases.
+ - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -37,6 +41,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge remote-tracking branch 'origin/main' into drusu/remove-private-data ([`2057273`](https://github.com/maidsafe/safe_network/commit/2057273509c2488cafc7f6db2ae69a99efc3b350))
+    - Merge branch 'main' into simplify_safeurl ([`a0175ab`](https://github.com/maidsafe/safe_network/commit/a0175abfa15e558e54fbb25dc3baf49343f040ac))
+    - Merge branch 'main' into drusu/remove-private-data ([`0cd2007`](https://github.com/maidsafe/safe_network/commit/0cd2007e442086d6eb2a39ad1f452e590fad46a9))
+    - add from_safekey, from_register, from_bytes ([`0f00c8c`](https://github.com/maidsafe/safe_network/commit/0f00c8cf7caae190716c8fd57addd38b18a3a49b))
+    - retry_loop on wallet tests ([`426ad4a`](https://github.com/maidsafe/safe_network/commit/426ad4a0c15d0ef3554ec098081c118759bf44fb))
+    - update test vectors now that private scope is gone ([`d7bcc10`](https://github.com/maidsafe/safe_network/commit/d7bcc1012d81d2d73b35e59d636630fe77f532ab))
+    - add retry loop to wallet tests ([`fcec8ff`](https://github.com/maidsafe/safe_network/commit/fcec8ffaaf7cfb827db5338428b38a7b29cc67af))
+    - hack: ignore private wallet test until encryption impl. ([`4cb31ff`](https://github.com/maidsafe/safe_network/commit/4cb31ffe40ac60ca4ce6233b7d61ddcc93d455a7))
+    - fix skipped byte in SafeUrl parsing without scope ([`d6c7887`](https://github.com/maidsafe/safe_network/commit/d6c7887631eab05a1f423d7a136feee814318329))
+    - remove private registers ([`1b1cb77`](https://github.com/maidsafe/safe_network/commit/1b1cb77df6c2805ecfa741bb824b359214558929))
+    - remove private data addresses ([`f1829f9`](https://github.com/maidsafe/safe_network/commit/f1829f99ef1415a83731f855757fbce9970fa4f0))
+    - remove private safe key addresses ([`8be2f2c`](https://github.com/maidsafe/safe_network/commit/8be2f2c9efac1623ea95ff1641c6b9bc22fad455))
+</details>
+
+## v0.64.1 (2022-06-07)
+
+<csr-id-24299786ba730e467c10946c8c152936b96148f8/>
+
+### Chore
+
+ - <csr-id-24299786ba730e467c10946c8c152936b96148f8/> address some review comments
+
+### Chore
+
+ - <csr-id-489904e325cfb8efca4289b05125904ad4029f3b/> sn_interface-0.6.1/sn_client-0.66.1/sn_node-0.62.1/sn_api-0.64.1
+
+### New Features
+
+ - <csr-id-dbda86be03f912079776be514828ff5fd034830c/> first version of Spentbook messaging, storage, and client API
+   - Storage is implemented using Register as the underlying data type. To be changed when
+   actual SpentBook native data type is put in place.
+- First version of sn_client API for Spentbook messages.
+- sn_client::spent_proof_shares API to fetch spent proof shares.
+- sn_client::spend_dbc API to request Elders to store the spent proof shares.
+- Serialise SpentProofShare to store it as an entry in the underlying Register.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.6.1/sn_client-0.66.1/sn_node-0.62.1/sn_api-0.64.1 ([`489904e`](https://github.com/maidsafe/safe_network/commit/489904e325cfb8efca4289b05125904ad4029f3b))
     - Merge branch 'main' into Gabriel_Spentbook_PR1143 ([`0eda02a`](https://github.com/maidsafe/safe_network/commit/0eda02ac126be4f088af6bf9e7247c8496a389ba))
     - address some review comments ([`2429978`](https://github.com/maidsafe/safe_network/commit/24299786ba730e467c10946c8c152936b96148f8))
     - first version of Spentbook messaging, storage, and client API ([`dbda86b`](https://github.com/maidsafe/safe_network/commit/dbda86be03f912079776be514828ff5fd034830c))
@@ -44,6 +101,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.64.0 (2022-06-05)
+
+<csr-id-1bf7dfb3ce8b14cbed7a4a8ed98c8310653a2da9/>
+<csr-id-c12e2269e3a537d96422bed96a4459a0add07deb/>
+<csr-id-e548388c693cfb71b270cf9e370b2f9b463044c5/>
 
 ### Chore
 
@@ -55,6 +116,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New Features
 
+<csr-id-0e9980f5358a0aca5d40d607dfdc6de120e6412b/>
+<csr-id-95de2ffe6f57ae0e6cebf123da3e9b6c3ad84aaf/>
+<csr-id-1048c5e3d2196aed7de89a7938d6fc01c1843502/>
+
  - <csr-id-4c6e6cff474d306e6632f004c6cf05729c7ced16/> add public key argument for owned dbcs
    The `wallet reissue` command now has an additional optional argument, `--public-key`, which allows
    the user to reissue a DBC to be owned by the holder of that public key. The key should be BLS
@@ -65,51 +130,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    
    Some additional changes were made in support or to tidy CLI-related code:
    * The conversion of DBCs to/from hex were removed from the CLI since this is now done on the `Dbc`
-     type.
-   * A CLI test that existed to test the above conversion code was removed since it's no longer
+   type.
+* A CLI test that existed to test the above conversion code was removed since it's no longer
      necessary.
-   * The naming scheme for the CLI wallet tests were elaborated and the redundant "calling_safe"
+* The naming scheme for the CLI wallet tests were elaborated and the redundant "calling_safe"
      prefixes were removed.
- - <csr-id-0e9980f5358a0aca5d40d607dfdc6de120e6412b/> add public key argument for owned dbcs
-   The `wallet reissue` command now has an additional optional argument, `--public-key`, which allows
-   the user to reissue a DBC to be owned by the holder of that public key. The key should be BLS
-   hex-encoded.
-   
-   The `wallet deposit` command will now require extension to provide the secret key when depositing an
-   owned DBC. This will be done as a separate piece of work.
-   
-   Some additional changes were made in support or to tidy CLI-related code:
-   * The conversion of DBCs to/from hex were removed from the CLI since this is now done on the `Dbc`
+* The conversion of DBCs to/from hex were removed from the CLI since this is now done on the `Dbc`
      type.
-   * A CLI test that existed to test the above conversion code was removed since it's no longer
+* A CLI test that existed to test the above conversion code was removed since it's no longer
      necessary.
-   * The naming scheme for the CLI wallet tests were elaborated and the redundant "calling_safe"
+* The naming scheme for the CLI wallet tests were elaborated and the redundant "calling_safe"
      prefixes were removed.
- - <csr-id-95de2ffe6f57ae0e6cebf123da3e9b6c3ad84aaf/> handover sap elder checks with membership knowledge
- - <csr-id-1048c5e3d2196aed7de89a7938d6fc01c1843502/> use persistent dbc owner in sn_api
-   The network connection functions in the CLI are updated to pass the persistent DBC Owner. This is
-   based on the existence of a key that was created with the new `create-dbc-owner` command. If the key
-   exists, the connection will use the persistent DBC owner; if `None` is passed, a random key will be
-   generated.
-   
-   During a reissue, the change DBC is then assigned the owner from the client. We don't yet assign the
-   output DBC this owner, because we're still only supporting bearer DBCs. This may change for owned
-   DBCs, which should come soon.
-   
-   I split the wallet reissue test out into a couple: one with a single input DBC and one with
-   multiple. The original test had multiple inputs, but it seemed it was worth checking that the
-   reissue would function if there were also just a single input.
 
 ### New Features (BREAKING)
 
  - <csr-id-92c53f186d2a63c6333b4d7b1016bb55edf74e42/> reissue dbc to a particular owner
-
  - <csr-id-cd85844f9f6402aba02f28fbedf92c7ee234e315/> reissue dbc to a particular owner
-
  - <csr-id-f03fb7e35319dbb9e4745e3cb36c7913c4f220ac/> cli will now use bls keys
-
  - <csr-id-48006b73547778bc08b077717e04fd5efb562eaf/> extend client with dbc owner field
-
 
 ### Commit Statistics
 
@@ -142,7 +180,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Merge #1192 ([`f9fc2a7`](https://github.com/maidsafe/safe_network/commit/f9fc2a76f083ba5161c8c4eef9013c53586b4693))
 </details>
 
+<csr-unknown>
+ add public key argument for owned dbcsThe wallet reissue command now has an additional optional argument, --public-key, which allowsthe user to reissue a DBC to be owned by the holder of that public key. The key should be BLShex-encoded.The wallet deposit command will now require extension to provide the secret key when depositing anowned DBC. This will be done as a separate piece of work.Some additional changes were made in support or to tidy CLI-related code: handover sap elder checks with membership knowledge use persistent dbc owner in sn_apiThe network connection functions in the CLI are updated to pass the persistent DBC Owner. This isbased on the existence of a key that was created with the new create-dbc-owner command. If the keyexists, the connection will use the persistent DBC owner; if None is passed, a random key will begenerated.During a reissue, the change DBC is then assigned the owner from the client. We don’t yet assign theoutput DBC this owner, because we’re still only supporting bearer DBCs. This may change for ownedDBCs, which should come soon.I split the wallet reissue test out into a couple: one with a single input DBC and one withmultiple. The original test had multiple inputs, but it seemed it was worth checking that thereissue would function if there were also just a single input.<csr-unknown/>
+
 ## v0.63.0 (2022-05-27)
+
+<csr-id-e5fcd032e1dd904e05bc23e119af1d06e3b85a06/>
 
 ### Chore
 

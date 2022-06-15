@@ -1113,25 +1113,36 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.66.1 (2022-06-07)
+## v0.66.2 (2022-06-15)
 
 ### New Features
 
- - <csr-id-dbda86be03f912079776be514828ff5fd034830c/> first version of Spentbook messaging, storage, and client API
-   - Storage is implemented using Register as the underlying data type. To be changed when
-     actual SpentBook native data type is put in place.
-   - First version of sn_client API for Spentbook messages.
-   - sn_client::spent_proof_shares API to fetch spent proof shares.
-   - sn_client::spend_dbc API to request Elders to store the spent proof shares.
-   - Serialise SpentProofShare to store it as an entry in the underlying Register.
+ - <csr-id-1b1cb77df6c2805ecfa741bb824b359214558929/> remove private registers
+ - <csr-id-f1829f99ef1415a83731f855757fbce9970fa4f0/> remove private data addresses
+
+### Bug Fixes
+
+ - <csr-id-6c52f37592fcda83243390565bd4fdefb821b9b4/> remove unused client_pk from Session::new(..) call
+ - <csr-id-fcec8ffaaf7cfb827db5338428b38a7b29cc67af/> add retry loop to wallet tests
+ - <csr-id-616d8cb12bfc257f9b3609239790065ebced8fe3/> replace at_least_one_elders with supermajority for sending cmd
+ - <csr-id-60f5a68a1df6114b65d7c57099fea0347ba3d1dd/> some changes I missed in the initial private removal
+ - <csr-id-7778f992fb9f450addb50daa6edfbddb0502079e/> make dbc reissue working in Windows
+
+### Refactor
+
+ - <csr-id-da58fdaa0d6849837e3e473cd7000edb92efe1f0/> minor refactor in sn_client messaging function
+
+### Test
+
+ - <csr-id-b818c3fd10a4e3304b2c5f84dac843397873cba6/> cmd sent to all elders
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 3 commits contributed to the release.
- - 1 day passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 11 commits contributed to the release over the course of 1 calendar day.
+ - 7 days passed between releases.
+ - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1141,12 +1152,63 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge remote-tracking branch 'origin/main' into drusu/remove-private-data ([`2057273`](https://github.com/maidsafe/safe_network/commit/2057273509c2488cafc7f6db2ae69a99efc3b350))
+    - remove unused client_pk from Session::new(..) call ([`6c52f37`](https://github.com/maidsafe/safe_network/commit/6c52f37592fcda83243390565bd4fdefb821b9b4))
+    - Merge branch 'main' into drusu/remove-private-data ([`0cd2007`](https://github.com/maidsafe/safe_network/commit/0cd2007e442086d6eb2a39ad1f452e590fad46a9))
+    - add retry loop to wallet tests ([`fcec8ff`](https://github.com/maidsafe/safe_network/commit/fcec8ffaaf7cfb827db5338428b38a7b29cc67af))
+    - replace at_least_one_elders with supermajority for sending cmd ([`616d8cb`](https://github.com/maidsafe/safe_network/commit/616d8cb12bfc257f9b3609239790065ebced8fe3))
+    - some changes I missed in the initial private removal ([`60f5a68`](https://github.com/maidsafe/safe_network/commit/60f5a68a1df6114b65d7c57099fea0347ba3d1dd))
+    - remove private registers ([`1b1cb77`](https://github.com/maidsafe/safe_network/commit/1b1cb77df6c2805ecfa741bb824b359214558929))
+    - remove private data addresses ([`f1829f9`](https://github.com/maidsafe/safe_network/commit/f1829f99ef1415a83731f855757fbce9970fa4f0))
+    - minor refactor in sn_client messaging function ([`da58fda`](https://github.com/maidsafe/safe_network/commit/da58fdaa0d6849837e3e473cd7000edb92efe1f0))
+    - cmd sent to all elders ([`b818c3f`](https://github.com/maidsafe/safe_network/commit/b818c3fd10a4e3304b2c5f84dac843397873cba6))
+    - make dbc reissue working in Windows ([`7778f99`](https://github.com/maidsafe/safe_network/commit/7778f992fb9f450addb50daa6edfbddb0502079e))
+</details>
+
+## v0.66.1 (2022-06-07)
+
+### Chore
+
+ - <csr-id-489904e325cfb8efca4289b05125904ad4029f3b/> sn_interface-0.6.1/sn_client-0.66.1/sn_node-0.62.1/sn_api-0.64.1
+
+### New Features
+
+ - <csr-id-dbda86be03f912079776be514828ff5fd034830c/> first version of Spentbook messaging, storage, and client API
+   - Storage is implemented using Register as the underlying data type. To be changed when
+   actual SpentBook native data type is put in place.
+- First version of sn_client API for Spentbook messages.
+- sn_client::spent_proof_shares API to fetch spent proof shares.
+- sn_client::spend_dbc API to request Elders to store the spent proof shares.
+- Serialise SpentProofShare to store it as an entry in the underlying Register.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.6.1/sn_client-0.66.1/sn_node-0.62.1/sn_api-0.64.1 ([`489904e`](https://github.com/maidsafe/safe_network/commit/489904e325cfb8efca4289b05125904ad4029f3b))
     - Merge branch 'main' into Gabriel_Spentbook_PR1143 ([`0eda02a`](https://github.com/maidsafe/safe_network/commit/0eda02ac126be4f088af6bf9e7247c8496a389ba))
     - first version of Spentbook messaging, storage, and client API ([`dbda86b`](https://github.com/maidsafe/safe_network/commit/dbda86be03f912079776be514828ff5fd034830c))
     - Merge #1217 ([`2f26043`](https://github.com/maidsafe/safe_network/commit/2f2604325d533357bad7d917315cf4cba0b2d3c0))
 </details>
 
 ## v0.66.0 (2022-06-05)
+
+<csr-id-1bf7dfb3ce8b14cbed7a4a8ed98c8310653a2da9/>
+<csr-id-c12e2269e3a537d96422bed96a4459a0add07deb/>
+<csr-id-e548388c693cfb71b270cf9e370b2f9b463044c5/>
+<csr-id-210c54e8814877c15d87150248fe3858e83eeee8/>
 
 ### Chore
 
@@ -1166,9 +1228,7 @@ needed, as they keypair itself contains the Arcs we need.
 ### New Features (BREAKING)
 
  - <csr-id-f03fb7e35319dbb9e4745e3cb36c7913c4f220ac/> cli will now use bls keys
-
  - <csr-id-48006b73547778bc08b077717e04fd5efb562eaf/> extend client with dbc owner field
-
 
 ### Commit Statistics
 
@@ -1198,6 +1258,11 @@ needed, as they keypair itself contains the Arcs we need.
 
 ## v0.65.0 (2022-05-27)
 
+<csr-id-e5fcd032e1dd904e05bc23e119af1d06e3b85a06/>
+<csr-id-b9e5db241f437f9bb8fd03ca9080a0331757b9a5/>
+<csr-id-f9700e3b6bb8b2b9949f33d627c99974c355ca2b/>
+<csr-id-14c92fb0f18fc40176963ca5290914442d340256/>
+
 ### Chore
 
  - <csr-id-e5fcd032e1dd904e05bc23e119af1d06e3b85a06/> sn_interface-0.5.0/sn_dysfunction-0.4.0/sn_client-0.65.0/sn_node-0.61.0/sn_api-0.63.0/sn_cli-0.56.0
@@ -1216,7 +1281,6 @@ needed, as they keypair itself contains the Arcs we need.
 ### New Features (BREAKING)
 
  - <csr-id-294549ebc998d11a2f3621e2a9fd20a0dd9bcce5/> remove sus node flows, replicate data per data
-
 
 ### Commit Statistics
 
@@ -1243,6 +1307,8 @@ needed, as they keypair itself contains the Arcs we need.
 </details>
 
 ## v0.64.0 (2022-05-25)
+
+<csr-id-ef56cf9cf8de45a9f13c2510c63de245b12aeae8/>
 
 ### Chore
 

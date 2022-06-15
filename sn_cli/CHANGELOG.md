@@ -4,7 +4,51 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.57.3 (2022-06-15)
+
+### New Features
+
+ - <csr-id-1b1cb77df6c2805ecfa741bb824b359214558929/> remove private registers
+
+### Bug Fixes
+
+ - <csr-id-67aa4f8380b1ed7ac4da79451caca7734dec0e7e/> replace Private Register with Register
+ - <csr-id-7778f992fb9f450addb50daa6edfbddb0502079e/> make dbc reissue working in Windows
+
+### Refactor
+
+ - <csr-id-0f00c8cf7caae190716c8fd57addd38b18a3a49b/> add from_safekey, from_register, from_bytes
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 7 commits contributed to the release over the course of 1 calendar day.
+ - 5 days passed between releases.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge remote-tracking branch 'origin/main' into drusu/remove-private-data ([`2057273`](https://github.com/maidsafe/safe_network/commit/2057273509c2488cafc7f6db2ae69a99efc3b350))
+    - Merge branch 'main' into simplify_safeurl ([`a0175ab`](https://github.com/maidsafe/safe_network/commit/a0175abfa15e558e54fbb25dc3baf49343f040ac))
+    - Merge branch 'main' into drusu/remove-private-data ([`0cd2007`](https://github.com/maidsafe/safe_network/commit/0cd2007e442086d6eb2a39ad1f452e590fad46a9))
+    - add from_safekey, from_register, from_bytes ([`0f00c8c`](https://github.com/maidsafe/safe_network/commit/0f00c8cf7caae190716c8fd57addd38b18a3a49b))
+    - replace Private Register with Register ([`67aa4f8`](https://github.com/maidsafe/safe_network/commit/67aa4f8380b1ed7ac4da79451caca7734dec0e7e))
+    - remove private registers ([`1b1cb77`](https://github.com/maidsafe/safe_network/commit/1b1cb77df6c2805ecfa741bb824b359214558929))
+    - make dbc reissue working in Windows ([`7778f99`](https://github.com/maidsafe/safe_network/commit/7778f992fb9f450addb50daa6edfbddb0502079e))
+</details>
+
 ## v0.57.2 (2022-06-09)
+
+### Chore
+
+ - <csr-id-d05e7b3a97db73cdf84f74560056abe1f087820a/> sn_cli-0.57.2
 
 ### Bug Fixes
 
@@ -16,8 +60,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 1 day passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -27,10 +72,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_cli-0.57.2 ([`d05e7b3`](https://github.com/maidsafe/safe_network/commit/d05e7b3a97db73cdf84f74560056abe1f087820a))
     - strip whitespace from dbc data file ([`b552184`](https://github.com/maidsafe/safe_network/commit/b55218435be43d84956d35539f541c21f5fcb988))
 </details>
 
 ## v0.57.1 (2022-06-08)
+
+<csr-id-9aa666763c381ed589343e306c583f558d935251/>
 
 ### Chore
 
@@ -160,9 +208,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - command to generate secret key for dbc owner ([`58ff197`](https://github.com/maidsafe/safe_network/commit/58ff1978c2772968290eccc73049ce114d02efbb))
     - Merge #1192 ([`f9fc2a7`](https://github.com/maidsafe/safe_network/commit/f9fc2a76f083ba5161c8c4eef9013c53586b4693))
 </details>
-
-<csr-unknown>
- add public key argument for owned dbcsThe wallet reissue command now has an additional optional argument, --public-key, which allowsthe user to reissue a DBC to be owned by the holder of that public key. The key should be BLShex-encoded.The wallet deposit command will now require extension to provide the secret key when depositing anowned DBC. This will be done as a separate piece of work.Some additional changes were made in support or to tidy CLI-related code: handover sap elder checks with membership knowledge use persistent dbc owner in sn_apiThe network connection functions in the CLI are updated to pass the persistent DBC Owner. This isbased on the existence of a key that was created with the new create-dbc-owner command. If the keyexists, the connection will use the persistent DBC owner; if None is passed, a random key will begenerated.During a reissue, the change DBC is then assigned the owner from the client. We don’t yet assign theoutput DBC this owner, because we’re still only supporting bearer DBCs. This may change for ownedDBCs, which should come soon.I split the wallet reissue test out into a couple: one with a single input DBC and one withmultiple. The original test had multiple inputs, but it seemed it was worth checking that thereissue would function if there were also just a single input. command to generate secret key for dbc ownerA new keys create-dbc-owner command is added to generate a secret key for use with reissuing DBCs.The key gets serialised to a file in ~/.safe/cli. It will be read from here when makingconnections to the network.This commit also features various other changes. Originally I had two separate commits, but Iaccidentally amended a previous commit and couldn’t separate the content.The keys create command is using functions from a module related to authentication to determinewhere to write the keys it generates. These functions directly specified a credential file’slocation at the user’s home directory. To help unit testing, I refactored this to provide thelocation from the Config struct. Previously I refactored networks commands in a similar fashion.The result is, during the unit test, the assert_fs library will create a temp directory for theconfig and so the user’s real home directory won’t be manipulated during the test suite. assert_fswill also remove the temp directory at the end of each test.With this change in place, I provided a couple of unit tests for the keys create command. Thiscommand doesn’t hit the network, so integration tests aren’t necessary. There are only really twocode paths to go through: one for writing the keypair to file and one for not doing so.I didn’t test the keys show command because it mostly just prints information to the console,and at this stage I don’t know how to capture that for a unit test (or if it’s even possible).Finally, I tidied up some commented out code that doesn’t seem to apply any more, and added someadditional documentation for the commands to try and make their intent a bit clearer.<csr-unknown/>
 
 ## v0.56.0 (2022-05-27)
 
