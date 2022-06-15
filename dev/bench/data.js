@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1655293085093,
+  "lastUpdate": 1655310557652,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -5099,6 +5099,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 9332796571,
             "range": "± 1429733945",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "f9c7544f369e15fb3b6f91158ac3277656737fa4",
+          "message": "Merge #1241\n\n1241: chore: upgrade blsttc to 6.0.0 r=jacderida a=jacderida\n\nThere were various other crates that had to be upgraded in this process:\r\n* secured_linked_list to v0.5.2 because it was also upgraded to reference v6.0.0 of blsttc\r\n* bls_dkg to v0.10.3 because it was also upgraded to reference v6.0.0 of blsttc\r\n* sn_consensus to v2.1.1 because it was also upgraded to reference v6.0.0 of blsttc\r\n* sn_dbc to v4.0.0 because it was also upgraded to reference v6.0.0 of blsttc\r\n\n\nCo-authored-by: Chris O'Neil <chriso83@protonmail.com>",
+          "timestamp": "2022-06-15T14:31:26Z",
+          "tree_id": "40c681175eabda1b649f1e22fb1300f18a0912d9",
+          "url": "https://github.com/maidsafe/safe_network/commit/f9c7544f369e15fb3b6f91158ac3277656737fa4"
+        },
+        "date": 1655310556285,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 10786762192,
+            "range": "± 10202506583",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 6791406791,
+            "range": "± 71182411",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 12261230842,
+            "range": "± 313595509",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10047688051,
+            "range": "± 7547814",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 6223740860,
+            "range": "± 60104108",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 8548453713,
+            "range": "± 735927438",
             "unit": "ns/iter"
           }
         ]
