@@ -248,7 +248,7 @@ mod tests {
     use anyhow::{anyhow, bail, Context, Result};
     use bytes::Bytes;
     use sn_interface::types::DataAddress;
-    use std::io::Read;
+    use std::{io::Read, time::Instant};
 
     #[tokio::test]
     async fn test_fetch_files_container() -> Result<()> {
@@ -889,6 +889,8 @@ mod tests {
     /// Then: `safe://a.example` resolves to the first file it was linked to
     #[tokio::test]
     async fn test_fetch_should_resolve_subname_to_specific_version() -> Result<()> {
+        let start_t = Instant::now();
+
         let site_name = random_nrs_name();
         let safe = new_safe_instance().await?;
 
@@ -898,6 +900,8 @@ mod tests {
             "/testdata/noextension",
         ])
         .await?;
+
+        let setup_t = Instant::now();
 
         safe.nrs_create(&site_name).await?;
         let nrs_url = safe
@@ -922,6 +926,8 @@ mod tests {
         )
         .await?;
 
+        let associate_t = Instant::now();
+
         // This URL has a version on it.
         let content = safe.fetch(&nrs_url.to_string(), None).await?;
         match &content {
@@ -935,6 +941,8 @@ mod tests {
                 bail!("PublicFile was not returned".to_string());
             }
         }
+
+        let fetch_t = Instant::now();
 
         // This is mainly to verify that the correct version was assigned to the NRS entry.
         let inspected_content = safe.inspect(&nrs_url.to_string()).await?;
@@ -968,6 +976,13 @@ mod tests {
                 bail!("NrsEntry was not returned".to_string());
             }
         }
+
+        let inspect_t = Instant::now();
+
+        println!("setup {:?}", setup_t.duration_since(start_t));
+        println!("associate {:?}", associate_t.duration_since(setup_t));
+        println!("fetch {:?}", fetch_t.duration_since(associate_t));
+        println!("inspect {:?}", inspect_t.duration_since(fetch_t));
 
         Ok(())
     }
