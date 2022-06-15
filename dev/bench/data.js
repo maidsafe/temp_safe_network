@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1655217989920,
+  "lastUpdate": 1655293085093,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -5039,6 +5039,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 11814575947,
             "range": "± 739716737",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "05b9b755165304c282cc415419030eee8b6a3636",
+          "message": "Merge #1234\n\n1234: Enable DKG issue tracking r=Yoga07 a=joshuef\n\nThis is atop #1232 so need that in first\n\nCo-authored-by: Josh Wilson <joshuef@gmail.com>",
+          "timestamp": "2022-06-15T09:43:04Z",
+          "tree_id": "e431beca79da731b9a9b1e53eed378fd78cf8f64",
+          "url": "https://github.com/maidsafe/safe_network/commit/05b9b755165304c282cc415419030eee8b6a3636"
+        },
+        "date": 1655293082843,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 29222362477,
+            "range": "± 11613475216",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 6970914612,
+            "range": "± 972845686",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 13925900988,
+            "range": "± 313347476",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10046483683,
+            "range": "± 6037088",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 6335567213,
+            "range": "± 71578968",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 9332796571,
+            "range": "± 1429733945",
             "unit": "ns/iter"
           }
         ]
