@@ -43,6 +43,7 @@ pub enum LogMarker {
     MembershipVotesBeingHandled,
     MembershipSendingAeUpdateRequest,
     MembershipAeRequestReceived,
+    ResendingLastMembershipVote,
     // Data
     DataStoreReceivedAtElder,
     DataQueryReceviedAtElder,

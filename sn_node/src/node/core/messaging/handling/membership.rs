@@ -50,6 +50,25 @@ impl Node {
         }
     }
 
+    /// Get our latest vote if any at this generation, and get cmds to resend to all elders
+    /// (which should in turn trigger them to resend their votes)
+    #[instrument(skip_all)]
+    pub(crate) async fn resend_our_last_vote_to_elders(&self) -> Result<Vec<Cmd>> {
+        let membership = self.membership.read().await.clone();
+
+        if let Some(membership) = membership {
+            if let Some(prev_vote) = membership.get_our_latest_vote() {
+                trace!("{}", LogMarker::ResendingLastMembershipVote);
+                let cmds = self
+                    .send_msg_to_our_elders(SystemMsg::MembershipVotes(vec![prev_vote.clone()]))
+                    .await?;
+                return Ok(vec![cmds]);
+            }
+        }
+
+        Ok(vec![])
+    }
+
     pub(crate) async fn handle_membership_votes(
         &self,
         peer: Peer,
