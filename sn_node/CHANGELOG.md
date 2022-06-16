@@ -5,9 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.62.5 (2022-06-16)
+
+### Chore
+
+ - <csr-id-f599c5973d50324aad1720166156666d5db1ed3d/> sn_interface-0.6.3/sn_dysfunction-0.5.1/sn_client-0.66.3/sn_api-0.64.3/sn_cli-0.57.4
+ - <csr-id-4eb43fa884d7b047febb18c067ae905969a113bf/> upgrade blsttc to 6.0.0
+   There were various other crates that had to be upgraded in this process:
+   * secured_linked_list to v0.5.2 because it was also upgraded to reference v6.0.0 of blsttc
+   * bls_dkg to v0.10.3 because it was also upgraded to reference v6.0.0 of blsttc
+   * sn_consensus to v2.1.1 because it was also upgraded to reference v6.0.0 of blsttc
+   * sn_dbc to v4.0.0 because it was also upgraded to reference v6.0.0 of blsttc
+ - <csr-id-83fa804ed62f30344dda48cef7ad852a4ac4118b/> increase dysfunction check interval
+ - <csr-id-fa709fb9fea7926048525e5a2f21ff0017676f41/> log dkg dysfunction in node
+ - <csr-id-e195c2504bee67fdc1ebbbbef9b3b4428ee8a32d/> add VotedOffline LogMarker
+ - <csr-id-ef5cb8c050cec82d215dcf98aeb0dc237cf1b574/> update cargo deps across the baord
+ - <csr-id-3a6d83bd9d406b824b538ee7de7da95119f536da/> use DashMap in comms to avoid RwLocks
+
+### New Features
+
+ - <csr-id-7ccb02a7ded7579bb8645c918b9a6108b1b585af/> enable tracking of Dkg issues
+
+### Bug Fixes
+
+ - <csr-id-38f82ee4dbf65a9bd94411ae56caae6a7296e129/> dont error out of node run thread entirely, just log issues
+   This allows us to keep looping and attempting to rejoin as a new node
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 9 commits contributed to the release.
+ - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.6.3/sn_dysfunction-0.5.1/sn_client-0.66.3/sn_api-0.64.3/sn_cli-0.57.4 ([`f599c59`](https://github.com/maidsafe/safe_network/commit/f599c5973d50324aad1720166156666d5db1ed3d))
+    - upgrade blsttc to 6.0.0 ([`4eb43fa`](https://github.com/maidsafe/safe_network/commit/4eb43fa884d7b047febb18c067ae905969a113bf))
+    - increase dysfunction check interval ([`83fa804`](https://github.com/maidsafe/safe_network/commit/83fa804ed62f30344dda48cef7ad852a4ac4118b))
+    - log dkg dysfunction in node ([`fa709fb`](https://github.com/maidsafe/safe_network/commit/fa709fb9fea7926048525e5a2f21ff0017676f41))
+    - add VotedOffline LogMarker ([`e195c25`](https://github.com/maidsafe/safe_network/commit/e195c2504bee67fdc1ebbbbef9b3b4428ee8a32d))
+    - enable tracking of Dkg issues ([`7ccb02a`](https://github.com/maidsafe/safe_network/commit/7ccb02a7ded7579bb8645c918b9a6108b1b585af))
+    - update cargo deps across the baord ([`ef5cb8c`](https://github.com/maidsafe/safe_network/commit/ef5cb8c050cec82d215dcf98aeb0dc237cf1b574))
+    - dont error out of node run thread entirely, just log issues ([`38f82ee`](https://github.com/maidsafe/safe_network/commit/38f82ee4dbf65a9bd94411ae56caae6a7296e129))
+    - use DashMap in comms to avoid RwLocks ([`3a6d83b`](https://github.com/maidsafe/safe_network/commit/3a6d83bd9d406b824b538ee7de7da95119f536da))
+</details>
+
 ## v0.62.4 (2022-06-15)
 
 <csr-id-08ea69a0084b0e8d8aea51f06b99af426a7255c9/>
+<csr-id-46246f155ab65f3fcd61381345f1a7f747dfe957/>
+<csr-id-4eb43fa884d7b047febb18c067ae905969a113bf/>
+<csr-id-83fa804ed62f30344dda48cef7ad852a4ac4118b/>
+<csr-id-fa709fb9fea7926048525e5a2f21ff0017676f41/>
+<csr-id-e195c2504bee67fdc1ebbbbef9b3b4428ee8a32d/>
+<csr-id-ef5cb8c050cec82d215dcf98aeb0dc237cf1b574/>
+<csr-id-3a6d83bd9d406b824b538ee7de7da95119f536da/>
 
 ### Chore
 
@@ -43,8 +102,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 8 commits contributed to the release.
- - 8 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits contributed to the release over the course of 1 calendar day.
+ - 4 days passed between releases.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -54,14 +114,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
-    - upgrade blsttc to 6.0.0 ([`4eb43fa`](https://github.com/maidsafe/safe_network/commit/4eb43fa884d7b047febb18c067ae905969a113bf))
-    - increase dysfunction check interval ([`83fa804`](https://github.com/maidsafe/safe_network/commit/83fa804ed62f30344dda48cef7ad852a4ac4118b))
-    - log dkg dysfunction in node ([`fa709fb`](https://github.com/maidsafe/safe_network/commit/fa709fb9fea7926048525e5a2f21ff0017676f41))
-    - add VotedOffline LogMarker ([`e195c25`](https://github.com/maidsafe/safe_network/commit/e195c2504bee67fdc1ebbbbef9b3b4428ee8a32d))
-    - enable tracking of Dkg issues ([`7ccb02a`](https://github.com/maidsafe/safe_network/commit/7ccb02a7ded7579bb8645c918b9a6108b1b585af))
-    - update cargo deps across the baord ([`ef5cb8c`](https://github.com/maidsafe/safe_network/commit/ef5cb8c050cec82d215dcf98aeb0dc237cf1b574))
-    - dont error out of node run thread entirely, just log issues ([`38f82ee`](https://github.com/maidsafe/safe_network/commit/38f82ee4dbf65a9bd94411ae56caae6a7296e129))
-    - use DashMap in comms to avoid RwLocks ([`3a6d83b`](https://github.com/maidsafe/safe_network/commit/3a6d83bd9d406b824b538ee7de7da95119f536da))
+    - sn_interface-0.6.2/sn_client-0.66.2/sn_node-0.62.4/sn_api-0.64.2/sn_cli-0.57.3 ([`46246f1`](https://github.com/maidsafe/safe_network/commit/46246f155ab65f3fcd61381345f1a7f747dfe957))
+    - Merge remote-tracking branch 'origin/main' into drusu/remove-private-data ([`2057273`](https://github.com/maidsafe/safe_network/commit/2057273509c2488cafc7f6db2ae69a99efc3b350))
+    - Merge branch 'main' into drusu/remove-private-data ([`0cd2007`](https://github.com/maidsafe/safe_network/commit/0cd2007e442086d6eb2a39ad1f452e590fad46a9))
+    - BREAKING CHANGE: removed private scope ([`08ea69a`](https://github.com/maidsafe/safe_network/commit/08ea69a0084b0e8d8aea51f06b99af426a7255c9))
+    - some changes I missed in the initial private removal ([`60f5a68`](https://github.com/maidsafe/safe_network/commit/60f5a68a1df6114b65d7c57099fea0347ba3d1dd))
+    - remove private registers ([`1b1cb77`](https://github.com/maidsafe/safe_network/commit/1b1cb77df6c2805ecfa741bb824b359214558929))
 </details>
 
 ## v0.62.3 (2022-06-11)
