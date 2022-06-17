@@ -119,6 +119,10 @@ impl Node {
 
         let churn_id = ChurnId(new_info.sig.signature.to_bytes().to_vec());
         let excluded_from_relocation = vec![new_info.name()].into_iter().collect();
+
+        // first things first, inform the node it can join us
+        cmds.extend(self.send_node_approval(new_info).await);
+
         cmds.extend(
             self.relocate_peers(churn_id, excluded_from_relocation)
                 .await?,
@@ -134,7 +138,6 @@ impl Node {
         }
 
         cmds.extend(result);
-        cmds.extend(self.send_node_approval(new_info).await);
 
         info!("cmds in queue for Accepting node {:?}", cmds);
 
