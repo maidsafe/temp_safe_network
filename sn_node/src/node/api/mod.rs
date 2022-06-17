@@ -96,7 +96,7 @@ impl NodeApi {
         .map_err(|_| Error::JoinTimeout)??;
 
         // Network keypair may have to be changed due to naming criteria or network requirements.
-        let keypair_as_bytes = api.dispatcher.node.info.read().await.keypair.to_bytes();
+        let keypair_as_bytes = api.dispatcher.node.info.borrow().keypair.to_bytes();
         store_network_keypair(root_dir, keypair_as_bytes).await?;
 
         let our_pid = std::process::id();
@@ -164,16 +164,15 @@ impl NodeApi {
                 used_space.clone(),
                 root_storage_dir.to_path_buf(),
                 genesis_sk_set,
-            )
-            .await?;
+            )?;
 
             let network_knowledge = node.network_knowledge();
 
             let elders = Elders {
-                prefix: network_knowledge.prefix().await,
-                key: network_knowledge.section_key().await,
+                prefix: network_knowledge.prefix(),
+                key: network_knowledge.section_key(),
                 remaining: BTreeSet::new(),
-                added: network_knowledge.authority_provider().await.names(),
+                added: network_knowledge.authority_provider().names(),
                 removed: BTreeSet::new(),
             };
 
@@ -248,10 +247,9 @@ impl NodeApi {
                 event_tx,
                 used_space.clone(),
                 root_storage_dir.to_path_buf(),
-            )
-            .await?;
-            info!("{} Joined the network!", node.info.read().await.name());
-            info!("Our AGE: {}", node.info.read().await.age());
+            )?;
+            info!("{} Joined the network!", node.info.borrow().name());
+            info!("Our AGE: {}", node.info.borrow().age());
 
             node
         };
@@ -289,17 +287,17 @@ impl NodeApi {
 
     /// Returns the current age of this node.
     pub async fn age(&self) -> u8 {
-        self.dispatcher.node.info.read().await.age()
+        self.dispatcher.node.info.borrow().age()
     }
 
     /// Returns the ed25519 public key of this node.
     pub async fn public_key(&self) -> PublicKey {
-        self.dispatcher.node.info.read().await.keypair.public
+        self.dispatcher.node.info.borrow().keypair.public
     }
 
     /// The name of this node.
     pub async fn name(&self) -> XorName {
-        self.dispatcher.node.info.read().await.name()
+        self.dispatcher.node.info.borrow().name()
     }
 
     /// Returns connection info of this node.
@@ -319,7 +317,7 @@ impl NodeApi {
 
     /// Prefix of our section
     pub async fn our_prefix(&self) -> Prefix {
-        self.dispatcher.node.network_knowledge().prefix().await
+        self.dispatcher.node.network_knowledge().prefix()
     }
 
     /// Returns whether the node is Elder.
@@ -329,12 +327,12 @@ impl NodeApi {
 
     /// Returns the information of all the current section elders.
     pub async fn our_elders(&self) -> Vec<Peer> {
-        self.dispatcher.node.network_knowledge().elders().await
+        self.dispatcher.node.network_knowledge().elders()
     }
 
     /// Returns the information of all the current section adults.
     pub async fn our_adults(&self) -> Vec<Peer> {
-        self.dispatcher.node.network_knowledge().adults().await
+        self.dispatcher.node.network_knowledge().adults()
     }
 
     /// Returns the info about the section matching the name.
@@ -350,7 +348,7 @@ impl NodeApi {
     ) -> Result<WireMsg> {
         let src_section_pk = *self.section_chain().await.last_key();
         WireMsg::single_src(
-            &self.dispatcher.node.info.read().await.clone(),
+            &self.dispatcher.node.info.borrow().clone(),
             dst,
             node_msg,
             src_section_pk,
@@ -378,8 +376,8 @@ impl NodeApi {
 
     /// Returns the current BLS public key set if this node has one, or
     /// `Error::MissingSecretKeyShare` otherwise.
-    pub async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        self.dispatcher.node.public_key_set().await
+    pub fn public_key_set(&self) -> Result<bls::PublicKeySet> {
+        self.dispatcher.node.public_key_set()
     }
 }
 
@@ -403,7 +401,7 @@ async fn handle_connection_events(
 
                 let span = {
                     let node = &dispatcher.node;
-                    trace_span!("handle_message", name = %node.info.read().await.name(), ?sender, msg_id = ?wire_msg.msg_id())
+                    trace_span!("handle_message", name = %node.info.borrow().name(), ?sender, msg_id = ?wire_msg.msg_id())
                 };
                 let _span_guard = span.enter();
 

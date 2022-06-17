@@ -9,13 +9,13 @@
 use crate::messaging::system::{KeyedSig, SigShare};
 use dashmap::DashMap;
 use std::{
+    cell::RefCell,
     collections::BTreeMap,
-    sync::Arc,
+    rc::Rc,
     time::{Duration, Instant},
 };
 use thiserror::Error;
 use tiny_keccak::{Hasher, Sha3};
-use tokio::sync::RwLock;
 
 /// Default duration since their last modification after which all unaggregated entries expire.
 const DEFAULT_EXPIRATION: Duration = Duration::from_secs(120);
@@ -36,7 +36,7 @@ type Digest256 = [u8; 32];
 ///
 #[derive(Debug, Clone)]
 pub struct SignatureAggregator {
-    map: Arc<DashMap<Digest256, State>>,
+    map: Rc<DashMap<Digest256, State>>,
     expiration: Duration,
 }
 
@@ -57,8 +57,8 @@ impl SignatureAggregator {
     /// shares still need to be added for that particular payload. This error could be safely
     /// ignored (it might still be useful perhaps for debugging). The other error variants, however,
     /// indicate failures and should be treated a such. See [Error] for more info.
-    pub async fn add(&self, payload: &[u8], sig_share: SigShare) -> Result<KeyedSig, Error> {
-        self.remove_expired().await;
+    pub fn add(&self, payload: &[u8], sig_share: SigShare) -> Result<KeyedSig, Error> {
+        self.remove_expired();
 
         if !sig_share.verify(payload) {
             return Err(Error::InvalidShare);
@@ -76,19 +76,19 @@ impl SignatureAggregator {
 
         let mut entry = self.map.entry(hash).or_insert_with(State::new);
 
-        entry.add(sig_share).await.map(|signature| KeyedSig {
+        entry.add(sig_share).map(|signature| KeyedSig {
             public_key,
             signature,
         })
     }
 
-    async fn remove_expired(&self) {
+    fn remove_expired(&self) {
         let expiration = self.expiration;
         let mut to_remove = vec![];
 
         for ref_multi in self.map.iter() {
             let (digest, state) = ref_multi.pair();
-            if state.modified.read().await.elapsed() >= expiration {
+            if state.modified.borrow().elapsed() >= expiration {
                 to_remove.push(*digest);
             }
         }
@@ -122,25 +122,25 @@ pub enum Error {
 
 #[derive(Debug, Clone)]
 struct State {
-    shares: Arc<DashMap<usize, bls::SignatureShare>>,
-    modified: Arc<RwLock<Instant>>,
+    shares: Rc<DashMap<usize, bls::SignatureShare>>,
+    modified: Rc<RefCell<Instant>>,
 }
 
 impl State {
     fn new() -> Self {
         Self {
             shares: Default::default(),
-            modified: Arc::new(RwLock::new(Instant::now())),
+            modified: Rc::new(RefCell::new(Instant::now())),
         }
     }
 
-    async fn add(&mut self, sig_share: SigShare) -> Result<bls::Signature, Error> {
+    fn add(&mut self, sig_share: SigShare) -> Result<bls::Signature, Error> {
         if self
             .shares
             .insert(sig_share.index, sig_share.signature_share)
             .is_none()
         {
-            *self.modified.write().await = Instant::now();
+            *self.modified.borrow_mut() = Instant::now();
         } else {
             // Duplicate share
             return Err(Error::NotEnoughShares);

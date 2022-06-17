@@ -636,7 +636,7 @@ mod tests {
         // Drive both tasks to completion concurrently (but on the same thread).
         let ((node, section), _) = future::try_join(bootstrap, others).await?;
 
-        assert_eq!(section.authority_provider().await, section_auth);
+        assert_eq!(sectionauthority_provider(), section_auth);
         assert_eq!(section.section_key().await, section_key);
         assert_eq!(node.age(), node_age);
 

@@ -174,7 +174,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
 
     let nonce: [u8; 32] = rand::random();
     let serialized = bincode::serialize(&(new_node.name(), nonce))?;
-    let nonce_signature = ed25519::sign(&serialized, &dispatcher.node.info.read().await.keypair);
+    let nonce_signature = ed25519::sign(&serialized, &dispatcher.node.info.borrow().keypair);
 
     let rp = ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY);
     let data = rp.create_proof_data(&nonce);
@@ -1033,8 +1033,8 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
         genesis_sk_set,
     )
     .await?;
-    let info = node.info.read().await.clone();
-    let section_pk = node.network_knowledge().section_key().await;
+    let info = node.info.borrow().clone();
+    let section_pk = node.network_knowledge().section_key();
     let dispatcher = Dispatcher::new(node);
 
     let dst_location = match dst {

@@ -37,7 +37,7 @@ impl Display for ChurnId {
 }
 
 /// Find all nodes to relocate after a churn event and generate the relocation details for them.
-pub(super) async fn find_nodes_to_relocate(
+pub(super) fn find_nodes_to_relocate(
     network_knowledge: &NetworkKnowledge,
     churn_id: &ChurnId,
     excluded: BTreeSet<XorName>,
@@ -45,7 +45,7 @@ pub(super) async fn find_nodes_to_relocate(
     // Find the peers that pass the relocation check and take only the oldest ones to avoid
     // relocating too many nodes at the same time.
     // Capped by criteria that cannot relocate too many node at once.
-    let joined_nodes = network_knowledge.section_members().await;
+    let joined_nodes = network_knowledge.section_members();
 
     if joined_nodes.len() < recommended_section_size() {
         return vec![];

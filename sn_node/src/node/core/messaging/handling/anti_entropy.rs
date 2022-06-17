@@ -36,22 +36,19 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         let snapshot = self.state_snapshot().await;
 
-        let our_name = self.info.read().await.name();
+        let our_name = self.info.borrow().name();
         let signed_sap = SectionAuth {
             value: section_auth.clone(),
             sig: section_signed.clone(),
         };
 
-        let _updated = self
-            .network_knowledge
-            .update_knowledge_if_valid(
-                signed_sap.clone(),
-                &proof_chain,
-                Some(members),
-                &our_name,
-                &self.section_keys_provider,
-            )
-            .await?;
+        let _updated = self.network_knowledge.update_knowledge_if_valid(
+            signed_sap.clone(),
+            &proof_chain,
+            Some(members),
+            &our_name,
+            &self.section_keys_provider,
+        )?;
 
         // always run this, only changes will trigger events
         let mut cmds = self.update_self_for_new_node_state(snapshot).await?;
@@ -100,10 +97,7 @@ impl Node {
                     result.extend(cmds);
                 }
 
-                result.push(
-                    self.send_direct_msg(sender, msg_to_resend, dst_section_key)
-                        .await?,
-                );
+                result.push(self.send_direct_msg(sender, msg_to_resend, dst_section_key)?);
 
                 Ok(result)
             }
@@ -163,9 +157,7 @@ impl Node {
 
                     self.create_or_wait_for_backoff(&elder).await;
 
-                    let cmd = self
-                        .send_direct_msg(elder, msg_to_redirect, dst_section_key)
-                        .await?;
+                    let cmd = self.send_direct_msg(elder, msg_to_redirect, dst_section_key)?;
 
                     Ok(vec![cmd])
                 }
@@ -206,23 +198,20 @@ impl Node {
             value: section_auth.clone(),
             sig: section_signed.clone(),
         };
-        let our_name = self.info.read().await.name();
-        let our_section_prefix = self.network_knowledge.prefix().await;
+        let our_name = self.info.borrow().name();
+        let our_section_prefix = self.network_knowledge.prefix();
         let equal_prefix = section_auth.prefix() == our_section_prefix;
         let is_extension_prefix = section_auth.prefix().is_extension_of(&our_section_prefix);
-        let our_peer_info = self.info.read().await.peer();
+        let our_peer_info = self.info.borrow().peer();
 
         // Update our network knowledge
-        let there_was_an_update = self
-            .network_knowledge
-            .update_knowledge_if_valid(
-                signed_sap.clone(),
-                &proof_chain,
-                None,
-                &our_name,
-                &self.section_keys_provider,
-            )
-            .await?;
+        let there_was_an_update = self.network_knowledge.update_knowledge_if_valid(
+            signed_sap.clone(),
+            &proof_chain,
+            None,
+            &our_name,
+            &self.section_keys_provider,
+        )?;
 
         if there_was_an_update {
             self.write_prefix_map().await;
@@ -258,34 +247,40 @@ impl Node {
     /// Checks AE-BackoffCache for backoff, or creates a new instance
     /// waits for any required backoff duration
     async fn create_or_wait_for_backoff(&self, peer: &Peer) {
-        let mut ae_backoff_guard = self.ae_backoff_cache.write().await;
-        let our_backoff = ae_backoff_guard
-            .find(|(node, _)| node == peer)
-            .map(|(_, backoff)| backoff);
+        let sleep_time = {
+            let mut ae_backoff_guard = self.ae_backoff_cache.borrow_mut();
+            let our_backoff = ae_backoff_guard
+                .find(|(node, _)| node == peer)
+                .map(|(_, backoff)| backoff);
 
-        if let Some(backoff) = our_backoff {
-            let next_backoff = backoff.next_backoff();
-            let sleep_time = if let Some(mut next_wait) = next_backoff {
-                // The default setup start with around 400ms
-                // then increases to around 50s after 25 calls.
-                next_wait /= 100;
-                if next_wait > Duration::from_secs(1) {
-                    backoff.reset();
-                }
-                Some(next_wait)
+            let mut sleep_time = None;
+
+            if let Some(backoff) = our_backoff {
+                let next_backoff = backoff.next_backoff();
+                sleep_time = if let Some(mut next_wait) = next_backoff {
+                    // The default setup start with around 400ms
+                    // then increases to around 50s after 25 calls.
+                    next_wait /= 100;
+                    if next_wait > Duration::from_secs(1) {
+                        backoff.reset();
+                    }
+                    Some(next_wait)
+                } else {
+                    // TODO: we've done all backoffs and are _still_ getting messages?
+                    // we should probably penalise the node here.
+                    None
+                };
             } else {
-                // TODO: we've done all backoffs and are _still_ getting messages?
-                // we should probably penalise the node here.
-                None
+                let _res = self
+                    .ae_backoff_cache
+                    .borrow_mut()
+                    .insert((*peer, ExponentialBackoff::default()));
             };
+            sleep_time
+        };
 
-            drop(ae_backoff_guard);
-
-            if let Some(sleep_time) = sleep_time {
-                tokio::time::sleep(sleep_time).await;
-            }
-        } else {
-            let _res = ae_backoff_guard.insert((*peer, ExponentialBackoff::default()));
+        if let Some(sleep_time) = sleep_time {
+            tokio::time::sleep(sleep_time).await;
         }
     }
 
@@ -301,10 +296,10 @@ impl Node {
     ) -> Result<Option<Cmd>> {
         // Check if the message has reached the correct section,
         // if not, we'll need to respond with AE
-        let our_prefix = self.network_knowledge.prefix().await;
+        let our_prefix = self.network_knowledge.prefix();
 
         // Let's try to find a section closer to the destination, if it's not for us.
-        if !self.network_knowledge.prefix().await.matches(&dst_name) {
+        if !self.network_knowledge.prefix().matches(&dst_name) {
             debug!(
                 "AE: prefix not matching. We are: {:?}, they sent to: {:?}",
                 our_prefix, dst_name
@@ -312,7 +307,6 @@ impl Node {
             match self
                 .network_knowledge
                 .get_closest_or_opposite_signed_sap(&dst_name)
-                .await
             {
                 Some((signed_sap, section_chain)) => {
                     info!("Found a better matching prefix {:?}", signed_sap.prefix());
@@ -325,10 +319,10 @@ impl Node {
                         bounced_msg,
                     };
                     let wire_msg = WireMsg::single_src(
-                        &self.info.read().await.clone(),
+                        &self.info.borrow().clone(),
                         src_location.to_dst(),
                         ae_msg,
-                        self.network_knowledge.section_key().await,
+                        self.network_knowledge.section_key(),
                     )?;
                     trace!("{}", LogMarker::AeSendRedirect);
 
@@ -353,14 +347,14 @@ impl Node {
             }
         }
 
-        let section_key = self.network_knowledge.section_key().await;
+        let section_key = self.network_knowledge.section_key();
         trace!(
             "Performing AE checks, provided pk was: {:?} ours is: {:?}",
             dst_section_key,
             section_key
         );
 
-        if dst_section_key == &self.network_knowledge.section_key().await {
+        if dst_section_key == &self.network_knowledge.section_key() {
             // Destination section key matches our current section key
             return Ok(None);
         }
@@ -368,15 +362,11 @@ impl Node {
         let ae_msg = match self
             .network_knowledge
             .get_proof_chain_to_current(dst_section_key)
-            .await
         {
             Ok(proof_chain) => {
                 info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg for AE-Retry with up to date SAP info.", sender);
 
-                let signed_sap = self
-                    .network_knowledge
-                    .section_signed_authority_provider()
-                    .await;
+                let signed_sap = self.network_knowledge.section_signed_authority_provider();
 
                 trace!(
                     "Sending AE-Retry with: proofchain last key: {:?} and  section key: {:?}",
@@ -399,12 +389,9 @@ impl Node {
                     sender
                 );
 
-                let proof_chain = self.network_knowledge.section_chain().await;
+                let proof_chain = self.network_knowledge.section_chain();
 
-                let signed_sap = self
-                    .network_knowledge
-                    .section_signed_authority_provider()
-                    .await;
+                let signed_sap = self.network_knowledge.section_signed_authority_provider();
 
                 trace!("{}", LogMarker::AeSendRetryDstPkFail);
 
@@ -418,10 +405,10 @@ impl Node {
         };
 
         let wire_msg = WireMsg::single_src(
-            &self.info.read().await.clone(),
+            &self.info.borrow().clone(),
             src_location.to_dst(),
             ae_msg,
-            self.network_knowledge.section_key().await,
+            self.network_knowledge.section_key(),
         )?;
 
         Ok(Some(Cmd::SendMsg {
@@ -437,23 +424,20 @@ impl Node {
         src_location: &SrcLocation,
         original_wire_msg: &WireMsg,
     ) -> Result<Cmd> {
-        let signed_sap = self
-            .network_knowledge
-            .section_signed_authority_provider()
-            .await;
+        let signed_sap = self.network_knowledge.section_signed_authority_provider();
 
         let ae_msg = SystemMsg::AntiEntropyRedirect {
             section_auth: signed_sap.value.to_msg(),
             section_signed: signed_sap.sig,
-            section_chain: self.network_knowledge.section_chain().await,
+            section_chain: self.network_knowledge.section_chain(),
             bounced_msg: original_wire_msg.serialize()?,
         };
 
         let wire_msg = WireMsg::single_src(
-            &self.info.read().await.clone(),
+            &self.info.borrow().clone(),
             src_location.to_dst(),
             ae_msg,
-            self.network_knowledge.section_key().await,
+            self.network_knowledge.section_key(),
         )?;
 
         trace!("{} in ae_redirect", LogMarker::AeSendRedirect);
@@ -498,14 +482,12 @@ mod tests {
     #[tokio::test]
     async fn ae_everything_up_to_date() -> Result<()> {
         let env = Env::new().await?;
-        let our_prefix = env.node.network_knowledge().prefix().await;
-        let (msg, src_location) = env.create_msg(
-            &our_prefix,
-            env.node.network_knowledge().section_key().await,
-        )?;
-        let sender = env.node.info.read().await.peer();
+        let our_prefix = env.node.network_knowledge().prefix();
+        let (msg, src_location) =
+            env.create_msg(&our_prefix, env.node.network_knowledge().section_key())?;
+        let sender = env.node.info.borrow().peer();
         let dst_name = our_prefix.substituted_in(xor_name::rand::random());
-        let dst_section_key = env.node.network_knowledge().section_key().await;
+        let dst_section_key = env.node.network_knowledge().section_key();
 
         let cmd = env
             .node
@@ -568,7 +550,7 @@ mod tests {
         let other_pk = other_sk.public_key();
 
         let (msg, src_location) = env.create_msg(&env.other_sap.prefix(), other_pk)?;
-        let sender = env.node.info.read().await.peer();
+        let sender = env.node.info.borrow().peer();
 
         // since it's not aware of the other prefix, it will redirect to self
         let dst_section_key = other_pk;
@@ -592,7 +574,7 @@ mod tests {
 
         assert_matches!(msg_type, MsgType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
-                assert_eq!(section_auth, env.node.network_knowledge().authority_provider().await.to_msg());
+                assert_eq!(section_auth, env.node.network_knowledge().authority_provider().to_msg());
             });
         });
 
@@ -604,7 +586,7 @@ mod tests {
                     env.other_sap.clone(),
                     &env.proof_chain,
                     None,
-                    &env.node.info.read().await.name(),
+                    &env.node.info.borrow().name(),
                     &env.node.section_keys_provider
                 )
                 .await?
@@ -641,13 +623,11 @@ mod tests {
     #[tokio::test]
     async fn ae_outdated_dst_key_of_our_section() -> Result<()> {
         let env = Env::new().await?;
-        let our_prefix = env.node.network_knowledge().prefix().await;
+        let our_prefix = env.node.network_knowledge().prefix();
 
-        let (msg, src_location) = env.create_msg(
-            &our_prefix,
-            env.node.network_knowledge().section_key().await,
-        )?;
-        let sender = env.node.info.read().await.peer();
+        let (msg, src_location) =
+            env.create_msg(&our_prefix, env.node.network_knowledge().section_key())?;
+        let sender = env.node.info.borrow().peer();
         let dst_name = our_prefix.substituted_in(xor_name::rand::random());
         let dst_section_key = env.node.network_knowledge().genesis_key();
 
@@ -670,7 +650,7 @@ mod tests {
 
         assert_matches!(msg_type, MsgType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
-                assert_eq!(section_auth, &env.node.network_knowledge().authority_provider().await.to_msg());
+                assert_eq!(section_auth, &env.node.network_knowledge().authority_provider().to_msg());
                 assert_eq!(proof_chain, &env.node.section_chain().await);
             });
         });
@@ -681,13 +661,11 @@ mod tests {
     #[tokio::test]
     async fn ae_wrong_dst_key_of_our_section_returns_retry() -> Result<()> {
         let env = Env::new().await?;
-        let our_prefix = env.node.network_knowledge().prefix().await;
+        let our_prefix = env.node.network_knowledge().prefix();
 
-        let (msg, src_location) = env.create_msg(
-            &our_prefix,
-            env.node.network_knowledge().section_key().await,
-        )?;
-        let sender = env.node.info.read().await.peer();
+        let (msg, src_location) =
+            env.create_msg(&our_prefix, env.node.network_knowledge().section_key())?;
+        let sender = env.node.info.borrow().peer();
         let dst_name = our_prefix.substituted_in(xor_name::rand::random());
 
         let bogus_env = Env::new().await?;
@@ -712,7 +690,7 @@ mod tests {
 
         assert_matches!(msg_type, MsgType::System{ msg, .. } => {
             assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
-                assert_eq!(*section_auth, env.node.network_knowledge().authority_provider().await.to_msg());
+                assert_eq!(*section_auth, env.node.network_knowledge().authority_provider().to_msg());
                 assert_eq!(*proof_chain, env.node.section_chain().await);
             });
         });
