@@ -260,7 +260,7 @@ impl NodeApi {
         let event_stream = EventStream::new(event_rx);
 
         // Start listening to incoming connections.
-        let _handle = task::spawn(handle_connection_events(
+        let _handle = task::spawn_local(handle_connection_events(
             dispatcher.clone(),
             connection_event_rx,
         ));

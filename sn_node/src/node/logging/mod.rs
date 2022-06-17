@@ -23,7 +23,7 @@ pub(super) async fn run_system_logger(ctx: LogCtx, print_resources_usage: bool) 
     let mut system = System::new_all();
     initial_log(&mut system, &ctx).await;
 
-    let _handle = tokio::task::spawn(async move {
+    let _handle = tokio::task::spawn_local(async move {
         let mut interval = tokio::time::interval(LOG_INTERVAL);
         interval.set_missed_tick_behavior(MissedTickBehavior::Skip); // default is `Burst`, probably not what we want
         loop {
