@@ -264,8 +264,8 @@ impl Dispatcher {
             loop {
                 let _ = interval.tick().await;
 
-                let members = dispatcher.node.network_knowledge().section_members().await;
-                let section_pk = dispatcher.node.network_knowledge().section_key().await;
+                let members = dispatcher.node.network_knowledge().section_members();
+                let section_pk = dispatcher.node.network_knowledge().section_key();
 
                 if let Some(load_report) = dispatcher.node.comm.tolerated_msgs_per_s().await {
                     trace!("New BackPressure report to disseminate: {:?}", load_report);
