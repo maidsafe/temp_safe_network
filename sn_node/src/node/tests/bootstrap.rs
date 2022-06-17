@@ -22,7 +22,7 @@ use xor_name::XOR_NAME_LEN;
 
 
 /*
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_genesis_node() -> Result<()> {
     let keypair = Keypair::generate(&mut rand::thread_rng());
     let (node, mut event_stream) = create_node(Config {
@@ -41,7 +41,7 @@ async fn test_genesis_node() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_node_bootstrapping() -> Result<()> {
     let (genesis_node, mut event_stream) = create_node(Config {
         first: true,
@@ -70,7 +70,7 @@ async fn test_node_bootstrapping() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_startup_section_bootstrapping() -> Result<()> {
     // Create the genesis node.
     let (genesis_node, mut event_stream) = create_node(Config {
@@ -122,7 +122,7 @@ async fn test_startup_section_bootstrapping() -> Result<()> {
 }
 
 // Test that the first `elder_count()` nodes in the network are promoted to elders.
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_startup_elders() -> Result<()> {
     let mut nodes = create_connected_nodes(elder_count()).await?;
 

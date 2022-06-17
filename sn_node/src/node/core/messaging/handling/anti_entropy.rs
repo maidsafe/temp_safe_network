@@ -495,7 +495,7 @@ mod tests {
     use tokio::sync::mpsc;
     use xor_name::Prefix;
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn ae_everything_up_to_date() -> Result<()> {
         let env = Env::new().await?;
         let our_prefix = env.node.network_knowledge().prefix().await;
@@ -523,7 +523,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn ae_update_msg_to_be_trusted() -> Result<()> {
         let env = Env::new().await?;
 
@@ -560,7 +560,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn ae_redirect_to_other_section() -> Result<()> {
         let env = Env::new().await?;
 
@@ -638,7 +638,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn ae_outdated_dst_key_of_our_section() -> Result<()> {
         let env = Env::new().await?;
         let our_prefix = env.node.network_knowledge().prefix().await;
@@ -678,7 +678,7 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn ae_wrong_dst_key_of_our_section_returns_retry() -> Result<()> {
         let env = Env::new().await?;
         let our_prefix = env.node.network_knowledge().prefix().await;

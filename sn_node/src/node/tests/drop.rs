@@ -18,7 +18,7 @@ use anyhow::{anyhow, Result};
 use bytes::Bytes;
 
 /*
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_node_drop() -> Result<()> {
     // NOTE: create at least 4 nodes, so when one is dropped the remaining ones still form a
     // supermajority and the `Offline` proposals reach agreement.

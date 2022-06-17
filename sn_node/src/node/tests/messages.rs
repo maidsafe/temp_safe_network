@@ -24,7 +24,7 @@ use utils::*;
 use xor_name::XorName;
 
 /*
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_messages_client_node() -> Result<()> {
     let (node, mut event_stream) = create_node(Config {
         first: true,
@@ -118,7 +118,7 @@ async fn test_messages_client_node() -> Result<()> {
     }
 }
 
-#[tokio::test(flavor = "multi_thread")]
+#[tokio::test]
 async fn test_messages_between_nodes() -> Result<()> {
     let msg = b"hello!";
     let response = b"good bye!";
