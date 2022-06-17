@@ -329,6 +329,7 @@ impl Membership {
         let vote_gen = signed_vote.vote.gen;
         let is_ongoing_consensus = vote_gen == self.gen + 1;
         let consensus = self.consensus_at_gen_mut(vote_gen)?;
+        let is_fresh_vote = !consensus.processed_votes_cache.contains(&signed_vote.sig);
 
         info!(
             "Membership - accepted signed vote from voter {:?}",
