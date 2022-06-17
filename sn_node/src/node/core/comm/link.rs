@@ -70,14 +70,14 @@ impl Link {
         }
     }
 
-    pub(crate) async fn new_with(
+    pub(crate) fn new_with(
         peer: Peer,
         endpoint: Endpoint,
         listener: MsgListener,
         conn: qp2p::Connection,
     ) -> Self {
         let instance = Self::new(peer, endpoint, listener);
-        instance.insert(conn).await;
+        instance.insert(conn);
         instance
     }
 
@@ -86,15 +86,15 @@ impl Link {
         &self.peer
     }
 
-    pub(crate) async fn add(&self, conn: qp2p::Connection) {
-        self.insert(conn).await;
+    pub(crate) fn add(&self, conn: qp2p::Connection) {
+        self.insert(conn);
     }
 
     /// Disposes of the link and all underlying resources.
     /// Also any clones of this link that are held, will be cleaned up.
     /// This is due to the fact that we do never leak the qp2p::Connection outside of this struct,
     /// since that struct is cloneable and uses Rc internally.
-    pub(crate) async fn disconnect(self) {
+    pub(crate) fn disconnect(self) {
         let _ = self.queue.borrow_mut().clear();
         let mut guard = self.connections.borrow_mut();
         for (_, item) in guard.iter() {
@@ -181,7 +181,7 @@ impl Link {
     }
 
     /// Is this Link currently connected?
-    pub(crate) async fn is_connected(&self) -> bool {
+    pub(crate) fn is_connected(&self) -> bool {
         // get the most recently used connection
         let res = { self.queue.borrow().peek_max().map(|(id, _prio)| *id) };
         match res {
@@ -189,7 +189,7 @@ impl Link {
             Some(id) => {
                 let expiring = self.connections.borrow().get(&id).cloned();
                 match expiring {
-                    Some(conn) => !conn.expired().await,
+                    Some(conn) => !conn.expired(),
                     None => false,
                 }
             }
@@ -200,7 +200,7 @@ impl Link {
         let res = { self.connections.borrow().get(&id).cloned() };
         match res {
             Some(item) => {
-                self.touch(item.conn.id()).await;
+                self.touch(item.conn.id());
                 Ok(item.conn)
             }
             None => self.create_connection().await,
@@ -221,14 +221,14 @@ impl Link {
             conn.id()
         );
 
-        self.insert(conn.clone()).await;
+        self.insert(conn.clone());
 
         self.listener.listen(conn.clone(), incoming_msgs);
 
         Ok(conn)
     }
 
-    async fn insert(&self, conn: qp2p::Connection) {
+    fn insert(&self, conn: qp2p::Connection) {
         let id = conn.id();
 
         {
@@ -238,14 +238,14 @@ impl Link {
                 .insert(id, ExpiringConn::new(conn));
         }
         {
-            let prio = self.priority().await;
+            let prio = self.priority();
             let _ = self.queue.borrow_mut().push(id, prio);
         }
     }
 
-    async fn touch(&self, id: ConnId) {
+    fn touch(&self, id: ConnId) {
         {
-            let prio = self.priority().await;
+            let prio = self.priority();
             let _old_prio = self.queue.borrow_mut().change_priority(&id, prio);
         }
         {
@@ -253,12 +253,12 @@ impl Link {
             let conn = conns.get(&id);
 
             if let Some(conn) = conn {
-                conn.touch().await
+                conn.touch()
             }
         }
     }
 
-    async fn priority(&self) -> Priority {
+    fn priority(&self) -> Priority {
         let prio = self.access_counter.fetch_add(1, Ordering::SeqCst);
         if prio == u64::MAX {
             // after u64::MAX connections to this peer (very unlikely), we need to update the prios
@@ -282,7 +282,7 @@ impl Link {
     }
 
     /// Remove expired connections.
-    pub(crate) async fn remove_expired(&self) {
+    pub(crate) fn remove_expired(&self) {
         if Instant::now() > { *self.expiration_check.borrow() } {
             *self.expiration_check.borrow_mut() = expiration();
         } else {
@@ -305,7 +305,7 @@ impl Link {
             }
             let read_items = self.connections.borrow().clone();
             if let Some(conn) = read_items.get(&id) {
-                if conn.expired().await {
+                if conn.expired() {
                     expired_ids.push(id);
                     remaining -= 1;
                 }
@@ -324,11 +324,11 @@ impl Link {
             }
         }
 
-        self.drop_excess().await;
+        self.drop_excess();
     }
 
     /// Remove connections that exceed capacity, oldest first.
-    async fn drop_excess(&self) {
+    fn drop_excess(&self) {
         let len = { self.queue.borrow().len() };
         if len >= CAPACITY as usize {
             // remove the least recently used connections
@@ -381,11 +381,11 @@ impl ExpiringConn {
         }
     }
 
-    async fn expired(&self) -> bool {
+    fn expired(&self) -> bool {
         *self.expiry.borrow() < Instant::now()
     }
 
-    async fn touch(&self) {
+    fn touch(&self) {
         *self.expiry.borrow_mut() = expiration();
     }
 }

@@ -354,7 +354,7 @@ impl FlowCtrl {
                 let _ = interval.tick().await;
 
                 let node = &self.node;
-                let our_info = node.info.read().await;
+                let our_info = node.info().await;
                 let our_name = our_info.name();
 
                 let members = node.network_knowledge().section_members().await;

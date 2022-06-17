@@ -103,9 +103,9 @@ impl Comm {
             let peer = entry.key();
             let session = entry.value();
 
-            session.remove_expired().await;
+            session.remove_expired();
 
-            let is_connected = session.is_connected().await;
+            let is_connected = session.is_connected();
 
             if !is_connected {
                 if !retain_peers.contains(peer) {
@@ -126,7 +126,7 @@ impl Comm {
                 let perhaps_peer = self.sessions.remove(&peer);
 
                 if let Some((_peer, session)) = perhaps_peer {
-                    session.disconnect().await
+                    session.disconnect()
                 };
             }
         }
@@ -178,7 +178,7 @@ impl Comm {
     /// according to the tolerated msgs per s provided by it.
     pub(crate) async fn regulate(&self, peer: &Peer, msgs_per_s: f64) {
         let session = self.get_or_create(peer).await;
-        session.update_send_rate(msgs_per_s).await;
+        session.update_send_rate(msgs_per_s);
     }
 
     /// Sends a message to a client. Reuses an existing or creates a connection if none.
@@ -468,15 +468,14 @@ impl Comm {
             // peer already exists
             let peer_session = entry.value();
             // add to it
-            peer_session.add(conn).await;
+            peer_session.add(conn);
         } else {
             let link = Link::new_with(
                 *peer,
                 self.our_endpoint.clone(),
                 self.msg_listener.clone(),
                 conn,
-            )
-            .await;
+            );
             let session = PeerSession::new(link);
             let _ = self.sessions.insert(*peer, session);
         }
@@ -506,7 +505,7 @@ impl Comm {
             recipient,
         );
         let peer = self.get_or_create(&recipient).await;
-        let result = peer.send(msg_id, msg_priority, msg_bytes).await;
+        let result = peer.send(msg_id, msg_priority, msg_bytes);
 
         (recipient, result)
     }

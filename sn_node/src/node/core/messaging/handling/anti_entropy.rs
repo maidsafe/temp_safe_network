@@ -328,7 +328,7 @@ impl Node {
                         bounced_msg,
                     };
                     let wire_msg = WireMsg::single_src(
-                        &self.info().await.clone(),
+                        &self.info().await,
                         src_location.to_dst(),
                         ae_msg,
                         self.network_knowledge.section_key().await,
@@ -421,7 +421,7 @@ impl Node {
         };
 
         let wire_msg = WireMsg::single_src(
-            &self.info().await.clone(),
+            &self.info().await,
             src_location.to_dst(),
             ae_msg,
             self.network_knowledge.section_key().await,
@@ -453,7 +453,7 @@ impl Node {
         };
 
         let wire_msg = WireMsg::single_src(
-            &self.info().await.clone(),
+            &self.info().await,
             src_location.to_dst(),
             ae_msg,
             self.network_knowledge.section_key().await,
