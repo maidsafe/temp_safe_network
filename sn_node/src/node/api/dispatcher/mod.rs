@@ -65,7 +65,7 @@ impl Dispatcher {
         cmd: Cmd,
         cmd_id: Option<CmdId>,
     ) -> Result<()> {
-        let _ = tokio::spawn(async {
+        let _ = tokio::task::spawn_local(async {
             let cmd_id: CmdId = cmd_id.unwrap_or_else(|| rand::random::<u32>().to_string());
 
             self.handle_cmd_and_offshoots(cmd, Some(cmd_id)).await
@@ -85,7 +85,7 @@ impl Dispatcher {
         let cmd_id = cmd_id.unwrap_or_else(|| rand::random::<u32>().to_string());
         let cmd_id_clone = cmd_id.clone();
         let cmd_display = cmd.to_string();
-        let _task = tokio::spawn(async move {
+        let _task = tokio::task::spawn_local(async move {
             match self.process_cmd(cmd, &cmd_id).await {
                 Ok(cmds) => {
                     for (sub_cmd_count, cmd) in cmds.into_iter().enumerate() {
@@ -112,7 +112,9 @@ impl Dispatcher {
     // Note: this indirecton is needed. Trying to call `spawn(self.handle_cmds(...))` directly
     // inside `handle_cmds` causes compile error about type check cycle.
     fn spawn_cmd_handling(self: Arc<Self>, cmd: Cmd, cmd_id: String) -> Result<()> {
-        let _task = tokio::spawn(self.enqueue_and_handle_next_cmd_and_offshoots(cmd, Some(cmd_id)));
+        let _task = tokio::task::spawn_local(
+            self.enqueue_and_handle_next_cmd_and_offshoots(cmd, Some(cmd_id)),
+        );
         Ok(())
     }
 

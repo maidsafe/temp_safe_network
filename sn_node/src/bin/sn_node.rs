@@ -35,7 +35,6 @@ use sn_node::node::{
 };
 
 use color_eyre::{Section, SectionExt};
-#[cfg(not(feature = "tokio-console"))]
 use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
 use self_update::{cargo_crate_version, Status};
 use std::{fmt::Debug, fs::File, io, io::Write, path::Path, process::exit};
@@ -76,7 +75,6 @@ fn main() -> Result<()> {
     loop {
         create_runtime_and_node()?;
     }
-
 }
 
 /// Create a tokio runtime per `run_node` instance.
@@ -97,18 +95,20 @@ fn create_runtime_and_node() -> Result<()> {
 
         let local = tokio::task::LocalSet::new();
 
-        let _res = local.run_until(async move {
-            // we want logging to persist
-            // loops ready to catch any ChurnJoinMiss
-            match run_node(config).await {
-                Ok(_) => {
-                    info!("Node has finished running, no runtime errors were reported");
-                }
-                Err(error) => {
-                    warn!("Node instance finished with an error: {error:?}");
-                }
-            };
-        }).await;
+        let _res = local
+            .run_until(async move {
+                // we want logging to persist
+                // loops ready to catch any ChurnJoinMiss
+                match run_node(config).await {
+                    Ok(_) => {
+                        info!("Node has finished running, no runtime errors were reported");
+                    }
+                    Err(error) => {
+                        warn!("Node instance finished with an error: {error:?}");
+                    }
+                };
+            })
+            .await;
 
         Result::<(), NodeError>::Ok(())
     });
