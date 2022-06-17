@@ -105,6 +105,8 @@ impl Link {
         guard.clear();
     }
 
+
+
     /// Send a message to the peer with default retry configuration.
     ///
     /// The message will be sent on a unidirectional QUIC stream, meaning the application is
