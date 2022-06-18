@@ -5,7 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.62.6 (2022-06-18)
+
+### Chore
+
+ - <csr-id-e4b43ce9a8655cc8deea8d459ac0a0755d9153c1/> reorder nodeacceptance cmds to inform node first of all
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 1 day passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - reorder nodeacceptance cmds to inform node first of all ([`e4b43ce`](https://github.com/maidsafe/safe_network/commit/e4b43ce9a8655cc8deea8d459ac0a0755d9153c1))
+</details>
+
 ## v0.62.5 (2022-06-16)
+
+<csr-id-f599c5973d50324aad1720166156666d5db1ed3d/>
+<csr-id-4eb43fa884d7b047febb18c067ae905969a113bf/>
+<csr-id-83fa804ed62f30344dda48cef7ad852a4ac4118b/>
+<csr-id-fa709fb9fea7926048525e5a2f21ff0017676f41/>
+<csr-id-e195c2504bee67fdc1ebbbbef9b3b4428ee8a32d/>
+<csr-id-ef5cb8c050cec82d215dcf98aeb0dc237cf1b574/>
+<csr-id-3a6d83bd9d406b824b538ee7de7da95119f536da/>
 
 ### Chore
 
@@ -22,6 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-ef5cb8c050cec82d215dcf98aeb0dc237cf1b574/> update cargo deps across the baord
  - <csr-id-3a6d83bd9d406b824b538ee7de7da95119f536da/> use DashMap in comms to avoid RwLocks
 
+### Chore
+
+ - <csr-id-9679f0cde6f4e5a2b1fbf2fded954f17b243e518/> sn_node-0.62.5
+
 ### New Features
 
  - <csr-id-7ccb02a7ded7579bb8645c918b9a6108b1b585af/> enable tracking of Dkg issues
@@ -35,8 +72,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 9 commits contributed to the release.
- - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits contributed to the release over the course of 1 calendar day.
+ - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -46,6 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_node-0.62.5 ([`9679f0c`](https://github.com/maidsafe/safe_network/commit/9679f0cde6f4e5a2b1fbf2fded954f17b243e518))
     - sn_interface-0.6.3/sn_dysfunction-0.5.1/sn_client-0.66.3/sn_api-0.64.3/sn_cli-0.57.4 ([`f599c59`](https://github.com/maidsafe/safe_network/commit/f599c5973d50324aad1720166156666d5db1ed3d))
     - upgrade blsttc to 6.0.0 ([`4eb43fa`](https://github.com/maidsafe/safe_network/commit/4eb43fa884d7b047febb18c067ae905969a113bf))
     - increase dysfunction check interval ([`83fa804`](https://github.com/maidsafe/safe_network/commit/83fa804ed62f30344dda48cef7ad852a4ac4118b))

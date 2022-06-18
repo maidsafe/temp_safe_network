@@ -4,7 +4,36 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
+## v0.57.5 (2022-06-18)
+
+### Chore
+
+ - <csr-id-4d1b0915ce6ab21c13d27b7be66a455e4fbd3133/> update rcgen to remove failure crate
+ - <csr-id-b55f8a78988c28369cc998f53b019b14a4ff024e/> update duct dep to remove nix security warning
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 day passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - update rcgen to remove failure crate ([`4d1b091`](https://github.com/maidsafe/safe_network/commit/4d1b0915ce6ab21c13d27b7be66a455e4fbd3133))
+    - update duct dep to remove nix security warning ([`b55f8a7`](https://github.com/maidsafe/safe_network/commit/b55f8a78988c28369cc998f53b019b14a4ff024e))
+</details>
+
 ## v0.57.4 (2022-06-15)
+
+<csr-id-4eb43fa884d7b047febb18c067ae905969a113bf/>
 
 ### Chore
 
@@ -15,12 +44,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
    * sn_consensus to v2.1.1 because it was also upgraded to reference v6.0.0 of blsttc
    * sn_dbc to v4.0.0 because it was also upgraded to reference v6.0.0 of blsttc
 
+### Chore
+
+ - <csr-id-f599c5973d50324aad1720166156666d5db1ed3d/> sn_interface-0.6.3/sn_dysfunction-0.5.1/sn_client-0.66.3/sn_api-0.64.3/sn_cli-0.57.4
+
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -30,12 +63,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.6.3/sn_dysfunction-0.5.1/sn_client-0.66.3/sn_api-0.64.3/sn_cli-0.57.4 ([`f599c59`](https://github.com/maidsafe/safe_network/commit/f599c5973d50324aad1720166156666d5db1ed3d))
     - upgrade blsttc to 6.0.0 ([`4eb43fa`](https://github.com/maidsafe/safe_network/commit/4eb43fa884d7b047febb18c067ae905969a113bf))
 </details>
 
 ## v0.57.3 (2022-06-15)
 
 <csr-id-0f00c8cf7caae190716c8fd57addd38b18a3a49b/>
+<csr-id-46246f155ab65f3fcd61381345f1a7f747dfe957/>
 
 ### New Features
 
