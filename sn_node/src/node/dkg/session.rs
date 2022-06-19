@@ -12,12 +12,15 @@ use crate::node::{
     messages::WireMsgUtils,
     Result,
 };
-use sn_interface::messaging::{
-    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
-    DstLocation, WireMsg,
+
+use sn_interface::{
+    messaging::{
+        system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
+        DstLocation, WireMsg,
+    },
+    network_knowledge::{NodeInfo, SectionAuthorityProvider, SectionKeyShare},
+    types::{keys::ed25519, log_markers::LogMarker, Peer, PublicKey},
 };
-use sn_interface::network_knowledge::{NodeInfo, SectionAuthorityProvider, SectionKeyShare};
-use sn_interface::types::{keys::ed25519, log_markers::LogMarker, Peer, PublicKey};
 
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{
@@ -500,11 +503,16 @@ impl Session {
 mod tests {
     use super::*;
     use crate::node::dkg::voter::DkgVoter;
-    use sn_interface::elder_count;
-    use sn_interface::messaging::system::{MembershipState, NodeState};
-    use sn_interface::messaging::MsgType;
-    use sn_interface::network_knowledge::{test_utils::gen_addr, NodeInfo, MIN_ADULT_AGE};
-    use sn_interface::types::keys::ed25519::{self, proptesting::arbitrary_keypair};
+
+    use sn_interface::{
+        elder_count,
+        messaging::{
+            system::{MembershipState, NodeState},
+            MsgType,
+        },
+        network_knowledge::{test_utils::gen_addr, NodeInfo, MIN_ADULT_AGE},
+        types::keys::ed25519::{self, proptesting::arbitrary_keypair},
+    };
 
     use assert_matches::assert_matches;
     use eyre::{bail, ContextCompat, Result};

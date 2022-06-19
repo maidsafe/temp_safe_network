@@ -6,20 +6,21 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::Cmd;
+use super::{Cmd, Dispatcher};
 use crate::node::{messages::WireMsgUtils, Result};
+
 #[cfg(feature = "back-pressure")]
 use sn_interface::messaging::DstLocation;
-use sn_interface::messaging::{
-    system::{NodeCmd, SystemMsg},
-    WireMsg,
+use sn_interface::{
+    messaging::{
+        system::{NodeCmd, SystemMsg},
+        WireMsg,
+    },
+    types::log_markers::LogMarker,
 };
-use sn_interface::types::log_markers::LogMarker;
-use std::{collections::BTreeSet, sync::Arc, time::Duration};
-use tokio::task::JoinHandle;
-use tokio::time::MissedTickBehavior;
 
-use super::Dispatcher;
+use std::{collections::BTreeSet, sync::Arc, time::Duration};
+use tokio::{task::JoinHandle, time::MissedTickBehavior};
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 #[cfg(feature = "back-pressure")]

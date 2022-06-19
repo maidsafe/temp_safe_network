@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,12 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::ipc::IpcError;
-use super::nrs::NrsMap;
-use super::safeurl::{Error as UrlError, SafeUrl, XorUrl};
+use super::{
+    ipc::IpcError,
+    nrs::NrsMap,
+    safeurl::{Error as UrlError, SafeUrl, XorUrl},
+};
+
 use sn_client::Error as ClientError;
 use sn_dbc::Error as DbcError;
 use sn_interface::types::Error as InterfaceError;
+
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;

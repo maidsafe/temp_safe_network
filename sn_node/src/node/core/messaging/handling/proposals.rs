@@ -7,12 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{api::cmds::Cmd, core::Proposal, dkg::SigShare, Result};
-use sn_interface::messaging::{
-    signature_aggregator::{Error as AggregatorError, SignatureAggregator},
-    MsgId,
+
+use sn_interface::{
+    messaging::{
+        signature_aggregator::{Error as AggregatorError, SignatureAggregator},
+        MsgId,
+    },
+    network_knowledge::NetworkKnowledge,
+    types::Peer,
 };
-use sn_interface::network_knowledge::NetworkKnowledge;
-use sn_interface::types::Peer;
 
 // Insert the proposal into the proposal aggregator and handle it if aggregated.
 pub(crate) async fn handle_proposal(

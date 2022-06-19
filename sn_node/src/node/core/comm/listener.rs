@@ -8,12 +8,13 @@
 
 use super::MsgEvent;
 
-use sn_interface::messaging::WireMsg;
-use sn_interface::types::{log_markers::LogMarker, Peer};
+use sn_interface::{
+    messaging::WireMsg,
+    types::{log_markers::LogMarker, Peer},
+};
 
 use qp2p::ConnectionIncoming;
-use tokio::sync::mpsc;
-use tokio::task;
+use tokio::{sync::mpsc, task};
 use tracing::Instrument;
 
 #[derive(Debug)]

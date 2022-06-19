@@ -7,9 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{dkg::SigShare, Result};
+
 use sn_consensus::Generation;
-use sn_interface::messaging::system::{Proposal as ProposalMsg, SectionAuth};
-use sn_interface::network_knowledge::{NodeState, SectionAuthorityProvider};
+use sn_interface::{
+    messaging::system::{Proposal as ProposalMsg, SectionAuth},
+    network_knowledge::{NodeState, SectionAuthorityProvider},
+};
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq)]
@@ -63,15 +66,13 @@ impl Proposal {
     }
 }
 
-// impl Proposal {
-// }
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sn_interface::network_knowledge::test_utils::gen_section_authority_provider;
+
     use eyre::Result;
     use serde::Serialize;
-    use sn_interface::network_knowledge::test_utils::gen_section_authority_provider;
     use std::fmt::Debug;
     use xor_name::Prefix;
 

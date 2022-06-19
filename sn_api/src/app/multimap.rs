@@ -11,9 +11,10 @@ use super::register::EntryHash;
 use crate::safeurl::{ContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe};
 
+use sn_interface::types::DataAddress;
+
 use log::debug;
 use rand::Rng;
-use sn_interface::types::DataAddress;
 use std::collections::BTreeSet;
 use xor_name::XorName;
 

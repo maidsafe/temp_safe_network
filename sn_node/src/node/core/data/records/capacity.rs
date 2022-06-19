@@ -7,8 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{Prefix, XorName};
-use itertools::Itertools;
 use sn_interface::messaging::data::StorageLevel;
+
+use itertools::Itertools;
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::Arc,

@@ -14,11 +14,12 @@ use crate::node::{
     Event,
 };
 use crate::UsedSpace;
-use sn_interface::messaging::WireMsg;
-use sn_interface::network_knowledge::{
-    NetworkKnowledge, NodeInfo, SectionAuthorityProvider, SectionKeyShare,
+
+use sn_interface::{
+    messaging::WireMsg,
+    network_knowledge::{NetworkKnowledge, NodeInfo, SectionAuthorityProvider, SectionKeyShare},
+    types::log_markers::LogMarker,
 };
-use sn_interface::types::log_markers::LogMarker;
 
 use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf};

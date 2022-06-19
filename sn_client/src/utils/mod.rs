@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -57,9 +57,8 @@ pub fn bin_data_format(data: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use sn_interface::types::utils::random_bytes;
-
     use super::*;
+    use sn_interface::types::utils::random_bytes;
 
     const SIZE: usize = 10;
 

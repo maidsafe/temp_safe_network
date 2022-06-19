@@ -14,14 +14,16 @@ mod version_hash;
 mod xorurl_media_types;
 
 pub use errors::{Error, Result};
+pub use version_hash::VersionHash;
+
+use sn_interface::types::{DataAddress, RegisterAddress};
+
 use multibase::{decode as base_decode, encode as base_encode, Base};
 use serde::{Deserialize, Serialize};
-use sn_interface::types::{DataAddress, RegisterAddress};
 use std::fmt;
 use tracing::{info, trace, warn};
 use url::Url;
 use url_parts::UrlParts;
-pub use version_hash::VersionHash;
 use xor_name::{XorName, XOR_NAME_LEN};
 use xorurl_media_types::{MEDIA_TYPE_CODES, MEDIA_TYPE_STR};
 
@@ -1138,9 +1140,10 @@ impl fmt::Display for SafeUrl {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sn_interface::types::register::EntryHash;
+
     use color_eyre::{eyre::bail, eyre::eyre, Result};
     use rand::Rng;
-    use sn_interface::types::register::EntryHash;
 
     macro_rules! verify_expected_result {
             ($result:expr, $pattern:pat $(if $cond:expr)?) => {

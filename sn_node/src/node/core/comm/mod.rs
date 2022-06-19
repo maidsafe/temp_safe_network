@@ -16,24 +16,26 @@ mod peer_session;
 #[cfg(feature = "back-pressure")]
 use self::back_pressure::BackPressure;
 
-use self::link::Link;
-use self::listener::{ListenerEvent, MsgListener};
-use self::peer_session::{PeerSession, SendWatcher};
+use self::{
+    link::Link,
+    listener::{ListenerEvent, MsgListener},
+    peer_session::{PeerSession, SendWatcher},
+};
 
-use crate::node::core::comm::peer_session::SendStatus;
-use crate::node::error::{Error, Result};
+use crate::node::{
+    core::comm::peer_session::SendStatus,
+    error::{Error, Result},
+};
+
 use sn_dysfunction::DysfunctionDetection;
-use sn_interface::messaging::WireMsg;
-use sn_interface::types::Peer;
+use sn_interface::{messaging::WireMsg, types::Peer};
 
 use bytes::Bytes;
+use dashmap::DashMap;
 use futures::stream::{FuturesUnordered, StreamExt};
 use qp2p::{Endpoint, IncomingConnections};
-use std::time::Duration;
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{sync::mpsc, task};
-
-use dashmap::DashMap;
 
 // Communication component of the node to interact with other nodes.
 #[derive(Clone)]
@@ -610,13 +612,19 @@ pub(crate) enum DeliveryStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use sn_interface::{
+        messaging::{
+            data::{DataQuery, ServiceMsg},
+            AuthKind, DstLocation, MsgId, ServiceAuth,
+        },
+        types::{ChunkAddress, Keypair, Peer},
+    };
+
     use assert_matches::assert_matches;
     use eyre::Result;
     use futures::future;
     use qp2p::Config;
-    use sn_interface::messaging::data::{DataQuery, ServiceMsg};
-    use sn_interface::messaging::{AuthKind, DstLocation, MsgId, ServiceAuth};
-    use sn_interface::types::{ChunkAddress, Keypair, Peer};
     use std::{net::Ipv4Addr, time::Duration};
     use tokio::{net::UdpSocket, sync::mpsc, time};
 

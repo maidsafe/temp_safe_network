@@ -7,13 +7,16 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{Error, Result};
-use sn_interface::messaging::{
-    system::{SigShare, SystemMsg},
-    AuthKind, AuthorityProof, BlsShareAuth, DstLocation, MsgId, NodeAuth, WireMsg,
+
+use sn_interface::{
+    messaging::{
+        system::{SigShare, SystemMsg},
+        AuthKind, AuthorityProof, BlsShareAuth, DstLocation, MsgId, NodeAuth, WireMsg,
+    },
+    network_knowledge::{NodeInfo, SectionKeyShare},
 };
 
 use bls::PublicKey as BlsPublicKey;
-use sn_interface::network_knowledge::{NodeInfo, SectionKeyShare};
 use xor_name::XorName;
 
 // Utilities for WireMsg.

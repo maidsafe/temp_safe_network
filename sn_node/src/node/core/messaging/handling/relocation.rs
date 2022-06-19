@@ -15,12 +15,13 @@ use crate::node::{
     },
     Event, Result,
 };
-use sn_interface::elder_count;
-use sn_interface::messaging::system::{
-    MembershipState, NodeState as NodeStateMsg, RelocateDetails, SectionAuth,
+
+use sn_interface::{
+    elder_count,
+    messaging::system::{MembershipState, NodeState as NodeStateMsg, RelocateDetails, SectionAuth},
+    network_knowledge::NodeState,
+    types::log_markers::LogMarker,
 };
-use sn_interface::network_knowledge::NodeState;
-use sn_interface::types::log_markers::LogMarker;
 
 use std::collections::BTreeSet;
 use xor_name::XorName;

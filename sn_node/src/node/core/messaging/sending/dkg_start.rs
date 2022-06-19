@@ -7,12 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{api::cmds::Cmd, core::Node, messages::WireMsgUtils, Result};
-use sn_interface::messaging::{
-    system::{DkgSessionId, SystemMsg},
-    DstLocation, WireMsg,
+
+use sn_interface::{
+    messaging::{
+        system::{DkgSessionId, SystemMsg},
+        DstLocation, WireMsg,
+    },
+    types::{log_markers::LogMarker, Peer},
 };
-use sn_interface::types::log_markers::LogMarker;
-use sn_interface::types::Peer;
 
 use xor_name::XorName;
 

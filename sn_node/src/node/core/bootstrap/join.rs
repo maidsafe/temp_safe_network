@@ -7,23 +7,26 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{read_prefix_map_from_disk, UsedRecipientSaps};
+
 use crate::node::{
     core::{Comm, DeliveryStatus, MsgEvent},
     messages::WireMsgUtils,
     Error, Result,
 };
-use sn_interface::messaging::{
-    system::{
-        JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, SectionAuth,
-        SystemMsg,
-    },
-    AuthKind, DstLocation, MsgType, NodeAuth, WireMsg,
-};
-use sn_interface::network_knowledge::{
-    prefix_map::NetworkPrefixMap, NetworkKnowledge, NodeInfo, SectionAuthUtils, MIN_ADULT_AGE,
-};
 
-use sn_interface::types::{keys::ed25519, log_markers::LogMarker, Peer};
+use sn_interface::{
+    messaging::{
+        system::{
+            JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, SectionAuth,
+            SystemMsg,
+        },
+        AuthKind, DstLocation, MsgType, NodeAuth, WireMsg,
+    },
+    network_knowledge::{
+        prefix_map::NetworkPrefixMap, NetworkKnowledge, NodeInfo, SectionAuthUtils, MIN_ADULT_AGE,
+    },
+    types::{keys::ed25519, log_markers::LogMarker, Peer},
+};
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -512,12 +515,12 @@ mod tests {
 
     use crate::node::{messages::WireMsgUtils, Error as RoutingError, MIN_ADULT_AGE};
 
-    use sn_interface::network_knowledge::{test_utils::*, NodeState};
-
-    use sn_interface::elder_count;
-    use sn_interface::init_logger;
-    use sn_interface::messaging::SectionAuthorityProvider as SectionAuthorityProviderMsg;
-    use sn_interface::types::PublicKey;
+    use sn_interface::{
+        elder_count, init_logger,
+        messaging::SectionAuthorityProvider as SectionAuthorityProviderMsg,
+        network_knowledge::{test_utils::*, NodeState},
+        types::PublicKey,
+    };
 
     use assert_matches::assert_matches;
     use eyre::{eyre, Error, Result};

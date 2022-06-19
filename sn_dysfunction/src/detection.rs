@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{error::Result, get_mean_of, std_deviation, DysfunctionDetection, OperationId};
+
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
@@ -282,12 +283,14 @@ impl DysfunctionDetection {
 
 #[cfg(test)]
 mod tests {
-    use crate::tests::init_test_logger;
-    use crate::{detection::IssueType, DysfunctionDetection, DysfunctionSeverity};
+    use crate::{
+        detection::IssueType, tests::init_test_logger, DysfunctionDetection, DysfunctionSeverity,
+    };
+    use sn_interface::messaging::data::OperationId;
+
     use eyre::bail;
     use proptest::prelude::*;
     use rand::Rng;
-    use sn_interface::messaging::data::OperationId;
     use tokio::runtime::Runtime;
     use xor_name::{rand::random as random_xorname, XorName};
 

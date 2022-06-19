@@ -9,15 +9,12 @@
 //! sn_node provides the interface to Safe routing.  The resulting executable is the node
 //! for the Safe network.
 
+use sn_client::{utils::test_utils::read_network_conn_info, Client, ClientConfig, Error, Result};
+use sn_interface::{init_logger, types::utils::random_bytes};
+
+use tiny_keccak::{Hasher, Sha3};
 use tokio::time::{sleep, Duration, Instant};
 use tracing::{debug, warn};
-
-use sn_client::{Client, ClientConfig, Error, Result};
-use sn_interface::init_logger;
-use sn_interface::types::utils::random_bytes;
-use tiny_keccak::{Hasher, Sha3};
-
-use sn_client::utils::test_utils::read_network_conn_info;
 use xor_name::XorName;
 
 #[tokio::main]

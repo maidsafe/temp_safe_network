@@ -27,24 +27,24 @@
     unused_results
 )]
 
-use color_eyre::{Section, SectionExt};
 #[cfg(not(feature = "tokio-console"))]
-use eyre::Error;
-
-use eyre::{eyre, Context, ErrReport, Result};
-use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
+use sn_interface::LogFormatter;
 use sn_node::node::{
     add_connection_info, set_connection_info, Config, Error as NodeError, Event, NodeApi,
 };
 
-use self_update::{cargo_crate_version, Status};
+use color_eyre::{Section, SectionExt};
 #[cfg(not(feature = "tokio-console"))]
-use sn_interface::LogFormatter;
-use std::{fmt::Debug, fs::File, io, path::Path};
-use std::{io::Write, process::exit};
+use eyre::Error;
+use eyre::{eyre, Context, ErrReport, Result};
+use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
+use self_update::{cargo_crate_version, Status};
+use std::{fmt::Debug, fs::File, io, io::Write, path::Path, process::exit};
 use structopt::{clap, StructOpt};
-use tokio::sync::RwLockReadGuard;
-use tokio::time::{sleep, Duration};
+use tokio::{
+    sync::RwLockReadGuard,
+    time::{sleep, Duration},
+};
 use tracing::{self, debug, error, info, trace, warn};
 
 #[cfg(not(feature = "tokio-console"))]

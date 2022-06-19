@@ -245,9 +245,10 @@ mod tests {
         app::test_helpers::{new_safe_instance, random_nrs_name, TestDataFilesContainer},
         SafeUrl,
     };
+    use sn_interface::types::DataAddress;
+
     use anyhow::{anyhow, bail, Context, Result};
     use bytes::Bytes;
-    use sn_interface::types::DataAddress;
     use std::io::Read;
 
     #[tokio::test]

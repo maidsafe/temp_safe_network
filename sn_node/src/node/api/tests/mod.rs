@@ -20,24 +20,25 @@ use crate::node::{
     messages::WireMsgUtils,
     Error, Event, Result as RoutingResult,
 };
-use sn_interface::messaging::{
-    system::{
-        JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState,
-        NodeMsgAuthorityUtils, NodeState as NodeStateMsg, RelocateDetails, ResourceProofResponse,
-        SectionAuth, SystemMsg,
-    },
-    AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, NodeAuth,
-    SectionAuth as MsgKindSectionAuth, WireMsg,
-};
-use sn_interface::network_knowledge::{
-    recommended_section_size, supermajority, test_utils::*, NetworkKnowledge, NodeInfo, NodeState,
-    SectionAuthorityProvider, SectionKeyShare, FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE,
-    MIN_ADULT_AGE,
-};
-use sn_interface::types::{keyed_signed, SecretKeySet};
-use sn_interface::{elder_count, init_logger};
 
-use sn_interface::types::{keys::ed25519, Keypair, Peer, PublicKey};
+use sn_interface::{
+    elder_count, init_logger,
+    messaging::{
+        system::{
+            JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState,
+            NodeMsgAuthorityUtils, NodeState as NodeStateMsg, RelocateDetails,
+            ResourceProofResponse, SectionAuth, SystemMsg,
+        },
+        AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, NodeAuth,
+        SectionAuth as MsgKindSectionAuth, WireMsg,
+    },
+    network_knowledge::{
+        recommended_section_size, supermajority, test_utils::*, NetworkKnowledge, NodeInfo,
+        NodeState, SectionAuthorityProvider, SectionKeyShare, FIRST_SECTION_MAX_AGE,
+        FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
+    },
+    types::{keyed_signed, keys::ed25519, Keypair, Peer, PublicKey, SecretKeySet},
+};
 
 use assert_matches::assert_matches;
 use bls_dkg::message::Message;

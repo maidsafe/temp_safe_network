@@ -67,8 +67,7 @@ mod errors;
 // Export public API.
 pub use api::{Client, RegisterWriteAheadLog};
 pub use config_handler::{ClientConfig, DEFAULT_ACK_WAIT, DEFAULT_OPERATION_TIMEOUT};
-pub use errors::ErrorMsg;
-pub use errors::{Error, Result};
+pub use errors::{Error, ErrorMsg, Result};
 pub use qp2p::Config as QuicP2pConfig;
 
 /// Client trait and related constants.
@@ -84,9 +83,9 @@ mod testnet_grep;
 #[cfg(test)]
 mod tests {
     use crate::testnet_grep::search_testnet_results_per_node;
+    use sn_interface::{network_knowledge::elder_count, types::log_markers::LogMarker};
+
     use eyre::Result;
-    use sn_interface::network_knowledge::elder_count;
-    use sn_interface::types::log_markers::LogMarker;
 
     // Check that with one split we have 14 elders.
     // This is intended to be run, just after split, in order to confirm splits are functioning correctly

@@ -6,11 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use sn_interface::types::register::EntryHash;
+
 use multibase::Base;
 use serde::{Deserialize, Serialize};
-use sn_interface::types::register::EntryHash;
-use std::convert::TryInto;
 use std::{
+    convert::TryInto,
     fmt::{self, Display},
     str::FromStr,
 };

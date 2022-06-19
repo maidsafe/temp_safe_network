@@ -6,10 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use sn_interface::messaging::data::Error as ErrorMsg;
-use sn_interface::types::{
-    convert_dt_error_to_error_msg, DataAddress, PublicKey, ReplicatedDataAddress,
+use sn_interface::{
+    messaging::data::Error as ErrorMsg,
+    types::{convert_dt_error_to_error_msg, DataAddress, PublicKey, ReplicatedDataAddress},
 };
+
 use std::io;
 use thiserror::Error;
 use xor_name::XorName;

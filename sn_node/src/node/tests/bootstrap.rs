@@ -8,15 +8,18 @@
 
 mod utils;
 
+use crate::node::routing_api::{Config, Event, NodeElderChange};
+
+use sn_interface::elder_count;
+
 use anyhow::{Error, Result};
 use ed25519_dalek::Keypair;
 use futures::future;
-use crate::node::routing_api::{Config, Event, NodeElderChange};
 use std::collections::HashSet;
 use tokio::time;
 use utils::*;
 use xor_name::XOR_NAME_LEN;
-use sn_interface::elder_count;
+
 
 /*
 #[tokio::test(flavor = "multi_thread")]

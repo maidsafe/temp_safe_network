@@ -15,9 +15,11 @@ use crate::{
     ipc::{IpcMsg, IpcResp},
     Error, Result,
 };
+
+use sn_interface::types::Keypair;
+
 use log::{debug, info};
 use serde_json::json;
-use sn_interface::types::Keypair;
 use std::path::{Path, PathBuf};
 
 // Method for requesting application's authorisation

@@ -6,16 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::collections::BTreeSet;
-use std::vec;
+use crate::node::{
+    api::cmds::Cmd,
+    core::{Node, Result},
+    membership,
+};
 
 use sn_consensus::{Generation, SignedVote, VoteResponse};
-use sn_interface::messaging::system::{KeyedSig, NodeState, SectionAuth, SystemMsg};
-use sn_interface::types::{log_markers::LogMarker, Peer};
+use sn_interface::{
+    messaging::system::{KeyedSig, NodeState, SectionAuth, SystemMsg},
+    types::{log_markers::LogMarker, Peer},
+};
 
-use crate::node::api::cmds::Cmd;
-use crate::node::core::{Node, Result};
-use crate::node::membership;
+use std::{collections::BTreeSet, vec};
 
 // Message handling
 impl Node {

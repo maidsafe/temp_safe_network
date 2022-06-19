@@ -11,8 +11,11 @@ use crate::node::{
     core::{Node, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY},
     Error, Result,
 };
-use sn_interface::messaging::system::{JoinResponse, ResourceProofResponse, SystemMsg};
-use sn_interface::types::{keys::ed25519, log_markers::LogMarker, Peer};
+
+use sn_interface::{
+    messaging::system::{JoinResponse, ResourceProofResponse, SystemMsg},
+    types::{keys::ed25519, log_markers::LogMarker, Peer},
+};
 
 use ed25519_dalek::Verifier;
 use xor_name::XorName;

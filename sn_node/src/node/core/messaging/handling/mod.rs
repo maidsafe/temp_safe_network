@@ -28,17 +28,20 @@ use crate::node::{
     messages::WireMsgUtils,
     Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
 };
-use sn_interface::messaging::{
-    data::{ServiceMsg, StorageLevel},
-    signature_aggregator::Error as AggregatorError,
-    system::{
-        JoinResponse, NodeCmd, NodeEvent, NodeMsgAuthorityUtils, NodeQuery,
-        Proposal as ProposalMsg, SystemMsg,
+
+use sn_interface::{
+    messaging::{
+        data::{ServiceMsg, StorageLevel},
+        signature_aggregator::Error as AggregatorError,
+        system::{
+            JoinResponse, NodeCmd, NodeEvent, NodeMsgAuthorityUtils, NodeQuery,
+            Proposal as ProposalMsg, SystemMsg,
+        },
+        AuthorityProof, DstLocation, MsgId, MsgType, NodeMsgAuthority, SectionAuth, WireMsg,
     },
-    AuthorityProof, DstLocation, MsgId, MsgType, NodeMsgAuthority, SectionAuth, WireMsg,
+    network_knowledge::NetworkKnowledge,
+    types::{log_markers::LogMarker, Peer, PublicKey},
 };
-use sn_interface::network_knowledge::NetworkKnowledge;
-use sn_interface::types::{log_markers::LogMarker, Peer, PublicKey};
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;

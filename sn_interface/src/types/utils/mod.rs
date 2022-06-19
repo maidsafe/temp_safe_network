@@ -6,13 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::errors::convert_bincode_error;
-// use sn_interface::network_knowledge::prefix_map::NetworkPrefixMap;
-use super::{Error, Result};
+use super::{errors::convert_bincode_error, Error, Result};
+
 use bytes::Bytes;
 use multibase::{self, Base};
-use rand::rngs::OsRng;
-use rand::Rng;
+use rand::{rngs::OsRng, Rng};
 use rayon::current_num_threads;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 

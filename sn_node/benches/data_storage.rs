@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -6,23 +6,24 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use sn_interface::{
+    messaging::data::{CreateRegister, SignedRegisterCreate},
+    types::{
+        register::{Policy, User},
+        Chunk, Keypair, RegisterCmd, ReplicatedData,
+    },
+};
+use sn_node::{
+    node::{cfg::config_handler::Config, DataStorage},
+    UsedSpace,
+};
+
 use criterion::{BenchmarkId, Criterion};
 use eyre::{Result, WrapErr};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use sn_interface::messaging::data::{CreateRegister, SignedRegisterCreate};
-use sn_interface::types::{
-    register::{Policy, User},
-    Chunk, Keypair,
-};
-use sn_interface::types::{RegisterCmd, ReplicatedData};
-use sn_node::node::cfg::config_handler::Config;
-use sn_node::node::DataStorage;
-use sn_node::UsedSpace;
-use std::path::Path;
+use std::{collections::BTreeMap, path::Path};
 use tempfile::tempdir;
 use tokio::runtime::Runtime;
-
-use std::collections::BTreeMap;
 
 // sample size is _NOT_ the number of times the command is run...
 // https://bheisler.github.io/criterion.rs/book/analysis.html#measurement

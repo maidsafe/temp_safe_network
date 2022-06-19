@@ -10,22 +10,17 @@
 
 /// Node Configuration
 pub mod cfg;
+
+pub(crate) mod handover;
+pub(crate) mod membership;
+
 // Node public API
 mod api;
-
 mod core;
-
-pub use self::core::DataStorage;
-
 mod dkg;
-// mod ed25519;
 mod error;
-pub(crate) mod handover;
 mod logging;
-pub(crate) mod membership;
 mod messages;
-
-use sn_interface::types::Peer;
 
 pub use self::{
     api::{
@@ -34,17 +29,21 @@ pub use self::{
         NodeApi,
     },
     cfg::config_handler::{add_connection_info, set_connection_info, Config},
+    core::DataStorage,
     error::{Error, Result},
+    test_utils::*,
 };
-pub use qp2p::{Config as NetworkConfig, SendStream};
+
 pub use sn_interface::network_knowledge::{
     FIRST_SECTION_MAX_AGE, FIRST_SECTION_MIN_AGE, MIN_ADULT_AGE,
 };
+
+pub use qp2p::{Config as NetworkConfig, SendStream};
 pub use xor_name::{Prefix, XorName, XOR_NAME_LEN}; // TODO remove pub on API update
 
-pub use test_utils::*;
-
 pub(crate) use self::core::MIN_LEVEL_WHEN_FULL;
+
+use sn_interface::types::Peer;
 
 mod test_utils {
     use super::cfg::config_handler::Config;

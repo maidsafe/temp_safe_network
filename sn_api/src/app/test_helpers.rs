@@ -7,11 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::{ipc::NodeConfig, Safe, SafeUrl};
+
+use sn_dbc::Owner;
+use sn_interface::types::{Keypair, PublicKey};
+
 use anyhow::{anyhow, bail, Context, Result};
 use bls::SecretKey;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use sn_dbc::Owner;
-use sn_interface::types::{Keypair, PublicKey};
 use std::{
     collections::{BTreeSet, HashMap},
     env::var,

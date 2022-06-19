@@ -7,19 +7,19 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{core::Proposal, XorName};
-use sn_interface::network_knowledge::{SectionAuthorityProvider, SectionKeyShare};
-use sn_interface::types::Peer;
+
+use sn_consensus::Generation;
 use sn_interface::{
     messaging::{
         system::{DkgFailureSigSet, KeyedSig, NodeState, SectionAuth, SystemMsg},
         DstLocation, WireMsg,
     },
-    types::ReplicatedDataAddress,
+    network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
+    types::{Peer, ReplicatedDataAddress},
 };
 
 use bytes::Bytes;
 use custom_debug::Debug;
-use sn_consensus::Generation;
 use std::{
     collections::BTreeSet,
     fmt,

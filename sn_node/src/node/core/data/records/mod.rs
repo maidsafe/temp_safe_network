@@ -16,16 +16,20 @@ use crate::node::{
     messages::WireMsgUtils,
     Error, Result,
 };
+
+use sn_dysfunction::IssueType;
+use sn_interface::{
+    data_copy_count,
+    messaging::{
+        data::{CmdError, DataQuery, MetadataExchange, StorageLevel},
+        system::{NodeCmd, NodeQuery, SystemMsg},
+        AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
+    },
+    types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData},
+};
+
 use dashmap::DashSet;
 use itertools::Itertools;
-use sn_dysfunction::IssueType;
-use sn_interface::data_copy_count;
-use sn_interface::messaging::{
-    data::{CmdError, DataQuery, MetadataExchange, StorageLevel},
-    system::{NodeCmd, NodeQuery, SystemMsg},
-    AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
-};
-use sn_interface::types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData};
 use std::{cmp::Ordering, collections::BTreeSet, sync::Arc};
 use tracing::info;
 use xor_name::XorName;

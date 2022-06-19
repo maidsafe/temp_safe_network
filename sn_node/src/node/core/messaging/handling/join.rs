@@ -11,13 +11,16 @@ use crate::node::{
     core::{relocation::RelocateDetailsUtils, Node},
     Result,
 };
-use sn_interface::elder_count;
-use sn_interface::messaging::system::{
-    JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
-    JoinResponse, MembershipState, NodeState, SystemMsg,
+
+use sn_interface::{
+    elder_count,
+    messaging::system::{
+        JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
+        JoinResponse, MembershipState, NodeState, SystemMsg,
+    },
+    network_knowledge::{SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE},
+    types::{log_markers::LogMarker, Peer},
 };
-use sn_interface::network_knowledge::{SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE};
-use sn_interface::types::{log_markers::LogMarker, Peer};
 
 use bls::PublicKey as BlsPublicKey;
 use std::vec;

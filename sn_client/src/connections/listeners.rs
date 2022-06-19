@@ -15,15 +15,19 @@ use crate::{
     },
     Error, Result,
 };
-use sn_interface::at_least_one_correct_elder;
-use sn_interface::messaging::{
-    data::{CmdError, ServiceMsg},
-    system::{KeyedSig, SectionAuth, SystemMsg},
-    AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, ServiceAuth, WireMsg,
+
+use sn_interface::{
+    at_least_one_correct_elder,
+    messaging::{
+        data::{CmdError, ServiceMsg},
+        system::{KeyedSig, SectionAuth, SystemMsg},
+        AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, ServiceAuth, WireMsg,
+    },
+    network_knowledge::{
+        utils::compare_and_write_prefix_map_to_disk, NetworkKnowledge, SectionAuthorityProvider,
+    },
+    types::{log_markers::LogMarker, Peer},
 };
-use sn_interface::network_knowledge::utils::compare_and_write_prefix_map_to_disk;
-use sn_interface::network_knowledge::{NetworkKnowledge, SectionAuthorityProvider};
-use sn_interface::types::{log_markers::LogMarker, Peer};
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;

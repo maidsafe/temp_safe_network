@@ -9,18 +9,21 @@
 use crate::dbs::{
     convert_to_error_msg, Error, EventStore, LruCache, Result, UsedSpace, SLED_FLUSH_TIME_MS,
 };
-use sn_interface::messaging::{
-    data::{
-        CreateRegister, EditRegister, ExtendRegister, OperationId, RegisterCmd, RegisterQuery,
-        RegisterStoreExport, ReplicatedRegisterLog, SignedRegisterCreate, SignedRegisterEdit,
-        SignedRegisterExtend,
+
+use sn_interface::{
+    messaging::{
+        data::{
+            CreateRegister, EditRegister, ExtendRegister, OperationId, RegisterCmd, RegisterQuery,
+            RegisterStoreExport, ReplicatedRegisterLog, SignedRegisterCreate, SignedRegisterEdit,
+            SignedRegisterExtend,
+        },
+        system::NodeQueryResponse,
+        SectionAuth, ServiceAuth, VerifyAuthority,
     },
-    system::NodeQueryResponse,
-    SectionAuth, ServiceAuth, VerifyAuthority,
-};
-use sn_interface::types::{
-    register::{Action, EntryHash, Permissions, Policy, Register, User},
-    DataAddress, Keypair, PublicKey, RegisterAddress, SPENTBOOK_TYPE_TAG,
+    types::{
+        register::{Action, EntryHash, Permissions, Policy, Register, User},
+        DataAddress, Keypair, PublicKey, RegisterAddress, SPENTBOOK_TYPE_TAG,
+    },
 };
 
 use bincode::serialize;
@@ -735,12 +738,17 @@ mod test {
 
     use crate::node::{Error, Result};
     use crate::UsedSpace;
-    use sn_interface::messaging::{
-        data::{RegisterCmd, RegisterQuery},
-        system::NodeQueryResponse,
+
+    use sn_interface::{
+        messaging::{
+            data::{RegisterCmd, RegisterQuery},
+            system::NodeQueryResponse,
+        },
+        types::{
+            register::{EntryHash, Policy, User},
+            Keypair,
+        },
     };
-    use sn_interface::types::register::{EntryHash, Policy};
-    use sn_interface::types::{register::User, Keypair};
 
     use rand::Rng;
     use tempfile::tempdir;

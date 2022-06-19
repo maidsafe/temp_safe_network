@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -10,11 +10,13 @@ use crate::{
     ipc::{req::AuthReq, resp::AuthGranted},
     Result, SafeAuthReq,
 };
+
+use sn_client::api::Client;
+use sn_interface::types::{Keypair, RegisterAddress};
+
 use hmac::Hmac;
 use rand_07::{rngs::StdRng, SeedableRng};
 use sha3::Sha3_256;
-use sn_client::api::Client;
-use sn_interface::types::{Keypair, RegisterAddress};
 use std::{
     collections::HashSet,
     net::SocketAddr,
@@ -511,9 +513,10 @@ impl SafeAuthenticator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sn_interface::types::PublicKey;
+
     use anyhow::{Context, Result};
     use proptest::prelude::*;
-    use sn_interface::types::PublicKey;
 
     #[test]
     fn get_deterministic_pk_from_known_seed() -> Result<()> {

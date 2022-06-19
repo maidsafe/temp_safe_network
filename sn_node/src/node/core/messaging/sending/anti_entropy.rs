@@ -11,8 +11,11 @@ use crate::node::{
     core::{Node, StateSnapshot},
     Result,
 };
-use sn_interface::messaging::system::{NodeCmd, SystemMsg};
-use sn_interface::types::{log_markers::LogMarker, Peer};
+
+use sn_interface::{
+    messaging::system::{NodeCmd, SystemMsg},
+    types::{log_markers::LogMarker, Peer},
+};
 
 use bls::PublicKey as BlsPublicKey;
 use xor_name::Prefix;

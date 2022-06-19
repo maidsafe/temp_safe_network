@@ -6,10 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+pub(crate) mod cmds;
 #[cfg(test)]
 pub(crate) mod tests;
-
-pub(crate) mod cmds;
 
 pub(super) mod dispatcher;
 pub(super) mod event;
@@ -31,9 +30,12 @@ use crate::node::{
     Config, Peer,
 };
 use crate::UsedSpace;
-use sn_interface::messaging::{system::SystemMsg, DstLocation, WireMsg};
-use sn_interface::network_knowledge::{NodeInfo, SectionAuthorityProvider, MIN_ADULT_AGE};
-use sn_interface::types::{keys::ed25519, log_markers::LogMarker, PublicKey as TypesPublicKey};
+
+use sn_interface::{
+    messaging::{system::SystemMsg, DstLocation, WireMsg},
+    network_knowledge::{NodeInfo, SectionAuthorityProvider, MIN_ADULT_AGE},
+    types::{keys::ed25519, log_markers::LogMarker, PublicKey as TypesPublicKey},
+};
 
 use ed25519_dalek::PublicKey;
 use itertools::Itertools;

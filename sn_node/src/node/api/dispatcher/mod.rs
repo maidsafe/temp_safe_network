@@ -7,18 +7,21 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 mod background_tasks;
+
 use super::Cmd;
+
 use crate::node::{
     core::{DeliveryStatus, Node, Proposal},
     messages::WireMsgUtils,
     Result,
 };
-use dashmap::DashMap;
-use sn_interface::types::{log_markers::LogMarker, Peer};
+
 use sn_interface::{
     messaging::{system::SystemMsg, AuthKind, WireMsg},
-    types::ReplicatedDataAddress,
+    types::{log_markers::LogMarker, Peer, ReplicatedDataAddress},
 };
+
+use dashmap::DashMap;
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::{sync::watch, sync::RwLock, time};
 use tracing::Instrument;

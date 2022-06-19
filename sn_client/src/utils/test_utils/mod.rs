@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -9,23 +9,25 @@
 #[cfg(test)]
 mod test_client;
 
-use crate::Error;
-#[cfg(test)]
-use backoff::ExponentialBackoff;
-use dirs_next::home_dir;
-use eyre::{eyre, Context, Result};
-#[cfg(test)]
-pub use sn_interface::init_logger;
-use sn_interface::types::PublicKey;
-#[cfg(test)]
-use std::future::Future;
-#[cfg(test)]
-use std::time::Duration;
-use std::{collections::BTreeSet, fs::File, io::BufReader, net::SocketAddr, path::Path};
 #[cfg(test)]
 pub use test_client::{
     create_test_client, create_test_client_with, get_dbc_owner_from_secret_key_hex,
 };
+
+#[cfg(test)]
+pub use sn_interface::init_logger;
+
+use crate::Error;
+
+use sn_interface::types::PublicKey;
+
+#[cfg(test)]
+use backoff::ExponentialBackoff;
+use dirs_next::home_dir;
+use eyre::{eyre, Context, Result};
+use std::{collections::BTreeSet, fs::File, io::BufReader, net::SocketAddr, path::Path};
+#[cfg(test)]
+use std::{future::Future, time::Duration};
 
 ///
 pub type ClientResult<T> = Result<T, Error>;

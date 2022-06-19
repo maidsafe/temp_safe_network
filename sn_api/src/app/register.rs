@@ -10,15 +10,18 @@ pub use sn_interface::types::register::{Entry, EntryHash};
 
 use crate::safeurl::{ContentType, SafeUrl, XorUrl};
 use crate::{Error, Result, Safe};
-use sn_interface::messaging::data::Error as ErrorMsg;
+
+use sn_client::Error as ClientError;
+use sn_interface::{
+    messaging::data::Error as ErrorMsg,
+    types::{
+        register::{Permissions, Policy, User},
+        DataAddress, Error as SafeNdError, RegisterAddress,
+    },
+};
 
 use log::debug;
 use rand::Rng;
-use sn_client::Error as ClientError;
-use sn_interface::types::{
-    register::{Permissions, Policy, User},
-    DataAddress, Error as SafeNdError, RegisterAddress,
-};
 use std::collections::{BTreeMap, BTreeSet};
 use tracing::info;
 use xor_name::XorName;

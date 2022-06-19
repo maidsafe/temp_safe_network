@@ -9,12 +9,17 @@
 use super::UsedRecipientSaps;
 
 use crate::node::{api::cmds::Cmd, messages::WireMsgUtils, Error, Result};
-use sn_interface::messaging::{
-    system::{JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeState, SectionAuth, SystemMsg},
-    DstLocation, WireMsg,
+
+use sn_interface::{
+    messaging::{
+        system::{
+            JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeState, SectionAuth, SystemMsg,
+        },
+        DstLocation, WireMsg,
+    },
+    network_knowledge::{NodeInfo, SectionAuthorityProvider},
+    types::{keys::ed25519, Peer, PublicKey},
 };
-use sn_interface::network_knowledge::{NodeInfo, SectionAuthorityProvider};
-use sn_interface::types::{keys::ed25519, Peer, PublicKey};
 
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{Keypair, Signature};
