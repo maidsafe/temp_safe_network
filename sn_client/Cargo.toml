@@ -65,7 +65,6 @@ serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_bytes = "~0.11.5"
 serde_json = "1.0.53"
 signature = "1.1.10"
-sled = "~0.34.6"
 sn_dbc = { version = "4.0.0", features = [ "serdes" ] }
 sn_interface = { path = "../sn_interface", version = "^0.6.3" }
 structopt = "~0.3.17"
