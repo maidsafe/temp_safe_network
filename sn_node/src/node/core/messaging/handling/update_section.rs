@@ -7,16 +7,17 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{api::cmds::Cmd, core::Node, Result};
-use itertools::Itertools;
-use sn_interface::data_copy_count;
-use sn_interface::types::{log_markers::LogMarker, Peer};
+
 use sn_interface::{
+    data_copy_count,
     messaging::{
         system::{NodeCmd, SystemMsg},
         DstLocation,
     },
-    types::ReplicatedDataAddress,
+    types::{log_markers::LogMarker, Peer, ReplicatedDataAddress},
 };
+
+use itertools::Itertools;
 use std::collections::BTreeSet;
 
 impl Node {

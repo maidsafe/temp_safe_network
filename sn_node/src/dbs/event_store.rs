@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{deserialise, serialise, Error, Result};
+
 use serde::{de::DeserializeOwned, Serialize};
 use sled::{Db, Tree};
 use std::{fmt::Debug, marker::PhantomData};
@@ -79,6 +80,7 @@ mod test {
     use super::EventStore;
     use crate::node::{Error, Result};
     use sn_interface::types::Token;
+
     use std::path::Path;
     use tempfile::tempdir;
     use xor_name::XorName;

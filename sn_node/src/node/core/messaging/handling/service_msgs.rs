@@ -7,25 +7,28 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{api::cmds::Cmd, core::Node, Error, Result};
-use sn_interface::data_copy_count;
-use sn_interface::messaging::{
-    data::{
-        CmdError, DataCmd, DataQuery, EditRegister, Error as ErrorMsg, ServiceMsg,
-        SignedRegisterEdit, SpentbookCmd,
-    },
-    system::{NodeQueryResponse, SystemMsg},
-    AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
-};
-use sn_interface::types::{
-    log_markers::LogMarker,
-    register::{Permissions, Policy, Register, User},
-    Keypair, Peer, PublicKey, RegisterCmd, ReplicatedData, SPENTBOOK_TYPE_TAG,
-};
 
-use bytes::Bytes;
 use sn_dbc::{
     Hash, IndexedSignatureShare, KeyImage, RingCtTransaction, SpentProofContent, SpentProofShare,
 };
+use sn_interface::{
+    data_copy_count,
+    messaging::{
+        data::{
+            CmdError, DataCmd, DataQuery, EditRegister, Error as ErrorMsg, ServiceMsg,
+            SignedRegisterEdit, SpentbookCmd,
+        },
+        system::{NodeQueryResponse, SystemMsg},
+        AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
+    },
+    types::{
+        log_markers::LogMarker,
+        register::{Permissions, Policy, Register, User},
+        Keypair, Peer, PublicKey, RegisterCmd, ReplicatedData, SPENTBOOK_TYPE_TAG,
+    },
+};
+
+use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 

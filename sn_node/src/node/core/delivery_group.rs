@@ -7,10 +7,13 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{Error, Result};
-use sn_interface::elder_count;
-use sn_interface::messaging::DstLocation;
-use sn_interface::network_knowledge::{supermajority, NetworkKnowledge};
-use sn_interface::types::Peer;
+
+use sn_interface::{
+    elder_count,
+    messaging::DstLocation,
+    network_knowledge::{supermajority, NetworkKnowledge},
+    types::Peer,
+};
 
 use itertools::Itertools;
 use std::{cmp, iter};
@@ -170,16 +173,19 @@ async fn get_peer(name: &XorName, network_knowledge: &NetworkKnowledge) -> Optio
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sn_interface::network_knowledge::test_utils::section_signed;
-    use sn_interface::types::keys::ed25519;
+
+    use sn_interface::{
+        network_knowledge::{
+            test_utils::section_signed,
+            test_utils::{gen_addr, gen_section_authority_provider},
+            NodeState, SectionAuthorityProvider, MIN_ADULT_AGE,
+        },
+        types::keys::ed25519,
+    };
 
     use eyre::{ContextCompat, Result};
     use rand::seq::IteratorRandom;
     use secured_linked_list::SecuredLinkedList;
-    use sn_interface::network_knowledge::{
-        test_utils::{gen_addr, gen_section_authority_provider},
-        NodeState, SectionAuthorityProvider, MIN_ADULT_AGE,
-    };
     use xor_name::Prefix;
 
     #[tokio::test]

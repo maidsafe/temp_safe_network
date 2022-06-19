@@ -46,18 +46,21 @@ extern crate tracing;
 mod detection;
 mod error;
 
-use xor_name::XorName;
-
-use crate::error::Result;
-use dashmap::DashMap;
-use sn_interface::messaging::data::OperationId;
-use std::collections::{BTreeSet, VecDeque};
-use std::sync::Arc;
-use std::time::Instant;
-use tokio::sync::RwLock;
+pub use detection::{DysfunctionSeverity, IssueType};
 
 pub use crate::error::Error;
-pub use detection::{DysfunctionSeverity, IssueType};
+use crate::error::Result;
+
+use sn_interface::messaging::data::OperationId;
+
+use dashmap::DashMap;
+use std::{
+    collections::{BTreeSet, VecDeque},
+    sync::Arc,
+    time::Instant,
+};
+use tokio::sync::RwLock;
+use xor_name::XorName;
 
 /// Some reproducible xorname derived from the operation. This is a permanent reference needed for logging all dysfunction.
 type NodeIdentifier = XorName;
@@ -273,10 +276,10 @@ fn std_deviation(data: &[f32]) -> Option<f32> {
 #[cfg(test)]
 mod tests {
     use super::{DysfunctionDetection, IssueType};
-    use eyre::Error;
     use sn_interface::messaging::data::OperationId;
-    use std::collections::BTreeSet;
-    use std::sync::Once;
+
+    use eyre::Error;
+    use std::{collections::BTreeSet, sync::Once};
     use xor_name::{rand::random as random_xorname, XorName};
 
     type Result<T, E = Error> = std::result::Result<T, E>;

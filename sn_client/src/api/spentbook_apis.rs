@@ -9,11 +9,12 @@
 use super::Client;
 
 use crate::Error;
+
 use sn_dbc::{KeyImage, RingCtTransaction, SpentProofShare};
-use sn_interface::messaging::data::{
-    DataCmd, DataQuery, QueryResponse, SpentbookCmd, SpentbookQuery,
+use sn_interface::{
+    messaging::data::{DataCmd, DataQuery, QueryResponse, SpentbookCmd, SpentbookQuery},
+    types::SpentbookAddress,
 };
-use sn_interface::types::SpentbookAddress;
 
 use xor_name::XorName;
 

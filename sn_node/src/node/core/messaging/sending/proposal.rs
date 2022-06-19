@@ -12,9 +12,12 @@ use crate::node::{
     messages::WireMsgUtils,
     Result,
 };
-use sn_interface::messaging::{system::SystemMsg, DstLocation, WireMsg};
-use sn_interface::network_knowledge::SectionKeyShare;
-use sn_interface::types::Peer;
+
+use sn_interface::{
+    messaging::{system::SystemMsg, DstLocation, WireMsg},
+    network_knowledge::SectionKeyShare,
+    types::Peer,
+};
 
 impl Node {
     /// Send proposal to all our elders.

@@ -8,6 +8,15 @@
 
 #![recursion_limit = "256"]
 
+use sn_interface::{
+    messaging::{data::Error::FailedToWriteFile, system::SystemMsg, DstLocation, MsgId},
+    types::Cache,
+};
+use sn_node::node::{
+    create_test_max_capacity_and_root_storage, Config, Event as RoutingEvent, NodeApi,
+    NodeElderChange,
+};
+
 use bls::PublicKey;
 use eyre::{eyre, Context, Error, Result};
 use futures::{
@@ -20,7 +29,6 @@ use rand::{
     distributions::{Distribution, WeightedIndex},
     Rng,
 };
-
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs::File,
@@ -37,15 +45,6 @@ use tokio_util::time::delay_queue::DelayQueue;
 use tracing_subscriber::EnvFilter;
 use xor_name::{Prefix, XorName};
 use yansi::{Color, Style};
-
-use sn_interface::messaging::{
-    data::Error::FailedToWriteFile, system::SystemMsg, DstLocation, MsgId,
-};
-use sn_interface::types::Cache;
-use sn_node::node::{
-    create_test_max_capacity_and_root_storage, Config, Event as RoutingEvent, NodeApi,
-    NodeElderChange,
-};
 
 // Minimal delay between two consecutive prints of the network status.
 const MIN_PRINT_DELAY: Duration = Duration::from_millis(500);

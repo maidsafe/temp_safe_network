@@ -9,20 +9,22 @@
 mod chunks;
 mod registers;
 
-use crate::{dbs::Result, UsedSpace};
-
-use sn_interface::messaging::{
-    data::{DataQuery, Error, RegisterQuery, RegisterStoreExport, StorageLevel},
-    system::NodeQueryResponse,
-};
-use sn_interface::types::{
-    register::User, RegisterAddress, ReplicatedData, ReplicatedDataAddress, SPENTBOOK_TYPE_TAG,
-};
-
 pub(crate) use chunks::ChunkStorage;
 pub(crate) use registers::RegisterStorage;
 
+use crate::{dbs::Result, UsedSpace};
+
 use sn_dbc::SpentProofShare;
+use sn_interface::{
+    messaging::{
+        data::{DataQuery, Error, RegisterQuery, RegisterStoreExport, StorageLevel},
+        system::NodeQueryResponse,
+    },
+    types::{
+        register::User, RegisterAddress, ReplicatedData, ReplicatedDataAddress, SPENTBOOK_TYPE_TAG,
+    },
+};
+
 use std::{path::Path, sync::Arc};
 use tokio::sync::RwLock;
 
@@ -210,20 +212,22 @@ mod tests {
     use crate::dbs::Error;
     use crate::node::core::data::DataStorage;
     use crate::UsedSpace;
+
+    use sn_interface::{
+        messaging::{data::DataQuery, system::NodeQueryResponse},
+        types::{
+            register::User, utils::random_bytes, Chunk, ChunkAddress, ReplicatedData,
+            ReplicatedDataAddress,
+        },
+    };
+
     use eyre::Result;
     use proptest::{
         collection::SizeRange,
         prelude::{any, prop_oneof, proptest},
         strategy::Strategy,
     };
-    use sn_interface::messaging::data::DataQuery;
-    use sn_interface::messaging::system::NodeQueryResponse;
-    use sn_interface::types::register::User;
-    use sn_interface::types::utils::random_bytes;
-    use sn_interface::types::{Chunk, ChunkAddress, ReplicatedData, ReplicatedDataAddress};
-    use std::cmp::max;
-    use std::collections::BTreeMap;
-    use std::{thread, time::Duration};
+    use std::{cmp::max, collections::BTreeMap, thread, time::Duration};
     use tempfile::tempdir;
     use tokio::runtime::Runtime;
     use xor_name::XorName;

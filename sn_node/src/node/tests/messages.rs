@@ -8,21 +8,21 @@
 
 mod utils;
 
-use anyhow::{anyhow, format_err, Result};
-use bytes::Bytes;
-use qp2p::QuicP2p;
-use sn_interface::types::Keypair;
-use sn_interface::messaging::client::ServiceMsg;
-use sn_interface::messaging::{
+use crate::node::{Config, Error, Event, NodeElderChange};
+
+use sn_interface::{types::Keypair, messaging::{
     client::{ServiceMsg, ClientSig, Query, TransferQuery},
     location::{Aggregation, Itinerary},
     DstLocation, MsgId, SrcLocation,
-};
-use crate::node::routing_api::{Config, Error, Event, NodeElderChange};
+}};
+
+use anyhow::{anyhow, format_err, Result};
+use bytes::Bytes;
+use qp2p::QuicP2p;
 use std::net::{IpAddr, Ipv4Addr};
 use utils::*;
 use xor_name::XorName;
-use crate::routing;
+
 /*
 #[tokio::test(flavor = "multi_thread")]
 async fn test_messages_client_node() -> Result<()> {

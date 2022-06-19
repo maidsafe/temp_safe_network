@@ -9,12 +9,14 @@
 use super::Prefix;
 
 use crate::node::handover::Error as HandoverError;
-use sn_interface::messaging::data::Error as ErrorMsg;
-use sn_interface::types::{convert_dt_error_to_error_msg, DataAddress, Peer, PublicKey};
+
+use sn_interface::{
+    messaging::data::Error as ErrorMsg,
+    types::{convert_dt_error_to_error_msg, DataAddress, Peer, PublicKey},
+};
 
 use secured_linked_list::error::Error as SecuredLinkedListError;
-use std::io;
-use std::net::SocketAddr;
+use std::{io, net::SocketAddr};
 use thiserror::Error;
 use xor_name::XorName;
 

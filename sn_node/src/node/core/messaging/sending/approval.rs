@@ -7,9 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{api::cmds::Cmd, core::Node};
-use sn_interface::messaging::system::{JoinResponse, SectionAuth, SystemMsg};
-use sn_interface::network_knowledge::NodeState;
-use sn_interface::types::log_markers::LogMarker;
+
+use sn_interface::{
+    messaging::system::{JoinResponse, SectionAuth, SystemMsg},
+    network_knowledge::NodeState,
+    types::log_markers::LogMarker,
+};
 
 impl Node {
     // Send `NodeApproval` to a joining node which makes it a section member

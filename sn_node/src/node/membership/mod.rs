@@ -1,20 +1,25 @@
-use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
-
-use bls_dkg::{PublicKeySet, SecretKeyShare};
-use core::fmt::Debug;
-use sn_interface::messaging::system::DkgSessionId;
-use sn_interface::{
-    messaging::system::{MembershipState, NodeState},
-    network_knowledge::{partition_by_prefix, recommended_section_size, SectionAuthorityProvider},
-    types::log_markers::LogMarker,
-};
-
-use thiserror::Error;
-use xor_name::{Prefix, XorName};
+// Copyright 2022 MaidSafe.net limited.
+//
+// This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
+// Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
+// under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. Please review the Licences for the specific language governing
+// permissions and limitations relating to use of the SAFE Network Software.
 
 use sn_consensus::{
     Ballot, Consensus, Decision, Generation, NodeId, SignedVote, Vote, VoteResponse,
 };
+use sn_interface::{
+    messaging::system::{DkgSessionId, MembershipState, NodeState},
+    network_knowledge::{partition_by_prefix, recommended_section_size, SectionAuthorityProvider},
+    types::log_markers::LogMarker,
+};
+
+use bls_dkg::{PublicKeySet, SecretKeyShare};
+use core::fmt::Debug;
+use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
+use thiserror::Error;
+use xor_name::{Prefix, XorName};
 
 #[derive(Debug, Error)]
 pub enum Error {

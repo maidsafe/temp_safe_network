@@ -7,13 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{api::cmds::Cmd, core::Node, messages::WireMsgUtils, Error, Event, Result};
-use sn_interface::messaging::{
-    system::{KeyedSig, SectionAuth, SectionPeers, SystemMsg},
-    MsgId, MsgType, SrcLocation, WireMsg,
-};
 
-use sn_interface::network_knowledge::SectionAuthorityProvider;
-use sn_interface::types::{log_markers::LogMarker, Peer, PublicKey};
+use sn_interface::{
+    messaging::{
+        system::{KeyedSig, SectionAuth, SectionPeers, SystemMsg},
+        MsgId, MsgType, SrcLocation, WireMsg,
+    },
+    network_knowledge::SectionAuthorityProvider,
+    types::{log_markers::LogMarker, Peer, PublicKey},
+};
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -466,28 +468,30 @@ impl Node {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::node::{
         api::tests::create_comm, create_test_max_capacity_and_root_storage, MIN_ADULT_AGE,
     };
     use crate::UsedSpace;
-    use sn_interface::elder_count;
-    use sn_interface::messaging::{
-        AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, NodeAuth, NodeMsgAuthority,
-        SectionAuth as SectionAuthMsg,
+
+    use sn_interface::{
+        elder_count,
+        messaging::{
+            AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, NodeAuth, NodeMsgAuthority,
+            SectionAuth as SectionAuthMsg,
+        },
+        network_knowledge::{
+            test_utils::{gen_addr, gen_section_authority_provider, section_signed},
+            NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider,
+        },
+        types::keys::ed25519,
     };
-    use sn_interface::network_knowledge::test_utils::{
-        gen_addr, gen_section_authority_provider, section_signed,
-    };
-    use sn_interface::network_knowledge::{
-        NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider,
-    };
-    use sn_interface::types::keys::ed25519;
-    use std::collections::BTreeSet;
 
     use assert_matches::assert_matches;
     use bls::SecretKey;
     use eyre::{Context, Result};
     use secured_linked_list::SecuredLinkedList;
+    use std::collections::BTreeSet;
     use tokio::sync::mpsc;
     use xor_name::Prefix;
 

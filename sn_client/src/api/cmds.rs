@@ -8,13 +8,17 @@
 
 use super::Client;
 use crate::Error;
+
+use sn_interface::{
+    messaging::{
+        data::{DataCmd, ServiceMsg},
+        ServiceAuth, WireMsg,
+    },
+    types::{PublicKey, Signature},
+};
+
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
-use sn_interface::messaging::{
-    data::{DataCmd, ServiceMsg},
-    ServiceAuth, WireMsg,
-};
-use sn_interface::types::{PublicKey, Signature};
 use tokio::time::Duration;
 use xor_name::XorName;
 

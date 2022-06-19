@@ -7,15 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::dkg::KeyedSig;
-use sn_consensus::Generation;
-use sn_interface::messaging::system::SectionAuth;
-use sn_interface::network_knowledge::SectionAuthorityProvider;
-use std::collections::BTreeMap;
-use xor_name::Prefix;
-type Entry = (SectionAuth<SectionAuthorityProvider>, KeyedSig);
-use std::sync::Arc;
 
+use sn_consensus::Generation;
+use sn_interface::{messaging::system::SectionAuth, network_knowledge::SectionAuthorityProvider};
+
+use std::{collections::BTreeMap, sync::Arc};
 use tokio::sync::RwLock;
+use xor_name::Prefix;
+
+type Entry = (SectionAuth<SectionAuthorityProvider>, KeyedSig);
 
 // Helper structure to make sure we process a split by updating info about both our section and the
 // sibling section at the same time.

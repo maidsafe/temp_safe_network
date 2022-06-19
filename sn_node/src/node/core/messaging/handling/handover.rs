@@ -6,24 +6,24 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::node::{
+    api::cmds::Cmd,
+    core::{Node, Proposal, SystemMsg},
+    handover::{Error as HandoverError, Handover},
+    membership::{elder_candidates, try_split_dkg},
+    Error, Peer, Result,
+};
+
 use sn_consensus::{Generation, SignedVote, VoteResponse};
+use sn_interface::{
+    messaging::system::{NodeState, SectionAuth},
+    network_knowledge::SapCandidate,
+    types::log_markers::LogMarker,
+    SectionAuthorityProvider,
+};
+
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::{Prefix, XorName};
-
-use crate::node::core::SystemMsg;
-use crate::node::handover::Error as HandoverError;
-use crate::node::handover::Handover;
-use crate::node::Peer;
-use crate::node::{api::cmds::Cmd, core::Node, Error, Result};
-
-use crate::node::core::Proposal;
-use sn_interface::messaging::system::NodeState;
-use sn_interface::messaging::system::SectionAuth;
-use sn_interface::network_knowledge::SapCandidate;
-use sn_interface::types::log_markers::LogMarker;
-use sn_interface::SectionAuthorityProvider;
-
-use crate::node::membership::{elder_candidates, try_split_dkg};
 
 impl Node {
     /// helper to handle a handover vote

@@ -11,8 +11,11 @@ use super::{
     Client,
 };
 use crate::{api::data::DataMapLevel, Error, Result};
-use sn_interface::messaging::data::{DataCmd, DataQuery, QueryResponse};
-use sn_interface::types::{Chunk, ChunkAddress};
+
+use sn_interface::{
+    messaging::data::{DataCmd, DataQuery, QueryResponse},
+    types::{Chunk, ChunkAddress},
+};
 
 use bincode::deserialize;
 use bytes::Bytes;
@@ -317,14 +320,12 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::test_utils::create_test_client_with;
     use crate::{
         api::file_apis::LargeFile,
-        utils::test_utils::{create_test_client, init_logger},
+        utils::test_utils::{create_test_client, create_test_client_with, init_logger},
         Client,
     };
-    use sn_interface::types::log_markers::LogMarker;
-    use sn_interface::types::utils::random_bytes;
+    use sn_interface::types::{log_markers::LogMarker, utils::random_bytes};
 
     use bytes::Bytes;
     use eyre::Result;

@@ -7,11 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{api::cmds::Cmd, core::Node, Result};
-use sn_interface::messaging::{
-    data::{CmdError, ServiceMsg},
-    AuthKind, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
+
+use sn_interface::{
+    messaging::{
+        data::{CmdError, ServiceMsg},
+        AuthKind, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
+    },
+    types::{Peer, PublicKey, Signature},
 };
-use sn_interface::types::{Peer, PublicKey, Signature};
 
 use bytes::Bytes;
 use ed25519_dalek::Signer;

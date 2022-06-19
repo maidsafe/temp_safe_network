@@ -9,24 +9,22 @@
 //! sn_node provides the interface to Safe routing.  The resulting executable is the node
 //! for the Safe network.
 
-use dirs_next::home_dir;
+use sn_client::{utils::test_utils::read_network_conn_info, Client, ClientConfig};
+use sn_interface::types::utils::random_bytes;
 use sn_launch_tool::Launch;
+
+use dirs_next::home_dir;
+use eyre::{eyre, Context, Result};
 use std::{
     path::PathBuf,
     process::{Command, Stdio},
 };
 use structopt::StructOpt;
+use tiny_keccak::{Hasher, Sha3};
 use tokio::fs::create_dir_all;
 use tokio::time::{sleep, Duration};
 use tracing::{debug, info};
 use xor_name::XorName;
-
-use tiny_keccak::{Hasher, Sha3};
-
-use eyre::{eyre, Context, Result};
-use sn_client::{utils::test_utils::read_network_conn_info, Client, ClientConfig};
-
-use sn_interface::types::utils::random_bytes;
 
 #[cfg(not(target_os = "windows"))]
 const SAFE_NODE_EXECUTABLE: &str = "sn_node";

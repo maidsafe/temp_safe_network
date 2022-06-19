@@ -1,4 +1,4 @@
-// Copyright 2020 MaidSafe.net limited.
+// Copyright 2022 MaidSafe.net limited.
 //
 // This SAFE Network Software is licensed to you under The General Public License (GPL), version 3.
 // Unless required by applicable law or agreed to in writing, the SAFE Network Software distributed
@@ -8,8 +8,10 @@
 
 use super::Safe;
 use crate::{Error, Result, SafeUrl};
-use hex::encode;
+
 use sn_interface::types::{Keypair, SecretKey};
+
+use hex::encode;
 use std::path::Path;
 use xor_name::XorName;
 
@@ -81,10 +83,11 @@ pub fn deserialize_keypair(path: impl AsRef<Path>) -> Result<Keypair> {
 #[cfg(test)]
 mod tests {
     use super::{Safe, SafeUrl};
+    use sn_interface::types::Keypair;
+
     use assert_fs::prelude::*;
     use color_eyre::{eyre::eyre, Result};
     use predicates::prelude::*;
-    use sn_interface::types::Keypair;
     use xor_name::XorName;
 
     #[test]

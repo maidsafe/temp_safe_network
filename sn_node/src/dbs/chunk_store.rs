@@ -178,9 +178,9 @@ fn list_files_in(path: &Path) -> Result<Vec<String>> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use sn_interface::types::utils::random_bytes;
 
-    use super::*;
     use futures::future::join_all;
     use rayon::prelude::*;
     use tempfile::tempdir;

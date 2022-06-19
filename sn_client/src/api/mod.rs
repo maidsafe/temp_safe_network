@@ -16,14 +16,16 @@ mod spentbook_apis;
 pub use register_apis::RegisterWriteAheadLog;
 
 use crate::{connections::Session, errors::Error, ClientConfig};
+
 use sn_dbc::{rng, Owner};
-use sn_interface::messaging::{
-    data::{CmdError, DataQuery, RegisterQuery, ServiceMsg},
-    ServiceAuth, WireMsg,
+use sn_interface::{
+    messaging::{
+        data::{CmdError, DataQuery, RegisterQuery, ServiceMsg},
+        ServiceAuth, WireMsg,
+    },
+    network_knowledge::{prefix_map::NetworkPrefixMap, utils::read_prefix_map_from_disk},
+    types::{Chunk, Keypair, Peer, PublicKey, RegisterAddress},
 };
-use sn_interface::network_knowledge::prefix_map::NetworkPrefixMap;
-use sn_interface::network_knowledge::utils::read_prefix_map_from_disk;
-use sn_interface::types::{Chunk, Keypair, Peer, PublicKey, RegisterAddress};
 
 use bytes::Bytes;
 use itertools::Itertools;
@@ -293,9 +295,9 @@ mod tests {
     use crate::utils::test_utils::{
         create_test_client, create_test_client_with, get_dbc_owner_from_secret_key_hex,
     };
+    use sn_interface::{init_logger, types::utils::random_bytes};
+
     use eyre::Result;
-    use sn_interface::init_logger;
-    use sn_interface::types::utils::random_bytes;
     use std::{
         collections::HashSet,
         net::{IpAddr, Ipv4Addr, SocketAddr},

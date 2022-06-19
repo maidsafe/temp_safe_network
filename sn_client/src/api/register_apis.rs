@@ -9,13 +9,16 @@
 use super::Client;
 
 use crate::Error;
-use sn_interface::messaging::data::{
-    CreateRegister, DataCmd, DataQuery, EditRegister, QueryResponse, RegisterCmd, RegisterQuery,
-    SignedRegisterCreate, SignedRegisterEdit,
-};
-use sn_interface::types::{
-    register::{Action, Entry, EntryHash, Permissions, Policy, Register, User},
-    RegisterAddress as Address,
+
+use sn_interface::{
+    messaging::data::{
+        CreateRegister, DataCmd, DataQuery, EditRegister, QueryResponse, RegisterCmd,
+        RegisterQuery, SignedRegisterCreate, SignedRegisterEdit,
+    },
+    types::{
+        register::{Action, Entry, EntryHash, Permissions, Policy, Register, User},
+        RegisterAddress as Address,
+    },
 };
 
 use std::collections::BTreeSet;
@@ -249,19 +252,23 @@ fn section_auth() -> sn_interface::messaging::SectionAuth {
 
 #[cfg(test)]
 mod tests {
-    use crate::retry_loop_for_pattern;
     use crate::{
+        retry_loop_for_pattern,
         utils::test_utils::{create_test_client, create_test_client_with, init_logger},
         Error,
     };
+
+    use sn_interface::{
+        messaging::data::Error as ErrorMsg,
+        types::{
+            log_markers::LogMarker,
+            register::{Action, EntryHash, Permissions, Policy, User},
+            Keypair,
+        },
+    };
+
     use eyre::{bail, eyre, Result};
     use rand::Rng;
-    use sn_interface::messaging::data::Error as ErrorMsg;
-    use sn_interface::types::{
-        log_markers::LogMarker,
-        register::{Action, EntryHash, Permissions, Policy, User},
-        Keypair,
-    };
     use std::{
         collections::{BTreeMap, BTreeSet},
         time::Instant,

@@ -9,10 +9,14 @@
 mod utils;
 
 use self::utils::*;
+
+use crate::node::routing_api::routing::{Event, NodeElderChange};
+
+use sn_interface::messaging::{Aggregation, DstLocation, Itinerary, SrcLocation};
+
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
-use sn_interface::messaging::{Aggregation, DstLocation, Itinerary, SrcLocation};
-use crate::node::routing_api::routing::{Event, NodeElderChange};
+
 /*
 #[tokio::test(flavor = "multi_thread")]
 async fn test_node_drop() -> Result<()> {

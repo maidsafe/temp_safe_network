@@ -9,9 +9,14 @@
 use super::{QueryResult, Session};
 
 use crate::{connections::CmdResponse, Error, Result};
-use sn_interface::messaging::{
-    data::{CmdError, DataQuery, QueryResponse},
-    AuthKind, DstLocation, MsgId, ServiceAuth, WireMsg,
+
+use sn_interface::{
+    messaging::{
+        data::{CmdError, DataQuery, QueryResponse},
+        AuthKind, DstLocation, MsgId, ServiceAuth, WireMsg,
+    },
+    network_knowledge::{prefix_map::NetworkPrefixMap, supermajority},
+    types::{Peer, PeerLinks, SendToOneError},
 };
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -21,8 +26,6 @@ use futures::future::join_all;
 use qp2p::{Close, Config as QuicP2pConfig, ConnectionError, Endpoint, SendError};
 use rand::{rngs::OsRng, seq::SliceRandom};
 use secured_linked_list::SecuredLinkedList;
-use sn_interface::network_knowledge::{prefix_map::NetworkPrefixMap, supermajority};
-use sn_interface::types::{Peer, PeerLinks, SendToOneError};
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::{
     sync::mpsc::{channel, Sender},
@@ -680,10 +683,11 @@ pub(crate) async fn create_safe_dir() -> Result<PathBuf, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use eyre::{eyre, Result};
     use sn_interface::network_knowledge::test_utils::{
         gen_section_authority_provider, section_signed,
     };
+
+    use eyre::{eyre, Result};
     use std::net::Ipv4Addr;
     use xor_name::Prefix;
 

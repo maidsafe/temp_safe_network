@@ -8,8 +8,11 @@
 
 use crate::dbs::{convert_to_error_msg, ChunkStore, Error, Result};
 use crate::UsedSpace;
-use sn_interface::messaging::system::NodeQueryResponse;
-use sn_interface::types::{log_markers::LogMarker, Chunk, ChunkAddress};
+
+use sn_interface::{
+    messaging::system::NodeQueryResponse,
+    types::{log_markers::LogMarker, Chunk, ChunkAddress},
+};
 
 use std::{
     fmt::{self, Display, Formatter},

@@ -6,16 +6,14 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use eyre::{bail, Error, Result};
-use grep::matcher::Matcher;
-use grep::regex::RegexMatcher;
-use grep::searcher::sinks::UTF8;
-use grep::searcher::Searcher;
 use sn_interface::types::log_markers::LogMarker;
-use std::str::FromStr;
+
+use eyre::{bail, Error, Result};
+use grep::{matcher::Matcher, regex::RegexMatcher, searcher::sinks::UTF8, searcher::Searcher};
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 use structopt::{clap::AppSettings::ColoredHelp, StructOpt};
 use strum::IntoEnumIterator;

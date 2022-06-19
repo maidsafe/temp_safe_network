@@ -6,13 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use sn_interface::messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, NodeState};
-use sn_interface::network_knowledge::supermajority;
-use sn_interface::types::keys::ed25519::{self, Digest256, Keypair, Verifier};
-use std::collections::{BTreeMap, BTreeSet};
-use std::net::SocketAddr;
-
 use sn_consensus::Generation;
+use sn_interface::{
+    messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, NodeState},
+    network_knowledge::supermajority,
+    types::keys::ed25519::{self, Digest256, Keypair, Verifier},
+};
+
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    net::SocketAddr,
+};
 use tiny_keccak::{Hasher, Sha3};
 use xor_name::{Prefix, XorName};
 

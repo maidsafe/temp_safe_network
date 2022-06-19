@@ -6,14 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use sn_consensus::SignedVote;
-use tracing::warn;
-
 use crate::node::{api::cmds::Cmd, core::Node, core::Proposal, Result};
-use sn_interface::messaging::system::SectionAuth;
-use sn_interface::messaging::system::SystemMsg;
-use sn_interface::network_knowledge::{SapCandidate, SectionAuthorityProvider};
-use sn_interface::types::log_markers::LogMarker;
+
+use sn_consensus::SignedVote;
+use sn_interface::{
+    messaging::system::{SectionAuth, SystemMsg},
+    network_knowledge::{SapCandidate, SectionAuthorityProvider},
+    types::log_markers::LogMarker,
+};
+
+use tracing::warn;
 
 impl Node {
     /// Make a handover consensus proposal vote for a sap candidate

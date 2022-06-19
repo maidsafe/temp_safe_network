@@ -6,15 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use bls::PublicKey;
 pub use sn_interface::messaging::data::Error as ErrorMsg;
-use sn_interface::messaging::{
-    data::{CmdError, OperationId, QueryResponse},
-    Error as MessagingError, MsgId,
+
+use sn_interface::{
+    messaging::{
+        data::{CmdError, OperationId, QueryResponse},
+        Error as MessagingError, MsgId,
+    },
+    types::Error as DtError,
 };
-use sn_interface::types::Error as DtError;
-use std::io;
-use std::net::SocketAddr;
+
+use bls::PublicKey;
+use std::{io, net::SocketAddr};
 use thiserror::Error;
 
 /// Specialisation of `std::Result` for Client.

@@ -47,8 +47,6 @@ pub use dbs::UsedSpace;
 
 pub mod node;
 
-// pub(crate) use sn_interface::{data_copy_count, at_least_one_correct_elder, max_num_faulty_elders}
-
 #[cfg(test)]
 #[ctor::ctor]
 fn test_setup() {

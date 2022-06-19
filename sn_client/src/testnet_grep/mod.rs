@@ -8,24 +8,16 @@
 
 use sn_interface::types::log_markers::LogMarker;
 
-use grep::matcher::Matcher;
-use grep::regex::RegexMatcher;
-use grep::searcher::sinks::UTF8;
-use grep::searcher::Searcher;
-use std::path::PathBuf;
-
-use std::collections::BTreeMap;
-use walkdir::WalkDir;
-
-use std::string::ToString;
-
-use eyre::{bail, Error, Result};
-
-use eyre::eyre;
-
 use dirs_next::home_dir;
-
+use eyre::{bail, eyre, Error, Result};
+use grep::{
+    matcher::Matcher,
+    regex::RegexMatcher,
+    searcher::{sinks::UTF8, Searcher},
+};
+use std::{collections::BTreeMap, path::PathBuf, string::ToString};
 use strum::IntoEnumIterator;
+use walkdir::WalkDir;
 
 // line number and the match
 pub(crate) type Matches = Vec<(u64, String)>;

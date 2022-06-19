@@ -19,19 +19,15 @@ mod split_barrier;
 
 /// DataStorage apis.
 pub use self::data::DataStorage;
-use self::split_barrier::SplitBarrier;
+
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use comm::{Comm, DeliveryStatus, MsgEvent};
 pub(crate) use data::MIN_LEVEL_WHEN_FULL;
 pub(crate) use proposal::Proposal;
 #[cfg(test)]
 pub(crate) use relocation::{check as relocation_check, ChurnId};
-use sn_interface::{
-    network_knowledge::{
-        supermajority, NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider,
-    },
-    types::keys::ed25519::Digest256,
-};
+
+use self::{data::Capacity, split_barrier::SplitBarrier};
 
 use super::{
     api::cmds::Cmd, dkg::DkgVoter, handover::Handover, membership::Membership, Elders, Event,
@@ -43,23 +39,27 @@ use crate::node::{
     membership::elder_candidates,
     membership::try_split_dkg,
 };
-use sn_interface::messaging::{
-    data::OperationId,
-    signature_aggregator::SignatureAggregator,
-    system::{DkgSessionId, NodeState, SystemMsg},
-    AuthorityProof, SectionAuth, SectionAuthorityProvider,
-};
-use sn_interface::types::{log_markers::LogMarker, Cache, Peer};
-
 use crate::UsedSpace;
-use sn_interface::network_knowledge::utils::compare_and_write_prefix_map_to_disk;
+
+use sn_dysfunction::{DysfunctionDetection, DysfunctionSeverity, IssueType};
+use sn_interface::{
+    messaging::{
+        data::OperationId,
+        signature_aggregator::SignatureAggregator,
+        system::{DkgSessionId, NodeState, SystemMsg},
+        AuthorityProof, SectionAuth, SectionAuthorityProvider,
+    },
+    network_knowledge::utils::compare_and_write_prefix_map_to_disk,
+    network_knowledge::{
+        supermajority, NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider,
+    },
+    types::{keys::ed25519::Digest256, log_markers::LogMarker, Cache, Peer},
+};
 
 use backoff::ExponentialBackoff;
 use dashmap::DashSet;
-use data::Capacity;
 use itertools::Itertools;
 use resource_proof::ResourceProof;
-use sn_dysfunction::{DysfunctionDetection, DysfunctionSeverity, IssueType};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     path::PathBuf,

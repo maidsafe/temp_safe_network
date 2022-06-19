@@ -9,6 +9,7 @@
 use super::Link;
 
 use crate::node::{Error, Result};
+
 use sn_interface::messaging::MsgId;
 
 use bytes::Bytes;

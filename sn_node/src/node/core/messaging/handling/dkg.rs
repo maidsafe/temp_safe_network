@@ -13,12 +13,15 @@ use crate::node::{
     messages::WireMsgUtils,
     Error, Result,
 };
-use sn_interface::messaging::{
-    system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
-    DstLocation, WireMsg,
+
+use sn_interface::{
+    messaging::{
+        system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
+        DstLocation, WireMsg,
+    },
+    network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
+    types::{log_markers::LogMarker, Peer},
 };
-use sn_interface::network_knowledge::{SectionAuthorityProvider, SectionKeyShare};
-use sn_interface::types::{log_markers::LogMarker, Peer};
 
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;

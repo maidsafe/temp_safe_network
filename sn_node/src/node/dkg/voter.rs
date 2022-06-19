@@ -7,18 +7,18 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{api::cmds::Cmd, dkg::session::Session, messages::WireMsgUtils, Result};
+
 use sn_interface::{
     messaging::{
         system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
         DstLocation, WireMsg,
     },
-    types::keys::ed25519::Digest256,
+    network_knowledge::{supermajority, NodeInfo, SectionAuthorityProvider, SectionKeyShare},
+    types::{
+        keys::ed25519::{self, Digest256},
+        Peer,
+    },
 };
-
-use sn_interface::network_knowledge::{
-    supermajority, NodeInfo, SectionAuthorityProvider, SectionKeyShare,
-};
-use sn_interface::types::{keys::ed25519, Peer};
 
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};

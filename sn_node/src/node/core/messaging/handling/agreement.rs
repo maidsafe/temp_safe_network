@@ -11,13 +11,16 @@ use crate::node::{
     core::{relocation::ChurnId, Node, Proposal},
     Event, Result,
 };
+
 use sn_consensus::Generation;
-use sn_interface::messaging::system::{KeyedSig, MembershipState, SectionAuth};
-use sn_interface::network_knowledge::SectionAuthUtils;
-use sn_interface::network_knowledge::{
-    NodeState, SapCandidate, SectionAuthorityProvider, MIN_ADULT_AGE,
+use sn_interface::{
+    messaging::system::{KeyedSig, MembershipState, SectionAuth},
+    network_knowledge::{
+        NodeState, SapCandidate, SectionAuthUtils, SectionAuthorityProvider, MIN_ADULT_AGE,
+    },
+    types::log_markers::LogMarker,
 };
-use sn_interface::types::log_markers::LogMarker;
+
 use std::{cmp, collections::BTreeSet};
 
 // Agreement

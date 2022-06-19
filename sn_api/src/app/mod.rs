@@ -38,10 +38,9 @@ use crate::NodeConfig;
 use sn_client::{Client, ClientConfig, DEFAULT_OPERATION_TIMEOUT};
 use sn_dbc::Owner;
 use sn_interface::types::Keypair;
-use tracing::debug;
 
-use std::path::Path;
-use std::time::Duration;
+use std::{path::Path, time::Duration};
+use tracing::debug;
 
 const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
 
