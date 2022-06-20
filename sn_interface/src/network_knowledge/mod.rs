@@ -590,7 +590,7 @@ impl NetworkKnowledge {
             node_state.state()
         );
 
-        let the_chain = self.chain.borrow();
+        let the_chain = self.section_chain().await;
         // let's check the node state is properly signed by one of the keys in our chain
         if !node_state.verify(&the_chain) {
             error!(
@@ -600,7 +600,6 @@ impl NetworkKnowledge {
             );
             return false;
         }
-        drop(the_chain);
 
         let updated = self.section_peers.update(node_state);
         trace!(
