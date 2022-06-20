@@ -270,17 +270,18 @@ impl Node {
                     // we should probably penalise the node here.
                     None
                 };
-            } else {
-                let _res = self
-                    .ae_backoff_cache
-                    .borrow_mut()
-                    .insert((*peer, ExponentialBackoff::default()));
-            };
+            }
+
             sleep_time
         };
 
         if let Some(sleep_time) = sleep_time {
             tokio::time::sleep(sleep_time).await;
+        } else {
+            let _res = self
+                .ae_backoff_cache
+                .borrow_mut()
+                .insert((*peer, ExponentialBackoff::default()));
         }
     }
 
