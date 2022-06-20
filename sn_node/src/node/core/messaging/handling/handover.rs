@@ -237,34 +237,27 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         self.check_signed_vote_saps(&signed_vote).await?;
 
-        let handover = self.handover_voting.borrow_mut();
-        let handover_state = handover.as_ref();
-        match handover_state {
-            Some(handover_state) => {
-                let mut state = handover_state.clone();
-                let mut cmds = self.handle_vote(&mut state, signed_vote, peer)?;
+        if let Some(ref mut handover_state) = *self.handover_voting.borrow_mut() {
+            let mut cmds = self.handle_vote(handover_state, signed_vote, peer)?;
 
-                // check for unsuccessful termination
-                state.handle_empty_set_decision();
+            // check for unsuccessful termination
+            handover_state.handle_empty_set_decision();
 
-                // check for successful termination
-                if let Some(candidates_sap) = state.consensus_value() {
-                    debug!(
-                        "{}: {:?}",
-                        LogMarker::HandoverConsensusTermination,
-                        candidates_sap
-                    );
+            // check for successful termination
+            if let Some(candidates_sap) = handover_state.consensus_value() {
+                debug!(
+                    "{}: {:?}",
+                    LogMarker::HandoverConsensusTermination,
+                    candidates_sap
+                );
 
-                    let bcast_cmds = self.broadcast_handover_decision(candidates_sap);
-                    cmds.extend(bcast_cmds);
-                }
-                *self.handover_voting.borrow_mut() = Some(state);
-                Ok(cmds)
+                let bcast_cmds = self.broadcast_handover_decision(candidates_sap);
+                cmds.extend(bcast_cmds);
             }
-            None => {
-                trace!("Non-elder node unexpectedly received handover Vote msg, ignoring...");
-                Ok(vec![])
-            }
+            Ok(cmds)
+        } else {
+            trace!("Non-elder node unexpectedly received handover Vote msg, ignoring...");
+            Ok(vec![])
         }
     }
 

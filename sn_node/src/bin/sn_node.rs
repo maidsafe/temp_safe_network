@@ -27,9 +27,9 @@
     unused_results
 )]
 
+use eyre::{eyre, Context, ErrReport, Error, Result};
 #[cfg(not(feature = "tokio-console"))]
 use sn_interface::LogFormatter;
-use eyre::{eyre, Error, Context, ErrReport, Result};
 use sn_node::node::{
     add_connection_info, set_connection_info, Config, Error as NodeError, Event, NodeApi,
 };
