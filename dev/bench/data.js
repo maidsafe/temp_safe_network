@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1655473313216,
+  "lastUpdate": 1655720093332,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -5279,6 +5279,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 8692578116,
             "range": "± 914074253",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "oetyng@gmail.com",
+            "name": "oetyng",
+            "username": "oetyng"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "d204cffdc25a08f604f3a7b97dd74c0f4181b696",
+          "message": "chore: remove unused deps and enum variants\nWas made aware by a comment on the forum that there was a sled\ndep in `sn_interface`, which seemed wrong, and from there I found more.",
+          "timestamp": "2022-06-20T11:31:30+02:00",
+          "tree_id": "8ef3b77b59cd4af04213c6831ca9e4321959fe98",
+          "url": "https://github.com/maidsafe/safe_network/commit/d204cffdc25a08f604f3a7b97dd74c0f4181b696"
+        },
+        "date": 1655720092022,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 20056450807,
+            "range": "± 11146841575",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 6695487448,
+            "range": "± 32494421",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 11207296449,
+            "range": "± 13572363834",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 10049252503,
+            "range": "± 7580977",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 6173654853,
+            "range": "± 60903630",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 8263316830,
+            "range": "± 1958286212",
             "unit": "ns/iter"
           }
         ]
