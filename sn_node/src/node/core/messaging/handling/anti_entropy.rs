@@ -497,227 +497,262 @@ mod tests {
 
     #[tokio::test]
     async fn ae_everything_up_to_date() -> Result<()> {
-        let env = Env::new().await?;
-        let our_prefix = env.node.network_knowledge().prefix().await;
-        let (msg, src_location) = env.create_msg(
-            &our_prefix,
-            env.node.network_knowledge().section_key().await,
-        )?;
-        let sender = env.node.info.read().await.peer();
-        let dst_name = our_prefix.substituted_in(xor_name::rand::random());
-        let dst_section_key = env.node.network_knowledge().section_key().await;
+        // Construct a local task set that can run `!Send` futures.
+        let local = tokio::task::LocalSet::new();
 
-        let cmd = env
-            .node
-            .check_for_entropy(
-                msg.serialize()?,
-                &src_location,
-                &dst_section_key,
-                dst_name,
-                &sender,
-            )
-            .await?;
+        // Run the local task set.
+        local
+            .run_until(async move {
+                let env = Env::new().await?;
+                let our_prefix = env.node.network_knowledge().prefix().await;
+                let (msg, src_location) = env.create_msg(
+                    &our_prefix,
+                    env.node.network_knowledge().section_key().await,
+                )?;
+                let sender = env.node.info.read().await.peer();
+                let dst_name = our_prefix.substituted_in(xor_name::rand::random());
+                let dst_section_key = env.node.network_knowledge().section_key().await;
 
-        assert!(cmd.is_none());
+                let cmd = env
+                    .node
+                    .check_for_entropy(
+                        msg.serialize()?,
+                        &src_location,
+                        &dst_section_key,
+                        dst_name,
+                        &sender,
+                    )
+                    .await?;
 
-        Ok(())
+                assert!(cmd.is_none());
+                Result::<()>::Ok(())
+            })
+            .await
     }
 
     #[tokio::test]
     async fn ae_update_msg_to_be_trusted() -> Result<()> {
-        let env = Env::new().await?;
+        // Construct a local task set that can run `!Send` futures.
+        let local = tokio::task::LocalSet::new();
 
-        let known_keys = vec![*env.node.network_knowledge().genesis_key()];
+        // Run the local task set.
+        local
+            .run_until(async move {
+                let env = Env::new().await?;
 
-        // This proof_chain already contains other_pk
-        let proof_chain = env.proof_chain.clone();
-        let (msg, msg_authority) = env.create_update_msg(proof_chain)?;
+                let known_keys = vec![*env.node.network_knowledge().genesis_key()];
 
-        // AeUpdate message shall get pass through.
-        assert!(NetworkKnowledge::verify_node_msg_can_be_trusted(
-            msg_authority.clone(),
-            msg,
-            &known_keys
-        ));
+                // This proof_chain already contains other_pk
+                let proof_chain = env.proof_chain.clone();
+                let (msg, msg_authority) = env.create_update_msg(proof_chain)?;
 
-        // AeUpdate message contains corrupted proof_chain shall get rejected.
-        let other_env = Env::new().await?;
-        let (corrupted_msg, _msg_authority) = env.create_update_msg(other_env.proof_chain)?;
-        assert!(!NetworkKnowledge::verify_node_msg_can_be_trusted(
-            msg_authority.clone(),
-            corrupted_msg,
-            &known_keys
-        ));
+                // AeUpdate message shall get pass through.
+                assert!(NetworkKnowledge::verify_node_msg_can_be_trusted(
+                    msg_authority.clone(),
+                    msg,
+                    &known_keys
+                ));
 
-        // Other messages shall get rejected.
-        let other_msg = SystemMsg::StartConnectivityTest(xor_name::rand::random());
-        assert!(!NetworkKnowledge::verify_node_msg_can_be_trusted(
-            msg_authority,
-            other_msg,
-            &known_keys
-        ));
+                // AeUpdate message contains corrupted proof_chain shall get rejected.
+                let other_env = Env::new().await?;
+                let (corrupted_msg, _msg_authority) =
+                    env.create_update_msg(other_env.proof_chain)?;
+                assert!(!NetworkKnowledge::verify_node_msg_can_be_trusted(
+                    msg_authority.clone(),
+                    corrupted_msg,
+                    &known_keys
+                ));
 
-        Ok(())
+                // Other messages shall get rejected.
+                let other_msg = SystemMsg::StartConnectivityTest(xor_name::rand::random());
+                assert!(!NetworkKnowledge::verify_node_msg_can_be_trusted(
+                    msg_authority,
+                    other_msg,
+                    &known_keys
+                ));
+                Result::<()>::Ok(())
+            })
+            .await
     }
 
     #[tokio::test]
     async fn ae_redirect_to_other_section() -> Result<()> {
-        let env = Env::new().await?;
+        // Construct a local task set that can run `!Send` futures.
+        let local = tokio::task::LocalSet::new();
 
-        let other_sk = bls::SecretKey::random();
-        let other_pk = other_sk.public_key();
+        // Run the local task set.
+        local.run_until(async move {
 
-        let (msg, src_location) = env.create_msg(&env.other_sap.prefix(), other_pk)?;
-        let sender = env.node.info.read().await.peer();
 
-        // since it's not aware of the other prefix, it will redirect to self
-        let dst_section_key = other_pk;
-        let dst_name = env.other_sap.prefix().name();
-        let cmd = env
-            .node
-            .check_for_entropy(
-                msg.serialize()?,
-                &src_location,
-                &dst_section_key,
-                dst_name,
-                &sender,
-            )
-            .await;
+            let env = Env::new().await?;
 
-        let msg_type = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { wire_msg, .. })) => {
-            wire_msg
-                .into_msg()
-                .context("failed to deserialised anti-entropy message")?
-        });
+            let other_sk = bls::SecretKey::random();
+            let other_pk = other_sk.public_key();
 
-        assert_matches!(msg_type, MsgType::System{ msg, .. } => {
-            assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
-                assert_eq!(section_auth, env.node.network_knowledge().authority_provider().await.to_msg());
-            });
-        });
+            let (msg, src_location) = env.create_msg(&env.other_sap.prefix(), other_pk)?;
+            let sender = env.node.info.read().await.peer();
 
-        // now let's insert the other SAP to make it aware of the other prefix
-        assert!(
-            env.node
-                .network_knowledge()
-                .update_knowledge_if_valid(
-                    env.other_sap.clone(),
-                    &env.proof_chain,
-                    None,
-                    &env.node.info.read().await.name(),
-                    &env.node.section_keys_provider
+            // since it's not aware of the other prefix, it will redirect to self
+            let dst_section_key = other_pk;
+            let dst_name = env.other_sap.prefix().name();
+            let cmd = env
+                .node
+                .check_for_entropy(
+                    msg.serialize()?,
+                    &src_location,
+                    &dst_section_key,
+                    dst_name,
+                    &sender,
                 )
-                .await?
-        );
+                .await;
 
-        // and it now shall give us an AE redirect msg
-        // with the SAP we inserted for other prefix
-        let cmd = env
-            .node
-            .check_for_entropy(
-                msg.serialize()?,
-                &src_location,
-                &dst_section_key,
-                dst_name,
-                &sender,
-            )
-            .await;
-
-        let msg_type = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { wire_msg, .. })) => {
-            wire_msg
-                .into_msg()
-                .context("failed to deserialised anti-entropy message")?
-        });
-
-        assert_matches!(msg_type, MsgType::System{ msg, .. } => {
-            assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
-                assert_eq!(section_auth, env.other_sap.value.to_msg());
+            let msg_type = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { wire_msg, .. })) => {
+                wire_msg
+                    .into_msg()
+                    .context("failed to deserialised anti-entropy message")?
             });
-        });
 
-        Ok(())
+            assert_matches!(msg_type, MsgType::System{ msg, .. } => {
+                assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
+                    assert_eq!(section_auth, env.node.network_knowledge().authority_provider().await.to_msg());
+                });
+            });
+
+            // now let's insert the other SAP to make it aware of the other prefix
+            assert!(
+                env.node
+                    .network_knowledge()
+                    .update_knowledge_if_valid(
+                        env.other_sap.clone(),
+                        &env.proof_chain,
+                        None,
+                        &env.node.info.read().await.name(),
+                        &env.node.section_keys_provider
+                    )
+                    .await?
+            );
+
+            // and it now shall give us an AE redirect msg
+            // with the SAP we inserted for other prefix
+            let cmd = env
+                .node
+                .check_for_entropy(
+                    msg.serialize()?,
+                    &src_location,
+                    &dst_section_key,
+                    dst_name,
+                    &sender,
+                )
+                .await;
+
+            let msg_type = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { wire_msg, .. })) => {
+                wire_msg
+                    .into_msg()
+                    .context("failed to deserialised anti-entropy message")?
+            });
+
+            assert_matches!(msg_type, MsgType::System{ msg, .. } => {
+                assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
+                    assert_eq!(section_auth, env.other_sap.value.to_msg());
+                });
+            });
+       Result::<()>::Ok(())
+   }).await
     }
 
     #[tokio::test]
     async fn ae_outdated_dst_key_of_our_section() -> Result<()> {
-        let env = Env::new().await?;
-        let our_prefix = env.node.network_knowledge().prefix().await;
+        // Construct a local task set that can run `!Send` futures.
+        let local = tokio::task::LocalSet::new();
 
-        let (msg, src_location) = env.create_msg(
-            &our_prefix,
-            env.node.network_knowledge().section_key().await,
-        )?;
-        let sender = env.node.info.read().await.peer();
-        let dst_name = our_prefix.substituted_in(xor_name::rand::random());
-        let dst_section_key = env.node.network_knowledge().genesis_key();
+        // Run the local task set.
+        local.run_until(async move {
 
-        let cmd = env
-            .node
-            .check_for_entropy(
-                msg.serialize()?,
-                &src_location,
-                dst_section_key,
-                dst_name,
-                &sender,
-            )
-            .await?;
 
-        let msg_type = assert_matches!(cmd, Some(Cmd::SendMsg { wire_msg, .. }) => {
-            wire_msg
-                .into_msg()
-                .context("failed to deserialised anti-entropy message")?
-        });
+            let env = Env::new().await?;
+            let our_prefix = env.node.network_knowledge().prefix().await;
 
-        assert_matches!(msg_type, MsgType::System{ msg, .. } => {
-            assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
-                assert_eq!(section_auth, &env.node.network_knowledge().authority_provider().await.to_msg());
-                assert_eq!(proof_chain, &env.node.section_chain().await);
+            let (msg, src_location) = env.create_msg(
+                &our_prefix,
+                env.node.network_knowledge().section_key().await,
+            )?;
+            let sender = env.node.info.read().await.peer();
+            let dst_name = our_prefix.substituted_in(xor_name::rand::random());
+            let dst_section_key = env.node.network_knowledge().genesis_key();
+
+            let cmd = env
+                .node
+                .check_for_entropy(
+                    msg.serialize()?,
+                    &src_location,
+                    dst_section_key,
+                    dst_name,
+                    &sender,
+                )
+                .await?;
+
+            let msg_type = assert_matches!(cmd, Some(Cmd::SendMsg { wire_msg, .. }) => {
+                wire_msg
+                    .into_msg()
+                    .context("failed to deserialised anti-entropy message")?
             });
-        });
 
-        Ok(())
+            assert_matches!(msg_type, MsgType::System{ msg, .. } => {
+                assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
+                    assert_eq!(section_auth, &env.node.network_knowledge().authority_provider().await.to_msg());
+                    assert_eq!(proof_chain, &env.node.section_chain().await);
+                });
+            });
+       Result::<()>::Ok(())
+   }).await
     }
 
     #[tokio::test]
     async fn ae_wrong_dst_key_of_our_section_returns_retry() -> Result<()> {
-        let env = Env::new().await?;
-        let our_prefix = env.node.network_knowledge().prefix().await;
+        // Construct a local task set that can run `!Send` futures.
+        let local = tokio::task::LocalSet::new();
 
-        let (msg, src_location) = env.create_msg(
-            &our_prefix,
-            env.node.network_knowledge().section_key().await,
-        )?;
-        let sender = env.node.info.read().await.peer();
-        let dst_name = our_prefix.substituted_in(xor_name::rand::random());
+        // Run the local task set.
+        local.run_until(async move {
 
-        let bogus_env = Env::new().await?;
-        let dst_section_key = bogus_env.node.network_knowledge().genesis_key();
+       let env = Env::new().await?;
+       let our_prefix = env.node.network_knowledge().prefix().await;
 
-        let cmd = env
-            .node
-            .check_for_entropy(
-                msg.serialize()?,
-                &src_location,
-                dst_section_key,
-                dst_name,
-                &sender,
-            )
-            .await?;
+       let (msg, src_location) = env.create_msg(
+           &our_prefix,
+           env.node.network_knowledge().section_key().await,
+       )?;
+       let sender = env.node.info.read().await.peer();
+       let dst_name = our_prefix.substituted_in(xor_name::rand::random());
 
-        let msg_type = assert_matches!(cmd, Some(Cmd::SendMsg { wire_msg, .. }) => {
-            wire_msg
-                .into_msg()
-                .context("failed to deserialised anti-entropy message")?
-        });
+       let bogus_env = Env::new().await?;
+       let dst_section_key = bogus_env.node.network_knowledge().genesis_key();
 
-        assert_matches!(msg_type, MsgType::System{ msg, .. } => {
-            assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
-                assert_eq!(*section_auth, env.node.network_knowledge().authority_provider().await.to_msg());
-                assert_eq!(*proof_chain, env.node.section_chain().await);
-            });
-        });
+       let cmd = env
+           .node
+           .check_for_entropy(
+               msg.serialize()?,
+               &src_location,
+               dst_section_key,
+               dst_name,
+               &sender,
+           )
+           .await?;
 
-        Ok(())
+       let msg_type = assert_matches!(cmd, Some(Cmd::SendMsg { wire_msg, .. }) => {
+           wire_msg
+               .into_msg()
+               .context("failed to deserialised anti-entropy message")?
+       });
+
+       assert_matches!(msg_type, MsgType::System{ msg, .. } => {
+           assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
+               assert_eq!(*section_auth, env.node.network_knowledge().authority_provider().await.to_msg());
+               assert_eq!(*proof_chain, env.node.section_chain().await);
+           });
+       });
+       Result::<()>::Ok(())
+   }).await
     }
 
     struct Env {
