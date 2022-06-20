@@ -88,71 +88,80 @@ struct Options {
 async fn main() -> Result<()> {
     let opts = Options::from_args();
 
-    if opts.schedule.is_empty() {
-        return Err(eyre!(
-            "Must specify churn schedule (run with --help for more info)."
-        ));
-    }
+    let local = tokio::task::LocalSet::new();
 
-    if opts.probe_frequency <= 0.0 {
-        return Err(eyre!("Probe frequency must be greater than zero."));
-    }
+    let _res = local
+        .run_until(async move {
+            if opts.schedule.is_empty() {
+                return Err(eyre!(
+                    "Must specify churn schedule (run with --help for more info)."
+                ));
+            }
 
-    // Init logging.
-    let _log_guard = if let Some(path) = opts.log {
-        let builder = tracing_subscriber::fmt().with_env_filter(EnvFilter::from_default_env());
+            if opts.probe_frequency <= 0.0 {
+                return Err(eyre!("Probe frequency must be greater than zero."));
+            }
 
-        if path == "-" {
-            builder.init();
-            None
-        } else {
-            let file = File::create(path)?;
-            let file = BufWriter::new(file);
-            let (writer, guard) = tracing_appender::non_blocking(file);
+            // Init logging.
+            let _log_guard = if let Some(path) = opts.log {
+                let builder =
+                    tracing_subscriber::fmt().with_env_filter(EnvFilter::from_default_env());
 
-            builder.with_writer(writer).init();
-            Some(guard)
-        }
-    } else {
-        None
-    };
-
-    let schedule = ChurnSchedule::parse(&opts.schedule)?;
-
-    let (event_tx, mut event_rx) = mpsc::channel(20);
-    let mut network = Network::new();
-
-    // Create the genesis node
-    network.create_node(event_tx.clone()).await;
-
-    let mut churn_events = schedule.events();
-
-    let probe_interval = Duration::from_secs_f64(1.0 / opts.probe_frequency);
-    let mut probes = time::interval(probe_interval);
-
-    loop {
-        tokio::select! {
-            event = event_rx.recv() => {
-                if let Some(event) = event {
-                    network.handle_event(event).await?
+                if path == "-" {
+                    builder.init();
+                    None
                 } else {
-                    break
+                    let file = File::create(path)?;
+                    let file = BufWriter::new(file);
+                    let (writer, guard) = tracing_appender::non_blocking(file);
+
+                    builder.with_writer(writer).init();
+                    Some(guard)
+                }
+            } else {
+                None
+            };
+
+            let schedule = ChurnSchedule::parse(&opts.schedule)?;
+
+            let (event_tx, mut event_rx) = mpsc::channel(20);
+            let mut network = Network::new();
+
+            // Create the genesis node
+            network.create_node(event_tx.clone()).await;
+
+            let mut churn_events = schedule.events();
+
+            let probe_interval = Duration::from_secs_f64(1.0 / opts.probe_frequency);
+            let mut probes = time::interval(probe_interval);
+
+            loop {
+                tokio::select! {
+                    event = event_rx.recv() => {
+                        if let Some(event) = event {
+                            network.handle_event(event).await?
+                        } else {
+                            break
+                        }
+                    }
+                    event = churn_events.next() => {
+                        match event {
+                            Some(ChurnEvent::Join) => {
+                                network.create_node(event_tx.clone()).await
+                            }
+                            Some(ChurnEvent::Drop) => {
+                                network.remove_random_node()
+                            }
+                            None => unreachable!()
+                        }
+                    }
+                    _ = probes.tick() => network.send_probes().await?,
                 }
             }
-            event = churn_events.next() => {
-                match event {
-                    Some(ChurnEvent::Join) => {
-                        network.create_node(event_tx.clone()).await
-                    }
-                    Some(ChurnEvent::Drop) => {
-                        network.remove_random_node()
-                    }
-                    None => unreachable!()
-                }
-            }
-            _ = probes.tick() => network.send_probes().await?,
-        }
-    }
+
+            Ok(())
+        })
+        .await;
 
     Ok(())
 }
@@ -226,8 +235,6 @@ impl Network {
             ..Default::default()
         };
 
-        // TODO: Fix this: future returned by `add_node` is not `Send`
-        //let _handle = task::spawn(add_node(id, config, event_tx));
         let _ = add_node(id, config, event_tx).await;
 
         self.try_print_status();

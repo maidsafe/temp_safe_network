@@ -545,9 +545,9 @@ fn setup(our_endpoint: Endpoint, receive_msg: mpsc::Sender<MsgEvent>) -> (Comm, 
     };
 
     #[cfg(feature = "back-pressure")]
-    let _ = task::spawn(count_msgs(back_pressure, msg_counter));
+    let _ = task::spawn_local(count_msgs(back_pressure, msg_counter));
 
-    let _ = task::spawn(receive_conns(comm.clone(), conn_receiver));
+    let _ = task::spawn_local(receive_conns(comm.clone(), conn_receiver));
 
     (comm, msg_listener)
 }
@@ -571,7 +571,7 @@ async fn receive_conns(comm: Comm, mut conn_receiver: mpsc::Receiver<ListenerEve
 
 #[tracing::instrument(skip_all)]
 fn listen(msg_listener: MsgListener, mut incoming_connections: IncomingConnections) {
-    let _ = task::spawn(async move {
+    let _ = task::spawn_local(async move {
         while let Some((connection, incoming_msgs)) = incoming_connections.next().await {
             trace!(
                 "incoming_connection from {:?} with connection_id {:?}",
@@ -630,251 +630,303 @@ mod tests {
 
     const TIMEOUT: Duration = Duration::from_secs(1);
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn successful_send() -> Result<()> {
-        let (tx, _rx) = mpsc::channel(1);
-        let comm = Comm::first_node(local_addr(), Config::default(), tx).await?;
+        // Construct a local task set that can run `!Send` futures.
+        let local = tokio::task::LocalSet::new();
 
-        let (peer0, mut rx0) = new_peer().await?;
-        let (peer1, mut rx1) = new_peer().await?;
+        // Run the local task set.
+        local
+            .run_until(async move {
+                let (tx, _rx) = mpsc::channel(1);
+                let comm = Comm::first_node(local_addr(), Config::default(), tx).await?;
 
-        let original_message = new_test_msg()?;
+                let (peer0, mut rx0) = new_peer().await?;
+                let (peer1, mut rx1) = new_peer().await?;
 
-        let status = comm
-            .send(&[peer0, peer1], 2, original_message.clone())
-            .await?;
+                let original_message = new_test_msg()?;
 
-        assert_matches!(status, DeliveryStatus::AllRecipients);
+                let status = comm
+                    .send(&[peer0, peer1], 2, original_message.clone())
+                    .await?;
 
-        if let Some(bytes) = rx0.recv().await {
-            // the dst location name is updated per sender, so
-            // we need to update that here before we check
-            let mut check_msg = original_message.clone();
-            check_msg.set_dst_xorname(peer0.name());
-            assert_eq!(WireMsg::from(bytes)?, check_msg);
-        }
+                assert_matches!(status, DeliveryStatus::AllRecipients);
 
-        if let Some(bytes) = rx1.recv().await {
-            // the dst location name is updated per sender, so
-            // we need to update that here before we check
-            let mut check_msg = original_message.clone();
-            check_msg.set_dst_xorname(peer1.name());
-            assert_eq!(WireMsg::from(bytes)?, check_msg);
-        }
-
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn successful_send_to_subset() -> Result<()> {
-        let (tx, _rx) = mpsc::channel(1);
-        let comm = Comm::first_node(local_addr(), Config::default(), tx).await?;
-
-        let (peer0, mut rx0) = new_peer().await?;
-        let (peer1, mut rx1) = new_peer().await?;
-
-        let original_message = new_test_msg()?;
-        let status = comm
-            .send(&[peer0, peer1], 1, original_message.clone())
-            .await?;
-
-        assert_matches!(status, DeliveryStatus::AllRecipients);
-
-        if let Some(bytes) = rx0.recv().await {
-            // the dst location name is updated per sender, so
-            // we need to update that here before we check
-            let mut check_msg = original_message.clone();
-            check_msg.set_dst_xorname(peer0.name());
-
-            assert_eq!(WireMsg::from(bytes)?, check_msg);
-        }
-
-        assert!(time::timeout(TIMEOUT, rx1.recv())
-            .await
-            .unwrap_or_default()
-            .is_none());
-
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn failed_send() -> Result<()> {
-        let (tx, _rx) = mpsc::channel(1);
-        let comm = Comm::first_node(
-            local_addr(),
-            Config {
-                // This makes this test faster.
-                idle_timeout: Some(Duration::from_millis(1)),
-                ..Config::default()
-            },
-            tx,
-        )
-        .await?;
-        let invalid_peer = get_invalid_peer().await?;
-        let invalid_addr = invalid_peer.addr();
-
-        let status = comm.send(&[invalid_peer], 1, new_test_msg()?).await?;
-
-        assert_matches!(
-            &status,
-            &DeliveryStatus::MinDeliveryGroupSizeFailed(_) => vec![invalid_addr]
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn successful_send_after_failed_attempts() -> Result<()> {
-        let (tx, _rx) = mpsc::channel(1);
-        let comm = Comm::first_node(
-            local_addr(),
-            Config {
-                idle_timeout: Some(Duration::from_millis(1)),
-                ..Config::default()
-            },
-            tx,
-        )
-        .await?;
-        let (peer, mut rx) = new_peer().await?;
-        let invalid_peer = get_invalid_peer().await?;
-
-        let message = new_test_msg()?;
-        let status = comm.send(&[invalid_peer, peer], 1, message.clone()).await?;
-        assert_matches!(status, DeliveryStatus::MinDeliveryGroupSizeReached(failed_recipients) => {
-            assert_eq!(&failed_recipients, &[invalid_peer])
-        });
-
-        if let Some(bytes) = rx.recv().await {
-            // the dst location name is updated per sender, so
-            // we need to update that here before we check
-            let mut check_msg = message.clone();
-            check_msg.set_dst_xorname(peer.name());
-
-            assert_eq!(WireMsg::from(bytes)?, check_msg);
-        }
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn partially_successful_send() -> Result<()> {
-        let (tx, _rx) = mpsc::channel(1);
-        let comm = Comm::first_node(
-            local_addr(),
-            Config {
-                idle_timeout: Some(Duration::from_millis(1)),
-                ..Config::default()
-            },
-            tx,
-        )
-        .await?;
-        let (peer, mut rx) = new_peer().await?;
-        let invalid_peer = get_invalid_peer().await?;
-
-        let message = new_test_msg()?;
-        let status = comm.send(&[invalid_peer, peer], 2, message.clone()).await?;
-
-        assert_matches!(
-            status,
-            DeliveryStatus::MinDeliveryGroupSizeFailed(_) => vec![invalid_peer]
-        );
-
-        if let Some(bytes) = rx.recv().await {
-            // the dst location name is updated per sender, so
-            // we need to update that here before we check
-            let mut check_msg = message.clone();
-            check_msg.set_dst_xorname(peer.name());
-
-            assert_eq!(WireMsg::from(bytes)?, check_msg);
-        }
-        Ok(())
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn send_after_reconnect() -> Result<()> {
-        let (tx, _rx) = mpsc::channel(1);
-        let send_comm = Comm::first_node(local_addr(), Config::default(), tx).await?;
-
-        let (recv_endpoint, mut incoming_connections, _) =
-            Endpoint::new_peer(local_addr(), &[], Config::default()).await?;
-        let recv_addr = recv_endpoint.public_addr();
-        let name = xor_name::rand::random();
-
-        let msg0 = new_test_msg()?;
-        let status = send_comm
-            .send(&[Peer::new(name, recv_addr)], 1, msg0.clone())
-            .await?;
-        assert_matches!(status, DeliveryStatus::AllRecipients);
-
-        let mut msg0_received = false;
-
-        // Receive one message and disconnect from the peer
-        {
-            if let Some((_, mut incoming_msgs)) = incoming_connections.next().await {
-                if let Some(msg) = time::timeout(TIMEOUT, incoming_msgs.next()).await?? {
+                if let Some(bytes) = rx0.recv().await {
                     // the dst location name is updated per sender, so
                     // we need to update that here before we check
-                    let mut check_msg = msg0.clone();
-                    check_msg.set_dst_xorname(name);
-                    assert_eq!(WireMsg::from(msg)?, check_msg);
-                    msg0_received = true;
+                    let mut check_msg = original_message.clone();
+                    check_msg.set_dst_xorname(peer0.name());
+                    assert_eq!(WireMsg::from(bytes)?, check_msg);
                 }
 
-                // connection dropped here
-            }
-            assert!(msg0_received);
-        }
+                if let Some(bytes) = rx1.recv().await {
+                    // the dst location name is updated per sender, so
+                    // we need to update that here before we check
+                    let mut check_msg = original_message.clone();
+                    check_msg.set_dst_xorname(peer1.name());
+                    assert_eq!(WireMsg::from(bytes)?, check_msg);
+                }
 
-        let msg1 = new_test_msg()?;
-        let status = send_comm
-            .send(&[Peer::new(name, recv_addr)], 1, msg1.clone())
-            .await?;
-        assert_matches!(status, DeliveryStatus::AllRecipients);
-
-        let mut msg1_received = false;
-
-        if let Some((_, mut incoming_msgs)) = incoming_connections.next().await {
-            if let Some(msg) = time::timeout(TIMEOUT, incoming_msgs.next()).await?? {
-                // the dst location name is updated per sender, so
-                // we need to update that here before we check
-                let mut check_msg = msg1.clone();
-                check_msg.set_dst_xorname(name);
-                assert_eq!(WireMsg::from(msg)?, check_msg);
-
-                msg1_received = true;
-            }
-        }
-
-        assert!(msg1_received);
-
-        Ok(())
+                Result::<()>::Ok(())
+            })
+            .await
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn incoming_connection_lost() -> Result<()> {
-        let (tx, mut rx0) = mpsc::channel(1);
-        let comm0 = Comm::first_node(local_addr(), Config::default(), tx).await?;
-        let addr0 = comm0.our_connection_info();
+    #[tokio::test]
+    async fn successful_send_to_subset() -> Result<()> {
+        // Construct a local task set that can run `!Send` futures.
+        let local = tokio::task::LocalSet::new();
 
-        let (tx, _rx) = mpsc::channel(1);
-        let comm1 = Comm::first_node(local_addr(), Config::default(), tx).await?;
+        // Run the local task set.
+        local
+            .run_until(async move {
+                let (tx, _rx) = mpsc::channel(1);
+                let comm = Comm::first_node(local_addr(), Config::default(), tx).await?;
 
-        // Send a message to establish the connection
-        let status = comm1
-            .send(
-                &[Peer::new(xor_name::rand::random(), addr0)],
-                1,
-                new_test_msg()?,
+                let (peer0, mut rx0) = new_peer().await?;
+                let (peer1, mut rx1) = new_peer().await?;
+
+                let original_message = new_test_msg()?;
+                let status = comm
+                    .send(&[peer0, peer1], 1, original_message.clone())
+                    .await?;
+
+                assert_matches!(status, DeliveryStatus::AllRecipients);
+
+                if let Some(bytes) = rx0.recv().await {
+                    // the dst location name is updated per sender, so
+                    // we need to update that here before we check
+                    let mut check_msg = original_message.clone();
+                    check_msg.set_dst_xorname(peer0.name());
+
+                    assert_eq!(WireMsg::from(bytes)?, check_msg);
+                }
+
+                assert!(time::timeout(TIMEOUT, rx1.recv())
+                    .await
+                    .unwrap_or_default()
+                    .is_none());
+                Result::<()>::Ok(())
+            })
+            .await
+    }
+
+    #[tokio::test]
+    async fn failed_send() -> Result<()> {
+        // Construct a local task set that can run `!Send` futures.
+        let local = tokio::task::LocalSet::new();
+
+        // Run the local task set.
+        local
+            .run_until(async move {
+                let (tx, _rx) = mpsc::channel(1);
+                let comm = Comm::first_node(
+                    local_addr(),
+                    Config {
+                        // This makes this test faster.
+                        idle_timeout: Some(Duration::from_millis(1)),
+                        ..Config::default()
+                    },
+                    tx,
+                )
+                .await?;
+                let invalid_peer = get_invalid_peer().await?;
+                let invalid_addr = invalid_peer.addr();
+
+                let status = comm.send(&[invalid_peer], 1, new_test_msg()?).await?;
+
+                assert_matches!(
+                    &status,
+                    &DeliveryStatus::MinDeliveryGroupSizeFailed(_) => vec![invalid_addr]
+                );
+
+                Result::<()>::Ok(())
+            })
+            .await
+    }
+
+    #[tokio::test]
+    async fn successful_send_after_failed_attempts() -> Result<()> {
+        // Construct a local task set that can run `!Send` futures.
+        let local = tokio::task::LocalSet::new();
+
+        // Run the local task set.
+        local.run_until(async move {
+            let (tx, _rx) = mpsc::channel(1);
+            let comm = Comm::first_node(
+                local_addr(),
+                Config {
+                    idle_timeout: Some(Duration::from_millis(1)),
+                    ..Config::default()
+                },
+                tx,
             )
             .await?;
-        assert_matches!(status, DeliveryStatus::AllRecipients);
+            let (peer, mut rx) = new_peer().await?;
+            let invalid_peer = get_invalid_peer().await?;
 
-        assert_matches!(rx0.recv().await, Some(MsgEvent::Received { .. }));
-        // Drop `comm1` to cause connection lost.
-        drop(comm1);
+            let message = new_test_msg()?;
+            let status = comm.send(&[invalid_peer, peer], 1, message.clone()).await?;
+            assert_matches!(status, DeliveryStatus::MinDeliveryGroupSizeReached(failed_recipients) => {
+                assert_eq!(&failed_recipients, &[invalid_peer])
+            });
 
-        assert_matches!(time::timeout(TIMEOUT, rx0.recv()).await, Err(_));
+            if let Some(bytes) = rx.recv().await {
+                // the dst location name is updated per sender, so
+                // we need to update that here before we check
+                let mut check_msg = message.clone();
+                check_msg.set_dst_xorname(peer.name());
 
-        Ok(())
+                assert_eq!(WireMsg::from(bytes)?, check_msg);
+            }
+
+            Result::<()>::Ok(())
+        }).await
+    }
+
+    #[tokio::test]
+    async fn partially_successful_send() -> Result<()> {
+        // Construct a local task set that can run `!Send` futures.
+        let local = tokio::task::LocalSet::new();
+
+        // Run the local task set.
+        local
+            .run_until(async move {
+                let (tx, _rx) = mpsc::channel(1);
+                let comm = Comm::first_node(
+                    local_addr(),
+                    Config {
+                        idle_timeout: Some(Duration::from_millis(1)),
+                        ..Config::default()
+                    },
+                    tx,
+                )
+                .await?;
+                let (peer, mut rx) = new_peer().await?;
+                let invalid_peer = get_invalid_peer().await?;
+
+                let message = new_test_msg()?;
+                let status = comm.send(&[invalid_peer, peer], 2, message.clone()).await?;
+
+                assert_matches!(
+                    status,
+                    DeliveryStatus::MinDeliveryGroupSizeFailed(_) => vec![invalid_peer]
+                );
+
+                if let Some(bytes) = rx.recv().await {
+                    // the dst location name is updated per sender, so
+                    // we need to update that here before we check
+                    let mut check_msg = message.clone();
+                    check_msg.set_dst_xorname(peer.name());
+
+                    assert_eq!(WireMsg::from(bytes)?, check_msg);
+                }
+                Result::<()>::Ok(())
+            })
+            .await
+    }
+
+    #[tokio::test]
+    async fn send_after_reconnect() -> Result<()> {
+        // Construct a local task set that can run `!Send` futures.
+        let local = tokio::task::LocalSet::new();
+
+        // Run the local task set.
+        local
+            .run_until(async move {
+                let (tx, _rx) = mpsc::channel(1);
+                let send_comm = Comm::first_node(local_addr(), Config::default(), tx).await?;
+
+                let (recv_endpoint, mut incoming_connections, _) =
+                    Endpoint::new_peer(local_addr(), &[], Config::default()).await?;
+                let recv_addr = recv_endpoint.public_addr();
+                let name = xor_name::rand::random();
+
+                let msg0 = new_test_msg()?;
+                let status = send_comm
+                    .send(&[Peer::new(name, recv_addr)], 1, msg0.clone())
+                    .await?;
+                assert_matches!(status, DeliveryStatus::AllRecipients);
+
+                let mut msg0_received = false;
+
+                // Receive one message and disconnect from the peer
+                {
+                    if let Some((_, mut incoming_msgs)) = incoming_connections.next().await {
+                        if let Some(msg) = time::timeout(TIMEOUT, incoming_msgs.next()).await?? {
+                            // the dst location name is updated per sender, so
+                            // we need to update that here before we check
+                            let mut check_msg = msg0.clone();
+                            check_msg.set_dst_xorname(name);
+                            assert_eq!(WireMsg::from(msg)?, check_msg);
+                            msg0_received = true;
+                        }
+
+                        // connection dropped here
+                    }
+                    assert!(msg0_received);
+                }
+
+                let msg1 = new_test_msg()?;
+                let status = send_comm
+                    .send(&[Peer::new(name, recv_addr)], 1, msg1.clone())
+                    .await?;
+                assert_matches!(status, DeliveryStatus::AllRecipients);
+
+                let mut msg1_received = false;
+
+                if let Some((_, mut incoming_msgs)) = incoming_connections.next().await {
+                    if let Some(msg) = time::timeout(TIMEOUT, incoming_msgs.next()).await?? {
+                        // the dst location name is updated per sender, so
+                        // we need to update that here before we check
+                        let mut check_msg = msg1.clone();
+                        check_msg.set_dst_xorname(name);
+                        assert_eq!(WireMsg::from(msg)?, check_msg);
+
+                        msg1_received = true;
+                    }
+                }
+
+                assert!(msg1_received);
+                Result::<()>::Ok(())
+            })
+            .await
+    }
+
+    #[tokio::test]
+    async fn incoming_connection_lost() -> Result<()> {
+        // Construct a local task set that can run `!Send` futures.
+        let local = tokio::task::LocalSet::new();
+
+        // Run the local task set.
+        local
+            .run_until(async move {
+                let (tx, mut rx0) = mpsc::channel(1);
+                let comm0 = Comm::first_node(local_addr(), Config::default(), tx).await?;
+                let addr0 = comm0.our_connection_info();
+
+                let (tx, _rx) = mpsc::channel(1);
+                let comm1 = Comm::first_node(local_addr(), Config::default(), tx).await?;
+
+                // Send a message to establish the connection
+                let status = comm1
+                    .send(
+                        &[Peer::new(xor_name::rand::random(), addr0)],
+                        1,
+                        new_test_msg()?,
+                    )
+                    .await?;
+                assert_matches!(status, DeliveryStatus::AllRecipients);
+
+                assert_matches!(rx0.recv().await, Some(MsgEvent::Received { .. }));
+                // Drop `comm1` to cause connection lost.
+                drop(comm1);
+
+                assert_matches!(time::timeout(TIMEOUT, rx0.recv()).await, Err(_));
+                Result::<()>::Ok(())
+            })
+            .await
     }
 
     fn new_test_msg() -> Result<WireMsg> {
@@ -906,7 +958,7 @@ mod tests {
 
         let (tx, rx) = mpsc::channel(1);
 
-        let _handle = tokio::spawn(async move {
+        let _handle = tokio::task::spawn_local(async move {
             while let Some((_, mut incoming_messages)) = incoming_connections.next().await {
                 while let Ok(Some(msg)) = incoming_messages.next().await {
                     let _ = tx.send(msg).await;
@@ -923,7 +975,7 @@ mod tests {
 
         // Keep the socket alive to keep the address bound, but don't read/write to it so any
         // attempt to connect to it will fail.
-        let _handle = tokio::spawn(async move {
+        let _handle = tokio::task::spawn_local(async move {
             debug!("get invalid peer");
             future::pending::<()>().await;
             let _ = socket;

@@ -213,7 +213,7 @@ mod tests {
         }
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_write_read_async_multiple_chunks() {
         let store = init_chunk_disk_store();
         let size = 100;
@@ -223,7 +223,7 @@ mod tests {
         write_and_read_chunks(&chunks, store).await;
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_write_read_async_multiple_identical_chunks() {
         let store = init_chunk_disk_store();
         let chunks: Vec<Chunk> = std::iter::repeat(Chunk::new(Bytes::from("test_concurrent")))
