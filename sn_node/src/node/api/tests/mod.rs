@@ -14,7 +14,7 @@ use crate::dbs::UsedSpace;
 use crate::node::{
     api::event_channel,
     core::{
-        relocation_check, ChurnId, MsgEvent, Node, Proposal, RESOURCE_PROOF_DATA_SIZE,
+        relocation_check, ChurnId, MsgEvent, Node, Proposal, RateLimits, RESOURCE_PROOF_DATA_SIZE,
         RESOURCE_PROOF_DIFFICULTY,
     },
     create_test_max_capacity_and_root_storage,
@@ -1114,8 +1114,13 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
         let info = gen_info(MIN_ADULT_AGE, None);
         let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
         let (comm_tx, mut comm_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-        let comm =
-            Comm::first_node((Ipv4Addr::LOCALHOST, 0).into(), Default::default(), comm_tx).await?;
+        let comm = Comm::first_node(
+            (Ipv4Addr::LOCALHOST, 0).into(),
+            Default::default(),
+            RateLimits::new(),
+            comm_tx,
+        )
+        .await?;
         let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
 
         let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
@@ -1511,7 +1516,13 @@ fn gen_info(age: u8, prefix: Option<Prefix>) -> NodeInfo {
 
 pub(crate) async fn create_comm() -> Result<Comm> {
     let (tx, _rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-    Ok(Comm::first_node((Ipv4Addr::LOCALHOST, 0).into(), Default::default(), tx).await?)
+    Ok(Comm::first_node(
+        (Ipv4Addr::LOCALHOST, 0).into(),
+        Default::default(),
+        RateLimits::new(),
+        tx,
+    )
+    .await?)
 }
 
 // Generate random SectionAuthorityProvider and the corresponding Nodes.
