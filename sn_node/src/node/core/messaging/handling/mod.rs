@@ -26,7 +26,7 @@ use crate::node::{
     api::cmds::Cmd,
     core::{DkgSessionInfo, Node, Proposal as CoreProposal, DATA_QUERY_LIMIT},
     messages::WireMsgUtils,
-    Error, Event, MessageReceived, Result, MIN_LEVEL_WHEN_FULL,
+    Error, Event, MembershipEvent, Result, MIN_LEVEL_WHEN_FULL,
 };
 
 use sn_interface::{
@@ -164,15 +164,7 @@ impl Node {
                 }
 
                 let handling_msg_cmds = self
-                    .handle_system_msg(
-                        sender,
-                        msg_id,
-                        msg_authority,
-                        dst_location,
-                        msg,
-                        payload,
-                        known_keys,
-                    )
+                    .handle_system_msg(sender, msg_id, msg_authority, msg, payload, known_keys)
                     .await?;
 
                 cmds.extend(handling_msg_cmds);
@@ -262,7 +254,6 @@ impl Node {
         sender: Peer,
         msg_id: MsgId,
         mut msg_authority: NodeMsgAuthority,
-        dst_location: DstLocation,
         msg: SystemMsg,
         payload: Bytes,
         known_keys: Vec<BlsPublicKey>,
@@ -275,7 +266,7 @@ impl Node {
             .await
         {
             Ok(false) => {
-                self.handle_valid_msg(msg_id, msg_authority, dst_location, msg, sender, known_keys)
+                self.handle_valid_msg(msg_id, msg_authority, msg, sender, known_keys)
                     .await
             }
             Err(Error::InvalidSignatureShare) => {
@@ -299,7 +290,6 @@ impl Node {
         &self,
         msg_id: MsgId,
         msg_authority: NodeMsgAuthority,
-        dst_location: DstLocation,
         node_msg: SystemMsg,
         sender: Peer,
         known_keys: Vec<BlsPublicKey>,
@@ -471,10 +461,10 @@ impl Node {
                                 recipients
                             );
 
-                            self.send_event(Event::Relocated {
+                            self.send_event(Event::Membership(MembershipEvent::Relocated {
                                 previous_name,
                                 new_keypair,
-                            })
+                            }))
                             .await;
 
                             trace!("{}", LogMarker::RelocateEnd);
@@ -705,17 +695,6 @@ impl Node {
                 self.get_missing_data_for_node(sender, known_data_addresses)
                     .await
             }
-            SystemMsg::NodeCmd(node_cmd) => {
-                self.send_event(Event::MessageReceived {
-                    msg_id,
-                    src: msg_authority.src_location(),
-                    dst: dst_location,
-                    msg: Box::new(MessageReceived::NodeCmd(node_cmd)),
-                })
-                .await;
-
-                Ok(vec![])
-            }
             SystemMsg::NodeQuery(node_query) => {
                 match node_query {
                     // A request from EndUser - via elders - for locally stored data
@@ -736,16 +715,6 @@ impl Node {
                             sender_xorname,
                         )
                         .await
-                    }
-                    _ => {
-                        self.send_event(Event::MessageReceived {
-                            msg_id,
-                            src: msg_authority.src_location(),
-                            dst: dst_location,
-                            msg: Box::new(MessageReceived::NodeQuery(node_query)),
-                        })
-                        .await;
-                        Ok(vec![])
                     }
                 }
             }

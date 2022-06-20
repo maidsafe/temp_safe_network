@@ -30,8 +30,11 @@ pub(crate) use relocation::{check as relocation_check, ChurnId};
 use self::{data::Capacity, split_barrier::SplitBarrier};
 
 use super::{
-    api::cmds::Cmd, dkg::DkgVoter, handover::Handover, membership::Membership, Elders, Event,
-    NodeElderChange,
+    api::{cmds::Cmd, event_channel::EventSender},
+    dkg::DkgVoter,
+    handover::Handover,
+    membership::Membership,
+    Elders, Event, MembershipEvent, NodeElderChange,
 };
 
 use crate::node::{
@@ -66,7 +69,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::RwLock;
 use uluru::LRUCache;
 use xor_name::{Prefix, XorName};
 
@@ -102,7 +105,7 @@ pub(crate) type AeBackoffCache =
 
 // Core state + logic of a node.
 pub(crate) struct Node {
-    pub(super) event_tx: mpsc::Sender<Event>,
+    pub(super) event_sender: EventSender,
     pub(crate) info: Arc<RwLock<NodeInfo>>,
 
     pub(crate) comm: Comm,
@@ -142,7 +145,7 @@ impl Node {
         mut info: NodeInfo,
         network_knowledge: NetworkKnowledge,
         section_key_share: Option<SectionKeyShare>,
-        event_tx: mpsc::Sender<Event>,
+        event_sender: EventSender,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
     ) -> Result<Self> {
@@ -215,7 +218,7 @@ impl Node {
             message_aggregator: SignatureAggregator::default(),
             dkg_voter: DkgVoter::default(),
             relocate_state: Arc::new(RwLock::new(None)),
-            event_tx,
+            event_sender,
             handover_voting: Arc::new(RwLock::new(handover)),
             joins_allowed: Arc::new(RwLock::new(true)),
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
@@ -624,10 +627,10 @@ impl Node {
                 )
                 .await?;
 
-                Event::SectionSplit {
+                Event::Membership(MembershipEvent::SectionSplit {
                     elders,
                     self_status_change,
-                }
+                })
             } else {
                 cmds.extend(
                     self.send_metadata_updates_to_nodes(
@@ -641,10 +644,10 @@ impl Node {
                     .await?,
                 );
 
-                Event::EldersChanged {
+                Event::Membership(MembershipEvent::EldersChanged {
                     elders,
                     self_status_change,
-                }
+                })
             };
 
             cmds.extend(

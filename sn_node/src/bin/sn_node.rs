@@ -33,7 +33,8 @@ use eyre::{eyre, Context, ErrReport, Result};
 #[cfg(not(feature = "tokio-console"))]
 use sn_interface::LogFormatter;
 use sn_node::node::{
-    add_connection_info, set_connection_info, Config, Error as NodeError, Event, NodeApi,
+    add_connection_info, set_connection_info, Config, Error as NodeError, Event, MembershipEvent,
+    NodeApi,
 };
 
 use color_eyre::{Section, SectionExt};
@@ -411,8 +412,8 @@ async fn run_node(config: Config) -> Result<()> {
 
     // This just keeps the node going as long as routing goes
     while let Some(event) = event_stream.next().await {
-        trace!("Routing event! {:?}", event);
-        if let Event::ChurnJoinMissError = event {
+        trace!("Node event! {:?}", event);
+        if let Event::Membership(MembershipEvent::ChurnJoinMissError) = event {
             return Err(NodeError::ChurnJoinMiss).map_err(ErrReport::msg);
         }
     }
