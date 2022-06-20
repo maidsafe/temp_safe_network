@@ -23,7 +23,7 @@ use self::{
 
 use crate::node::{
     cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
-    core::{join_network, Comm, MsgEvent, Node},
+    core::{join_network, Comm, MsgEvent, Node, RateLimits},
     error::{Error, Result},
     logging::{log_ctx::LogCtx, run_system_logger},
     messages::WireMsgUtils,
@@ -136,6 +136,7 @@ impl NodeApi {
             .local_addr
             .unwrap_or_else(|| SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)));
 
+        let monitoring = RateLimits::new();
         let (event_sender, event_receiver) = event_channel::new(EVENT_CHANNEL_SIZE);
 
         let node = if config.is_first() {
@@ -152,6 +153,7 @@ impl NodeApi {
             let comm = Comm::first_node(
                 local_addr,
                 config.network_config().clone(),
+                monitoring.clone(),
                 connection_event_tx,
             )
             .await?;
@@ -219,6 +221,7 @@ impl NodeApi {
                     .collect_vec()
                     .as_slice(),
                 config.network_config().clone(),
+                monitoring.clone(),
                 connection_event_tx,
             )
             .await?;
