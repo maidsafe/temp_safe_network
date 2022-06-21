@@ -168,7 +168,7 @@ pub async fn process_get_command(
                         );
 
                         warn!("Skipping file \"{}\". {}", status.path_local.display(), msg);
-                        if isatty::stderr_isatty() {
+                        if atty::is(atty::Stream::Stderr) {
                             eprintln!("Warning: {}", msg);
                         }
                         overwrite = false;
