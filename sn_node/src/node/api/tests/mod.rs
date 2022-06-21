@@ -12,13 +12,14 @@ use super::{Cmd, Comm, Dispatcher};
 
 use crate::dbs::UsedSpace;
 use crate::node::{
+    api::event_channel,
     core::{
         relocation_check, ChurnId, MsgEvent, Node, Proposal, RESOURCE_PROOF_DATA_SIZE,
         RESOURCE_PROOF_DIFFICULTY,
     },
     create_test_max_capacity_and_root_storage,
     messages::WireMsgUtils,
-    Error, Event, Result as RoutingResult,
+    Error, Event, MembershipEvent, Result as RoutingResult,
 };
 
 use sn_interface::{
@@ -86,7 +87,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
                 node,
                 section,
                 Some(section_key_share),
-                mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+                event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
                 UsedSpace::new(max_capacity),
                 root_storage_dir,
             )
@@ -174,7 +175,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
                 node,
                 section,
                 Some(section_key_share),
-                mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+                event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
                 UsedSpace::new(max_capacity),
                 root_storage_dir,
             )
@@ -271,7 +272,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
                 node,
                 section,
                 Some(section_key_share),
-                mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+                event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
                 UsedSpace::new(max_capacity),
                 root_storage_dir,
             )
@@ -341,7 +342,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 
 #[tokio::test]
 async fn handle_agreement_on_online() -> Result<()> {
-    let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+    let (event_sender, mut event_receiver) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
 
     // Construct a local task set that can run `!Send` futures.
     let local = tokio::task::LocalSet::new();
@@ -361,7 +362,7 @@ async fn handle_agreement_on_online() -> Result<()> {
                 node,
                 section,
                 Some(section_key_share),
-                event_tx,
+                event_sender,
                 UsedSpace::new(max_capacity),
                 root_storage_dir,
             )
@@ -373,7 +374,7 @@ async fn handle_agreement_on_online() -> Result<()> {
             let status = handle_online_cmd(&new_peer, &sk_set, &dispatcher, &section_auth).await?;
             assert!(status.node_approval_sent);
 
-            assert_matches!(event_rx.recv().await, Some(Event::MemberJoined { name, age, .. }) => {
+            assert_matches!(event_receiver.next().await, Some(Event::Membership(MembershipEvent::MemberJoined { name, age, .. })) => {
                 assert_eq!(name, new_peer.name());
                 assert_eq!(age, MIN_ADULT_AGE);
             });
@@ -436,7 +437,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 node,
                 section,
                 Some(section_key_share),
-                mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+                event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
                 UsedSpace::new(max_capacity),
                 root_storage_dir,
             )
@@ -604,7 +605,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
             let _updated = section.update_member(node_state).await;
 
             // Make a Node
-            let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+            let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
             let info = node_infos.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let node = Node::new(
@@ -612,7 +613,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
                 info,
                 section,
                 Some(section_key_share),
-                event_tx,
+                event_sender,
                 UsedSpace::new(max_capacity),
                 root_storage_dir,
             )
@@ -680,7 +681,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
             let node_state = section_signed(sk_set.secret_key(), node_state)?;
             let _updated = section.update_member(node_state).await;
 
-            let (event_tx, _event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+            let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let node = Node::new(
@@ -688,7 +689,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
                 node,
                 section,
                 Some(section_key_share),
-                event_tx,
+                event_sender,
                 UsedSpace::new(max_capacity),
                 root_storage_dir,
             )
@@ -742,7 +743,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
                 .leave()?;
 
             // Create our node
-            let (event_tx, _event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+            let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let node = nodes.remove(0);
             let node = Node::new(
@@ -750,7 +751,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
                 node,
                 section,
                 Some(section_key_share),
-                event_tx,
+                event_sender,
                 UsedSpace::new(max_capacity),
                 root_storage_dir,
             )
@@ -816,7 +817,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                 NetworkKnowledge::new(pk0, chain.clone(), signed_old_sap, None)?;
 
             // Create our node
-            let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+            let (event_sender, mut event_receiver) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
             let section_key_share = create_section_key_share(&sk_set1, 0);
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
@@ -825,7 +826,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                 node,
                 network_knowledge,
                 Some(section_key_share),
-                event_tx,
+                event_sender,
                 UsedSpace::new(max_capacity),
                 root_storage_dir,
             )
@@ -896,8 +897,8 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
             // Verify our `Section` got updated.
             assert_matches!(
-                event_rx.recv().await,
-                Some(Event::EldersChanged { elders, .. }) => {
+                event_receiver.next().await,
+                Some(Event::Membership(MembershipEvent::EldersChanged { elders, .. })) => {
                     assert_eq!(elders.key, pk2);
                     assert!(elders.added.iter().all(|a| new_section_elders.contains(a)));
                     assert!(elders.remaining.iter().all(|a| new_section_elders.contains(a)));
@@ -942,7 +943,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
                 members: BTreeSet::default(),
             };
 
-            let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+            let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
             let info = gen_info(MIN_ADULT_AGE, None);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let node = Node::new(
@@ -950,7 +951,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
                 info,
                 our_section.clone(),
                 None,
-                event_tx,
+                event_sender,
                 UsedSpace::new(max_capacity),
                 root_storage_dir,
             )
@@ -1042,7 +1043,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             node,
             section,
             Some(section_key_share),
-            mpsc::channel(TEST_EVENT_CHANNEL_SIZE).0,
+            event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
             UsedSpace::new(max_capacity),
             root_storage_dir,
         )
@@ -1110,71 +1111,69 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
 
     // Run the local task set.
     local.run_until(async move {
+        let info = gen_info(MIN_ADULT_AGE, None);
+        let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
+        let (comm_tx, mut comm_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+        let comm =
+            Comm::first_node((Ipv4Addr::LOCALHOST, 0).into(), Default::default(), comm_tx).await?;
+        let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
 
+        let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
+        let node = Node::first_node(
+            comm,
+            info,
+            event_sender,
+            UsedSpace::new(max_capacity),
+            root_storage_dir,
+            genesis_sk_set,
+        )
+        .await?;
+        let info = node.info.read().await.clone();
+        let section_pk = node.network_knowledge().section_key().await;
+        let dispatcher = Dispatcher::new(node);
 
-               let info = gen_info(MIN_ADULT_AGE, None);
-               let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-               let (comm_tx, mut comm_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
-               let comm =
-                   Comm::first_node((Ipv4Addr::LOCALHOST, 0).into(), Default::default(), comm_tx).await?;
-               let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
+        let dst_location = match dst {
+            MessageDst::Node => DstLocation::Node {
+                name: info.name(),
+                section_pk,
+            },
+            MessageDst::Section => DstLocation::Section {
+                name: info.name(),
+                section_pk,
+            },
+        };
 
-               let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
-               let node = Node::first_node(
-                   comm,
-                   info,
-                   event_tx,
-                   UsedSpace::new(max_capacity),
-                   root_storage_dir,
-                   genesis_sk_set,
-               )
-               .await?;
-               let info = node.info.read().await.clone();
-               let section_pk = node.network_knowledge().section_key().await;
-               let dispatcher = Dispatcher::new(node);
+        let node_msg = SystemMsg::NodeMsgError {
+            error: sn_interface::messaging::data::Error::FailedToWriteFile,
+            correlation_id: MsgId::new(),
+        };
+        let wire_msg = WireMsg::single_src(&info, dst_location, node_msg.clone(), section_pk)?;
 
-               let dst_location = match dst {
-                   MessageDst::Node => DstLocation::Node {
-                       name: info.name(),
-                       section_pk,
-                   },
-                   MessageDst::Section => DstLocation::Section {
-                       name: info.name(),
-                       section_pk,
-                   },
-               };
+        let cmds = dispatcher
+            .process_cmd(
+                Cmd::SendMsg {
+                    recipients: vec![info.peer()],
+                    wire_msg,
+                },
+                "cmd-id",
+            )
+            .await?;
 
-               let node_msg = SystemMsg::NodeMsgError {
-                   error: sn_interface::messaging::data::Error::FailedToWriteFile,
-                   correlation_id: MsgId::new(),
-               };
-               let wire_msg = WireMsg::single_src(&info, dst_location, node_msg.clone(), section_pk)?;
+        assert!(cmds.is_empty());
 
-               let cmds = dispatcher
-                   .process_cmd(
-                       Cmd::SendMsg {
-                           recipients: vec![info.peer()],
-                           wire_msg,
-                       },
-                       "cmd-id",
-                   )
-                   .await?;
+        let msg_type = assert_matches!(comm_rx.recv().await, Some(MsgEvent::Received { sender, wire_msg, .. }) => {
+            assert_eq!(sender.addr(), info.addr);
+            assert_matches!(wire_msg.into_msg(), Ok(msg_type) => msg_type)
+        });
 
-               assert!(cmds.is_empty());
-
-               let msg_type = assert_matches!(comm_rx.recv().await, Some(MsgEvent::Received { sender, wire_msg, .. }) => {
-                   assert_eq!(sender.addr(), info.addr);
-                   assert_matches!(wire_msg.into_msg(), Ok(msg_type) => msg_type)
-               });
-
-               assert_matches!(msg_type, MsgType::System { msg, dst_location: dst, .. } => {
-                   assert_eq!(dst, dst_location);
-                   assert_eq!(
-                       msg,
-                       node_msg
-                   );
-               });
-       Result::<()>::Ok(())
+        assert_matches!(msg_type, MsgType::System { msg, dst_location: dst, .. } => {
+            assert_eq!(dst, dst_location);
+            assert_eq!(
+                msg,
+                node_msg
+            );
+        });
+        Result::<()>::Ok(())
    }).await
 }
 
@@ -1248,14 +1247,14 @@ async fn handle_elders_update() -> Result<()> {
             public_key: pk0,
         };
 
-        let (event_tx, mut event_rx) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+        let (event_sender, mut event_receiver) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
         let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
         let node = Node::new(
             create_comm().await?,
             info,
             section0.clone(),
             Some(section_key_share),
-            event_tx,
+            event_sender,
             UsedSpace::new(max_capacity),
             root_storage_dir,
         )
@@ -1316,8 +1315,8 @@ async fn handle_elders_update() -> Result<()> {
         assert_eq!(update_actual_recipients, update_expected_recipients);
 
         assert_matches!(
-            event_rx.recv().await,
-            Some(Event::EldersChanged { elders, .. }) => {
+            event_receiver.next().await,
+            Some(Event::Membership(MembershipEvent::EldersChanged { elders, .. })) => {
                 assert_eq!(elders.key, pk1);
                 assert_eq!(elder_names1, elders.added.union(&elders.remaining).copied().collect());
                 assert!(elders.removed.iter().all(|r| !elder_names1.contains(r)));
@@ -1390,14 +1389,14 @@ async fn handle_demote_during_split() -> Result<()> {
             }
 
             // we make a new full node from info, to see what it does
-            let (event_tx, _) = mpsc::channel(TEST_EVENT_CHANNEL_SIZE);
+            let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let node = Node::new(
                 create_comm().await?,
                 info,
                 section,
                 Some(section_key_share),
-                event_tx,
+                event_sender,
                 UsedSpace::new(max_capacity),
                 root_storage_dir,
             )

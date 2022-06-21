@@ -24,8 +24,8 @@ mod messages;
 
 pub use self::{
     api::{
-        event::{Elders, Event, MessageReceived, NodeElderChange},
-        event_stream::EventStream,
+        event::{Elders, Event, MembershipEvent, MessagingEvent, NodeElderChange},
+        event_channel::EventReceiver,
         NodeApi,
     },
     cfg::config_handler::{add_connection_info, set_connection_info, Config},

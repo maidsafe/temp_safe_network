@@ -12,13 +12,13 @@ pub(crate) mod tests;
 
 pub(super) mod dispatcher;
 pub(super) mod event;
-pub(super) mod event_stream;
+pub(super) mod event_channel;
 
 use self::{
     cmds::Cmd,
     dispatcher::Dispatcher,
-    event::{Elders, Event, NodeElderChange},
-    event_stream::EventStream,
+    event::{Elders, Event, MembershipEvent, NodeElderChange},
+    event_channel::EventReceiver,
 };
 
 use crate::node::{
@@ -71,7 +71,7 @@ impl NodeApi {
     ////////////////////////////////////////////////////////////////////////////
 
     /// Initialize a new node.
-    pub async fn new(config: &Config, joining_timeout: Duration) -> Result<(Self, EventStream)> {
+    pub async fn new(config: &Config, joining_timeout: Duration) -> Result<(Self, EventReceiver)> {
         let root_dir_buf = config.root_dir()?;
         let root_dir = root_dir_buf.as_path();
         tokio::fs::create_dir_all(root_dir).await?;
@@ -129,13 +129,14 @@ impl NodeApi {
         config: &Config,
         used_space: UsedSpace,
         root_storage_dir: &Path,
-    ) -> Result<(Self, EventStream)> {
-        let (event_tx, event_rx) = mpsc::channel(EVENT_CHANNEL_SIZE);
+    ) -> Result<(Self, EventReceiver)> {
         let (connection_event_tx, mut connection_event_rx) = mpsc::channel(1);
 
         let local_addr = config
             .local_addr
             .unwrap_or_else(|| SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)));
+
+        let (event_sender, event_receiver) = event_channel::new(EVENT_CHANNEL_SIZE);
 
         let node = if config.is_first() {
             // Genesis node having a fix age of 255.
@@ -160,7 +161,7 @@ impl NodeApi {
             let node = Node::first_node(
                 comm,
                 info,
-                event_tx,
+                event_sender.clone(),
                 used_space.clone(),
                 root_storage_dir.to_path_buf(),
                 genesis_sk_set,
@@ -178,10 +179,10 @@ impl NodeApi {
             };
 
             info!("{}", LogMarker::PromotedToElder);
-            node.send_event(Event::EldersChanged {
+            node.send_event(Event::Membership(MembershipEvent::EldersChanged {
                 elders,
                 self_status_change: NodeElderChange::Promoted,
-            })
+            }))
             .await;
 
             let genesis_key = network_knowledge.genesis_key();
@@ -245,7 +246,7 @@ impl NodeApi {
                 info,
                 network_knowledge,
                 None,
-                event_tx,
+                event_sender.clone(),
                 used_space.clone(),
                 root_storage_dir.to_path_buf(),
             )
@@ -257,7 +258,6 @@ impl NodeApi {
         };
 
         let dispatcher = Arc::new(Dispatcher::new(node));
-        let event_stream = EventStream::new(event_rx);
 
         // Start listening to incoming connections.
         let _handle = task::spawn_local(handle_connection_events(
@@ -284,7 +284,7 @@ impl NodeApi {
 
         let api = Self { dispatcher };
 
-        Ok((api, event_stream))
+        Ok((api, event_receiver))
     }
 
     /// Returns the current age of this node.
