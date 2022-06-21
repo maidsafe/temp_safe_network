@@ -27,3 +27,4 @@ sn_interface = { path = "../sn_interface", version = "^0.6.4" }
 proptest = "~1.0.0"
 tokio = { version = "1.17.0", features = [ "macros", "rt-multi-thread", "sync" ] }
 tracing-subscriber = { version = "0.3.1", features = ["env-filter", "json"] }
+itertools = "~0.10.0"
