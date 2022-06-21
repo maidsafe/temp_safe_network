@@ -233,7 +233,7 @@ pub fn pluralize<'a>(singular: &'a str, plural: &'a str, count: u64) -> &'a str 
 // if stdout is a TTY, then it returns a string with ansi codes according to
 // style.  Otherwise, it returns the original string.
 pub fn if_tty(s: &str, style: Style) -> String {
-    if isatty::stdout_isatty() {
+    if atty::is(atty::Stream::Stdout) {
         style.paint(s).to_string()
     } else {
         s.to_string()

@@ -28,7 +28,7 @@ dirs-next = "2.0.0"
 ed25519-dalek = { version = "1.0.1", features = ["serde"] }
 hex = "~0.4"
 human-panic = "1.0.3"
-isatty = "~0.1"
+atty = "~0.2.14"
 num-traits = "~0.2"
 percent-encoding = "2.1.0"
 pretty-hex = "~0.2"

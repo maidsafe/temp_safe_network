@@ -196,8 +196,7 @@ impl Comm {
 
         let msg_id = wire_msg.msg_id();
 
-        // TODO: rework priority so this we dont need to deserialise payload to determine priority.
-        let priority = wire_msg.into_msg()?.priority();
+        let priority = wire_msg.priority();
 
         let (_, result) = self.send_to_one(*recipient, wire_msg, priority).await;
 
@@ -325,7 +324,7 @@ impl Comm {
             return Err(Error::EmptyRecipientList);
         }
 
-        let priority = wire_msg.clone().into_msg()?.priority();
+        let priority = wire_msg.priority();
 
         // Run all the sends concurrently (using `FuturesUnordered`). If any of them fails, pick
         // the next recipient and try to send to them. Proceed until the needed number of sends
