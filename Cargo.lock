@@ -3372,7 +3372,7 @@ checksum = "f2dd574626839106c320a323308629dcb1acfc96e32a8cba364ddc61ac23ee83"
 
 [[package]]
 name = "sn_api"
-version = "0.64.3"
+version = "0.64.4"
 dependencies = [
  "anyhow",
  "assert_fs",
@@ -3470,7 +3470,7 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.66.3"
+version = "0.66.4"
 dependencies = [
  "backoff 0.4.0",
  "base64",
@@ -3579,7 +3579,7 @@ dependencies = [
 
 [[package]]
 name = "sn_dysfunction"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "dashmap",
  "eyre",
@@ -3595,7 +3595,7 @@ dependencies = [
 
 [[package]]
 name = "sn_interface"
-version = "0.6.3"
+version = "0.6.4"
 dependencies = [
  "backoff 0.4.0",
  "base64",
@@ -3667,7 +3667,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.62.6"
+version = "0.62.7"
 dependencies = [
  "assert_matches",
  "backoff 0.4.0",

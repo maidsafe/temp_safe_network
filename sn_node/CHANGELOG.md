@@ -5,19 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.62.6 (2022-06-18)
+## v0.62.7 (2022-06-21)
 
 ### Chore
 
- - <csr-id-e4b43ce9a8655cc8deea8d459ac0a0755d9153c1/> reorder nodeacceptance cmds to inform node first of all
+ - <csr-id-fd7f845f7d1534cf9ff93ee9dc9f3009ab7e5664/> make NetworkKnowledge single threaded
+ - <csr-id-c038635cf88d32c52da89d11a8532e6c91c8bf38/> misc cleanup
+
+### New Features
+
+ - <csr-id-a68caa7bb6e998b52f052e322f4485c4b836939c/> change to single threaded runtime by default
+
+### Bug Fixes
+
+ - <csr-id-d5c65440b2152cf570a2014eee102b353678af00/> routing_stress example compiles once more
+
+### Other
+
+ - <csr-id-d8730f1bbd276b0686c68b00714c54ed86b7241a/> add LocalSet to node test runs
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 1 day passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 5 commits contributed to the release.
+ - 2 days passed between releases.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -27,6 +40,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - routing_stress example compiles once more ([`d5c6544`](https://github.com/maidsafe/safe_network/commit/d5c65440b2152cf570a2014eee102b353678af00))
+    - add LocalSet to node test runs ([`d8730f1`](https://github.com/maidsafe/safe_network/commit/d8730f1bbd276b0686c68b00714c54ed86b7241a))
+    - make NetworkKnowledge single threaded ([`fd7f845`](https://github.com/maidsafe/safe_network/commit/fd7f845f7d1534cf9ff93ee9dc9f3009ab7e5664))
+    - change to single threaded runtime by default ([`a68caa7`](https://github.com/maidsafe/safe_network/commit/a68caa7bb6e998b52f052e322f4485c4b836939c))
+    - misc cleanup ([`c038635`](https://github.com/maidsafe/safe_network/commit/c038635cf88d32c52da89d11a8532e6c91c8bf38))
+</details>
+
+## v0.62.6 (2022-06-18)
+
+<csr-id-e4b43ce9a8655cc8deea8d459ac0a0755d9153c1/>
+
+### Chore
+
+ - <csr-id-e4b43ce9a8655cc8deea8d459ac0a0755d9153c1/> reorder nodeacceptance cmds to inform node first of all
+
+### Chore
+
+ - <csr-id-eda5d22e57779a7d1ecab1707f01bccd5f94706d/> sn_node-0.62.6/sn_cli-0.57.5
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 2 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.62.6/sn_cli-0.57.5 ([`eda5d22`](https://github.com/maidsafe/safe_network/commit/eda5d22e57779a7d1ecab1707f01bccd5f94706d))
     - reorder nodeacceptance cmds to inform node first of all ([`e4b43ce`](https://github.com/maidsafe/safe_network/commit/e4b43ce9a8655cc8deea8d459ac0a0755d9153c1))
 </details>
 
@@ -39,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-e195c2504bee67fdc1ebbbbef9b3b4428ee8a32d/>
 <csr-id-ef5cb8c050cec82d215dcf98aeb0dc237cf1b574/>
 <csr-id-3a6d83bd9d406b824b538ee7de7da95119f536da/>
+<csr-id-9679f0cde6f4e5a2b1fbf2fded954f17b243e518/>
 
 ### Chore
 

@@ -5,24 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.5.1 (2022-06-15)
+## v0.5.2 (2022-06-21)
 
 ### Chore
 
- - <csr-id-26e35cc2d1c5aab81c3479dd7948f7a7e586f817/> adjust some dysfunction weighting. decreas dkg
- - <csr-id-537b6c08447c15a056d8c79c8592106d9a40b672/> reduce comm error weighting
-
-### New Features
-
- - <csr-id-7ccb02a7ded7579bb8645c918b9a6108b1b585af/> enable tracking of Dkg issues
+ - <csr-id-c038635cf88d32c52da89d11a8532e6c91c8bf38/> misc cleanup
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release over the course of 9 calendar days.
- - 10 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 5 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -32,6 +27,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - misc cleanup ([`c038635`](https://github.com/maidsafe/safe_network/commit/c038635cf88d32c52da89d11a8532e6c91c8bf38))
+</details>
+
+## v0.5.1 (2022-06-15)
+
+<csr-id-26e35cc2d1c5aab81c3479dd7948f7a7e586f817/>
+<csr-id-537b6c08447c15a056d8c79c8592106d9a40b672/>
+
+### Chore
+
+ - <csr-id-26e35cc2d1c5aab81c3479dd7948f7a7e586f817/> adjust some dysfunction weighting. decreas dkg
+ - <csr-id-537b6c08447c15a056d8c79c8592106d9a40b672/> reduce comm error weighting
+
+### Chore
+
+ - <csr-id-f599c5973d50324aad1720166156666d5db1ed3d/> sn_interface-0.6.3/sn_dysfunction-0.5.1/sn_client-0.66.3/sn_api-0.64.3/sn_cli-0.57.4
+
+### New Features
+
+ - <csr-id-7ccb02a7ded7579bb8645c918b9a6108b1b585af/> enable tracking of Dkg issues
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 5 commits contributed to the release over the course of 9 calendar days.
+ - 10 days passed between releases.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.6.3/sn_dysfunction-0.5.1/sn_client-0.66.3/sn_api-0.64.3/sn_cli-0.57.4 ([`f599c59`](https://github.com/maidsafe/safe_network/commit/f599c5973d50324aad1720166156666d5db1ed3d))
     - adjust some dysfunction weighting. decreas dkg ([`26e35cc`](https://github.com/maidsafe/safe_network/commit/26e35cc2d1c5aab81c3479dd7948f7a7e586f817))
     - reduce comm error weighting ([`537b6c0`](https://github.com/maidsafe/safe_network/commit/537b6c08447c15a056d8c79c8592106d9a40b672))
     - enable tracking of Dkg issues ([`7ccb02a`](https://github.com/maidsafe/safe_network/commit/7ccb02a7ded7579bb8645c918b9a6108b1b585af))
@@ -39,6 +72,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.5.0 (2022-06-05)
+
+<csr-id-1bf7dfb3ce8b14cbed7a4a8ed98c8310653a2da9/>
 
 ### Chore
 
