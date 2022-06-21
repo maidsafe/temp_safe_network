@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1655720093332,
+  "lastUpdate": 1655802981893,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -5339,6 +5339,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 8263316830,
             "range": "± 1958286212",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "cff8b337be20f3e1c0cddc5464c2eee0c8cc9e1c",
+          "message": "Merge #1256\n\n1256: refactor(events): cleanup and restructure of enum r=joshuef a=oetyng\n\n - Initiates the use of the node event channel for more structured\r\nlogging.\r\nBREAKING CHANGE: events renamed and restructured\n\nCo-authored-by: oetyng <oetyng@gmail.com>\nCo-authored-by: joshuef <joshuef@gmail.com>",
+          "timestamp": "2022-06-21T07:26:27Z",
+          "tree_id": "a14084ec411025b82d251988bdebcc649b37703f",
+          "url": "https://github.com/maidsafe/safe_network/commit/cff8b337be20f3e1c0cddc5464c2eee0c8cc9e1c"
+        },
+        "date": 1655802981093,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 6448838898,
+            "range": "± 4152237",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 6768071655,
+            "range": "± 73941548",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 12185008952,
+            "range": "± 1445475729",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 6033727951,
+            "range": "± 154873893",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 6227621271,
+            "range": "± 40273172",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 8648234143,
+            "range": "± 158106548",
             "unit": "ns/iter"
           }
         ]
