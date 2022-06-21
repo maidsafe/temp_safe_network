@@ -3559,6 +3559,7 @@ version = "0.5.2"
 dependencies = [
  "dashmap",
  "eyre",
+ "itertools 0.10.3",
  "proptest",
  "rand 0.8.5",
  "sn_interface",
