@@ -26,20 +26,16 @@ pub async fn compare_and_write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap)
 
     // Check if the prefixMap is already present and is latest to the provided Map.
     let disk_map = read_prefix_map_from_disk().await;
-    let mut update_default: bool = false;
     if let Ok(old_map) = disk_map {
-        // if symlink points to a different PrefixMap
+        // if hardlink points to a different PrefixMap1
         if old_map.genesis_key() != prefix_map.genesis_key() {
-            update_default = true;
+            warn!("Genesis key mismatch while updating prefix map");
         }
         // Return early as the PrefixMap in disk is the equivalent/latest already
         else if &old_map >= prefix_map {
             info!("Equivalent/Latest PrefixMap already in disk");
             return Ok(());
         }
-    } else {
-        // if symlink is not present
-        update_default = true;
     }
 
     trace!("Writing prefix_map to disk at {:?}", prefix_map_file);
@@ -58,9 +54,7 @@ pub async fn compare_and_write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap)
         .await
         .map_err(|e| Error::FileHandling(e.to_string()))?;
 
-    if update_default {
-        set_default_prefix_map(&prefix_map.genesis_key()).await?;
-    }
+    set_default_prefix_map(&prefix_map.genesis_key()).await?;
 
     Ok(())
 }

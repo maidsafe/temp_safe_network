@@ -3435,7 +3435,7 @@ dependencies = [
  "sn_api",
  "sn_cmd_test_utilities",
  "sn_dbc",
- "sn_launch_tool 0.9.9",
+ "sn_launch_tool",
  "structopt",
  "tokio",
  "tracing",
@@ -3488,7 +3488,7 @@ dependencies = [
  "signature",
  "sn_dbc",
  "sn_interface",
- "sn_launch_tool 0.9.8",
+ "sn_launch_tool",
  "structopt",
  "strum",
  "strum_macros",
@@ -3626,19 +3626,6 @@ dependencies = [
  "uluru",
  "url",
  "xor_name",
-]
-
-[[package]]
-name = "sn_launch_tool"
-version = "0.9.8"
-source = "git+https://github.com/RolandSherwin/sn_launch_tool?branch=prefix_map#bb1868b9a1e0e1f8187147d7592bd2a67c2a58c7"
-dependencies = [
- "color-eyre",
- "dirs-next 1.0.2",
- "eyre",
- "structopt",
- "tracing",
- "tracing-subscriber 0.3.11",
 ]
 
 [[package]]
@@ -3919,7 +3906,7 @@ dependencies = [
  "console-subscriber",
  "dirs-next 2.0.0",
  "eyre",
- "sn_launch_tool 0.9.8",
+ "sn_launch_tool",
  "structopt",
  "tokio",
  "tracing",

@@ -184,7 +184,6 @@ async fn get_config() -> Result<Config> {
     let mut prefix_maps_path = config_path;
     prefix_maps_path.push("prefix_maps");
     let prefix_maps_path_string = prefix_maps_path.as_path().display().to_string();
-    dbg!(&prefix_maps_path_string);
     env::set_var(SN_PREFIX_MAP_DIR, prefix_maps_path_string);
     let mut config = Config::new(cli_config_path, prefix_maps_path).await?;
     config.sync().await?;
