@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1655802981893,
+  "lastUpdate": 1655819830400,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -5399,6 +5399,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 8648234143,
             "range": "± 158106548",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "ed0b5d890e8404a59c25f8131eab5d23ce12eb7d",
+          "message": "Merge #1255 #1258\n\n1255: refactor: improve efficiency of load monitoring r=joshuef a=oetyng\n\nRefactors load monitoring so that it is more efficiently used, and\r\nfor both outgoing msgs and (in coming commit) cmds.\n\n1258: ci: remove register data_storage benchmark for now as sled db keeps e… r=joshuef a=joshuef\n\n…rroring\r\n\r\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\n\nCo-authored-by: oetyng <oetyng@gmail.com>\nCo-authored-by: Josh Wilson <joshuef@gmail.com>",
+          "timestamp": "2022-06-21T12:14:38Z",
+          "tree_id": "90fab8af9d8e313357083fd04be88bc9238a91ab",
+          "url": "https://github.com/maidsafe/safe_network/commit/ed0b5d890e8404a59c25f8131eab5d23ce12eb7d"
+        },
+        "date": 1655819828961,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 6447629339,
+            "range": "± 159703663",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 6790362976,
+            "range": "± 651310103",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 12314213220,
+            "range": "± 379556423",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 6036152959,
+            "range": "± 6356812",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 6215394716,
+            "range": "± 29385243",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 8603512976,
+            "range": "± 243124246",
             "unit": "ns/iter"
           }
         ]
