@@ -35,6 +35,8 @@ mod errors;
 mod location;
 // Message ID definition
 mod msg_id;
+// Message types
+mod msg_type;
 // Types of messages and corresponding source authorities
 mod auth_kind;
 // SectionAuthorityProvider
@@ -48,6 +50,7 @@ pub use self::{
     errors::{Error, Result},
     location::{DstLocation, EndUser, SrcLocation},
     msg_id::{MsgId, MESSAGE_ID_LEN},
+    msg_type::MsgType,
     sap::SectionAuthorityProvider,
-    serialisation::{MsgType, NodeMsgAuthority, WireMsg},
+    serialisation::{NodeMsgAuthority, WireMsg},
 };

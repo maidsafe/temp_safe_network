@@ -14,7 +14,6 @@ mod node_msgs;
 mod node_state;
 mod signed;
 
-use crate::network_knowledge::SapCandidate;
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SectionAuth};
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
@@ -22,12 +21,14 @@ pub use msg_authority::NodeMsgAuthorityUtils;
 pub use node_msgs::{NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse};
 pub use node_state::{MembershipState, NodeState, RelocateDetails};
 pub use signed::{KeyedSig, SigShare};
-use sn_consensus::{Generation, SignedVote};
 
-/// List of peers of a section
-pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
+use super::{authority::SectionAuth as SectionAuthProof, AuthorityProof};
 
 use crate::messaging::{EndUser, MsgId, SectionAuthorityProvider};
+use crate::network_knowledge::SapCandidate;
+
+use sn_consensus::{Generation, SignedVote};
+
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;
@@ -35,8 +36,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
-use super::authority::SectionAuth as SectionAuthProof;
-use super::AuthorityProof;
+/// List of peers of a section
+pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -202,4 +203,62 @@ pub enum SystemMsg {
         /// TEMP: Add user here as part of return flow. Remove this as we have chunk routing etc
         user: EndUser,
     },
+}
+
+impl SystemMsg {
+    /// The priority of the message, when handled by lower level comms.
+    pub fn priority(&self) -> i32 {
+        #[cfg(feature = "back-pressure")]
+        use super::msg_type::BACKPRESSURE_MSG_PRIORITY;
+        use super::msg_type::{
+            ANTIENTROPY_MSG_PRIORITY, DKG_MSG_PRIORITY, JOIN_RELOCATE_MSG_PRIORITY,
+            JOIN_RESPONSE_PRIORITY, NODE_DATA_MSG_PRIORITY,
+        };
+        match self {
+            // DKG messages
+            SystemMsg::DkgStart { .. }
+            | SystemMsg::DkgSessionUnknown { .. }
+            | SystemMsg::DkgSessionInfo { .. }
+            | SystemMsg::DkgNotReady { .. }
+            | SystemMsg::DkgRetry { .. }
+            | SystemMsg::DkgMessage { .. }
+            | SystemMsg::DkgFailureObservation { .. }
+            | SystemMsg::DkgFailureAgreement(_) => DKG_MSG_PRIORITY,
+
+            // Inter-node comms for AE updates
+            SystemMsg::AntiEntropyRetry { .. }
+            | SystemMsg::AntiEntropyRedirect { .. }
+            | SystemMsg::AntiEntropyUpdate { .. }
+            | SystemMsg::AntiEntropyProbe => ANTIENTROPY_MSG_PRIORITY,
+
+            // Join responses
+            SystemMsg::JoinResponse(_) | SystemMsg::JoinAsRelocatedResponse(_) => {
+                JOIN_RESPONSE_PRIORITY
+            }
+
+            // Inter-node comms for joining, relocating etc.
+            SystemMsg::Relocate(_)
+            | SystemMsg::JoinRequest(_)
+            | SystemMsg::JoinAsRelocatedRequest(_)
+            | SystemMsg::Propose { .. }
+            | SystemMsg::StartConnectivityTest(_)
+            | SystemMsg::MembershipVotes(_)
+            | SystemMsg::MembershipAE(_)
+            | SystemMsg::HandoverAE(_)
+            | SystemMsg::HandoverVotes(_) => JOIN_RELOCATE_MSG_PRIORITY,
+
+            #[cfg(feature = "back-pressure")]
+            // Inter-node comms for backpressure
+            SystemMsg::BackPressure(_) => BACKPRESSURE_MSG_PRIORITY,
+
+            SystemMsg::NodeMsgError { .. } => NODE_DATA_MSG_PRIORITY,
+
+            #[cfg(any(feature = "chunks", feature = "registers"))]
+            // Inter-node comms related to processing client requests
+            SystemMsg::NodeCmd(_)
+            | SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData { .. })
+            | SystemMsg::NodeQuery(_)
+            | SystemMsg::NodeQueryResponse { .. } => NODE_DATA_MSG_PRIORITY,
+        }
+    }
 }

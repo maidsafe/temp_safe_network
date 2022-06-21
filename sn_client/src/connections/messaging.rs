@@ -551,7 +551,7 @@ pub(super) async fn send_msg(
     wire_msg: WireMsg,
     msg_id: MsgId,
 ) -> Result<()> {
-    let priority = wire_msg.clone().into_msg()?.priority();
+    let priority = wire_msg.priority();
     let msg_bytes = wire_msg.serialize()?;
 
     let mut last_error = None;

@@ -183,19 +183,39 @@ impl WireMsg {
         self.header.msg_envelope.msg_id
     }
 
-    /// Update the message ID
-    pub fn set_msg_id(&mut self, msg_id: MsgId) {
-        self.header.msg_envelope.msg_id = msg_id;
-    }
-
     /// Return the kind of this message
     pub fn msg_kind(&self) -> &AuthKind {
         &self.header.msg_envelope.msg_kind
     }
 
+    /// Return the priority of this message
+    /// TODO: rework priority so this we dont need to deserialise payload to determine priority.
+    pub fn priority(&self) -> i32 {
+        if let Ok(msg) = self.clone().into_msg() {
+            msg.priority()
+        } else {
+            0
+        }
+    }
+
     /// Return the destination section PublicKey for this message
     pub fn dst_section_pk(&self) -> Option<BlsPublicKey> {
         self.header.msg_envelope.dst_location.section_pk()
+    }
+
+    /// Return the source section PublicKey for this
+    /// message if it's a NodeMsg
+    pub fn src_section_pk(&self) -> Option<BlsPublicKey> {
+        match &self.header.msg_envelope.msg_kind {
+            AuthKind::Node(node_signed) => Some(node_signed.section_pk),
+            AuthKind::NodeBlsShare(bls_share_signed) => Some(bls_share_signed.section_pk),
+            _ => None,
+        }
+    }
+
+    /// Update the message ID
+    pub fn set_msg_id(&mut self, msg_id: MsgId) {
+        self.header.msg_envelope.msg_id = msg_id;
     }
 
     /// Update the destination section PublicKey for this message
@@ -211,16 +231,6 @@ impl WireMsg {
     /// Return the destination for this message
     pub fn dst_location(&self) -> &DstLocation {
         &self.header.msg_envelope.dst_location
-    }
-
-    /// Return the source section PublicKey for this
-    /// message if it's a NodeMsg
-    pub fn src_section_pk(&self) -> Option<BlsPublicKey> {
-        match &self.header.msg_envelope.msg_kind {
-            AuthKind::Node(node_signed) => Some(node_signed.section_pk),
-            AuthKind::NodeBlsShare(bls_share_signed) => Some(bls_share_signed.section_pk),
-            _ => None,
-        }
     }
 
     /// Convenience function which creates a temporary WireMsg from the provided
@@ -276,13 +286,13 @@ mod tests {
         let msg_id = MsgId::new();
         let pk = crate::types::PublicKey::Bls(dst_section_pk);
 
-        let node_msg = SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel {
+        let msg = SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel {
             node_id: pk,
             section: pk.into(),
             level: StorageLevel::zero(),
         });
 
-        let payload = WireMsg::serialize_msg_payload(&node_msg)?;
+        let payload = WireMsg::serialize_msg_payload(&msg)?;
         let node_auth = NodeAuth::authorize(src_section_pk, &src_node_keypair, &payload);
 
         let msg_kind = AuthKind::Node(node_auth.clone().into_inner());
@@ -305,7 +315,7 @@ mod tests {
                 msg_id: wire_msg.msg_id(),
                 msg_authority: NodeMsgAuthority::Node(node_auth),
                 dst_location,
-                msg: node_msg,
+                msg,
             }
         );
 

@@ -30,13 +30,10 @@ pub use self::{
     spentbook::{SpentbookCmd, SpentbookQuery},
 };
 
+use crate::messaging::{data::Error as ErrorMsg, MsgId};
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
-    Chunk, ChunkAddress, DataAddress,
-};
-use crate::{
-    messaging::{data::Error as ErrorMsg, MsgId},
-    types::utils,
+    utils, Chunk, ChunkAddress, DataAddress,
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
@@ -95,8 +92,9 @@ pub struct ServiceError {
     pub source_message: Option<Bytes>,
 }
 
-/// Network service messages that clients or nodes send in order to use the services,
-/// communicate and carry out the tasks.
+/// Network service messages exchanged between clients
+/// and nodes in order for the clients to use the network services.
+/// NB: These are not used for node-to-node comms (see [`SystemMsg`] for those).
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum ServiceMsg {
@@ -149,6 +147,18 @@ impl ServiceMsg {
             Self::Cmd(cmd) => Some(cmd.dst_name()),
             Self::Query(query) => Some(query.dst_name()),
             _ => None,
+        }
+    }
+
+    #[cfg(any(feature = "chunks", feature = "registers"))]
+    /// The priority of the message, when handled by lower level comms.
+    pub fn priority(&self) -> i32 {
+        use super::msg_type::{SERVICE_CMD_PRIORITY, SERVICE_QUERY_PRIORITY};
+
+        match self {
+            // Client <-> node service comms
+            ServiceMsg::Cmd(_) => SERVICE_CMD_PRIORITY,
+            _ => SERVICE_QUERY_PRIORITY,
         }
     }
 }
