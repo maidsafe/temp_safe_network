@@ -98,7 +98,7 @@ impl Node {
         let our_name = self.info.read().await.name();
         for recipient in recipients.into_iter() {
             if recipient.name() == our_name {
-                match wire_msg.msg_kind() {
+                match wire_msg.auth_kind() {
                     AuthKind::NodeBlsShare(_) => {
                         // do nothing, continue we should be accumulating this
                         handle = true;

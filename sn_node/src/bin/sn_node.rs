@@ -28,9 +28,6 @@
 )]
 
 #[cfg(not(feature = "tokio-console"))]
-use eyre::Error;
-use eyre::{eyre, Context, ErrReport, Result};
-#[cfg(not(feature = "tokio-console"))]
 use sn_interface::LogFormatter;
 use sn_node::node::{
     add_connection_info, set_connection_info, Config, Error as NodeError, Event, MembershipEvent,
@@ -38,6 +35,9 @@ use sn_node::node::{
 };
 
 use color_eyre::{Section, SectionExt};
+#[cfg(not(feature = "tokio-console"))]
+use eyre::Error;
+use eyre::{eyre, Context, ErrReport, Result};
 use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
 use self_update::{cargo_crate_version, Status};
 use std::{fmt::Debug, fs::File, io, io::Write, path::Path, process::exit};

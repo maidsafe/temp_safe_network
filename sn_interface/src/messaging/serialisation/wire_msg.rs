@@ -65,11 +65,11 @@ impl WireMsg {
     pub fn new_msg(
         msg_id: MsgId,
         payload: Bytes,
-        msg_kind: AuthKind,
+        auth_kind: AuthKind,
         dst_location: DstLocation,
     ) -> Result<Self> {
         Ok(Self {
-            header: WireMsgHeader::new(msg_id, msg_kind, dst_location),
+            header: WireMsgHeader::new(msg_id, auth_kind, dst_location),
             payload,
             #[cfg(feature = "test-utils")]
             payload_debug: None,
@@ -118,7 +118,7 @@ impl WireMsg {
 
     /// Deserialize the payload from this WireMsg returning a MsgType instance.
     pub fn into_msg(&self) -> Result<MsgType> {
-        match self.header.msg_envelope.msg_kind.clone() {
+        match self.header.msg_envelope.auth_kind.clone() {
             #[cfg(any(feature = "chunks", feature = "registers"))]
             AuthKind::Service(auth) => {
                 let msg: ServiceMsg = rmp_serde::from_slice(&self.payload).map_err(|err| {
@@ -184,8 +184,8 @@ impl WireMsg {
     }
 
     /// Return the kind of this message
-    pub fn msg_kind(&self) -> &AuthKind {
-        &self.header.msg_envelope.msg_kind
+    pub fn auth_kind(&self) -> &AuthKind {
+        &self.header.msg_envelope.auth_kind
     }
 
     /// Return the priority of this message
@@ -206,7 +206,7 @@ impl WireMsg {
     /// Return the source section PublicKey for this
     /// message if it's a NodeMsg
     pub fn src_section_pk(&self) -> Option<BlsPublicKey> {
-        match &self.header.msg_envelope.msg_kind {
+        match &self.header.msg_envelope.auth_kind {
             AuthKind::Node(node_signed) => Some(node_signed.section_pk),
             AuthKind::NodeBlsShare(bls_share_signed) => Some(bls_share_signed.section_pk),
             _ => None,
@@ -295,9 +295,9 @@ mod tests {
         let payload = WireMsg::serialize_msg_payload(&msg)?;
         let node_auth = NodeAuth::authorize(src_section_pk, &src_node_keypair, &payload);
 
-        let msg_kind = AuthKind::Node(node_auth.clone().into_inner());
+        let auth_kind = AuthKind::Node(node_auth.clone().into_inner());
 
-        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+        let wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst_location)?;
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header
@@ -345,9 +345,9 @@ mod tests {
         };
         let auth_proof = AuthorityProof::verify(auth.clone(), &payload).unwrap();
 
-        let msg_kind = AuthKind::Service(auth);
+        let auth_kind = AuthKind::Service(auth);
 
-        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+        let wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst_location)?;
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header

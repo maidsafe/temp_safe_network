@@ -153,7 +153,7 @@ impl PeerSession {
                 continue;
             }
 
-            #[cfg(test)]
+            #[cfg(feature = "test-utils")]
             {
                 let queue = self.msg_queue.read().await;
                 debug!("Peer {} queue length: {}", self.link.peer(), queue.len());

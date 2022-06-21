@@ -235,7 +235,7 @@ impl Network {
             ..Default::default()
         };
 
-        let _ = add_node(id, config, event_tx).await;
+        let _handle = tokio::task::spawn_local(add_node(id, config, event_tx));
 
         self.try_print_status();
     }
