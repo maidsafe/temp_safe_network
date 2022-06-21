@@ -33,8 +33,10 @@ pub enum Error {
     // section keys are not in chain.
     #[error("Dkg prefix is shorter than our prefix, so dropping the message.")]
     InvalidDkgPrefix,
-    #[error("Max amount of service cmds being handled, dropping cmd.")]
-    AtMaxServiceCmdThroughput,
+    #[error("Max retries reached for processing cmd, cmd dropped.")]
+    MaxCmdRetriesReached(usize),
+    #[error("Cmd job watcher dropped for some unknown reason.")]
+    CmdJobWatcherDropped,
     #[error("Permit was not retrieved in 500 loops")]
     CouldNotGetPermitInTime,
     #[cfg(feature = "chaos")]

@@ -20,6 +20,7 @@ mod split_barrier;
 
 /// DataStorage apis.
 pub use self::data::DataStorage;
+use self::{data::Capacity, split_barrier::SplitBarrier};
 
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
 pub(crate) use comm::{Comm, DeliveryStatus, MsgEvent};
@@ -29,8 +30,6 @@ pub(crate) use proposal::Proposal;
 #[cfg(test)]
 pub(crate) use relocation::{check as relocation_check, ChurnId};
 
-use self::{data::Capacity, split_barrier::SplitBarrier};
-
 use super::{
     api::{cmds::Cmd, event_channel::EventSender},
     dkg::DkgVoter,
@@ -39,12 +38,11 @@ use super::{
     Elders, Event, MembershipEvent, NodeElderChange,
 };
 
+use crate::dbs::UsedSpace;
 use crate::node::{
     error::{Error, Result},
-    membership::elder_candidates,
-    membership::try_split_dkg,
+    membership::{elder_candidates, try_split_dkg},
 };
-use crate::UsedSpace;
 
 use sn_dysfunction::{DysfunctionDetection, DysfunctionSeverity, IssueType};
 use sn_interface::{
@@ -54,15 +52,15 @@ use sn_interface::{
         system::{DkgSessionId, NodeState, SystemMsg},
         AuthorityProof, SectionAuth, SectionAuthorityProvider,
     },
-    network_knowledge::utils::compare_and_write_prefix_map_to_disk,
     network_knowledge::{
-        supermajority, NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider,
+        supermajority, utils::compare_and_write_prefix_map_to_disk, NetworkKnowledge, NodeInfo,
+        SectionKeyShare, SectionKeysProvider,
     },
-    types::{keys::ed25519::Digest256, log_markers::LogMarker, Cache, Peer},
+    types::{keys::ed25519::Digest256, log_markers::LogMarker, Cache, Peer, ReplicatedDataAddress},
 };
 
 use backoff::ExponentialBackoff;
-use dashmap::DashSet;
+use dashmap::{DashMap, DashSet};
 use itertools::Itertools;
 use resource_proof::ResourceProof;
 use std::{
@@ -78,6 +76,11 @@ use xor_name::{Prefix, XorName};
 pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 128;
 pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 10;
 
+// This prevents pending query limit unbound growth
+pub(crate) const DATA_QUERY_LIMIT: usize = 100;
+// per query we can have this many peers, so the total peers waiting can be QUERY_LIMIT * MAX_WAITING_PEERS_PER_QUERY
+pub(crate) const MAX_WAITING_PEERS_PER_QUERY: usize = 100;
+
 const BACKOFF_CACHE_LIMIT: usize = 100;
 
 // How long to hold on to correlated `Peer`s for data queries. Since data queries are forwarded
@@ -89,11 +92,6 @@ const BACKOFF_CACHE_LIMIT: usize = 100;
 // based on liveness properties (e.g. the timeout should be dynamic based on the responsiveness of
 // the section).
 const DATA_QUERY_TIMEOUT: Duration = Duration::from_secs(15);
-
-// This prevents pending query limit unbound growth
-pub(crate) const DATA_QUERY_LIMIT: usize = 100;
-// per query we can have this many peers, so the total peers waiting can be QUERY_LIMIT * MAX_WAITING_PEERS_PER_QUERY
-pub(crate) const MAX_WAITING_PEERS_PER_QUERY: usize = 100;
 
 #[derive(Debug, Clone)]
 pub(crate) struct DkgSessionInfo {
@@ -108,12 +106,14 @@ pub(crate) type AeBackoffCache =
 // Core state + logic of a node.
 pub(crate) struct Node {
     pub(super) event_sender: EventSender,
-    pub(crate) info: Arc<RwLock<NodeInfo>>,
-
-    pub(crate) comm: Comm,
-
     pub(super) data_storage: DataStorage, // Adult only before cache
-
+    pub(crate) info: Arc<RwLock<NodeInfo>>,
+    pub(crate) comm: Comm,
+    /// queue up all batch data to be replicated (as a result of churn events atm)
+    // TODO: This can probably be reworked into the general per peer msg queue, but as
+    // we need to pull data first before we form the WireMsg, we won't do that just now
+    pub(crate) pending_data_to_replicate_to_peers:
+        Arc<DashMap<ReplicatedDataAddress, Arc<RwLock<BTreeSet<Peer>>>>>,
     resource_proof: ResourceProof,
     // Network resources
     pub(crate) section_keys_provider: SectionKeysProvider,
@@ -209,7 +209,7 @@ impl Node {
             None
         };
 
-        Ok(Self {
+        let node = Self {
             comm,
             info: Arc::new(RwLock::new(info)),
             network_knowledge,
@@ -228,9 +228,14 @@ impl Node {
             capacity: Capacity::default(),
             dysfunction_tracking: node_dysfunction_detector,
             pending_data_queries: Arc::new(Cache::with_expiry_duration(DATA_QUERY_TIMEOUT)),
+            pending_data_to_replicate_to_peers: Arc::new(DashMap::new()),
             ae_backoff_cache: AeBackoffCache::default(),
             membership: Arc::new(RwLock::new(membership)),
-        })
+        };
+
+        node.write_prefix_map().await;
+
+        Ok(node)
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -328,20 +333,6 @@ impl Node {
     pub(crate) async fn log_dkg_session(&self, name: &XorName) {
         trace!("Logging Dkg session as responded to in dysfunction");
         self.dysfunction_tracking.dkg_ack_fulfilled(name).await;
-    }
-
-    pub(crate) async fn write_prefix_map(&self) {
-        info!("Writing our latest PrefixMap to disk");
-        // TODO: Make this serialization human readable
-
-        let prefix_map = self.network_knowledge.prefix_map().clone();
-
-        let _ = tokio::task::spawn_local(async move {
-            // Compare and write Prefix to `~/.safe/prefix_maps` dir
-            if let Err(e) = compare_and_write_prefix_map_to_disk(&prefix_map).await {
-                error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);
-            }
-        });
     }
 
     pub(super) async fn state_snapshot(&self) -> StateSnapshot {
@@ -720,6 +711,20 @@ impl Node {
         } else {
             debug!("log_section_stats: No membership instance");
         };
+    }
+
+    async fn write_prefix_map(&self) {
+        info!("Writing our latest PrefixMap to disk");
+        // TODO: Make this serialization human readable
+
+        let prefix_map = self.network_knowledge.prefix_map().clone();
+
+        let _ = tokio::spawn(async move {
+            // Compare and write Prefix to `~/.safe/prefix_maps` dir
+            if let Err(e) = compare_and_write_prefix_map_to_disk(&prefix_map).await {
+                error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);
+            }
+        });
     }
 }
 
