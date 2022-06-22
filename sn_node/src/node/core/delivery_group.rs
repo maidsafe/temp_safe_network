@@ -176,6 +176,7 @@ mod tests {
 
     use sn_interface::{
         network_knowledge::{
+            build_bootstrap_membership_decision,
             test_utils::section_signed,
             test_utils::{gen_addr, gen_section_authority_provider},
             NodeState, SectionAuthorityProvider, MIN_ADULT_AGE,
@@ -217,14 +218,18 @@ mod tests {
 
     #[tokio::test]
     async fn delivery_targets_elder_to_our_adult() -> Result<()> {
-        let (our_name, network_knowledge, sk) = setup_elder().await?;
+        let (our_name, network_knowledge, sk_set) = setup_elder().await?;
 
         let name = ed25519::gen_name_with_age(MIN_ADULT_AGE);
         let dst_name = network_knowledge.prefix().await.substituted_in(name);
         let peer = Peer::new(dst_name, gen_addr());
-        let node_state = NodeState::joined(peer, None);
-        let node_state = section_signed(&sk, node_state)?;
-        assert!(network_knowledge.update_member(node_state).await);
+        let node_state = NodeState::joined(peer, None).to_msg();
+        let membership_decision = build_bootstrap_membership_decision(&sk_set, node_state, 1)?;
+        assert!(
+            network_knowledge
+                .update_members(&sk_set.public_keys(), membership_decision)
+                .await
+        );
 
         let section_pk = network_knowledge.authority_provider().await.section_key();
         let dst = DstLocation::Node {
@@ -555,13 +560,13 @@ mod tests {
         Ok(())
     }
 
-    async fn setup_elder() -> Result<(XorName, NetworkKnowledge, bls::SecretKey)> {
+    async fn setup_elder() -> Result<(XorName, NetworkKnowledge, bls::SecretKeySet)> {
         let prefix0 = Prefix::default().pushed(false);
         let prefix1 = Prefix::default().pushed(true);
 
-        let (section_auth0, _, secret_key_set) =
+        let (section_auth0, _, genesis_sks) =
             gen_section_authority_provider(prefix0, elder_count());
-        let genesis_sk = secret_key_set.secret_key();
+        let genesis_sk = genesis_sks.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
         let elders0 = section_auth0.elders_vec();
@@ -572,9 +577,13 @@ mod tests {
         let network_knowledge = NetworkKnowledge::new(genesis_pk, chain, section_auth0, None)?;
 
         for peer in elders0 {
-            let node_state = NodeState::joined(peer, None);
-            let node_state = section_signed(genesis_sk, node_state)?;
-            assert!(network_knowledge.update_member(node_state).await);
+            let node_state = NodeState::joined(peer, None).to_msg();
+            let decision = build_bootstrap_membership_decision(&genesis_sks, node_state, 1)?;
+            assert!(
+                network_knowledge
+                    .update_members(&genesis_sks.public_keys(), decision)
+                    .await
+            );
         }
 
         let (section_auth1, _, secret_key_set) =
@@ -606,7 +615,7 @@ mod tests {
 
         let our_name = choose_elder_name(&network_knowledge.authority_provider().await)?;
 
-        Ok((our_name, network_knowledge, genesis_sk.clone()))
+        Ok((our_name, network_knowledge, genesis_sks.set))
     }
 
     async fn setup_adult() -> Result<(XorName, NetworkKnowledge)> {

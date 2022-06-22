@@ -10,9 +10,11 @@ use crate::node::{
     api::cmds::Cmd, core::Node, messages::WireMsgUtils, Error, Event, MembershipEvent, Result,
 };
 
+use bls_dkg::PublicKeySet;
+use sn_consensus::Decision;
 use sn_interface::{
     messaging::{
-        system::{KeyedSig, SectionAuth, SectionPeers, SystemMsg},
+        system::{KeyedSig, NodeState, SectionAuth, SystemMsg},
         MsgId, MsgType, SrcLocation, WireMsg,
     },
     network_knowledge::SectionAuthorityProvider,
@@ -24,7 +26,7 @@ use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
 use secured_linked_list::SecuredLinkedList;
-use std::time::Duration;
+use std::{collections::BTreeSet, time::Duration};
 use xor_name::XorName;
 
 impl Node {
@@ -34,7 +36,7 @@ impl Node {
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
-        members: SectionPeers,
+        members: BTreeSet<(PublicKeySet, Decision<NodeState>)>,
     ) -> Result<Vec<Cmd>> {
         let snapshot = self.state_snapshot().await;
 
@@ -49,7 +51,7 @@ impl Node {
             .update_knowledge_if_valid(
                 signed_sap.clone(),
                 &proof_chain,
-                Some(members),
+                members,
                 &our_name,
                 &self.section_keys_provider,
             )
@@ -220,7 +222,7 @@ impl Node {
             .update_knowledge_if_valid(
                 signed_sap.clone(),
                 &proof_chain,
-                None,
+                BTreeSet::new(),
                 &our_name,
                 &self.section_keys_provider,
             )
@@ -628,7 +630,7 @@ mod tests {
                     .update_knowledge_if_valid(
                         env.other_sap.clone(),
                         &env.proof_chain,
-                        None,
+                        BTreeSet::new(),
                         &env.node.info.read().await.name(),
                         &env.node.section_keys_provider
                     )
@@ -806,7 +808,7 @@ mod tests {
                 .update_knowledge_if_valid(
                     signed_sap.clone(),
                     &chain,
-                    None,
+                    BTreeSet::new(),
                     &info.name(),
                     &node.section_keys_provider,
                 )

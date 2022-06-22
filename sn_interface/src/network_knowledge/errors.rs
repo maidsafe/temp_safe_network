@@ -32,6 +32,8 @@ pub enum Error {
     MissingSecretKeyShare(bls::PublicKey),
     #[error("Invalid section chain: {0}")]
     InvalidSectionChain(#[from] SecuredLinkedListError),
+    #[error("Consensus Err: {0}")]
+    Consensus(#[from] sn_consensus::Error),
     #[error("Invalid payload")]
     InvalidPayload,
     #[error("The section is currently set to not allow taking any new node")]

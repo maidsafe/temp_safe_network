@@ -172,7 +172,10 @@ mod tests {
 
     use sn_interface::{
         elder_count,
-        network_knowledge::{test_utils::section_signed, SectionAuthorityProvider, MIN_ADULT_AGE},
+        network_knowledge::{
+            build_bootstrap_membership_decision, test_utils::section_signed,
+            SectionAuthorityProvider, MIN_ADULT_AGE,
+        },
         types::SecretKeySet,
     };
 
@@ -237,10 +240,12 @@ mod tests {
         )?;
 
         for peer in &peers {
-            let info = NodeState::joined(*peer, None);
-            let info = section_signed(sk, info)?;
+            let info = NodeState::joined(*peer, None).to_msg();
+            let decision = build_bootstrap_membership_decision(&sk_set, info, 1)?;
 
-            let res = futures::executor::block_on(network_knowledge.update_member(info));
+            let res = futures::executor::block_on(
+                network_knowledge.update_members(&sk_set.public_keys(), decision),
+            );
             assert!(res);
         }
 

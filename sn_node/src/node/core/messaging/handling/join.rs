@@ -18,7 +18,7 @@ use sn_interface::{
         JoinAsRelocatedRequest, JoinAsRelocatedResponse, JoinRejectionReason, JoinRequest,
         JoinResponse, MembershipState, NodeState, SystemMsg,
     },
-    network_knowledge::{SectionAuthUtils, FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE},
+    network_knowledge::{FIRST_SECTION_MAX_AGE, MIN_ADULT_AGE},
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -237,25 +237,23 @@ impl Node {
             ]);
         }
 
-        let relocate_details = if let MembershipState::Relocated(ref details) =
-            join_request.relocate_proof.value.state
-        {
+        let (node_state, section_key_set, decision) = join_request.relocate_proof;
+        let relocate_details = if let MembershipState::Relocated(ref details) = node_state.state {
             // Check for signatures and trust of the relocate_proof
-            if !join_request.relocate_proof.self_verify() {
+            if !decision.proposals().contains(&node_state)
+                && decision.validate(&section_key_set).is_err()
+            {
                 debug!("Ignoring JoinAsRelocatedRequest from {peer} - invalid sig.");
                 return Ok(vec![]);
             }
-            if !known_keys.contains(&join_request.relocate_proof.sig.public_key) {
+            if !known_keys.contains(&section_key_set.public_key()) {
                 debug!("Ignoring JoinAsRelocatedRequest from {peer} - untrusted src.");
                 return Ok(vec![]);
             }
 
             details
         } else {
-            debug!(
-                "Ignoring JoinAsRelocatedRequest from {peer} with invalid relocate proof state: {:?}",
-                join_request.relocate_proof.value.state
-            );
+            debug!("Ignoring JoinAsRelocatedRequest from {peer} with invalid relocate proof state: {node_state:?}");
             return Ok(vec![]);
         };
 
@@ -278,7 +276,6 @@ impl Node {
             ]);
         };
 
-        self.propose_membership_change(join_request.relocate_proof.value)
-            .await
+        self.propose_membership_change(node_state).await
     }
 }

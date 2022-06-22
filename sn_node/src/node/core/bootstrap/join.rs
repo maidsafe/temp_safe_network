@@ -22,9 +22,7 @@ use sn_interface::{
         },
         AuthKind, DstLocation, MsgType, NodeAuth, WireMsg,
     },
-    network_knowledge::{
-        prefix_map::NetworkPrefixMap, NetworkKnowledge, NodeInfo, SectionAuthUtils, MIN_ADULT_AGE,
-    },
+    network_knowledge::{prefix_map::NetworkPrefixMap, NetworkKnowledge, NodeInfo, MIN_ADULT_AGE},
     types::{keys::ed25519, log_markers::LogMarker, Peer},
 };
 
@@ -162,6 +160,7 @@ impl<'a> Join<'a> {
         let mut used_recipient_saps = UsedRecipientSaps::new();
 
         loop {
+            info!("Waiting for join response");
             let (response, sender) = self.receive_join_response().await?;
             match response {
                 JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(addr)) => {
@@ -180,6 +179,7 @@ impl<'a> Join<'a> {
                     genesis_key,
                     section_chain,
                     node_state,
+                    decision,
                 } => {
                     info!("{}", LogMarker::ReceivedJoinApproval);
                     if node_state.name != self.node.name() {
@@ -187,11 +187,14 @@ impl<'a> Join<'a> {
                         continue;
                     }
 
-                    if !node_state.verify(&section_chain) {
-                        error!(
-                            "Verification of node state in JoinResponse failed: {:?}",
-                            node_state
-                        );
+                    let node_state_is_in_decision = decision.proposals().contains(&node_state);
+
+                    if !node_state_is_in_decision
+                        || decision
+                            .validate(&section_auth.value.public_key_set)
+                            .is_err()
+                    {
+                        error!("Verification of node state in JoinResponse failed: {node_state:?}");
                         continue;
                     }
 
@@ -518,7 +521,7 @@ mod tests {
     use sn_interface::{
         elder_count, init_logger,
         messaging::SectionAuthorityProvider as SectionAuthorityProviderMsg,
-        network_knowledge::{test_utils::*, NodeState},
+        network_knowledge::{build_bootstrap_membership_decision, test_utils::*, NodeState},
         types::PublicKey,
     };
 
@@ -616,15 +619,17 @@ mod tests {
 
             // Send JoinResponse::Approval
             let section_auth = section_signed(sk, section_auth.clone())?;
-            let node_state = section_signed(sk, NodeState::joined(peer, None))?;
-            let proof_chain = SecuredLinkedList::new(section_key);
+            let node_state = NodeState::joined(peer, None).to_msg();
+            let section_chain = SecuredLinkedList::new(section_key);
+            let decision = build_bootstrap_membership_decision(&sk_set, node_state.clone(), 1)?;
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
                     genesis_key: section_key,
                     section_auth: section_auth.clone().into_authed_msg(),
-                    node_state: node_state.into_authed_msg(),
-                    section_chain: proof_chain,
+                    node_state,
+                    section_chain,
+                    decision,
                 })),
                 &bootstrap_node,
                 section_auth.section_key(),

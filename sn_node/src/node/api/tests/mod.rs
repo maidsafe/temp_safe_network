@@ -22,6 +22,8 @@ use crate::node::{
     Error, Event, MembershipEvent, Result as RoutingResult,
 };
 
+use sn_consensus::Decision;
+use sn_interface::network_knowledge::build_bootstrap_membership_decision;
 use sn_interface::{
     elder_count, init_logger,
     messaging::{
@@ -295,8 +297,10 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
                 relocated_node.peer(),
                 Some(relocated_node_old_name),
                 relocate_details,
-            );
-            let relocate_proof = section_signed(sk_set.secret_key(), node_state.to_msg())?;
+            )
+            .to_msg();
+            let decision = build_bootstrap_membership_decision(&sk_set, node_state.clone(), 1)?;
+            let relocate_proof = (node_state, sk_set.public_keys(), decision);
 
             let signature_over_new_name =
                 ed25519::sign(&relocated_node.name().0, &relocated_node_old_keypair);
@@ -415,13 +419,10 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             let mut expected_new_elders = BTreeSet::new();
 
             for peer in section_auth.elders() {
-                let node_state = NodeState::joined(*peer, None);
-                let sig = prove(sk_set.secret_key(), &node_state)?;
+                let node_state = NodeState::joined(*peer, None).to_msg();
+                let decision = build_bootstrap_membership_decision(&sk_set, node_state, 1)?;
                 let _updated = section
-                    .update_member(SectionAuth {
-                        value: node_state,
-                        sig,
-                    })
+                    .update_members(&sk_set.public_keys(), decision)
                     .await;
                 if peer.age() == MIN_ADULT_AGE + 1 {
                     let _changed = expected_new_elders.insert(peer);
@@ -447,9 +448,9 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             // Handle agreement on Online of a peer that is older than the youngest
             // current elder - that means this peer is going to be promoted.
             let new_peer = create_peer(MIN_ADULT_AGE + 1);
-            let node_state = NodeState::joined(new_peer, Some(xor_name::rand::random()));
+            let node_state = NodeState::joined(new_peer, Some(xor_name::rand::random())).to_msg();
 
-            let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
+            let decision = build_bootstrap_membership_decision(&sk_set, node_state.clone(), 1)?;
 
             // Force this node to join
             dispatcher
@@ -459,10 +460,16 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 .await
                 .as_mut()
                 .unwrap()
-                .force_bootstrap(node_state.to_msg());
+                .force_bootstrap(node_state);
 
             let cmds = dispatcher
-                .process_cmd(Cmd::HandleNewNodeOnline(auth), "cmd-id")
+                .process_cmd(
+                    Cmd::HandleMembershipChurn {
+                        section_key_set: sk_set.public_keys(),
+                        decision,
+                    },
+                    "cmd-id",
+                )
                 .await?;
 
             // Verify we sent a `DkgStart` message with the expected participants.
@@ -514,11 +521,17 @@ async fn handle_online_cmd(
     dispatcher: &Dispatcher,
     section_auth: &SectionAuthorityProvider,
 ) -> Result<HandleOnlineStatus> {
-    let node_state = NodeState::joined(*peer, None);
-    let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
+    let node_state = NodeState::joined(*peer, None).to_msg();
+    let decision = build_bootstrap_membership_decision(sk_set, node_state, 1)?;
 
     let cmds = dispatcher
-        .process_cmd(Cmd::HandleNewNodeOnline(auth), "cmd-id")
+        .process_cmd(
+            Cmd::HandleMembershipChurn {
+                section_key_set: sk_set.public_keys(),
+                decision,
+            },
+            "cmd-id",
+        )
         .await?;
 
     let mut status = HandleOnlineStatus {
@@ -600,9 +613,11 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
 
             // Make a left peer.
             let peer = create_peer(age);
-            let node_state = NodeState::left(peer, None);
-            let node_state = section_signed(sk_set.secret_key(), node_state)?;
-            let _updated = section.update_member(node_state).await;
+            let node_state = NodeState::left(peer, None).to_msg();
+            let decision = build_bootstrap_membership_decision(&sk_set, node_state, 1)?;
+            let _updated = section
+                .update_members(&sk_set.public_keys(), decision)
+                .await;
 
             // Make a Node
             let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
@@ -676,10 +691,11 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
             let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
 
             let existing_peer = create_peer(MIN_ADULT_AGE);
-
-            let node_state = NodeState::joined(existing_peer, None);
-            let node_state = section_signed(sk_set.secret_key(), node_state)?;
-            let _updated = section.update_member(node_state).await;
+            let node_state = NodeState::joined(existing_peer, None).to_msg();
+            let decision = build_bootstrap_membership_decision(&sk_set, node_state, 1)?;
+            let _updated = section
+                .update_members(&sk_set.public_keys(), decision)
+                .await;
 
             let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
             let node = nodes.remove(0);
@@ -726,11 +742,12 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
             let (section_auth, mut nodes, sk_set) = create_section_auth();
 
             let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
-
             let existing_peer = create_peer(MIN_ADULT_AGE);
-            let node_state = NodeState::joined(existing_peer, None);
-            let node_state = section_signed(sk_set.secret_key(), node_state)?;
-            let _updated = section.update_member(node_state).await;
+            let node_state = NodeState::joined(existing_peer, None).to_msg();
+            let decision = build_bootstrap_membership_decision(&sk_set, node_state, 1)?;
+            let _updated = section
+                .update_members(&sk_set.public_keys(), decision)
+                .await;
 
             // Pick the elder to remove.
             let auth_peers = section_auth.elders();
@@ -1013,8 +1030,6 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
 
     // Run the local task set.
     local.run_until(async move {
-
-
         let prefix: Prefix = "0".parse().unwrap();
         let section_size = match relocated_peer_role {
             RelocatedPeerRole::Elder => elder_count(),
@@ -1022,20 +1037,26 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         };
         let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, elder_count());
         let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
-
         let mut adults = section_size - elder_count();
         while adults > 0 {
             adults -= 1;
             let non_elder_peer = create_peer(MIN_ADULT_AGE);
-            let node_state = NodeState::joined(non_elder_peer, None);
-            let node_state = section_signed(sk_set.secret_key(), node_state)?;
-            assert!(section.update_member(node_state).await);
+            let node_state = NodeState::joined(non_elder_peer, None).to_msg();
+            let decision = build_bootstrap_membership_decision(&sk_set, node_state, 1)?;
+            assert!(
+                section
+                    .update_members(&sk_set.public_keys(), decision)
+                    .await
+            );
         }
-
-        let non_elder_peer = create_peer(MIN_ADULT_AGE - 1);
-        let node_state = NodeState::joined(non_elder_peer, None);
-        let node_state = section_signed(sk_set.secret_key(), node_state)?;
-        assert!(section.update_member(node_state).await);
+    let non_elder_peer = create_peer(MIN_ADULT_AGE - 1);
+    let node_state = NodeState::joined(non_elder_peer, None).to_msg();
+    let decision = build_bootstrap_membership_decision(&sk_set, node_state, 1)?;
+    assert!(
+        section
+            .update_members(&sk_set.public_keys(), decision)
+            .await
+    );
         let node = nodes.remove(0);
         let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
         let node = Node::new(
@@ -1046,8 +1067,8 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
             UsedSpace::new(max_capacity),
             root_storage_dir,
-        )
-        .await?;
+        ).await?;
+
         let dispatcher = Dispatcher::new(node);
 
         let relocated_peer = match relocated_peer_role {
@@ -1055,9 +1076,11 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             RelocatedPeerRole::NonElder => non_elder_peer,
         };
 
-        let auth = create_relocation_trigger(sk_set.secret_key(), relocated_peer.age())?;
         let cmds = dispatcher
-            .process_cmd(Cmd::HandleNewNodeOnline(auth), "cmd-id")
+            .process_cmd(Cmd::HandleMembershipChurn {
+                section_key_set: sk_set.public_keys(),
+                decision: create_relocation_trigger(&sk_set, relocated_peer.age())?,
+            }, "cmd-id")
             .await?;
 
         let mut offline_relocate_sent = false;
@@ -1221,9 +1244,13 @@ async fn handle_elders_update() -> Result<()> {
         let (section0, section_key_share) = create_section(&sk_set0, &sap0).await?;
 
         for peer in [&adult_peer, &promoted_peer] {
-            let node_state = NodeState::joined(*peer, None);
-            let node_state = section_signed(sk_set0.secret_key(), node_state)?;
-            assert!(section0.update_member(node_state).await);
+            let node_state = NodeState::joined(*peer, None).to_msg();
+            let decision = build_bootstrap_membership_decision(&sk_set0, node_state, 1)?;
+            assert!(
+                section0
+                    .update_members(&sk_set0.public_keys(), decision)
+                    .await
+            );
         }
 
         let demoted_peer = other_elder_peers.remove(0);
@@ -1388,9 +1415,13 @@ async fn handle_demote_during_split() -> Result<()> {
 
             // all peers b are added
             for peer in peers_b.iter().chain(iter::once(&peer_c)).cloned() {
-                let node_state = NodeState::joined(peer, None);
-                let node_state = section_signed(sk_set_v0.secret_key(), node_state)?;
-                assert!(section.update_member(node_state).await);
+                let node_state = NodeState::joined(peer, None).to_msg();
+                let decision = build_bootstrap_membership_decision(&sk_set_v0, node_state, 1)?;
+                assert!(
+                    section
+                        .update_members(&sk_set_v0.public_keys(), decision)
+                        .await
+                );
             }
 
             // we make a new full node from info, to see what it does
@@ -1551,9 +1582,11 @@ async fn create_section(
         NetworkKnowledge::new(*section_chain.root_key(), section_chain, signed_sap, None)?;
 
     for peer in section_auth.elders() {
-        let node_state = NodeState::joined(*peer, None);
-        let node_state = section_signed(sk_set.secret_key(), node_state)?;
-        let _updated = section.update_member(node_state).await;
+        let node_state = NodeState::joined(*peer, None).to_msg();
+        let decision = build_bootstrap_membership_decision(sk_set, node_state, 1)?;
+        let _updated = section
+            .update_members(&sk_set.public_keys(), decision)
+            .await;
     }
 
     let section_key_share = create_section_key_share(sk_set, 0);
@@ -1566,15 +1599,15 @@ async fn create_section(
 // NOTE: recommended to call this with low `age` (4 or 5), otherwise it might take very long time
 // to complete because it needs to generate a signature with the number of trailing zeroes equal to
 // (or greater that) `age`.
-fn create_relocation_trigger(sk: &bls::SecretKey, age: u8) -> Result<SectionAuth<NodeStateMsg>> {
+fn create_relocation_trigger(sks: &bls::SecretKeySet, age: u8) -> Result<Decision<NodeStateMsg>> {
     loop {
         let node_state =
-            NodeState::joined(create_peer(MIN_ADULT_AGE), Some(xor_name::rand::random()));
-        let auth = section_signed(sk, node_state.to_msg())?;
+            NodeState::joined(create_peer(MIN_ADULT_AGE), Some(xor_name::rand::random())).to_msg();
+        let decision = build_bootstrap_membership_decision(sks, node_state, 1)?;
 
-        let churn_id = ChurnId(auth.sig.signature.to_bytes().to_vec());
+        let churn_id = ChurnId(decision.proposals_sig.to_bytes().to_vec());
         if relocation_check(age, &churn_id) && !relocation_check(age + 1, &churn_id) {
-            return Ok(auth);
+            return Ok(decision);
         }
     }
 }

@@ -99,7 +99,7 @@ pub mod test_utils {
     // Note: `bls::SecretKeySet` does have a `secret_key` method, but it's test-only and not available
     // for the consumers of the crate.
     pub struct SecretKeySet {
-        set: bls::SecretKeySet,
+        pub set: bls::SecretKeySet,
         key: bls::SecretKey,
     }
 

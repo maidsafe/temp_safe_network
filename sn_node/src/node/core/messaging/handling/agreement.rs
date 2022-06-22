@@ -12,16 +12,17 @@ use crate::node::{
     Event, MembershipEvent, Result,
 };
 
-use sn_consensus::Generation;
+use bls_dkg::PublicKeySet;
+use sn_consensus::{Decision, Generation};
 use sn_interface::{
-    messaging::system::{KeyedSig, MembershipState, SectionAuth},
+    messaging::system::{KeyedSig, MembershipState, NodeState as NodeStateMsg, SectionAuth},
     network_knowledge::{
         NodeState, SapCandidate, SectionAuthUtils, SectionAuthorityProvider, MIN_ADULT_AGE,
     },
     types::log_markers::LogMarker,
 };
 
-use std::{cmp, collections::BTreeSet};
+use std::collections::BTreeSet;
 
 // Agreement
 impl Node {
@@ -49,102 +50,116 @@ impl Node {
         }
     }
 
-    pub(crate) async fn handle_online_agreement(
+    pub(crate) async fn handle_membership_decision(
         &self,
-        new_info: NodeState,
-        sig: KeyedSig,
+        section_key_set: PublicKeySet,
+        decision: Decision<NodeStateMsg>,
     ) -> Result<Vec<Cmd>> {
-        debug!("{}", LogMarker::AgreementOfOnline);
         let mut cmds = vec![];
-        if let Some(old_info) = self
+
+        if !self
             .network_knowledge
-            .is_either_member_or_archived(&new_info.name())
+            .update_members(&section_key_set, decision.clone())
             .await
         {
-            // This node is rejoin with same name.
-            if old_info.state() != MembershipState::Left {
-                debug!(
-                    "Ignoring Online node {} , Already a member (or has been) - {:?} not Left.",
-                    new_info.name(),
-                    old_info.state(),
-                );
+            info!("Skipping membership decision");
+            return Ok(cmds);
+        }
 
-                return Ok(cmds);
-            }
-
-            // We would approve and relocate it only if half its age is at least MIN_ADULT_AGE
-            let new_age = cmp::max(MIN_ADULT_AGE - 1, old_info.age() / 2);
-            if new_age >= MIN_ADULT_AGE {
-                // TODO: consider handling the relocation inside the bootstrap phase, to avoid
-                // having to send this `NodeApproval`.
-                cmds.extend(self.send_node_approval(old_info.clone()).await);
-
+        for node_state in decision.proposals() {
+            if node_state.state == MembershipState::Joined {
+                // Node has been accepted into the section
+                cmds.extend(self.handle_node_joined(node_state).await?)
+            } else {
+                // Node was removed from the section
                 cmds.extend(
-                    self.relocate_rejoining_peer(old_info.value, new_age)
+                    self.handle_node_left(node_state, &section_key_set, &decision)
                         .await?,
-                );
-
-                return Ok(cmds);
+                )
             }
         }
-
-        let new_info = SectionAuth {
-            value: new_info,
-            sig,
-        };
-
-        if !self.network_knowledge.update_member(new_info.clone()).await {
-            info!("ignore Online: {} at {}", new_info.name(), new_info.addr());
-            return Ok(vec![]);
-        }
-
-        self.add_new_adult_to_trackers(new_info.name()).await;
-
-        info!("handle Online: {} at {}", new_info.name(), new_info.addr());
-
-        // still used for testing
-        self.send_event(Event::Membership(MembershipEvent::MemberJoined {
-            name: new_info.name(),
-            previous_name: new_info.previous_name(),
-            age: new_info.age(),
-        }))
-        .await;
-
-        self.log_section_stats().await;
-
-        // Do not disable node joins in first section.
-        let our_prefix = self.network_knowledge.prefix().await;
-        if !our_prefix.is_empty() {
-            // ..otherwise, switch off joins_allowed on a node joining.
-            // TODO: fix racing issues here? https://github.com/maidsafe/safe_network/issues/890
-            *self.joins_allowed.write().await = false;
-        }
-
-        let churn_id = ChurnId(new_info.sig.signature.to_bytes().to_vec());
-        let excluded_from_relocation = vec![new_info.name()].into_iter().collect();
 
         // first things first, inform the node it can join us
-        cmds.extend(self.send_node_approval(new_info).await);
+        cmds.extend(self.send_node_approvals(decision.clone()).await);
+
+        let churn_id = ChurnId(decision.proposals_sig.to_bytes().to_vec());
+        let excluded_from_relocation = BTreeSet::from_iter(
+            decision
+                .proposals()
+                .into_iter()
+                .filter(|n| n.state == MembershipState::Joined)
+                .map(|n| n.name),
+        );
 
         cmds.extend(
             self.relocate_peers(churn_id, excluded_from_relocation)
                 .await?,
         );
 
-        let result = self
+        let promote_demote_cmds = self
             .promote_and_demote_elders_except(&BTreeSet::default())
             .await?;
 
-        if result.is_empty() {
+        if promote_demote_cmds.is_empty() {
             // Send AE-Update to our section
             cmds.extend(self.send_ae_update_to_our_section().await);
         }
 
-        cmds.extend(result);
+        cmds.extend(promote_demote_cmds);
+
+        self.liveness_retain_only(
+            self.network_knowledge
+                .adults()
+                .await
+                .iter()
+                .map(|peer| peer.name())
+                .collect(),
+        )
+        .await?;
+
+        info!("cmds in queue for membership churn {:?}", cmds);
+
+        Ok(cmds)
+    }
+
+    async fn handle_node_joined(&self, new_info: NodeStateMsg) -> Result<Vec<Cmd>> {
+        debug!(
+            "{}, {} at {}",
+            LogMarker::AgreementOfOnline,
+            new_info.name,
+            new_info.addr
+        );
+
+        let mut cmds = vec![];
+
+        if let Some(old_info) = self.network_knowledge.is_archived(&new_info.name).await {
+            // This node is rejoin with same name.
+            let new_age = MIN_ADULT_AGE.max(old_info.age() / 2);
+            cmds.extend(self.relocate_rejoining_peer(old_info, new_age).await?);
+            return Ok(cmds);
+        }
+
+        self.add_new_adult_to_trackers(new_info.name).await;
+
+        // Do not disable node joins in first section.
+        if self.network_knowledge.prefix().await.bit_count() > 0 {
+            // ..otherwise, switch off joins_allowed on a node joining.
+            // TODO: fix racing issues here? https://github.com/maidsafe/safe_network/issues/890
+            *self.joins_allowed.write().await = false;
+        }
 
         info!("cmds in queue for Accepting node {:?}", cmds);
 
+        self.log_section_stats().await;
         self.print_network_stats().await;
+
+        // still used for testing
+        self.send_event(Event::Membership(MembershipEvent::MemberJoined {
+            name: new_info.name,
+            previous_name: new_info.previous_name,
+            age: new_info.age(),
+        }))
+        .await;
 
         Ok(cmds)
     }
@@ -287,7 +302,7 @@ impl Node {
                     .update_knowledge_if_valid(
                         signed_section_auth.clone(),
                         &proof_chain,
-                        None,
+                        BTreeSet::new(),
                         &our_name,
                         &self.section_keys_provider,
                     )

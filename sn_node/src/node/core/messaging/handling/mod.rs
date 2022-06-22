@@ -311,10 +311,10 @@ impl Node {
                 )
                 .await
             }
-            SystemMsg::Relocate(node_state) => {
+            SystemMsg::Relocate(node_state, section_key_set, decision) => {
                 trace!("Handling msg: Relocate from {}: {:?}", sender, msg_id);
                 Ok(self
-                    .handle_relocate(node_state)
+                    .handle_relocate(node_state, section_key_set, decision)
                     .await?
                     .into_iter()
                     .collect())

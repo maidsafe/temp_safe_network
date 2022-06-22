@@ -207,14 +207,12 @@ impl Dispatcher {
             Cmd::HandleAgreement { proposal, sig } => {
                 self.node.handle_general_agreements(proposal, sig).await
             }
-            Cmd::HandleNewNodeOnline(auth) => {
+            Cmd::HandleMembershipChurn {
+                section_key_set,
+                decision,
+            } => {
                 self.node
-                    .handle_online_agreement(auth.value.into_state(), auth.sig)
-                    .await
-            }
-            Cmd::HandleNodeLeft(auth) => {
-                self.node
-                    .handle_node_left(auth.value.into_state(), auth.sig)
+                    .handle_membership_decision(section_key_set, decision)
                     .await
             }
             Cmd::HandleNewEldersAgreement { proposal, sig } => match proposal {

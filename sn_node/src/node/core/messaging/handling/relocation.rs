@@ -16,9 +16,11 @@ use crate::node::{
     Event, MembershipEvent, Result,
 };
 
+use bls_dkg::PublicKeySet;
+use sn_consensus::Decision;
 use sn_interface::{
     elder_count,
-    messaging::system::{MembershipState, NodeState as NodeStateMsg, RelocateDetails, SectionAuth},
+    messaging::system::{MembershipState, NodeState as NodeStateMsg, RelocateDetails},
     network_knowledge::NodeState,
     types::log_markers::LogMarker,
 };
@@ -92,10 +94,12 @@ impl Node {
 
     pub(crate) async fn handle_relocate(
         &self,
-        relocate_proof: SectionAuth<NodeStateMsg>,
+        node_state: NodeStateMsg,
+        section_key_set: PublicKeySet,
+        decision: Decision<NodeStateMsg>,
     ) -> Result<Option<Cmd>> {
         let (dst_xorname, dst_section_key, new_age) =
-            if let MembershipState::Relocated(ref relocate_details) = relocate_proof.value.state {
+            if let MembershipState::Relocated(ref relocate_details) = node_state.state {
                 (
                     relocate_details.dst,
                     relocate_details.dst_section_key,
@@ -104,7 +108,7 @@ impl Node {
             } else {
                 debug!(
                     "Ignoring Relocate msg containing invalid NodeState: {:?}",
-                    relocate_proof.state
+                    node_state.state
                 );
                 return Ok(None);
             };
@@ -116,10 +120,7 @@ impl Node {
             return Ok(None);
         }
 
-        debug!(
-            "Received Relocate message to join the section at {}",
-            dst_xorname
-        );
+        debug!("Received Relocate message to join the section at {dst_xorname}");
 
         match *self.relocate_state.read().await {
             Some(_) => {
@@ -151,7 +152,7 @@ impl Node {
         let (joining_as_relocated, cmd) = JoiningAsRelocated::start(
             node,
             genesis_key,
-            relocate_proof,
+            (node_state, section_key_set, decision),
             bootstrap_addrs,
             dst_xorname,
             dst_section_key,

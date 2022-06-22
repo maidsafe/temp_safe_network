@@ -10,11 +10,11 @@ use super::UsedRecipientSaps;
 
 use crate::node::{api::cmds::Cmd, messages::WireMsgUtils, Error, Result};
 
+use bls_dkg::PublicKeySet;
+use sn_consensus::Decision;
 use sn_interface::{
     messaging::{
-        system::{
-            JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeState, SectionAuth, SystemMsg,
-        },
+        system::{JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeState, SystemMsg},
         DstLocation, WireMsg,
     },
     network_knowledge::{NodeInfo, SectionAuthorityProvider},
@@ -30,7 +30,7 @@ use xor_name::{Prefix, XorName};
 pub(crate) struct JoiningAsRelocated {
     pub(crate) node: NodeInfo,
     genesis_key: BlsPublicKey,
-    relocate_proof: SectionAuth<NodeState>,
+    relocate_proof: (NodeState, PublicKeySet, Decision<NodeState>),
     // Avoid sending more than one duplicated request (with same SectionKey) to the same peer.
     used_recipient_saps: UsedRecipientSaps,
     dst_xorname: XorName,
@@ -45,7 +45,7 @@ impl JoiningAsRelocated {
     pub(crate) fn start(
         node: NodeInfo,
         genesis_key: BlsPublicKey,
-        relocate_proof: SectionAuth<NodeState>,
+        relocate_proof: (NodeState, PublicKeySet, Decision<NodeState>),
         bootstrap_addrs: Vec<SocketAddr>,
         dst_xorname: XorName,
         dst_section_key: BlsPublicKey,

@@ -164,8 +164,8 @@ impl Membership {
         &self.consensus.elders
     }
 
-    pub(crate) fn most_recent_decision(&self) -> Option<&Decision<NodeState>> {
-        self.history.values().last().map(|(d, _)| d)
+    pub(crate) fn decision(&self, generation: Generation) -> Option<&Decision<NodeState>> {
+        self.history.get(&generation).map(|(d, _)| d)
     }
 
     #[cfg(test)]
@@ -206,15 +206,6 @@ impl Membership {
         }
     }
 
-    pub(crate) fn is_leaving_section(&self, node: &NodeState, our_prefix: Prefix) -> bool {
-        // TODO: ideally this logic is combined with the logic in self.section_members() for deciding if a node is leaving
-        match &node.state {
-            MembershipState::Joined => false,
-            MembershipState::Left => true,
-            MembershipState::Relocated(r) => !our_prefix.matches(&r.dst),
-        }
-    }
-
     pub(crate) fn current_section_members(&self) -> BTreeMap<XorName, NodeState> {
         self.section_members(self.gen).unwrap_or_default()
     }
@@ -228,7 +219,7 @@ impl Membership {
         }
 
         for (history_gen, (decision, _)) in self.history.iter() {
-            for (node_state, _sig) in decision.proposals.iter() {
+            for node_state in decision.proposals() {
                 match node_state.state {
                     MembershipState::Joined => {
                         let _ = members.insert(node_state.name, node_state.clone());
@@ -328,10 +319,7 @@ impl Membership {
 
         if let Some(decision) = consensus.decision.clone() {
             if vote_gen == self.gen + 1 {
-                info!(
-                    "Membership - decided {:?}",
-                    BTreeSet::from_iter(decision.proposals.keys())
-                );
+                info!("Membership - decided {:?}", decision.proposals());
 
                 debug!("{}", LogMarker::VotedOffline);
                 let next_consensus = Consensus::from(

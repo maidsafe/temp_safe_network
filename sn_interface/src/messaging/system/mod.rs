@@ -15,6 +15,7 @@ mod node_state;
 mod signed;
 
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SectionAuth};
+use bls_dkg::PublicKeySet;
 pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use msg_authority::NodeMsgAuthorityUtils;
@@ -27,7 +28,7 @@ use super::{authority::SectionAuth as SectionAuthProof, AuthorityProof};
 use crate::messaging::{EndUser, MsgId, SectionAuthorityProvider};
 use crate::network_knowledge::SapCandidate;
 
-use sn_consensus::{Generation, SignedVote};
+use sn_consensus::{Decision, Generation, SignedVote};
 
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use bytes::Bytes;
@@ -83,7 +84,7 @@ pub enum SystemMsg {
         /// Our section chain truncated from the triggering msg's dst section_key (or genesis key for full proof)
         proof_chain: SecuredLinkedList,
         /// Section members
-        members: SectionPeers,
+        members: BTreeSet<(PublicKeySet, Decision<NodeState>)>,
     },
     /// Probes the network by sending a message to a random or chosen dst triggering an AE flow.
     AntiEntropyProbe,
@@ -92,7 +93,7 @@ pub enum SystemMsg {
     /// It tells the node to adjust msg sending rate according to the provided value in this msg.
     BackPressure(f64),
     /// Send from a section to the node to be immediately relocated.
-    Relocate(SectionAuth<NodeState>),
+    Relocate(NodeState, PublicKeySet, Decision<NodeState>),
     /// Membership Votes, in order they should be processed in.
     MembershipVotes(Vec<SignedVote<NodeState>>),
     /// Membership Anti-Entropy request
@@ -237,7 +238,7 @@ impl SystemMsg {
             }
 
             // Inter-node comms for joining, relocating etc.
-            SystemMsg::Relocate(_)
+            SystemMsg::Relocate(..)
             | SystemMsg::JoinRequest(_)
             | SystemMsg::JoinAsRelocatedRequest(_)
             | SystemMsg::Propose { .. }

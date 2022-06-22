@@ -8,16 +8,34 @@
 
 use crate::node::{api::cmds::Cmd, core::Node};
 
+use sn_consensus::Decision;
 use sn_interface::{
-    messaging::system::{JoinResponse, SectionAuth, SystemMsg},
-    network_knowledge::NodeState,
+    messaging::system::{JoinResponse, MembershipState, NodeState, SystemMsg},
     types::log_markers::LogMarker,
 };
 
 impl Node {
     // Send `NodeApproval` to a joining node which makes it a section member
-    pub(crate) async fn send_node_approval(&self, node_state: SectionAuth<NodeState>) -> Vec<Cmd> {
-        let peer = *node_state.peer();
+    pub(crate) async fn send_node_approvals(&self, decision: Decision<NodeState>) -> Vec<Cmd> {
+        let mut cmds = vec![];
+
+        for node_state in decision.proposals() {
+            if node_state.state != MembershipState::Joined {
+                continue;
+            }
+
+            cmds.extend(self.send_node_approval(node_state, decision.clone()).await)
+        }
+
+        cmds
+    }
+
+    async fn send_node_approval(
+        &self,
+        node_state: NodeState,
+        decision: Decision<NodeState>,
+    ) -> Vec<Cmd> {
+        let peer = node_state.peer();
         let prefix = self.network_knowledge.prefix().await;
         info!("Our section with {:?} has approved peer {}.", prefix, peer,);
 
@@ -28,7 +46,8 @@ impl Node {
                 .section_signed_authority_provider()
                 .await
                 .into_authed_msg(),
-            node_state: node_state.into_authed_msg(),
+            node_state,
+            decision: decision.clone(),
             section_chain: self.network_knowledge.section_chain().await,
         }));
 

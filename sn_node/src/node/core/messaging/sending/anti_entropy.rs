@@ -181,13 +181,7 @@ impl Node {
             self.network_knowledge.section_chain().await
         };
 
-        let members = self
-            .network_knowledge
-            .section_signed_members()
-            .await
-            .iter()
-            .map(|state| state.clone().into_authed_msg())
-            .collect();
+        let members = self.network_knowledge.membership_decisions().await;
 
         Ok(SystemMsg::AntiEntropyUpdate {
             section_auth: signed_sap.value.to_msg(),

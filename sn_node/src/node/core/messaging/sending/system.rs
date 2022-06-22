@@ -8,12 +8,13 @@
 
 use crate::node::{api::cmds::Cmd, core::Node, messages::WireMsgUtils, Error, Result};
 
+use bls_dkg::PublicKeySet;
+use sn_consensus::Decision;
 use sn_interface::{
     messaging::{
-        system::{SectionAuth, SystemMsg},
+        system::{NodeState, SystemMsg},
         AuthKind, DstLocation, WireMsg,
     },
-    network_knowledge::NodeState,
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -65,9 +66,11 @@ impl Node {
     pub(crate) async fn send_relocate(
         &self,
         recipient: Peer,
-        node_state: SectionAuth<NodeState>,
+        node_state: NodeState,
+        section_key_set: PublicKeySet,
+        decision: Decision<NodeState>,
     ) -> Result<Cmd> {
-        let node_msg = SystemMsg::Relocate(node_state.into_authed_msg());
+        let node_msg = SystemMsg::Relocate(node_state, section_key_set, decision);
         let section_pk = self.network_knowledge.section_key().await;
         self.send_direct_msg(recipient, node_msg, section_pk).await
     }

@@ -160,10 +160,10 @@ impl Node {
             // TODO: the bootstrap members should come from handover
             let bootstrap_members = BTreeSet::from_iter(
                 network_knowledge
-                    .section_signed_members()
+                    .section_members()
                     .await
                     .into_iter()
-                    .map(|section_auth| section_auth.value.to_msg()),
+                    .map(|n| n.to_msg()),
             );
 
             Some(Membership::from(

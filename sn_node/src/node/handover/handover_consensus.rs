@@ -91,7 +91,7 @@ impl Handover {
 
     pub(crate) fn handle_empty_set_decision(&mut self) {
         if let Some(decision) = &self.consensus.decision {
-            if decision.proposals.is_empty() {
+            if decision.proposals().is_empty() {
                 let new_consensus = Consensus::<SapCandidate>::from(
                     self.consensus.secret_key.clone(),
                     self.consensus.elders.clone(),
@@ -168,7 +168,7 @@ impl Handover {
         if let Some(decision) = &self.consensus.decision {
             // deterministically choose a single sap_candidate
             // sn_consensus decides on a set, we deterministically pick the min as the handover winner
-            decision.proposals.keys().min().map(|s| s.to_owned())
+            decision.proposals().into_iter().min()
         } else {
             None
         }
@@ -200,8 +200,8 @@ mod tests {
         let _ = nodes_handover_state.iter_mut().map(|state| {
             state.consensus.decision = Some(Decision {
                 votes: BTreeSet::new(),
-                proposals: BTreeMap::new(),
                 faults: BTreeSet::new(),
+                proposals_sig: elders_sk.secret_key().sign(b"placeholder"),
             });
         });
 

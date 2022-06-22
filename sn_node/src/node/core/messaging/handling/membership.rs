@@ -14,11 +14,9 @@ use crate::node::{
 
 use sn_consensus::{Generation, SignedVote, VoteResponse};
 use sn_interface::{
-    messaging::system::{KeyedSig, NodeState, SectionAuth, SystemMsg},
+    messaging::system::{NodeState, SystemMsg},
     types::{log_markers::LogMarker, Peer},
 };
-
-use std::{collections::BTreeSet, vec};
 
 // Message handling
 impl Node {
@@ -64,6 +62,8 @@ impl Node {
         let mut cmds = vec![];
 
         for signed_vote in signed_votes {
+            let vote_gen = signed_vote.vote.gen;
+
             if let Some(membership) = self.membership.write().await.as_mut() {
                 match membership.handle_signed_vote(signed_vote, &prefix) {
                     Ok(VoteResponse::Broadcast(response_vote)) => {
@@ -101,33 +101,13 @@ impl Node {
                     }
                 };
 
-                // TODO: We should be able to detect when a *new* decision is made
-                //       As it stands, we will reprocess each decision for any new vote
-                //       we receive, it should be safe to do as `HandleNewNodeOnline`
-                //       should be idempotent.
-                if let Some(decision) = membership.most_recent_decision() {
+                if let Some(decision) = membership.decision(vote_gen) {
                     // process the membership change
-                    debug!(
-                        "Handling Membership Decision {:?}",
-                        BTreeSet::from_iter(decision.proposals.keys())
-                    );
-                    for (state, signature) in &decision.proposals {
-                        let sig = KeyedSig {
-                            public_key: membership.voters_public_key_set().public_key(),
-                            signature: signature.clone(),
-                        };
-                        if membership.is_leaving_section(state, prefix) {
-                            cmds.push(Cmd::HandleNodeLeft(SectionAuth {
-                                value: state.clone(),
-                                sig,
-                            }));
-                        } else {
-                            cmds.push(Cmd::HandleNewNodeOnline(SectionAuth {
-                                value: state.clone(),
-                                sig,
-                            }));
-                        }
-                    }
+                    debug!("Reached membership decision {:?}", decision.proposals());
+                    cmds.push(Cmd::HandleMembershipChurn {
+                        section_key_set: membership.voters_public_key_set().clone(),
+                        decision: decision.clone(),
+                    });
                 }
             } else {
                 error!(

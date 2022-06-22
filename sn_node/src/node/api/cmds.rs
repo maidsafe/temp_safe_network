@@ -8,10 +8,11 @@
 
 use crate::node::{core::Proposal, XorName};
 
-use sn_consensus::Generation;
+use bls_dkg::PublicKeySet;
+use sn_consensus::{Decision, Generation};
 use sn_interface::{
     messaging::{
-        system::{DkgFailureSigSet, KeyedSig, NodeState, SectionAuth, SystemMsg},
+        system::{DkgFailureSigSet, KeyedSig, NodeState, SystemMsg},
         DstLocation, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
@@ -48,10 +49,11 @@ pub(crate) enum Cmd {
     HandlePeerLost(Peer),
     /// Handle agreement on a proposal.
     HandleAgreement { proposal: Proposal, sig: KeyedSig },
-    /// Handle a new Node joining agreement.
-    HandleNewNodeOnline(SectionAuth<NodeState>),
     /// Handle a Node leaving agreement.
-    HandleNodeLeft(SectionAuth<NodeState>),
+    HandleMembershipChurn {
+        section_key_set: PublicKeySet,
+        decision: Decision<NodeState>,
+    },
     /// Handle agree on elders. This blocks node message processing until complete.
     HandleNewEldersAgreement { proposal: Proposal, sig: KeyedSig },
     /// Handle the outcome of a DKG session where we are one of the participants (that is, one of
@@ -112,8 +114,7 @@ impl fmt::Display for Cmd {
             Cmd::HandlePeerLost(peer) => write!(f, "HandlePeerLost({:?})", peer.name()),
             Cmd::HandleAgreement { .. } => write!(f, "HandleAgreement"),
             Cmd::HandleNewEldersAgreement { .. } => write!(f, "HandleNewEldersAgreement"),
-            Cmd::HandleNewNodeOnline(_) => write!(f, "HandleNewNodeOnline"),
-            Cmd::HandleNodeLeft(_) => write!(f, "HandleNodeLeft"),
+            Cmd::HandleMembershipChurn { .. } => write!(f, "HandleMembershipChurn"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Cmd::HandleDkgFailure(_) => write!(f, "HandleDkgFailure"),
             #[cfg(not(test))]
