@@ -465,7 +465,9 @@ impl Session {
 
         let (target_count, dst_address_of_bounced_msg) = match service_msg.clone() {
             ServiceMsg::Cmd(cmd) => (at_least_one_correct_elder(), cmd.dst_name()),
-            ServiceMsg::Query(query) => (NUM_OF_ELDERS_SUBSET_FOR_QUERIES, query.dst_name()),
+            ServiceMsg::Query(query) => {
+                (NUM_OF_ELDERS_SUBSET_FOR_QUERIES, query.variant.dst_name())
+            }
             _ => {
                 warn!(
                     "Invalid bounced msg {:?} received in AE response: {:?}. Msg is of invalid type",

@@ -23,6 +23,7 @@ pub use self::{
     },
     errors::{Error, Result},
     query::DataQuery,
+    query::DataQueryVariant,
     register::{
         CreateRegister, EditRegister, ExtendRegister, RegisterCmd, RegisterQuery,
         SignedRegisterCreate, SignedRegisterEdit, SignedRegisterExtend,
@@ -145,7 +146,7 @@ impl ServiceMsg {
     pub fn dst_address(&self) -> Option<XorName> {
         match self {
             Self::Cmd(cmd) => Some(cmd.dst_name()),
-            Self::Query(query) => Some(query.dst_name()),
+            Self::Query(query) => Some(query.variant.dst_name()),
             _ => None,
         }
     }
