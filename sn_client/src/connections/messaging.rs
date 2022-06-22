@@ -12,7 +12,7 @@ use crate::{connections::CmdResponse, Error, Result};
 
 use sn_interface::{
     messaging::{
-        data::{CmdError, DataQuery, QueryResponse},
+        data::{CmdError, DataQuery, DataQueryVariant, QueryResponse},
         AuthKind, DstLocation, MsgId, ServiceAuth, WireMsg,
     },
     network_knowledge::{prefix_map::NetworkPrefixMap, supermajority},
@@ -181,13 +181,13 @@ impl Session {
     ) -> Result<QueryResult> {
         let endpoint = self.endpoint.clone();
 
-        let chunk_addr = if let DataQuery::GetChunk(address) = query {
+        let chunk_addr = if let DataQueryVariant::GetChunk(address) = query.variant {
             Some(address)
         } else {
             None
         };
 
-        let dst = query.dst_name();
+        let dst = query.variant.dst_name();
 
         let (section_pk, elders) = self.get_query_elders(dst).await?;
         let elders_len = elders.len();
@@ -204,7 +204,7 @@ impl Session {
 
         let (sender, mut receiver) = channel::<QueryResponse>(7);
 
-        if let Ok(op_id) = query.operation_id() {
+        if let Ok(op_id) = query.variant.operation_id() {
             // Insert the response sender
             trace!("Inserting channel for op_id {:?}", (msg_id, op_id));
             if let Some(mut entry) = self.pending_queries.get_mut(&op_id) {

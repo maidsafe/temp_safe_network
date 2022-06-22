@@ -193,10 +193,10 @@ impl Node {
         self.capacity.full_adults().await
     }
 
-    /// Used to fetch the list of holders for given data name. Includes full nodes
+    /// Construct list of adults that hold target data, including full nodes.
+    /// List is sorted by distance from `target`.
     async fn get_adults_holding_data_including_full(&self, target: &XorName) -> BTreeSet<XorName> {
         let full_adults = self.full_adults().await;
-        // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
         let adults = self.network_knowledge().adults().await;
 
         let adults_names = adults.iter().map(|p2p_node| p2p_node.name());

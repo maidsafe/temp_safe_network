@@ -20,7 +20,7 @@ use crate::{connections::Session, errors::Error, ClientConfig};
 use sn_dbc::{rng, Owner};
 use sn_interface::{
     messaging::{
-        data::{CmdError, DataQuery, RegisterQuery, ServiceMsg},
+        data::{CmdError, DataQuery, DataQueryVariant, RegisterQuery, ServiceMsg},
         ServiceAuth, WireMsg,
     },
     network_knowledge::{prefix_map::NetworkPrefixMap, utils::read_prefix_map_from_disk},
@@ -184,11 +184,13 @@ impl Client {
             // Generate a random query to send a dummy message
             let random_dst_addr = xor_name::rand::random();
             let serialised_cmd = {
-                let msg =
-                    ServiceMsg::Query(DataQuery::Register(RegisterQuery::Get(RegisterAddress {
+                let msg = ServiceMsg::Query(DataQuery {
+                    adult: 0,
+                    variant: DataQueryVariant::Register(RegisterQuery::Get(RegisterAddress {
                         name: random_dst_addr,
                         tag: 1,
-                    })));
+                    })),
+                });
                 WireMsg::serialize_msg_payload(&msg)?
             };
             let signature = client.keypair.sign(&serialised_cmd);

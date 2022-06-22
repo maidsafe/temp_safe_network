@@ -15,7 +15,7 @@ use sn_interface::{
     data_copy_count,
     messaging::{
         data::{
-            CmdError, DataCmd, DataQuery, EditRegister, Error as ErrorMsg, ServiceMsg,
+            CmdError, DataCmd, DataQueryVariant, EditRegister, Error as ErrorMsg, ServiceMsg,
             SignedRegisterEdit, SpentbookCmd,
         },
         system::{NodeQueryResponse, SystemMsg},
@@ -37,7 +37,7 @@ impl Node {
     pub(crate) async fn handle_data_query_at_adult(
         &self,
         correlation_id: MsgId,
-        query: &DataQuery,
+        query: &DataQueryVariant,
         auth: ServiceAuth,
         user: EndUser,
         requesting_elder: XorName,

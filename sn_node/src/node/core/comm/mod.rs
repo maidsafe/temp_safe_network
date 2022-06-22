@@ -621,7 +621,7 @@ mod tests {
 
     use sn_interface::{
         messaging::{
-            data::{DataQuery, ServiceMsg},
+            data::{DataQuery, DataQueryVariant, ServiceMsg},
             AuthKind, DstLocation, MsgId, ServiceAuth,
         },
         types::{ChunkAddress, Keypair, Peer},
@@ -954,12 +954,13 @@ mod tests {
 
         let src_keypair = Keypair::new_ed25519();
 
-        let msg = ServiceMsg::Query(DataQuery::GetChunk(ChunkAddress(xor_name::rand::random())));
-        let payload = WireMsg::serialize_msg_payload(&msg)?;
-        let auth = ServiceAuth {
-            public_key: src_keypair.public_key(),
-            signature: src_keypair.sign(&payload),
+        let query = DataQueryVariant::GetChunk(ChunkAddress(xor_name::rand::random()));
+        let query = DataQuery {
+            adult: 0,
+            variant: query,
         };
+        let query = ServiceMsg::Query(query);
+        let payload = WireMsg::serialize_msg_payload(&query)?;
 
         let wire_msg =
             WireMsg::new_msg(MsgId::new(), payload, AuthKind::Service(auth), dst_location)?;

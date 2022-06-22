@@ -11,7 +11,7 @@ use crate::{connections::QueryResult, errors::Error};
 
 use sn_interface::{
     messaging::{
-        data::{DataQuery, ServiceMsg},
+        data::{DataQuery, DataQueryVariant, ServiceMsg},
         ServiceAuth, WireMsg,
     },
     types::{PublicKey, Signature},
@@ -29,7 +29,7 @@ impl Client {
     /// Send a Query to the network and await a response.
     /// Queries are automatically retried using exponential backoff if the timeout is hit.
     #[instrument(skip(self), level = "debug")]
-    pub async fn send_query(&self, query: DataQuery) -> Result<QueryResult, Error> {
+    pub async fn send_query(&self, query: DataQueryVariant) -> Result<QueryResult, Error> {
         self.send_query_with_retry_count(query, MAX_RETRY_COUNT)
             .await
     }
@@ -37,7 +37,10 @@ impl Client {
     /// Send a Query to the network and await a response.
     /// Queries are not retried if the timeout is hit.
     #[instrument(skip(self), level = "debug")]
-    pub async fn send_query_without_retry(&self, query: DataQuery) -> Result<QueryResult, Error> {
+    pub async fn send_query_without_retry(
+        &self,
+        query: DataQueryVariant,
+    ) -> Result<QueryResult, Error> {
         self.send_query_with_retry_count(query, 1.0).await
     }
 
@@ -47,7 +50,7 @@ impl Client {
     #[instrument(skip(self), level = "debug")]
     async fn send_query_with_retry_count(
         &self,
-        query: DataQuery,
+        query: DataQueryVariant,
         retry_count: f32,
     ) -> Result<QueryResult, Error> {
         let client_pk = self.public_key();

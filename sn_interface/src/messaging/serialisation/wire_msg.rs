@@ -260,7 +260,7 @@ mod tests {
     use super::*;
     use crate::{
         messaging::{
-            data::{DataQuery, ServiceMsg, StorageLevel},
+            data::{DataQuery, DataQueryVariant, ServiceMsg, StorageLevel},
             system::{NodeCmd, SystemMsg},
             AuthorityProof, MsgId, NodeAuth, ServiceAuth,
         },
@@ -335,8 +335,10 @@ mod tests {
 
         let msg_id = MsgId::new();
 
-        let client_msg =
-            ServiceMsg::Query(DataQuery::GetChunk(ChunkAddress(xor_name::rand::random())));
+        let client_msg = ServiceMsg::Query(DataQuery {
+            adult: 0,
+            variant: DataQueryVariant::GetChunk(ChunkAddress(xor_name::rand::random())),
+        });
 
         let payload = WireMsg::serialize_msg_payload(&client_msg)?;
         let auth = ServiceAuth {
