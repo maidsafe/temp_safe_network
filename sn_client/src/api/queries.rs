@@ -10,6 +10,7 @@ use super::Client;
 use crate::{connections::QueryResult, errors::Error};
 
 use sn_interface::{
+    data_copy_count,
     messaging::{
         data::{DataQuery, DataQueryVariant, ServiceMsg},
         ServiceAuth, WireMsg,
@@ -54,12 +55,12 @@ impl Client {
         retry_count: f32,
     ) -> Result<QueryResult, Error> {
         let client_pk = self.public_key();
-        let msg = ServiceMsg::Query(query.clone());
-        let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
-        let signature = self.keypair.sign(&serialised_query);
+        let mut query = DataQuery {
+            adult_index: 0,
+            variant: query,
+        };
 
         let mut rng = rand::rngs::OsRng;
-
         // Add jitter so not all clients retry at the same rate. This divider will knock on to the overall retry window
         // and should help prevent elders from being conseceutively overwhelmed
         let jitter = rng.gen_range(1.0..1.5);
@@ -70,6 +71,10 @@ impl Client {
         let _ = span.enter();
         let mut attempt = 1.0;
         loop {
+            let msg = ServiceMsg::Query(query.clone());
+            let serialised_query = WireMsg::serialize_msg_payload(&msg)?;
+            let signature = self.keypair.sign(&serialised_query);
+
             debug!(
                 "Attempting {:?} (attempt #{}) with a query timeout of {:?}",
                 query, attempt, attempt_timeout
@@ -97,6 +102,13 @@ impl Client {
             }
 
             attempt += 1.0;
+
+            // In the next attempt, try the next adult, further away.
+            query.adult_index += 1;
+            // There should not be more than a certain amount of adults holding copies of the data. Retry the closest adult again.
+            if query.adult_index >= data_copy_count() {
+                query.adult_index = 0;
+            }
         }
     }
 

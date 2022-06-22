@@ -61,8 +61,8 @@ impl Node {
         auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
     ) -> Result<Vec<Cmd>> {
-        let address = query.address();
-        let operation_id = query.operation_id()?;
+        let address = query.variant.address();
+        let operation_id = query.variant.operation_id()?;
         trace!(
             "{:?} preparing to query adults for data at {:?} with op_id: {:?}",
             LogMarker::DataQueryReceviedAtElder,
@@ -73,6 +73,16 @@ impl Node {
         let targets = self
             .get_adults_holding_data_including_full(address.name())
             .await;
+
+        // Query only the nth adult
+        let targets = BTreeSet::from_iter(
+            targets
+                .iter()
+                .nth(query.adult_index) // Grab only nth adult
+                .iter() // Get Iter of length 0 (if nth adult does not exists) or 1
+                .copied() // &&XorName -> &XorName
+                .copied(), // &XorName -> XorName
+        );
 
         if targets.is_empty() {
             let error =
@@ -128,7 +138,7 @@ impl Node {
                 .await;
 
             let msg = SystemMsg::NodeQuery(NodeQuery::Data {
-                query,
+                query: query.variant,
                 auth: auth.into_inner(),
                 origin: EndUser(origin.name()),
                 correlation_id: MsgId::from_xor_name(*address.name()),

@@ -185,7 +185,7 @@ impl Client {
             let random_dst_addr = xor_name::rand::random();
             let serialised_cmd = {
                 let msg = ServiceMsg::Query(DataQuery {
-                    adult: 0,
+                    adult_index: 0,
                     variant: DataQueryVariant::Register(RegisterQuery::Get(RegisterAddress {
                         name: random_dst_addr,
                         tag: 1,

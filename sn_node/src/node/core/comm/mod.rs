@@ -956,11 +956,16 @@ mod tests {
 
         let query = DataQueryVariant::GetChunk(ChunkAddress(xor_name::rand::random()));
         let query = DataQuery {
-            adult: 0,
+            adult_index: 0,
             variant: query,
         };
         let query = ServiceMsg::Query(query);
         let payload = WireMsg::serialize_msg_payload(&query)?;
+
+        let auth = ServiceAuth {
+            public_key: src_keypair.public_key(),
+            signature: src_keypair.sign(&payload),
+        };
 
         let wire_msg =
             WireMsg::new_msg(MsgId::new(), payload, AuthKind::Service(auth), dst_location)?;
