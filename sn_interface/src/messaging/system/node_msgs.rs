@@ -7,10 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    data::{
-        DataQueryVariant, MetadataExchange, OperationId, QueryResponse, Result,
-        StorageLevel,
-    },
+    data::{DataQueryVariant, MetadataExchange, OperationId, QueryResponse, Result, StorageLevel},
     EndUser, MsgId, ServiceAuth,
 };
 use crate::types::{

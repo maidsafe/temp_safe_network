@@ -346,7 +346,7 @@ mod tests {
         let msg_id = MsgId::new();
 
         let client_msg = ServiceMsg::Query(DataQuery {
-            adult: 0,
+            adult_index: 0,
             variant: DataQueryVariant::GetChunk(ChunkAddress(xor_name::rand::random())),
         });
 

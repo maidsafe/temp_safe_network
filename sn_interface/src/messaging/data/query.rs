@@ -14,6 +14,15 @@ use crate::types::{ChunkAddress, ReplicatedDataAddress, SpentbookAddress};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
+/// A query for requesting (meta)data at a particular adult.
+#[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
+pub struct DataQuery {
+    /// The actual query, e.g. retrieving a Chunk or Register
+    pub variant: DataQueryVariant,
+    /// nth closest adult (XOR distance) to query for data
+    pub adult_index: usize,
+}
+
 /// Data queries - retrieving data and inspecting their structure.
 ///
 /// See the [`types`] module documentation for more details of the types supported by the Safe
