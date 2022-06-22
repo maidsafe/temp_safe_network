@@ -274,6 +274,12 @@ jobs:
         shell: bash
         run: cd sn_client && cargo run --release --example client_files
 
+      - name: Ensure no nodes have left during test runs
+        timeout-minutes: 1
+        shell: bash
+        if: matrix.os != 'windows-latest'
+        run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left
+
       - name: Are nodes still running...?
         shell: bash
         timeout-minutes: 1
@@ -413,10 +419,15 @@ jobs:
         shell: bash
         run: cd sn_client && cargo run  --release --example client_files
 
+      - name: Ensure no nodes have left during test runs
+        timeout-minutes: 1
+        shell: bash
+        if: matrix.os != 'windows-latest'
+        run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left
+
       - name: Are nodes still running...?
         shell: bash
         timeout-minutes: 1
-        if: failure()
         continue-on-error: true
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
@@ -524,6 +535,13 @@ jobs:
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
 
+      - name: Ensure no nodes have left during test runs
+        timeout-minutes: 1
+        shell: bash
+        if: matrix.os != 'windows-latest'
+        run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left
+
+
       - name: Print Network Log Stats
         shell: bash
         continue-on-error: true
@@ -615,6 +633,12 @@ jobs:
         run: |
           echo "$(pgrep sn_node | wc -l) nodes still running"
           ls $HOME/.safe/node/local-test-network
+
+      - name: Ensure no nodes have left during test runs
+        timeout-minutes: 1
+        shell: bash
+        if: matrix.os != 'windows-latest'
+        run: rg "Membership - decided" $HOME/.safe/node/local-test-network | rg Left
 
       - name: Print Network Log Stats
         shell: bash
