@@ -115,8 +115,8 @@ pub fn create_credentials_file(config: &Config) -> Result<(File, PathBuf)> {
 
 pub fn read_credentials(safe: &Safe, config: &Config) -> Result<(PathBuf, Option<Keypair>)> {
     let (_, path) = get_credentials_file_path(config)?;
-    let keypair = match safe.deserialize_keypair(&path) {
-        Ok(kp) => Some(kp),
+    let keypair = match safe.deserialize_bls_key(&path) {
+        Ok(sk) => Some(Keypair::bls_from_hex(&sk.to_hex())?),
         Err(e) => {
             debug!("Unable to read credentials from {}: {}", path.display(), e);
             None

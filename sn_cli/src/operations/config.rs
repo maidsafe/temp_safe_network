@@ -9,7 +9,7 @@
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Help, Report, Result};
 use comfy_table::Table;
 use serde::{Deserialize, Serialize};
-use sn_api::keys::deserialize_keypair;
+use sn_api::keys::deserialize_bls_key;
 use sn_api::{NodeConfig, PublicKey};
 use sn_dbc::Owner;
 use std::{
@@ -366,11 +366,7 @@ impl Config {
 
     async fn get_dbc_owner(dbc_sk_path: &Path) -> Result<Option<Owner>> {
         if dbc_sk_path.exists() {
-            let keypair = deserialize_keypair(dbc_sk_path)?;
-            let sk = keypair.secret_key()?.bls().ok_or_else(|| {
-                eyre!("The CLI keypair must be a BLS keypair.")
-                    .suggestion("Use the keys create command to generate a BLS keypair.")
-            })?;
+            let sk = deserialize_bls_key(dbc_sk_path)?;
             return Ok(Some(Owner::from(sk)));
         }
         Ok(None)
@@ -460,9 +456,10 @@ pub fn serialise_node_config(node_config: &NodeConfig) -> Result<String> {
 mod constructor {
     use super::{Config, NetworkInfo};
     use assert_fs::prelude::*;
+    use bls::SecretKey;
     use color_eyre::{eyre::eyre, Result};
     use predicates::prelude::*;
-    use sn_api::{Keypair, Safe};
+    use sn_api::Safe;
     use std::net::SocketAddr;
     use std::path::PathBuf;
 
@@ -475,9 +472,9 @@ mod constructor {
         let cli_config_file = cli_config_dir.child("config.json");
         let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
         let dbc_owner_sk_file = cli_config_dir.child("credentials");
-        let keypair = Keypair::new_bls();
+        let sk = SecretKey::random();
         let safe = Safe::dry_runner(None);
-        safe.serialize_keypair(&keypair, dbc_owner_sk_file.path())?;
+        safe.serialize_bls_key(&sk, dbc_owner_sk_file.path())?;
 
         let config = Config::new(
             PathBuf::from(cli_config_file.path()),
