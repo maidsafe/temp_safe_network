@@ -16,3 +16,6 @@ cc 431f58262fc80eee37c76d2d47244c45a4382a5d19f7481b0d3887e70bdbec44 # shrinks to
 cc 2cebe98b0b3287054764b94fc83bc59088d032e2ec2a2f7fd0a615c56d874d9c # shrinks to good_nodes = 21, bad_nodes = 6, issue_count = 1258, issue_type = Communication
 cc 6b03329bb1fb9be03b4151e5220185851dd272bd10353ad96e3678b814c4c581 # shrinks to good_nodes = 19, bad_nodes = 6, issue_count = 4005, issue_type = Communication
 cc b4559601eb25f3776c1689092a9f91d27aa514423a11cd2a9e337df326d5c264 # shrinks to good_nodes = 18, bad_nodes = 6, issue_count = 3030, issue_type = Communication
+cc 920ef2635386ecd1b589f63eccf9171a7c016f426032e6cf3d5d3a8e9f782064 # shrinks to good_nodes = 20, bad_nodes = 6, issue_count = 6498, issue_type = PendingRequestOperation(Some(OpId-eaacf3..))
+cc be42c3c09acdcc0bc29cc40c4c17aba97159abf6c6bda2826830d58003c115f4 # shrinks to good_nodes = 18, bad_nodes = 6, issue_count = 2031, issue_type = Communication
+cc a5c69d90bd9df96b892601d9f1872122ce9ad373feb5d945a9f2c8c56bc0a934 # shrinks to good_nodes = 21, bad_nodes = 6, issue_count = 2247, issue_type = PendingRequestOperation(Some(OpId-431097..))
