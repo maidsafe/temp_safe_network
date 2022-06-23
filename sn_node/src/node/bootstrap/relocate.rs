@@ -265,3 +265,230 @@ impl JoiningAsRelocated {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::JoiningAsRelocated;
+    use crate::node::Cmd;
+    use color_eyre::Result;
+    use eyre::eyre;
+    use sn_interface::{
+        elder_count,
+        messaging::{
+            system::{JoinAsRelocatedResponse, NodeState, SystemMsg},
+            MsgType, SectionAuthorityProvider,
+        },
+        network_knowledge::{
+            test_utils::{gen_addr, section_signed},
+            NodeInfo, MIN_ADULT_AGE,
+        },
+        types::keys::ed25519,
+    };
+    use std::{collections::BTreeMap, net::SocketAddr};
+    use tokio;
+    use xor_name::{Prefix, XorName};
+
+    #[tokio::test]
+    async fn should_send_join_as_relocated_request_system_msg() -> Result<()> {
+        // from_sap
+        let (mut from_sap, from_sk_set) = generate_sap();
+        let node = NodeInfo::new(
+            ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
+            gen_addr(),
+        );
+        let node_state = NodeState::joined(node.name(), node.addr, None);
+        let _ = from_sap.members.insert(node.name(), node_state.clone());
+        let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state)?;
+        // to_sap
+        let (to_sap, _) = generate_sap();
+
+        let bootstrap: Vec<SocketAddr> = to_sap.elders.iter().map(|(_, addr)| *addr).collect();
+        let (_, cmd) = JoiningAsRelocated::start(
+            node.clone(),
+            from_sk_set.secret_key().public_key(),
+            signed_node_state,
+            bootstrap.clone(),
+            node.name(),
+            bls::SecretKey::random().public_key(),
+            node.age() + 1,
+        )?;
+
+        match cmd {
+            Cmd::SendMsg {
+                recipients,
+                wire_msg,
+            } => {
+                assert_eq!(bootstrap.len(), recipients.len());
+                if !matches!(
+                    wire_msg.into_msg(),
+                    Ok(MsgType::System {
+                        msg: SystemMsg::JoinAsRelocatedRequest(_),
+                        ..
+                    })
+                ) {
+                    return Err(eyre!("Should be JoinAsRelocatedRequest"));
+                }
+            }
+            _ => return Err(eyre!("Should be SendMsg")),
+        };
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn retry_and_redirect_should_update_the_node_with_latest_sap_of_the_destination_section(
+    ) -> Result<()> {
+        // destination section sends its updated SAP
+        relocate(Response::Retry).await?;
+        // incorrect section sends the SAP of the correct section
+        relocate(Response::Redirect).await?;
+
+        async fn relocate(response: Response) -> Result<()> {
+            // from_sap
+            let (mut from_sap, from_sk_set) = generate_sap();
+            let node = NodeInfo::new(
+                ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
+                gen_addr(),
+            );
+            let node_state = NodeState::joined(node.name(), node.addr, None);
+            let _ = from_sap.members.insert(node.name(), node_state.clone());
+            let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state)?;
+            // to_sap
+            let (to_sap, to_sk_set) = generate_sap();
+
+            let bootstrap: Vec<SocketAddr> = to_sap.elders.iter().map(|(_, addr)| *addr).collect();
+            let (mut joining, _) = JoiningAsRelocated::start(
+                node.clone(),
+                from_sk_set.secret_key().public_key(),
+                signed_node_state,
+                bootstrap,
+                // initially with our own xorname
+                node.name(),
+                // initially we have outdated destination section key
+                bls::SecretKey::random().public_key(),
+                node.age() + 1,
+            )?;
+
+            // destination section sends Retry/Redirect response with its latest SAP
+            let response = match response {
+                Response::Retry => JoinAsRelocatedResponse::Retry(to_sap.clone()),
+                Response::Redirect => JoinAsRelocatedResponse::Redirect(to_sap.clone()),
+            };
+            let (_, sender) = to_sap
+                .elders
+                .iter()
+                .next()
+                .ok_or_else(|| eyre!("Elder will be present"))?;
+            let handled = joining
+                .handle_join_response(response.clone(), *sender)
+                .await;
+
+            // updated with section's latest key
+            assert_eq!(joining.dst_section_key, to_sk_set.secret_key().public_key());
+            // new name is set
+            assert_ne!(joining.node.name(), node.name());
+            if let Ok(Some(Cmd::SendMsg {
+                recipients,
+                wire_msg,
+            })) = handled
+            {
+                assert_eq!(recipients.len(), elder_count());
+                assert_eq!(
+                    wire_msg
+                        .dst_section_pk()
+                        .ok_or_else(|| eyre!("Should be present"))?,
+                    joining.dst_section_key
+                );
+            }
+
+            // The to_sap's elder list is exhausted after the first handle_join_response
+            // Thus it should return None when new_recipients is empty and with outdated section key
+            joining.dst_section_key = bls::SecretKey::random().public_key();
+            let handled = joining.handle_join_response(response, *sender).await;
+            if let Ok(Some(_)) = handled {
+                return Err(eyre!("Should return Ok(None)"));
+            }
+
+            Ok(())
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn retry_and_redirect_should_return_none_on_latest_sap() -> Result<()> {
+        relocate(Response::Retry).await?;
+        relocate(Response::Redirect).await?;
+
+        async fn relocate(response: Response) -> Result<()> {
+            // from_sap
+            let (mut from_sap, from_sk_set) = generate_sap();
+            let node = NodeInfo::new(
+                ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
+                gen_addr(),
+            );
+            let node_state = NodeState::joined(node.name(), node.addr, None);
+            let _ = from_sap.members.insert(node.name(), node_state.clone());
+            let signed_node_state = section_signed(&from_sk_set.secret_key(), node_state)?;
+            // to_sap
+            let (to_sap, to_sk_set) = generate_sap();
+
+            let bootstrap: Vec<SocketAddr> = to_sap.elders.iter().map(|(_, addr)| *addr).collect();
+            let (mut joining, _) = JoiningAsRelocated::start(
+                node.clone(),
+                from_sk_set.secret_key().public_key(),
+                signed_node_state,
+                bootstrap,
+                node.name(),
+                // latest section key of the destination
+                to_sk_set.secret_key().public_key(),
+                node.age() + 1,
+            )?;
+
+            // destination section sends Retry/Redirect response with its latest SAP
+            let response = match response {
+                Response::Retry => JoinAsRelocatedResponse::Retry(to_sap.clone()),
+                Response::Redirect => JoinAsRelocatedResponse::Redirect(to_sap.clone()),
+            };
+            let (_, sender) = to_sap
+                .elders
+                .iter()
+                .next()
+                .ok_or_else(|| eyre!("Elder will be present"))?;
+            let handled = joining
+                .handle_join_response(response.clone(), *sender)
+                .await;
+
+            if let Ok(Some(_)) = handled {
+                return Err(eyre!("Should return Ok(None)"));
+            }
+            Ok(())
+        }
+        Ok(())
+    }
+
+    enum Response {
+        Retry,
+        Redirect,
+    }
+
+    fn generate_sap() -> (SectionAuthorityProvider, bls::SecretKeySet) {
+        let sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
+
+        let mut elders: BTreeMap<XorName, SocketAddr> = BTreeMap::new();
+        let mut members: BTreeMap<XorName, NodeState> = BTreeMap::new();
+
+        for _ in 0..elder_count() {
+            let xor_name = xor_name::rand::random();
+            let socket_addr = gen_addr();
+            let _ = elders.insert(xor_name, socket_addr);
+            let _ = members.insert(xor_name, NodeState::joined(xor_name, socket_addr, None));
+        }
+        let sap = SectionAuthorityProvider {
+            prefix: Prefix::default(),
+            public_key_set: sk_set.public_keys(),
+            elders,
+            members,
+            membership_gen: 0,
+        };
+        (sap, sk_set)
+    }
+}
