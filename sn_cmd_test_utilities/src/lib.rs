@@ -101,15 +101,6 @@ pub mod util {
         }
     }
 
-    pub fn create_and_get_keys() -> Result<(String, String)> {
-        let pk_cmd_result = safe_cmd_stdout(["keys", "create", "--json"], Some(0))?;
-
-        let (xorurl, (_pk, sk)): (SafeUrl, (String, String)) =
-            parse_keys_create_output(&pk_cmd_result)?;
-
-        Ok((xorurl.to_string(), sk))
-    }
-
     pub fn create_nrs_link(name: &str, link: &str) -> Result<SafeUrl> {
         let nrs_creation = safe_cmd_stdout(["nrs", "create", name, "-l", link, "--json"], Some(0))?;
         let (_, nrs_map_xorurl, _change_map) = parse_nrs_register_output(&nrs_creation)?;
@@ -341,7 +332,7 @@ pub mod util {
             .map_err(|_| eyre!("Failed to parse output of `safe dog`: {}", output))
     }
 
-    pub fn parse_keys_create_output(output: &str) -> Result<(SafeUrl, (String, String))> {
+    pub fn parse_keys_create_output(output: &str) -> Result<(String, String)> {
         serde_json::from_str(output)
             .map_err(|_| eyre!("Failed to parse output of `safe keys create`: {}", output))
     }

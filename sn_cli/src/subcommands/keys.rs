@@ -11,7 +11,7 @@ use crate::operations::auth_and_connect::{get_credentials_file_path, read_creden
 use crate::operations::config::Config;
 use bls::SecretKey;
 use color_eyre::{eyre::WrapErr, Result};
-use sn_api::{resolver::SafeUrl, Keypair, Safe, XorName};
+use sn_api::Safe;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -42,15 +42,15 @@ pub async fn key_commander(
         KeysSubCommands::Show { show_sk } => {
             match read_credentials(safe, config)? {
                 (file_path, Some(keypair)) => {
-                    let xorname = XorName::from(keypair.public_key());
-                    let xorurl = SafeUrl::from_safekey(xorname)?.encode(safe.xorurl_base);
                     let (pk_hex, sk_hex) = keypair.to_hex()?;
-
-                    println!("Current CLI's SafeKey found at {}:", file_path.display());
-                    println!("XOR-URL: {}", xorurl);
-                    println!("Public Key: {}", pk_hex);
-                    if show_sk {
-                        println!("Secret Key: {}", sk_hex);
+                    if output_fmt == OutputFmt::Pretty {
+                        println!("CLI credentials located at {}", file_path.display());
+                        println!("Public Key: {}", pk_hex);
+                        if show_sk {
+                            println!("Secret Key: {}", sk_hex);
+                        }
+                    } else {
+                        println!("{}", serialise_output(&(pk_hex, sk_hex), output_fmt));
                     }
                 }
                 (file_path, None) => println!("No SafeKey found at {}", file_path.display()),
