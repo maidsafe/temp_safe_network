@@ -309,7 +309,7 @@ jobs:
     name: E2E tests w/ full network
     runs-on: self-hosted-ubuntu
     env:
-      NODE_COUNT: 33
+      NODE_COUNT: 15
     steps:
       - uses: actions/checkout@v2
 
@@ -342,9 +342,9 @@ jobs:
         run: cargo build  --release --bin log_cmds_inspector
         timeout-minutes: 60
 
-      # This starts a 25 node network, we should kill before moving on to split checks
+      # This starts a NODE_COUNT node network, and then adds 12 more nodes. We should kill before moving on to split checks
       - name: Run network churn data integrity test
-        timeout-minutes: 30
+        timeout-minutes: 35 # made 35 for now due to client slowdown. TODO: fix that!
         shell: bash
         run: cargo run --release --example churn
         env:
@@ -362,9 +362,9 @@ jobs:
           sleep 10
           rm -rf ~/.safe
 
-      # This starts a 30 node network
+      # This starts a NODE_COUNT node network, and then adds 15 _more_ nodes
       - name: Run network split data integrity test
-        timeout-minutes: 30
+        timeout-minutes: 35 # made 35 for now due to client slowdown. TODO: fix that!
         shell: bash
         run: cargo run --release --example network_split
         env:
