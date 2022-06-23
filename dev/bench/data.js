@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1655978229124,
+  "lastUpdate": 1655993466293,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -5579,6 +5579,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 8701450338,
             "range": "± 183459773",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "2415f169917f101459ec6273375dc5e2cbbd06d4",
+          "message": "Merge #1261\n\n1261: feat(flow_control): organize internal work r=joshuef a=oetyng\n\n- Organizes internal work so that internal cmds (work) are now dealt\r\nwith according to priority.\r\n- Enables adaptive throughput of cmds.\r\n- Prepares for logging of cmds separately (future feat).\r\n\n\nCo-authored-by: oetyng <oetyng@gmail.com>",
+          "timestamp": "2022-06-23T12:37:48Z",
+          "tree_id": "bb031e1f0a321511ba34d8216a6e533a577a5d25",
+          "url": "https://github.com/maidsafe/safe_network/commit/2415f169917f101459ec6273375dc5e2cbbd06d4"
+        },
+        "date": 1655993463865,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 6647123729,
+            "range": "± 80026366",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 7121897475,
+            "range": "± 1514478596",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 17892920867,
+            "range": "± 799884178",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 6023935578,
+            "range": "± 3901480",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 6316114008,
+            "range": "± 89757513",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 12132613430,
+            "range": "± 519236453",
             "unit": "ns/iter"
           }
         ]
