@@ -15,7 +15,6 @@
 use super::super::{Error, Result};
 use super::super::{PublicKey, SecretKey, Signature, SignatureShare};
 
-use crate::types::errors::convert_bincode_error;
 use bls::{self, serde_impl::SerdeSecret, PublicKeySet};
 use bytes::Bytes;
 use ed25519_dalek::Signer;
@@ -172,6 +171,19 @@ impl Keypair {
         }))
     }
 
+    /// Get a BLS keypair from a hex representation of the secret key.
+    ///
+    /// In BLS, the public key is derivable from the secret key.
+    pub fn bls_from_hex(sk_hex: &str) -> Result<Self> {
+        let sk = bls::SecretKey::from_hex(sk_hex)?;
+        let pk = sk.public_key();
+        let keypair = BlsKeypair {
+            secret: SerdeSecret(sk),
+            public: pk,
+        };
+        Ok(Self::Bls(Arc::new(keypair)))
+    }
+
     /// Returns the public key associated with this keypair.
     pub fn public_key(&self) -> PublicKey {
         match self {
@@ -214,17 +226,13 @@ impl Keypair {
         let pk = self.public_key();
         let pk_hex = match pk {
             PublicKey::Ed25519(key) => hex::encode(key.to_bytes()),
-            PublicKey::Bls(key) => hex::encode(key.to_bytes()),
+            PublicKey::Bls(key) => key.to_hex(),
             PublicKey::BlsShare(key) => hex::encode(key.to_bytes()),
         };
         let sk = self.secret_key()?;
         let sk_hex = match sk {
             SecretKey::Ed25519(key) => hex::encode(key.to_bytes()),
-            SecretKey::Bls(key) => {
-                let mut bytes = bincode::serialize(&key).map_err(convert_bincode_error)?;
-                bytes.reverse();
-                hex::encode(bytes)
-            }
+            SecretKey::Bls(key) => key.to_hex(),
             SecretKey::BlsShare(key) => key.inner().reveal(),
         };
         Ok((pk_hex, sk_hex))
@@ -267,7 +275,6 @@ pub struct BlsKeypair {
 mod tests {
     use super::super::super::utils;
     use super::*;
-    use crate::types::errors::convert_bincode_error;
 
     #[test]
     fn should_serialise_an_ed25519_keypair() -> Result<()> {
@@ -318,24 +325,40 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "there is a problem with decoding the secret key hex representation"]
     fn to_hex_should_convert_bls_keypair_to_hex() -> Result<()> {
         let keypair = Keypair::new_bls();
-        let pk = keypair.public_key();
-
         let (pk_hex, sk_hex) = keypair.to_hex()?;
 
-        let pk_from_hex = PublicKey::bls_from_hex(&pk_hex)?;
-        let sk_bytes = match hex::decode(&sk_hex) {
-            Ok(bytes) => bytes,
+        match bls::PublicKey::from_hex(&pk_hex) {
+            Ok(_) => {}
             Err(e) => {
                 return Err(Error::Serialisation(e.to_string()));
             }
-        };
-
-        // We can't compare two SecretKey types, so just test the deserialization works ok.
-        let _: SecretKey = bincode::deserialize(&sk_bytes).map_err(convert_bincode_error)?;
-        assert_eq!(pk, pk_from_hex);
+        }
+        match bls::SecretKey::from_hex(&sk_hex) {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(Error::Serialisation(e.to_string()));
+            }
+        }
         Ok(())
+    }
+
+    #[test]
+    fn bls_from_hex_should_deserialize_hex_to_keypair() -> Result<()> {
+        match Keypair::bls_from_hex(
+            "374776f600eded836298292746edab504c079e1b9c9d36ac2c4a16dc6f2c0c22",
+        ) {
+            Ok(keypair) => match keypair {
+                Keypair::Bls(_) => Ok(()),
+                Keypair::BlsShare(_) => Err(Error::Serialisation(
+                    "A BlsKeypair should be returned".to_string(),
+                )),
+                Keypair::Ed25519(_) => Err(Error::Serialisation(
+                    "A BlsKeypair should be returned".to_string(),
+                )),
+            },
+            Err(e) => Err(Error::Serialisation(e.to_string())),
+        }
     }
 }

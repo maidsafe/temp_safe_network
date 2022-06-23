@@ -9,6 +9,7 @@
 use super::{helpers::serialise_output, OutputFmt};
 use crate::operations::auth_and_connect::{get_credentials_file_path, read_credentials};
 use crate::operations::config::Config;
+use bls::SecretKey;
 use color_eyre::{eyre::WrapErr, Result};
 use sn_api::{resolver::SafeUrl, Keypair, Safe, XorName};
 use structopt::StructOpt;
@@ -58,12 +59,11 @@ pub async fn key_commander(
             Ok(())
         }
         KeysSubCommands::Create { for_cli } => {
-            let (keypair, url) = safe.new_keypair_with_pk_url()?;
-            print_new_key_output(output_fmt, url, Some(&keypair));
-
+            let sk = SecretKey::random();
+            print_new_key_output(output_fmt, &sk);
             if for_cli {
                 let (_, path) = get_credentials_file_path(config)?;
-                safe.serialize_keypair(&keypair, &path)
+                safe.serialize_bls_key(&sk, &path)
                     .wrap_err("Unable to serialize keypair to file")?;
                 println!("Keypair saved at {}", path.display());
                 println!("Safe CLI now has write access to the network");
@@ -73,27 +73,14 @@ pub async fn key_commander(
     }
 }
 
-pub fn print_new_key_output(output_fmt: OutputFmt, xorurl: SafeUrl, key_pair: Option<&Keypair>) {
+pub fn print_new_key_output(output_fmt: OutputFmt, secret_key: &SecretKey) {
+    let sk_hex = secret_key.to_hex();
+    let pk_hex = secret_key.public_key().to_hex();
     if OutputFmt::Pretty == output_fmt {
-        println!("New SafeKey created: \"{}\"", xorurl);
-
-        if let Some(pair) = &key_pair {
-            match pair.to_hex() {
-                Ok((pk_hex, sk_hex)) => {
-                    println!("Public Key: {}", pk_hex);
-                    println!("Secret Key: {}", sk_hex);
-                }
-                Err(err) => println!("{}", err),
-            }
-        }
-    } else if let Some(pair) = &key_pair {
-        match pair.to_hex() {
-            Ok((pk_hex, sk_hex)) => println!(
-                "{}",
-                serialise_output(&(xorurl, (pk_hex, sk_hex)), output_fmt)
-            ),
-            Err(err) => println!("{}", err),
-        }
+        println!("Public Key: {}", pk_hex);
+        println!("Secret Key: {}", sk_hex);
+    } else {
+        println!("{}", serialise_output(&(pk_hex, sk_hex), output_fmt));
     }
 }
 
