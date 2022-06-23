@@ -126,7 +126,7 @@ impl Node {
     //   ---------------------------------- Mut ------------------------------------------
     // ----------------------------------------------------------------------------------------
 
-    pub(crate) async fn handle_timeout(&self, token: u64) -> Result<Vec<Cmd>> {
+    pub(crate) async fn handle_dkg_timeout(&self, token: u64) -> Result<Vec<Cmd>> {
         self.dkg_voter.handle_timeout(
             &self.info.read().await.clone(),
             token,

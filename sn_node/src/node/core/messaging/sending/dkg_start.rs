@@ -70,7 +70,13 @@ impl Node {
                 err
             })?;
 
+        #[cfg(feature = "test-utils")]
+        let node_msg_clone = node_msg.clone();
+
         let wire_msg = WireMsg::for_dst_accumulation(&key_share, src, dst, node_msg, section_key)?;
+
+        #[cfg(feature = "test-utils")]
+        let wire_msg = wire_msg.set_payload_debug(node_msg_clone);
 
         trace!(
             "Send {:?} for accumulation at dst to {:?}",

@@ -103,8 +103,8 @@ impl Session {
             section_pk,
         };
 
-        let msg_kind = AuthKind::Service(auth);
-        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+        let auth_kind = AuthKind::Service(auth);
+        let wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst_location)?;
 
         // The insertion of channel will be executed AFTER the completion of the `send_message`.
         let (sender, mut receiver) = channel::<CmdResponse>(elders_len);
@@ -223,8 +223,8 @@ impl Session {
             name: dst,
             section_pk,
         };
-        let msg_kind = AuthKind::Service(auth);
-        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+        let auth_kind = AuthKind::Service(auth);
+        let wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst_location)?;
 
         send_msg_in_bg(self.clone(), elders, wire_msg, msg_id)?;
 
@@ -361,8 +361,8 @@ impl Session {
             name: dst_address,
             section_pk,
         };
-        let msg_kind = AuthKind::Service(auth);
-        let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+        let auth_kind = AuthKind::Service(auth);
+        let wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst_location)?;
 
         // When the client bootstrap using the nodes read from the config, the list is sorted
         // by socket addresses. To improve the efficiency, the `elders_or_adults` shall be sorted

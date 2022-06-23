@@ -65,7 +65,7 @@ impl Dispatcher {
                 wire_msg,
                 original_bytes,
             } => self.node.handle_msg(sender, wire_msg, original_bytes).await,
-            Cmd::HandleTimeout(token) => self.node.handle_timeout(token).await,
+            Cmd::HandleDkgTimeout(token) => self.node.handle_dkg_timeout(token).await,
             Cmd::HandleAgreement { proposal, sig } => {
                 self.node.handle_general_agreements(proposal, sig).await
             }
@@ -142,8 +142,8 @@ impl Dispatcher {
                 self.send_msg(&recipients, delivery_group_size, wire_msg)
                     .await
             }
-            Cmd::ScheduleTimeout { duration, token } => Ok(self
-                .handle_schedule_timeout(duration, token)
+            Cmd::ScheduleDkgTimeout { duration, token } => Ok(self
+                .handle_scheduled_dkg_timeout(duration, token)
                 .await
                 .into_iter()
                 .collect()),
@@ -181,7 +181,7 @@ impl Dispatcher {
         delivery_group_size: usize,
         wire_msg: WireMsg,
     ) -> Result<Vec<Cmd>> {
-        let cmds = match wire_msg.msg_kind() {
+        let cmds = match wire_msg.auth_kind() {
             AuthKind::Node(_) | AuthKind::NodeBlsShare(_) => {
                 self.deliver_msgs(recipients, delivery_group_size, wire_msg)
                     .await?
@@ -238,7 +238,7 @@ impl Dispatcher {
         }
     }
 
-    async fn handle_schedule_timeout(&self, duration: Duration, token: u64) -> Option<Cmd> {
+    async fn handle_scheduled_dkg_timeout(&self, duration: Duration, token: u64) -> Option<Cmd> {
         let mut cancel_rx = self.dkg_timeout.cancel_timer_rx.clone();
 
         if *cancel_rx.borrow() {
@@ -247,7 +247,7 @@ impl Dispatcher {
         }
 
         tokio::select! {
-            _ = time::sleep(duration) => Some(Cmd::HandleTimeout(token)),
+            _ = time::sleep(duration) => Some(Cmd::HandleDkgTimeout(token)),
             _ = cancel_rx.changed() => None,
         }
     }
