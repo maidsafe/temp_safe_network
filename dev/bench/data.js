@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1655993466293,
+  "lastUpdate": 1655998926085,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -5639,6 +5639,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 12132613430,
             "range": "± 519236453",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "366be4d3ddc39f32beea0e26d0addd161acc90c2",
+          "message": "Merge #1266\n\n1266: chore(misc): misc cleanup and fixes r=joshuef a=oetyng\n\n- Complete `msg_kind` => `auth_kind` renaming.\r\n- Fix broken `routing_stress` startup.\r\n- Clarify context of `HandleTimeout` and `ScheduleTimeout` by\r\ninserting `Dkg`.\r\n- Tweak `network_split` example.\r\n- Set various things, such as payload debug, under `test-utils` flag.\r\n- Fix comments/logs: the opposite group of `full` adults are\r\n`non-full`, not `empty`.\r\n\r\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\n\nCo-authored-by: oetyng <oetyng@gmail.com>",
+          "timestamp": "2022-06-23T14:07:30Z",
+          "tree_id": "173076c535cf2e3f90fbaf67907d4d6ebe07d4f0",
+          "url": "https://github.com/maidsafe/safe_network/commit/366be4d3ddc39f32beea0e26d0addd161acc90c2"
+        },
+        "date": 1655998925309,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 6646502175,
+            "range": "± 78963812",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 7035877544,
+            "range": "± 649179448",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 15347060993,
+            "range": "± 1591744905",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 6019694457,
+            "range": "± 2143022",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 6239467640,
+            "range": "± 72431752",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 11015379701,
+            "range": "± 417709957",
             "unit": "ns/iter"
           }
         ]
