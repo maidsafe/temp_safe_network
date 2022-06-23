@@ -189,7 +189,17 @@ impl WireMsg {
     }
 
     /// Return the priority of this message
-    /// TODO: rework priority so this we dont need to deserialise payload to determine priority.
+    ///
+    /// The priority of the msg will be that of the underlying
+    /// [`MsgType`] variant, i.e. [`SystemMsg`] or [`ServiceMsg`].
+    /// This means that we do the same ordering in both incoming
+    /// and outgoing msg queues. We decide which outgoing WireMsg
+    /// should be sent first, and which incoming WireMsg should
+    /// be deserialized and handled first, in the same way that
+    /// the underlying Cmd/Query/Event will be prioritized when
+    /// handled at dst.
+    ///
+    /// TODO: rework priority so that we dont need to deserialise payload to determine priority.
     pub fn priority(&self) -> i32 {
         if let Ok(msg) = self.clone().into_msg() {
             msg.priority()

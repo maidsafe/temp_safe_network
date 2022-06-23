@@ -6,21 +6,21 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::api::dispatcher::Dispatcher;
+use crate::node::core::Node;
 
 use std::sync::Arc;
 use xor_name::Prefix;
 
 pub(crate) struct LogCtx {
-    cmds_dispatcher: Arc<Dispatcher>,
+    node: Arc<Node>,
 }
 
 impl LogCtx {
-    pub(crate) fn new(cmds_dispatcher: Arc<Dispatcher>) -> Self {
-        Self { cmds_dispatcher }
+    pub(crate) fn new(node: Arc<Node>) -> Self {
+        Self { node }
     }
 
     pub(crate) async fn prefix(&self) -> Prefix {
-        self.cmds_dispatcher.node.network_knowledge().prefix().await
+        self.node.network_knowledge().prefix().await
     }
 }

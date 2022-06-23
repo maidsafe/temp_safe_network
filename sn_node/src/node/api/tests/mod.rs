@@ -55,6 +55,7 @@ use std::{
     net::Ipv4Addr,
     ops::Deref,
     path::Path,
+    sync::Arc,
 };
 use tempfile::tempdir;
 use tokio::{
@@ -92,7 +93,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
                 root_storage_dir,
             )
             .await?;
-            let dispatcher = Dispatcher::new(node);
+            let dispatcher = Dispatcher::new(Arc::new(node));
 
             let new_node_comm = create_comm().await?;
             let new_node = NodeInfo::new(
@@ -114,14 +115,11 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
             )?;
 
             let mut cmds = dispatcher
-                .process_cmd(
-                    Cmd::HandleMsg {
-                        sender: new_node.peer(),
-                        wire_msg,
-                        original_bytes: None,
-                    },
-                    "cmd-id",
-                )
+                .process_cmd(Cmd::HandleMsg {
+                    sender: new_node.peer(),
+                    wire_msg,
+                    original_bytes: None,
+                })
                 .await?
                 .into_iter();
 
@@ -180,7 +178,8 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
                 root_storage_dir,
             )
             .await?;
-            let dispatcher = Dispatcher::new(node);
+            let node = Arc::new(node);
+            let dispatcher = Dispatcher::new(node.clone());
 
             let new_node = NodeInfo::new(
                 ed25519::gen_keypair(&prefix1.range_inclusive(), MIN_ADULT_AGE),
@@ -189,8 +188,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
 
             let nonce: [u8; 32] = rand::random();
             let serialized = bincode::serialize(&(new_node.name(), nonce))?;
-            let nonce_signature =
-                ed25519::sign(&serialized, &dispatcher.node.info.read().await.keypair);
+            let nonce_signature = ed25519::sign(&serialized, &node.info.read().await.keypair);
 
             let rp = ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY);
             let data = rp.create_proof_data(&nonce);
@@ -216,18 +214,14 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
             )?;
 
             let _ = dispatcher
-                .process_cmd(
-                    Cmd::HandleMsg {
-                        sender: new_node.peer(),
-                        wire_msg,
-                        original_bytes: None,
-                    },
-                    "cmd-id",
-                )
+                .process_cmd(Cmd::HandleMsg {
+                    sender: new_node.peer(),
+                    wire_msg,
+                    original_bytes: None,
+                })
                 .await?;
 
-            assert!(dispatcher
-                .node
+            assert!(node
                 .membership
                 .read()
                 .await
@@ -237,8 +231,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
             // makes sure that the nonce signature is always valid
             let random_peer = Peer::new(xor_name::rand::random(), gen_addr());
             assert!(
-                !dispatcher
-                    .node
+                !node
                     .validate_resource_proof_response(&random_peer.name(), resource_proof_response)
                     .await
             );
@@ -277,7 +270,8 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
                 root_storage_dir,
             )
             .await?;
-            let dispatcher = Dispatcher::new(node);
+            let node = Arc::new(node);
+            let dispatcher = Dispatcher::new(node.clone());
 
             let relocated_node = NodeInfo::new(
                 ed25519::gen_keypair(&Prefix::default().range_inclusive(), MIN_ADULT_AGE + 1),
@@ -316,18 +310,14 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
             )?;
 
             let _ = dispatcher
-                .process_cmd(
-                    Cmd::HandleMsg {
-                        sender: relocated_node.peer(),
-                        wire_msg,
-                        original_bytes: None,
-                    },
-                    "cmd-id",
-                )
+                .process_cmd(Cmd::HandleMsg {
+                    sender: relocated_node.peer(),
+                    wire_msg,
+                    original_bytes: None,
+                })
                 .await?;
 
-            assert!(dispatcher
-                .node
+            assert!(node
                 .membership
                 .read()
                 .await
@@ -367,7 +357,7 @@ async fn handle_agreement_on_online() -> Result<()> {
                 root_storage_dir,
             )
             .await?;
-            let dispatcher = Dispatcher::new(node);
+            let dispatcher = Dispatcher::new(Arc::new(node));
 
             let new_peer = create_peer(MIN_ADULT_AGE);
 
@@ -442,7 +432,8 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 root_storage_dir,
             )
             .await?;
-            let dispatcher = Dispatcher::new(node);
+            let node = Arc::new(node);
+            let dispatcher = Dispatcher::new(node.clone());
 
             // Handle agreement on Online of a peer that is older than the youngest
             // current elder - that means this peer is going to be promoted.
@@ -452,9 +443,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
 
             // Force this node to join
-            dispatcher
-                .node
-                .membership
+            node.membership
                 .write()
                 .await
                 .as_mut()
@@ -462,7 +451,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 .force_bootstrap(node_state.to_msg());
 
             let cmds = dispatcher
-                .process_cmd(Cmd::HandleNewNodeOnline(auth), "cmd-id")
+                .process_cmd(Cmd::HandleNewNodeOnline(auth))
                 .await?;
 
             // Verify we sent a `DkgStart` message with the expected participants.
@@ -518,7 +507,7 @@ async fn handle_online_cmd(
     let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
 
     let cmds = dispatcher
-        .process_cmd(Cmd::HandleNewNodeOnline(auth), "cmd-id")
+        .process_cmd(Cmd::HandleNewNodeOnline(auth))
         .await?;
 
     let mut status = HandleOnlineStatus {
@@ -618,7 +607,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
                 root_storage_dir,
             )
             .await?;
-            let dispatcher = Dispatcher::new(node);
+            let dispatcher = Dispatcher::new(Arc::new(node));
 
             // Simulate peer with the same name is rejoin and verify resulted behaviours.
             let status = handle_online_cmd(&peer, &sk_set, &dispatcher, &section_auth).await?;
@@ -694,18 +683,18 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
                 root_storage_dir,
             )
             .await?;
-            let dispatcher = Dispatcher::new(node);
+            let node = Arc::new(node);
+            let dispatcher = Dispatcher::new(node.clone());
 
             let node_state = NodeState::left(existing_peer, None);
             let proposal = Proposal::Offline(node_state.clone());
             let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
             let _cmds = dispatcher
-                .process_cmd(Cmd::HandleAgreement { proposal, sig }, "cmd-id")
+                .process_cmd(Cmd::HandleAgreement { proposal, sig })
                 .await?;
 
-            assert!(!dispatcher
-                .node
+            assert!(!node
                 .network_knowledge()
                 .section_members()
                 .await
@@ -756,20 +745,20 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
                 root_storage_dir,
             )
             .await?;
-            let dispatcher = Dispatcher::new(node);
+            let node = Arc::new(node);
+            let dispatcher = Dispatcher::new(node.clone());
 
             // Handle agreement on the Offline proposal
             let proposal = Proposal::Offline(remove_node_state.clone());
             let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
 
             let _ = dispatcher
-                .process_cmd(Cmd::HandleAgreement { proposal, sig }, "cmd-id")
+                .process_cmd(Cmd::HandleAgreement { proposal, sig })
                 .await?;
 
             // Verify we initiated a membership churn
 
-            assert!(dispatcher
-                .node
+            assert!(node
                 .membership
                 .read()
                 .await
@@ -882,17 +871,14 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                 .insert(create_section_key_share(&sk_set2, 0))
                 .await;
 
-            let dispatcher = Dispatcher::new(node);
+            let dispatcher = Dispatcher::new(Arc::new(node));
 
             let _cmds = dispatcher
-                .process_cmd(
-                    Cmd::HandleMsg {
-                        sender: old_node.peer(),
-                        wire_msg,
-                        original_bytes: None,
-                    },
-                    "cmd-id",
-                )
+                .process_cmd(Cmd::HandleMsg {
+                    sender: old_node.peer(),
+                    wire_msg,
+                    original_bytes: None,
+                })
                 .await?;
 
             // Verify our `Section` got updated.
@@ -957,7 +943,8 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
             )
             .await?;
 
-            let dispatcher = Dispatcher::new(node);
+            let node = Arc::new(node);
+            let dispatcher = Dispatcher::new(node.clone());
 
             let sender = gen_info(MIN_ADULT_AGE, None);
             let wire_msg = WireMsg::single_src(
@@ -972,19 +959,16 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
             )?;
 
             let _cmds = dispatcher
-                .process_cmd(
-                    Cmd::HandleMsg {
-                        sender: sender.peer(),
-                        wire_msg,
-                        original_bytes: None,
-                    },
-                    "cmd-id",
-                )
+                .process_cmd(Cmd::HandleMsg {
+                    sender: sender.peer(),
+                    wire_msg,
+                    original_bytes: None,
+                })
                 .await?;
 
-            assert_eq!(dispatcher.node.network_knowledge().genesis_key(), &pk0);
+            assert_eq!(node.network_knowledge().genesis_key(), &pk0);
             assert_eq!(
-                dispatcher.node.network_knowledge().prefix_map().all(),
+                node.network_knowledge().prefix_map().all(),
                 vec![section_signed_our_section_auth.value]
             );
             Result::<()>::Ok(())
@@ -1048,7 +1032,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             root_storage_dir,
         )
         .await?;
-        let dispatcher = Dispatcher::new(node);
+        let dispatcher = Dispatcher::new(Arc::new(node));
 
         let relocated_peer = match relocated_peer_role {
             RelocatedPeerRole::Elder => *section_auth.elders().nth(1).expect("too few elders"),
@@ -1057,7 +1041,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
 
         let auth = create_relocation_trigger(sk_set.secret_key(), relocated_peer.age())?;
         let cmds = dispatcher
-            .process_cmd(Cmd::HandleNewNodeOnline(auth), "cmd-id")
+            .process_cmd(Cmd::HandleNewNodeOnline(auth))
             .await?;
 
         let mut offline_relocate_sent = false;
@@ -1135,7 +1119,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
         .await?;
         let info = node.info.read().await.clone();
         let section_pk = node.network_knowledge().section_key().await;
-        let dispatcher = Dispatcher::new(node);
+        let dispatcher = Dispatcher::new(Arc::new(node));
 
         let dst_location = match dst {
             MessageDst::Node => DstLocation::Node {
@@ -1160,7 +1144,6 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
                     recipients: vec![info.peer()],
                     wire_msg,
                 },
-                "cmd-id",
             )
             .await?;
 
@@ -1271,10 +1254,10 @@ async fn handle_elders_update() -> Result<()> {
             .insert(create_section_key_share(&sk_set1, 0))
             .await;
 
-        let dispatcher = Dispatcher::new(node);
+        let dispatcher = Dispatcher::new(Arc::new(node));
 
         let cmds = dispatcher
-            .process_cmd(Cmd::HandleNewEldersAgreement { proposal, sig }, "cmd-id")
+            .process_cmd(Cmd::HandleNewEldersAgreement { proposal, sig })
             .await?;
 
         let mut update_actual_recipients = HashSet::new();
@@ -1422,7 +1405,7 @@ async fn handle_demote_during_split() -> Result<()> {
                     .await;
             }
 
-            let dispatcher = Dispatcher::new(node);
+            let dispatcher = Dispatcher::new(Arc::new(node));
 
             // Create agreement on `OurElder` for both sub-sections
             let create_our_elders_cmd = |signed_sap| -> Result<_> {
@@ -1447,7 +1430,7 @@ async fn handle_demote_during_split() -> Result<()> {
 
             let signed_sap = section_signed(sk_set_v1_p0.secret_key(), section_auth)?;
             let cmd = create_our_elders_cmd(signed_sap)?;
-            let mut cmds = dispatcher.process_cmd(cmd, "cmd-id-1").await?;
+            let mut cmds = dispatcher.process_cmd(cmd).await?;
 
             // Handle agreement on `NewElders` for prefix-1.
             let section_auth = SectionAuthorityProvider::new(
@@ -1461,7 +1444,7 @@ async fn handle_demote_during_split() -> Result<()> {
             let signed_sap = section_signed(sk_set_v1_p1.secret_key(), section_auth)?;
             let cmd = create_our_elders_cmd(signed_sap)?;
 
-            let new_cmds = dispatcher.process_cmd(cmd, "cmd-id-2").await?;
+            let new_cmds = dispatcher.process_cmd(cmd).await?;
 
             cmds.extend(new_cmds);
 
