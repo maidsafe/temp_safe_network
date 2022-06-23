@@ -6,17 +6,28 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use super::cmds::CmdJob;
+
 use sn_interface::messaging::{
     data::ServiceMsg, system::SystemMsg, AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth,
     SrcLocation,
 };
 
 use bls::PublicKey as BlsPublicKey;
+use chrono::{DateTime, Utc};
 use ed25519_dalek::Keypair;
-use std::{collections::BTreeSet, sync::Arc};
+use std::{collections::BTreeSet, sync::Arc, time::SystemTime};
 use xor_name::{Prefix, XorName};
 
 /// Node-internal events raised by a [`Node`] via its event sender.
+///
+/// These have previously connected to separate (legacy) layers of the
+/// code base (routing and node), which today has been refactored away.
+/// They remained in tests though, as those were tightly dependent on
+/// the events, and were not refactored.
+/// Recently the event has been taken into use by the domain logic in one place,
+/// but primarily the aim is now to make use of it for a more structured logging
+/// and as a read-api to a UI.
 #[allow(clippy::large_enum_variant)]
 #[derive(custom_debug::Debug)]
 pub enum Event {
@@ -26,15 +37,19 @@ pub enum Event {
     Messaging(MessagingEvent),
     ///
     Membership(MembershipEvent),
+    ///
+    CmdProcessing(CmdProcessEvent),
 }
 
+/// Informing on data related changes.
 ///
-//#[derive(custom_debug::Debug)]
+/// Currently not used.
 #[derive(Debug)]
 pub enum DataEvent {}
 
+/// Informing on incoming msgs.
 ///
-//#[derive(custom_debug::Debug)]
+/// Currently only used in tests.
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum MessagingEvent {
@@ -66,7 +81,48 @@ pub enum MessagingEvent {
     },
 }
 
+/// Informing on the processing of an individual cmd.
+#[derive(custom_debug::Debug)]
+pub enum CmdProcessEvent {
+    ///
+    Started {
+        ///
+        job: CmdJob,
+        ///
+        time: SystemTime,
+    },
+    ///
+    Retrying {
+        ///
+        job: CmdJob,
+        ///
+        retry: usize,
+        ///
+        time: SystemTime,
+    },
+    ///
+    Finished {
+        ///
+        job: CmdJob,
+        ///
+        time: SystemTime,
+    },
+    ///
+    Failed {
+        ///
+        job: CmdJob,
+        ///
+        retry: usize,
+        ///
+        time: SystemTime,
+        ///
+        error: String,
+    },
+}
+
+/// Informing on membership related changes.¨
 ///
+/// Still mostly used in tests.
 #[derive(custom_debug::Debug)]
 pub enum MembershipEvent {
     /// Join occured during section churn and new elders missed it,
@@ -125,6 +181,79 @@ pub enum MembershipEvent {
         #[debug(skip)]
         new_keypair: Arc<Keypair>,
     },
+}
+
+impl std::fmt::Display for Event {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Data(e) => write!(f, "{:?}", e),
+            Self::Messaging(e) => write!(f, "{:?}", e),
+            Self::Membership(e) => write!(f, "{:?}", e),
+            Self::CmdProcessing(e) => write!(f, "{}", e),
+        }
+    }
+}
+
+impl std::fmt::Display for CmdProcessEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Started { job, time } => {
+                let cmd = job.cmd();
+                let queued_for = time
+                    .duration_since(job.created_at())
+                    .unwrap_or_default()
+                    .as_millis();
+                let time: DateTime<Utc> = (*time).into();
+                write!(
+                    f,
+                    "{}: Started id: {}, prio: {}, queued for {} ms. Cmd: {}",
+                    time.to_rfc3339(),
+                    job.id(),
+                    job.priority(),
+                    queued_for,
+                    cmd,
+                )
+            }
+            Self::Retrying { job, retry, time } => {
+                let time: DateTime<Utc> = (*time).into();
+                write!(
+                    f,
+                    "{}: Retry #{} of id: {}, prio: {}",
+                    time.to_rfc3339(),
+                    retry,
+                    job.id(),
+                    job.priority(),
+                )
+            }
+            Self::Finished { job, time } => {
+                let time: DateTime<Utc> = (*time).into();
+                write!(
+                    f,
+                    "{}: Finished id: {}, prio: {}",
+                    time.to_rfc3339(),
+                    job.id(),
+                    job.priority(),
+                )
+            }
+            Self::Failed {
+                job,
+                retry,
+                time,
+                error,
+            } => {
+                let time: DateTime<Utc> = (*time).into();
+                write!(
+                    f,
+                    "{}: Failed id: {}, prio: {}, on try #{}, due to: {}",
+                    time.to_rfc3339(),
+                    job.id(),
+                    job.priority(),
+                    retry,
+                    error,
+                )
+            }
+        }
+    }
 }
 
 /// A flag in EldersChanged event, indicating

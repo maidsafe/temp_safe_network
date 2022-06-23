@@ -61,7 +61,6 @@ impl EventRates {
     }
 
     /// Count an "event" (something that happened).
-    #[allow(unused)]
     pub(super) async fn increment(&self) {
         // increments the latest entry, which represents current interval
         if let Some(entry) = self.samples.read().await.back() {

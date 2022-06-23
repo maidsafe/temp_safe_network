@@ -59,7 +59,6 @@ impl RateLimits {
         instance
     }
 
-    #[allow(unused)]
     pub(crate) async fn increment_cmds(&self) {
         self.cmd_rates.increment().await;
     }
@@ -69,7 +68,6 @@ impl RateLimits {
         self.msg_rates.increment().await;
     }
 
-    #[allow(unused)]
     pub(crate) async fn max_cmds_per_s(&self) -> f64 {
         self.cmd_rates.max_events_per_s().await
     }

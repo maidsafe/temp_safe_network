@@ -24,7 +24,10 @@ mod messages;
 
 pub use self::{
     api::{
-        event::{Elders, Event, MembershipEvent, MessagingEvent, NodeElderChange},
+        event::{
+            CmdProcessEvent, DataEvent, Elders, Event, MembershipEvent, MessagingEvent,
+            NodeElderChange,
+        },
         event_channel::EventReceiver,
         NodeApi,
     },
