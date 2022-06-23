@@ -443,7 +443,7 @@ impl<'a> Join<'a> {
             let (join_response, sender) = match event {
                 MsgEvent::Received {
                     sender, wire_msg, ..
-                } => match wire_msg.msg_kind() {
+                } => match wire_msg.auth_kind() {
                     AuthKind::Service(_) => continue,
                     AuthKind::NodeBlsShare(_) => {
                         trace!(

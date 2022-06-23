@@ -209,14 +209,14 @@ impl Node {
             .collect::<BTreeSet<_>>();
 
         trace!(
-            "Chunk holders of {:?} are empty adults: {:?} and full adults: {:?}",
+            "Chunk holders of {:?} are non-full adults: {:?} and full adults: {:?}",
             target,
             candidates,
             full_adults
         );
 
         // Full adults that are close to the chunk, shall still be considered as candidates
-        // to allow chunks stored to empty adults can be queried when nodes become full.
+        // to allow chunks stored to non-full adults can be queried when nodes become full.
         let close_full_adults = if let Some(closest_empty) = candidates.iter().next() {
             full_adults
                 .iter()
@@ -255,7 +255,7 @@ impl Node {
             .collect::<BTreeSet<_>>();
 
         trace!(
-            "Target holders of {:?} are empty adults: {:?} and full adults that were ignored: {:?}",
+            "Target holders of {:?} are non-full adults: {:?} and full adults that were ignored: {:?}",
             target,
             candidates,
             full_adults

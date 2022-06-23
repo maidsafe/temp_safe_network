@@ -33,7 +33,7 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node";
 const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
 const NODES_DIR: &str = "local-test-network";
-const INTERVAL: &str = "10000";
+const INTERVAL: &str = "5000"; // milliseconds
 const RUST_LOG: &str = "RUST_LOG";
 const ADDITIONAL_NODES_TO_SPLIT: u64 = 15;
 
@@ -135,7 +135,7 @@ pub async fn run_split() -> Result<()> {
         .wrap_err("Error starting the testnet")?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
-    let interval_duration = Duration::from_millis(*interval_as_int);
+    let interval_duration = Duration::from_millis(2 * interval_as_int);
     sleep(interval_duration).await;
     println!("Done sleeping....");
 
@@ -166,6 +166,7 @@ pub async fn run_split() -> Result<()> {
         .wrap_err("Error adding nodes to the testnet")?;
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
+    let interval_duration = Duration::from_millis(interval_as_int * ADDITIONAL_NODES_TO_SPLIT / 10);
     sleep(interval_duration).await;
 
     // now we read the data
@@ -183,7 +184,7 @@ pub async fn run_split() -> Result<()> {
         while bytes.is_err() && attempts < 10 {
             attempts += 1;
             // do some retries to ensure we're not just timing out by chance
-            sleep(Duration::from_secs(1)).await;
+            sleep(Duration::from_secs(attempts)).await;
             bytes = client.read_bytes(address).await;
         }
 
@@ -236,7 +237,7 @@ async fn upload_data() -> Result<(XorName, [u8; 32])> {
     while bytes.is_err() && attempts < 10 {
         attempts += 1;
         // do some retries to ensure we're not just timing out by chance
-        sleep(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(attempts)).await;
         bytes = client.read_bytes(address).await;
     }
 

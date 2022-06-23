@@ -857,9 +857,9 @@ mod tests {
 
             let node_auth = NodeAuth::authorize(src_section_pk, &src_node_keypair, &payload);
 
-            let msg_kind = AuthKind::Node(node_auth.into_inner());
+            let auth_kind = AuthKind::Node(node_auth.into_inner());
 
-            let wire_msg = WireMsg::new_msg(msg_id, payload, msg_kind, dst_location)?;
+            let wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst_location)?;
 
             let src_location = SrcLocation::Node {
                 name: sender_name,

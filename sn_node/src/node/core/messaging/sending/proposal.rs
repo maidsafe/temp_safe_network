@@ -76,6 +76,10 @@ impl Node {
             proposal: proposal.clone().into_msg(),
             sig_share: sig_share.clone(),
         };
+
+        #[cfg(feature = "test-utils")]
+        let node_msg_clone = node_msg.clone();
+
         // Name of the section_pk may not matches the section prefix.
         // Carry out a substitution to prevent the dst_location becomes other section.
         let section_key = self.network_knowledge.section_key().await;
@@ -88,6 +92,9 @@ impl Node {
             node_msg,
             section_key,
         )?;
+
+        #[cfg(feature = "test-utils")]
+        let wire_msg = wire_msg.set_payload_debug(node_msg_clone);
 
         let msg_id = wire_msg.msg_id();
 
