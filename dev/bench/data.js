@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1656082521401,
+  "lastUpdate": 1656110283491,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -5879,6 +5879,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 5189193076,
             "range": "± 15611320",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "chriso83@protonmail.com",
+            "name": "Chris O'Neil",
+            "username": "jacderida"
+          },
+          "committer": {
+            "email": "gabrielviganotti@gmail.com",
+            "name": "bochaco",
+            "username": "bochaco"
+          },
+          "distinct": true,
+          "id": "3f3c39a14987910bb424df51f89d948333ca3e87",
+          "message": "chore: changes based on review feedback\n\n* Prefer `map_err` in various places rather than a full `match`.\n* Change key serialization utility functions to static rather than instance.\n* Change `dog` command to print non-support of `SafeKey` data type rather than panic.\n* Remove unnecessary clone on `public_key_hex`.\n* Remove unnecessary match in various tests.\n* Ignore wallet CLI tests that deleted the credentials file. They are problematic when running in\n  parallel with other tests. We need better isolated testing mechanisms for these. Will address in a\n  separate PR.\n* Use different deposit names in wallet tests where multiple DBCs are deposited.",
+          "timestamp": "2022-06-24T19:05:07-03:00",
+          "tree_id": "d2bd5a1336d327ca2745fb67c00f710f173a62f3",
+          "url": "https://github.com/maidsafe/safe_network/commit/3f3c39a14987910bb424df51f89d948333ca3e87"
+        },
+        "date": 1656110281306,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 5478853879,
+            "range": "± 142558153",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 5658735959,
+            "range": "± 66448444",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 5874866476,
+            "range": "± 34979901",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 5014612104,
+            "range": "± 2979550",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 5036823915,
+            "range": "± 2315212",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 5235072867,
+            "range": "± 20925942",
             "unit": "ns/iter"
           }
         ]
