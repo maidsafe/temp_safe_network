@@ -328,19 +328,10 @@ mod tests {
     fn to_hex_should_convert_bls_keypair_to_hex() -> Result<()> {
         let keypair = Keypair::new_bls();
         let (pk_hex, sk_hex) = keypair.to_hex()?;
-
-        match bls::PublicKey::from_hex(&pk_hex) {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(Error::Serialisation(e.to_string()));
-            }
-        }
-        match bls::SecretKey::from_hex(&sk_hex) {
-            Ok(_) => {}
-            Err(e) => {
-                return Err(Error::Serialisation(e.to_string()));
-            }
-        }
+        let _ =
+            bls::PublicKey::from_hex(&pk_hex).map_err(|e| Error::Serialisation(e.to_string()))?;
+        let _ =
+            bls::SecretKey::from_hex(&sk_hex).map_err(|e| Error::Serialisation(e.to_string()))?;
         Ok(())
     }
 

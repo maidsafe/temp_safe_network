@@ -53,11 +53,7 @@ impl Safe {
     /// Serializes a `SecretKey` to hex in a file at a given path.
     ///
     /// If the path already exists it will be overwritten.
-    pub fn serialize_bls_key(
-        &self,
-        secret_key: &BlsSecretKey,
-        path: impl AsRef<Path>,
-    ) -> Result<()> {
+    pub fn serialize_bls_key(secret_key: &BlsSecretKey, path: impl AsRef<Path>) -> Result<()> {
         let hex = secret_key.to_hex();
         std::fs::write(&path, hex)?;
         Ok(())
@@ -66,20 +62,10 @@ impl Safe {
     /// Deserializes a `Keypair` from file at a given path.
     ///
     /// A utility to help callers working with keypairs avoid using serde or bincode directly.
-    pub fn deserialize_bls_key(&self, path: impl AsRef<Path>) -> Result<BlsSecretKey> {
-        deserialize_bls_key(path)
+    pub fn deserialize_bls_key(path: impl AsRef<Path>) -> Result<BlsSecretKey> {
+        let hex = std::fs::read_to_string(path)?;
+        Ok(BlsSecretKey::from_hex(&hex)?)
     }
-}
-
-/// Deserializes a `Keypair` from file at a given path.
-///
-/// A utility to help callers working with keypairs avoid using serde or bincode directly.
-///
-/// This exists as an independent function in addition to being a function of the safe client
-/// because some deserialization needs to be performed in the CLI before it has access to a client.
-pub fn deserialize_bls_key(path: impl AsRef<Path>) -> Result<BlsSecretKey> {
-    let hex = std::fs::read_to_string(path)?;
-    Ok(BlsSecretKey::from_hex(&hex)?)
 }
 
 #[cfg(test)]
@@ -113,12 +99,11 @@ mod tests {
 
     #[test]
     fn serialize_keypair_should_serialize_a_bls_keypair_to_file() -> Result<()> {
-        let safe = Safe::dry_runner(None);
         let tmp_dir = assert_fs::TempDir::new()?;
         let serialized_keypair_file = tmp_dir.child("serialized_keypair");
 
         let sk = BlsSecretKey::random();
-        let _ = safe.serialize_bls_key(&sk, serialized_keypair_file.path())?;
+        let _ = Safe::serialize_bls_key(&sk, serialized_keypair_file.path())?;
 
         serialized_keypair_file.assert(predicate::path::is_file());
 
@@ -130,14 +115,13 @@ mod tests {
 
     #[test]
     fn deserialize_keypair_should_deserialize_a_bls_keypair_from_file() -> Result<()> {
-        let safe = Safe::dry_runner(None);
         let tmp_dir = assert_fs::TempDir::new()?;
         let serialized_keypair_file = tmp_dir.child("serialized_keypair");
 
         let sk = BlsSecretKey::random();
-        let _ = safe.serialize_bls_key(&sk, serialized_keypair_file.path())?;
+        let _ = Safe::serialize_bls_key(&sk, serialized_keypair_file.path())?;
 
-        let sk2 = safe.deserialize_bls_key(serialized_keypair_file.path())?;
+        let sk2 = Safe::deserialize_bls_key(serialized_keypair_file.path())?;
         assert_eq!(sk, sk2);
         Ok(())
     }

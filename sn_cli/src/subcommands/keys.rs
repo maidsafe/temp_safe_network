@@ -35,12 +35,11 @@ pub enum KeysSubCommands {
 pub async fn key_commander(
     cmd: KeysSubCommands,
     output_fmt: OutputFmt,
-    safe: &Safe,
     config: &Config,
 ) -> Result<()> {
     match cmd {
         KeysSubCommands::Show { show_sk } => {
-            match read_credentials(safe, config)? {
+            match read_credentials(config)? {
                 (file_path, Some(keypair)) => {
                     let (pk_hex, sk_hex) = keypair.to_hex()?;
                     if output_fmt == OutputFmt::Pretty {
@@ -63,7 +62,7 @@ pub async fn key_commander(
             print_new_key_output(output_fmt, &sk);
             if for_cli {
                 let (_, path) = get_credentials_file_path(config)?;
-                safe.serialize_bls_key(&sk, &path)
+                Safe::serialize_bls_key(&sk, &path)
                     .wrap_err("Unable to serialize keypair to file")?;
                 println!("Keypair saved at {}", path.display());
                 println!("Safe CLI now has write access to the network");
@@ -93,7 +92,7 @@ mod create_command {
     use assert_fs::prelude::*;
     use color_eyre::{eyre::eyre, Result};
     use predicates::prelude::*;
-    use sn_api::{Keypair, Safe};
+    use sn_api::Keypair;
 
     #[tokio::test]
     async fn should_create_bls_keypair() -> Result<()> {
@@ -106,12 +105,10 @@ mod create_command {
             node_config_file.path().to_path_buf(),
         )
         .await?;
-        let safe = Safe::dry_runner(None);
 
         let result = key_commander(
             KeysSubCommands::Create { for_cli: false },
             OutputFmt::Pretty,
-            &safe,
             &config,
         )
         .await;
@@ -132,12 +129,10 @@ mod create_command {
             node_config_file.path().to_path_buf(),
         )
         .await?;
-        let safe = Safe::dry_runner(None);
 
         let result = key_commander(
             KeysSubCommands::Create { for_cli: true },
             OutputFmt::Pretty,
-            &safe,
             &config,
         )
         .await;
@@ -145,7 +140,7 @@ mod create_command {
         assert!(result.is_ok());
         credentials_file.assert(predicate::path::is_file());
 
-        let (_, keypair) = read_credentials(&safe, &config)?;
+        let (_, keypair) = read_credentials(&config)?;
         let keypair =
             keypair.ok_or_else(|| eyre!("The command should have generated a keypair"))?;
         match keypair {

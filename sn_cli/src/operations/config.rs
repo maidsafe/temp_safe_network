@@ -9,8 +9,7 @@
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Help, Report, Result};
 use comfy_table::Table;
 use serde::{Deserialize, Serialize};
-use sn_api::keys::deserialize_bls_key;
-use sn_api::{NodeConfig, PublicKey};
+use sn_api::{NodeConfig, PublicKey, Safe};
 use sn_dbc::Owner;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -366,7 +365,7 @@ impl Config {
 
     async fn get_dbc_owner(dbc_sk_path: &Path) -> Result<Option<Owner>> {
         if dbc_sk_path.exists() {
-            let sk = deserialize_bls_key(dbc_sk_path)?;
+            let sk = Safe::deserialize_bls_key(dbc_sk_path)?;
             return Ok(Some(Owner::from(sk)));
         }
         Ok(None)
@@ -473,8 +472,7 @@ mod constructor {
         let node_config_file = tmp_dir.child(".safe/node/node_connection_info.config");
         let dbc_owner_sk_file = cli_config_dir.child("credentials");
         let sk = SecretKey::random();
-        let safe = Safe::dry_runner(None);
-        safe.serialize_bls_key(&sk, dbc_owner_sk_file.path())?;
+        Safe::serialize_bls_key(&sk, dbc_owner_sk_file.path())?;
 
         let config = Config::new(
             PathBuf::from(cli_config_file.path()),

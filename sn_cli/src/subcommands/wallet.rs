@@ -153,27 +153,19 @@ pub async fn wallet_commander(
             } else {
                 None
             };
-            let name = match safe
+            let name = safe
                 .wallet_deposit(&wallet_url, name.as_deref(), &dbc, sk)
                 .await
-            {
-                Ok(name) => name,
-                Err(e) => match e {
-                    Error::DbcDepositInvalidSecretKey() => {
-                        return Err(eyre!(
-                            "The supplied secret key did not match the public key for this DBC."
-                        )
-                        .suggestion(
-                            "Please run the command again with the correct key for the \
+                .map_err(|e| match e {
+                    Error::DbcDepositInvalidSecretKey => {
+                        eyre!("The supplied secret key did not match the public key for this DBC.")
+                            .suggestion(
+                                "Please run the command again with the correct key for the \
                                 --secret-key argument.",
-                        ));
+                            )
                     }
-                    _ => {
-                        return Err(eyre!(e));
-                    }
-                },
-            };
-
+                    _ => e.into(),
+                })?;
             if OutputFmt::Pretty == output_fmt {
                 println!(
                     "Spendable DBC deposited with name '{}' in wallet located at \"{}\"",
@@ -199,7 +191,7 @@ pub async fn wallet_commander(
                     "Please run the command again and use one or the other, but not both, of these \
                     arguments."));
             }
-            let pk = if let Some(pk_hex) = public_key_hex.clone() {
+            let pk = if let Some(pk_hex) = public_key_hex {
                 Some(PublicKey::from_hex(&pk_hex)?)
             } else if owned {
                 let sk = read_key_from_configured_credentials(

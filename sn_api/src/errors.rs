@@ -136,7 +136,7 @@ pub enum Error {
     DbcDepositError(String),
     /// DbcDepositError
     #[error("The secret key does not match the public key for this owned DBC")]
-    DbcDepositInvalidSecretKey(),
+    DbcDepositInvalidSecretKey,
     /// NotImplementedError
     #[error("NotImplementedError: {0}")]
     NotImplementedError(String),

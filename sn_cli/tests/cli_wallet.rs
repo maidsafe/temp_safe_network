@@ -220,7 +220,7 @@ fn wallet_deposit_should_deposit_an_owned_dbc_with_configured_secret_key() -> Re
             "wallet",
             "deposit",
             "--name",
-            "my-first-dbc",
+            "reissued-dbc",
             "--dbc",
             &reissue_output,
             &wallet_xorurl,
@@ -230,7 +230,7 @@ fn wallet_deposit_should_deposit_an_owned_dbc_with_configured_secret_key() -> Re
     .assert()
     .stdout(format!(
         "Spendable DBC deposited with name '{}' in wallet located at \"{}\"\n",
-        "my-first-dbc", wallet_xorurl
+        "reissued-dbc", wallet_xorurl
     ))
     .success();
     Ok(())
@@ -276,7 +276,7 @@ fn wallet_deposit_should_deposit_an_owned_dbc_with_secret_key_arg() -> Result<()
             "wallet",
             "deposit",
             "--name",
-            "my-first-dbc",
+            "reissued-dbc",
             "--dbc",
             &reissue_output,
             "--secret-key",
@@ -288,7 +288,7 @@ fn wallet_deposit_should_deposit_an_owned_dbc_with_secret_key_arg() -> Result<()
     .assert()
     .stdout(format!(
         "Spendable DBC deposited with name '{}' in wallet located at \"{}\"\n",
-        "my-first-dbc", wallet_xorurl
+        "reissued-dbc", wallet_xorurl
     ))
     .success();
     Ok(())
@@ -303,6 +303,7 @@ fn wallet_deposit_should_deposit_an_owned_dbc_with_secret_key_arg() -> Result<()
 /// probably be for each test case that requires credentials to generate its own keypair, but at
 /// the moment we don't have that infrastructure.
 #[test]
+#[ignore = "this test is problematic when running in parallel"]
 fn wallet_deposit_owned_dbc_with_no_secret_key_or_credentials_should_fail_with_suggestion(
 ) -> Result<()> {
     let pk_hex = bls::SecretKey::random().public_key().to_hex();
@@ -348,7 +349,7 @@ fn wallet_deposit_owned_dbc_with_no_secret_key_or_credentials_should_fail_with_s
             "wallet",
             "deposit",
             "--name",
-            "my-first-dbc",
+            "reissued-dbc",
             "--dbc",
             &reissue_output,
             &wallet_xorurl,
@@ -412,7 +413,7 @@ fn wallet_deposit_owned_dbc_with_secret_key_that_does_not_match_should_fail_with
             "wallet",
             "deposit",
             "--name",
-            "my-first-dbc",
+            "reissued-dbc",
             "--dbc",
             &reissue_output,
             "--secret-key",
@@ -594,6 +595,7 @@ fn wallet_reissue_with_owned_arg_should_reissue_with_configured_public_key() -> 
 /// probably be for each test case that requires credentials to generate its own keypair, but at
 /// the moment we don't have that infrastructure.
 #[test]
+#[ignore = "this test is problematic when running in parallel"]
 fn wallet_reissue_with_owned_arg_should_fail_if_credentials_are_not_configured() -> Result<()> {
     let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
