@@ -47,7 +47,7 @@ fn random_vector(length: usize) -> Vec<u8> {
 }
 
 /// Grows a seed vector into a Bytes with specified length.
-fn grows_vec_to_bytes(seed: &Vec<u8>, length: usize) -> Bytes {
+fn grows_vec_to_bytes(seed: &[u8], length: usize) -> Bytes {
     let mut seed = seed.clone();
     let mut rng = OsRng;
     seed[0] = rng.gen::<u8>();
