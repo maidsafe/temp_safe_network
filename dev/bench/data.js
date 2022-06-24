@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1656110283491,
+  "lastUpdate": 1656113573821,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -5939,6 +5939,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 5235072867,
             "range": "± 20925942",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "de5f156936e4326a5494c722307608f22188455e",
+          "message": "Merge #1273\n\n1273: feat: deposit owned dbcs r=jacderida a=jacderida\n\n- 554c9d688 **chore: upgrade sn_dbc to 3.3.0**\r\n\r\n  This version contains an update for converting an owned DBC to a bearer DBC.\r\n\r\n- 23802f8e3 **feat!: extend wallet_deposit for owned dbcs**\r\n\r\n  BREAKING CHANGE: the `wallet_deposit` function now provides an `Option<bls::SecretKey>` argument for\r\n  providing a secret key when depositing an owned DBC.\r\n\r\n  The owned DBC is changed to a bearer by providing the secret key, and the resulting DBC is then\r\n  stored in the wallet. This means you don't need to provide the secret key at reissue time, where\r\n  there is an issue with mapping input DBCs to secret keys.\r\n\r\n  A couple of misc changes:\r\n  * Extra test cases were added here to cover assigning the name to the deposit.\r\n  * More instances of \"Wallet\" were converted to \"wallet\", because \"wallet\" is not a proper noun.\r\n\r\n  As an unrelated change, this commit also provides more test coverage for `keys show` command. This\r\n  isn't a hugely important command, but I just wanted to ensure we don't break support for BLS keys.\r\n\r\n  These are integration tests because you really need to parse the console output, which you can't do\r\n  with unit tests.\r\n\r\n  This should probably have been its own commit, but it was accidentally added via an amend, then the\r\n  API changes were also amended on top, so it was too difficult to break out.\r\n\r\n- 67006eb2e **feat!: serialize to bls keys in util functions**\r\n\r\n  Utility functions were recently added to the API for serializing to the `Keypair` type. This was\r\n  changed to serialize directly to BLS to make it easier for the CLI to deal directly with BLS keys.\r\n  Soon we will be refactoring the `Keypair` type to have a different use case and things like\r\n  `sn_client` would be refactored to directly work with BLS keys. This is a little step in that\r\n  direction.\r\n\r\n  There was a utility function added to `sn_interface` to create a `Keypair` from a hex-based BLS key\r\n  because we still need to use the `Keypair` at this point in time.\r\n\r\n- f7940c5cd **feat!: remove use of xorurl with keys command**\r\n\r\n  The use of BLS keys means the XorUrl that was displayed to the user will no longer be usable, since\r\n  the BLS key is a 48-byte structure, and not 32 bytes like the Dalek key. We will come back and\r\n  address this issue later, possibly re-introducing the `SafeKey` type in some kind of different form.\r\n\r\n  The functionality and corresponding test cases for the `cat` and `dog` command that were working\r\n  with the `SafeKey` data type were removed.\r\n\r\n  The test cases for the `keys` commands were elaborated here to check the output of both the pretty\r\n  print and the json formats and to make sure the CLI prints out a matching keypair.\r\n\r\n- 69079d698 **feat: extend cli wallet deposit for owned dbcs**\r\n\r\n  The CLI is now extended to support the deposit of owned DBCs.\r\n\r\n  The `deposit` command will check if the supplied DBC is owned, and if it is, it will check to see if\r\n  the `--secret-key` argument is present and use that. If that argument isn't present, it will attempt\r\n  to use the secret key that's configured for use with the CLI, i.e., the `keys create --for-cli`\r\n  command.\r\n\r\n  The `reissue` command was also extended to provide an `--owned` flag, which when used, will reissue\r\n  an owned DBC using the public key configured for use with the CLI. This argument is mutually\r\n  exclusive with the `--public-key` argument, which will reissue the DBC using a specified key.\r\n\r\n  So we could offer the user a suggestion when a supplied secret key didn't match, this also involved\r\n  making a little extension to the API, to return a specific type of error. We will need to modify\r\n  `sn_dbc` to return a specific error type for this too, so we can avoid checking the string content\r\n  of the error message, but this will be covered on a separate PR.\n\nCo-authored-by: Chris O'Neil <chriso83@protonmail.com>",
+          "timestamp": "2022-06-24T22:05:24Z",
+          "tree_id": "d2bd5a1336d327ca2745fb67c00f710f173a62f3",
+          "url": "https://github.com/maidsafe/safe_network/commit/de5f156936e4326a5494c722307608f22188455e"
+        },
+        "date": 1656113572791,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 5558911495,
+            "range": "± 74014644",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 5606036952,
+            "range": "± 52281357",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 5803860230,
+            "range": "± 76310014",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 5012718913,
+            "range": "± 2406725",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 5032604128,
+            "range": "± 2454268",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 5205066949,
+            "range": "± 19622814",
             "unit": "ns/iter"
           }
         ]
