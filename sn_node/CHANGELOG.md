@@ -5,12 +5,71 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.62.8 (2022-06-24)
+
+### Chore
+
+ - <csr-id-d7a831329ad600ad7b5a1b6b68841f96b8ef8cfa/> misc cleanup and fixes
+ - <csr-id-402fb2c13860d89f6c7e5aa0858974ccc75dc1ec/> reduce dysfunction interval to 30s
+
+### New Features
+
+ - <csr-id-71eb46e47032074cdca678783e815b8d55ae39a0/> organize internal work
+
+### Other
+
+ - <csr-id-024ddf06fc517935f1a55af42b2aa1707a05f2e8/> remove register data_storage benchmark for now as sled db keeps erroring
+
+### Refactor
+
+ - <csr-id-0a46f508d22141eb06717012fc4cc0b37c7f025f/> improve efficiency of load monitoring
+ - <csr-id-1fbc762305a581680b52e2cbdaa7aea2feaf05ab/> move it to its own file
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 9 commits contributed to the release over the course of 2 calendar days.
+ - 2 days passed between releases.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - misc cleanup and fixes ([`d7a8313`](https://github.com/maidsafe/safe_network/commit/d7a831329ad600ad7b5a1b6b68841f96b8ef8cfa))
+    - organize internal work ([`71eb46e`](https://github.com/maidsafe/safe_network/commit/71eb46e47032074cdca678783e815b8d55ae39a0))
+    - reduce dysfunction interval to 30s ([`402fb2c`](https://github.com/maidsafe/safe_network/commit/402fb2c13860d89f6c7e5aa0858974ccc75dc1ec))
+    - Merge #1255 #1258 ([`ed0b5d8`](https://github.com/maidsafe/safe_network/commit/ed0b5d890e8404a59c25f8131eab5d23ce12eb7d))
+    - Merge #1257 #1260 ([`19d89df`](https://github.com/maidsafe/safe_network/commit/19d89dfbbf8ac8ab2b08380ce9b4bed58a5dc0d9))
+    - improve efficiency of load monitoring ([`0a46f50`](https://github.com/maidsafe/safe_network/commit/0a46f508d22141eb06717012fc4cc0b37c7f025f))
+    - move it to its own file ([`1fbc762`](https://github.com/maidsafe/safe_network/commit/1fbc762305a581680b52e2cbdaa7aea2feaf05ab))
+    - remove register data_storage benchmark for now as sled db keeps erroring ([`024ddf0`](https://github.com/maidsafe/safe_network/commit/024ddf06fc517935f1a55af42b2aa1707a05f2e8))
+    - Merge branch 'main' into refactor-event-channel ([`024883e`](https://github.com/maidsafe/safe_network/commit/024883e9a1b853c02c29daa5c447b03570af2473))
+</details>
+
 ## v0.62.7 (2022-06-21)
+
+<csr-id-fd7f845f7d1534cf9ff93ee9dc9f3009ab7e5664/>
+<csr-id-c038635cf88d32c52da89d11a8532e6c91c8bf38/>
+<csr-id-d8730f1bbd276b0686c68b00714c54ed86b7241a/>
 
 ### Chore
 
  - <csr-id-fd7f845f7d1534cf9ff93ee9dc9f3009ab7e5664/> make NetworkKnowledge single threaded
  - <csr-id-c038635cf88d32c52da89d11a8532e6c91c8bf38/> misc cleanup
+
+### Refactor
+
+ - <csr-id-d26d26df6ddd0321555fa3653be966fe91e2dca4/> cleanup and restructure of enum
+
+### Chore
+
+ - <csr-id-d526e0a32d3f09a788899d82db4fe6f13258568c/> sn_interface-0.6.4/sn_dysfunction-0.5.2/sn_client-0.66.4/sn_node-0.62.7/sn_api-0.64.4
 
 ### New Features
 
@@ -28,9 +87,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 5 commits contributed to the release.
+ - 7 commits contributed to the release.
  - 2 days passed between releases.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -40,6 +99,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.6.4/sn_dysfunction-0.5.2/sn_client-0.66.4/sn_node-0.62.7/sn_api-0.64.4 ([`d526e0a`](https://github.com/maidsafe/safe_network/commit/d526e0a32d3f09a788899d82db4fe6f13258568c))
+    - cleanup and restructure of enum ([`d26d26d`](https://github.com/maidsafe/safe_network/commit/d26d26df6ddd0321555fa3653be966fe91e2dca4))
     - routing_stress example compiles once more ([`d5c6544`](https://github.com/maidsafe/safe_network/commit/d5c65440b2152cf570a2014eee102b353678af00))
     - add LocalSet to node test runs ([`d8730f1`](https://github.com/maidsafe/safe_network/commit/d8730f1bbd276b0686c68b00714c54ed86b7241a))
     - make NetworkKnowledge single threaded ([`fd7f845`](https://github.com/maidsafe/safe_network/commit/fd7f845f7d1534cf9ff93ee9dc9f3009ab7e5664))
@@ -50,6 +111,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.62.6 (2022-06-18)
 
 <csr-id-e4b43ce9a8655cc8deea8d459ac0a0755d9153c1/>
+<csr-id-eda5d22e57779a7d1ecab1707f01bccd5f94706d/>
 
 ### Chore
 

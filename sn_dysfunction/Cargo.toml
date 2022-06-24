@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "sn_dysfunction"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
-version = "0.5.2"
+version = "0.5.3"
 
 [features]
 default = []
@@ -21,7 +21,7 @@ thiserror = "1.0.23"
 tokio = { version = "1.0.23", features = [ "sync" ] }
 tracing = "~0.1.26"
 xor_name = "4.0.1"
-sn_interface = { path = "../sn_interface", version = "^0.6.4" }
+sn_interface = { path = "../sn_interface", version = "^0.6.5" }
 
 [dev-dependencies]
 proptest = "~1.0.0"

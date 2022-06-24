@@ -5,18 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.5.2 (2022-06-21)
+## v0.5.3 (2022-06-24)
 
-### Chore
+### Test
 
- - <csr-id-c038635cf88d32c52da89d11a8532e6c91c8bf38/> misc cleanup
+ - <csr-id-b433a23b2f661ad3ac0ebc290f457f1c64e04471/> improving dysf test, reproducible issues
+   we add defined strategy for zornames, use those for nodes, and add an
+   address to the IssueTypes generated, so they can be reliably routed to
+   the same nodes.
+   
+   We also adjust our assert to tolerate finding _less_ than the required
+   bad nodes... but do not allow false positives
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 5 days passed between releases.
+ - 2 days passed between releases.
  - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -27,6 +33,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - improving dysf test, reproducible issues ([`b433a23`](https://github.com/maidsafe/safe_network/commit/b433a23b2f661ad3ac0ebc290f457f1c64e04471))
+</details>
+
+## v0.5.2 (2022-06-21)
+
+<csr-id-c038635cf88d32c52da89d11a8532e6c91c8bf38/>
+
+### Chore
+
+ - <csr-id-c038635cf88d32c52da89d11a8532e6c91c8bf38/> misc cleanup
+
+### Chore
+
+ - <csr-id-d526e0a32d3f09a788899d82db4fe6f13258568c/> sn_interface-0.6.4/sn_dysfunction-0.5.2/sn_client-0.66.4/sn_node-0.62.7/sn_api-0.64.4
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 5 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.6.4/sn_dysfunction-0.5.2/sn_client-0.66.4/sn_node-0.62.7/sn_api-0.64.4 ([`d526e0a`](https://github.com/maidsafe/safe_network/commit/d526e0a32d3f09a788899d82db4fe6f13258568c))
     - misc cleanup ([`c038635`](https://github.com/maidsafe/safe_network/commit/c038635cf88d32c52da89d11a8532e6c91c8bf38))
 </details>
 
@@ -34,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-id-26e35cc2d1c5aab81c3479dd7948f7a7e586f817/>
 <csr-id-537b6c08447c15a056d8c79c8592106d9a40b672/>
+<csr-id-f599c5973d50324aad1720166156666d5db1ed3d/>
 
 ### Chore
 

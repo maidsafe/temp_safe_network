@@ -4,20 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.57.5 (2022-06-18)
+## v0.57.6 (2022-06-24)
 
 ### Chore
 
- - <csr-id-4d1b0915ce6ab21c13d27b7be66a455e4fbd3133/> update rcgen to remove failure crate
- - <csr-id-b55f8a78988c28369cc998f53b019b14a4ff024e/> update duct dep to remove nix security warning
+ - <csr-id-9bf7a9f710632768fff82f5abc2d10127b844160/> use atty instead of isatty
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 1 day passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits contributed to the release over the course of 2 calendar days.
+ - 5 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -27,6 +26,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge #1255 #1258 ([`ed0b5d8`](https://github.com/maidsafe/safe_network/commit/ed0b5d890e8404a59c25f8131eab5d23ce12eb7d))
+    - use atty instead of isatty ([`9bf7a9f`](https://github.com/maidsafe/safe_network/commit/9bf7a9f710632768fff82f5abc2d10127b844160))
+</details>
+
+## v0.57.5 (2022-06-18)
+
+<csr-id-4d1b0915ce6ab21c13d27b7be66a455e4fbd3133/>
+<csr-id-b55f8a78988c28369cc998f53b019b14a4ff024e/>
+
+### Chore
+
+ - <csr-id-4d1b0915ce6ab21c13d27b7be66a455e4fbd3133/> update rcgen to remove failure crate
+ - <csr-id-b55f8a78988c28369cc998f53b019b14a4ff024e/> update duct dep to remove nix security warning
+
+### Chore
+
+ - <csr-id-eda5d22e57779a7d1ecab1707f01bccd5f94706d/> sn_node-0.62.6/sn_cli-0.57.5
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 2 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_node-0.62.6/sn_cli-0.57.5 ([`eda5d22`](https://github.com/maidsafe/safe_network/commit/eda5d22e57779a7d1ecab1707f01bccd5f94706d))
     - update rcgen to remove failure crate ([`4d1b091`](https://github.com/maidsafe/safe_network/commit/4d1b0915ce6ab21c13d27b7be66a455e4fbd3133))
     - update duct dep to remove nix security warning ([`b55f8a7`](https://github.com/maidsafe/safe_network/commit/b55f8a78988c28369cc998f53b019b14a4ff024e))
 </details>
@@ -34,6 +68,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ## v0.57.4 (2022-06-15)
 
 <csr-id-4eb43fa884d7b047febb18c067ae905969a113bf/>
+<csr-id-f599c5973d50324aad1720166156666d5db1ed3d/>
 
 ### Chore
 

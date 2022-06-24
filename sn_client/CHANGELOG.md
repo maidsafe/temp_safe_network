@@ -1113,19 +1113,22 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.66.4 (2022-06-21)
+## v0.66.5 (2022-06-24)
 
 ### Chore
 
- - <csr-id-d204cffdc25a08f604f3a7b97dd74c0f4181b696/> remove unused deps and enum variants
- - <csr-id-c038635cf88d32c52da89d11a8532e6c91c8bf38/> misc cleanup
+ - <csr-id-d7a831329ad600ad7b5a1b6b68841f96b8ef8cfa/> misc cleanup and fixes
+
+### Refactor
+
+ - <csr-id-1fbc762305a581680b52e2cbdaa7aea2feaf05ab/> move it to its own file
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release.
- - 5 days passed between releases.
+ - 4 commits contributed to the release over the course of 2 calendar days.
+ - 2 days passed between releases.
  - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
@@ -1136,6 +1139,43 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - misc cleanup and fixes ([`d7a8313`](https://github.com/maidsafe/safe_network/commit/d7a831329ad600ad7b5a1b6b68841f96b8ef8cfa))
+    - Merge #1255 #1258 ([`ed0b5d8`](https://github.com/maidsafe/safe_network/commit/ed0b5d890e8404a59c25f8131eab5d23ce12eb7d))
+    - Merge #1257 #1260 ([`19d89df`](https://github.com/maidsafe/safe_network/commit/19d89dfbbf8ac8ab2b08380ce9b4bed58a5dc0d9))
+    - move it to its own file ([`1fbc762`](https://github.com/maidsafe/safe_network/commit/1fbc762305a581680b52e2cbdaa7aea2feaf05ab))
+</details>
+
+## v0.66.4 (2022-06-21)
+
+<csr-id-d204cffdc25a08f604f3a7b97dd74c0f4181b696/>
+<csr-id-c038635cf88d32c52da89d11a8532e6c91c8bf38/>
+
+### Chore
+
+ - <csr-id-d204cffdc25a08f604f3a7b97dd74c0f4181b696/> remove unused deps and enum variants
+ - <csr-id-c038635cf88d32c52da89d11a8532e6c91c8bf38/> misc cleanup
+
+### Chore
+
+ - <csr-id-d526e0a32d3f09a788899d82db4fe6f13258568c/> sn_interface-0.6.4/sn_dysfunction-0.5.2/sn_client-0.66.4/sn_node-0.62.7/sn_api-0.64.4
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 5 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.6.4/sn_dysfunction-0.5.2/sn_client-0.66.4/sn_node-0.62.7/sn_api-0.64.4 ([`d526e0a`](https://github.com/maidsafe/safe_network/commit/d526e0a32d3f09a788899d82db4fe6f13258568c))
     - remove unused deps and enum variants ([`d204cff`](https://github.com/maidsafe/safe_network/commit/d204cffdc25a08f604f3a7b97dd74c0f4181b696))
     - misc cleanup ([`c038635`](https://github.com/maidsafe/safe_network/commit/c038635cf88d32c52da89d11a8532e6c91c8bf38))
 </details>
@@ -1143,6 +1183,7 @@ needed, as they keypair itself contains the Arcs we need.
 ## v0.66.3 (2022-06-15)
 
 <csr-id-4eb43fa884d7b047febb18c067ae905969a113bf/>
+<csr-id-f599c5973d50324aad1720166156666d5db1ed3d/>
 
 ### Chore
 

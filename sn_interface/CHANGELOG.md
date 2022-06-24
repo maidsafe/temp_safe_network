@@ -6,22 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## v0.6.4 (2022-06-21)
+## v0.6.5 (2022-06-24)
 
 ### Chore
 
- - <csr-id-1574b495f17d25af2ed9dd017ccf8dce715a8b28/> avoid another chain borrow/drop, use cloning api
- - <csr-id-fd7f845f7d1534cf9ff93ee9dc9f3009ab7e5664/> make NetworkKnowledge single threaded
- - <csr-id-d204cffdc25a08f604f3a7b97dd74c0f4181b696/> remove unused deps and enum variants
- - <csr-id-c038635cf88d32c52da89d11a8532e6c91c8bf38/> misc cleanup
+ - <csr-id-d7a831329ad600ad7b5a1b6b68841f96b8ef8cfa/> misc cleanup and fixes
+
+### New Features
+
+ - <csr-id-71eb46e47032074cdca678783e815b8d55ae39a0/> organize internal work
+
+### Refactor
+
+ - <csr-id-1fbc762305a581680b52e2cbdaa7aea2feaf05ab/> move it to its own file
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release.
- - 5 days passed between releases.
- - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits contributed to the release over the course of 2 calendar days.
+ - 2 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -31,6 +36,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - misc cleanup and fixes ([`d7a8313`](https://github.com/maidsafe/safe_network/commit/d7a831329ad600ad7b5a1b6b68841f96b8ef8cfa))
+    - organize internal work ([`71eb46e`](https://github.com/maidsafe/safe_network/commit/71eb46e47032074cdca678783e815b8d55ae39a0))
+    - Merge #1255 #1258 ([`ed0b5d8`](https://github.com/maidsafe/safe_network/commit/ed0b5d890e8404a59c25f8131eab5d23ce12eb7d))
+    - Merge #1257 #1260 ([`19d89df`](https://github.com/maidsafe/safe_network/commit/19d89dfbbf8ac8ab2b08380ce9b4bed58a5dc0d9))
+    - move it to its own file ([`1fbc762`](https://github.com/maidsafe/safe_network/commit/1fbc762305a581680b52e2cbdaa7aea2feaf05ab))
+    - Merge branch 'main' into refactor-event-channel ([`024883e`](https://github.com/maidsafe/safe_network/commit/024883e9a1b853c02c29daa5c447b03570af2473))
+</details>
+
+## v0.6.4 (2022-06-21)
+
+<csr-id-1574b495f17d25af2ed9dd017ccf8dce715a8b28/>
+<csr-id-fd7f845f7d1534cf9ff93ee9dc9f3009ab7e5664/>
+<csr-id-d204cffdc25a08f604f3a7b97dd74c0f4181b696/>
+<csr-id-c038635cf88d32c52da89d11a8532e6c91c8bf38/>
+
+### Chore
+
+ - <csr-id-1574b495f17d25af2ed9dd017ccf8dce715a8b28/> avoid another chain borrow/drop, use cloning api
+ - <csr-id-fd7f845f7d1534cf9ff93ee9dc9f3009ab7e5664/> make NetworkKnowledge single threaded
+ - <csr-id-d204cffdc25a08f604f3a7b97dd74c0f4181b696/> remove unused deps and enum variants
+ - <csr-id-c038635cf88d32c52da89d11a8532e6c91c8bf38/> misc cleanup
+
+### Refactor
+
+ - <csr-id-d26d26df6ddd0321555fa3653be966fe91e2dca4/> cleanup and restructure of enum
+
+### Chore
+
+ - <csr-id-d526e0a32d3f09a788899d82db4fe6f13258568c/> sn_interface-0.6.4/sn_dysfunction-0.5.2/sn_client-0.66.4/sn_node-0.62.7/sn_api-0.64.4
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release.
+ - 5 days passed between releases.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.6.4/sn_dysfunction-0.5.2/sn_client-0.66.4/sn_node-0.62.7/sn_api-0.64.4 ([`d526e0a`](https://github.com/maidsafe/safe_network/commit/d526e0a32d3f09a788899d82db4fe6f13258568c))
+    - cleanup and restructure of enum ([`d26d26d`](https://github.com/maidsafe/safe_network/commit/d26d26df6ddd0321555fa3653be966fe91e2dca4))
     - avoid another chain borrow/drop, use cloning api ([`1574b49`](https://github.com/maidsafe/safe_network/commit/1574b495f17d25af2ed9dd017ccf8dce715a8b28))
     - make NetworkKnowledge single threaded ([`fd7f845`](https://github.com/maidsafe/safe_network/commit/fd7f845f7d1534cf9ff93ee9dc9f3009ab7e5664))
     - remove unused deps and enum variants ([`d204cff`](https://github.com/maidsafe/safe_network/commit/d204cffdc25a08f604f3a7b97dd74c0f4181b696))
@@ -41,6 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-id-4eb43fa884d7b047febb18c067ae905969a113bf/>
 <csr-id-537b6c08447c15a056d8c79c8592106d9a40b672/>
+<csr-id-f599c5973d50324aad1720166156666d5db1ed3d/>
 
 ### Chore
 
