@@ -62,7 +62,19 @@ impl Safe {
             dbc.clone()
         } else if let Some(sk) = secret_key {
             let mut owned_dbc = dbc.clone();
-            owned_dbc.to_bearer(&sk)?;
+            match owned_dbc.to_bearer(&sk) {
+                Ok(()) => {}
+                Err(e) => {
+                    // TODO: Add a specific error type to `sn_dbc` for the mismatched key so we can
+                    // avoid this string check.
+                    if e.to_string()
+                        .contains("supplied secret key does not match the public key")
+                    {
+                        return Err(Error::DbcDepositInvalidSecretKey());
+                    }
+                    return Err(Error::DbcDepositError(e.to_string()));
+                }
+            }
             owned_dbc
         } else {
             return Err(Error::DbcDepositError(
@@ -516,6 +528,34 @@ mod tests {
                 Ok(())
             }
             Err(_) => Err(anyhow!("This test should use a DbcDepositError".to_string())),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_wallet_deposit_with_owned_dbc_with_invalid_secret_key() -> Result<()> {
+        let safe = new_safe_instance().await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+        let sk = bls::SecretKey::random();
+        let sk2 = bls::SecretKey::random();
+        let pk = sk.public_key();
+
+        let dbc = new_dbc(DBC_WITH_12_230_000_000)?;
+        safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
+            .await?;
+        let owned_dbc = safe
+            .wallet_reissue(&wallet_xorurl, "2.35", Some(pk))
+            .await?;
+        let result = safe
+            .wallet_deposit(&wallet_xorurl, Some("owned-dbc"), &owned_dbc, Some(sk2))
+            .await;
+        match result {
+            Ok(_) => Err(anyhow!(
+                "This test case should result in an error".to_string()
+            )),
+            Err(Error::DbcDepositInvalidSecretKey()) => Ok(()),
+            Err(_) => Err(anyhow!(
+                "This test should use a DbcDepositInvalidSecretKey error".to_string()
+            )),
         }
     }
 
