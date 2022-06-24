@@ -131,9 +131,12 @@ pub enum Error {
     /// DbcReissueError
     #[error("DbcReissueError: {0}")]
     DbcReissueError(String),
-    /// DbcReissueError
+    /// DbcDepositError
     #[error("DbcDepositError: {0}")]
     DbcDepositError(String),
+    /// DbcDepositError
+    #[error("The secret key does not match the public key for this owned DBC")]
+    DbcDepositInvalidSecretKey(),
     /// NotImplementedError
     #[error("NotImplementedError: {0}")]
     NotImplementedError(String),

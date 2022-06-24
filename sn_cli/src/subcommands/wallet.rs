@@ -10,8 +10,10 @@ use super::{
     helpers::{get_from_arg_or_stdin, serialise_output},
     OutputFmt,
 };
+use crate::operations::config::Config;
+use bls::{PublicKey, SecretKey};
 use color_eyre::{eyre::eyre, Help, Result};
-use sn_api::Safe;
+use sn_api::{Error, Safe};
 use std::path::Path;
 use structopt::StructOpt;
 
@@ -27,7 +29,9 @@ pub enum WalletSubCommands {
         target: Option<String>,
     },
     #[structopt(name = "deposit")]
-    /// Deposit a spendable DBC in a wallet
+    /// Deposit a spendable DBC in a wallet. If the DBC is not bearer, we will try to deposit using
+    /// the secret key configured for use with safe. If you wish to use a different key, use the
+    /// --secret-key argument.
     Deposit {
         /// The URL of the wallet for the deposit
         wallet_url: String,
@@ -39,6 +43,10 @@ pub enum WalletSubCommands {
         /// directly may not work.
         #[structopt(long = "dbc")]
         dbc: Option<String>,
+        #[structopt(long = "secret-key")]
+        /// Use this argument to specify a secret key for an owned DBC. It should be a hex-encoded
+        /// BLS key.
+        secret_key_hex: Option<String>,
     },
     #[structopt(name = "reissue")]
     /// Reissue a DBC from a wallet to a SafeKey.
@@ -50,9 +58,13 @@ pub enum WalletSubCommands {
         from: String,
         /// To reissue the DBC to a particular owner, provide their public key. This should be a
         /// hex-encoded BLS key. Otherwise the DBC will be reissued as bearer, meaning anyone can
-        /// spend it.
+        /// spend it. This argument and the --owned argument are mutually exclusive.
         #[structopt(long = "public-key")]
         public_key_hex: Option<String>,
+        /// Set this flag to reissue as an owned DBC, using the public key configured for use with
+        /// safe. This argument and the --public-key argument are mutually exclusive.
+        #[structopt(long = "owned")]
+        owned: bool,
     },
 }
 
@@ -60,6 +72,7 @@ pub async fn wallet_commander(
     cmd: WalletSubCommands,
     output_fmt: OutputFmt,
     safe: &Safe,
+    config: &Config,
 ) -> Result<()> {
     match cmd {
         WalletSubCommands::Create {} => {
@@ -96,6 +109,7 @@ pub async fn wallet_commander(
             wallet_url,
             name,
             dbc,
+            secret_key_hex,
         } => {
             let dbc = if let Some(dbc) = dbc {
                 let path = Path::new(&dbc);
@@ -119,17 +133,54 @@ pub async fn wallet_commander(
                 println!("{}", dbc_hex);
                 sn_dbc::Dbc::from_hex(dbc_hex.trim())?
             };
-            let the_name = safe
-                .wallet_deposit(&wallet_url, name.as_deref(), &dbc, None)
-                .await?;
+            let sk = if !dbc.is_bearer() {
+                // This is an owned DBC, so we need a secret key. Either use the one supplied, or
+                // attempt to use the key configured for use with the CLI.
+                if let Some(sk_hex) = secret_key_hex {
+                    Some(SecretKey::from_hex(&sk_hex)?)
+                } else {
+                    Some(read_key_from_configured_credentials(
+                        config,
+                        "This is an owned DBC. To deposit, it requires a secret key. \
+                         A secret key was not supplied and there were no credentials \
+                         configured for use with safe."
+                            .to_string(),
+                        "Please run the command again using the --secret-key \
+                         argument to specify the key."
+                            .to_string(),
+                    )?)
+                }
+            } else {
+                None
+            };
+            let name = match safe
+                .wallet_deposit(&wallet_url, name.as_deref(), &dbc, sk)
+                .await
+            {
+                Ok(name) => name,
+                Err(e) => match e {
+                    Error::DbcDepositInvalidSecretKey() => {
+                        return Err(eyre!(
+                            "The supplied secret key did not match the public key for this DBC."
+                        )
+                        .suggestion(
+                            "Please run the command again with the correct key for the \
+                                --secret-key argument.",
+                        ));
+                    }
+                    _ => {
+                        return Err(eyre!(e));
+                    }
+                },
+            };
 
             if OutputFmt::Pretty == output_fmt {
                 println!(
                     "Spendable DBC deposited with name '{}' in wallet located at \"{}\"",
-                    the_name, wallet_url
+                    name, wallet_url
                 );
             } else {
-                println!("{}", serialise_output(&(wallet_url, the_name), output_fmt));
+                println!("{}", serialise_output(&(wallet_url, name), output_fmt));
             }
 
             Ok(())
@@ -138,16 +189,28 @@ pub async fn wallet_commander(
             amount,
             from,
             public_key_hex,
+            owned,
         } => {
+            if owned && public_key_hex.is_some() {
+                return Err(eyre!(
+                    "The --owned and --public-key arguments are mutually exclusive."
+                )
+                .suggestion(
+                    "Please run the command again and use one or the other, but not both, of these \
+                    arguments."));
+            }
             let pk = if let Some(pk_hex) = public_key_hex.clone() {
-                let pk_bytes = hex::decode(pk_hex)?;
-                let pk_bytes: [u8; bls::PK_SIZE] = pk_bytes.try_into().map_err(|_| {
-                    eyre!("Could not decode supplied public key").suggestion(
-                        "Verify that this is a hex encoded BLS key. \
-                            You can use the `keys create` command to see the format of the key.",
-                    )
-                })?;
-                Some(bls::PublicKey::from_bytes(pk_bytes)?)
+                Some(PublicKey::from_hex(&pk_hex)?)
+            } else if owned {
+                let sk = read_key_from_configured_credentials(
+                    config,
+                    "The --owned argument requires credentials to be configured for safe."
+                        .to_string(),
+                    "Run the 'keys create --for-cli' command to generate a credentials then run \
+                    this command again."
+                        .to_string(),
+                )?;
+                Some(sk.public_key())
             } else {
                 None
             };
@@ -159,8 +222,8 @@ pub async fn wallet_commander(
                 println!("-------- DBC DATA --------");
                 println!("{}", dbc_hex);
                 println!("--------------------------");
-                if let Some(pk_hex) = public_key_hex {
-                    println!("This DBC is owned by public key {}", pk_hex);
+                if let Some(pk) = pk {
+                    println!("This DBC is owned by public key {}", pk.to_hex());
                 } else {
                     println!("This is a bearer DBC that can be spent by anyone.");
                 }
@@ -171,4 +234,25 @@ pub async fn wallet_commander(
             Ok(())
         }
     }
+}
+
+/// Helper to get the secret key from the credentials that are configured for use with safe.
+///
+/// Different error and suggestion messages need to be provided depending on the context in which
+/// it is used.
+///
+/// Returns an error if the credentials file is missing.
+fn read_key_from_configured_credentials(
+    config: &Config,
+    error: String,
+    suggestion: String,
+) -> Result<SecretKey> {
+    let mut credentials_path = config.cli_config_path.clone();
+    credentials_path.pop();
+    credentials_path.push("credentials");
+    if !credentials_path.exists() {
+        return Err(eyre!(error).suggestion(suggestion));
+    }
+    let sk_hex = std::fs::read_to_string(credentials_path)?;
+    Ok(SecretKey::from_hex(&sk_hex)?)
 }

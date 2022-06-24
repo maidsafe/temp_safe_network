@@ -12,7 +12,7 @@ use sn_cmd_test_utilities::util::{parse_keys_create_output, safe_cmd_stdout};
 #[test]
 fn keys_create_should_output_public_and_secret_key() -> Result<()> {
     let output = safe_cmd_stdout(["keys", "create"], Some(0))?;
-    let lines: Vec<&str> = output.split("\n").collect();
+    let lines: Vec<&str> = output.split('\n').collect();
     let (_, pk_hex) = lines[0]
         .split_once(':')
         .ok_or_else(|| eyre!("the output should contain a public key in hex"))?;
@@ -44,13 +44,13 @@ fn keys_create_with_json_output_should_output_keys_and_url() -> Result<()> {
 #[test]
 fn keys_show_should_output_public_key() -> Result<()> {
     let output = safe_cmd_stdout(["keys", "show"], Some(0))?;
-    let lines: Vec<&str> = output.split("\n").collect();
+    let lines: Vec<&str> = output.split('\n').collect();
     let (_, pk_hex) = lines[1]
         .split_once(':')
         .ok_or_else(|| eyre!("the output should contain a public key in hex"))?;
     let pk_hex = pk_hex.trim();
 
-    match bls::PublicKey::from_hex(&pk_hex) {
+    match bls::PublicKey::from_hex(pk_hex) {
         Ok(_) => Ok(()),
         Err(e) => Err(eyre!(e)),
     }
@@ -59,7 +59,7 @@ fn keys_show_should_output_public_key() -> Result<()> {
 #[test]
 fn keys_show_with_show_sk_should_output_public_and_secret_key() -> Result<()> {
     let output = safe_cmd_stdout(["keys", "show", "--show-sk"], Some(0))?;
-    let lines: Vec<&str> = output.split("\n").collect();
+    let lines: Vec<&str> = output.split('\n').collect();
     let (_, pk_hex) = lines[1]
         .split_once(':')
         .ok_or_else(|| eyre!("the output should contain a public key in hex"))?;
@@ -69,8 +69,8 @@ fn keys_show_with_show_sk_should_output_public_and_secret_key() -> Result<()> {
     let pk_hex = pk_hex.trim();
     let sk_hex = sk_hex.trim();
 
-    let _ = bls::PublicKey::from_hex(&pk_hex)?;
-    let sk = bls::SecretKey::from_hex(&sk_hex)?;
+    let _ = bls::PublicKey::from_hex(pk_hex)?;
+    let sk = bls::SecretKey::from_hex(sk_hex)?;
     assert_eq!(pk_hex, sk.public_key().to_hex());
     Ok(())
 }
