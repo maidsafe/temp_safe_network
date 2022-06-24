@@ -101,7 +101,7 @@ pub async fn run() -> Result<()> {
             let mut launcher = Box::new(SnLaunchToolNetworkLauncher::default());
             node_commander(cmd, &mut get_config().await?, &mut launcher).await
         }
-        SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, &safe, &get_config().await?).await,
+        SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, &get_config().await?).await,
         SubCommands::Xorurl {
             cmd,
             location,

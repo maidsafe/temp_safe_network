@@ -50,10 +50,8 @@ fn keys_show_should_output_public_key() -> Result<()> {
         .ok_or_else(|| eyre!("the output should contain a public key in hex"))?;
     let pk_hex = pk_hex.trim();
 
-    match bls::PublicKey::from_hex(pk_hex) {
-        Ok(_) => Ok(()),
-        Err(e) => Err(eyre!(e)),
-    }
+    let _ = bls::PublicKey::from_hex(pk_hex)?;
+    Ok(())
 }
 
 #[test]

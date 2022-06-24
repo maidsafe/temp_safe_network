@@ -120,7 +120,7 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe)
                     );
                 }
                 SafeData::SafeKey { .. } => {
-                    unimplemented!("The SafeKey data type is not supported at the moment");
+                    println!("The SafeKey data type is not supported at the moment");
                 }
                 SafeData::Multimap {
                     xorurl,

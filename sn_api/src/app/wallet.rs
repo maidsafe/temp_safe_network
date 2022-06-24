@@ -62,19 +62,15 @@ impl Safe {
             dbc.clone()
         } else if let Some(sk) = secret_key {
             let mut owned_dbc = dbc.clone();
-            match owned_dbc.to_bearer(&sk) {
-                Ok(()) => {}
-                Err(e) => {
-                    // TODO: Add a specific error type to `sn_dbc` for the mismatched key so we can
-                    // avoid this string check.
-                    if e.to_string()
-                        .contains("supplied secret key does not match the public key")
-                    {
-                        return Err(Error::DbcDepositInvalidSecretKey());
-                    }
-                    return Err(Error::DbcDepositError(e.to_string()));
+            owned_dbc.to_bearer(&sk).map_err(|e| {
+                if e.to_string()
+                    .contains("supplied secret key does not match the public key")
+                {
+                    Error::DbcDepositInvalidSecretKey
+                } else {
+                    Error::DbcDepositError(e.to_string())
                 }
-            }
+            })?;
             owned_dbc
         } else {
             return Err(Error::DbcDepositError(
@@ -552,7 +548,7 @@ mod tests {
             Ok(_) => Err(anyhow!(
                 "This test case should result in an error".to_string()
             )),
-            Err(Error::DbcDepositInvalidSecretKey()) => Ok(()),
+            Err(Error::DbcDepositInvalidSecretKey) => Ok(()),
             Err(_) => Err(anyhow!(
                 "This test should use a DbcDepositInvalidSecretKey error".to_string()
             )),
