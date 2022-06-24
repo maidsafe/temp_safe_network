@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use criterion::{criterion_group, criterion_main, Criterion, SamplingMode};
 use eyre::Result;
 use rand::{rngs::OsRng, Rng};
@@ -48,13 +48,13 @@ fn random_vector(length: usize) -> Vec<u8> {
 
 /// Grows a seed vector into a Bytes with specified length.
 fn grows_vec_to_bytes(seed: &[u8], length: usize) -> Bytes {
-    let mut seed = seed.clone();
+    let mut seed = BytesMut::from(seed);
     let mut rng = OsRng;
     seed[0] = rng.gen::<u8>();
     let iterations = length / seed.len();
     let remainder = length % seed.len();
 
-    let mut bytes = Vec::new();
+    let mut bytes = BytesMut::new();
 
     for _ in 0..iterations {
         bytes.extend(seed.clone());
