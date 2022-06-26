@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "sn_client"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
-version = "0.66.5"
+version = "0.67.0"
 
 [[bench]]
 name = "upload_bytes"
@@ -66,7 +66,7 @@ serde_bytes = "~0.11.5"
 serde_json = "1.0.53"
 signature = "1.1.10"
 sn_dbc = { version = "4.0.0", features = [ "serdes" ] }
-sn_interface = { path = "../sn_interface", version = "^0.6.5" }
+sn_interface = { path = "../sn_interface", version = "^0.7.0" }
 structopt = "~0.3.17"
 strum = "~0.23.0"
 strum_macros = "~0.23.1"
@@ -95,7 +95,7 @@ sn_launch_tool = "~0.9.7"
 termcolor="1.1.2"
 tokio-util = { version = "~0.6.7", features = ["time"] }
 walkdir = "2"
-sn_interface = { path = "../sn_interface", version = "^0.6.5", features= ["test-utils"] }
+sn_interface = { path = "../sn_interface", version = "^0.7.0", features= ["test-utils"] }
 
 [dev-dependencies.cargo-husky]
 version = "1.5.0"
