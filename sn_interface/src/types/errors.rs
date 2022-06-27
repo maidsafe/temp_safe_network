@@ -10,6 +10,7 @@ use super::{register::User, RegisterAddress};
 
 use crate::messaging::data::Error as ErrorMsg;
 
+use bls::Error as BlsError;
 use std::{
     collections::BTreeMap,
     fmt::{self, Debug, Formatter},
@@ -124,6 +125,8 @@ pub enum Error {
     UntrustedSectionAuthProvider(String),
     #[error("Proof chain cannot be trusted: {0}")]
     UntrustedProofChain(String),
+    #[error("BlsError: {0}")]
+    BlsError(#[from] BlsError),
 }
 
 pub fn convert_bincode_error(err: bincode::Error) -> Error {

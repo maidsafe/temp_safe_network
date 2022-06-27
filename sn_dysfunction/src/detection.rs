@@ -14,13 +14,13 @@ use xor_name::XorName;
 use std::time::Duration;
 static RECENT_ISSUE_DURATION: Duration = Duration::from_secs(60 * 10); // 10 minutes
 
-static CONN_WEIGHTING: f32 = 2.0;
+static CONN_WEIGHTING: f32 = 3.0;
 static OP_WEIGHTING: f32 = 1.0;
-static KNOWLEDGE_WEIGHTING: f32 = 3.0;
-static DKG_WEIGHTING: f32 = 4.0;
+static KNOWLEDGE_WEIGHTING: f32 = 4.0;
+static DKG_WEIGHTING: f32 = 1.0;
 
 /// Z-score value above which a node is dysfunctional
-static DYSFUNCTIONAL_DEVIATION: f32 = 2.6;
+static DYSFUNCTIONAL_DEVIATION: f32 = 2.0;
 
 #[derive(Clone, Debug)]
 /// Represents the different type of issues that can be recorded by the Dysfunction Detection
@@ -185,7 +185,7 @@ impl DysfunctionDetection {
         let mut scores_only = vec![];
         // now we loop to get the scores per xorname, so we can then avg etc
         for (name, score) in ops_scores {
-            trace!("Ops sore: {name}, {score}");
+            debug!("Ops sore: {name}, {score}");
 
             let ops_score = score * OP_WEIGHTING;
 
@@ -198,9 +198,9 @@ impl DysfunctionDetection {
             let node_knowledge_score = *knowledge_scores.get(&name).unwrap_or(&1.0);
             let node_knowledge_score = node_knowledge_score * KNOWLEDGE_WEIGHTING;
 
-            trace!("Conns score: {name}, {node_conn_score}");
-            trace!("Knowledge score: {name}, {node_knowledge_score}");
-            trace!("Dkg score: {name}, {node_dkg_score}");
+            debug!("Conns score: {name}, {node_conn_score}");
+            debug!("Knowledge score: {name}, {node_knowledge_score}");
+            debug!("Dkg score: {name}, {node_dkg_score}");
             let final_score = ops_score + node_conn_score + node_knowledge_score + node_dkg_score;
 
             scores_only.push(final_score);
@@ -231,7 +231,7 @@ impl DysfunctionDetection {
                 _ => None,
             };
 
-            trace!("Final Z-score for {name} is {zscore:?}");
+            debug!("Final Z-score for {name} is {zscore:?}");
 
             let _existed = final_scores.insert(name, zscore);
         }
@@ -259,6 +259,9 @@ impl DysfunctionDetection {
     }
 
     /// Get a list of nodes whose score is above mean * DysfunctionalSeverity weighting
+    /// TODO: order these to act upon _most_ dysfunctional first
+    /// (the nodes must all ProposeOffline over a dysfunctional node and then _immediately_ vote it off. So any other membershipn changes in flight could block this.
+    /// thus, we need to be callling this function often until nodes are removed.)
     pub async fn get_nodes_beyond_severity(
         &self,
         severity: DysfunctionSeverity,
@@ -293,53 +296,187 @@ mod tests {
 
     use eyre::bail;
     use proptest::prelude::*;
-    use rand::Rng;
     use tokio::runtime::Runtime;
     use xor_name::{rand::random as random_xorname, XorName};
 
-    fn issue_type_strategy() -> impl Strategy<Value = IssueType> {
-        // Weighted issues to be (vaguely) representative of a real network
-        // (TODO: take stats from section)
+    #[derive(Debug, Clone)]
+    enum NodeQualityScored {
+        Bad(f32),
+        Good(f32),
+    }
+
+    impl NodeQualityScored {
+        fn get_failure_rate(&self) -> &f32 {
+            match self {
+                NodeQualityScored::Good(r) => r,
+                NodeQualityScored::Bad(r) => r,
+            }
+        }
+    }
+
+    /// In a standard network startup (as of 24/06/22)
+    /// we see:
+    /// 0 op requests
+    /// 2407 DkgBroadcastMsg DKG (each are tracked as an eror until a respnose comes in...) this is total across all nodes...
+    ///
+    /// This includes:
+    /// 510 "tracker: Dkg..." (the initial black mark)
+    /// ~2394 "Logging Dkg session as responded to in dysfunction." (aka removing a black mark) < -- we're not simulating this,
+    /// only the stains that stick... So in reality, over time we' see 0 DKG issues in a normal startup
+    /// ~469 "tracker: Know"
+    /// ~230 "tracker: Communication""
+    /// 0 "tracker: PendingOp..." (equally a lot of these are being responded to...)
+    fn generate_network_startup_msg_issues() -> impl Strategy<Value = IssueType> {
         // higher numbers here are more frequent
         prop_oneof![
-            30 => Just(IssueType::Communication),
-            5 => Just(IssueType::Dkg),
-            10 => Just(IssueType::Knowledge),
-            100 => (any::<[u8; 32]>())
+        230 => Just(IssueType::Communication),
+        500 => Just(IssueType::Dkg),
+        450 => Just(IssueType::Knowledge),
+        ]
+    }
+
+    /// In a standard network startup (as of 24/06/22)
+    /// these values are on top of the above...
+    /// after we then we run the client test suite (once),
+    /// (and yes, some of them have not changed)
+    /// 510 "tracker: Dkg..."
+    /// ~2394 "Attempting to remove logged dkg"
+    /// ~469 "tracker: Know"
+    /// ~1588 "tracker: Communication""
+    /// ~3376 "tracker: PendingOp..." (equally a lot of these are being responded to...)
+    fn generate_no_churn_normal_use_msg_issues() -> impl Strategy<Value = IssueType> {
+        // higher numbers here are more frequent
+        prop_oneof![
+            1200 => Just(IssueType::Communication),
+            0 => Just(IssueType::Dkg),
+            0 => Just(IssueType::Knowledge),
+            3400 => (any::<[u8; 32]>())
                 .prop_map(|x| IssueType::PendingRequestOperation(Some(OperationId(x))))
         ]
     }
 
-    /// Generate proptest issues, in a range from 1000 to...max_quantity
-    fn generate_issues(min: usize, max: usize) -> impl Strategy<Value = Vec<(IssueType, XorName)>> {
+    /// Generate proptest issues, in a range from 1000 to...max_uantity
+    fn generate_msg_issues(
+        min: usize,
+        max: usize,
+    ) -> impl Strategy<Value = Vec<(IssueType, XorName, f32)>> {
         let issue_name_for_direction = generate_xorname();
         prop::collection::vec(
-            (issue_type_strategy(), issue_name_for_direction),
+            (
+                generate_no_churn_normal_use_msg_issues(),
+                issue_name_for_direction,
+                0.0..1.0f32,
+            ),
+            min..max + 1,
+        )
+    }
+
+    /// Generate proptest issues, in a range from 1000 to...max_quantity
+    /// issues had a name for reliably routing
+    /// issues come with a random f32 0-1 to use as our test against NodeQuality
+    fn generate_startup_issues(
+        min: usize,
+        max: usize,
+    ) -> impl Strategy<Value = Vec<(IssueType, XorName, f32)>> {
+        let issue_name_for_direction = generate_xorname();
+        prop::collection::vec(
+            (
+                generate_network_startup_msg_issues(),
+                issue_name_for_direction,
+                0.0..1.0f32,
+            ),
             min..max + 1,
         )
     }
 
     fn generate_xorname() -> impl Strategy<Value = XorName> {
         // get a random string
-        let str_val = "[a-z]{1,4}\\p{Cyrillic}{1,4}\\p{Greek}{1,32}";
+        let str_val = "[1-9]{32}[a-zA-Z]{32}[1-9]{32}[a-zA-Z]{32}[1-9]{32}[a-zA-Z]{32}";
+
         str_val.prop_map(|s| XorName::from_content(s.as_bytes()))
     }
 
-    /// Generate proptest nodes, each a Xorname
-    fn generate_nodes(min: usize, max: usize) -> impl Strategy<Value = Vec<XorName>> {
-        prop::collection::vec(generate_xorname(), min..max)
+    /// Generate proptest nodes, each a Xorname, this will generate nodes with different NodeQualities
+    fn generate_nodes_and_quality(
+        min: usize,
+        max: usize,
+    ) -> impl Strategy<Value = Vec<(XorName, NodeQualityScored)>> {
+        prop::collection::vec(
+            (
+                generate_xorname(),
+                prop_oneof![
+                    // 3 x as likely to have good nodes vs bad
+                    // good nodes fail only 10% of the time
+                    3 => Just(NodeQualityScored::Good(0.05)),
+                    // bad nodes fail 75% of the time
+                    1 => Just(NodeQualityScored::Bad(0.75)),
+
+                ],
+            ),
+            min..max,
+        )
+        .prop_filter(
+            "there should be at least two good and one bad node",
+            |nodes| {
+                let mut good_len: f32 = 0.0;
+                let mut bad_len: f32 = 0.0;
+
+                for (_name, quality) in nodes {
+                    match quality {
+                        NodeQualityScored::Good(_) => good_len += 1.0,
+                        NodeQualityScored::Bad(_) => bad_len += 1.0,
+                    }
+                }
+
+                let byzantine_level = good_len / 3.0;
+
+                // we have at least one bad node
+                bad_len >= 1.0 &&
+                // at least two good
+                good_len >=2.0 &&
+                // we're not overly byzantine (ie no more than 30% bad)
+                byzantine_level >= 1.0 &&
+                // otherwise, 3 good and 2 bad nodes
+                byzantine_level > bad_len
+            },
+        )
     }
 
-    #[derive(Debug, Clone)]
-    enum NodeQuality {
-        Bad,
-        Good,
+    /// for a given issue and a "Root address" to base elder selection off, this returns
+    /// the nodes we should target for this specific issue:
+    /// eg if DKG, it's the closest to the root_addr
+    /// if anything else, we base it off issue name closeness
+    fn get_target_nodes_for_issue(
+        issue: IssueType,
+        issue_location: XorName,
+        root: XorName,
+        nodes: &[(XorName, NodeQualityScored)],
+        elders_count: usize,
+    ) -> Vec<(XorName, NodeQualityScored)> {
+        if matches!(issue, IssueType::Dkg) {
+            nodes
+                .iter()
+                .sorted_by(|lhs, rhs| root.clone().cmp_distance(&lhs.0, &rhs.0))
+                .take(elders_count)
+                .cloned()
+                .collect::<Vec<_>>()
+        } else {
+            // we use the "issue location" to determine which four nodes to send to
+            // this should therefore be reproducible amongst proptest retries/shrinking etc
+            nodes
+            .iter()
+            .sorted_by(|lhs, rhs| issue_location.cmp_distance(&lhs.0, &rhs.0))
+            // and we simul-send it to 4 nodes
+            .take(4)
+            .cloned()
+            .collect::<Vec<_>>()
+        }
     }
 
     proptest! {
         #[test]
         fn pt_calculate_scores_should_include_all_nodes_in_score_map(
-            adult_count in 4..50usize, issue_type in issue_type_strategy())
+            adult_count in 4..50usize, issue_type in generate_no_churn_normal_use_msg_issues())
         {
             Runtime::new().unwrap().block_on(async {
                 let adults = (0..adult_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
@@ -371,7 +508,7 @@ mod tests {
 
         #[test]
         fn pt_calculate_scores_one_node_with_issues_should_have_higher_score_and_others_should_have_one(
-            adult_count in 4..50usize, issue_count in 0..50, issue_type in issue_type_strategy())
+            adult_count in 4..50usize, issue_count in 0..50, issue_type in generate_no_churn_normal_use_msg_issues())
         {
             Runtime::new().unwrap().block_on(async {
                 let adults = (0..adult_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
@@ -415,66 +552,153 @@ mod tests {
         /// Test that gives a range of nodes and a few bad nodes,
         /// we then check that we can reliably detect those nodes
         ///
-        /// We do not want false positives, we do want -- over longer timeframes -- to find all bad nodes... there's a tough balance to strike here.
+        /// We do not want false positives, We do want -- over longer timeframes -- to find all bad nodes... there's a tough balance to strike here.
+        /// Given that the tests _must_ terminate, there will be some instances where a bad node may not be found. But we can assume as long as we're
+        /// getting _some_ that most will be caught over the long term. So we opt to check that every bad node we get from dysf is indeed bad,
+        /// and that we don't exceed the count of bad_nodes per test
         ///
         /// "Nodes" are just random xornames,
         /// each issue has a random xorname attached to it to, and is sent to 4 nodes... each of which will fail a % of the time, depending on the
         /// NodeQuality (Good or Bad)
-        fn pt_correct_or_less_amount_of_dysf_nodes_should_be_detected(
-            good_nodes in generate_nodes(5,23), bad_nodes in generate_nodes(1,7), issues in generate_issues(1000,3000))
+        fn pt_detect_correct_or_less_amount_of_dysf_nodes(
+            elders_in_dkg in 2..7usize,
+            nodes in generate_nodes_and_quality(3,30), issues in generate_msg_issues(500,1500))
             {
+                init_test_logger();
+                let _outer_span = tracing::info_span!("pt_correct_less").entered();
 
-                let good_len =good_nodes.len();
-                let bad_len = bad_nodes.len();
-            // finish early as we're over byzantine levels
-            if good_len / 3 <= bad_len {
-                return Ok(());
-            }
+                let mut good_len = 0;
+                let mut bad_len = 0;
 
-            init_test_logger();
-            let _outer_span = tracing::info_span!("pt_correct_amount_of_dysf_nodes_should_be_detected").entered();
+                for (_node, quality) in &nodes {
+                    match quality {
+                        NodeQualityScored::Good(_) => good_len += 1,
+                        NodeQualityScored::Bad(_) => bad_len += 1,
+                    }
+                }
 
-            // tolerances...
-            // So here a dysf node fails 65% of the time
-            const DYSF_SUCCESS_RATIO : f32 = 0.35;
-            const NORMAL_SUCCESS_RATIO: f32 = 0.95;
+                debug!("Good {good_len}");
+                debug!("Bad {bad_len}");
 
-            let _res = Runtime::new().unwrap().block_on(async {
+                // random xorname to pick 7 nodes as "elders" for DKG
+                let random_xorname_root = nodes[0].0;
+
+
+                let _res = Runtime::new().unwrap().block_on(async {
+                    // add dysf to our all_nodes
+                    let all_node_names = nodes.clone().iter().map(|(name, _)| *name).collect::<Vec<XorName>>();
+
+                    let dysfunctional_detection = DysfunctionDetection::new(all_node_names);
+
+                    // Now we loop through each issue/msg
+                    for (issue, issue_location, fail_test ) in issues {
+
+                        let target_nodes = get_target_nodes_for_issue(issue.clone(), issue_location, random_xorname_root, &nodes, elders_in_dkg);
+
+                        // now we track our issue, but only if that node fails to passes muster...
+                        for (node, quality) in target_nodes {
+                            // if our random fail test is less than the failure rate.
+                            let failure_chance = quality.get_failure_rate();
+                            let msg_failed = &fail_test < failure_chance;
+
+                            if msg_failed {
+                                let _ = dysfunctional_detection.track_issue(
+                                    node, issue.clone()).await;
+                            }
+
+                        }
+                    }
+                    // now we can see what we have...
+                    let dysfunctional_nodes_found = match dysfunctional_detection
+                        .get_nodes_beyond_severity( DysfunctionSeverity::Dysfunctional)
+                        .await {
+                            Ok(nodes) => nodes,
+                            Err(error) => bail!("Failed getting dysfunctional nodes from DysfunctionDetector: {error}")
+                        };
+
+                    info!("======================");
+                    info!("dysf found len {:?}:, expected {:}", dysfunctional_nodes_found.len(), bad_len );
+                    info!("======================");
+
+                    // over a long enough time span, we should catch those bad nodes...
+                    // So long as dysfunction isn't returning _more_ than the bad node count, this can pass
+                    assert!(dysfunctional_nodes_found.len() <= bad_len, "checking {} dysf nodes found is equal or less than the {} actual bad nodes in test", dysfunctional_nodes_found.len(), bad_len);
+
+                    // check that these were indeed bad nodes
+                    for bad_node in dysfunctional_nodes_found {
+                        if let Some((_, quality)) = nodes.iter().find(|(name, _)| {name == &bad_node }) {
+                            match quality {
+                                NodeQualityScored::Good(_) => bail!("identified a good node as bad"),
+                                NodeQualityScored::Bad(_) => {
+                                    // everything is fine
+                                }
+                            }
+                        }
+                        else {
+                            bail!("bad node not found in our original node set!?")
+                        }
+
+                    }
+
+                    Ok(())
+                });
+        }
+
+
+        #[test]
+        /// Test to check if we have more DKG messages, that bad nodes are found, within our expected issue count
+        /// we then check that we can reliably detect those nodes
+        ///
+        /// We do not want false positives, We do want -- over longer timeframes -- to find all bad nodes... there's a tough balance to strike here.
+        /// Given that the tests _must_ terminate, there will be some instances where a bad node may not be found. But we can assume as long as we're
+        /// getting _some_ that most will be caught over the long term. So we opt to check that every bad node we get from dysf is indeed bad,
+        /// and that we don't exceed the count of bad_nodes per test
+        ///
+        /// "Nodes" are just random xornames,
+        /// each issue has a random xorname attached to it to, and is sent to 4 nodes... each of which will fail a % of the time, depending on the
+        /// NodeQuality (Good or Bad)
+        fn pt_detect_dkg_bad_nodes(
+            elders_in_dkg in 2..7usize,
+            // ~1500 msgs total should get us ~500 dkg which would be representative
+            nodes in generate_nodes_and_quality(3,30), issues in generate_startup_issues(500,2500))
+            {
+                init_test_logger();
+                let _outer_span = tracing::info_span!("pt_dkg").entered();
+                let mut good_len = 0;
+                let mut bad_len = 0;
+                let random_xorname_root = nodes[0].0;
+
+                for (_, quality) in &nodes {
+                    match quality {
+                        NodeQualityScored::Good(_) => good_len += 1,
+                        NodeQualityScored::Bad(_) => bad_len += 1,
+                    }
+                }
+
+                debug!("Good {good_len}");
+                debug!("Bad {bad_len}");
+
+                let _res = Runtime::new().unwrap().block_on(async {
                 // add dysf to our all_nodes
-                let mut all_node_names= good_nodes.clone();
-                all_node_names.extend(bad_nodes.clone());
-
-                let all_nodes = good_nodes.clone().iter().map(|name| (*name, NodeQuality::Good)).collect::<Vec<(XorName, NodeQuality)>>();
-                let bad_nodes = bad_nodes.iter().map(|name| (*name, NodeQuality::Bad)).collect::<Vec<(XorName, NodeQuality)>>();
-                all_nodes.clone().extend(bad_nodes);
+                let all_node_names = nodes.clone().iter().map(|(name, _)| *name).collect::<Vec<XorName>>();
 
                 let dysfunctional_detection = DysfunctionDetection::new(all_node_names);
-                let mut rng = rand::thread_rng();
 
                 // Now we loop through each issue/msg
-                for (issue, issue_location ) in issues {
+                for (issue, issue_location, fail_test ) in issues {
 
-                    // we use the "issue location" to determine which four nodes to send to
-                    // this should therefore be reproducible amongst proptest retries/shrinking etc
-                    let target_nodes = all_nodes
-                    .iter()
-                    .sorted_by(|lhs, rhs| issue_location.cmp_distance(&lhs.0, &rhs.0))
-                    // and we simul-send it to 4 nodes
-                    .take(4)
-                    .collect::<Vec<_>>();
+                    let target_nodes = get_target_nodes_for_issue(issue.clone(), issue_location, random_xorname_root, &nodes, elders_in_dkg);
 
+                    // we send each message to all nodes in this situation where we're looking at elder comms alone over dkg
                     // now we track our issue, but only if that node fails to passes muster...
-                    for (node, quality) in target_nodes {
-                        // if our random fail test is larger than the quality success rate.
-                        // it's a fail
-                        let fail_test: f32 = rng.gen_range(0.0..1.0);
-                        let q_value = match quality {
-                            NodeQuality::Good => NORMAL_SUCCESS_RATIO,
-                            NodeQuality::Bad => DYSF_SUCCESS_RATIO,
-                        };
-                        if fail_test > q_value {
+                    for (node, quality) in target_nodes.clone() {
+                        // if our random fail test is less than the quality failure rate.
+                        let failure_chance = quality.get_failure_rate();
+                        let msg_failed = &fail_test < failure_chance;
+
+                        if msg_failed {
                             let _ = dysfunctional_detection.track_issue(
-                                *node, issue.clone()).await;
+                                node, issue.clone()).await;
                         }
 
                     }
@@ -488,19 +712,35 @@ mod tests {
                     };
 
                 info!("======================");
-                info!("dysf found len {:?}: {:?}", dysfunctional_nodes_found.len(), dysfunctional_nodes_found);
+                info!("dysf found len {:?}:, expected {:}?", dysfunctional_nodes_found.len(), bad_len );
                 info!("======================");
 
                 // over a long enough time span, we should catch those bad nodes...
                 // So long as dysfunction isn't returning _more_ than the bad node count, this can pass
-                assert!(dysfunctional_nodes_found.len() <= bad_len, "checking {} dysf nodes found is equal or less than the {} actual bad nodes in test", dysfunctional_nodes_found.len(), bad_len);
+                assert!(dysfunctional_nodes_found.len() <= bad_len, "checking {} dysf nodes found is less or equal to the {} actual bad nodes in test", dysfunctional_nodes_found.len(), bad_len);
+
+                // check that these were indeed bad nodes
+                for bad_node in dysfunctional_nodes_found {
+                    if let Some((_, quality)) = nodes.iter().find(|(name, _)| {name == &bad_node }) {
+                        match quality {
+                            NodeQualityScored::Good(_) => bail!("identified a good node as bad"),
+                            NodeQualityScored::Bad(_) => {
+                                // everything is fine
+                            }
+                        }
+                    }
+                    else {
+                        bail!("bad node not found in our original node set!?")
+                    }
+
+                }
                 Ok(())
             });
         }
 
         #[test]
         fn pt_calculate_scores_when_all_nodes_have_the_same_number_of_issues_scores_should_all_be_one(
-            adult_count in 4..50, issue_count in 0..50, issue_type in issue_type_strategy())
+            adult_count in 4..50, issue_count in 0..50, issue_type in generate_no_churn_normal_use_msg_issues())
         {
             Runtime::new().unwrap().block_on(async {
                 let adults = (0..adult_count).map(|_| random_xorname()).collect::<Vec<XorName>>();

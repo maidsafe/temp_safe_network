@@ -5,12 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.63.0 (2022-06-26)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 0 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #1268 ([`e9adc0d`](https://github.com/maidsafe/safe_network/commit/e9adc0d3ba2f33fe0b4590a5fe11fea56bd4bda9))
+</details>
+
 ## v0.62.8 (2022-06-24)
+
+<csr-id-d7a831329ad600ad7b5a1b6b68841f96b8ef8cfa/>
+<csr-id-402fb2c13860d89f6c7e5aa0858974ccc75dc1ec/>
+<csr-id-024ddf06fc517935f1a55af42b2aa1707a05f2e8/>
+<csr-id-0a46f508d22141eb06717012fc4cc0b37c7f025f/>
+<csr-id-1fbc762305a581680b52e2cbdaa7aea2feaf05ab/>
 
 ### Chore
 
  - <csr-id-d7a831329ad600ad7b5a1b6b68841f96b8ef8cfa/> misc cleanup and fixes
  - <csr-id-402fb2c13860d89f6c7e5aa0858974ccc75dc1ec/> reduce dysfunction interval to 30s
+
+### Chore
+
+ - <csr-id-dc69a62eec590b2d621ab2cbc3009cb052955e66/> sn_interface-0.6.5/sn_dysfunction-0.5.3/sn_client-0.66.5/sn_node-0.62.8/sn_cli-0.57.6
 
 ### New Features
 
@@ -29,9 +59,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 9 commits contributed to the release over the course of 2 calendar days.
- - 2 days passed between releases.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits contributed to the release over the course of 3 calendar days.
+ - 3 days passed between releases.
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -41,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.6.5/sn_dysfunction-0.5.3/sn_client-0.66.5/sn_node-0.62.8/sn_cli-0.57.6 ([`dc69a62`](https://github.com/maidsafe/safe_network/commit/dc69a62eec590b2d621ab2cbc3009cb052955e66))
     - misc cleanup and fixes ([`d7a8313`](https://github.com/maidsafe/safe_network/commit/d7a831329ad600ad7b5a1b6b68841f96b8ef8cfa))
     - organize internal work ([`71eb46e`](https://github.com/maidsafe/safe_network/commit/71eb46e47032074cdca678783e815b8d55ae39a0))
     - reduce dysfunction interval to 30s ([`402fb2c`](https://github.com/maidsafe/safe_network/commit/402fb2c13860d89f6c7e5aa0858974ccc75dc1ec))
@@ -57,6 +88,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-fd7f845f7d1534cf9ff93ee9dc9f3009ab7e5664/>
 <csr-id-c038635cf88d32c52da89d11a8532e6c91c8bf38/>
 <csr-id-d8730f1bbd276b0686c68b00714c54ed86b7241a/>
+<csr-id-d26d26df6ddd0321555fa3653be966fe91e2dca4/>
+<csr-id-d526e0a32d3f09a788899d82db4fe6f13258568c/>
 
 ### Chore
 

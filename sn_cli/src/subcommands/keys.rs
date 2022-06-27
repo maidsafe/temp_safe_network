@@ -9,8 +9,9 @@
 use super::{helpers::serialise_output, OutputFmt};
 use crate::operations::auth_and_connect::{get_credentials_file_path, read_credentials};
 use crate::operations::config::Config;
+use bls::SecretKey;
 use color_eyre::{eyre::WrapErr, Result};
-use sn_api::{resolver::SafeUrl, Keypair, Safe, XorName};
+use sn_api::Safe;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -34,22 +35,21 @@ pub enum KeysSubCommands {
 pub async fn key_commander(
     cmd: KeysSubCommands,
     output_fmt: OutputFmt,
-    safe: &Safe,
     config: &Config,
 ) -> Result<()> {
     match cmd {
         KeysSubCommands::Show { show_sk } => {
-            match read_credentials(safe, config)? {
+            match read_credentials(config)? {
                 (file_path, Some(keypair)) => {
-                    let xorname = XorName::from(keypair.public_key());
-                    let xorurl = SafeUrl::from_safekey(xorname)?.encode(safe.xorurl_base);
                     let (pk_hex, sk_hex) = keypair.to_hex()?;
-
-                    println!("Current CLI's SafeKey found at {}:", file_path.display());
-                    println!("XOR-URL: {}", xorurl);
-                    println!("Public Key: {}", pk_hex);
-                    if show_sk {
-                        println!("Secret Key: {}", sk_hex);
+                    if output_fmt == OutputFmt::Pretty {
+                        println!("CLI credentials located at {}", file_path.display());
+                        println!("Public Key: {}", pk_hex);
+                        if show_sk {
+                            println!("Secret Key: {}", sk_hex);
+                        }
+                    } else {
+                        println!("{}", serialise_output(&(pk_hex, sk_hex), output_fmt));
                     }
                 }
                 (file_path, None) => println!("No SafeKey found at {}", file_path.display()),
@@ -58,12 +58,11 @@ pub async fn key_commander(
             Ok(())
         }
         KeysSubCommands::Create { for_cli } => {
-            let (keypair, url) = safe.new_keypair_with_pk_url()?;
-            print_new_key_output(output_fmt, url, Some(&keypair));
-
+            let sk = SecretKey::random();
+            print_new_key_output(output_fmt, &sk);
             if for_cli {
                 let (_, path) = get_credentials_file_path(config)?;
-                safe.serialize_keypair(&keypair, &path)
+                Safe::serialize_bls_key(&sk, &path)
                     .wrap_err("Unable to serialize keypair to file")?;
                 println!("Keypair saved at {}", path.display());
                 println!("Safe CLI now has write access to the network");
@@ -73,27 +72,14 @@ pub async fn key_commander(
     }
 }
 
-pub fn print_new_key_output(output_fmt: OutputFmt, xorurl: SafeUrl, key_pair: Option<&Keypair>) {
+pub fn print_new_key_output(output_fmt: OutputFmt, secret_key: &SecretKey) {
+    let sk_hex = secret_key.to_hex();
+    let pk_hex = secret_key.public_key().to_hex();
     if OutputFmt::Pretty == output_fmt {
-        println!("New SafeKey created: \"{}\"", xorurl);
-
-        if let Some(pair) = &key_pair {
-            match pair.to_hex() {
-                Ok((pk_hex, sk_hex)) => {
-                    println!("Public Key: {}", pk_hex);
-                    println!("Secret Key: {}", sk_hex);
-                }
-                Err(err) => println!("{}", err),
-            }
-        }
-    } else if let Some(pair) = &key_pair {
-        match pair.to_hex() {
-            Ok((pk_hex, sk_hex)) => println!(
-                "{}",
-                serialise_output(&(xorurl, (pk_hex, sk_hex)), output_fmt)
-            ),
-            Err(err) => println!("{}", err),
-        }
+        println!("Public Key: {}", pk_hex);
+        println!("Secret Key: {}", sk_hex);
+    } else {
+        println!("{}", serialise_output(&(pk_hex, sk_hex), output_fmt));
     }
 }
 
@@ -106,7 +92,7 @@ mod create_command {
     use assert_fs::prelude::*;
     use color_eyre::{eyre::eyre, Result};
     use predicates::prelude::*;
-    use sn_api::{Keypair, Safe};
+    use sn_api::Keypair;
 
     #[tokio::test]
     async fn should_create_bls_keypair() -> Result<()> {
@@ -119,12 +105,10 @@ mod create_command {
             node_config_file.path().to_path_buf(),
         )
         .await?;
-        let safe = Safe::dry_runner(None);
 
         let result = key_commander(
             KeysSubCommands::Create { for_cli: false },
             OutputFmt::Pretty,
-            &safe,
             &config,
         )
         .await;
@@ -145,12 +129,10 @@ mod create_command {
             node_config_file.path().to_path_buf(),
         )
         .await?;
-        let safe = Safe::dry_runner(None);
 
         let result = key_commander(
             KeysSubCommands::Create { for_cli: true },
             OutputFmt::Pretty,
-            &safe,
             &config,
         )
         .await;
@@ -158,7 +140,7 @@ mod create_command {
         assert!(result.is_ok());
         credentials_file.assert(predicate::path::is_file());
 
-        let (_, keypair) = read_credentials(&safe, &config)?;
+        let (_, keypair) = read_credentials(&config)?;
         let keypair =
             keypair.ok_or_else(|| eyre!("The command should have generated a keypair"))?;
         match keypair {

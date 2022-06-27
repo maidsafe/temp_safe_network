@@ -12,6 +12,7 @@ use super::{
     safeurl::{Error as UrlError, SafeUrl, XorUrl},
 };
 
+use bls::Error as BlsError;
 use sn_client::Error as ClientError;
 use sn_dbc::Error as DbcError;
 use sn_interface::types::Error as InterfaceError;
@@ -130,7 +131,15 @@ pub enum Error {
     /// DbcReissueError
     #[error("DbcReissueError: {0}")]
     DbcReissueError(String),
+    /// DbcDepositError
+    #[error("DbcDepositError: {0}")]
+    DbcDepositError(String),
+    /// DbcDepositError
+    #[error("The secret key does not match the public key for this owned DBC")]
+    DbcDepositInvalidSecretKey,
     /// NotImplementedError
     #[error("NotImplementedError: {0}")]
     NotImplementedError(String),
+    #[error("BlsError: {0}")]
+    BlsError(#[from] BlsError),
 }

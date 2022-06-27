@@ -12,8 +12,8 @@ use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
 use sn_api::resolver::{SafeData, SafeUrl};
 use sn_cmd_test_utilities::util::{
-    create_and_get_keys, get_random_nrs_string, parse_files_put_or_sync_output,
-    parse_wallet_create_output, safe_cmd, safe_cmd_stdout, upload_path,
+    get_random_nrs_string, parse_files_put_or_sync_output, parse_wallet_create_output, safe_cmd,
+    safe_cmd_stdout, upload_path,
 };
 use std::path::PathBuf;
 
@@ -112,25 +112,6 @@ fn calling_safe_dog_files_container_nrsurl_yaml() -> Result<()> {
         Ok(())
     } else {
         panic!("Content retrieved was unexpected: {:?}", content);
-    }
-}
-
-#[test]
-fn calling_safe_dog_safekey_nrsurl() -> Result<()> {
-    let (safekey_xorurl, _sk) = create_and_get_keys()?;
-
-    let nrsurl = get_random_nrs_string();
-    safe_cmd(["nrs", "register", &nrsurl, "-l", &safekey_xorurl], Some(0))?;
-    let dog_output = safe_cmd_stdout(["dog", &nrsurl, "--json"], Some(0))?;
-    let (url, mut content): (String, Vec<SafeData>) =
-        serde_json::from_str(&dog_output).expect("Failed to parse output of `safe dog` on file");
-    assert_eq!(url, format!("safe://{}", nrsurl));
-
-    if let Some(SafeData::SafeKey { resolved_from, .. }) = content.pop() {
-        assert_eq!(resolved_from, safekey_xorurl);
-        Ok(())
-    } else {
-        Err(eyre!("Content retrieved was unexpected: {:?}", content))
     }
 }
 

@@ -9,6 +9,7 @@
 use super::Safe;
 use crate::{Error, Result, SafeUrl};
 
+use bls::SecretKey as BlsSecretKey;
 use sn_interface::types::{Keypair, SecretKey};
 
 use hex::encode;
@@ -49,35 +50,22 @@ impl Safe {
         Ok((keypair, url))
     }
 
-    /// Serializes a `Keypair` to a file at a given path.
-    ///
-    /// A utility to help callers working with keypairs avoid using serde or bincode directly.
+    /// Serializes a `SecretKey` to hex in a file at a given path.
     ///
     /// If the path already exists it will be overwritten.
-    pub fn serialize_keypair(&self, keypair: &Keypair, path: impl AsRef<Path>) -> Result<()> {
-        let serialized = sn_interface::types::utils::serialise(&keypair)?;
-        std::fs::write(&path, serialized)?;
+    pub fn serialize_bls_key(secret_key: &BlsSecretKey, path: impl AsRef<Path>) -> Result<()> {
+        let hex = secret_key.to_hex();
+        std::fs::write(&path, hex)?;
         Ok(())
     }
 
     /// Deserializes a `Keypair` from file at a given path.
     ///
     /// A utility to help callers working with keypairs avoid using serde or bincode directly.
-    pub fn deserialize_keypair(&self, path: impl AsRef<Path>) -> Result<Keypair> {
-        deserialize_keypair(path)
+    pub fn deserialize_bls_key(path: impl AsRef<Path>) -> Result<BlsSecretKey> {
+        let hex = std::fs::read_to_string(path)?;
+        Ok(BlsSecretKey::from_hex(&hex)?)
     }
-}
-
-/// Deserializes a `Keypair` from file at a given path.
-///
-/// A utility to help callers working with keypairs avoid using serde or bincode directly.
-///
-/// This exists as an independent function in addition to being a function of the safe client
-/// because some deserialization needs to be performed in the CLI before it has access to a client.
-pub fn deserialize_keypair(path: impl AsRef<Path>) -> Result<Keypair> {
-    let deserialized = std::fs::read(path)?;
-    let keypair: Keypair = sn_interface::types::utils::deserialise(&deserialized)?;
-    Ok(keypair)
 }
 
 #[cfg(test)]
@@ -86,6 +74,7 @@ mod tests {
     use sn_interface::types::Keypair;
 
     use assert_fs::prelude::*;
+    use bls::SecretKey as BlsSecretKey;
     use color_eyre::{eyre::eyre, Result};
     use predicates::prelude::*;
     use xor_name::XorName;
@@ -110,31 +99,30 @@ mod tests {
 
     #[test]
     fn serialize_keypair_should_serialize_a_bls_keypair_to_file() -> Result<()> {
-        let safe = Safe::dry_runner(None);
         let tmp_dir = assert_fs::TempDir::new()?;
         let serialized_keypair_file = tmp_dir.child("serialized_keypair");
 
-        let (keypair, _) = safe.new_keypair_with_pk_url()?;
-        let _ = safe.serialize_keypair(&keypair, serialized_keypair_file.path())?;
+        let sk = BlsSecretKey::random();
+        let _ = Safe::serialize_bls_key(&sk, serialized_keypair_file.path())?;
 
         serialized_keypair_file.assert(predicate::path::is_file());
 
-        let encoded = std::fs::read(serialized_keypair_file.path())?;
-        let keypair2: Keypair = sn_interface::types::utils::deserialise(&encoded)?;
-        assert_eq!(keypair, keypair2);
+        let sk_hex = std::fs::read_to_string(serialized_keypair_file.path())?;
+        let sk2 = BlsSecretKey::from_hex(&sk_hex)?;
+        assert_eq!(sk, sk2);
         Ok(())
     }
 
     #[test]
     fn deserialize_keypair_should_deserialize_a_bls_keypair_from_file() -> Result<()> {
-        let safe = Safe::dry_runner(None);
         let tmp_dir = assert_fs::TempDir::new()?;
         let serialized_keypair_file = tmp_dir.child("serialized_keypair");
-        let (keypair, _) = safe.new_keypair_with_pk_url()?;
-        let _ = safe.serialize_keypair(&keypair, serialized_keypair_file.path())?;
 
-        let keypair2 = safe.deserialize_keypair(serialized_keypair_file.path())?;
-        assert_eq!(keypair, keypair2);
+        let sk = BlsSecretKey::random();
+        let _ = Safe::serialize_bls_key(&sk, serialized_keypair_file.path())?;
+
+        let sk2 = Safe::deserialize_bls_key(serialized_keypair_file.path())?;
+        assert_eq!(sk, sk2);
         Ok(())
     }
 }

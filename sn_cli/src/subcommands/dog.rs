@@ -119,16 +119,8 @@ pub async fn dog_commander(cmd: DogCommands, output_fmt: OutputFmt, safe: &Safe)
                         media_type.clone().unwrap_or_else(|| "Unknown".to_string())
                     );
                 }
-                SafeData::SafeKey {
-                    xorurl,
-                    xorname,
-                    resolved_from,
-                } => {
-                    println!("Resolved from: {}", resolved_from);
-                    println!("= SafeKey =");
-                    println!("XOR-URL: {}", xorurl);
-                    println!("XOR name: 0x{}", xorname_to_hex(xorname));
-                    println!("Native data type: SafeKey");
+                SafeData::SafeKey { .. } => {
+                    println!("The SafeKey data type is not supported at the moment");
                 }
                 SafeData::Multimap {
                     xorurl,

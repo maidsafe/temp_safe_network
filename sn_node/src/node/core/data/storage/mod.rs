@@ -17,7 +17,7 @@ use crate::{dbs::Result, UsedSpace};
 use sn_dbc::SpentProofShare;
 use sn_interface::{
     messaging::{
-        data::{DataQuery, Error, RegisterQuery, RegisterStoreExport, StorageLevel},
+        data::{DataQueryVariant, Error, RegisterQuery, RegisterStoreExport, StorageLevel},
         system::NodeQueryResponse,
     },
     types::{
@@ -97,11 +97,15 @@ impl DataStorage {
     }
 
     // Query the local store and return NodeQueryResponse
-    pub(crate) async fn query(&self, query: &DataQuery, requester: User) -> NodeQueryResponse {
+    pub(crate) async fn query(
+        &self,
+        query: &DataQueryVariant,
+        requester: User,
+    ) -> NodeQueryResponse {
         match query {
-            DataQuery::GetChunk(addr) => self.chunks.get(addr).await,
-            DataQuery::Register(read) => self.registers.read(read, requester).await,
-            DataQuery::Spentbook(read) => {
+            DataQueryVariant::GetChunk(addr) => self.chunks.get(addr).await,
+            DataQueryVariant::Register(read) => self.registers.read(read, requester).await,
+            DataQueryVariant::Spentbook(read) => {
                 // TODO: this is temporary till spentbook native data type is implemented,
                 // we read from the Register where we store the spentbook data
                 let spentbook_op_id = match read.operation_id() {
@@ -214,7 +218,7 @@ mod tests {
     use crate::UsedSpace;
 
     use sn_interface::{
-        messaging::{data::DataQuery, system::NodeQueryResponse},
+        messaging::{data::DataQueryVariant, system::NodeQueryResponse},
         types::{
             register::User, utils::random_bytes, Chunk, ChunkAddress, ReplicatedData,
             ReplicatedDataAddress,
@@ -263,7 +267,7 @@ mod tests {
         assert_eq!(replicated_data, fetched_data);
 
         // Test client fetch
-        let query = DataQuery::GetChunk(*chunk.address());
+        let query = DataQueryVariant::GetChunk(*chunk.address());
         let user = User::Anyone;
 
         let query_response = storage.query(&query, user).await;
@@ -363,7 +367,7 @@ mod tests {
                 Op::Query(idx) => {
                     // +1 for a chance to get random xor_name
                     let key = get_xor_name(&model, idx % (model.len() + 1));
-                    let query = DataQuery::GetChunk(ChunkAddress(key));
+                    let query = DataQueryVariant::GetChunk(ChunkAddress(key));
                     let user = User::Anyone;
                     let stored_res = runtime.block_on(storage.query(&query, user));
                     let model_res = model.get(&key);

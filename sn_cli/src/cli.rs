@@ -101,7 +101,7 @@ pub async fn run() -> Result<()> {
             let mut launcher = Box::new(SnLaunchToolNetworkLauncher::default());
             node_commander(cmd, &mut get_config().await?, &mut launcher).await
         }
-        SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, &safe, &get_config().await?).await,
+        SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, &get_config().await?).await,
         SubCommands::Xorurl {
             cmd,
             location,
@@ -153,7 +153,9 @@ pub async fn run() -> Result<()> {
                 SubCommands::Dog(cmd) => dog_commander(cmd, output_fmt, &safe).await,
                 SubCommands::Files(cmd) => files_commander(cmd, output_fmt, &safe).await,
                 SubCommands::Nrs(cmd) => nrs_commander(cmd, output_fmt, &safe).await,
-                SubCommands::Wallet(cmd) => wallet_commander(cmd, output_fmt, &safe).await,
+                SubCommands::Wallet(cmd) => {
+                    wallet_commander(cmd, output_fmt, &safe, &get_config().await?).await
+                }
                 _ => Err(eyre!("Unknown safe subcommand")),
             }
         }
