@@ -33,6 +33,7 @@ use tokio::{
 };
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
+const MISSING_VOTE_INTERVAL: Duration = Duration::from_secs(15);
 #[cfg(feature = "back-pressure")]
 const BACKPRESSURE_INTERVAL: Duration = Duration::from_secs(60);
 const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
@@ -53,6 +54,7 @@ impl FlowCtrl {
 
         ctrl.clone().start_connection_listening(incoming_conns);
         ctrl.clone().start_network_probing();
+        ctrl.clone().start_checking_for_missed_votes();
         ctrl.clone().start_section_probing();
         ctrl.clone().start_data_replication();
         ctrl.clone().start_dysfunction_detection();
@@ -152,6 +154,46 @@ impl FlowCtrl {
                             }
                         }
                         Err(error) => error!("Problem generating section probe msg: {:?}", error),
+                    }
+                }
+            }
+        });
+    }
+
+    /// Checks the interval since last vote received during a generation
+    fn start_checking_for_missed_votes(self) {
+        info!("Starting to check for missed votes");
+        let _handle: JoinHandle<Result<()>> = tokio::task::spawn_local(async move {
+            let dispatcher = self.clone();
+            let mut interval = tokio::time::interval(MISSING_VOTE_INTERVAL);
+            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+            loop {
+                let _instant = interval.tick().await;
+
+                if !dispatcher.node.is_elder().await {
+                    continue;
+                }
+                trace!("looping vote check in elder");
+
+                let membership = dispatcher.node.membership.read().await;
+
+                if let Some(membership) = &*membership {
+                    let last_received_vote_time = membership.last_received_vote_time();
+
+                    if let Some(time) = last_received_vote_time {
+                        // we want to resend the prev vote
+                        if time.elapsed() >= MISSING_VOTE_INTERVAL {
+                            debug!("Vote consensus appears stalled...");
+                            let cmds = self.node.resend_our_last_vote_to_elders().await?;
+
+                            trace!("Vote resending cmds: {:?}", cmds.len());
+                            for cmd in cmds {
+                                if let Err(e) = self.cmd_ctrl.push(cmd).await {
+                                    error!("Error resending a vote msg to the network: {:?}", e);
+                                }
+                            }
+                        }
                     }
                 }
             }

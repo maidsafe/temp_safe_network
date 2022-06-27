@@ -399,7 +399,7 @@ async fn run_node(config: Config) -> Result<()> {
 
         if !config.is_first() && x > 0.6 {
             println!(
-                "[Chaos] (PID: {our_pid}): Startup chaos crash w/ x of: {}",
+                "\n =========== [Chaos] (PID: {our_pid}): Startup chaos crash w/ x of: {} ============== \n",
                 x
             );
 

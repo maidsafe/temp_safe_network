@@ -5,19 +5,17 @@
 // under the GPL Licence is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
-
+use bls_dkg::{PublicKeySet, SecretKeyShare};
+use core::fmt::Debug;
 use sn_consensus::{
     Ballot, Consensus, Decision, Generation, NodeId, SignedVote, Vote, VoteResponse,
 };
 use sn_interface::{
     messaging::system::{DkgSessionId, MembershipState, NodeState},
     network_knowledge::{partition_by_prefix, recommended_section_size, SectionAuthorityProvider},
-    types::log_markers::LogMarker,
 };
-
-use bls_dkg::{PublicKeySet, SecretKeyShare};
-use core::fmt::Debug;
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
+use std::time::Instant;
 use thiserror::Error;
 use xor_name::{Prefix, XorName};
 
@@ -139,6 +137,8 @@ pub(crate) struct Membership {
     bootstrap_members: BTreeSet<NodeState>,
     gen: Generation,
     history: BTreeMap<Generation, (Decision<NodeState>, Consensus<NodeState>)>,
+    // last membership vote timestamp
+    last_received_vote_time: Option<Instant>,
 }
 
 impl Membership {
@@ -153,7 +153,12 @@ impl Membership {
             bootstrap_members,
             gen: 0,
             history: BTreeMap::default(),
+            last_received_vote_time: None,
         }
+    }
+
+    pub(crate) fn last_received_vote_time(&self) -> Option<Instant> {
+        self.last_received_vote_time
     }
 
     pub(crate) fn generation(&self) -> Generation {
@@ -176,6 +181,11 @@ impl Membership {
     #[cfg(test)]
     pub(crate) fn force_bootstrap(&mut self, state: NodeState) {
         let _ = self.bootstrap_members.insert(state);
+    }
+
+    /// Return the current generation vote we have made
+    pub(crate) fn get_our_latest_vote(&self) -> Option<&SignedVote<NodeState>> {
+        self.consensus.votes.get(&self.id())
     }
 
     fn consensus_at_gen(&self, gen: Generation) -> Result<&Consensus<NodeState>> {
@@ -317,8 +327,9 @@ impl Membership {
         self.validate_proposals(&signed_vote, prefix)?;
 
         let vote_gen = signed_vote.vote.gen;
-
+        let is_ongoing_consensus = vote_gen == self.gen + 1;
         let consensus = self.consensus_at_gen_mut(vote_gen)?;
+        let is_fresh_vote = !consensus.processed_votes_cache.contains(&signed_vote.sig);
 
         info!(
             "Membership - accepted signed vote from voter {:?}",
@@ -327,13 +338,15 @@ impl Membership {
         let vote_response = consensus.handle_signed_vote(signed_vote)?;
 
         if let Some(decision) = consensus.decision.clone() {
-            if vote_gen == self.gen + 1 {
+            if is_ongoing_consensus {
                 info!(
                     "Membership - decided {:?}",
                     BTreeSet::from_iter(decision.proposals.keys())
                 );
 
-                debug!("{}", LogMarker::VotedOffline);
+                // wipe the last vote time
+                self.last_received_vote_time = None;
+
                 let next_consensus = Consensus::from(
                     self.consensus.secret_key.clone(),
                     self.consensus.elders.clone(),
@@ -343,6 +356,11 @@ impl Membership {
                 let decided_consensus = std::mem::replace(&mut self.consensus, next_consensus);
                 let _ = self.history.insert(vote_gen, (decision, decided_consensus));
                 self.gen = vote_gen
+            }
+        } else {
+            // if this is our ongoing round, lets log the vote
+            if is_ongoing_consensus && is_fresh_vote {
+                self.last_received_vote_time = Some(Instant::now());
             }
         }
 
