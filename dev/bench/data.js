@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1656225981230,
+  "lastUpdate": 1656334690527,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -6059,6 +6059,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 5255386187,
             "range": "± 23906608",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "joshuef@gmail.com",
+            "name": "Josh Wilson",
+            "username": "joshuef"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "eebbc30f5dd449b786115c37813a4554309875e0",
+          "message": "test: adding new dysf test for DKG rounds",
+          "timestamp": "2022-06-27T14:22:00+02:00",
+          "tree_id": "f96d4ecdf629c301478176333fd177598958510f",
+          "url": "https://github.com/maidsafe/safe_network/commit/eebbc30f5dd449b786115c37813a4554309875e0"
+        },
+        "date": 1656334689243,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 5636525846,
+            "range": "± 102931494",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 5682690200,
+            "range": "± 146476474",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 5821934316,
+            "range": "± 114259358",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 5017254407,
+            "range": "± 2763328",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 5036380556,
+            "range": "± 2827820",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 5204290853,
+            "range": "± 29634269",
             "unit": "ns/iter"
           }
         ]
