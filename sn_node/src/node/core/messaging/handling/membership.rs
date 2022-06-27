@@ -30,7 +30,7 @@ impl Node {
             "Proposing membership change: {} - {:?}",
             node_state.name, node_state.state
         );
-        let prefix = self.network_knowledge.prefix().await;
+        let prefix = self.network_knowledge.prefix();
         if let Some(membership) = self.membership.write().await.as_mut() {
             let membership_vote = match membership.propose(node_state, &prefix) {
                 Ok(vote) => vote,
@@ -78,7 +78,7 @@ impl Node {
             "{:?} {signed_votes:?} from {peer}",
             LogMarker::MembershipVotesBeingHandled
         );
-        let prefix = self.network_knowledge.prefix().await;
+        let prefix = self.network_knowledge.prefix();
 
         let mut cmds = vec![];
 
@@ -100,7 +100,7 @@ impl Node {
                         debug!("Membership - We are behind the voter, requesting AE");
                         // We hit an error while processing this vote, perhaps we are missing information.
                         // We'll send a membership AE request to see if they can help us catch up.
-                        let sap = self.network_knowledge.authority_provider().await;
+                        let sap = self.network_knowledge.authority_provider();
                         let dst_section_pk = sap.section_key();
                         let section_name = prefix.name();
                         let msg = SystemMsg::MembershipAE(membership.generation());
@@ -177,7 +177,7 @@ impl Node {
                         self.send_direct_msg(
                             peer,
                             SystemMsg::MembershipVotes(catchup_votes),
-                            self.network_knowledge.section_key().await,
+                            self.network_knowledge.section_key(),
                         )
                         .await?,
                     ]

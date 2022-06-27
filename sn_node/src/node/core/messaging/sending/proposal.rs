@@ -22,11 +22,7 @@ use sn_interface::{
 impl Node {
     /// Send proposal to all our elders.
     pub(crate) async fn propose(&self, proposal: Proposal) -> Result<Vec<Cmd>> {
-        let elders = self
-            .network_knowledge
-            .authority_provider()
-            .await
-            .elders_vec();
+        let elders = self.network_knowledge.authority_provider().elders_vec();
         self.send_proposal(elders, proposal).await
     }
 
@@ -36,7 +32,7 @@ impl Node {
         recipients: Vec<Peer>,
         proposal: Proposal,
     ) -> Result<Vec<Cmd>> {
-        let section_key = self.network_knowledge.section_key().await;
+        let section_key = self.network_knowledge.section_key();
 
         let key_share = self
             .section_keys_provider
@@ -82,11 +78,11 @@ impl Node {
 
         // Name of the section_pk may not matches the section prefix.
         // Carry out a substitution to prevent the dst_location becomes other section.
-        let section_key = self.network_knowledge.section_key().await;
+        let section_key = self.network_knowledge.section_key();
         let wire_msg = WireMsg::single_src(
             &self.info().await,
             DstLocation::Section {
-                name: self.network_knowledge.prefix().await.name(),
+                name: self.network_knowledge.prefix().name(),
                 section_pk: section_key,
             },
             node_msg,

@@ -59,7 +59,6 @@ impl Node {
         if let Some(old_info) = self
             .network_knowledge
             .is_either_member_or_archived(&new_info.name())
-            .await
         {
             // This node is rejoin with same name.
             if old_info.state() != MembershipState::Left {
@@ -113,7 +112,7 @@ impl Node {
         self.log_section_stats().await;
 
         // Do not disable node joins in first section.
-        let our_prefix = self.network_knowledge.prefix().await;
+        let our_prefix = self.network_knowledge.prefix();
         if !our_prefix.is_empty() {
             // ..otherwise, switch off joins_allowed on a node joining.
             // TODO: fix racing issues here? https://github.com/maidsafe/safe_network/issues/890
@@ -172,10 +171,10 @@ impl Node {
         generation: Generation,
     ) -> Result<Vec<Cmd>> {
         // check if section matches our prefix
-        let equal_prefix = section_auth.prefix() == self.network_knowledge.prefix().await;
+        let equal_prefix = section_auth.prefix() == self.network_knowledge.prefix();
         let is_extension_prefix = section_auth
             .prefix()
-            .is_extension_of(&self.network_knowledge.prefix().await);
+            .is_extension_of(&self.network_knowledge.prefix());
         if !equal_prefix && !is_extension_prefix {
             // Other section. We shouln't be receiving or updating a SAP for
             // a remote section here, that is done with a AE msg response.
@@ -226,7 +225,7 @@ impl Node {
             .write()
             .await
             .process(
-                &self.network_knowledge.prefix().await,
+                &self.network_knowledge.prefix(),
                 signed_section_auth.clone(),
                 sig.clone(),
                 generation,

@@ -101,7 +101,7 @@ pub async fn run() -> Result<()> {
             let mut launcher = Box::new(SnLaunchToolNetworkLauncher::default());
             node_commander(cmd, &mut get_config().await?, &mut launcher).await
         }
-        SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, &get_config().await?).await,
+        SubCommands::Keys(cmd) => key_commander(cmd, output_fmt, &get_config().await?),
         SubCommands::Xorurl {
             cmd,
             location,
@@ -109,7 +109,7 @@ pub async fn run() -> Result<()> {
             follow_links,
         } => {
             if let Some(cmd) = cmd {
-                xorurl_commander(cmd, output_fmt, safe.xorurl_base).await
+                xorurl_commander(cmd, output_fmt, safe.xorurl_base)
             } else {
                 xorurl_of_files(
                     location,

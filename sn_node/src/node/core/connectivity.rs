@@ -16,7 +16,7 @@ use xor_name::XorName;
 
 impl Node {
     pub(crate) async fn handle_peer_lost(&self, addr: &SocketAddr) -> Result<Vec<Cmd>> {
-        let name = if let Some(peer) = self.network_knowledge.find_member_by_addr(addr).await {
+        let name = if let Some(peer) = self.network_knowledge.find_member_by_addr(addr) {
             debug!("Lost known peer {}", peer);
             peer.name()
         } else {
@@ -43,14 +43,13 @@ impl Node {
         let elders: Vec<_> = self
             .network_knowledge
             .authority_provider()
-            .await
             .elders()
             .filter(|peer| !names.contains(&peer.name()))
             .cloned()
             .collect();
         let mut result: Vec<Cmd> = Vec::new();
         for name in names.iter() {
-            if let Some(info) = self.network_knowledge.get_section_member(name).await {
+            if let Some(info) = self.network_knowledge.get_section_member(name) {
                 let info = info.leave()?;
                 if let Ok(cmds) = self
                     .send_proposal(elders.clone(), Proposal::Offline(info))

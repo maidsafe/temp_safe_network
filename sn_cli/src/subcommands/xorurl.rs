@@ -30,7 +30,7 @@ pub enum XorurlSubCommands {
     },
 }
 
-pub async fn xorurl_commander(
+pub fn xorurl_commander(
     cmd: XorurlSubCommands,
     output_fmt: OutputFmt,
     xorurl_base: XorUrlBase,

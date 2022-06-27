@@ -144,7 +144,7 @@ impl Node {
                                     .await?
                                 {
                                     // we want to log issues with an elder who is out of sync here...
-                                    let knowledge = self.network_knowledge.elders().await;
+                                    let knowledge = self.network_knowledge.elders();
                                     let mut known_elders = knowledge.iter().map(|peer| peer.name());
 
                                     if known_elders.contains(&sender.name()) {
@@ -495,7 +495,7 @@ impl Node {
             SystemMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
                 if self.is_not_elder().await
-                    && join_request.section_key == self.network_knowledge.section_key().await
+                    && join_request.section_key == self.network_knowledge.section_key()
                 {
                     return Ok(vec![]);
                 }
@@ -592,7 +592,7 @@ impl Node {
                     sender,
                     message,
                     session_id,
-                    self.network_knowledge.section_key().await,
+                    self.network_knowledge.section_key(),
                 )
                 .await
             }
@@ -653,7 +653,7 @@ impl Node {
                 } else {
                     let mut cmds = vec![];
 
-                    let section_pk = PublicKey::Bls(self.network_knowledge.section_key().await);
+                    let section_pk = PublicKey::Bls(self.network_knowledge.section_key());
                     let own_keypair = Keypair::Ed25519(self.keypair.read().await.clone());
 
                     for data in data_collection {
@@ -772,7 +772,7 @@ impl Node {
                         message_cache,
                         message,
                     };
-                    let section_pk = self.network_knowledge.section_key().await;
+                    let section_pk = self.network_knowledge.section_key();
                     let wire_msg = WireMsg::single_src(
                         &self.info().await,
                         DstLocation::Node {
@@ -803,7 +803,7 @@ impl Node {
                 let payload =
                     WireMsg::serialize_msg_payload(&SystemMsg::DkgStart(session_id.clone()))?;
                 let auth = section_auth.clone().into_inner();
-                if self.network_knowledge.section_key().await == auth.sig.public_key {
+                if self.network_knowledge.section_key() == auth.sig.public_key {
                     if let Err(err) = AuthorityProof::verify(auth, payload) {
                         error!("Error verifying signature for DkgSessionInfo: {:?}", err);
                         return Ok(cmds);
@@ -853,7 +853,7 @@ impl Node {
 
             let dst = DstLocation::Section {
                 name: node_xorname,
-                section_pk: self.network_knowledge.section_key().await,
+                section_pk: self.network_knowledge.section_key(),
             };
 
             cmds.push(Cmd::SignOutgoingSystemMsg { msg, dst });

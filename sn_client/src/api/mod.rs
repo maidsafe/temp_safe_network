@@ -369,8 +369,7 @@ mod tests {
         init_logger();
         let dbc_owner = get_dbc_owner_from_secret_key_hex(
             "81ebce8339cb2a6e5cbf8b748215ba928acff7f92557b3acfb09a5b25e920d20",
-        )
-        .await?;
+        )?;
 
         let client = create_test_client_with(None, Some(dbc_owner.clone()), None, true).await?;
         assert_eq!(dbc_owner, client.dbc_owner());
