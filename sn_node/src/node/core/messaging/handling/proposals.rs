@@ -33,10 +33,10 @@ pub(crate) async fn handle_proposal(
         let section_auth = sap;
         // TODO: do we want to drop older generations too?
 
-        if section_auth.prefix() == network_knowledge.prefix().await
+        if section_auth.prefix() == network_knowledge.prefix()
             || section_auth
                 .prefix()
-                .is_extension_of(&network_knowledge.prefix().await)
+                .is_extension_of(&network_knowledge.prefix())
         {
             // This `SectionInfo` is proposed by the DKG participants and
             // it's signed by the new key created by the DKG so we don't
@@ -53,7 +53,7 @@ pub(crate) async fn handle_proposal(
     } else {
         // Proposal from other section shall be ignored.
         // TODO: check this is for our prefix , or a child prefix, otherwise just drop it
-        if !network_knowledge.prefix().await.matches(&sender.name()) {
+        if !network_knowledge.prefix().matches(&sender.name()) {
             trace!(
                 "Ignore proposal {:?} from other section, src {}: {:?}",
                 proposal,
@@ -65,7 +65,7 @@ pub(crate) async fn handle_proposal(
 
         // Let's now verify the section key in the msg authority is trusted
         // based on our current knowledge of the network and sections chains.
-        if !network_knowledge.has_chain_key(sig_share_pk).await {
+        if !network_knowledge.has_chain_key(sig_share_pk) {
             warn!(
                 "Dropped Propose msg ({:?}) with untrusted sig share from {}: {:?}",
                 msg_id, sender, proposal

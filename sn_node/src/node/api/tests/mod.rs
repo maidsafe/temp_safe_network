@@ -697,7 +697,6 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
             assert!(!node
                 .network_knowledge()
                 .section_members()
-                .await
                 .contains(&node_state));
             Result::<()>::Ok(())
         })
@@ -727,7 +726,6 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
 
             let remove_node_state = section
                 .get_section_member(&remove_peer.name())
-                .await
                 .expect("member not found")
                 .leave()?;
 
@@ -1118,7 +1116,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
         )
         .await?;
         let info = node.info().await;
-        let section_pk = node.network_knowledge().section_key().await;
+        let section_pk = node.network_knowledge().section_key();
         let dispatcher = Dispatcher::new(Arc::new(node));
 
         let dst_location = match dst {

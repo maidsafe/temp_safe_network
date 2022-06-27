@@ -175,10 +175,10 @@ impl NodeApi {
             let network_knowledge = node.network_knowledge();
 
             let elders = Elders {
-                prefix: network_knowledge.prefix().await,
-                key: network_knowledge.section_key().await,
+                prefix: network_knowledge.prefix(),
+                key: network_knowledge.section_key(),
                 remaining: BTreeSet::new(),
-                added: network_knowledge.authority_provider().await.names(),
+                added: network_knowledge.authority_provider().names(),
                 removed: BTreeSet::new(),
             };
 
@@ -303,7 +303,7 @@ impl NodeApi {
 
     /// Prefix of our section
     pub async fn our_prefix(&self) -> Prefix {
-        self.node.network_knowledge().prefix().await
+        self.node.network_knowledge().prefix()
     }
 
     /// Returns whether the node is Elder.
@@ -313,12 +313,12 @@ impl NodeApi {
 
     /// Returns the information of all the current section elders.
     pub async fn our_elders(&self) -> Vec<Peer> {
-        self.node.network_knowledge().elders().await
+        self.node.network_knowledge().elders()
     }
 
     /// Returns the information of all the current section adults.
     pub async fn our_adults(&self) -> Vec<Peer> {
-        self.node.network_knowledge().adults().await
+        self.node.network_knowledge().adults()
     }
 
     /// Returns the info about the section matching the name.

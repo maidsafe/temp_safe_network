@@ -41,7 +41,7 @@ impl Node {
             return Ok(vec![]);
         }
 
-        let adults = self.network_knowledge.adults().await;
+        let adults = self.network_knowledge.adults();
         let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
 
         let mut data_for_sender = vec![];
@@ -90,10 +90,10 @@ impl Node {
         let data_i_have = self.data_storage.keys().await?;
         let mut cmds = vec![];
 
-        let adults = self.network_knowledge.adults().await;
+        let adults = self.network_knowledge.adults();
         let adults_names = adults.iter().map(|p2p_node| p2p_node.name()).collect_vec();
 
-        let elders = self.network_knowledge.elders().await;
+        let elders = self.network_knowledge.elders();
         let my_name = self.info().await.name();
 
         // find data targets that are not us.
@@ -115,7 +115,7 @@ impl Node {
             let _existed = target_member_names.insert(elder.name());
         }
 
-        let section_pk = self.network_knowledge.section_key().await;
+        let section_pk = self.network_knowledge.section_key();
 
         for name in target_member_names {
             trace!("Sending our data list to: {:?}", name);

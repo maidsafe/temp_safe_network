@@ -523,8 +523,7 @@ async fn files_map_get_files(
                 Path::new(&denormalize_slashes(details.getattr("symlink_target")?)),
                 &abspath,
                 details.getattr("symlink_target_type")?,
-            )
-            .await?;
+            )?;
             continue;
         }
 
@@ -553,7 +552,7 @@ async fn files_map_get_files(
 }
 
 #[cfg(unix)]
-async fn create_symlink_worker(
+fn create_symlink_worker(
     target: &Path,
     link: &Path,
     _target_type: &str,
@@ -571,7 +570,7 @@ async fn create_symlink_worker(
 }
 
 #[cfg(windows)]
-async fn create_symlink_worker(
+fn create_symlink_worker(
     target: &Path,
     link: &Path,
     target_type: &str,
@@ -590,14 +589,14 @@ async fn create_symlink_worker(
     )
 }
 
-async fn create_symlink(target: &Path, link: &Path, target_type: &str) -> ApiResult<()> {
+fn create_symlink(target: &Path, link: &Path, target_type: &str) -> ApiResult<()> {
     info!(
         "creating symlink: {} --> {}",
         link.display(),
         target.display()
     );
 
-    let result = create_symlink_worker(target, link, target_type).await;
+    let result = create_symlink_worker(target, link, target_type);
     match result {
         Ok(_) => {}
         Err((msg, os_err)) => {

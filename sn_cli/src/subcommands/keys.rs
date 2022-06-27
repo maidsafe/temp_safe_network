@@ -32,11 +32,7 @@ pub enum KeysSubCommands {
     },
 }
 
-pub async fn key_commander(
-    cmd: KeysSubCommands,
-    output_fmt: OutputFmt,
-    config: &Config,
-) -> Result<()> {
+pub fn key_commander(cmd: KeysSubCommands, output_fmt: OutputFmt, config: &Config) -> Result<()> {
     match cmd {
         KeysSubCommands::Show { show_sk } => {
             match read_credentials(config)? {
@@ -110,8 +106,7 @@ mod create_command {
             KeysSubCommands::Create { for_cli: false },
             OutputFmt::Pretty,
             &config,
-        )
-        .await;
+        );
 
         assert!(result.is_ok());
         credentials_file.assert(predicate::path::missing());
@@ -134,8 +129,7 @@ mod create_command {
             KeysSubCommands::Create { for_cli: true },
             OutputFmt::Pretty,
             &config,
-        )
-        .await;
+        );
 
         assert!(result.is_ok());
         credentials_file.assert(predicate::path::is_file());

@@ -35,24 +35,18 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         // Do not carry out relocations in the first section
         // TODO: consider avoiding relocations in first 16 sections instead.
-        if self.network_knowledge.prefix().await.is_empty() {
+        if self.network_knowledge.prefix().is_empty() {
             return Ok(vec![]);
         }
 
         // Do not carry out relocation when there is not enough elder nodes.
-        if self
-            .network_knowledge
-            .authority_provider()
-            .await
-            .elder_count()
-            < elder_count()
-        {
+        if self.network_knowledge.authority_provider().elder_count() < elder_count() {
             return Ok(vec![]);
         }
 
         let mut cmds = vec![];
         for (node_state, relocate_details) in
-            find_nodes_to_relocate(&self.network_knowledge, &churn_id, excluded).await
+            find_nodes_to_relocate(&self.network_knowledge, &churn_id, excluded)
         {
             debug!(
                 "Relocating {:?} to {} (on churn of {})",
@@ -143,10 +137,7 @@ impl Node {
         {
             sap.addresses()
         } else {
-            self.network_knowledge
-                .authority_provider()
-                .await
-                .addresses()
+            self.network_knowledge.authority_provider().addresses()
         };
         let (joining_as_relocated, cmd) = JoiningAsRelocated::start(
             node,

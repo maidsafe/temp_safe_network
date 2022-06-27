@@ -33,7 +33,7 @@ use xor_name::XorName;
 ///     - if our name *is* the dst, returns an empty set; otherwise
 ///     - if the destination name is an entry in the routing table, returns it; otherwise
 ///     - returns the `N/3` closest members of the RT to the target
-pub(crate) async fn delivery_targets(
+pub(crate) fn delivery_targets(
     dst: &DstLocation,
     our_name: &XorName,
     network_knowledge: &NetworkKnowledge,
@@ -42,39 +42,35 @@ pub(crate) async fn delivery_targets(
     // Functions of `section_candidates` and `candidates` only take section elder into account.
 
     match dst {
-        DstLocation::Section { name, .. } => {
-            section_candidates(name, our_name, network_knowledge).await
-        }
-        DstLocation::EndUser(user) => {
-            section_candidates(&user.0, our_name, network_knowledge).await
-        }
+        DstLocation::Section { name, .. } => section_candidates(name, our_name, network_knowledge),
+        DstLocation::EndUser(user) => section_candidates(&user.0, our_name, network_knowledge),
         DstLocation::Node { name, .. } => {
             if name == our_name {
                 return Ok((Vec::new(), 0));
             }
-            if let Some(node) = get_peer(name, network_knowledge).await {
+            if let Some(node) = get_peer(name, network_knowledge) {
                 return Ok((vec![node], 1));
             }
 
-            if !network_knowledge.is_elder(our_name).await {
+            if !network_knowledge.is_elder(our_name) {
                 // We are not Elder - return all the elders of our section,
                 // so the message can be properly relayed through them.
-                let targets: Vec<_> = network_knowledge.authority_provider().await.elders_vec();
+                let targets: Vec<_> = network_knowledge.authority_provider().elders_vec();
                 let dg_size = targets.len();
                 Ok((targets, dg_size))
             } else {
-                candidates(name, our_name, network_knowledge).await
+                candidates(name, our_name, network_knowledge)
             }
         }
     }
 }
 
-async fn section_candidates(
+fn section_candidates(
     target_name: &XorName,
     our_name: &XorName,
     network_knowledge: &NetworkKnowledge,
 ) -> Result<(Vec<Peer>, usize)> {
-    let default_sap = network_knowledge.authority_provider().await;
+    let default_sap = network_knowledge.authority_provider();
     // Find closest section to `target_name` out of the ones we know (including our own)
     let network_sections = network_knowledge.prefix_map().all();
     let info = iter::once(default_sap.clone())
@@ -82,7 +78,7 @@ async fn section_candidates(
         .min_by(|lhs, rhs| lhs.prefix().cmp_distance(&rhs.prefix(), target_name))
         .unwrap_or(default_sap);
 
-    if info.prefix() == network_knowledge.prefix().await {
+    if info.prefix() == network_knowledge.prefix() {
         // Exclude our name since we don't need to send to ourself
         let chosen_section: Vec<_> = info
             .elders()
@@ -93,11 +89,11 @@ async fn section_candidates(
         return Ok((chosen_section, dg_size));
     }
 
-    candidates(target_name, our_name, network_knowledge).await
+    candidates(target_name, our_name, network_knowledge)
 }
 
 // Obtain the delivery group candidates for this target
-async fn candidates(
+fn candidates(
     target_name: &XorName,
     our_name: &XorName,
     network_knowledge: &NetworkKnowledge,
@@ -138,7 +134,7 @@ async fn candidates(
             )
         }
 
-        if *prefix == network_knowledge.prefix().await {
+        if *prefix == network_knowledge.prefix() {
             // Send to all connected targets so they can forward the message
             candidates.retain(|node| node.name() != *our_name);
             dg_size = candidates.len();
@@ -159,8 +155,8 @@ async fn candidates(
 }
 
 // Returns a `Peer` for a known node.
-async fn get_peer(name: &XorName, network_knowledge: &NetworkKnowledge) -> Option<Peer> {
-    match network_knowledge.get_section_member(name).await {
+fn get_peer(name: &XorName, network_knowledge: &NetworkKnowledge) -> Option<Peer> {
+    match network_knowledge.get_section_member(name) {
         Some(info) => Some(*info.peer()),
         None => network_knowledge
             .section_by_name(name)
@@ -194,19 +190,18 @@ mod tests {
 
         let dst_name = *network_knowledge
             .authority_provider()
-            .await
             .names()
             .iter()
             .filter(|&&name| name != our_name)
             .choose(&mut rand::thread_rng())
             .context("too few elders")?;
 
-        let section_pk = network_knowledge.authority_provider().await.section_key();
+        let section_pk = network_knowledge.authority_provider().section_key();
         let dst = DstLocation::Node {
             name: dst_name,
             section_pk,
         };
-        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge).await?;
+        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge)?;
 
         // Send only to the dst node.
         assert_eq!(dg_size, 1);
@@ -220,18 +215,18 @@ mod tests {
         let (our_name, network_knowledge, sk) = setup_elder().await?;
 
         let name = ed25519::gen_name_with_age(MIN_ADULT_AGE);
-        let dst_name = network_knowledge.prefix().await.substituted_in(name);
+        let dst_name = network_knowledge.prefix().substituted_in(name);
         let peer = Peer::new(dst_name, gen_addr());
         let node_state = NodeState::joined(peer, None);
         let node_state = section_signed(&sk, node_state)?;
         assert!(network_knowledge.update_member(node_state).await);
 
-        let section_pk = network_knowledge.authority_provider().await.section_key();
+        let section_pk = network_knowledge.authority_provider().section_key();
         let dst = DstLocation::Node {
             name: dst_name,
             section_pk,
         };
-        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge).await?;
+        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge)?;
 
         // Send only to the dst node.
         assert_eq!(dg_size, 1);
@@ -246,19 +241,17 @@ mod tests {
 
         let dst_name = network_knowledge
             .prefix()
-            .await
             .substituted_in(xor_name::rand::random());
-        let section_pk = network_knowledge.authority_provider().await.section_key();
+        let section_pk = network_knowledge.authority_provider().section_key();
         let dst = DstLocation::Section {
             name: dst_name,
             section_pk,
         };
-        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge).await?;
+        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge)?;
 
         // Send to all our elders except us.
         let expected_recipients: Vec<_> = network_knowledge
             .authority_provider()
-            .await
             .elders()
             .filter(|elder| elder.name() != our_name)
             .cloned()
@@ -280,12 +273,12 @@ mod tests {
             .context("unknown section")?;
 
         let dst_name = choose_elder_name(&section_auth1)?;
-        let section_pk = network_knowledge.authority_provider().await.section_key();
+        let section_pk = network_knowledge.authority_provider().section_key();
         let dst = DstLocation::Node {
             name: dst_name,
             section_pk,
         };
-        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge).await?;
+        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge)?;
 
         // Send only to the dst node.
         assert_eq!(dg_size, 1);
@@ -306,12 +299,12 @@ mod tests {
         let dst_name = section_auth1
             .prefix()
             .substituted_in(xor_name::rand::random());
-        let section_pk = network_knowledge.authority_provider().await.section_key();
+        let section_pk = network_knowledge.authority_provider().section_key();
         let dst = DstLocation::Node {
             name: dst_name,
             section_pk,
         };
-        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge).await?;
+        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge)?;
 
         // Send to all elders in the dst section
         let expected_recipients = section_auth1
@@ -337,12 +330,12 @@ mod tests {
             .prefix()
             .pushed(false)
             .substituted_in(xor_name::rand::random());
-        let section_pk = network_knowledge.authority_provider().await.section_key();
+        let section_pk = network_knowledge.authority_provider().section_key();
         let dst = DstLocation::Node {
             name: dst_name,
             section_pk,
         };
-        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge).await?;
+        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge)?;
 
         // Send to all elders in the dst section
         let expected_recipients = elders_info1
@@ -368,12 +361,12 @@ mod tests {
         let dst_name = section_auth1
             .prefix()
             .substituted_in(xor_name::rand::random());
-        let section_pk = network_knowledge.authority_provider().await.section_key();
+        let section_pk = network_knowledge.authority_provider().section_key();
         let dst = DstLocation::Section {
             name: dst_name,
             section_pk,
         };
-        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge).await?;
+        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge)?;
 
         // Send to all elders in the final dst section
         let expected_recipients = section_auth1
@@ -399,12 +392,12 @@ mod tests {
             .prefix()
             .pushed(false)
             .substituted_in(xor_name::rand::random());
-        let section_pk = network_knowledge.authority_provider().await.section_key();
+        let section_pk = network_knowledge.authority_provider().section_key();
         let dst = DstLocation::Section {
             name: dst_name,
             section_pk,
         };
-        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge).await?;
+        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge)?;
 
         // Send to a subset of elders in the intermediary dst section
         let min_dg_size =
@@ -422,24 +415,21 @@ mod tests {
 
     #[tokio::test]
     async fn delivery_targets_adult_to_our_elder() -> Result<()> {
-        let (our_name, network_knowledge) = setup_adult().await?;
+        let (our_name, network_knowledge) = setup_adult()?;
 
-        let dst_name = choose_elder_name(&network_knowledge.authority_provider().await)?;
-        let section_pk = network_knowledge.authority_provider().await.section_key();
+        let dst_name = choose_elder_name(&network_knowledge.authority_provider())?;
+        let section_pk = network_knowledge.authority_provider().section_key();
         let dst = DstLocation::Node {
             name: dst_name,
             section_pk,
         };
-        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge).await?;
+        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge)?;
 
         // Send to chosen elder
         assert_eq!(dg_size, 1);
         assert_eq!(
             Some(&recipients[0]),
-            network_knowledge
-                .authority_provider()
-                .await
-                .get_elder(&dst_name),
+            network_knowledge.authority_provider().get_elder(&dst_name),
         );
 
         Ok(())
@@ -447,110 +437,96 @@ mod tests {
 
     #[tokio::test]
     async fn delivery_targets_adult_to_our_adult() -> Result<()> {
-        let (our_name, network_knowledge) = setup_adult().await?;
+        let (our_name, network_knowledge) = setup_adult()?;
 
         let dst_name = network_knowledge
             .prefix()
-            .await
             .substituted_in(xor_name::rand::random());
-        let section_pk = network_knowledge.authority_provider().await.section_key();
+        let section_pk = network_knowledge.authority_provider().section_key();
         let dst = DstLocation::Node {
             name: dst_name,
             section_pk,
         };
-        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge).await?;
+        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge)?;
 
         // Send to all elders
         assert_eq!(
             dg_size,
-            network_knowledge.authority_provider().await.elder_count()
+            network_knowledge.authority_provider().elder_count()
         );
-        itertools::assert_equal(
-            recipients,
-            network_knowledge.authority_provider().await.elders(),
-        );
+        itertools::assert_equal(recipients, network_knowledge.authority_provider().elders());
 
         Ok(())
     }
 
     #[tokio::test]
     async fn delivery_targets_adult_to_our_section() -> Result<()> {
-        let (our_name, network_knowledge) = setup_adult().await?;
+        let (our_name, network_knowledge) = setup_adult()?;
 
         let dst_name = network_knowledge
             .prefix()
-            .await
             .substituted_in(xor_name::rand::random());
-        let section_pk = network_knowledge.authority_provider().await.section_key();
+        let section_pk = network_knowledge.authority_provider().section_key();
         let dst = DstLocation::Section {
             name: dst_name,
             section_pk,
         };
-        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge).await?;
+        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge)?;
 
         // Send to all elders
         assert_eq!(
             dg_size,
-            network_knowledge.authority_provider().await.elder_count()
+            network_knowledge.authority_provider().elder_count()
         );
-        itertools::assert_equal(
-            recipients,
-            network_knowledge.authority_provider().await.elders(),
-        );
+        itertools::assert_equal(recipients, network_knowledge.authority_provider().elders());
 
         Ok(())
     }
 
     #[tokio::test]
     async fn delivery_targets_adult_to_remote_peer() -> Result<()> {
-        let (our_name, network_knowledge) = setup_adult().await?;
+        let (our_name, network_knowledge) = setup_adult()?;
 
         let dst_name = Prefix::default()
             .pushed(true)
             .substituted_in(xor_name::rand::random());
-        let section_pk = network_knowledge.authority_provider().await.section_key();
+        let section_pk = network_knowledge.authority_provider().section_key();
         let dst = DstLocation::Node {
             name: dst_name,
             section_pk,
         };
-        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge).await?;
+        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge)?;
 
         // Send to all elders
         assert_eq!(
             dg_size,
-            network_knowledge.authority_provider().await.elder_count()
+            network_knowledge.authority_provider().elder_count()
         );
-        itertools::assert_equal(
-            recipients,
-            network_knowledge.authority_provider().await.elders(),
-        );
+        itertools::assert_equal(recipients, network_knowledge.authority_provider().elders());
 
         Ok(())
     }
 
     #[tokio::test]
     async fn delivery_targets_adult_to_remote_section() -> Result<()> {
-        let (our_name, network_knowledge) = setup_adult().await?;
+        let (our_name, network_knowledge) = setup_adult()?;
 
         let dst_name = Prefix::default()
             .pushed(true)
             .substituted_in(xor_name::rand::random());
-        let section_pk = network_knowledge.authority_provider().await.section_key();
+        let section_pk = network_knowledge.authority_provider().section_key();
         let dst = DstLocation::Section {
             name: dst_name,
             section_pk,
         };
-        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge).await?;
+        let (recipients, dg_size) = delivery_targets(&dst, &our_name, &network_knowledge)?;
 
         // Send to all elders
         assert_eq!(
             dg_size,
-            network_knowledge.authority_provider().await.elder_count()
+            network_knowledge.authority_provider().elder_count()
         );
-        itertools::assert_equal(
-            recipients,
-            network_knowledge.authority_provider().await.elders(),
-        );
+        itertools::assert_equal(recipients, network_knowledge.authority_provider().elders());
 
         Ok(())
     }
@@ -604,12 +580,12 @@ mod tests {
             )
             .is_ok(),);
 
-        let our_name = choose_elder_name(&network_knowledge.authority_provider().await)?;
+        let our_name = choose_elder_name(&network_knowledge.authority_provider())?;
 
         Ok((our_name, network_knowledge, genesis_sk.clone()))
     }
 
-    async fn setup_adult() -> Result<(XorName, NetworkKnowledge)> {
+    fn setup_adult() -> Result<(XorName, NetworkKnowledge)> {
         let prefix0 = Prefix::default().pushed(false);
 
         let (section_auth, _, secret_key_set) =
@@ -622,7 +598,6 @@ mod tests {
 
         let our_name = network_knowledge
             .prefix()
-            .await
             .substituted_in(xor_name::rand::random());
 
         Ok((our_name, network_knowledge))

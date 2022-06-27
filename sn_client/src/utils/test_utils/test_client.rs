@@ -62,7 +62,7 @@ pub async fn create_test_client_with(
 /// then be used as the basis for an `Owner`.
 ///
 /// The conversion method was copied from the `mint-repl` example in `sn_dbc`.
-pub async fn get_dbc_owner_from_secret_key_hex(secret_key_hex: &str) -> Result<Owner> {
+pub fn get_dbc_owner_from_secret_key_hex(secret_key_hex: &str) -> Result<Owner> {
     let mut decoded_bytes = hex::decode(secret_key_hex).map_err(|e| eyre!(e))?;
     decoded_bytes.reverse(); // convert from big endian to little endian
     let sk: SecretKey = bincode::deserialize(&decoded_bytes).map_err(|e| eyre!(e))?;

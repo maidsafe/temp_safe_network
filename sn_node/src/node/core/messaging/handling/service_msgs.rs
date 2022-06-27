@@ -57,7 +57,7 @@ impl Node {
         };
 
         // Setup node authority on this response and send this back to our elders
-        let section_pk = self.network_knowledge().section_key().await;
+        let section_pk = self.network_knowledge().section_key();
         let dst = DstLocation::Node {
             name: requesting_elder,
             section_pk,
@@ -205,7 +205,7 @@ impl Node {
         if data_copy_count() > cmds.len() {
             error!("InsufficientAdults for storing data reliably");
             let error = CmdError::Data(ErrorMsg::InsufficientAdults {
-                prefix: self.network_knowledge().prefix().await,
+                prefix: self.network_knowledge().prefix(),
                 expected: data_copy_count() as u8,
                 found: cmds.len() as u8,
             });
@@ -252,7 +252,7 @@ impl Node {
         // 1- perform all validations on the key image and tx received
         // 2- if everything is ok then sign the spent proof
 
-        let sap = self.network_knowledge.authority_provider().await;
+        let sap = self.network_knowledge.authority_provider();
         let current_section_key = sap.section_key();
         let spentbook_pks = sap.public_key_set();
 

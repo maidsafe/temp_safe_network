@@ -73,9 +73,9 @@ impl Node {
             .await?;
         if result.is_empty() {
             // Send AE-Update to Adults of our section
-            let our_adults = self.network_knowledge.adults().await;
-            let our_prefix = self.network_knowledge.prefix().await;
-            let our_section_pk = self.network_knowledge.section_key().await;
+            let our_adults = self.network_knowledge.adults();
+            let our_prefix = self.network_knowledge.prefix();
+            let our_section_pk = self.network_knowledge.section_key();
             cmds.extend(
                 self.send_ae_update_to_nodes(our_adults, &our_prefix, our_section_pk)
                     .await,
@@ -87,7 +87,6 @@ impl Node {
         self.liveness_retain_only(
             self.network_knowledge
                 .adults()
-                .await
                 .iter()
                 .map(|peer| peer.name())
                 .collect(),

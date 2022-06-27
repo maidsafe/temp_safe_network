@@ -51,7 +51,7 @@ impl Dispatcher {
                 Ok(vec![])
             }
             Cmd::SignOutgoingSystemMsg { msg, dst } => {
-                let src_section_pk = self.node.network_knowledge().section_key().await;
+                let src_section_pk = self.node.network_knowledge().section_key();
                 let wire_msg =
                     WireMsg::single_src(&self.node.info().await, dst, msg, src_section_pk)?;
 
@@ -154,12 +154,7 @@ impl Dispatcher {
                     .await?,
             ]),
             Cmd::TestConnectivity(name) => {
-                if let Some(member_info) = self
-                    .node
-                    .network_knowledge()
-                    .get_section_member(&name)
-                    .await
-                {
+                if let Some(member_info) = self.node.network_knowledge().get_section_member(&name) {
                     if self
                         .node
                         .comm

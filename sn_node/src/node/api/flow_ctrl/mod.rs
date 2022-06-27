@@ -119,7 +119,7 @@ impl FlowCtrl {
 
                 // Send a probe message if we are an elder
                 let node = &self.node;
-                if node.is_elder().await && !node.network_knowledge().prefix().await.is_empty() {
+                if node.is_elder().await && !node.network_knowledge().prefix().is_empty() {
                     match node.generate_probe_msg().await {
                         Ok(cmd) => {
                             info!("Sending probe msg");
@@ -145,7 +145,7 @@ impl FlowCtrl {
 
                 // Send a probe message to an elder
                 let node = &self.node;
-                if !node.network_knowledge().prefix().await.is_empty() {
+                if !node.network_knowledge().prefix().is_empty() {
                     match node.generate_section_probe_msg().await {
                         Ok(cmd) => {
                             info!("Sending section probe msg");
@@ -230,7 +230,7 @@ impl FlowCtrl {
                         node.pending_data_to_replicate_to_peers.remove(&address)
                     {
                         // get info for the WireMsg
-                        let src_section_pk = node.network_knowledge().section_key().await;
+                        let src_section_pk = node.network_knowledge().section_key();
                         let our_info = node.info().await;
 
                         let mut recipients = vec![];
@@ -354,11 +354,11 @@ impl FlowCtrl {
                 let _ = interval.tick().await;
 
                 let node = &self.node;
-                let our_info = node.info.read().await;
+                let our_info = node.info().await;
                 let our_name = our_info.name();
 
-                let members = node.network_knowledge().section_members().await;
-                let section_pk = node.network_knowledge().section_key().await;
+                let members = node.network_knowledge().section_members();
+                let section_pk = node.network_knowledge().section_key();
 
                 if let Some(load_report) = node.comm.tolerated_msgs_per_s().await {
                     trace!("New BackPressure report to disseminate: {:?}", load_report);

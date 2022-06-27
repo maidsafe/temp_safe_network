@@ -79,9 +79,7 @@ impl Node {
 
     /// Is this node an elder?
     pub(crate) async fn is_elder(&self) -> bool {
-        self.network_knowledge
-            .is_elder(&self.info().await.name())
-            .await
+        self.network_knowledge.is_elder(&self.info().await.name())
     }
 
     pub(crate) async fn is_not_elder(&self) -> bool {
@@ -111,7 +109,7 @@ impl Node {
     /// Returns our key share in the current BLS group if this node is a member of one, or
     /// `Error::MissingSecretKeyShare` otherwise.
     pub(crate) async fn key_share(&self) -> Result<SectionKeyShare> {
-        let section_key = self.network_knowledge.section_key().await;
+        let section_key = self.network_knowledge.section_key();
         self.section_keys_provider
             .key_share(&section_key)
             .await
@@ -130,7 +128,7 @@ impl Node {
         self.dkg_voter.handle_timeout(
             &self.info().await,
             token,
-            self.network_knowledge().section_key().await,
+            self.network_knowledge().section_key(),
         )
     }
 
@@ -141,8 +139,7 @@ impl Node {
             dst_location,
             &self.info().await.name(),
             &self.network_knowledge,
-        )
-        .await?;
+        )?;
 
         let target_name = dst_location.name();
 
@@ -151,7 +148,7 @@ impl Node {
         if self.is_elder().await
             && targets.len() > 1
             && dst_location.is_to_node()
-            && self.network_knowledge.prefix().await.matches(&target_name)
+            && self.network_knowledge.prefix().matches(&target_name)
         {
             // This actually means being an elder, but we don't know the member yet. Which most likely
             // happens during the join process that a node's name is changed.

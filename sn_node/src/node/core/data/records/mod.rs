@@ -85,8 +85,7 @@ impl Node {
         );
 
         if targets.is_empty() {
-            let error =
-                convert_to_error_msg(Error::NoAdults(self.network_knowledge().prefix().await));
+            let error = convert_to_error_msg(Error::NoAdults(self.network_knowledge().prefix()));
 
             debug!("No targets found for {msg_id:?}");
             return self
@@ -207,7 +206,7 @@ impl Node {
     /// List is sorted by distance from `target`.
     async fn get_adults_holding_data_including_full(&self, target: &XorName) -> BTreeSet<XorName> {
         let full_adults = self.full_adults().await;
-        let adults = self.network_knowledge().adults().await;
+        let adults = self.network_knowledge().adults();
 
         let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
 
@@ -251,7 +250,7 @@ impl Node {
     async fn get_adults_who_should_store_data(&self, target: XorName) -> BTreeSet<XorName> {
         let full_adults = self.full_adults().await;
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
-        let adults = self.network_knowledge().adults().await;
+        let adults = self.network_knowledge().adults();
 
         trace!("Total adults known about: {:?}", adults.len());
 
@@ -284,7 +283,7 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         // we create a dummy/random dst location,
         // we will set it correctly for each msg and target
-        let section_pk = self.network_knowledge().section_key().await;
+        let section_pk = self.network_knowledge().section_key();
         let our_name = self.info().await.name();
         let dummy_dst_location = DstLocation::Node {
             name: our_name,

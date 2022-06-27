@@ -166,7 +166,7 @@ impl Node {
     }
 
     async fn check_sap_candidate_prefix(&self, sap_candidate: &SapCandidate) -> Result<()> {
-        let section_prefix = self.network_knowledge.prefix().await;
+        let section_prefix = self.network_knowledge.prefix();
         match sap_candidate {
             SapCandidate::ElderHandover(single_sap) => {
                 // single handover, must be same prefix
@@ -284,9 +284,9 @@ impl Node {
                 Err(Error::RequestHandoverAntiEntropy(gen)) => {
                     // We hit an error while processing this vote, perhaps we are missing information.
                     // We'll send a handover AE request to see if they can help us catch up.
-                    let sap = self.network_knowledge.authority_provider().await;
+                    let sap = self.network_knowledge.authority_provider();
                     let dst_section_pk = sap.section_key();
-                    let section_name = self.network_knowledge.prefix().await.name();
+                    let section_name = self.network_knowledge.prefix().name();
                     let msg = SystemMsg::HandoverAE(gen);
                     let cmd = self
                         .send_direct_msg_to_nodes(vec![peer], msg, section_name, dst_section_pk)
@@ -326,7 +326,7 @@ impl Node {
                         self.send_direct_msg(
                             peer,
                             SystemMsg::HandoverVotes(catchup_votes),
-                            self.network_knowledge.section_key().await,
+                            self.network_knowledge.section_key(),
                         )
                         .await?,
                     ]
