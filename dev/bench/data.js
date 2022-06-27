@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1656334690527,
+  "lastUpdate": 1656334792722,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -6119,6 +6119,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 5204290853,
             "range": "± 29634269",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bzeeman@live.nl",
+            "name": "Benno Zeeman",
+            "username": "b-zee"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "6bfd101ed12a16f3f6a9a0b55252d45d200af7c6",
+          "message": "feat(dataquery): Select which adult to query\n\nLet the client pick the adult to query, based on the XOR distance.",
+          "timestamp": "2022-06-27T14:23:03+02:00",
+          "tree_id": "3068fdde11295e3313773130f11da0d15e61d57c",
+          "url": "https://github.com/maidsafe/safe_network/commit/6bfd101ed12a16f3f6a9a0b55252d45d200af7c6"
+        },
+        "date": 1656334791180,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 5777100054,
+            "range": "± 80934518",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 5788794272,
+            "range": "± 154304672",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 5934511394,
+            "range": "± 6917541594",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 5013193772,
+            "range": "± 3124429",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 5030714312,
+            "range": "± 1500898",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 5200489717,
+            "range": "± 23187028",
             "unit": "ns/iter"
           }
         ]
