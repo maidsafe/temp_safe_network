@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::messaging::{
-    data::{DataQuery, MetadataExchange, OperationId, QueryResponse, Result, StorageLevel},
+    data::{DataQueryVariant, MetadataExchange, OperationId, QueryResponse, Result, StorageLevel},
     EndUser, MsgId, ServiceAuth,
 };
 use crate::types::{
@@ -68,7 +68,7 @@ pub enum NodeQuery {
     /// Data is handled by Adults
     Data {
         /// The query
-        query: DataQuery,
+        query: DataQueryVariant,
         /// Client signature
         auth: ServiceAuth,
         /// The user that has initiated this query

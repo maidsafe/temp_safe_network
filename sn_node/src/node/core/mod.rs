@@ -322,7 +322,7 @@ impl Node {
 
     /// Log a dkg issue (ie, an initialised but unfinished dkg round for a given participant)
     pub(crate) async fn log_dkg_issue(&self, name: XorName) -> Result<()> {
-        trace!("Logging Dkg Issue in dysfunction");
+        trace!("Logging Dkg issue in dysfunction");
         self.dysfunction_tracking
             .track_issue(name, IssueType::Dkg)
             .await

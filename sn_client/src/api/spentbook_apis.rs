@@ -12,7 +12,7 @@ use crate::Error;
 
 use sn_dbc::{KeyImage, RingCtTransaction, SpentProofShare};
 use sn_interface::{
-    messaging::data::{DataCmd, DataQuery, QueryResponse, SpentbookCmd, SpentbookQuery},
+    messaging::data::{DataCmd, DataQueryVariant, QueryResponse, SpentbookCmd, SpentbookQuery},
     types::SpentbookAddress,
 };
 
@@ -41,7 +41,7 @@ impl Client {
         key_image: KeyImage,
     ) -> Result<Vec<SpentProofShare>, Error> {
         let address = SpentbookAddress::new(XorName::from_content(&key_image.to_bytes()));
-        let query = DataQuery::Spentbook(SpentbookQuery::SpentProofShares(address));
+        let query = DataQueryVariant::Spentbook(SpentbookQuery::SpentProofShares(address));
         let query_result = self.send_query(query).await?;
         match query_result.response {
             QueryResponse::SpentProofShares((res, op_id)) => {

@@ -99,7 +99,7 @@ impl DysfunctionDetection {
     ///
     /// The `op_id` only applies when adding an operational issue.
     pub async fn track_issue(&self, node_id: NodeIdentifier, issue_type: IssueType) -> Result<()> {
-        debug!("Adding a new issue to the dysfunction tracker: {issue_type:?}");
+        trace!("Adding a new issue to the dysfunction tracker: {issue_type:?}");
         match issue_type {
             IssueType::Dkg => {
                 let mut entry = self.dkg_issues.entry(node_id).or_default();
@@ -125,7 +125,7 @@ impl DysfunctionDetection {
                             .to_string(),
                     )
                 })?;
-                debug!("New issue has associated operation ID: {op_id:#?}");
+                trace!("New issue has associated operation ID: {op_id:#?}");
                 v.write().await.push(op_id);
             }
         }
