@@ -418,8 +418,10 @@ impl Node {
                     msg_id
                 );
                 // TODO: Factor in med/long term backpressure into general node liveness calculations
-                comm.regulate(&sender, msgs_per_s).await;
-                Ok(vec![])
+                Ok(vec![Cmd::Comm(crate::comm::Cmd::Regulate {
+                    peer: sender,
+                    msgs_per_s,
+                })])
             }
             // The AcceptedOnlineShare for relocation will be received here.
             SystemMsg::JoinResponse(join_response) => {

@@ -51,6 +51,14 @@ pub(crate) struct Comm {
     sessions: Arc<DashMap<Peer, PeerSession>>,
 }
 
+/// Commands for interacting with Comm.
+#[derive(Debug, Clone)]
+pub(crate) enum Cmd {
+    #[cfg(feature = "back-pressure")]
+    /// Set message rate for peer to the desired msgs per second
+    Regulate { peer: Peer, msgs_per_s: f64 },
+}
+
 impl Comm {
     #[tracing::instrument(skip_all)]
     pub(crate) async fn first_node(
@@ -100,6 +108,13 @@ impl Comm {
         msg_listener.listen(connection, incoming_msgs);
 
         Ok((comm, remote_address))
+    }
+
+    pub(crate) async fn handle_cmd(&self, cmd: Cmd) {
+        match cmd {
+            #[cfg(feature = "back-pressure")]
+            Cmd::Regulate { peer, msgs_per_s } => self.regulate(peer, msgs_per_s).await,
+        }
     }
 
     pub(crate) fn socket_addr(&self) -> SocketAddr {
