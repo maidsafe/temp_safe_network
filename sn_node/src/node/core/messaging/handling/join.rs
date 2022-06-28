@@ -6,12 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::comm::Comm;
 use crate::node::{
     api::cmds::Cmd,
     core::{relocation::RelocateDetailsUtils, Node},
     Result,
 };
-
 use sn_interface::{
     elder_count,
     messaging::system::{
@@ -33,6 +33,7 @@ impl Node {
         &self,
         peer: Peer,
         join_request: JoinRequest,
+        comm: &Comm,
     ) -> Result<Vec<Cmd>> {
         debug!("Received {:?} from {}", join_request, peer);
 
@@ -151,7 +152,7 @@ impl Node {
         }
 
         // Do reachability check only for the initial join request
-        let cmd = if self.comm.is_reachable(&peer.addr()).await.is_err() {
+        let cmd = if comm.is_reachable(&peer.addr()).await.is_err() {
             let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
                 JoinRejectionReason::NodeNotReachable(peer.addr()),
             )));
@@ -209,6 +210,7 @@ impl Node {
         peer: Peer,
         join_request: JoinAsRelocatedRequest,
         known_keys: Vec<BlsPublicKey>,
+        comm: &Comm,
     ) -> Result<Vec<Cmd>> {
         debug!("Received JoinAsRelocatedRequest {join_request:?} from {peer}",);
 
@@ -262,7 +264,7 @@ impl Node {
         }
 
         // Finally do reachability check
-        if self.comm.is_reachable(&peer.addr()).await.is_err() {
+        if comm.is_reachable(&peer.addr()).await.is_err() {
             let node_msg = SystemMsg::JoinAsRelocatedResponse(Box::new(
                 JoinAsRelocatedResponse::NodeNotReachable(peer.addr()),
             ));

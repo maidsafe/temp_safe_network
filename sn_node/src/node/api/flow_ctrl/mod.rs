@@ -9,13 +9,8 @@
 mod cmd_ctrl;
 
 pub(crate) use self::cmd_ctrl::CmdCtrl;
-
-use crate::node::{
-    api::cmds::Cmd,
-    core::{MsgEvent, Node},
-    messages::WireMsgUtils,
-    Error, Result,
-};
+use crate::comm::MsgEvent;
+use crate::node::{api::cmds::Cmd, core::Node, messages::WireMsgUtils, Error, Result};
 
 use sn_interface::{
     messaging::{

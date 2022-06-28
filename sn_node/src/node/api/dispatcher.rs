@@ -8,11 +8,12 @@
 
 use crate::node::{
     api::Cmd,
-    core::{DeliveryStatus, Node, Proposal},
+    core::{Node, Proposal},
     messages::WireMsgUtils,
     Result,
 };
 
+use crate::comm::{Comm, DeliveryStatus};
 use sn_interface::{
     messaging::{system::SystemMsg, AuthKind, WireMsg},
     types::Peer,
@@ -22,21 +23,25 @@ use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::{sync::watch, sync::RwLock, time};
 
 // Cmd Dispatcher.
-#[derive(Clone)]
 pub(crate) struct Dispatcher {
     node: Arc<Node>,
+    comm: Comm,
     dkg_timeout: Arc<DkgTimeout>,
 }
 
 impl Dispatcher {
-    pub(super) fn new(node: Arc<Node>) -> Self {
+    pub(super) fn new(node: Arc<Node>, comm: Comm) -> Self {
         let (cancel_timer_tx, cancel_timer_rx) = watch::channel(false);
         let dkg_timeout = Arc::new(DkgTimeout {
             cancel_timer_tx,
             cancel_timer_rx,
         });
 
-        Self { node, dkg_timeout }
+        Self {
+            node,
+            dkg_timeout,
+            comm,
+        }
     }
 
     pub(crate) fn node(&self) -> Arc<Node> {
@@ -47,7 +52,10 @@ impl Dispatcher {
     pub(crate) async fn process_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
         match cmd {
             Cmd::CleanupPeerLinks => {
-                self.node.cleanup_non_elder_peers().await?;
+                let elders = self.node.network_knowledge.elders();
+                self.comm
+                    .cleanup_peers(elders, self.node.dysfunction_tracking.clone())
+                    .await?;
                 Ok(vec![])
             }
             Cmd::SignOutgoingSystemMsg { msg, dst } => {
@@ -64,7 +72,11 @@ impl Dispatcher {
                 sender,
                 wire_msg,
                 original_bytes,
-            } => self.node.handle_msg(sender, wire_msg, original_bytes).await,
+            } => {
+                self.node
+                    .handle_msg(sender, wire_msg, original_bytes, &self.comm)
+                    .await
+            }
             Cmd::HandleDkgTimeout(token) => self.node.handle_dkg_timeout(token).await,
             Cmd::HandleAgreement { proposal, sig } => {
                 self.node.handle_general_agreements(proposal, sig).await
@@ -155,13 +167,7 @@ impl Dispatcher {
             ]),
             Cmd::TestConnectivity(name) => {
                 if let Some(member_info) = self.node.network_knowledge().get_section_member(&name) {
-                    if self
-                        .node
-                        .comm
-                        .is_reachable(&member_info.addr())
-                        .await
-                        .is_err()
-                    {
+                    if self.comm.is_reachable(&member_info.addr()).await.is_err() {
                         self.node.log_comm_issue(member_info.name()).await?
                     }
                 }
@@ -189,12 +195,7 @@ impl Dispatcher {
                     recipients.len(), wire_msg);
                 }
                 if let Some(recipient) = recipients.get(0) {
-                    if let Err(err) = self
-                        .node
-                        .comm
-                        .send_to_client(recipient, wire_msg.clone())
-                        .await
-                    {
+                    if let Err(err) = self.comm.send_to_client(recipient, wire_msg.clone()).await {
                         error!(
                             "Failed sending message {:?} to client {:?} with error {:?}",
                             wire_msg, recipient, err
@@ -216,7 +217,6 @@ impl Dispatcher {
         wire_msg: WireMsg,
     ) -> Result<Vec<Cmd>> {
         let status = self
-            .node
             .comm
             .send(recipients, delivery_group_size, wire_msg)
             .await?;
