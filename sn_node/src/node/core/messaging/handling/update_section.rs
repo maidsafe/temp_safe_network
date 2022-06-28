@@ -94,7 +94,7 @@ impl Node {
         let adults_names = adults.iter().map(|p2p_node| p2p_node.name()).collect_vec();
 
         let elders = self.network_knowledge.elders().await;
-        let my_name = self.info.read().await.name();
+        let my_name = self.info().await.name();
 
         // find data targets that are not us.
         let mut target_member_names = adults_names

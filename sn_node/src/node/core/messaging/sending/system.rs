@@ -42,7 +42,7 @@ impl Node {
         section_pk: BlsPublicKey,
     ) -> Result<Cmd> {
         trace!("{}", LogMarker::SendDirectToNodes);
-        let our_node = self.info.read().await.clone();
+        let our_node = self.info().await;
         let our_section_key = self.network_knowledge.section_key().await;
 
         let wire_msg = WireMsg::single_src(
@@ -95,7 +95,7 @@ impl Node {
 
         trace!("Send {:?} to {:?}", wire_msg, recipients);
 
-        let our_name = self.info.read().await.name();
+        let our_name = self.info().await.name();
         for recipient in recipients.into_iter() {
             if recipient.name() == our_name {
                 match wire_msg.auth_kind() {

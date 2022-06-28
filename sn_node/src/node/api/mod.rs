@@ -99,7 +99,7 @@ impl NodeApi {
         .map_err(|_| Error::JoinTimeout)??;
 
         // Network keypair may have to be changed due to naming criteria or network requirements.
-        let keypair_as_bytes = api.node.info.read().await.keypair.to_bytes();
+        let keypair_as_bytes = api.node.keypair.read().await.to_bytes();
         store_network_keypair(root_dir, keypair_as_bytes).await?;
 
         let our_pid = std::process::id();
@@ -160,12 +160,11 @@ impl NodeApi {
                 connection_event_tx,
             )
             .await?;
-            let info = NodeInfo::new(keypair, comm.our_connection_info());
 
             let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
             let node = Node::first_node(
                 comm,
-                info,
+                Arc::new(keypair),
                 event_sender.clone(),
                 used_space.clone(),
                 root_storage_dir.to_path_buf(),
@@ -249,7 +248,7 @@ impl NodeApi {
 
             let node = Node::new(
                 comm,
-                info,
+                info.keypair.clone(),
                 network_knowledge,
                 None,
                 event_sender.clone(),
@@ -258,8 +257,8 @@ impl NodeApi {
             )
             .await?;
 
-            info!("{} Joined the network!", node.info.read().await.name());
-            info!("Our AGE: {}", node.info.read().await.age());
+            info!("{} Joined the network!", node.info().await.name());
+            info!("Our AGE: {}", node.info().await.age());
 
             node
         };
@@ -274,17 +273,17 @@ impl NodeApi {
 
     /// Returns the current age of this node.
     pub async fn age(&self) -> u8 {
-        self.node.info.read().await.age()
+        self.node.info().await.age()
     }
 
     /// Returns the ed25519 public key of this node.
     pub async fn public_key(&self) -> PublicKey {
-        self.node.info.read().await.keypair.public
+        self.node.keypair.read().await.public
     }
 
     /// The name of this node.
     pub async fn name(&self) -> XorName {
-        self.node.info.read().await.name()
+        self.node.info().await.name()
     }
 
     /// Returns connection info of this node.
@@ -334,12 +333,7 @@ impl NodeApi {
         dst: DstLocation,
     ) -> Result<WireMsg> {
         let src_section_pk = *self.section_chain().await.last_key();
-        WireMsg::single_src(
-            &self.node.info.read().await.clone(),
-            dst,
-            node_msg,
-            src_section_pk,
-        )
+        WireMsg::single_src(&self.node.info().await, dst, node_msg, src_section_pk)
     }
 
     /// Send a message.

@@ -231,7 +231,7 @@ impl FlowCtrl {
                     {
                         // get info for the WireMsg
                         let src_section_pk = node.network_knowledge().section_key().await;
-                        let our_info = &*node.info.read().await;
+                        let our_info = node.info().await;
 
                         let mut recipients = vec![];
 
@@ -258,7 +258,7 @@ impl FlowCtrl {
                         let system_msg =
                             SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
                         let wire_msg =
-                            WireMsg::single_src(our_info, dst, system_msg, src_section_pk)?;
+                            WireMsg::single_src(&our_info, dst, system_msg, src_section_pk)?;
 
                         debug!(
                             "{:?} to: {:?} w/ {:?} ",
@@ -425,7 +425,7 @@ async fn handle_connection_events(ctrl: FlowCtrl, mut incoming_conns: mpsc::Rece
 
                 let span = {
                     let node = &ctrl.node;
-                    trace_span!("handle_message", name = %node.info.read().await.name(), ?sender, msg_id = ?wire_msg.msg_id())
+                    trace_span!("handle_message", name = %node.info().await.name(), ?sender, msg_id = ?wire_msg.msg_id())
                 };
                 let _span_guard = span.enter();
 

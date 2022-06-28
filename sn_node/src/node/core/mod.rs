@@ -61,6 +61,7 @@ use sn_interface::{
 
 use backoff::ExponentialBackoff;
 use dashmap::{DashMap, DashSet};
+use ed25519_dalek::Keypair;
 use itertools::Itertools;
 use resource_proof::ResourceProof;
 use std::{
@@ -107,7 +108,7 @@ pub(crate) type AeBackoffCache =
 pub(crate) struct Node {
     pub(super) event_sender: EventSender,
     pub(super) data_storage: DataStorage, // Adult only before cache
-    pub(crate) info: Arc<RwLock<NodeInfo>>,
+    pub(crate) keypair: Arc<RwLock<Arc<Keypair>>>,
     pub(crate) comm: Comm,
     /// queue up all batch data to be replicated (as a result of churn events atm)
     // TODO: This can probably be reworked into the general per peer msg queue, but as
@@ -144,7 +145,7 @@ impl Node {
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn new(
         comm: Comm,
-        mut info: NodeInfo,
+        keypair: Arc<Keypair>,
         network_knowledge: NetworkKnowledge,
         section_key_share: Option<SectionKeyShare>,
         event_sender: EventSender,
@@ -178,9 +179,6 @@ impl Node {
 
         let section_keys_provider = SectionKeysProvider::new(section_key_share.clone()).await;
 
-        // make sure the Node has the correct local addr as Comm
-        info.addr = comm.our_connection_info();
-
         let data_storage = DataStorage::new(&root_storage_dir, used_space.clone())?;
 
         info!("Creating DysfunctionDetection checks");
@@ -211,7 +209,7 @@ impl Node {
 
         let node = Self {
             comm,
-            info: Arc::new(RwLock::new(info)),
+            keypair: Arc::new(RwLock::new(keypair)),
             network_knowledge,
             section_keys_provider,
             dkg_sessions: Arc::new(RwLock::new(HashMap::default())),
@@ -236,6 +234,12 @@ impl Node {
         node.write_prefix_map().await;
 
         Ok(node)
+    }
+
+    pub(crate) async fn info(&self) -> NodeInfo {
+        let keypair = self.keypair.read().await.clone();
+        let addr = self.comm.our_connection_info();
+        NodeInfo { keypair, addr }
     }
 
     ////////////////////////////////////////////////////////////////////////////

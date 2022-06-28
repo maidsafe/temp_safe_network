@@ -429,7 +429,7 @@ impl Node {
                         {
                             let new_node = joining_as_relocated.node.clone();
                             let new_name = new_node.name();
-                            let previous_name = self.info.read().await.name();
+                            let previous_name = self.info().await.name();
                             let new_keypair = new_node.keypair.clone();
 
                             info!(
@@ -454,7 +454,8 @@ impl Node {
                             //       As the sending of the JoinRequest as notification
                             //       may require the `node` to be switched to new already.
 
-                            self.relocate(new_node, new_network_knowledge).await?;
+                            self.relocate(new_keypair.clone(), new_network_knowledge)
+                                .await?;
 
                             trace!(
                                 "Relocation: Sending aggregated JoinRequest to {:?}",
@@ -545,7 +546,7 @@ impl Node {
             SystemMsg::DkgStart(session_id) => {
                 trace!("Handling msg: Dkg-Start {:?} from {}", session_id, sender);
                 self.log_dkg_session(&sender.name()).await;
-                let our_name = self.info.read().await.name();
+                let our_name = self.info().await.name();
                 if !session_id.contains_elder(our_name) {
                     return Ok(vec![]);
                 }
@@ -653,7 +654,7 @@ impl Node {
                     let mut cmds = vec![];
 
                     let section_pk = PublicKey::Bls(self.network_knowledge.section_key().await);
-                    let own_keypair = Keypair::Ed25519(self.info.read().await.keypair.clone());
+                    let own_keypair = Keypair::Ed25519(self.keypair.read().await.clone());
 
                     for data in data_collection {
                         // We are an adult here, so just store away!
@@ -672,8 +673,7 @@ impl Node {
                                 // db full
                                 error!("Not enough space to store more data");
 
-                                let node_id =
-                                    PublicKey::from(self.info.read().await.keypair.public);
+                                let node_id = PublicKey::from(self.keypair.read().await.public);
                                 let msg = SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                                     node_id,
                                     data,
@@ -774,7 +774,7 @@ impl Node {
                     };
                     let section_pk = self.network_knowledge.section_key().await;
                     let wire_msg = WireMsg::single_src(
-                        &self.info.read().await.clone(),
+                        &self.info().await,
                         DstLocation::Node {
                             name: sender.name(),
                             section_pk,
@@ -841,7 +841,7 @@ impl Node {
         let mut cmds = vec![];
         if let Some(level) = level {
             info!("Storage has now passed {} % used.", 10 * level.value());
-            let node_id = PublicKey::from(self.info.read().await.keypair.public);
+            let node_id = PublicKey::from(self.keypair.read().await.public);
             let node_xorname = XorName::from(node_id);
 
             // we ask the section to record the new level reached

@@ -85,7 +85,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let node = Node::new(
                 create_comm().await?,
-                node,
+                node.keypair.clone(),
                 section,
                 Some(section_key_share),
                 event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
@@ -170,7 +170,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let node = Node::new(
                 create_comm().await?,
-                node,
+                node.keypair.clone(),
                 section,
                 Some(section_key_share),
                 event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
@@ -188,7 +188,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
 
             let nonce: [u8; 32] = rand::random();
             let serialized = bincode::serialize(&(new_node.name(), nonce))?;
-            let nonce_signature = ed25519::sign(&serialized, &node.info.read().await.keypair);
+            let nonce_signature = ed25519::sign(&serialized, &node.info().await.keypair);
 
             let rp = ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY);
             let data = rp.create_proof_data(&nonce);
@@ -262,7 +262,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let node = Node::new(
                 create_comm().await?,
-                node,
+                node.keypair.clone(),
                 section,
                 Some(section_key_share),
                 event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
@@ -349,7 +349,7 @@ async fn handle_agreement_on_online() -> Result<()> {
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let node = Node::new(
                 create_comm().await?,
-                node,
+                node.keypair.clone(),
                 section,
                 Some(section_key_share),
                 event_sender,
@@ -424,7 +424,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let node = Node::new(
                 create_comm().await?,
-                node,
+                node.keypair.clone(),
                 section,
                 Some(section_key_share),
                 event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
@@ -599,7 +599,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let node = Node::new(
                 create_comm().await?,
-                info,
+                info.keypair.clone(),
                 section,
                 Some(section_key_share),
                 event_sender,
@@ -675,7 +675,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let node = Node::new(
                 create_comm().await?,
-                node,
+                node.keypair.clone(),
                 section,
                 Some(section_key_share),
                 event_sender,
@@ -737,7 +737,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
             let node = nodes.remove(0);
             let node = Node::new(
                 create_comm().await?,
-                node,
+                node.keypair.clone(),
                 section,
                 Some(section_key_share),
                 event_sender,
@@ -812,7 +812,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let node = Node::new(
                 create_comm().await?,
-                node,
+                node.keypair.clone(),
                 network_knowledge,
                 Some(section_key_share),
                 event_sender,
@@ -934,7 +934,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let node = Node::new(
                 create_comm().await?,
-                info,
+                info.keypair.clone(),
                 our_section.clone(),
                 None,
                 event_sender,
@@ -1024,7 +1024,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
         let node = Node::new(
             create_comm().await?,
-            node,
+            node.keypair.clone(),
             section,
             Some(section_key_share),
             event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
@@ -1110,14 +1110,14 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
         let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
         let node = Node::first_node(
             comm,
-            info,
+            info.keypair.clone(),
             event_sender,
             UsedSpace::new(max_capacity),
             root_storage_dir,
             genesis_sk_set,
         )
         .await?;
-        let info = node.info.read().await.clone();
+        let info = node.info().await;
         let section_pk = node.network_knowledge().section_key().await;
         let dispatcher = Dispatcher::new(Arc::new(node));
 
@@ -1239,7 +1239,7 @@ async fn handle_elders_update() -> Result<()> {
         let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
         let node = Node::new(
             create_comm().await?,
-            info,
+            info.keypair.clone(),
             section0.clone(),
             Some(section_key_share),
             event_sender,
@@ -1381,7 +1381,7 @@ async fn handle_demote_during_split() -> Result<()> {
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let node = Node::new(
                 create_comm().await?,
-                info,
+                info.keypair.clone(),
                 section,
                 Some(section_key_share),
                 event_sender,

@@ -179,7 +179,7 @@ impl Node {
                 let spent_proof_share = self.gen_spent_proof_share(&key_image, &tx).await?;
 
                 // use own keypair for generating the register command
-                let own_keypair = Keypair::Ed25519(self.info.read().await.keypair.clone());
+                let own_keypair = Keypair::Ed25519(self.keypair.read().await.clone());
 
                 // store spent proof share to adults
                 let reg_cmd = gen_register_cmd(&key_image, &spent_proof_share, own_keypair)?;

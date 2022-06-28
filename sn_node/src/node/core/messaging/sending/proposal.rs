@@ -84,7 +84,7 @@ impl Node {
         // Carry out a substitution to prevent the dst_location becomes other section.
         let section_key = self.network_knowledge.section_key().await;
         let wire_msg = WireMsg::single_src(
-            &self.info.read().await.clone(),
+            &self.info().await,
             DstLocation::Section {
                 name: self.network_knowledge.prefix().await.name(),
                 section_pk: section_key,
@@ -99,7 +99,7 @@ impl Node {
         let msg_id = wire_msg.msg_id();
 
         let mut cmds = vec![];
-        let our_name = self.info.read().await.name();
+        let our_name = self.info().await.name();
         // handle ourselves if we should
         for peer in recipients.clone() {
             if peer.name() == our_name {

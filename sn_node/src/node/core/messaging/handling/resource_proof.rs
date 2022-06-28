@@ -34,10 +34,9 @@ impl Node {
         };
 
         if self
-            .info
+            .keypair
             .read()
             .await
-            .keypair
             .public
             .verify(&serialized, &response.nonce_signature)
             .is_err()
@@ -57,7 +56,7 @@ impl Node {
             data_size: RESOURCE_PROOF_DATA_SIZE,
             difficulty: RESOURCE_PROOF_DIFFICULTY,
             nonce,
-            nonce_signature: ed25519::sign(&serialized, &self.info.read().await.keypair),
+            nonce_signature: ed25519::sign(&serialized, &*self.keypair.read().await),
         }));
 
         trace!("{}", LogMarker::SendResourceProofChallenge);

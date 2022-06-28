@@ -21,28 +21,31 @@ use sn_interface::{
     types::log_markers::LogMarker,
 };
 
+use ed25519_dalek::Keypair;
 use secured_linked_list::SecuredLinkedList;
-use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf};
+use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf, sync::Arc};
 use xor_name::XorName;
 
 impl Node {
     // Creates `Core` for the first node in the network
     pub(crate) async fn first_node(
         comm: Comm,
-        mut node: NodeInfo,
+        keypair: Arc<Keypair>,
         event_sender: EventSender,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
         genesis_sk_set: bls::SecretKeySet,
     ) -> Result<Self> {
-        // make sure the Node has the correct local addr as Comm
-        node.addr = comm.our_connection_info();
+        let info = NodeInfo {
+            keypair: keypair.clone(),
+            addr: comm.our_connection_info(),
+        };
 
         let (section, section_key_share) =
-            NetworkKnowledge::first_node(node.peer(), genesis_sk_set).await?;
+            NetworkKnowledge::first_node(info.peer(), genesis_sk_set).await?;
         Self::new(
             comm,
-            node,
+            keypair.clone(),
             section,
             Some(section_key_share),
             event_sender,
@@ -54,17 +57,14 @@ impl Node {
 
     pub(crate) async fn relocate(
         &self,
-        mut new_node: NodeInfo,
+        new_keypair: Arc<Keypair>,
         new_section: NetworkKnowledge,
     ) -> Result<()> {
         // we first try to relocate section info.
         self.network_knowledge.relocated_to(new_section).await?;
 
-        // make sure the new Node has the correct local addr as Comm
-        new_node.addr = self.comm.our_connection_info();
-
-        let mut our_node = self.info.write().await;
-        *our_node = new_node;
+        let mut our_keypair = self.keypair.write().await;
+        *our_keypair = new_keypair;
 
         Ok(())
     }
@@ -80,7 +80,7 @@ impl Node {
     /// Is this node an elder?
     pub(crate) async fn is_elder(&self) -> bool {
         self.network_knowledge
-            .is_elder(&self.info.read().await.name())
+            .is_elder(&self.info().await.name())
             .await
     }
 
@@ -128,7 +128,7 @@ impl Node {
 
     pub(crate) async fn handle_dkg_timeout(&self, token: u64) -> Result<Vec<Cmd>> {
         self.dkg_voter.handle_timeout(
-            &self.info.read().await.clone(),
+            &self.info().await,
             token,
             self.network_knowledge().section_key().await,
         )
@@ -139,7 +139,7 @@ impl Node {
         let dst_location = wire_msg.dst_location();
         let (targets, dg_size) = delivery_group::delivery_targets(
             dst_location,
-            &self.info.read().await.name(),
+            &self.info().await.name(),
             &self.network_knowledge,
         )
         .await?;
