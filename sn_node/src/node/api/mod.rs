@@ -7,13 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 pub(crate) mod cmds;
+mod dispatcher;
 pub(super) mod event;
 pub(super) mod event_channel;
 pub(super) mod flow_ctrl;
 #[cfg(test)]
 pub(crate) mod tests;
-
-mod dispatcher;
 
 use self::{
     cmds::Cmd,
@@ -22,10 +21,10 @@ use self::{
     event_channel::EventReceiver,
     flow_ctrl::{CmdCtrl, FlowCtrl},
 };
-
+use crate::comm::Comm;
 use crate::node::{
     cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
-    core::{join_network, Comm, Node, RateLimits},
+    core::{join_network, Node, RateLimits},
     error::{Error, Result},
     logging::{log_ctx::LogCtx, run_system_logger},
     messages::WireMsgUtils,
@@ -142,7 +141,7 @@ impl NodeApi {
         let monitoring = RateLimits::new();
         let (event_sender, event_receiver) = event_channel::new(EVENT_CHANNEL_SIZE);
 
-        let node = if config.is_first() {
+        let (node, comm) = if config.is_first() {
             // Genesis node having a fix age of 255.
             let keypair = ed25519::gen_keypair(&Prefix::default().range_inclusive(), 255);
             let node_name = ed25519::name(&keypair.public);
@@ -163,12 +162,12 @@ impl NodeApi {
 
             let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
             let node = Node::first_node(
-                comm,
                 Arc::new(keypair),
                 event_sender.clone(),
                 used_space.clone(),
                 root_storage_dir.to_path_buf(),
                 genesis_sk_set,
+                comm.socket_addr(),
             )
             .await?;
 
@@ -197,7 +196,7 @@ impl NodeApi {
                 hex::encode(genesis_key.to_bytes())
             );
 
-            node
+            (node, comm)
         } else {
             let genesis_key_str = config.genesis_key.as_ref().ok_or_else(|| {
                 Error::Configuration("Network's genesis key was not provided.".to_string())
@@ -231,12 +230,12 @@ impl NodeApi {
                 "{} Joining as a new node (PID: {}) our socket: {}, bootstrapper was: {}, network's genesis key: {:?}",
                 node_name,
                 std::process::id(),
-                comm.our_connection_info(),
+                comm.socket_addr(),
                 bootstrap_addr,
                 genesis_key
             );
 
-            let joining_node = NodeInfo::new(keypair, comm.our_connection_info());
+            let joining_node = NodeInfo::new(keypair, comm.socket_addr());
             let (info, network_knowledge) = join_network(
                 joining_node,
                 &comm,
@@ -247,24 +246,28 @@ impl NodeApi {
             .await?;
 
             let node = Node::new(
-                comm,
                 info.keypair.clone(),
                 network_knowledge,
                 None,
                 event_sender.clone(),
                 used_space.clone(),
                 root_storage_dir.to_path_buf(),
+                comm.socket_addr(),
             )
             .await?;
 
             info!("{} Joined the network!", node.info().await.name());
             info!("Our AGE: {}", node.info().await.age());
 
-            node
+            (node, comm)
         };
 
         let node = Arc::new(node);
-        let cmd_ctrl = CmdCtrl::new(Dispatcher::new(node.clone()), monitoring, event_sender);
+        let cmd_ctrl = CmdCtrl::new(
+            Dispatcher::new(node.clone(), comm),
+            monitoring,
+            event_sender,
+        );
         let flow_ctrl = FlowCtrl::new(cmd_ctrl, connection_event_rx);
         let api = Self { node, flow_ctrl };
 
@@ -288,7 +291,7 @@ impl NodeApi {
 
     /// Returns connection info of this node.
     pub async fn our_connection_info(&self) -> SocketAddr {
-        self.node.our_connection_info()
+        self.node.info().await.addr
     }
 
     /// Returns the Section Signed Chain

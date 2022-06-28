@@ -126,7 +126,7 @@ impl Node {
             wire_msg.set_dst_xorname(our_name);
 
             cmds.push(Cmd::HandleMsg {
-                sender: Peer::new(our_name, self.our_connection_info()),
+                sender: Peer::new(our_name, self.addr),
                 wire_msg,
                 original_bytes: None,
             });

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{delivery_group, Comm, Node};
+use super::{delivery_group, Node};
 
 use crate::node::{
     api::{cmds::Cmd, event_channel::EventSender},
@@ -29,28 +29,28 @@ use xor_name::XorName;
 impl Node {
     // Creates `Core` for the first node in the network
     pub(crate) async fn first_node(
-        comm: Comm,
         keypair: Arc<Keypair>,
         event_sender: EventSender,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
         genesis_sk_set: bls::SecretKeySet,
+        connection_info: SocketAddr,
     ) -> Result<Self> {
         let info = NodeInfo {
             keypair: keypair.clone(),
-            addr: comm.our_connection_info(),
+            addr: connection_info,
         };
 
         let (section, section_key_share) =
             NetworkKnowledge::first_node(info.peer(), genesis_sk_set).await?;
         Self::new(
-            comm,
             keypair.clone(),
             section,
             Some(section_key_share),
             event_sender,
             used_space,
             root_storage_dir,
+            connection_info,
         )
         .await
     }
@@ -88,10 +88,10 @@ impl Node {
         !self.is_elder().await
     }
 
-    /// Returns connection info of this node.
-    pub(crate) fn our_connection_info(&self) -> SocketAddr {
-        self.comm.our_connection_info()
-    }
+    // /// Returns connection info of this node.
+    // pub(crate) fn our_connection_info(&self) -> SocketAddr {
+    //     self.comm.our_connection_info()
+    // }
 
     /// Returns the current BLS public key set
     pub(crate) async fn public_key_set(&self) -> Result<bls::PublicKeySet> {

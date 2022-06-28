@@ -98,7 +98,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
             let new_node_comm = create_comm().await?;
             let new_node = NodeInfo::new(
                 ed25519::gen_keypair(&prefix1.range_inclusive(), MIN_ADULT_AGE),
-                new_node_comm.our_connection_info(),
+                new_node_comm.socket_addr(),
             );
 
             let wire_msg = WireMsg::single_src(

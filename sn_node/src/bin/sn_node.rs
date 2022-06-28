@@ -412,7 +412,7 @@ async fn run_node(config: Config) -> Result<()> {
 
     // This just keeps the node going as long as routing goes
     while let Some(event) = event_stream.next().await {
-        trace!("Node event! {}", event);
+        // trace!("Node event! {}", event);
         if let Event::Membership(MembershipEvent::ChurnJoinMissError) = event {
             return Err(NodeError::ChurnJoinMiss).map_err(ErrReport::msg);
         }

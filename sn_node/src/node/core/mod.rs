@@ -8,7 +8,6 @@
 
 mod api;
 mod bootstrap;
-mod comm;
 mod connectivity;
 mod data;
 mod delivery_group;
@@ -23,7 +22,6 @@ pub use self::data::DataStorage;
 use self::{data::Capacity, split_barrier::SplitBarrier};
 
 pub(crate) use bootstrap::{join_network, JoiningAsRelocated};
-pub(crate) use comm::{Comm, DeliveryStatus, MsgEvent};
 pub(crate) use data::MIN_LEVEL_WHEN_FULL;
 pub(crate) use monitoring::RateLimits;
 pub(crate) use proposal::Proposal;
@@ -66,6 +64,7 @@ use itertools::Itertools;
 use resource_proof::ResourceProof;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
+    net::SocketAddr,
     path::PathBuf,
     sync::Arc,
     time::Duration,
@@ -106,10 +105,10 @@ pub(crate) type AeBackoffCache =
 
 // Core state + logic of a node.
 pub(crate) struct Node {
+    addr: SocketAddr, // does this change? if so... when? only at node start atm?
     pub(super) event_sender: EventSender,
     pub(super) data_storage: DataStorage, // Adult only before cache
     pub(crate) keypair: Arc<RwLock<Arc<Keypair>>>,
-    pub(crate) comm: Comm,
     /// queue up all batch data to be replicated (as a result of churn events atm)
     // TODO: This can probably be reworked into the general per peer msg queue, but as
     // we need to pull data first before we form the WireMsg, we won't do that just now
@@ -118,7 +117,7 @@ pub(crate) struct Node {
     resource_proof: ResourceProof,
     // Network resources
     pub(crate) section_keys_provider: SectionKeysProvider,
-    network_knowledge: NetworkKnowledge,
+    pub(crate) network_knowledge: NetworkKnowledge,
     // Signature aggregators
     message_aggregator: SignatureAggregator,
     proposal_aggregator: SignatureAggregator,
@@ -134,7 +133,7 @@ pub(crate) struct Node {
     joins_allowed: Arc<RwLock<bool>>,
     // Trackers
     capacity: Capacity,
-    dysfunction_tracking: DysfunctionDetection,
+    pub(crate) dysfunction_tracking: DysfunctionDetection,
     pending_data_queries: Arc<Cache<OperationId, Arc<DashSet<Peer>>>>,
     // Caches
     ae_backoff_cache: AeBackoffCache,
@@ -144,13 +143,13 @@ impl Node {
     // Creates `Core` for a regular node.
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn new(
-        comm: Comm,
         keypair: Arc<Keypair>,
         network_knowledge: NetworkKnowledge,
         section_key_share: Option<SectionKeyShare>,
         event_sender: EventSender,
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
+        addr: SocketAddr,
     ) -> Result<Self> {
         let membership = if let Some(key) = section_key_share.clone() {
             let n_elders = network_knowledge
@@ -208,7 +207,7 @@ impl Node {
         };
 
         let node = Self {
-            comm,
+            addr,
             keypair: Arc::new(RwLock::new(keypair)),
             network_knowledge,
             section_keys_provider,
@@ -238,7 +237,7 @@ impl Node {
 
     pub(crate) async fn info(&self) -> NodeInfo {
         let keypair = self.keypair.read().await.clone();
-        let addr = self.comm.our_connection_info();
+        let addr = self.addr;
         NodeInfo { keypair, addr }
     }
 
@@ -290,13 +289,13 @@ impl Node {
             .await
     }
 
-    /// Removes any PeerLinks not from our section elders
-    pub(crate) async fn cleanup_non_elder_peers(&self) -> Result<()> {
-        let elders = self.network_knowledge.elders().await;
-        self.comm
-            .cleanup_peers(elders, self.dysfunction_tracking.clone())
-            .await
-    }
+    // /// Removes any PeerLinks not from our section elders
+    // pub(crate) async fn cleanup_non_elder_peers(&self) -> Result<()> {
+    //     let elders = self.network_knowledge.elders().await;
+    //     self.comm
+    //         .cleanup_peers(elders, self.dysfunction_tracking.clone())
+    //         .await
+    // }
 
     /// returns names that are relatively dysfunctional
     pub(crate) async fn get_dysfunctional_node_names(&self) -> Result<BTreeSet<XorName>> {
