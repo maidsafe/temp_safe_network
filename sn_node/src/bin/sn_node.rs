@@ -373,9 +373,10 @@ async fn run_node(config: Config) -> Result<()> {
         let mut rng = rand::thread_rng();
         let x: f64 = rng.gen_range(0.0..1.0);
 
+        let is_elder = node.is_elder().await;
         if !config.is_first() && x > 0.6 {
             println!(
-                "\n =========== [Chaos] (PID: {our_pid}): Startup chaos crash w/ x of: {} ============== \n",
+                "\n =========== [Chaos] (PID: {our_pid}): Startup chaos crash w/ x of: {}. Was elder?: {is_elder} ============== \n",
                 x
             );
 

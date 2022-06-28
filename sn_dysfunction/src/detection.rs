@@ -17,7 +17,7 @@ static RECENT_ISSUE_DURATION: Duration = Duration::from_secs(60 * 10); // 10 min
 static CONN_WEIGHTING: f32 = 3.0;
 static OP_WEIGHTING: f32 = 1.0;
 static KNOWLEDGE_WEIGHTING: f32 = 4.0;
-static DKG_WEIGHTING: f32 = 1.0;
+static DKG_WEIGHTING: f32 = 5.0;
 
 /// Z-score value above which a node is dysfunctional
 static DYSFUNCTIONAL_DEVIATION: f32 = 2.0;
@@ -393,10 +393,10 @@ mod tests {
                 generate_xorname(),
                 prop_oneof![
                     // 3 x as likely to have good nodes vs bad
-                    // good nodes fail only 10% of the time
-                    3 => Just(NodeQualityScored::Good(0.05)),
-                    // bad nodes fail 75% of the time
-                    1 => Just(NodeQualityScored::Bad(0.75)),
+                    // good nodes fail only 2.5% of the time
+                    3 => Just(NodeQualityScored::Good(0.025)),
+                    // bad nodes fail 90% of the time
+                    1 => Just(NodeQualityScored::Bad(0.90)),
 
                 ],
             ),
