@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1656399454861,
+  "lastUpdate": 1656403402600,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -6359,6 +6359,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 5207542287,
             "range": "± 18518911",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "davidrusu.me@gmail.com",
+            "name": "David Rusu",
+            "username": "davidrusu"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "5f085f3765ab3156c74a4b7a7d7ab63a3bf6a670",
+          "message": "refactor(move-comm-out-of-node): remove NodeInfo in Node struct\n\nNodeInfo store a copy of our current socket address, which is\navailable from `Comm`.\n\nThroughout our code we have to ask Comm for our current address and\nreplace the copy in NodeInfo with the address from Comm.\n\nNext changes will hopefully remove more of our reliance on Comm inside\nof Node.",
+          "timestamp": "2022-06-28T09:35:23+02:00",
+          "tree_id": "1b536b9b5669562217dc98d64b560eb05798846b",
+          "url": "https://github.com/maidsafe/safe_network/commit/5f085f3765ab3156c74a4b7a7d7ab63a3bf6a670"
+        },
+        "date": 1656403401127,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 5733057304,
+            "range": "± 86392378",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 5702613981,
+            "range": "± 124602596",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 5893575854,
+            "range": "± 9684519329",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 5014654144,
+            "range": "± 3852420",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 5032037208,
+            "range": "± 2042428",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 5195618218,
+            "range": "± 25069464",
             "unit": "ns/iter"
           }
         ]
