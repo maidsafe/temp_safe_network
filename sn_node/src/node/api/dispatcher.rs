@@ -173,6 +173,10 @@ impl Dispatcher {
                 }
                 Ok(vec![])
             }
+            Cmd::Comm(comm_cmd) => {
+                self.comm.handle_cmd(comm_cmd).await;
+                Ok(vec![])
+            }
         }
     }
 
