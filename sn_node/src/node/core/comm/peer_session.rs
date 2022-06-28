@@ -37,7 +37,7 @@ pub(crate) struct PeerSession {
     sent: MsgThroughput,
     attempted: MsgThroughput,
     peer_desired_rate: Arc<RwLock<f64>>, // msgs per s
-    disconnnected: Arc<RwLock<bool>>,
+    disconnected: Arc<RwLock<bool>>,
 }
 
 impl PeerSession {
@@ -48,7 +48,7 @@ impl PeerSession {
             sent: MsgThroughput::default(),
             attempted: MsgThroughput::default(),
             peer_desired_rate: Arc::new(RwLock::new(DEFAULT_DESIRED_RATE)),
-            disconnnected: Arc::new(RwLock::new(false)),
+            disconnected: Arc::new(RwLock::new(false)),
         };
 
         let session_clone = session.clone();
@@ -124,14 +124,14 @@ impl PeerSession {
     // NB that clones could still exist, however they would be in the disconnected state
     // if only accessing via session map (as intended)
     pub(crate) async fn disconnect(self) {
-        *self.disconnnected.write().await = true;
+        *self.disconnected.write().await = true;
         self.msg_queue.write().await.clear();
         self.link.disconnect().await;
     }
 
     // could be accessed via a clone
     async fn disconnected(&self) -> bool {
-        *self.disconnnected.read().await
+        *self.disconnected.read().await
     }
 
     #[instrument(skip_all)]

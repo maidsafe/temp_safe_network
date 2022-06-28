@@ -38,7 +38,7 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         let snapshot = self.state_snapshot().await;
 
-        let our_name = self.info.read().await.name();
+        let our_name = self.info().await.name();
         let signed_sap = SectionAuth {
             value: section_auth.clone(),
             sig: section_signed.clone(),
@@ -208,11 +208,11 @@ impl Node {
             value: section_auth.clone(),
             sig: section_signed.clone(),
         };
-        let our_name = self.info.read().await.name();
+        let our_name = self.info().await.name();
         let our_section_prefix = self.network_knowledge.prefix().await;
         let equal_prefix = section_auth.prefix() == our_section_prefix;
         let is_extension_prefix = section_auth.prefix().is_extension_of(&our_section_prefix);
-        let our_peer_info = self.info.read().await.peer();
+        let our_peer_info = self.info().await.peer();
 
         // Update our network knowledge
         let there_was_an_update = self
@@ -328,7 +328,7 @@ impl Node {
                         bounced_msg,
                     };
                     let wire_msg = WireMsg::single_src(
-                        &self.info.read().await.clone(),
+                        &self.info().await.clone(),
                         src_location.to_dst(),
                         ae_msg,
                         self.network_knowledge.section_key().await,
@@ -421,7 +421,7 @@ impl Node {
         };
 
         let wire_msg = WireMsg::single_src(
-            &self.info.read().await.clone(),
+            &self.info().await.clone(),
             src_location.to_dst(),
             ae_msg,
             self.network_knowledge.section_key().await,
@@ -453,7 +453,7 @@ impl Node {
         };
 
         let wire_msg = WireMsg::single_src(
-            &self.info.read().await.clone(),
+            &self.info().await.clone(),
             src_location.to_dst(),
             ae_msg,
             self.network_knowledge.section_key().await,
@@ -512,7 +512,7 @@ mod tests {
                     &our_prefix,
                     env.node.network_knowledge().section_key().await,
                 )?;
-                let sender = env.node.info.read().await.peer();
+                let sender = env.node.info().await.peer();
                 let dst_name = our_prefix.substituted_in(xor_name::rand::random());
                 let dst_section_key = env.node.network_knowledge().section_key().await;
 
@@ -593,7 +593,7 @@ mod tests {
             let other_pk = other_sk.public_key();
 
             let (msg, src_location) = env.create_msg(&env.other_sap.prefix(), other_pk)?;
-            let sender = env.node.info.read().await.peer();
+            let sender = env.node.info().await.peer();
 
             // since it's not aware of the other prefix, it will redirect to self
             let dst_section_key = other_pk;
@@ -629,7 +629,7 @@ mod tests {
                         env.other_sap.clone(),
                         &env.proof_chain,
                         None,
-                        &env.node.info.read().await.name(),
+                        &env.node.info().await.name(),
                         &env.node.section_keys_provider
                     )
                     .await?
@@ -679,7 +679,7 @@ mod tests {
                 &our_prefix,
                 env.node.network_knowledge().section_key().await,
             )?;
-            let sender = env.node.info.read().await.peer();
+            let sender = env.node.info().await.peer();
             let dst_name = our_prefix.substituted_in(xor_name::rand::random());
             let dst_section_key = env.node.network_knowledge().genesis_key();
 
@@ -725,7 +725,7 @@ mod tests {
            &our_prefix,
            env.node.network_knowledge().section_key().await,
        )?;
-       let sender = env.node.info.read().await.peer();
+       let sender = env.node.info().await.peer();
        let dst_name = our_prefix.substituted_in(xor_name::rand::random());
 
        let bogus_env = Env::new().await?;
@@ -784,7 +784,7 @@ mod tests {
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let mut node = Node::first_node(
                 create_comm().await?,
-                info.clone(),
+                info.keypair.clone(),
                 event_channel::new(1).0,
                 UsedSpace::new(max_capacity),
                 root_storage_dir,

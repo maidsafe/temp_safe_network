@@ -53,7 +53,7 @@ impl Dispatcher {
             Cmd::SignOutgoingSystemMsg { msg, dst } => {
                 let src_section_pk = self.node.network_knowledge().section_key().await;
                 let wire_msg =
-                    WireMsg::single_src(&*self.node.info.read().await, dst, msg, src_section_pk)?;
+                    WireMsg::single_src(&self.node.info().await, dst, msg, src_section_pk)?;
 
                 let mut cmds = vec![];
                 cmds.extend(self.node.send_msg_to_nodes(wire_msg).await?);

@@ -285,19 +285,15 @@ impl Node {
         // we create a dummy/random dst location,
         // we will set it correctly for each msg and target
         let section_pk = self.network_knowledge().section_key().await;
-        let our_name = self.info.read().await.name();
+        let our_name = self.info().await.name();
         let dummy_dst_location = DstLocation::Node {
             name: our_name,
             section_pk,
         };
 
         // separate this into form_wire_msg based on agg
-        let wire_msg = WireMsg::single_src(
-            &self.info.read().await.clone(),
-            dummy_dst_location,
-            msg,
-            section_pk,
-        )?;
+        let wire_msg =
+            WireMsg::single_src(&self.info().await, dummy_dst_location, msg, section_pk)?;
 
         let mut cmds = vec![];
 
