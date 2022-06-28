@@ -146,6 +146,8 @@ pub(crate) enum Cmd {
     StartConnectivityTest(XorName),
     /// Test Connectivity
     TestConnectivity(XorName),
+    /// Comm Commands
+    Comm(crate::comm::Cmd),
 }
 
 impl Cmd {
@@ -176,6 +178,7 @@ impl Cmd {
             SendMsgDeliveryGroup { wire_msg, .. } => wire_msg.priority(),
 
             CleanupPeerLinks => -10,
+            Comm(_) => 10,
         }
     }
 }
@@ -239,6 +242,7 @@ impl fmt::Display for Cmd {
             Cmd::ProposeOffline(_) => write!(f, "ProposeOffline"),
             Cmd::StartConnectivityTest(_) => write!(f, "StartConnectivityTest"),
             Cmd::TestConnectivity(_) => write!(f, "TestConnectivity"),
+            Cmd::Comm(comm) => write!(f, "Comm({:?})", comm),
         }
     }
 }
