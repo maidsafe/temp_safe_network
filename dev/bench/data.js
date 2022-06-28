@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1656403402600,
+  "lastUpdate": 1656417018656,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -6419,6 +6419,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 5195618218,
             "range": "± 25069464",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bzeeman@live.nl",
+            "name": "Benno Zeeman",
+            "username": "b-zee"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "4e04a2b0acc79140bf1d0aefd82c0ad5b046a3cd",
+          "message": "chore(misc): remove unused asyncs (clippy)\n\nUpon removing async keywords from\nsn_interface/src/network_knowledge/mod.rs a lot of removal propagated up\nand removed most of it with help of Clippy. Clippy does not yet detect\nunnecessary async in methods\n(https://github.com/rust-lang/rust-clippy/issues/9024), but will soon.\n\nWith the help of a new Clippy lint:\ncargo clippy --all-targets --all-features -- -W clippy::unused_async\nAnd automatically fixing code with:\ncargo fix --broken-code --allow-dirty --all-targets --all-features\n\nResults mostly from the single thread work of @joshuef in #1253 (and\nongoing efforts).",
+          "timestamp": "2022-06-28T13:20:12+02:00",
+          "tree_id": "dd119b08110646f3346bc3059af7755c776afab6",
+          "url": "https://github.com/maidsafe/safe_network/commit/4e04a2b0acc79140bf1d0aefd82c0ad5b046a3cd"
+        },
+        "date": 1656417017446,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 5541416716,
+            "range": "± 130166552",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 5815036903,
+            "range": "± 135845250",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 5967578884,
+            "range": "± 12149731174",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 5013313609,
+            "range": "± 123644755",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 5036106405,
+            "range": "± 3396666",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 5233251979,
+            "range": "± 22395098",
             "unit": "ns/iter"
           }
         ]
