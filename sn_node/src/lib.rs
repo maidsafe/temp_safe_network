@@ -41,6 +41,8 @@
 #[macro_use]
 extern crate tracing;
 
+mod comm;
+
 mod dbs;
 
 pub use dbs::UsedSpace;

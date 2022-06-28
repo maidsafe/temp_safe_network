@@ -51,7 +51,7 @@ pub(crate) struct CmdCtrl {
     attempted: MsgThroughput,
     monitoring: RateLimits,
     stopped: Arc<RwLock<bool>>,
-    dispatcher: Dispatcher,
+    pub(crate) dispatcher: Arc<Dispatcher>,
     id_counter: Arc<AtomicU64>,
     event_sender: EventSender,
 }
@@ -67,7 +67,7 @@ impl CmdCtrl {
             attempted: MsgThroughput::default(),
             monitoring,
             stopped: Arc::new(RwLock::new(false)),
-            dispatcher,
+            dispatcher: Arc::new(dispatcher),
             id_counter: Arc::new(AtomicU64::new(0)),
             event_sender,
         };
@@ -160,7 +160,6 @@ impl CmdCtrl {
                 if enqueued.retries >= MAX_RETRIES {
                     // break this loop, report error to other nodes
                     // await decision on how to continue
-
                     // (or send event on a channel (to report error to other nodes), then sleep for a very long time, then try again?)
 
                     enqueued
