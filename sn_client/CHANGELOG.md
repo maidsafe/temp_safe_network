@@ -1113,23 +1113,27 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
-## v0.66.5 (2022-06-24)
+## v0.67.1 (2022-06-28)
 
-### Chore
+### New Features
 
- - <csr-id-d7a831329ad600ad7b5a1b6b68841f96b8ef8cfa/> misc cleanup and fixes
+ - <csr-id-44b93fde435214b363c009e555a2579bb3404e75/> use node's section_key and own key for register
+ - <csr-id-6bfd101ed12a16f3f6a9a0b55252d45d200af7c6/> Select which adult to query
+   Let the client pick the adult to query, based on the XOR distance.
 
 ### Refactor
 
- - <csr-id-1fbc762305a581680b52e2cbdaa7aea2feaf05ab/> move it to its own file
+ - <csr-id-8c69306dc86a99a8be443ab8213253983540f1cf/> Rename DataQuery with suffix Variant
+   A new structure with the name DataQuery will be introduced that has common data for all these
+   variants.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 4 commits contributed to the release over the course of 2 calendar days.
- - 2 days passed between releases.
- - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 3 commits contributed to the release.
+ - 1 day passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1139,6 +1143,50 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - use node's section_key and own key for register ([`44b93fd`](https://github.com/maidsafe/safe_network/commit/44b93fde435214b363c009e555a2579bb3404e75))
+    - Select which adult to query ([`6bfd101`](https://github.com/maidsafe/safe_network/commit/6bfd101ed12a16f3f6a9a0b55252d45d200af7c6))
+    - Rename DataQuery with suffix Variant ([`8c69306`](https://github.com/maidsafe/safe_network/commit/8c69306dc86a99a8be443ab8213253983540f1cf))
+</details>
+
+## v0.66.5 (2022-06-24)
+
+<csr-id-d7a831329ad600ad7b5a1b6b68841f96b8ef8cfa/>
+<csr-id-1fbc762305a581680b52e2cbdaa7aea2feaf05ab/>
+
+### Chore
+
+ - <csr-id-d7a831329ad600ad7b5a1b6b68841f96b8ef8cfa/> misc cleanup and fixes
+
+### Test
+
+ - <csr-id-bee6968f85734b2202597d3f8e802eabe8d0c931/> make the measurement of client bench test more accurate
+
+### Chore
+
+ - <csr-id-dc69a62eec590b2d621ab2cbc3009cb052955e66/> sn_interface-0.6.5/sn_dysfunction-0.5.3/sn_client-0.66.5/sn_node-0.62.8/sn_cli-0.57.6
+
+### Refactor
+
+ - <csr-id-1fbc762305a581680b52e2cbdaa7aea2feaf05ab/> move it to its own file
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release over the course of 2 calendar days.
+ - 3 days passed between releases.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.6.5/sn_dysfunction-0.5.3/sn_client-0.66.5/sn_node-0.62.8/sn_cli-0.57.6 ([`dc69a62`](https://github.com/maidsafe/safe_network/commit/dc69a62eec590b2d621ab2cbc3009cb052955e66))
+    - make the measurement of client bench test more accurate ([`bee6968`](https://github.com/maidsafe/safe_network/commit/bee6968f85734b2202597d3f8e802eabe8d0c931))
     - misc cleanup and fixes ([`d7a8313`](https://github.com/maidsafe/safe_network/commit/d7a831329ad600ad7b5a1b6b68841f96b8ef8cfa))
     - Merge #1255 #1258 ([`ed0b5d8`](https://github.com/maidsafe/safe_network/commit/ed0b5d890e8404a59c25f8131eab5d23ce12eb7d))
     - Merge #1257 #1260 ([`19d89df`](https://github.com/maidsafe/safe_network/commit/19d89dfbbf8ac8ab2b08380ce9b4bed58a5dc0d9))
@@ -1149,6 +1197,7 @@ needed, as they keypair itself contains the Arcs we need.
 
 <csr-id-d204cffdc25a08f604f3a7b97dd74c0f4181b696/>
 <csr-id-c038635cf88d32c52da89d11a8532e6c91c8bf38/>
+<csr-id-d526e0a32d3f09a788899d82db4fe6f13258568c/>
 
 ### Chore
 
@@ -1312,6 +1361,36 @@ needed, as they keypair itself contains the Arcs we need.
     - Merge branch 'main' into Gabriel_Spentbook_PR1143 ([`0eda02a`](https://github.com/maidsafe/safe_network/commit/0eda02ac126be4f088af6bf9e7247c8496a389ba))
     - first version of Spentbook messaging, storage, and client API ([`dbda86b`](https://github.com/maidsafe/safe_network/commit/dbda86be03f912079776be514828ff5fd034830c))
     - Merge #1217 ([`2f26043`](https://github.com/maidsafe/safe_network/commit/2f2604325d533357bad7d917315cf4cba0b2d3c0))
+</details>
+
+## v0.67.0 (2022-06-26)
+
+### Chore
+
+ - <csr-id-243cfc48a7f4a9b60b5b7f1fdd609c02197aba5e/> sn_interface-0.7.0/sn_dysfunction-0.6.0/sn_client-0.67.0/sn_node-0.63.0/sn_api-0.65.0/sn_cli-0.58.0
+ - <csr-id-c85dc4c7a07d2f5343490328c593cceb0f50c6aa/> more tweaks to benchmarks for clippy
+ - <csr-id-697947510688c114699b5317f219ef625c29c6d1/> fix &Vec -> &[] clippy warning
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 4 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.7.0/sn_dysfunction-0.6.0/sn_client-0.67.0/sn_node-0.63.0/sn_api-0.65.0/sn_cli-0.58.0 ([`243cfc4`](https://github.com/maidsafe/safe_network/commit/243cfc48a7f4a9b60b5b7f1fdd609c02197aba5e))
+    - more tweaks to benchmarks for clippy ([`c85dc4c`](https://github.com/maidsafe/safe_network/commit/c85dc4c7a07d2f5343490328c593cceb0f50c6aa))
+    - fix &Vec -> &[] clippy warning ([`6979475`](https://github.com/maidsafe/safe_network/commit/697947510688c114699b5317f219ef625c29c6d1))
+    - Merge #1268 ([`e9adc0d`](https://github.com/maidsafe/safe_network/commit/e9adc0d3ba2f33fe0b4590a5fe11fea56bd4bda9))
 </details>
 
 ## v0.66.0 (2022-06-05)

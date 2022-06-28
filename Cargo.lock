@@ -3446,7 +3446,7 @@ dependencies = [
 
 [[package]]
 name = "sn_client"
-version = "0.67.0"
+version = "0.67.1"
 dependencies = [
  "backoff 0.4.0",
  "base64",
@@ -3555,7 +3555,7 @@ dependencies = [
 
 [[package]]
 name = "sn_dysfunction"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "dashmap",
  "eyre",
@@ -3572,7 +3572,7 @@ dependencies = [
 
 [[package]]
 name = "sn_interface"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "backoff 0.4.0",
  "base64",
@@ -3644,7 +3644,7 @@ dependencies = [
 
 [[package]]
 name = "sn_node"
-version = "0.63.0"
+version = "0.63.1"
 dependencies = [
  "assert_matches",
  "backoff 0.4.0",

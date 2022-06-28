@@ -6,11 +6,59 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## v0.7.1 (2022-06-28)
+
+### New Features
+
+ - <csr-id-6bfd101ed12a16f3f6a9a0b55252d45d200af7c6/> Select which adult to query
+   Let the client pick the adult to query, based on the XOR distance.
+
+### Bug Fixes
+
+ - <csr-id-752824774884ef77616d26734517c58530cdae1f/> resend last vote if nothing received after an interval.
+   We were seeing stalled membership, perhaps due to dropped packages. This means we don't rest
+   and if after an interval we haven't seen anything new, we trigger nodes to resend their votes out, which
+   should hopefully complete the current gen
+
+### Refactor
+
+ - <csr-id-8c69306dc86a99a8be443ab8213253983540f1cf/> Rename DataQuery with suffix Variant
+   A new structure with the name DataQuery will be introduced that has common data for all these
+   variants.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release.
+ - 1 day passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - resend last vote if nothing received after an interval. ([`7528247`](https://github.com/maidsafe/safe_network/commit/752824774884ef77616d26734517c58530cdae1f))
+    - Select which adult to query ([`6bfd101`](https://github.com/maidsafe/safe_network/commit/6bfd101ed12a16f3f6a9a0b55252d45d200af7c6))
+    - Rename DataQuery with suffix Variant ([`8c69306`](https://github.com/maidsafe/safe_network/commit/8c69306dc86a99a8be443ab8213253983540f1cf))
+</details>
+
 ## v0.6.5 (2022-06-24)
+
+<csr-id-d7a831329ad600ad7b5a1b6b68841f96b8ef8cfa/>
+<csr-id-1fbc762305a581680b52e2cbdaa7aea2feaf05ab/>
 
 ### Chore
 
  - <csr-id-d7a831329ad600ad7b5a1b6b68841f96b8ef8cfa/> misc cleanup and fixes
+
+### Chore
+
+ - <csr-id-dc69a62eec590b2d621ab2cbc3009cb052955e66/> sn_interface-0.6.5/sn_dysfunction-0.5.3/sn_client-0.66.5/sn_node-0.62.8/sn_cli-0.57.6
 
 ### New Features
 
@@ -24,9 +72,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 6 commits contributed to the release over the course of 2 calendar days.
- - 2 days passed between releases.
- - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 7 commits contributed to the release over the course of 3 calendar days.
+ - 3 days passed between releases.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -36,6 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.6.5/sn_dysfunction-0.5.3/sn_client-0.66.5/sn_node-0.62.8/sn_cli-0.57.6 ([`dc69a62`](https://github.com/maidsafe/safe_network/commit/dc69a62eec590b2d621ab2cbc3009cb052955e66))
     - misc cleanup and fixes ([`d7a8313`](https://github.com/maidsafe/safe_network/commit/d7a831329ad600ad7b5a1b6b68841f96b8ef8cfa))
     - organize internal work ([`71eb46e`](https://github.com/maidsafe/safe_network/commit/71eb46e47032074cdca678783e815b8d55ae39a0))
     - Merge #1255 #1258 ([`ed0b5d8`](https://github.com/maidsafe/safe_network/commit/ed0b5d890e8404a59c25f8131eab5d23ce12eb7d))
@@ -50,6 +99,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-fd7f845f7d1534cf9ff93ee9dc9f3009ab7e5664/>
 <csr-id-d204cffdc25a08f604f3a7b97dd74c0f4181b696/>
 <csr-id-c038635cf88d32c52da89d11a8532e6c91c8bf38/>
+<csr-id-d26d26df6ddd0321555fa3653be966fe91e2dca4/>
+<csr-id-d526e0a32d3f09a788899d82db4fe6f13258568c/>
 
 ### Chore
 
@@ -226,6 +277,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - address some review comments ([`2429978`](https://github.com/maidsafe/safe_network/commit/24299786ba730e467c10946c8c152936b96148f8))
     - first version of Spentbook messaging, storage, and client API ([`dbda86b`](https://github.com/maidsafe/safe_network/commit/dbda86be03f912079776be514828ff5fd034830c))
     - Merge #1217 ([`2f26043`](https://github.com/maidsafe/safe_network/commit/2f2604325d533357bad7d917315cf4cba0b2d3c0))
+</details>
+
+## v0.7.0 (2022-06-26)
+
+### Chore
+
+ - <csr-id-243cfc48a7f4a9b60b5b7f1fdd609c02197aba5e/> sn_interface-0.7.0/sn_dysfunction-0.6.0/sn_client-0.67.0/sn_node-0.63.0/sn_api-0.65.0/sn_cli-0.58.0
+ - <csr-id-3f3c39a14987910bb424df51f89d948333ca3e87/> changes based on review feedback
+   * Prefer `map_err` in various places rather than a full `match`.
+   * Change key serialization utility functions to static rather than instance.
+   * Change `dog` command to print non-support of `SafeKey` data type rather than panic.
+   * Remove unnecessary clone on `public_key_hex`.
+   * Remove unnecessary match in various tests.
+   * Ignore wallet CLI tests that deleted the credentials file. They are problematic when running in
+     parallel with other tests. We need better isolated testing mechanisms for these. Will address in a
+     separate PR.
+   * Use different deposit names in wallet tests where multiple DBCs are deposited.
+ - <csr-id-5ea4c3d60bf84384ed37b5dde25ac4dc26147c24/> changes based on review feedback
+   * Prefer `map_err` in various places rather than a full `match`.
+   * Change key serialization utility functions to static rather than instance.
+   * Change `dog` command to print non-support of `SafeKey` data type rather than panic.
+   * Remove unnecessary clone on `public_key_hex`.
+   * Remove unnecessary match in various tests.
+   * Ignore wallet CLI tests that deleted the credentials file. They are problematic when running in
+     parallel with other tests. We need better isolated testing mechanisms for these. Will address in a
+     separate PR.
+   * Use different deposit names in wallet tests where multiple DBCs are deposited.
+
+### New Features (BREAKING)
+
+ - <csr-id-5577695b5d3291c46cd475df8c0933a067b4cfc5/> serialize to bls keys in util functions
+   Utility functions were recently added to the API for serializing to the `Keypair` type. This was
+   changed to serialize directly to BLS to make it easier for the CLI to deal directly with BLS keys.
+   Soon we will be refactoring the `Keypair` type to have a different use case and things like
+   `sn_client` would be refactored to directly work with BLS keys. This is a little step in that
+   direction.
+   
+   There was a utility function added to `sn_interface` to create a `Keypair` from a hex-based BLS key
+   because we still need to use the `Keypair` at this point in time.
+ - <csr-id-67006eb2e84b750a6b9b03d04aafdcfc85b38955/> serialize to bls keys in util functions
+   Utility functions were recently added to the API for serializing to the `Keypair` type. This was
+   changed to serialize directly to BLS to make it easier for the CLI to deal directly with BLS keys.
+   Soon we will be refactoring the `Keypair` type to have a different use case and things like
+   `sn_client` would be refactored to directly work with BLS keys. This is a little step in that
+   direction.
+   
+   There was a utility function added to `sn_interface` to create a `Keypair` from a hex-based BLS key
+   because we still need to use the `Keypair` at this point in time.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 6 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.7.0/sn_dysfunction-0.6.0/sn_client-0.67.0/sn_node-0.63.0/sn_api-0.65.0/sn_cli-0.58.0 ([`243cfc4`](https://github.com/maidsafe/safe_network/commit/243cfc48a7f4a9b60b5b7f1fdd609c02197aba5e))
+    - changes based on review feedback ([`3f3c39a`](https://github.com/maidsafe/safe_network/commit/3f3c39a14987910bb424df51f89d948333ca3e87))
+    - serialize to bls keys in util functions ([`5577695`](https://github.com/maidsafe/safe_network/commit/5577695b5d3291c46cd475df8c0933a067b4cfc5))
+    - changes based on review feedback ([`5ea4c3d`](https://github.com/maidsafe/safe_network/commit/5ea4c3d60bf84384ed37b5dde25ac4dc26147c24))
+    - serialize to bls keys in util functions ([`67006eb`](https://github.com/maidsafe/safe_network/commit/67006eb2e84b750a6b9b03d04aafdcfc85b38955))
+    - Merge #1268 ([`e9adc0d`](https://github.com/maidsafe/safe_network/commit/e9adc0d3ba2f33fe0b4590a5fe11fea56bd4bda9))
 </details>
 
 ## v0.6.0 (2022-06-05)

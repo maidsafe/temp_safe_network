@@ -5,14 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.63.0 (2022-06-26)
+## v0.63.1 (2022-06-28)
+
+### Chore
+
+ - <csr-id-b5b833a18b2b0ec9a5083036ccb4c068be3f1d7b/> only log vote time if fresh vote
+
+### New Features
+
+ - <csr-id-44b93fde435214b363c009e555a2579bb3404e75/> use node's section_key and own key for register
+ - <csr-id-6bfd101ed12a16f3f6a9a0b55252d45d200af7c6/> Select which adult to query
+   Let the client pick the adult to query, based on the XOR distance.
+
+### Bug Fixes
+
+ - <csr-id-752824774884ef77616d26734517c58530cdae1f/> resend last vote if nothing received after an interval.
+   We were seeing stalled membership, perhaps due to dropped packages. This means we don't rest
+   and if after an interval we haven't seen anything new, we trigger nodes to resend their votes out, which
+   should hopefully complete the current gen
+
+### Refactor
+
+ - <csr-id-8c69306dc86a99a8be443ab8213253983540f1cf/> Rename DataQuery with suffix Variant
+   A new structure with the name DataQuery will be introduced that has common data for all these
+   variants.
+
+### Test
+
+ - <csr-id-eebbc30f5dd449b786115c37813a4554309875e0/> adding new dysf test for DKG rounds
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 1 commit contributed to the release.
- - 0 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 6 commits contributed to the release.
+ - 1 day passed between releases.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -22,6 +50,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - use node's section_key and own key for register ([`44b93fd`](https://github.com/maidsafe/safe_network/commit/44b93fde435214b363c009e555a2579bb3404e75))
+    - only log vote time if fresh vote ([`b5b833a`](https://github.com/maidsafe/safe_network/commit/b5b833a18b2b0ec9a5083036ccb4c068be3f1d7b))
+    - resend last vote if nothing received after an interval. ([`7528247`](https://github.com/maidsafe/safe_network/commit/752824774884ef77616d26734517c58530cdae1f))
+    - Select which adult to query ([`6bfd101`](https://github.com/maidsafe/safe_network/commit/6bfd101ed12a16f3f6a9a0b55252d45d200af7c6))
+    - Rename DataQuery with suffix Variant ([`8c69306`](https://github.com/maidsafe/safe_network/commit/8c69306dc86a99a8be443ab8213253983540f1cf))
+    - adding new dysf test for DKG rounds ([`eebbc30`](https://github.com/maidsafe/safe_network/commit/eebbc30f5dd449b786115c37813a4554309875e0))
+</details>
+
+## v0.63.0 (2022-06-26)
+
+### Chore
+
+ - <csr-id-243cfc48a7f4a9b60b5b7f1fdd609c02197aba5e/> sn_interface-0.7.0/sn_dysfunction-0.6.0/sn_client-0.67.0/sn_node-0.63.0/sn_api-0.65.0/sn_cli-0.58.0
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.7.0/sn_dysfunction-0.6.0/sn_client-0.67.0/sn_node-0.63.0/sn_api-0.65.0/sn_cli-0.58.0 ([`243cfc4`](https://github.com/maidsafe/safe_network/commit/243cfc48a7f4a9b60b5b7f1fdd609c02197aba5e))
     - Merge #1268 ([`e9adc0d`](https://github.com/maidsafe/safe_network/commit/e9adc0d3ba2f33fe0b4590a5fe11fea56bd4bda9))
 </details>
 
@@ -32,6 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-024ddf06fc517935f1a55af42b2aa1707a05f2e8/>
 <csr-id-0a46f508d22141eb06717012fc4cc0b37c7f025f/>
 <csr-id-1fbc762305a581680b52e2cbdaa7aea2feaf05ab/>
+<csr-id-dc69a62eec590b2d621ab2cbc3009cb052955e66/>
 
 ### Chore
 
