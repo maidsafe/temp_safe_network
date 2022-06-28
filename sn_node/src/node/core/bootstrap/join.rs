@@ -7,12 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{read_prefix_map_from_disk, UsedRecipientSaps};
+use crate::comm::{Comm, DeliveryStatus, MsgEvent};
 
-use crate::node::{
-    core::{Comm, DeliveryStatus, MsgEvent},
-    messages::WireMsgUtils,
-    Error, Result,
-};
+use crate::node::{messages::WireMsgUtils, Error, Result};
 
 use sn_interface::{
     messaging::{

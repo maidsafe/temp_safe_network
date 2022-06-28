@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{delivery_group, Comm, Node};
+use super::{delivery_group, Node};
 
 use crate::node::{
     api::{cmds::Cmd, event_channel::EventSender},
@@ -29,7 +29,7 @@ use xor_name::XorName;
 impl Node {
     // Creates `Core` for the first node in the network
     pub(crate) async fn first_node(
-        comm: Comm,
+        our_addr: SocketAddr,
         keypair: Arc<Keypair>,
         event_sender: EventSender,
         used_space: UsedSpace,
@@ -38,13 +38,13 @@ impl Node {
     ) -> Result<Self> {
         let info = NodeInfo {
             keypair: keypair.clone(),
-            addr: comm.our_connection_info(),
+            addr: our_addr,
         };
 
         let (section, section_key_share) =
             NetworkKnowledge::first_node(info.peer(), genesis_sk_set).await?;
         Self::new(
-            comm,
+            our_addr,
             keypair.clone(),
             section,
             Some(section_key_share),
@@ -84,11 +84,6 @@ impl Node {
 
     pub(crate) async fn is_not_elder(&self) -> bool {
         !self.is_elder().await
-    }
-
-    /// Returns connection info of this node.
-    pub(crate) fn our_connection_info(&self) -> SocketAddr {
-        self.comm.our_connection_info()
     }
 
     /// Returns the current BLS public key set

@@ -9,13 +9,8 @@
 mod cmd_ctrl;
 
 pub(crate) use self::cmd_ctrl::CmdCtrl;
-
-use crate::node::{
-    api::cmds::Cmd,
-    core::{MsgEvent, Node},
-    messages::WireMsgUtils,
-    Error, Result,
-};
+use crate::comm::MsgEvent;
+use crate::node::{api::cmds::Cmd, core::Node, messages::WireMsgUtils, Error, Result};
 
 use sn_interface::{
     messaging::{
@@ -360,7 +355,9 @@ impl FlowCtrl {
                 let members = node.network_knowledge().section_members();
                 let section_pk = node.network_knowledge().section_key();
 
-                if let Some(load_report) = node.comm.tolerated_msgs_per_s().await {
+                if let Some(load_report) =
+                    self.cmd_ctrl.dispatcher.comm().tolerated_msgs_per_s().await
+                {
                     trace!("New BackPressure report to disseminate: {:?}", load_report);
 
                     // TODO: use comms to send report to anyone connected? (can we ID end users there?)

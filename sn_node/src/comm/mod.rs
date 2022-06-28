@@ -23,9 +23,10 @@ use self::{
 };
 
 use crate::node::{
-    core::{comm::peer_session::SendStatus, RateLimits},
+    core::RateLimits,
     error::{Error, Result},
 };
+use peer_session::SendStatus;
 
 use sn_dysfunction::DysfunctionDetection;
 use sn_interface::{messaging::WireMsg, types::Peer};
@@ -35,7 +36,10 @@ use dashmap::DashMap;
 use futures::stream::{FuturesUnordered, StreamExt};
 use qp2p::{Endpoint, IncomingConnections};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
-use tokio::{sync::mpsc, task};
+use tokio::{
+    sync::mpsc::{self, Receiver, Sender},
+    task,
+};
 
 // Communication component of the node to interact with other nodes.
 #[derive(Clone)]
@@ -53,14 +57,19 @@ impl Comm {
         local_addr: SocketAddr,
         config: qp2p::Config,
         monitoring: RateLimits,
-        receive_msg: mpsc::Sender<MsgEvent>,
+        incoming_msg_pipe: Sender<MsgEvent>,
     ) -> Result<Self> {
         // Doesn't bootstrap, just creates an endpoint to listen to
         // the incoming messages from other nodes.
         let (our_endpoint, incoming_connections, _) =
             Endpoint::new_peer(local_addr, Default::default(), config).await?;
 
-        let (comm, _) = setup_comms(our_endpoint, incoming_connections, monitoring, receive_msg);
+        let (comm, _) = setup_comms(
+            our_endpoint,
+            incoming_connections,
+            monitoring,
+            incoming_msg_pipe,
+        );
 
         Ok(comm)
     }
@@ -71,15 +80,19 @@ impl Comm {
         bootstrap_nodes: &[SocketAddr],
         config: qp2p::Config,
         monitoring: RateLimits,
-        receive_msg: mpsc::Sender<MsgEvent>,
+        incoming_msg_pipe: Sender<MsgEvent>,
     ) -> Result<(Self, SocketAddr)> {
         debug!("Starting bootstrap process with bootstrap nodes: {bootstrap_nodes:?}");
         // Bootstrap to the network returning the connection to a node.
         let (our_endpoint, incoming_connections, bootstrap_node) =
             Endpoint::new_peer(local_addr, bootstrap_nodes, config).await?;
 
-        let (comm, msg_listener) =
-            setup_comms(our_endpoint, incoming_connections, monitoring, receive_msg);
+        let (comm, msg_listener) = setup_comms(
+            our_endpoint,
+            incoming_connections,
+            monitoring,
+            incoming_msg_pipe,
+        );
 
         let (connection, incoming_msgs) = bootstrap_node.ok_or(Error::BootstrapFailed)?;
         let remote_address = connection.remote_address();
@@ -89,7 +102,7 @@ impl Comm {
         Ok((comm, remote_address))
     }
 
-    pub(crate) fn our_connection_info(&self) -> SocketAddr {
+    pub(crate) fn socket_addr(&self) -> SocketAddr {
         self.our_endpoint.public_addr()
     }
 
@@ -454,7 +467,6 @@ impl Comm {
         if let Some(entry) = self.sessions.get(peer) {
             return entry.value().clone();
         }
-
         let link = Link::new(*peer, self.our_endpoint.clone(), self.msg_listener.clone());
         let session = PeerSession::new(link);
         let _ = self.sessions.insert(*peer, session.clone());
@@ -517,11 +529,11 @@ fn setup_comms(
     our_endpoint: Endpoint,
     incoming_connections: IncomingConnections,
     monitoring: RateLimits,
-    receive_msg: mpsc::Sender<MsgEvent>,
+    incoming_msg_pipe: Sender<MsgEvent>,
 ) -> (Comm, MsgListener) {
-    let (comm, msg_listener) = setup(our_endpoint, monitoring, receive_msg);
+    let (comm, msg_listener) = setup(our_endpoint, monitoring, incoming_msg_pipe);
 
-    listen(msg_listener.clone(), incoming_connections);
+    listen_for_incoming_msgs(msg_listener.clone(), incoming_connections);
 
     (comm, msg_listener)
 }
@@ -531,7 +543,7 @@ fn setup(
     our_endpoint: Endpoint,
     #[cfg(feature = "back-pressure")] monitoring: RateLimits,
     #[cfg(not(feature = "back-pressure"))] _monitoring: RateLimits,
-    receive_msg: mpsc::Sender<MsgEvent>,
+    receive_msg: Sender<MsgEvent>,
 ) -> (Comm, MsgListener) {
     #[cfg(feature = "back-pressure")]
     let back_pressure = BackPressure::new(monitoring);
@@ -560,7 +572,7 @@ fn setup(
 
 #[tracing::instrument(skip_all)]
 #[cfg(feature = "back-pressure")]
-async fn count_msgs(back_pressure: BackPressure, mut msg_counter: mpsc::Receiver<()>) {
+async fn count_msgs(back_pressure: BackPressure, mut msg_counter: Receiver<()>) {
     debug!("Entered msg counting listener loop.");
     while let Some(()) = msg_counter.recv().await {
         back_pressure.count_msg().await;
@@ -569,14 +581,17 @@ async fn count_msgs(back_pressure: BackPressure, mut msg_counter: mpsc::Receiver
 }
 
 #[tracing::instrument(skip_all)]
-async fn receive_conns(comm: Comm, mut conn_receiver: mpsc::Receiver<ListenerEvent>) {
+async fn receive_conns(comm: Comm, mut conn_receiver: Receiver<ListenerEvent>) {
     while let Some(ListenerEvent::Connected { peer, connection }) = conn_receiver.recv().await {
         comm.add_incoming(&peer, connection).await;
     }
 }
 
 #[tracing::instrument(skip_all)]
-fn listen(msg_listener: MsgListener, mut incoming_connections: IncomingConnections) {
+fn listen_for_incoming_msgs(
+    msg_listener: MsgListener,
+    mut incoming_connections: IncomingConnections,
+) {
     let _ = task::spawn_local(async move {
         while let Some((connection, incoming_msgs)) = incoming_connections.next().await {
             trace!(
@@ -919,7 +934,7 @@ mod tests {
                 let comm0 =
                     Comm::first_node(local_addr(), Config::default(), RateLimits::new(), tx)
                         .await?;
-                let addr0 = comm0.our_connection_info();
+                let addr0 = comm0.socket_addr();
 
                 let (tx, _rx) = mpsc::channel(1);
                 let comm1 =
@@ -973,7 +988,7 @@ mod tests {
         Ok(wire_msg)
     }
 
-    async fn new_peer() -> Result<(Peer, mpsc::Receiver<Bytes>)> {
+    async fn new_peer() -> Result<(Peer, Receiver<Bytes>)> {
         let (endpoint, mut incoming_connections, _) =
             Endpoint::new_peer(local_addr(), &[], Config::default()).await?;
         let addr = endpoint.public_addr();
