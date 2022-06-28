@@ -23,7 +23,6 @@ use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::{sync::watch, sync::RwLock, time};
 
 // Cmd Dispatcher.
-#[derive(Clone)]
 pub(crate) struct Dispatcher {
     node: Arc<Node>,
     comm: Comm,

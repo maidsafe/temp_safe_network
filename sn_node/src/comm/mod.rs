@@ -42,7 +42,6 @@ use tokio::{
 };
 
 // Communication component of the node to interact with other nodes.
-#[derive(Clone)]
 pub(crate) struct Comm {
     our_endpoint: Endpoint,
     msg_listener: MsgListener,
@@ -468,9 +467,11 @@ impl Comm {
             return entry.value().clone();
         }
 
+        debug!("GET OR CREAETE");
         let link = Link::new(*peer, self.our_endpoint.clone(), self.msg_listener.clone());
         let session = PeerSession::new(link);
         let _ = self.sessions.insert(*peer, session.clone());
+        debug!("sesh got");
         session
     }
 
@@ -519,7 +520,9 @@ impl Comm {
             recipient,
         );
         let peer = self.get_or_create(&recipient).await;
+        debug!("???????????????????");
         let result = peer.send(msg_id, msg_priority, msg_bytes).await;
+        debug!("did senddd");
 
         (recipient, result)
     }

@@ -97,20 +97,25 @@ impl PeerSession {
         msg_priority: i32,
         msg_bytes: Bytes,
     ) -> Result<SendWatcher> {
+        debug!("indsenndd");
         if self.disconnected().await {
             // should not happen (be reachable) if we only access PeerSession from Comm
-            return Err(Error::InvalidState);
+            // return Err(Error::InvalidState);
+            panic!("BOOOOOOM");
         }
 
         let (watcher, reporter) = status_watching();
 
+        debug!("making job");
         let job = SendJob {
             msg_id,
             msg_bytes,
             retries: 3,
             reporter,
         };
+        debug!("writing q");
         let _ = self.msg_queue.write().await.push(job, msg_priority);
+        debug!("q wrote");
 
         Ok(watcher)
     }
