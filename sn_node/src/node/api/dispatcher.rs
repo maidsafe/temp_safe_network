@@ -78,7 +78,11 @@ impl Dispatcher {
                 sender,
                 wire_msg,
                 original_bytes,
-            } => self.node.handle_msg(sender, wire_msg, original_bytes).await,
+            } => {
+                self.node
+                    .handle_msg(sender, wire_msg, original_bytes, &self.comm)
+                    .await
+            }
             Cmd::HandleDkgTimeout(token) => self.node.handle_dkg_timeout(token).await,
             Cmd::HandleAgreement { proposal, sig } => {
                 self.node.handle_general_agreements(proposal, sig).await

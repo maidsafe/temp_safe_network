@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::comm::Comm;
 use crate::node::{
     api::cmds::Cmd,
     core::{relocation::RelocateDetailsUtils, Node},
@@ -32,6 +33,7 @@ impl Node {
         &self,
         peer: Peer,
         join_request: JoinRequest,
+        comm: &Comm,
     ) -> Result<Vec<Cmd>> {
         debug!("Received {:?} from {}", join_request, peer);
 
@@ -146,25 +148,21 @@ impl Node {
             ]);
         }
 
-        // TODO(drusu - June 28 2022): I'm temporarily disabling reachability checking while we are moving Comm around.
+        // Do reachability check only for the initial join request
+        let cmd = if comm.is_reachable(&peer.addr()).await.is_err() {
+            let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
+                JoinRejectionReason::NodeNotReachable(peer.addr()),
+            )));
 
-        // // Do reachability check only for the initial join request
-        // let cmd = if comm.is_reachable(&peer.addr()).await.is_err() {
-        //     let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
-        //         JoinRejectionReason::NodeNotReachable(peer.addr()),
-        //     )));
+            trace!("{}", LogMarker::SendJoinRejected);
 
-        //     trace!("{}", LogMarker::SendJoinRejected);
-
-        //     trace!("Sending {:?} to {}", node_msg, peer);
-        //     self.send_direct_msg(peer, node_msg, our_section_key)
-        //         .await?
-        // } else {
-        //     // It's reachable, let's then send the proof challenge
-        //     self.send_resource_proof_challenge(peer).await?
-        // };
-
-        let cmd = self.send_resource_proof_challenge(peer).await?;
+            trace!("Sending {:?} to {}", node_msg, peer);
+            self.send_direct_msg(peer, node_msg, our_section_key)
+                .await?
+        } else {
+            // It's reachable, let's then send the proof challenge
+            self.send_resource_proof_challenge(peer).await?
+        };
 
         Ok(vec![cmd])
     }
@@ -209,6 +207,7 @@ impl Node {
         peer: Peer,
         join_request: JoinAsRelocatedRequest,
         known_keys: Vec<BlsPublicKey>,
+        comm: &Comm,
     ) -> Result<Vec<Cmd>> {
         debug!("Received JoinAsRelocatedRequest {join_request:?} from {peer}",);
 
@@ -261,21 +260,19 @@ impl Node {
             return Ok(vec![]);
         }
 
-        // TODO(drusu - June 28 2022): I'm temporarily disabling reachability checking while we are moving Comm around.
+        // Finally do reachability check
+        if comm.is_reachable(&peer.addr()).await.is_err() {
+            let node_msg = SystemMsg::JoinAsRelocatedResponse(Box::new(
+                JoinAsRelocatedResponse::NodeNotReachable(peer.addr()),
+            ));
+            trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
 
-        // // Finally do reachability check
-        // if comm.is_reachable(&peer.addr()).await.is_err() {
-        //     let node_msg = SystemMsg::JoinAsRelocatedResponse(Box::new(
-        //         JoinAsRelocatedResponse::NodeNotReachable(peer.addr()),
-        //     ));
-        //     trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
-
-        //     trace!("Sending {:?} to {}", node_msg, peer);
-        //     return Ok(vec![
-        //         self.send_direct_msg(peer, node_msg, self.network_knowledge.section_key())
-        //             .await?,
-        //     ]);
-        // };
+            trace!("Sending {:?} to {}", node_msg, peer);
+            return Ok(vec![
+                self.send_direct_msg(peer, node_msg, self.network_knowledge.section_key())
+                    .await?,
+            ]);
+        };
 
         self.propose_membership_change(join_request.relocate_proof.value)
             .await
