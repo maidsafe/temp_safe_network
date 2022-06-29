@@ -114,7 +114,7 @@ impl Comm {
     pub(crate) async fn handle_cmd(&self, cmd: Cmd) {
         match cmd {
             #[cfg(feature = "back-pressure")]
-            Cmd::Regulate { peer, msgs_per_s } => self.regulate(peer, msgs_per_s).await,
+            Cmd::Regulate { peer, msgs_per_s } => self.regulate(&peer, msgs_per_s).await,
         }
     }
 

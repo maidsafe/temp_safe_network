@@ -103,7 +103,7 @@ impl PeerSession {
 
     #[cfg(feature = "back-pressure")]
     pub(crate) async fn update_send_rate(&self, rate: f64) {
-        if let Err(_) = self.channel.send(SessionCmd::SetMsgsPerSecond(rate)).await {
+        if let Err(e) = self.channel.send(SessionCmd::SetMsgsPerSecond(rate)).await {
             error!("Error while sending SetMsgsPerSecond cmd {e:?}");
         }
     }
