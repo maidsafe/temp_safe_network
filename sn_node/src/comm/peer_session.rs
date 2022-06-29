@@ -151,7 +151,7 @@ impl PeerSessionWorker {
                     SessionStatus::Ok
                 }
                 SessionCmd::RemoveExpired => {
-                    self.link.remove_expired().await;
+                    self.link.remove_expired();
                     SessionStatus::Ok
                 }
                 SessionCmd::AddConnection(conn) => {
@@ -179,12 +179,12 @@ impl PeerSessionWorker {
         }
 
         // disconnect the link.
-        self.link.disconnect().await;
+        self.link.disconnect();
 
         info!("Finished peer session shutdown");
     }
 
-    async fn send(&self, job: SendJob) -> SessionStatus {
+    async fn send(&mut self, job: SendJob) -> SessionStatus {
         let actual_rate = self.attempted.value();
         if actual_rate > self.peer_desired_rate {
             let diff = actual_rate - self.peer_desired_rate;
