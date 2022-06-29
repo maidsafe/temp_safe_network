@@ -147,6 +147,7 @@ pub(crate) enum Cmd {
     /// Test Connectivity
     TestConnectivity(XorName),
     /// Comm Commands
+    #[allow(unused)]
     Comm(crate::comm::Cmd),
 }
 

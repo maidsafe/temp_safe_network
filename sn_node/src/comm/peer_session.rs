@@ -139,7 +139,7 @@ impl PeerSessionWorker {
         }
     }
 
-    async fn run(mut self, mut channel: mpsc::Receiver<SessionCmd>) {
+    async fn run(#[allow(unused_mut)] mut self, mut channel: mpsc::Receiver<SessionCmd>) {
         while let Some(session_cmd) = channel.recv().await {
             info!("Processing session cmd: {:?}", session_cmd);
 

@@ -52,6 +52,7 @@ pub(crate) struct Comm {
 }
 
 /// Commands for interacting with Comm.
+#[allow(unused)]
 #[derive(Debug, Clone)]
 pub(crate) enum Cmd {
     #[cfg(feature = "back-pressure")]
