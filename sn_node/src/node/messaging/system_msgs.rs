@@ -479,7 +479,6 @@ impl Node {
                     message,
                     sender
                 );
-                self.log_dkg_session(&sender.name()).await;
                 self.handle_dkg_msg(session_id, message, sender).await
             }
             SystemMsg::DkgFailureObservation {
@@ -494,8 +493,6 @@ impl Node {
                 message,
                 session_id,
             } => {
-                self.log_dkg_session(&sender.name()).await;
-
                 self.handle_dkg_not_ready(
                     sender,
                     message,
@@ -509,8 +506,6 @@ impl Node {
                 message,
                 session_id,
             } => {
-                self.log_dkg_session(&sender.name()).await;
-
                 self.handle_dkg_retry(&session_id, message_history, message, sender)
                     .await
             }
