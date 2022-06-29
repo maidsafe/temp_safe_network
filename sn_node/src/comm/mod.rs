@@ -414,6 +414,7 @@ impl Comm {
                                 // that happens when the peer session dropped
                                 // or the msg was sent, meaning the send didn't actually fail,
                                 // so we would be sending an extra msg here in case of such a glitch
+                                info!("Watcher Dropped");
                                 try_next(Error::FailedSend(recipient), recipient, &mut tasks);
                                 break; // we now move to checking next recipient send task..
                             }
@@ -427,8 +428,7 @@ impl Comm {
                                     recipient, error
                                 );
                                 tokio::time::sleep(Duration::from_millis(200)).await;
-                                try_next(Error::FailedSend(recipient), recipient, &mut tasks);
-                                break; // we now move to checking next recipient send task..
+                                continue;
                             }
                         }
                     }
