@@ -50,13 +50,12 @@ use xor_name::XorName;
 
 // Message handling
 impl Node {
-    #[instrument(skip(self, original_bytes, comm))]
+    #[instrument(skip(self, original_bytes))]
     pub(crate) async fn handle_msg(
         &self,
         sender: Peer,
         wire_msg: WireMsg,
         original_bytes: Option<Bytes>,
-        comm: &Comm,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
 
@@ -165,15 +164,7 @@ impl Node {
                 }
 
                 let handling_msg_cmds = self
-                    .handle_system_msg(
-                        sender,
-                        msg_id,
-                        msg_authority,
-                        msg,
-                        payload,
-                        known_keys,
-                        comm,
-                    )
+                    .handle_system_msg(sender, msg_id, msg_authority, msg, payload, known_keys)
                     .await?;
 
                 cmds.extend(handling_msg_cmds);
@@ -266,7 +257,6 @@ impl Node {
         msg: SystemMsg,
         payload: Bytes,
         known_keys: Vec<BlsPublicKey>,
-        comm: &Comm,
     ) -> Result<Vec<Cmd>> {
         trace!("{:?}", LogMarker::SystemMsgToBeHandled);
 
@@ -276,7 +266,7 @@ impl Node {
             .await
         {
             Ok(false) => {
-                self.handle_valid_msg(msg_id, msg_authority, msg, sender, known_keys, comm)
+                self.handle_valid_msg(msg_id, msg_authority, msg, sender, known_keys)
                     .await
             }
             Err(Error::InvalidSignatureShare) => {
@@ -303,7 +293,6 @@ impl Node {
         node_msg: SystemMsg,
         sender: Peer,
         known_keys: Vec<BlsPublicKey>,
-        comm: &Comm,
     ) -> Result<Vec<Cmd>> {
         let src_name = msg_authority.name();
         match node_msg {
@@ -503,7 +492,7 @@ impl Node {
             SystemMsg::HandoverAE(gen) => self.handle_handover_anti_entropy(sender, gen).await,
             SystemMsg::JoinRequest(join_request) => {
                 trace!("Handling msg: JoinRequest from {}", sender);
-                self.handle_join_request(sender, *join_request, comm).await
+                self.handle_join_request(sender, *join_request).await
             }
             SystemMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
@@ -513,7 +502,7 @@ impl Node {
                     return Ok(vec![]);
                 }
 
-                self.handle_join_as_relocated_request(sender, *join_request, known_keys, comm)
+                self.handle_join_as_relocated_request(sender, *join_request, known_keys)
                     .await
             }
             SystemMsg::MembershipVotes(votes) => {
