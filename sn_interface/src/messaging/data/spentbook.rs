@@ -13,7 +13,7 @@ use crate::types::SpentbookAddress;
 use tiny_keccak::{Hasher, Sha3};
 
 use serde::{Deserialize, Serialize};
-use sn_dbc::{KeyImage, RingCtTransaction};
+use sn_dbc::{KeyImage, RingCtTransaction, SpentProof};
 use xor_name::XorName;
 
 /// [`Spentbook`] read operations.
@@ -33,6 +33,8 @@ pub enum SpentbookCmd {
     Spend {
         key_image: KeyImage,
         tx: RingCtTransaction,
+        spent_proofs: Vec<SpentProof>,
+        spent_transactions: Vec<RingCtTransaction>,
     },
 }
 

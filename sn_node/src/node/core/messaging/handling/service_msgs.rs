@@ -9,7 +9,8 @@
 use crate::node::{api::cmds::Cmd, core::Node, Error, Result};
 
 use sn_dbc::{
-    Hash, IndexedSignatureShare, KeyImage, RingCtTransaction, SpentProofContent, SpentProofShare,
+    Commitment, Hash, IndexedSignatureShare, KeyImage, RingCtTransaction, SpentProof,
+    SpentProofContent, SpentProofShare,
 };
 use sn_interface::{
     data_copy_count,
@@ -174,16 +175,25 @@ impl Node {
         let data = match msg {
             // These reads/writes are for adult nodes...
             ServiceMsg::Cmd(DataCmd::Register(cmd)) => ReplicatedData::RegisterWrite(cmd),
-            ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend { key_image, tx })) => {
-                // generate and sign spent proof share
-                let spent_proof_share = self.gen_spent_proof_share(&key_image, &tx).await?;
-
-                // use own keypair for generating the register command
-                let own_keypair = Keypair::Ed25519(self.keypair.read().await.clone());
-
-                // store spent proof share to adults
-                let reg_cmd = gen_register_cmd(&key_image, &spent_proof_share, own_keypair)?;
-                ReplicatedData::SpentbookWrite(reg_cmd)
+            ServiceMsg::Cmd(DataCmd::Spentbook(SpentbookCmd::Spend {
+                key_image,
+                tx,
+                spent_proofs,
+                spent_transactions,
+            })) => {
+                // Generate and sign spent proof share
+                if let Some(spent_proof_share) = self
+                    .gen_spent_proof_share(&key_image, &tx, &spent_proofs, &spent_transactions)
+                    .await?
+                {
+                    // Store spent proof share to adults
+                    let reg_cmd = self
+                        .gen_register_cmd(&key_image, &spent_proof_share)
+                        .await?;
+                    ReplicatedData::SpentbookWrite(reg_cmd)
+                } else {
+                    return Ok(vec![]);
+                }
             }
             ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => ReplicatedData::Chunk(chunk),
             ServiceMsg::Query(query) => {
@@ -199,6 +209,7 @@ impl Node {
                 return Ok(vec![]);
             }
         };
+
         // build the replication cmds
         let mut cmds = self.replicate_data(data).await?;
         // make sure the expected replication factor is achieved
@@ -247,17 +258,82 @@ impl Node {
         &self,
         key_image: &KeyImage,
         tx: &RingCtTransaction,
-    ) -> Result<SpentProofShare> {
-        // TODO:
-        // 1- perform all validations on the key image and tx received
-        // 2- if everything is ok then sign the spent proof
-
+        spent_proofs: &[SpentProof],
+        spent_transactions: &[RingCtTransaction],
+    ) -> Result<Option<SpentProofShare>> {
         let sap = self.network_knowledge.authority_provider();
         let current_section_key = sap.section_key();
         let spentbook_pks = sap.public_key_set();
 
-        // FIXME!!!: populate with real commitments taken from tx
-        let public_commitments = vec![];
+        // Obtain commitments from TX
+        let mut public_commitments_info = Vec::<(KeyImage, Vec<Commitment>)>::new();
+        for mlsag in tx.mlsags.iter() {
+            // TODO: verify the SpentProofs signatures are valid,
+            // and verify they are signed by known section keys.
+
+            // For each public key in ring, look up the matching OutputProof
+            // using the SpentProof's and spent TX's provided by the client.
+            let output_proofs: Vec<_> = mlsag
+                .public_keys()
+                .iter()
+                .flat_map(|pk| {
+                    spent_proofs.iter().flat_map(move |proof| {
+                        // make sure the spent proof:
+                        // 1- corresponds to any of the spent TX provided
+                        // 2- the TX output PK matches the ring PK
+                        spent_transactions.iter().filter_map(|tx| {
+                            if Hash::from(tx.hash()) == proof.transaction_hash() {
+                                tx.outputs
+                                    .iter()
+                                    .find(|output| output.public_key() == &pk.clone())
+                            } else {
+                                None
+                            }
+                        })
+                    })
+                })
+                .collect();
+
+            if output_proofs.len() != mlsag.public_keys().len() {
+                debug!("Dropping DBC spend request since the number of SpentProofs ({}) does not match the number of input public keys ({})",
+                        output_proofs.len(),
+                        mlsag.public_keys().len(),
+                    );
+                return Ok(None);
+            }
+
+            // Collect Commitments from matched SpentProofs
+            let commitments: Vec<Commitment> = output_proofs
+                .iter()
+                .map(|proof| proof.commitment())
+                .collect();
+
+            public_commitments_info.push((mlsag.key_image.into(), commitments));
+        }
+
+        // Do not sign invalid tx.
+        let tx_public_commitments: Vec<Vec<Commitment>> = public_commitments_info
+            .clone()
+            .into_iter()
+            .map(|(_, v)| v)
+            .collect();
+
+        if let Err(err) = tx.verify(&tx_public_commitments) {
+            debug!(
+                "Dropping DBC spend request since TX failed to verify: {:?}",
+                err
+            );
+            return Ok(None);
+        }
+
+        // TODO:
+        // Check the key_image wasn't already spent with a different TX (i.e. double spent)
+
+        // Grab the commitments specific to the spent KeyImage
+        let public_commitments: Vec<Commitment> = public_commitments_info
+            .into_iter()
+            .flat_map(|(k, v)| if &k == key_image { v } else { vec![] })
+            .collect();
 
         let content = SpentProofContent {
             key_image: *key_image,
@@ -271,56 +347,58 @@ impl Node {
             .await?;
         let spentbook_sig_share = IndexedSignatureShare::new(index as u64, sig_share);
 
-        Ok(SpentProofShare {
+        Ok(Some(SpentProofShare {
             content,
             spentbook_pks,
             spentbook_sig_share,
-        })
+        }))
     }
-}
 
-// Helper to generate the RegisterCmd to write the SpentProofShare
-// as an entry in the Spentbook (Register).
-// TODO: store not only the SpentProofShare but also the linked Tx
-fn gen_register_cmd(
-    key_image: &KeyImage,
-    spent_proof_share: &SpentProofShare,
-    own_keypair: Keypair,
-) -> Result<RegisterCmd> {
-    let mut permissions = BTreeMap::new();
-    let _ = permissions.insert(User::Anyone, Permissions::new(true));
-    let owner = User::Key(own_keypair.public_key());
-    let policy = Policy { owner, permissions };
+    // Private helper to generate the RegisterCmd to write the SpentProofShare
+    // as an entry in the Spentbook (Register).
+    async fn gen_register_cmd(
+        &self,
+        key_image: &KeyImage,
+        spent_proof_share: &SpentProofShare,
+    ) -> Result<RegisterCmd> {
+        let mut permissions = BTreeMap::new();
+        let _ = permissions.insert(User::Anyone, Permissions::new(true));
 
-    let mut register = Register::new(
-        owner,
-        XorName::from_content(&key_image.to_bytes()),
-        SPENTBOOK_TYPE_TAG,
-        policy,
-        u16::MAX,
-    );
+        // use our own keypair for generating the register command
+        let own_keypair = Keypair::Ed25519(self.info().await.keypair);
+        let owner = User::Key(own_keypair.public_key());
+        let policy = Policy { owner, permissions };
 
-    let entry = Bytes::from(rmp_serde::to_vec_named(spent_proof_share).map_err(|err| {
-        Error::SpentbookError(format!(
-            "Failed to serialise SpentProofShare to insert it into the spentbook (Register): {:?}",
-            err
-        ))
-    })?);
+        let mut register = Register::new(
+            owner,
+            XorName::from_content(&key_image.to_bytes()),
+            SPENTBOOK_TYPE_TAG,
+            policy,
+            u16::MAX,
+        );
 
-    let (_, op) = register.write(entry.to_vec(), BTreeSet::default())?;
-    let op = EditRegister {
-        address: *register.address(),
-        edit: op,
-    };
+        let entry = Bytes::from(rmp_serde::to_vec_named(spent_proof_share).map_err(|err| {
+            Error::SpentbookError(format!(
+                "Failed to serialise SpentProofShare to insert it into the spentbook (Register): {:?}",
+                err
+            ))
+        })?);
 
-    let signature = own_keypair.sign(&bincode::serialize(&op)?);
-    let signed_edit = SignedRegisterEdit {
-        op,
-        auth: ServiceAuth {
-            public_key: own_keypair.public_key(),
-            signature,
-        },
-    };
+        let (_, op) = register.write(entry.to_vec(), BTreeSet::default())?;
+        let op = EditRegister {
+            address: *register.address(),
+            edit: op,
+        };
 
-    Ok(RegisterCmd::Edit(signed_edit))
+        let signature = own_keypair.sign(&bincode::serialize(&op)?);
+        let signed_edit = SignedRegisterEdit {
+            op,
+            auth: ServiceAuth {
+                public_key: own_keypair.public_key(),
+                signature,
+            },
+        };
+
+        Ok(RegisterCmd::Edit(signed_edit))
+    }
 }
