@@ -19,6 +19,7 @@ mod resource_proof;
 mod service_msgs;
 mod update_section;
 
+use crate::comm::Comm;
 use crate::dbs::Error as DbError;
 use crate::node::{
     api::cmds::Cmd,
@@ -27,7 +28,6 @@ use crate::node::{
     Error, Event, MembershipEvent, Result, MIN_LEVEL_WHEN_FULL,
 };
 pub(crate) use proposals::handle_proposal;
-
 use sn_interface::{
     messaging::{
         data::{ServiceMsg, StorageLevel},
@@ -49,12 +49,13 @@ use xor_name::XorName;
 
 // Message handling
 impl Node {
-    #[instrument(skip(self, original_bytes))]
+    #[instrument(skip(self, original_bytes, comm))]
     pub(crate) async fn handle_msg(
         &self,
         sender: Peer,
         wire_msg: WireMsg,
         original_bytes: Option<Bytes>,
+        comm: &Comm,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
 
@@ -163,7 +164,15 @@ impl Node {
                 }
 
                 let handling_msg_cmds = self
-                    .handle_system_msg(sender, msg_id, msg_authority, msg, payload, known_keys)
+                    .handle_system_msg(
+                        sender,
+                        msg_id,
+                        msg_authority,
+                        msg,
+                        payload,
+                        known_keys,
+                        comm,
+                    )
                     .await?;
 
                 cmds.extend(handling_msg_cmds);
@@ -256,6 +265,7 @@ impl Node {
         msg: SystemMsg,
         payload: Bytes,
         known_keys: Vec<BlsPublicKey>,
+        comm: &Comm,
     ) -> Result<Vec<Cmd>> {
         trace!("{:?}", LogMarker::SystemMsgToBeHandled);
 
@@ -265,7 +275,7 @@ impl Node {
             .await
         {
             Ok(false) => {
-                self.handle_valid_msg(msg_id, msg_authority, msg, sender, known_keys)
+                self.handle_valid_msg(msg_id, msg_authority, msg, sender, known_keys, comm)
                     .await
             }
             Err(Error::InvalidSignatureShare) => {
@@ -292,6 +302,7 @@ impl Node {
         node_msg: SystemMsg,
         sender: Peer,
         known_keys: Vec<BlsPublicKey>,
+        comm: &Comm,
     ) -> Result<Vec<Cmd>> {
         let src_name = msg_authority.name();
         match node_msg {
@@ -491,7 +502,7 @@ impl Node {
             SystemMsg::HandoverAE(gen) => self.handle_handover_anti_entropy(sender, gen).await,
             SystemMsg::JoinRequest(join_request) => {
                 trace!("Handling msg: JoinRequest from {}", sender);
-                self.handle_join_request(sender, *join_request).await
+                self.handle_join_request(sender, *join_request, comm).await
             }
             SystemMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
@@ -501,7 +512,7 @@ impl Node {
                     return Ok(vec![]);
                 }
 
-                self.handle_join_as_relocated_request(sender, *join_request, known_keys)
+                self.handle_join_as_relocated_request(sender, *join_request, known_keys, comm)
                     .await
             }
             SystemMsg::MembershipVotes(votes) => {
