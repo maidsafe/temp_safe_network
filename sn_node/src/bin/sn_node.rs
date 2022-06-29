@@ -40,12 +40,9 @@ use eyre::Error;
 use eyre::{eyre, Context, ErrReport, Result};
 use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
 use self_update::{cargo_crate_version, Status};
-use std::{fmt::Debug, fs::File, io, io::Write, path::Path, process::exit};
+use std::{fmt::Debug, io, io::Write, path::Path, process::exit};
 use structopt::{clap, StructOpt};
-use tokio::{
-    sync::RwLockReadGuard,
-    time::{sleep, Duration},
-};
+use tokio::time::{sleep, Duration};
 use tracing::{self, debug, error, info, trace, warn};
 
 #[cfg(not(feature = "tokio-console"))]
@@ -99,7 +96,7 @@ fn create_runtime_and_node() -> Result<()> {
 
         let local = tokio::task::LocalSet::new();
 
-        let _res = local
+        local
             .run_until(async move {
                 // we want logging to persist
                 // loops ready to catch any ChurnJoinMiss
@@ -214,7 +211,7 @@ fn init_node_logging(config: Config) -> Result<Option<WorkerGuard>> {
     Ok(_optional_guard)
 }
 
-/// FileRotateAppender is a tracing_appender with extra logrotate features:
+/// `FileRotateAppender` is a tracing_appender with extra logrotate features:
 ///  - most recent logfile name re-used to support following (e.g. 'tail -f=logfile')
 ///  - numbered rotation (logfile.1, logfile.2 etc)
 ///  - limit logfile by size, lines or time
@@ -226,15 +223,9 @@ pub struct FileRotateAppender {
     writer: FileRotate<AppendCount>,
 }
 
-#[derive(Debug)]
-struct RollingWriter<'a>(RwLockReadGuard<'a, File>);
-
 impl<'a> FileRotateAppender {
-    /// Create default FileRotateAppender
-    pub fn new(
-        directory: impl AsRef<Path>,
-        file_name_prefix: impl AsRef<Path>,
-    ) -> FileRotateAppender {
+    /// Create default `FileRotateAppender`
+    pub fn new(directory: impl AsRef<Path>, file_name_prefix: impl AsRef<Path>) -> Self {
         let log_directory = directory.as_ref().to_str().unwrap();
         let log_filename_prefix = file_name_prefix.as_ref().to_str().unwrap();
         let path = Path::new(&log_directory).join(&log_filename_prefix);
@@ -248,14 +239,14 @@ impl<'a> FileRotateAppender {
         Self { writer }
     }
 
-    /// Create FileRotateAppender using parameters
+    /// Create `FileRotateAppender` using parameters
     pub fn make_rotate_appender(
         directory: impl AsRef<Path>,
         file_name_prefix: impl AsRef<Path>,
         num_logs: AppendCount,
         max_log_size: ContentLimit,
         compression: Compression,
-    ) -> FileRotateAppender {
+    ) -> Self {
         let log_directory = directory.as_ref().to_str().unwrap();
         let log_filename_prefix = file_name_prefix.as_ref().to_str().unwrap();
         let path = Path::new(&log_directory).join(&log_filename_prefix);
@@ -282,6 +273,7 @@ impl Debug for FileRotateAppender {
         f.debug_struct("FileRotateAppender").finish()
     }
 }
+
 async fn run_node(config: Config) -> Result<()> {
     if let Some(c) = &config.completions() {
         let shell = c.parse().map_err(|err: String| eyre!(err))?;
@@ -432,33 +424,33 @@ fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
         .build()?
         .fetch()?;
 
-    if !releases.is_empty() {
-        tracing::debug!("Target for update is {}", target);
-        tracing::debug!("Found releases: {:#?}\n", releases);
-        let bin_name = if target.contains("pc-windows") {
-            "sn_node.exe"
-        } else {
-            "sn_node"
-        };
-        let status = self_update::backends::github::Update::configure()
-            .repo_owner("maidsafe")
-            .repo_name("safe_network")
-            .target(target)
-            .bin_name(bin_name)
-            .show_download_progress(true)
-            .no_confirm(true)
-            .current_version(cargo_crate_version!())
-            .build()?
-            .update()?;
-        println!("Update status: '{}'!", status.version());
-        Ok(status)
-    } else {
+    if releases.is_empty() {
         println!("Current version is '{}'", cargo_crate_version!());
         println!("No releases are available for updates");
-        Ok(Status::UpToDate(
+        return Ok(Status::UpToDate(
             "No releases are available for updates".to_string(),
-        ))
+        ));
     }
+
+    tracing::debug!("Target for update is {}", target);
+    tracing::debug!("Found releases: {:#?}\n", releases);
+    let bin_name = if target.contains("pc-windows") {
+        "sn_node.exe"
+    } else {
+        "sn_node"
+    };
+    let status = self_update::backends::github::Update::configure()
+        .repo_owner("maidsafe")
+        .repo_name("safe_network")
+        .target(target)
+        .bin_name(bin_name)
+        .show_download_progress(true)
+        .no_confirm(true)
+        .current_version(cargo_crate_version!())
+        .build()?
+        .update()?;
+    println!("Update status: '{}'!", status.version());
+    Ok(status)
 }
 
 fn gen_completions_for_shell(shell: clap::Shell) -> Result<Vec<u8>, String> {
