@@ -133,7 +133,7 @@ impl Comm {
 
             session.remove_expired().await;
 
-            let is_connected = session.is_connected().await;
+            let is_connected = session.is_connected();
 
             if !is_connected {
                 if !retain_peers.contains(peer) {
@@ -274,18 +274,6 @@ impl Comm {
                             );
                             return Err(Error::PeerLinkDropped(*recipient));
                         }
-                        SendStatus::MaxRetriesReached(retries) => {
-                            // this would perhaps be a place to start taking action against this peer
-                            // (if not, then this clause can be collapsed with the one below)
-                            error!(
-                                "Gave up on sending message (msg_id: {:?}) to {:?} (name {:?}), after retrying {} times",
-                                msg_id,
-                                addr,
-                                name,
-                                retries,
-                            );
-                            return Err(Error::FailedSend(*recipient));
-                        }
                         SendStatus::WatcherDropped => {
                             // the send job is dropped for some reason,
                             // that happens when the peer session dropped
@@ -420,12 +408,6 @@ impl Comm {
                                 try_next(Error::PeerLinkDropped(recipient), recipient, &mut tasks);
                                 break; // we now move to checking next recipient send task..
                             }
-                            SendStatus::MaxRetriesReached(_) => {
-                                // this would perhaps be a place to start taking action against this peer
-                                // (if not, then this clause can be collapsed with the one below)
-                                try_next(Error::FailedSend(recipient), recipient, &mut tasks);
-                                break; // we now move to checking next recipient send task..
-                            }
                             SendStatus::WatcherDropped => {
                                 // the send job is dropped for some reason,
                                 // that happens when the peer session dropped
@@ -444,7 +426,8 @@ impl Comm {
                                     recipient, error
                                 );
                                 tokio::time::sleep(Duration::from_millis(200)).await;
-                                continue; // await change on the same recipient again
+                                try_next(Error::FailedSend(recipient), recipient, &mut tasks);
+                                break; // we now move to checking next recipient send task..
                             }
                         }
                     }
