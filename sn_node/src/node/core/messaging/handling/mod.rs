@@ -19,7 +19,6 @@ mod resource_proof;
 mod service_msgs;
 mod update_section;
 
-use crate::comm::Comm;
 use crate::dbs::Error as DbError;
 use crate::node::{
     api::cmds::Cmd,
