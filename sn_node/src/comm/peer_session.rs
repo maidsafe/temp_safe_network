@@ -8,13 +8,13 @@
 
 use super::Link;
 
-use crate::node::{Error, Result};
+use crate::node::Result;
 
+use qp2p::RetryConfig;
 use sn_interface::messaging::MsgId;
 
 use bytes::Bytes;
 use custom_debug::Debug;
-use priority_queue::PriorityQueue;
 use std::{
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -22,86 +22,69 @@ use std::{
     },
     time::Duration,
 };
-use tokio::{sync::RwLock, time::Instant};
+use tokio::{sync::mpsc, time::Instant};
 
-type Priority = i32;
+// TODO: temporarily disable priority while we transition to channels
+// type Priority = i32;
 
-const MAX_RETRIES: usize = 10;
 const DEFAULT_DESIRED_RATE: f64 = 10.0; // 10 msgs / s
-const SLEEP_TIME: Duration = Duration::from_millis(200);
+
+#[derive(Debug)]
+enum SessionCmd {
+    Send(SendJob),
+    #[cfg(feature = "back-pressure")]
+    SetMsgsPerSecond(f64),
+    RemoveExpired,
+    AddConnection(qp2p::Connection),
+    Terminate,
+}
 
 #[derive(Clone)]
 pub(crate) struct PeerSession {
-    link: Link,
-    msg_queue: Arc<RwLock<PriorityQueue<SendJob, Priority>>>,
-    sent: MsgThroughput,
-    attempted: MsgThroughput,
-    peer_desired_rate: Arc<RwLock<f64>>, // msgs per s
-    disconnected: Arc<RwLock<bool>>,
+    channel: mpsc::Sender<SessionCmd>,
 }
 
 impl PeerSession {
-    pub(crate) fn new(link: Link) -> Self {
-        let session = Self {
-            link,
-            msg_queue: Arc::new(RwLock::new(PriorityQueue::new())),
-            sent: MsgThroughput::default(),
-            attempted: MsgThroughput::default(),
-            peer_desired_rate: Arc::new(RwLock::new(DEFAULT_DESIRED_RATE)),
-            disconnected: Arc::new(RwLock::new(false)),
-        };
+    pub(crate) fn new(link: Link) -> PeerSession {
+        let (sender, receiver) = mpsc::channel(1000);
 
-        let session_clone = session.clone();
-        let _ = tokio::task::spawn_local(async move { session_clone.keep_sending().await });
+        let _ = tokio::task::spawn_local(PeerSessionWorker::new(link).run(receiver));
 
-        session
+        PeerSession { channel: sender }
     }
 
     pub(crate) async fn remove_expired(&self) {
-        self.link.remove_expired().await
+        if let Err(e) = self.channel.send(SessionCmd::RemoveExpired).await {
+            error!("Error while sending RemoveExpired cmd {e:?}");
+        }
     }
 
-    pub(crate) async fn is_connected(&self) -> bool {
-        self.link.is_connected().await
-    }
-
-    #[allow(unused)]
-    pub(crate) async fn throughput(&self) -> f64 {
-        self.sent.value()
-    }
-
-    #[allow(unused)]
-    pub(crate) async fn success_ratio(&self) -> f64 {
-        self.sent.value() / self.attempted.value()
+    pub(crate) fn is_connected(&self) -> bool {
+        !self.channel.is_closed()
     }
 
     // this must be restricted somehow, we can't allow an unbounded inflow
     // of connections from a peer...
     pub(crate) async fn add(&self, conn: qp2p::Connection) {
-        if self.disconnected().await {
+        let cmd = SessionCmd::AddConnection(conn.clone());
+        if let Err(e) = self.channel.send(cmd).await {
+            error!("Error while sending AddConnection {e:?}");
+
             // if we have disconnected from a peer, will we allow it to connect to us again anyway..??
             conn.close(Some(
                 "We have disconnected from the peer and do not allow incoming connections."
                     .to_string(),
             ));
-            return;
         }
-
-        self.link.add(conn).await
     }
 
-    #[instrument(skip(self, msg_bytes, msg_priority))]
+    #[instrument(skip(self, msg_bytes, _msg_priority))]
     pub(crate) async fn send(
         &self,
         msg_id: MsgId,
-        msg_priority: i32,
+        _msg_priority: i32, // TODO: priority is temporarily disabled
         msg_bytes: Bytes,
     ) -> Result<SendWatcher> {
-        if self.disconnected().await {
-            // should not happen (be reachable) if we only access PeerSession from Comm
-            return Err(Error::InvalidState);
-        }
-
         let (watcher, reporter) = status_watching();
 
         let job = SendJob {
@@ -110,91 +93,130 @@ impl PeerSession {
             retries: 3,
             reporter,
         };
-        let _ = self.msg_queue.write().await.push(job, msg_priority);
+
+        if let Err(e) = self.channel.send(SessionCmd::Send(job)).await {
+            error!("Error while sending Send command {e:?}");
+        }
 
         Ok(watcher)
     }
 
     #[cfg(feature = "back-pressure")]
-    pub(crate) async fn update_send_rate(&self, peer_desired_rate: f64) {
-        *self.peer_desired_rate.write().await = peer_desired_rate;
+    pub(crate) async fn update_send_rate(&self, rate: f64) {
+        if let Err(_) = self.channel.send(SessionCmd::SetMsgsPerSecond(rate)).await {
+            error!("Error while sending SetMsgsPerSecond cmd {e:?}");
+        }
     }
 
-    // consume self
-    // NB that clones could still exist, however they would be in the disconnected state
-    // if only accessing via session map (as intended)
     pub(crate) async fn disconnect(self) {
-        *self.disconnected.write().await = true;
-        self.msg_queue.write().await.clear();
-        self.link.disconnect().await;
+        if let Err(e) = self.channel.send(SessionCmd::Terminate).await {
+            error!("Error while sending Terminate command: {e:?}");
+        }
+    }
+}
+
+/// After processing each SessionCmd, we decide whether to keep going
+#[must_use]
+enum SessionStatus {
+    Ok,
+    Terminate,
+}
+
+struct PeerSessionWorker {
+    link: Link,
+    sent: MsgThroughput,
+    attempted: MsgThroughput,
+    peer_desired_rate: f64, // msgs per s
+}
+
+impl PeerSessionWorker {
+    fn new(link: Link) -> Self {
+        Self {
+            link,
+            sent: MsgThroughput::default(),
+            attempted: MsgThroughput::default(),
+            peer_desired_rate: DEFAULT_DESIRED_RATE,
+        }
     }
 
-    // could be accessed via a clone
-    async fn disconnected(&self) -> bool {
-        *self.disconnected.read().await
-    }
+    async fn run(mut self, mut channel: mpsc::Receiver<SessionCmd>) {
+        while let Some(session_cmd) = channel.recv().await {
+            info!("Processing session cmd: {:?}", session_cmd);
 
-    #[instrument(skip_all)]
-    async fn keep_sending(&self) {
-        loop {
-            if self.disconnected().await {
-                break;
-            }
-
-            let expected_rate = { *self.peer_desired_rate.read().await };
-            let actual_rate = self.attempted.value();
-            if actual_rate > expected_rate {
-                let diff = actual_rate - expected_rate;
-                let diff_ms = Duration::from_millis((diff * 1000_f64) as u64);
-                tokio::time::sleep(diff_ms).await;
-                continue;
-            } else if self.msg_queue.read().await.is_empty() {
-                tokio::time::sleep(SLEEP_TIME).await;
-                continue;
-            }
-
-            #[cfg(feature = "test-utils")]
-            {
-                let queue = self.msg_queue.read().await;
-                debug!("Peer {} queue length: {}", self.link.peer(), queue.len());
-                for (job, priority) in queue.iter() {
-                    debug!("Prio: {}, Job: {:?}", priority, job);
+            let status = match session_cmd {
+                SessionCmd::Send(job) => self.send(job).await,
+                #[cfg(feature = "back-pressure")]
+                SessionCmd::SetMsgsPerSecond(rate) => {
+                    self.peer_desired_rate = rate;
+                    SessionStatus::Ok
                 }
-            }
-
-            let queue_res = { self.msg_queue.write().await.pop() };
-            if let Some((mut job, prio)) = queue_res {
-                if job.retries >= MAX_RETRIES {
-                    // break this loop, report error to other nodes
-                    // await decision on how to continue
-
-                    // (or send event on a channel (to report error to other nodes), then sleep for a very long time, then try again?)
-
-                    job.reporter
-                        .send(SendStatus::MaxRetriesReached(job.retries));
-
-                    break; // this means we will stop all sending to this peer!
+                SessionCmd::RemoveExpired => {
+                    self.link.remove_expired().await;
+                    SessionStatus::Ok
                 }
-
-                if let Err(err) = self.link.send(job.msg_bytes.clone()).await {
-                    job.retries += 1;
-                    if err.is_local_close() {
-                        job.reporter.send(SendStatus::PeerLinkDropped);
-                        break; // this means we will stop all sending to this peer!
-                    } else {
-                        job.reporter
-                            .send(SendStatus::TransientError(format!("{:?}", err)));
-
-                        let _ = self.msg_queue.write().await.push(job, prio);
-                    }
-                } else {
-                    job.reporter.send(SendStatus::Sent);
-                    self.sent.increment(); // on success
+                SessionCmd::AddConnection(conn) => {
+                    self.link.add(conn).await;
+                    SessionStatus::Ok
                 }
+                SessionCmd::Terminate => SessionStatus::Terminate,
+            };
 
-                self.attempted.increment(); // both on fail and success
+            match status {
+                SessionStatus::Terminate => {
+                    info!("Terminating connection");
+                    break;
+                }
+                SessionStatus::Ok => (),
             }
         }
+
+        // close the channel to prevent senders adding more messages.
+        channel.close();
+
+        // drain channel to avoid memory leaks.
+        while let Some(msg) = channel.recv().await {
+            info!("Draining channel: dropping {:?}", msg);
+        }
+
+        // disconnect the link.
+        self.link.disconnect().await;
+
+        info!("Finished peer session shutdown");
+    }
+
+    async fn send(&self, job: SendJob) -> SessionStatus {
+        let actual_rate = self.attempted.value();
+        if actual_rate > self.peer_desired_rate {
+            let diff = actual_rate - self.peer_desired_rate;
+            let diff_ms = Duration::from_millis((diff * 1000_f64) as u64);
+            tokio::time::sleep(diff_ms).await;
+        }
+
+        self.attempted.increment(); // both on fail and success
+
+        let send_resp = self
+            .link
+            .send_with(job.msg_bytes.clone(), 0, Some(&RetryConfig::default()))
+            .await;
+
+        match send_resp {
+            Ok(_) => {
+                job.reporter.send(SendStatus::Sent);
+                self.sent.increment(); // on success
+            }
+            Err(err) if err.is_local_close() => {
+                info!("Peer linked dropped");
+                job.reporter.send(SendStatus::PeerLinkDropped);
+                return SessionStatus::Terminate;
+            }
+            Err(err) => {
+                warn!("Dropping message to peer but keeping connection alive");
+                job.reporter
+                    .send(SendStatus::TransientError(format!("{err:?}")));
+            }
+        }
+
+        SessionStatus::Ok
     }
 }
 
@@ -231,7 +253,7 @@ pub(crate) struct SendJob {
     msg_id: MsgId,
     #[debug(skip)]
     msg_bytes: Bytes,
-    retries: usize,
+    retries: usize, // TAI: Do we need this if we are using QP2P's retry
     reporter: StatusReporting,
 }
 
@@ -259,7 +281,6 @@ pub(crate) enum SendStatus {
     Sent,
     PeerLinkDropped,
     TransientError(String),
-    MaxRetriesReached(usize),
     WatcherDropped,
 }
 
