@@ -33,7 +33,6 @@ impl Node {
         &self,
         peer: Peer,
         join_request: JoinRequest,
-        comm: &Comm,
     ) -> Result<Vec<Cmd>> {
         debug!("Received {:?} from {}", join_request, peer);
 
@@ -47,12 +46,7 @@ impl Node {
                 return Ok(vec![]);
             }
 
-            let node_state = NodeState {
-                name: peer.name(),
-                addr: peer.addr(),
-                state: MembershipState::Joined,
-                previous_name: None,
-            };
+            let node_state = NodeState::joined(peer.name(), peer.addr(), None);
             return self.propose_membership_change(node_state).await;
         }
 
@@ -115,25 +109,27 @@ impl Node {
             is_age_invalid
         );
 
-        if !section_key_matches || is_age_invalid {
-            if !section_key_matches {
-                trace!("{}", LogMarker::SendJoinRetryNotCorrectKey);
-                trace!(
-                    "JoinRequest from {} doesn't have our latest section_key {:?}, presented {:?}.",
-                    peer,
-                    our_section_key,
-                    join_request.section_key
-                );
-            } else {
-                trace!("{}", LogMarker::SendJoinRetryAgeIssue);
-                trace!(
-                    "JoinRequest from {} (with age {}) doesn't have the expected: {}",
-                    peer,
-                    peer.age(),
-                    expected_age,
-                );
-            }
+        if !section_key_matches {
+            trace!("{}", LogMarker::SendJoinRetryNotCorrectKey);
+            trace!(
+                "JoinRequest from {} doesn't have our latest section_key {:?}, presented {:?}.",
+                peer,
+                our_section_key,
+                join_request.section_key
+            );
+        }
 
+        if is_age_invalid {
+            trace!("{}", LogMarker::SendJoinRetryAgeIssue);
+            trace!(
+                "JoinRequest from {} (with age {}) doesn't have the expected age: {}",
+                peer,
+                peer.age(),
+                expected_age,
+            );
+        }
+
+        if !section_key_matches || is_age_invalid {
             let proof_chain = self.network_knowledge.section_chain().await;
             let signed_sap = self.network_knowledge.section_signed_authority_provider();
 
@@ -151,21 +147,25 @@ impl Node {
             ]);
         }
 
-        // Do reachability check only for the initial join request
-        let cmd = if comm.is_reachable(&peer.addr()).await.is_err() {
-            let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
-                JoinRejectionReason::NodeNotReachable(peer.addr()),
-            )));
+        // TODO(drusu - June 28 2022): I'm temporarily disabling reachability checking while we are moving Comm around.
 
-            trace!("{}", LogMarker::SendJoinRejected);
+        // // Do reachability check only for the initial join request
+        // let cmd = if comm.is_reachable(&peer.addr()).await.is_err() {
+        //     let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
+        //         JoinRejectionReason::NodeNotReachable(peer.addr()),
+        //     )));
 
-            trace!("Sending {:?} to {}", node_msg, peer);
-            self.send_direct_msg(peer, node_msg, our_section_key)
-                .await?
-        } else {
-            // It's reachable, let's then send the proof challenge
-            self.send_resource_proof_challenge(peer).await?
-        };
+        //     trace!("{}", LogMarker::SendJoinRejected);
+
+        //     trace!("Sending {:?} to {}", node_msg, peer);
+        //     self.send_direct_msg(peer, node_msg, our_section_key)
+        //         .await?
+        // } else {
+        //     // It's reachable, let's then send the proof challenge
+        //     self.send_resource_proof_challenge(peer).await?
+        // };
+
+        let cmd = self.send_resource_proof_challenge(peer).await?;
 
         Ok(vec![cmd])
     }
@@ -210,7 +210,6 @@ impl Node {
         peer: Peer,
         join_request: JoinAsRelocatedRequest,
         known_keys: Vec<BlsPublicKey>,
-        comm: &Comm,
     ) -> Result<Vec<Cmd>> {
         debug!("Received JoinAsRelocatedRequest {join_request:?} from {peer}",);
 
@@ -263,19 +262,21 @@ impl Node {
             return Ok(vec![]);
         }
 
-        // Finally do reachability check
-        if comm.is_reachable(&peer.addr()).await.is_err() {
-            let node_msg = SystemMsg::JoinAsRelocatedResponse(Box::new(
-                JoinAsRelocatedResponse::NodeNotReachable(peer.addr()),
-            ));
-            trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
+        // TODO(drusu - June 28 2022): I'm temporarily disabling reachability checking while we are moving Comm around.
 
-            trace!("Sending {:?} to {}", node_msg, peer);
-            return Ok(vec![
-                self.send_direct_msg(peer, node_msg, self.network_knowledge.section_key())
-                    .await?,
-            ]);
-        };
+        // // Finally do reachability check
+        // if comm.is_reachable(&peer.addr()).await.is_err() {
+        //     let node_msg = SystemMsg::JoinAsRelocatedResponse(Box::new(
+        //         JoinAsRelocatedResponse::NodeNotReachable(peer.addr()),
+        //     ));
+        //     trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
+
+        //     trace!("Sending {:?} to {}", node_msg, peer);
+        //     return Ok(vec![
+        //         self.send_direct_msg(peer, node_msg, self.network_knowledge.section_key())
+        //             .await?,
+        //     ]);
+        // };
 
         self.propose_membership_change(join_request.relocate_proof.value)
             .await
