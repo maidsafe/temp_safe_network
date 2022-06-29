@@ -182,6 +182,7 @@ impl Link {
     }
 
     /// Is this Link currently connected?
+    #[allow(unused)]
     pub(crate) async fn is_connected(&self) -> bool {
         // get the most recently used connection
         let res = { self.queue.read().await.peek_max().map(|(id, _prio)| *id) };
