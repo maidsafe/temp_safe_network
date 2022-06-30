@@ -250,8 +250,8 @@ impl NodeApi {
             )
             .await?;
 
-            info!("{} Joined the network!", node.info().await.name());
-            info!("Our AGE: {}", node.info().await.age());
+            info!("{} Joined the network!", node.info().name());
+            info!("Our AGE: {}", node.info().age());
 
             (node, comm)
         };
@@ -270,7 +270,7 @@ impl NodeApi {
 
     /// Returns the current age of this node.
     pub async fn age(&self) -> u8 {
-        self.node.read().await.info().await.age()
+        self.node.read().await.info().age()
     }
 
     /// Returns the ed25519 public key of this node.
@@ -280,12 +280,12 @@ impl NodeApi {
 
     /// The name of this node.
     pub async fn name(&self) -> XorName {
-        self.node.read().await.info().await.name()
+        self.node.read().await.info().name()
     }
 
     /// Returns connection info of this node.
     pub async fn our_connection_info(&self) -> SocketAddr {
-        self.node.read().await.info().await.addr
+        self.node.read().await.info().addr
     }
 
     /// Returns the Section Signed Chain
@@ -305,7 +305,7 @@ impl NodeApi {
 
     /// Returns whether the node is Elder.
     pub async fn is_elder(&self) -> bool {
-        self.node.read().await.is_elder().await
+        self.node.read().await.is_elder()
     }
 
     /// Returns the information of all the current section elders.
@@ -331,7 +331,7 @@ impl NodeApi {
     ) -> Result<WireMsg> {
         let src_section_pk = *self.section_chain().await.last_key();
         WireMsg::single_src(
-            &self.node.read().await.info().await,
+            &self.node.read().await.info(),
             dst,
             node_msg,
             src_section_pk,
