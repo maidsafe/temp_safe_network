@@ -20,15 +20,14 @@ use tracing::warn;
 impl Node {
     /// Make a handover consensus proposal vote for a sap candidate
     pub(crate) async fn propose_handover_consensus(
-        &self,
+        &mut self,
         sap_candidates: SapCandidate,
     ) -> Result<Vec<Cmd>> {
-        let mut wlock = self.handover_voting.write().await;
-        match &*wlock {
+        match &self.handover_voting {
             Some(handover_voting_state) => {
                 let mut vs = handover_voting_state.clone();
                 let vote = vs.propose(sap_candidates)?;
-                *wlock = Some(vs);
+                self.handover_voting = Some(vs);
                 debug!("{}: {:?}", LogMarker::HandoverConsensusTrigger, &vote);
                 Ok(self.broadcast_handover_vote_msg(vote).await)
             }
