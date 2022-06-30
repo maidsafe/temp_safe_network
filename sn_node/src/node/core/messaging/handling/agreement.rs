@@ -27,7 +27,7 @@ use std::{cmp, collections::BTreeSet};
 impl Node {
     #[instrument(skip(self), level = "trace")]
     pub(crate) async fn handle_general_agreements(
-        &self,
+        &mut self,
         proposal: Proposal,
         sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
@@ -43,14 +43,14 @@ impl Node {
                 Ok(vec![])
             }
             Proposal::JoinsAllowed(joins_allowed) => {
-                *self.joins_allowed.write().await = joins_allowed;
+                self.joins_allowed = joins_allowed;
                 Ok(vec![])
             }
         }
     }
 
     pub(crate) async fn handle_online_agreement(
-        &self,
+        &mut self,
         new_info: NodeState,
         sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
@@ -116,7 +116,7 @@ impl Node {
         if !our_prefix.is_empty() {
             // ..otherwise, switch off joins_allowed on a node joining.
             // TODO: fix racing issues here? https://github.com/maidsafe/safe_network/issues/890
-            *self.joins_allowed.write().await = false;
+            self.joins_allowed = false;
         }
 
         let churn_id = ChurnId(new_info.sig.signature.to_bytes().to_vec());
@@ -150,7 +150,7 @@ impl Node {
 
     #[instrument(skip(self))]
     async fn handle_offline_agreement(
-        &self,
+        &mut self,
         node_state: NodeState,
         sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
@@ -165,7 +165,7 @@ impl Node {
 
     #[instrument(skip(self), level = "trace")]
     async fn handle_section_info_agreement(
-        &self,
+        &mut self,
         section_auth: SectionAuthorityProvider,
         sig: KeyedSig,
         generation: Generation,
@@ -222,8 +222,6 @@ impl Node {
         // NB TODO temporary while we wait for Membership generations and possibly double DKG
         let chosen_candidates = self
             .split_barrier
-            .write()
-            .await
             .process(
                 &self.network_knowledge.prefix(),
                 signed_section_auth.clone(),
@@ -252,7 +250,7 @@ impl Node {
 
     #[instrument(skip(self), level = "trace")]
     pub(crate) async fn handle_new_elders_agreement(
-        &self,
+        &mut self,
         signed_section_auth: SectionAuth<SectionAuthorityProvider>,
         key_sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
