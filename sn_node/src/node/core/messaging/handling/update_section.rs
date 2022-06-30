@@ -94,7 +94,7 @@ impl Node {
         let adults_names = adults.iter().map(|p2p_node| p2p_node.name()).collect_vec();
 
         let elders = self.network_knowledge.elders();
-        let my_name = self.info().await.name();
+        let my_name = self.info().name();
 
         // find data targets that are not us.
         let mut target_member_names = adults_names
@@ -135,7 +135,7 @@ impl Node {
     pub(crate) async fn try_reorganize_data(&self) -> Result<Vec<Cmd>> {
         // as an elder we dont want to get any more data for our name
         // (elders will eventually be caching data in general)
-        if self.is_elder().await {
+        if self.is_elder() {
             return Ok(vec![]);
         }
 

@@ -69,7 +69,7 @@ impl Dispatcher {
                 let node = self.node.read().await;
 
                 let src_section_pk = node.network_knowledge().section_key();
-                let wire_msg = WireMsg::single_src(&node.info().await, dst, msg, src_section_pk)?;
+                let wire_msg = WireMsg::single_src(&node.info(), dst, msg, src_section_pk)?;
 
                 let mut cmds = vec![];
                 cmds.extend(node.send_msg_to_nodes(wire_msg).await?);
@@ -89,7 +89,7 @@ impl Dispatcher {
             Cmd::HandleDkgTimeout(token) => {
                 let node = self.node.read().await;
 
-                node.handle_dkg_timeout(token).await
+                node.handle_dkg_timeout(token)
             }
             Cmd::HandleAgreement { proposal, sig } => {
                 let mut node = self.node.write().await;
