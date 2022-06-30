@@ -244,7 +244,7 @@ impl Node {
             return Ok(vec![]);
         }
 
-        if self.is_not_elder().await {
+        if self.is_not_elder() {
             error!("Received unexpected message while Adult: {:?}", msg_id);
             return Ok(vec![]);
         }
@@ -365,7 +365,7 @@ impl Node {
         let _ = permissions.insert(User::Anyone, Permissions::new(true));
 
         // use our own keypair for generating the register command
-        let own_keypair = Keypair::Ed25519(self.info().await.keypair);
+        let own_keypair = Keypair::Ed25519(self.info().keypair);
         let owner = User::Key(own_keypair.public_key());
         let policy = Policy { owner, permissions };
 

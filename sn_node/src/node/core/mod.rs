@@ -231,7 +231,7 @@ impl Node {
         Ok(node)
     }
 
-    pub(crate) async fn info(&self) -> NodeInfo {
+    pub(crate) fn info(&self) -> NodeInfo {
         let keypair = self.keypair.clone();
         let addr = self.addr;
         NodeInfo { keypair, addr }
@@ -328,7 +328,7 @@ impl Node {
 
     pub(super) async fn state_snapshot(&self) -> StateSnapshot {
         StateSnapshot {
-            is_elder: self.is_elder().await,
+            is_elder: self.is_elder(),
             section_key: self.network_knowledge.section_key(),
             prefix: self.network_knowledge.prefix(),
             elders: self.network_knowledge().authority_provider().names(),

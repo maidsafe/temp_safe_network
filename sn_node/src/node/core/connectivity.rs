@@ -24,7 +24,7 @@ impl Node {
             return Ok(vec![]);
         };
 
-        if self.is_not_elder().await {
+        if self.is_not_elder() {
             // Adults cannot complain about connectivity.
             return Ok(vec![]);
         }
