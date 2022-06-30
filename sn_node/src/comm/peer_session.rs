@@ -119,7 +119,7 @@ impl PeerSession {
 #[must_use]
 enum SessionStatus {
     Ok,
-    Terminate,
+    Terminating,
 }
 
 struct PeerSessionWorker {
@@ -158,11 +158,11 @@ impl PeerSessionWorker {
                     self.link.add(conn).await;
                     SessionStatus::Ok
                 }
-                SessionCmd::Terminate => SessionStatus::Terminate,
+                SessionCmd::Terminate => SessionStatus::Terminating,
             };
 
             match status {
-                SessionStatus::Terminate => {
+                SessionStatus::Terminating => {
                     info!("Terminating connection");
                     break;
                 }
@@ -207,7 +207,7 @@ impl PeerSessionWorker {
             Err(err) if err.is_local_close() => {
                 info!("Peer linked dropped");
                 job.reporter.send(SendStatus::PeerLinkDropped);
-                return SessionStatus::Terminate;
+                return SessionStatus::Terminating;
             }
             Err(err) => {
                 warn!("Dropping message to peer but keeping connection alive");
