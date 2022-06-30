@@ -109,7 +109,7 @@ impl Node {
                 // Let's check for entropy before we proceed further
                 // Adult nodes don't need to carry out entropy checking,
                 // however the message shall always be handled.
-                if self.is_elder().await {
+                if self.is_elder() {
                     // For the case of receiving a join request not matching our prefix,
                     // we just let the join request handler to deal with it later on.
                     // We also skip AE check on Anti-Entropy messages
@@ -198,7 +198,7 @@ impl Node {
 
                 let src_location = wire_msg.auth_kind().src();
 
-                if self.is_not_elder().await {
+                if self.is_not_elder() {
                     trace!("Redirecting from adult to section elders");
                     cmds.push(
                         self.ae_redirect_to_our_elders(sender, &src_location, &wire_msg)
@@ -335,7 +335,7 @@ impl Node {
                     sender,
                     msg_id
                 );
-                if self.is_not_elder().await {
+                if self.is_not_elder() {
                     return Ok(vec![]);
                 }
 
@@ -439,7 +439,7 @@ impl Node {
                         if let Some(ref mut joining_as_relocated) = self.relocate_state {
                             let new_node = joining_as_relocated.node.clone();
                             let new_name = new_node.name();
-                            let previous_name = self.info().await.name();
+                            let previous_name = self.info().name();
                             let new_keypair = new_node.keypair.clone();
 
                             info!(
@@ -504,7 +504,7 @@ impl Node {
             }
             SystemMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
-                if self.is_not_elder().await
+                if self.is_not_elder()
                     && join_request.section_key == self.network_knowledge.section_key()
                 {
                     return Ok(vec![]);
@@ -524,7 +524,7 @@ impl Node {
                 proposal,
                 sig_share,
             } => {
-                if self.is_not_elder().await {
+                if self.is_not_elder() {
                     trace!("Adult handling a Propose msg from {}: {:?}", sender, msg_id);
                 }
 
@@ -556,7 +556,7 @@ impl Node {
             SystemMsg::DkgStart(session_id) => {
                 trace!("Handling msg: Dkg-Start {:?} from {}", session_id, sender);
                 self.log_dkg_session(&sender.name()).await;
-                let our_name = self.info().await.name();
+                let our_name = self.info().name();
                 if !session_id.contains_elder(our_name) {
                     return Ok(vec![]);
                 }
@@ -639,7 +639,7 @@ impl Node {
                     msg_id
                 );
 
-                if self.is_elder().await {
+                if self.is_elder() {
                     if full {
                         let changed = self
                             .set_storage_level(&node_id, StorageLevel::from(StorageLevel::MAX)?)
@@ -657,7 +657,7 @@ impl Node {
             }
             SystemMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
                 info!("ReplicateData MsgId: {:?}", msg_id);
-                return if self.is_elder().await {
+                return if self.is_elder() {
                     error!("Received unexpected message while Elder");
                     Ok(vec![])
                 } else {
@@ -778,7 +778,7 @@ impl Node {
                     };
                     let section_pk = self.network_knowledge.section_key();
                     let wire_msg = WireMsg::single_src(
-                        &self.info().await,
+                        &self.info(),
                         DstLocation::Node {
                             name: sender.name(),
                             section_pk,

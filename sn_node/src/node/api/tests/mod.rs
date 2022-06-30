@@ -193,8 +193,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
 
             let nonce: [u8; 32] = rand::random();
             let serialized = bincode::serialize(&(new_node.name(), nonce))?;
-            let nonce_signature =
-                ed25519::sign(&serialized, &node.read().await.info().await.keypair);
+            let nonce_signature = ed25519::sign(&serialized, &node.read().await.info().keypair);
 
             let rp = ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY);
             let data = rp.create_proof_data(&nonce);
@@ -451,7 +450,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
 
             // Force this node to join
-            node.read()
+            node.write()
                 .await
                 .membership
                 .as_mut()
@@ -1131,7 +1130,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
             genesis_sk_set,
         )
         .await?;
-        let info = node.info().await;
+        let info = node.info();
         let section_pk = node.network_knowledge().section_key();
         let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
