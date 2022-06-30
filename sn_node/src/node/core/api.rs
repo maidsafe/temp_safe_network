@@ -69,15 +69,14 @@ impl Node {
     }
 
     pub(crate) async fn relocate(
-        &self,
+        &mut self,
         new_keypair: Arc<Keypair>,
         new_section: NetworkKnowledge,
     ) -> Result<()> {
         // we first try to relocate section info.
         self.network_knowledge.relocated_to(new_section).await?;
 
-        let mut our_keypair = self.keypair.write().await;
-        *our_keypair = new_keypair;
+        self.keypair = new_keypair;
 
         Ok(())
     }

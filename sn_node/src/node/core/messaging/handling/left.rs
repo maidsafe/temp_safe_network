@@ -21,7 +21,7 @@ use std::collections::BTreeSet;
 
 impl Node {
     pub(crate) async fn handle_node_left(
-        &self,
+        &mut self,
         node_state: NodeState,
         sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
@@ -92,7 +92,7 @@ impl Node {
                 .collect(),
         )
         .await?;
-        *self.joins_allowed.write().await = true;
+        self.joins_allowed = true;
 
         Ok(cmds)
     }

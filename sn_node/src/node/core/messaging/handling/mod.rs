@@ -51,7 +51,7 @@ use xor_name::XorName;
 impl Node {
     #[instrument(skip(self, original_bytes, comm))]
     pub(crate) async fn handle_msg(
-        &self,
+        &mut self,
         sender: Peer,
         wire_msg: WireMsg,
         original_bytes: Option<Bytes>,
@@ -258,7 +258,7 @@ impl Node {
     // Handler for all system messages
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn handle_system_msg(
-        &self,
+        &mut self,
         sender: Peer,
         msg_id: MsgId,
         mut msg_authority: NodeMsgAuthority,
@@ -296,7 +296,7 @@ impl Node {
     // Handler for data messages which have successfully
     // passed all signature checks and msg verifications
     pub(crate) async fn handle_valid_msg(
-        &self,
+        &mut self,
         msg_id: MsgId,
         msg_authority: NodeMsgAuthority,
         node_msg: SystemMsg,
@@ -343,7 +343,7 @@ impl Node {
             }
             SystemMsg::JoinAsRelocatedResponse(join_response) => {
                 trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
-                if let Some(ref mut joining_as_relocated) = *self.relocate_state.write().await {
+                if let Some(ref mut joining_as_relocated) = self.relocate_state {
                     if let Some(cmd) = joining_as_relocated
                         .handle_join_response(*join_response, sender.addr())
                         .await?
@@ -436,9 +436,7 @@ impl Node {
                         );
                         info!("Relocation: Successfully aggregated ApprovalShares for joining the network");
 
-                        if let Some(ref mut joining_as_relocated) =
-                            *self.relocate_state.write().await
-                        {
+                        if let Some(ref mut joining_as_relocated) = self.relocate_state {
                             let new_node = joining_as_relocated.node.clone();
                             let new_name = new_node.name();
                             let previous_name = self.info().await.name();
@@ -563,7 +561,7 @@ impl Node {
                     return Ok(vec![]);
                 }
                 if let NodeMsgAuthority::Section(authority) = msg_authority {
-                    let _existing = self.dkg_sessions.write().await.insert(
+                    let _existing = self.dkg_sessions.insert(
                         session_id.hash(),
                         DkgSessionInfo {
                             session_id: session_id.clone(),
@@ -622,7 +620,7 @@ impl Node {
                 let changed = self.set_storage_level(&node_id, level).await;
                 if changed && level.value() == MIN_LEVEL_WHEN_FULL {
                     // ..then we accept a new node in place of the full node
-                    *self.joins_allowed.write().await = true;
+                    self.joins_allowed = true;
                 }
                 Ok(vec![])
             }
@@ -648,7 +646,7 @@ impl Node {
                             .await;
                         if changed {
                             // ..then we accept a new node in place of the full node
-                            *self.joins_allowed.write().await = true;
+                            self.joins_allowed = true;
                         }
                     }
                     self.replicate_data(data).await
@@ -666,7 +664,7 @@ impl Node {
                     let mut cmds = vec![];
 
                     let section_pk = PublicKey::Bls(self.network_knowledge.section_key());
-                    let own_keypair = Keypair::Ed25519(self.keypair.read().await.clone());
+                    let own_keypair = Keypair::Ed25519(self.keypair.clone());
 
                     for data in data_collection {
                         // We are an adult here, so just store away!
@@ -685,7 +683,7 @@ impl Node {
                                 // db full
                                 error!("Not enough space to store more data");
 
-                                let node_id = PublicKey::from(self.keypair.read().await.public);
+                                let node_id = PublicKey::from(self.keypair.public);
                                 let msg = SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
                                     node_id,
                                     data,
@@ -764,13 +762,7 @@ impl Node {
                 session_id,
                 message,
             } => {
-                if let Some(session_info) = self
-                    .dkg_sessions
-                    .read()
-                    .await
-                    .get(&session_id.hash())
-                    .cloned()
-                {
+                if let Some(session_info) = self.dkg_sessions.get(&session_id.hash()).cloned() {
                     let message_cache = self.dkg_voter.get_cached_msgs(&session_info.session_id);
                     trace!(
                         "Sending DkgSessionInfo {{ {:?}, ... }} to {}",
@@ -831,7 +823,7 @@ impl Node {
                     warn!("Chain: {:?}", chain);
                     return Ok(cmds);
                 };
-                let _existing = self.dkg_sessions.write().await.insert(
+                let _existing = self.dkg_sessions.insert(
                     session_id.hash(),
                     DkgSessionInfo {
                         session_id: session_id.clone(),
@@ -853,7 +845,7 @@ impl Node {
         let mut cmds = vec![];
         if let Some(level) = level {
             info!("Storage has now passed {} % used.", 10 * level.value());
-            let node_id = PublicKey::from(self.keypair.read().await.public);
+            let node_id = PublicKey::from(self.keypair.public);
             let node_xorname = XorName::from(node_id);
 
             // we ask the section to record the new level reached
