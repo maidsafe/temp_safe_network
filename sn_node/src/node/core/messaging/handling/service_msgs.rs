@@ -146,7 +146,7 @@ impl Node {
             response: query_response,
             correlation_id,
         };
-        let (auth_kind, payload) = self.ed_sign_client_msg(&msg).await?;
+        let (auth_kind, payload) = self.ed_sign_client_msg(&msg)?;
 
         for peer in waiting_peers.iter() {
             let dst = DstLocation::EndUser(EndUser(peer.name()));

@@ -22,7 +22,7 @@ use xor_name::XorName;
 
 // Resource signed
 impl Node {
-    pub(crate) async fn validate_resource_proof_response(
+    pub(crate) fn validate_resource_proof_response(
         &self,
         peer_name: &XorName,
         response: ResourceProofResponse,
@@ -35,8 +35,6 @@ impl Node {
 
         if self
             .keypair
-            .read()
-            .await
             .public
             .verify(&serialized, &response.nonce_signature)
             .is_err()
@@ -56,7 +54,7 @@ impl Node {
             data_size: RESOURCE_PROOF_DATA_SIZE,
             difficulty: RESOURCE_PROOF_DIFFICULTY,
             nonce,
-            nonce_signature: ed25519::sign(&serialized, &*self.keypair.read().await),
+            nonce_signature: ed25519::sign(&serialized, &self.keypair),
         }));
 
         trace!("{}", LogMarker::SendResourceProofChallenge);

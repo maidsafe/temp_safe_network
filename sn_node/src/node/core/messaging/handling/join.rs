@@ -30,7 +30,7 @@ const FIRST_SECTION_MIN_ELDER_AGE: u8 = 90;
 // Message handling
 impl Node {
     pub(crate) async fn handle_join_request(
-        &self,
+        &mut self,
         peer: Peer,
         join_request: JoinRequest,
         comm: &Comm,
@@ -39,10 +39,7 @@ impl Node {
 
         // Require resource signed if joining as a new node.
         if let Some(response) = join_request.resource_proof_response {
-            if !self
-                .validate_resource_proof_response(&peer.name(), response)
-                .await
-            {
+            if !self.validate_resource_proof_response(&peer.name(), response) {
                 debug!("Ignoring JoinRequest from {peer} - invalid resource signed response");
                 return Ok(vec![]);
             }
@@ -83,7 +80,7 @@ impl Node {
             ]);
         }
 
-        if !*self.joins_allowed.read().await {
+        if !self.joins_allowed {
             debug!(
                 "Rejecting JoinRequest from {} - joins currently not allowed.",
                 peer,
@@ -203,7 +200,7 @@ impl Node {
     }
 
     pub(crate) async fn handle_join_as_relocated_request(
-        &self,
+        &mut self,
         peer: Peer,
         join_request: JoinAsRelocatedRequest,
         known_keys: Vec<BlsPublicKey>,
