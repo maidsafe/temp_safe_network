@@ -103,7 +103,7 @@ impl Node {
                 return Ok(None);
             };
 
-        let node = self.info().await;
+        let node = self.info();
         if dst_xorname != node.name() {
             // This `Relocate` message is not for us - it's most likely a duplicate of a previous
             // message that we already handled.

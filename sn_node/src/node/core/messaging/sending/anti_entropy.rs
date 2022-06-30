@@ -23,7 +23,7 @@ use xor_name::Prefix;
 impl Node {
     /// Send `AntiEntropyUpdate` message to all nodes in our own section.
     pub(crate) async fn send_ae_update_to_our_section(&self) -> Vec<Cmd> {
-        let our_name = self.info().await.name();
+        let our_name = self.info().name();
         let nodes: Vec<_> = self
             .network_knowledge
             .section_members()
