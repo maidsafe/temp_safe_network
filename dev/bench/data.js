@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1656491925637,
+  "lastUpdate": 1656578620646,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -6539,6 +6539,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 5205697131,
             "range": "± 10449702",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "gabrielviganotti@gmail.com",
+            "name": "bochaco",
+            "username": "bochaco"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "5dad80d3f239f5844243fedb89f8d4baaee3b640",
+          "message": "feat(dbc): have the nodes to attach valid Commitments to signed SpentProofShares\n\nBREAKING CHANGE: SpentbookCmd::Spend message now also carries the spent proofs for nodes to verify.",
+          "timestamp": "2022-06-30T10:07:45+02:00",
+          "tree_id": "1836ea199cdc421bbcf64fc4b35633260b2d14da",
+          "url": "https://github.com/maidsafe/safe_network/commit/5dad80d3f239f5844243fedb89f8d4baaee3b640"
+        },
+        "date": 1656578619519,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 5239493247,
+            "range": "± 6498114",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 5278490236,
+            "range": "± 40629787",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 5524248028,
+            "range": "± 19727983",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 5013591124,
+            "range": "± 1422565",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 5033169407,
+            "range": "± 4517554",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 5656577162,
+            "range": "± 284626250",
             "unit": "ns/iter"
           }
         ]
