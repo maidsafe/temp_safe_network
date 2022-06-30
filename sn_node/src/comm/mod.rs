@@ -298,6 +298,15 @@ impl Comm {
                             );
                             continue; // moves on to awaiting a new change
                         }
+                        SendStatus::MaxRetriesReached => {
+                            error!(
+                                "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed, as we've reached maximum retries",
+                                msg_id,
+                                addr,
+                                name,
+                            );
+                            return Err(Error::FailedSend(*recipient));
+                        }
                     }
                 }
             }
@@ -429,6 +438,11 @@ impl Comm {
                                 );
                                 tokio::time::sleep(Duration::from_millis(200)).await;
                                 continue;
+                            }
+                            SendStatus::MaxRetriesReached => {
+                                info!("Max retries reached");
+                                try_next(Error::FailedSend(recipient), recipient, &mut tasks);
+                                break; // we now move to checking next recipient send task..
                             }
                         }
                     }

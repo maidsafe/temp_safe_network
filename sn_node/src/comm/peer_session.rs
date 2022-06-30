@@ -27,6 +27,7 @@ use tokio::{sync::mpsc, time::Instant};
 // TODO: temporarily disable priority while we transition to channels
 // type Priority = i32;
 
+const MAX_SENDJOB_RETRIES: usize = 10;
 const DEFAULT_DESIRED_RATE: f64 = 10.0; // 10 msgs / s
 
 #[derive(Debug)]
@@ -48,7 +49,8 @@ impl PeerSession {
     pub(crate) fn new(link: Link) -> PeerSession {
         let (sender, receiver) = mpsc::channel(1000);
 
-        let _ = tokio::task::spawn_local(PeerSessionWorker::new(link).run(receiver));
+        let _ =
+            tokio::task::spawn_local(PeerSessionWorker::new(link, sender.clone()).run(receiver));
 
         PeerSession { channel: sender }
     }
@@ -90,7 +92,7 @@ impl PeerSession {
         let job = SendJob {
             msg_id,
             msg_bytes,
-            retries: 3,
+            retries: 0,
             reporter,
         };
 
@@ -123,6 +125,7 @@ enum SessionStatus {
 }
 
 struct PeerSessionWorker {
+    queue: mpsc::Sender<SessionCmd>,
     link: Link,
     sent: MsgThroughput,
     attempted: MsgThroughput,
@@ -130,8 +133,9 @@ struct PeerSessionWorker {
 }
 
 impl PeerSessionWorker {
-    fn new(link: Link) -> Self {
+    fn new(link: Link, queue: mpsc::Sender<SessionCmd>) -> Self {
         Self {
+            queue,
             link,
             sent: MsgThroughput::default(),
             attempted: MsgThroughput::default(),
@@ -184,7 +188,12 @@ impl PeerSessionWorker {
         info!("Finished peer session shutdown");
     }
 
-    async fn send(&mut self, job: SendJob) -> SessionStatus {
+    async fn send(&mut self, mut job: SendJob) -> SessionStatus {
+        if job.retries > MAX_SENDJOB_RETRIES {
+            job.reporter.send(SendStatus::MaxRetriesReached);
+            return SessionStatus::Ok;
+        }
+
         let actual_rate = self.attempted.value();
         if actual_rate > self.peer_desired_rate {
             let diff = actual_rate - self.peer_desired_rate;
@@ -210,9 +219,16 @@ impl PeerSessionWorker {
                 return SessionStatus::Terminating;
             }
             Err(err) => {
-                warn!("Dropping message to peer but keeping connection alive");
+                warn!("Transient error while attempting to send, re-enqueing job {err:?}");
                 job.reporter
                     .send(SendStatus::TransientError(format!("{err:?}")));
+
+                job.retries += 1;
+
+                if let Err(e) = self.queue.send(SessionCmd::Send(job)).await {
+                    warn!("Failed to re-enqueue job after transient error {e:?}");
+                    return SessionStatus::Terminating;
+                }
             }
         }
 
@@ -282,6 +298,7 @@ pub(crate) enum SendStatus {
     PeerLinkDropped,
     TransientError(String),
     WatcherDropped,
+    MaxRetriesReached,
 }
 
 pub(crate) struct SendWatcher {
