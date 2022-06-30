@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1656578620646,
+  "lastUpdate": 1656579032901,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -6599,6 +6599,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 5656577162,
             "range": "± 284626250",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bzeeman@live.nl",
+            "name": "Benno Zeeman",
+            "username": "b-zee"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "2ab264744de8eeff8e26ff1423de32dadded688f",
+          "message": "chore(cleanup): small cleanup tweaks to node bin",
+          "timestamp": "2022-06-30T10:05:49+02:00",
+          "tree_id": "a58f0ce9bf78e70a8c8e3bc9118a72bb45bad40a",
+          "url": "https://github.com/maidsafe/safe_network/commit/2ab264744de8eeff8e26ff1423de32dadded688f"
+        },
+        "date": 1656579031444,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 5253169488,
+            "range": "± 6290520",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 5294651528,
+            "range": "± 55727783",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 5628842902,
+            "range": "± 39366080",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 5016136987,
+            "range": "± 3173382",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 5040931198,
+            "range": "± 4755680",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 5289594594,
+            "range": "± 16087234",
             "unit": "ns/iter"
           }
         ]
