@@ -58,7 +58,7 @@ impl Node {
 
             if holder_adult_list.contains(&sender.name()) {
                 debug!("Our requester should hold: {:?}", data);
-                let _existed = data_for_sender.push(data);
+                data_for_sender.push(data);
             }
         }
 

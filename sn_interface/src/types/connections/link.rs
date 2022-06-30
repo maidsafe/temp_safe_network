@@ -88,7 +88,7 @@ impl Link {
     /// This is due to the fact that we do never leak the qp2p::Connection outside of this struct,
     /// since that struct is cloneable and uses Arc internally.
     pub async fn disconnect(self) {
-        let _ = self.queue.write().await.clear();
+        self.queue.write().await.clear();
         let mut guard = self.connections.write().await;
         for (_, item) in guard.iter() {
             item.conn

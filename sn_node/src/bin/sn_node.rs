@@ -223,7 +223,7 @@ pub struct FileRotateAppender {
     writer: FileRotate<AppendCount>,
 }
 
-impl<'a> FileRotateAppender {
+impl FileRotateAppender {
     /// Create default `FileRotateAppender`
     pub fn new(directory: impl AsRef<Path>, file_name_prefix: impl AsRef<Path>) -> Self {
         let log_directory = directory.as_ref().to_str().unwrap();
