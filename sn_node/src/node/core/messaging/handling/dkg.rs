@@ -65,7 +65,7 @@ impl Node {
         let cmds = self
             .dkg_voter
             .start(
-                &self.info().await,
+                &self.info(),
                 session_id,
                 self.network_knowledge().section_key(),
             )
@@ -93,7 +93,7 @@ impl Node {
         self.dkg_voter
             .process_msg(
                 sender,
-                &self.info().await,
+                &self.info(),
                 &session_id,
                 message,
                 self.network_knowledge().section_key(),
@@ -115,7 +115,7 @@ impl Node {
             session_id,
         };
         let wire_msg = WireMsg::single_src(
-            &self.info().await,
+            &self.info(),
             DstLocation::Node {
                 name: sender.name(),
                 section_pk,
@@ -149,7 +149,7 @@ impl Node {
         let mut cmds = self
             .dkg_voter
             .handle_dkg_history(
-                &self.info().await,
+                &self.info(),
                 session_id,
                 message_history,
                 sender.name(),
@@ -159,7 +159,7 @@ impl Node {
 
         cmds.extend(
             self.dkg_voter
-                .process_msg(sender, &self.info().await, session_id, message, section_key)
+                .process_msg(sender, &self.info(), session_id, message, section_key)
                 .await?,
         );
         Ok(cmds)

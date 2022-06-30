@@ -114,7 +114,7 @@ impl FlowCtrl {
 
                 // Send a probe message if we are an elder
                 let node = &self.node;
-                if node.read().await.is_elder().await
+                if node.read().await.is_elder()
                     && !node.read().await.network_knowledge().prefix().is_empty()
                 {
                     match node.read().await.generate_probe_msg().await {
@@ -168,7 +168,7 @@ impl FlowCtrl {
             loop {
                 let _instant = interval.tick().await;
 
-                if !dispatcher.node.read().await.is_elder().await {
+                if !dispatcher.node.read().await.is_elder() {
                     continue;
                 }
                 trace!("looping vote check in elder");
@@ -238,7 +238,7 @@ impl FlowCtrl {
                     {
                         // get info for the WireMsg
                         let src_section_pk = node.read().await.network_knowledge().section_key();
-                        let our_info = node.read().await.info().await;
+                        let our_info = node.read().await.info();
 
                         let mut recipients = vec![];
 
@@ -363,8 +363,8 @@ impl FlowCtrl {
             loop {
                 let _ = interval.tick().await;
 
-                let node = &self.node;
-                let our_info = node.info().await;
+                let node = self.node.read().await;
+                let our_info = node.info();
                 let our_name = our_info.name();
 
                 let members = node.network_knowledge().section_members();
@@ -437,7 +437,7 @@ async fn handle_connection_events(ctrl: FlowCtrl, mut incoming_conns: mpsc::Rece
 
                 let span = {
                     let node = &ctrl.node;
-                    trace_span!("handle_message", name = %node.read().await.info().await.name(), ?sender, msg_id = ?wire_msg.msg_id())
+                    trace_span!("handle_message", name = %node.read().await.info().name(), ?sender, msg_id = ?wire_msg.msg_id())
                 };
                 let _span_guard = span.enter();
 

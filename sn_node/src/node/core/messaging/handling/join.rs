@@ -54,7 +54,7 @@ impl Node {
         // Ignore `JoinRequest` if we are not elder, unless the join request
         // is outdated in which case we'll reply with `JoinResponse::Retry`
         // with the up-to-date info.
-        if self.is_not_elder().await && section_key_matches {
+        if self.is_not_elder() && section_key_matches {
             // Note: We don't bounce this message because the current bounce-resend
             // mechanism wouldn't preserve the original SocketAddr which is needed for
             // properly handling this message.

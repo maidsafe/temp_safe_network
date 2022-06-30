@@ -263,7 +263,7 @@ impl Node {
 
         info!("New SAP agreed for:{}", *signed_section_auth);
 
-        let our_name = self.info().await.name();
+        let our_name = self.info().name();
 
         // Let's update our network knowledge, including our
         // section SAP and chain if the new SAP's prefix matches our name
