@@ -121,9 +121,9 @@ impl Session {
         let mut received_ack = 0;
         let mut received_err = 0;
         let mut attempts = 0;
-        let interval = Duration::from_millis(1000);
+        let interval = Duration::from_millis(50);
         let expected_cmd_ack_wait_attempts =
-            std::cmp::max(10, self.cmd_ack_wait.as_millis() / interval.as_millis());
+            std::cmp::max(200, self.cmd_ack_wait.as_millis() / interval.as_millis());
         loop {
             match receiver.try_recv() {
                 Ok((src, None)) => {
