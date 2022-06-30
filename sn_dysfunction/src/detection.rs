@@ -936,7 +936,7 @@ mod knowledge_tests {
 
         // Add a new adults
         let new_adult = random_xorname();
-        let _ = dysfunctional_detection.add_new_node(new_adult).await;
+        dysfunctional_detection.add_new_node(new_adult).await;
 
         // Add just one knowledge issue...
         for _ in 0..1 {

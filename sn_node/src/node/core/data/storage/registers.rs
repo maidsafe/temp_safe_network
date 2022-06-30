@@ -272,7 +272,7 @@ impl RegisterStorage {
                     );
                     continue;
                 }
-                let _ = self.apply(replicated_cmd).await?;
+                self.apply(replicated_cmd).await?;
             }
         }
 
@@ -328,7 +328,7 @@ impl RegisterStorage {
                 }
 
                 // insert the op to the event log
-                let _ = store.append(cmd)?;
+                store.append(cmd)?;
                 self.used_space.increase(required_space);
 
                 Ok(())
@@ -763,7 +763,7 @@ mod test {
 
         // create register
         let (cmd, authority) = create_register()?;
-        let _ = store.write(cmd.clone()).await?;
+        store.write(cmd.clone()).await?;
 
         // get register
 
@@ -798,7 +798,7 @@ mod test {
 
         // create register
         let (cmd, authority) = create_register()?;
-        let _ = store.write(cmd.clone()).await?;
+        store.write(cmd.clone()).await?;
 
         // export db
         // get all data in db
@@ -808,7 +808,7 @@ mod test {
         // create new db and update it with the data from first db
         let new_store = new_store()?;
 
-        let _ = new_store.update(for_update).await?;
+        new_store.update(for_update).await?;
         let address = cmd.dst_address();
         // assert the same tests hold as for the first db
 
@@ -844,7 +844,7 @@ mod test {
 
         // create register
         let (cmd, authority) = create_register()?;
-        let _ = store.write(cmd.clone()).await?;
+        store.write(cmd.clone()).await?;
 
         let hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
 
@@ -873,7 +873,7 @@ mod test {
 
         // create register
         let (cmd, authority) = create_register()?;
-        let _ = store.write(cmd.clone()).await?;
+        store.write(cmd.clone()).await?;
 
         let (user, _) = random_user();
 
