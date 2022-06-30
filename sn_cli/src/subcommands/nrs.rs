@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use std::fmt::Write as _;
+
 use super::{
     helpers::{get_from_arg_or_stdin, get_target_url, serialise_output},
     OutputFmt,
@@ -82,12 +84,15 @@ async fn run_register_subcommand(
     match safe.nrs_create(&name).await {
         Ok(topname_url) => {
             let mut summary = String::new();
-            summary.push_str("The container for the map is located at ");
-            summary.push_str(&topname_url.to_xorurl_string());
+            write!(
+                summary,
+                "The container for the map is located at {}",
+                topname_url.to_xorurl_string()
+            )?;
             if let Some(ref link) = link {
                 let url = get_target_url(link)?;
                 let _ = associate_url_with_public_name(&name, safe, &url).await?;
-                summary.push_str(&format!("\nThe entry points to {link}"));
+                write!(summary, "\nThe entry points to {link}")?;
             }
             print_summary(
                 output_fmt,
@@ -147,27 +152,28 @@ async fn run_add_subcommand(
 
     let mut summary_header = String::new();
     if topname_was_registered {
-        summary_header.push_str("New NRS Map created.\n");
-        summary_header.push_str("The container for the map is located at ");
-        summary_header.push_str(
-            &SafeUrl::from_url(&format!("safe://{}", url.top_name()))?.to_xorurl_string(),
-        );
+        writeln!(summary_header, "New NRS Map created.")?;
+        write!(
+            summary_header,
+            "The container for the map is located at {}",
+            SafeUrl::from_url(&format!("safe://{}", url.top_name()))?.to_xorurl_string()
+        )?;
     } else {
-        summary_header.push_str("Existing NRS Map updated. ");
+        write!(summary_header, "Existing NRS Map updated. ")?;
     }
     let version = url
         .content_version()
         .ok_or_else(|| eyre!("Content version not set for returned NRS SafeUrl"))?
         .to_string();
-    summary_header.push_str(&format!("\nNow at version {}. ", version));
+    write!(summary_header, "\nNow at version {version}. ")?;
 
     if default {
         let topname = get_topname_from_public_name(&name)?;
         associate_url_with_public_name(&topname, safe, &link_url).await?;
-        summary_header.push_str(&format!(
-            "This link was also set as the default location for {}.",
-            topname
-        ));
+        write!(
+            summary_header,
+            "This link was also set as the default location for {topname}."
+        )?;
     }
     print_summary(
         output_fmt,
