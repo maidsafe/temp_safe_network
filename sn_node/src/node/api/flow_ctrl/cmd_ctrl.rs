@@ -78,7 +78,7 @@ impl CmdCtrl {
         session
     }
 
-    pub(crate) fn node(&self) -> Arc<crate::node::core::Node> {
+    pub(crate) fn node(&self) -> Arc<RwLock<crate::node::core::Node>> {
         self.dispatcher.node()
     }
 

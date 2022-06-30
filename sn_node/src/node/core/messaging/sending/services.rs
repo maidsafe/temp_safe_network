@@ -46,7 +46,7 @@ impl Node {
     async fn send_cmd_response(&self, target: Peer, msg: ServiceMsg) -> Result<Vec<Cmd>> {
         let dst = DstLocation::EndUser(EndUser(target.name()));
 
-        let (auth_kind, payload) = self.ed_sign_client_msg(&msg).await?;
+        let (auth_kind, payload) = self.ed_sign_client_msg(&msg)?;
         let wire_msg = WireMsg::new_msg(MsgId::new(), payload, auth_kind, dst)?;
 
         let cmd = Cmd::SendMsg {
@@ -58,11 +58,8 @@ impl Node {
     }
 
     /// Currently using node's Ed key. May need to use bls key share for concensus purpose.
-    pub(crate) async fn ed_sign_client_msg(
-        &self,
-        client_msg: &ServiceMsg,
-    ) -> Result<(AuthKind, Bytes)> {
-        let keypair = self.keypair.read().await.clone();
+    pub(crate) fn ed_sign_client_msg(&self, client_msg: &ServiceMsg) -> Result<(AuthKind, Bytes)> {
+        let keypair = self.keypair.clone();
         let payload = WireMsg::serialize_msg_payload(client_msg)?;
         let signature = keypair.sign(&payload);
 

@@ -30,7 +30,7 @@ use std::collections::BTreeSet;
 use xor_name::XorName;
 
 impl Node {
-    pub(crate) async fn handle_dkg_start(&self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
+    pub(crate) async fn handle_dkg_start(&mut self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
         let current_generation = self.network_knowledge.chain_len();
         if session_id.section_chain_len < current_generation {
             trace!("Skipping DkgStart for older generation: {:?}", &session_id);
@@ -59,12 +59,9 @@ impl Node {
         }
 
         trace!("Received DkgStart for {:?}", session_id);
-        self.dkg_sessions
-            .write()
-            .await
-            .retain(|_, existing_session_info| {
-                existing_session_info.session_id.section_chain_len >= session_id.section_chain_len
-            });
+        self.dkg_sessions.retain(|_, existing_session_info| {
+            existing_session_info.session_id.section_chain_len >= session_id.section_chain_len
+        });
         let cmds = self
             .dkg_voter
             .start(
@@ -234,7 +231,7 @@ impl Node {
     }
 
     pub(crate) async fn handle_dkg_outcome(
-        &self,
+        &mut self,
         sap: SectionAuthorityProvider,
         key_share: SectionKeyShare,
         generation: Generation,
