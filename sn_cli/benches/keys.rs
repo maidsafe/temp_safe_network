@@ -6,10 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-#[macro_use]
-extern crate duct;
 use criterion::Criterion;
-
+use duct::cmd;
 use sn_cmd_test_utilities::util::get_bin_location;
 use std::time::Duration;
 
@@ -32,7 +30,7 @@ fn bench_cli_keys(c: &mut Criterion) {
     c.bench_function("generating keys", |b| {
         b.iter(|| {
             //  use the safe command, so for bench it has to be installed
-            cmd!(get_bin_location(), "keys", "create", "--test-coins")
+            cmd!(get_bin_location().unwrap(), "keys", "create")
                 .read()
                 .unwrap()
         })

@@ -13,7 +13,7 @@ pub mod util {
     use multibase::{encode, Base};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use sn_api::{files::ProcessedFiles, resolver::SafeData, SafeUrl};
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use std::{collections::BTreeMap, env, fs, process};
     use tiny_keccak::{Hasher, Sha3};
     use walkdir::WalkDir;
@@ -88,17 +88,23 @@ pub mod util {
         Ok(metadata.len())
     }
 
-    pub fn get_bin_location() -> String {
+    pub fn get_bin_location() -> Result<PathBuf> {
         let target_dir = match env::var("CARGO_TARGET_DIR") {
-            Ok(target_dir) => target_dir,
-            Err(_) => "target".to_string(),
+            Ok(target_dir) => PathBuf::from(target_dir),
+            Err(_) => {
+                // cargo-criterion takes .../safe_network as current_dir, while cargo bench takes
+                // .../safe_network/sn_cli as current_dir. Assuming cargo-criterion is being used
+                let current_dir = std::env::current_dir()?;
+                current_dir.join("target")
+            }
         };
 
-        if cfg!(debug_assertions) {
-            format!("{}{}", target_dir, "/debug/safe")
+        let target_dir = if cfg!(debug_assertions) {
+            target_dir.join("debug/safe")
         } else {
-            format!("{}{}", target_dir, "/release/safe")
-        }
+            target_dir.join("release/safe")
+        };
+        Ok(target_dir)
     }
 
     pub fn create_nrs_link(name: &str, link: &str) -> Result<SafeUrl> {
