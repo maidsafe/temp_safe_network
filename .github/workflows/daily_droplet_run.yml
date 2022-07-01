@@ -199,8 +199,8 @@ jobs:
       - name: Download network config
         shell: bash
         run: |
-          mkdir -p ~/.safe/node
-          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-node_connection_info.config > ~/.safe/node/node_connection_info.config
+          mkdir -p ~/.safe/prefix_maps
+          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-prefix-map > ~/.safe/prefix_maps/default
 
       - name: Build all test targets
         run: cargo test --no-run --release
@@ -242,11 +242,12 @@ jobs:
       - name: Set TESTNET_ID env
         shell: bash
         run: echo "TESTNET_ID=gha-testnet-$(echo ${{ github.event.pull_request.head.sha || github.sha }} | cut -c 1-7)" >> $GITHUB_ENV
-      - name: Download network config
+      - name: Download network prefix map
         shell: bash
         run: |
-          mkdir -p ~/.safe/node
-          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-node_connection_info.config > ~/.safe/node/node_connection_info.config
+          mkdir -p ~/.safe/prefix_maps
+          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-prefix-map > ~/.safe/prefix_maps/default
+
       - uses: Swatinem/rust-cache@v1
         continue-on-error: true
         with:
@@ -298,8 +299,8 @@ jobs:
       - name: Download network config
         shell: bash
         run: |
-          mkdir -p ~/.safe/node
-          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-node_connection_info.config > ~/.safe/node/node_connection_info.config
+          mkdir -p ~/.safe/prefix_maps
+          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-prefix-map > ~/.safe/prefix_maps/default
 
       - name: Build all CLI tests
         run: cargo test --no-run -p sn_cli --release
