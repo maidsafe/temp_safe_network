@@ -20,8 +20,7 @@
   - [Node Management](#node-management)
   - [Run a Local Network](#run-a-local-network)
   - [Connect to a Remote Network](#connect-to-a-remote-network)
-    - [Connection Info via HTTP](#connection-info-via-http)
-    - [Direct Connection Info](#direct-connection-info)
+    - [Network Map via HTTP](#network-map-via-http)
     - [Provide a Node](#provide-a-node)
 - [XorUrl](#xorurl)
 - [Keys](#xorurl)
@@ -244,8 +243,6 @@ Node PID: 1025437, prefix: Prefix(), name: 260ca3(00100110).., age: 72, connecti
 "127.0.0.1:48606"
 Node PID: 1025475, prefix: Prefix(), name: c5feb4(11000101).., age: 70, connection info:
 "127.0.0.1:42312"
-Creating '/home/chris/.safe/cli/networks' folder for networks connection info cache
-Caching current network connection information into '/home/chris/.safe/cli/networks/baby-fleming_node_connection_info.config'
 ```
 
 If you now run `safe networks`, you will see the newly created network in your networks list:
@@ -253,9 +250,9 @@ If you now run `safe networks`, you will see the newly created network in your n
 +----------+--------------+-------------------------------------------------------------------------+
 | Networks |              |                                                                         |
 +----------+--------------+-------------------------------------------------------------------------+
-| Current  | Network name | Connection info                                                         |
+| Current  | Network name | Network map info                                                        |
 +----------+--------------+-------------------------------------------------------------------------+
-| *        | baby-fleming | /home/chris/.safe/cli/networks/baby-fleming_node_connection_info.config |
+| *        | baby-fleming | Local: "/home/chris/.safe/prefix_maps/PublicKey(0704..73ae)"            |
 +----------+--------------+-------------------------------------------------------------------------+
 ```
 
@@ -275,14 +272,14 @@ However, you can feel free to keep this network running but still connect to ano
 
 We'll describe the process for connecting to a remote network using a couple of example networks created by our [testnet tool](https://github.com/maidsafe/sn_testnet_tool). We'll call these networks 'alpha' and 'beta'.
 
-To connect to a network, we need to obtain its node connection information. This can be provided using different mechanisms. Contact the owner(s)/administrator(s) of the network you're trying to connect to and ask them to provide you with the connection info.
+To connect to a network, we need to obtain its network map. This can be provided using different mechanisms. Contact the owner(s)/administrator(s) of the network you're trying to connect to and ask them to provide you with the network map.
 
-#### Connection Info via HTTP
+#### Network Map via HTTP
 
-People who run networks can keep a copy of the connection info at some http location. In our case, we have this connection information hosted in an S3 bucket, and this is available via http. We can add a new network and use this http location for the connection info:
+People who run networks can keep a copy of the network map at some http location. In our case, we have this map hosted in an S3 bucket, and this is available via http. We can add a new network and use this http location for the network map:
 ```
-$ safe networks add alpha https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/alpha-node_connection_info.config
-Network 'alpha' was added to the list. Connection information is located at 'https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/alpha-node_connection_info.config'
+$ safe networks add alpha https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/TESTNET_ID-prefix-map
+Network 'alpha' was added to the list. Network map is located at 'https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/TESTNET_ID-prefix-map'
 ```
 
 We've given this network the name 'alpha', but it can be named however you wish to refer to it. Run `safe networks` to see it in the networks list:
@@ -291,11 +288,11 @@ $ safe networks
 +----------+--------------+----------------------------------------------------------------------------------------+
 | Networks |              |                                                                                        |
 +----------+--------------+----------------------------------------------------------------------------------------+
-| Current  | Network name | Connection info                                                                        |
+| Current  | Network name | Network map info                                                                       |
 +----------+--------------+----------------------------------------------------------------------------------------+
-|          | alpha        | https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/alpha-node_connection_info.config |
+|          | alpha        | Remote: "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/TESTNET_ID-prefix-map"   |
 +----------+--------------+----------------------------------------------------------------------------------------+
-| *        | baby-fleming | /home/chris/.safe/cli/networks/baby-fleming_node_connection_info.config                |
+| *        | baby-fleming | Local: "/home/chris/.safe/prefix_maps/PublicKey(0704..73ae)"                           |
 +----------+--------------+----------------------------------------------------------------------------------------+
 
 ```
@@ -304,7 +301,6 @@ Notice our new network isn't set as the current network, meaning any `safe` comm
 ```
 $ safe networks switch alpha
 Switching to 'alpha' network...
-Fetching 'alpha' network connection information from 'https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/alpha-node_connection_info.config' ...
 Successfully switched to 'alpha' network in your system!
 ```
 
@@ -313,34 +309,15 @@ You can then run `safe networks` to see the current network has changed:
 +----------+--------------+----------------------------------------------------------------------------------------+
 | Networks |              |                                                                                        |
 +----------+--------------+----------------------------------------------------------------------------------------+
-| Current  | Network name | Connection info                                                                        |
+| Current  | Network name | Network map info                                                                       |
 +----------+--------------+----------------------------------------------------------------------------------------+
-| *        | alpha        | https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/alpha-node_connection_info.config |
+| *        | alpha        | Remote: "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/TESTNET_ID-prefix-map"   |
 +----------+--------------+----------------------------------------------------------------------------------------+
-|          | baby-fleming | /home/chris/.safe/cli/networks/baby-fleming_node_connection_info.config                |
+|          | baby-fleming | Local: "/home/chris/.safe/prefix_maps/PublicKey(0704..73ae)"                           |
 +----------+--------------+----------------------------------------------------------------------------------------+
 ```
 
 At this point, you can now start using this network. Try uploading some files and retrieving them.
-
-#### Direct Connection Info
-
-If for some reason connection info isn't available via http, the network owner can directly provide the network's genesis key and the list of IP and port pairs for each node. These can then be added as a network using the `networks set` command:
-```
-$ safe networks set beta \
-    a857bf4e8cce3ab97a6e6c27c2308eebe640ccf57e0447182b732b41f6b04a9796edce5bf151fbfa522b01bcfbbfefa0 \
-    178.62.57.53:12000 167.99.88.95:12000 178.128.41.85:12000 206.189.23.17:12000 \
-    178.128.42.138:12000 178.128.173.109:12000 167.99.199.158:12000 142.93.41.250:12000 \
-    206.189.117.149:12000 209.97.191.137:12000 104.248.171.51:12000 142.93.41.143:12000 \
-    167.99.199.11:12000 104.248.174.35:12000 178.128.162.247:12000 209.97.189.244:12000
-Network 'beta' was added to the list. Contacts: '(PublicKey(0857..aa81), {104.248.171.51:12000, 104.248.174.35:12000, 142.93.41.143:12000, 142.93.41.250:12000, 167.99.88.95:12000, 167.99.199.11:12000, 167.99.199.158:12000, 178.62.57.53:12000, 178.128.41.85:12000, 178.128.42.138:12000, 178.128.162.247:12000, 178.128.173.109:12000, 206.189.23.17:12000, 206.189.117.149:12000, 209.97.189.244:12000, 209.97.191.137:12000})'
-```
-
-As can be seen, this method isn't as convenient as http, but nonetheless, it's available if need be.
-
-If you run `safe networks`, you'll now see 'beta' in the networks list, and you can run `safe networks switch beta` to start using this network.
-
-Perhaps give that a try by uploading some files, then switch between each network.
 
 ### Provide a Node
 
