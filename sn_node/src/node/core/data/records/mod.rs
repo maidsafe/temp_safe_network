@@ -168,7 +168,7 @@ impl Node {
         self.capacity.retain_members_only(&members).await;
 
         // stop tracking liveness of absent holders
-        let _ = self.dysfunction_tracking.retain_members_only(members).await;
+        self.dysfunction_tracking.retain_members_only(members).await;
 
         Ok(())
     }
@@ -178,7 +178,7 @@ impl Node {
         info!("Adding new Adult: {adult} to trackers");
         self.capacity.add_new_adult(adult).await;
 
-        let _ = self.dysfunction_tracking.add_new_node(adult).await;
+        self.dysfunction_tracking.add_new_node(adult).await;
     }
 
     /// Set storage level of a given node.

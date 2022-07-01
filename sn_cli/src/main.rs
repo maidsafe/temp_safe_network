@@ -11,10 +11,12 @@ mod cli;
 mod operations;
 mod subcommands;
 
+use std::fmt::Write as _;
+use std::panic::set_hook;
+
 use cli::run;
 use color_eyre::{eyre::eyre, Help, Report, Result};
 use human_panic::{handle_dump, Metadata};
-use std::panic::set_hook;
 use tracing::{self, debug};
 use tracing_subscriber::filter::EnvFilter;
 
@@ -61,15 +63,20 @@ async fn main() -> Result<(), Report> {
         };
 
         let mut error_msg = String::new();
-        error_msg.push_str("The Safe CLI had a problem and crashed. To help us diagnose the problem you can send us a crash report.\n\n");
-        match handle_dump(&metadata, panic_info) {
-            Some(report_filepath) => error_msg.push_str(&format!("We have generated a report file at \"{}\". Please submit an issue, including the report as an attachment, at {}.\n", report_filepath.display(), env!("CARGO_PKG_REPOSITORY"))),
-            None => error_msg.push_str(&format!("Please submit an issue, including details to reproduce it, at {}.\n", env!("CARGO_PKG_REPOSITORY"))),
-        }
-        error_msg.push_str(
-            "Alternatively, you can report it on our dev forum at: https://forum.safedev.org.\n\n",
+        let _ = writeln!(error_msg, "The Safe CLI had a problem and crashed. To help us diagnose the problem you can send us a crash report.");
+        let _ = writeln!(error_msg);
+
+        let _ = match handle_dump(&metadata, panic_info) {
+            Some(report_filepath) => writeln!(error_msg, "We have generated a report file at \"{}\". Please submit an issue, including the report as an attachment, at {}.", report_filepath.display(), env!("CARGO_PKG_REPOSITORY")),
+            None => writeln!(error_msg, "Please submit an issue, including details to reproduce it, at {}.", env!("CARGO_PKG_REPOSITORY")),
+        };
+        let _ = writeln!(
+            error_msg,
+            "Alternatively, you can report it on our dev forum at: https://forum.safedev.org"
         );
-        error_msg.push_str("In order to improve the software, we rely on people to submit reports.\n\nThank you kindly!\n");
+        let _ = writeln!(error_msg);
+        let _ = writeln!(error_msg, "In order to improve the software, we rely on people to submit reports.\n\nThank you kindly!");
+
         eprintln!("{}", error_msg);
     }));
 

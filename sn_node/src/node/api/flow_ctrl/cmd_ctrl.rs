@@ -87,7 +87,7 @@ impl CmdCtrl {
         let mut results = vec![];
 
         for cmd in cmds {
-            let _ = results.push(self.push(cmd).await);
+            results.push(self.push(cmd).await);
         }
 
         results

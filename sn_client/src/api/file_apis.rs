@@ -202,7 +202,7 @@ impl Client {
 
         for res in respones {
             // fail with any issue here
-            let _ = res?;
+            res?;
         }
 
         Ok(head_address)
@@ -507,7 +507,7 @@ mod tests {
         let results = join_all(tasks).await;
 
         for res in results {
-            let _ok = res??;
+            res??;
         }
 
         // TODO: we need to use the node log analysis to check the mem usage across nodes does not exceed X
