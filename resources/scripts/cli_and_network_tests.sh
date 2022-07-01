@@ -70,7 +70,7 @@ function run_testnet() {
         git clone https://github.com/maidsafe/sn_testnet_tool.git
         cd sn_testnet_tool
         export SN_TESTNET_NODE_VERSION="${SN_NODE_VERSION}"
-        make $TESTNET_NAME # Runs testnet and copies config to ~/.safe/node/node_connection_info.config
+        make $TESTNET_NAME # Runs testnet and copies prefix-map to ~/.safe/prefix_maps
     )
 }
 
