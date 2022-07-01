@@ -60,7 +60,7 @@ use std::{
 };
 use tempfile::tempdir;
 use tokio::{
-    sync::mpsc,
+    sync::{mpsc, RwLock},
     time::{timeout, Duration},
 };
 use xor_name::{Prefix, XorName};
@@ -97,7 +97,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
                 root_storage_dir,
             )
             .await?;
-            let dispatcher = Dispatcher::new(Arc::new(node), comm);
+            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
             let new_node_comm = create_comm().await?;
             let new_node = NodeInfo::new(
@@ -183,7 +183,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
                 root_storage_dir,
             )
             .await?;
-            let node = Arc::new(node);
+            let node = Arc::new(RwLock::new(node));
             let dispatcher = Dispatcher::new(node.clone(), comm);
 
             let new_node = NodeInfo::new(
@@ -193,7 +193,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
 
             let nonce: [u8; 32] = rand::random();
             let serialized = bincode::serialize(&(new_node.name(), nonce))?;
-            let nonce_signature = ed25519::sign(&serialized, &node.info().await.keypair);
+            let nonce_signature = ed25519::sign(&serialized, &node.read().await.info().keypair);
 
             let rp = ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY);
             let data = rp.create_proof_data(&nonce);
@@ -227,19 +227,18 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
                 .await?;
 
             assert!(node
-                .membership
                 .read()
                 .await
+                .membership
                 .as_ref()
                 .unwrap()
                 .is_churn_in_progress());
             // makes sure that the nonce signature is always valid
             let random_peer = Peer::new(xor_name::rand::random(), gen_addr());
-            assert!(
-                !node
-                    .validate_resource_proof_response(&random_peer.name(), resource_proof_response)
-                    .await
-            );
+            assert!(!node
+                .read()
+                .await
+                .validate_resource_proof_response(&random_peer.name(), resource_proof_response));
             Result::<()>::Ok(())
         })
         .await
@@ -276,7 +275,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
                 root_storage_dir,
             )
             .await?;
-            let node = Arc::new(node);
+            let node = Arc::new(RwLock::new(node));
             let dispatcher = Dispatcher::new(node.clone(), comm);
 
             let relocated_node = NodeInfo::new(
@@ -324,9 +323,9 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
                 .await?;
 
             assert!(node
-                .membership
                 .read()
                 .await
+                .membership
                 .as_ref()
                 .unwrap()
                 .is_churn_in_progress());
@@ -364,7 +363,7 @@ async fn handle_agreement_on_online() -> Result<()> {
                 root_storage_dir,
             )
             .await?;
-            let dispatcher = Dispatcher::new(Arc::new(node), comm);
+            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
             let new_peer = create_peer(MIN_ADULT_AGE);
 
@@ -440,7 +439,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 root_storage_dir,
             )
             .await?;
-            let node = Arc::new(node);
+            let node = Arc::new(RwLock::new(node));
             let dispatcher = Dispatcher::new(node.clone(), comm);
 
             // Handle agreement on Online of a peer that is older than the youngest
@@ -451,9 +450,9 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
 
             // Force this node to join
-            node.membership
-                .write()
+            node.write()
                 .await
+                .membership
                 .as_mut()
                 .unwrap()
                 .force_bootstrap(node_state.to_msg());
@@ -616,7 +615,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
                 root_storage_dir,
             )
             .await?;
-            let dispatcher = Dispatcher::new(Arc::new(node), comm);
+            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
             // Simulate peer with the same name is rejoin and verify resulted behaviours.
             let status = handle_online_cmd(&peer, &sk_set, &dispatcher, &section_auth).await?;
@@ -693,7 +692,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
                 root_storage_dir,
             )
             .await?;
-            let node = Arc::new(node);
+            let node = Arc::new(RwLock::new(node));
             let dispatcher = Dispatcher::new(node.clone(), comm);
 
             let node_state = NodeState::left(existing_peer, None);
@@ -705,6 +704,8 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
                 .await?;
 
             assert!(!node
+                .read()
+                .await
                 .network_knowledge()
                 .section_members()
                 .contains(&node_state));
@@ -754,7 +755,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
                 root_storage_dir,
             )
             .await?;
-            let node = Arc::new(node);
+            let node = Arc::new(RwLock::new(node));
             let dispatcher = Dispatcher::new(node.clone(), comm);
 
             // Handle agreement on the Offline proposal
@@ -768,9 +769,9 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
             // Verify we initiated a membership churn
 
             assert!(node
-                .membership
                 .read()
                 .await
+                .membership
                 .as_ref()
                 .unwrap()
                 .is_churn_in_progress());
@@ -881,7 +882,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                 .insert(create_section_key_share(&sk_set2, 0))
                 .await;
 
-            let dispatcher = Dispatcher::new(Arc::new(node), comm);
+            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
             let _cmds = dispatcher
                 .process_cmd(Cmd::HandleMsg {
@@ -954,7 +955,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
             )
             .await?;
 
-            let node = Arc::new(node);
+            let node = Arc::new(RwLock::new(node));
             let dispatcher = Dispatcher::new(node.clone(), comm);
 
             let sender = gen_info(MIN_ADULT_AGE, None);
@@ -977,9 +978,9 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
                 })
                 .await?;
 
-            assert_eq!(node.network_knowledge().genesis_key(), &pk0);
+            assert_eq!(node.read().await.network_knowledge().genesis_key(), &pk0);
             assert_eq!(
-                node.network_knowledge().prefix_map().all(),
+                node.read().await.network_knowledge().prefix_map().all(),
                 vec![section_signed_our_section_auth.value]
             );
             Result::<()>::Ok(())
@@ -1044,7 +1045,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             root_storage_dir,
         )
         .await?;
-        let dispatcher = Dispatcher::new(Arc::new(node), comm);
+        let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
         let relocated_peer = match relocated_peer_role {
             RelocatedPeerRole::Elder => *section_auth.elders().nth(1).expect("too few elders"),
@@ -1129,9 +1130,9 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
             genesis_sk_set,
         )
         .await?;
-        let info = node.info().await;
+        let info = node.info();
         let section_pk = node.network_knowledge().section_key();
-        let dispatcher = Dispatcher::new(Arc::new(node), comm);
+        let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
         let dst_location = match dst {
             MessageDst::Node => DstLocation::Node {
@@ -1267,7 +1268,7 @@ async fn handle_elders_update() -> Result<()> {
             .insert(create_section_key_share(&sk_set1, 0))
             .await;
 
-        let dispatcher = Dispatcher::new(Arc::new(node), comm);
+        let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
         let cmds = dispatcher
             .process_cmd(Cmd::HandleNewEldersAgreement { proposal, sig })
@@ -1419,7 +1420,7 @@ async fn handle_demote_during_split() -> Result<()> {
                     .await;
             }
 
-            let dispatcher = Dispatcher::new(Arc::new(node), comm);
+            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
             // Create agreement on `OurElder` for both sub-sections
             let create_our_elders_cmd = |signed_sap| -> Result<_> {

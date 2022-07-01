@@ -306,7 +306,7 @@ mod tests {
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
         let nodes_to_retain = adults[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
 
-        let _ = dysfunctional_detection
+        dysfunctional_detection
             .retain_members_only(nodes_to_retain.clone())
             .await;
 
@@ -356,7 +356,7 @@ mod tests {
 
         let nodes_to_retain = adults[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
 
-        let _ = dysfunctional_detection
+        dysfunctional_detection
             .retain_members_only(nodes_to_retain.clone())
             .await;
 
@@ -439,7 +439,7 @@ mod tests {
         let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
 
         let new_adult = random_xorname();
-        let _ = dysfunctional_detection.add_new_node(new_adult).await;
+        dysfunctional_detection.add_new_node(new_adult).await;
 
         let current_nodes = dysfunctional_detection.current_nodes().await;
 

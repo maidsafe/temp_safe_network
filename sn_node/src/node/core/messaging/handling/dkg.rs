@@ -30,7 +30,7 @@ use std::collections::BTreeSet;
 use xor_name::XorName;
 
 impl Node {
-    pub(crate) async fn handle_dkg_start(&self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
+    pub(crate) async fn handle_dkg_start(&mut self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
         let current_generation = self.network_knowledge.chain_len();
         if session_id.section_chain_len < current_generation {
             trace!("Skipping DkgStart for older generation: {:?}", &session_id);
@@ -59,16 +59,13 @@ impl Node {
         }
 
         trace!("Received DkgStart for {:?}", session_id);
-        self.dkg_sessions
-            .write()
-            .await
-            .retain(|_, existing_session_info| {
-                existing_session_info.session_id.section_chain_len >= session_id.section_chain_len
-            });
+        self.dkg_sessions.retain(|_, existing_session_info| {
+            existing_session_info.session_id.section_chain_len >= session_id.section_chain_len
+        });
         let cmds = self
             .dkg_voter
             .start(
-                &self.info().await,
+                &self.info(),
                 session_id,
                 self.network_knowledge().section_key(),
             )
@@ -96,7 +93,7 @@ impl Node {
         self.dkg_voter
             .process_msg(
                 sender,
-                &self.info().await,
+                &self.info(),
                 &session_id,
                 message,
                 self.network_knowledge().section_key(),
@@ -118,7 +115,7 @@ impl Node {
             session_id,
         };
         let wire_msg = WireMsg::single_src(
-            &self.info().await,
+            &self.info(),
             DstLocation::Node {
                 name: sender.name(),
                 section_pk,
@@ -152,7 +149,7 @@ impl Node {
         let mut cmds = self
             .dkg_voter
             .handle_dkg_history(
-                &self.info().await,
+                &self.info(),
                 session_id,
                 message_history,
                 sender.name(),
@@ -162,7 +159,7 @@ impl Node {
 
         cmds.extend(
             self.dkg_voter
-                .process_msg(sender, &self.info().await, session_id, message, section_key)
+                .process_msg(sender, &self.info(), session_id, message, section_key)
                 .await?,
         );
         Ok(cmds)
@@ -234,7 +231,7 @@ impl Node {
     }
 
     pub(crate) async fn handle_dkg_outcome(
-        &self,
+        &mut self,
         sap: SectionAuthorityProvider,
         key_share: SectionKeyShare,
         generation: Generation,

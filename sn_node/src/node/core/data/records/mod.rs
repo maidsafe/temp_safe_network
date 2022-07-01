@@ -38,7 +38,7 @@ impl Node {
     // Locate ideal holders for this data, line up wiremsgs for those to instruct them to store the data
     pub(crate) async fn replicate_data(&self, data: ReplicatedData) -> Result<Vec<Cmd>> {
         trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
-        if self.is_elder().await {
+        if self.is_elder() {
             let targets = self.get_adults_who_should_store_data(data.name()).await;
 
             info!(
@@ -168,7 +168,7 @@ impl Node {
         self.capacity.retain_members_only(&members).await;
 
         // stop tracking liveness of absent holders
-        let _ = self.dysfunction_tracking.retain_members_only(members).await;
+        self.dysfunction_tracking.retain_members_only(members).await;
 
         Ok(())
     }
@@ -178,7 +178,7 @@ impl Node {
         info!("Adding new Adult: {adult} to trackers");
         self.capacity.add_new_adult(adult).await;
 
-        let _ = self.dysfunction_tracking.add_new_node(adult).await;
+        self.dysfunction_tracking.add_new_node(adult).await;
     }
 
     /// Set storage level of a given node.
@@ -284,15 +284,14 @@ impl Node {
         // we create a dummy/random dst location,
         // we will set it correctly for each msg and target
         let section_pk = self.network_knowledge().section_key();
-        let our_name = self.info().await.name();
+        let our_name = self.info().name();
         let dummy_dst_location = DstLocation::Node {
             name: our_name,
             section_pk,
         };
 
         // separate this into form_wire_msg based on agg
-        let wire_msg =
-            WireMsg::single_src(&self.info().await, dummy_dst_location, msg, section_pk)?;
+        let wire_msg = WireMsg::single_src(&self.info(), dummy_dst_location, msg, section_pk)?;
 
         let mut cmds = vec![];
 

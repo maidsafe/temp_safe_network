@@ -78,7 +78,7 @@ impl CmdCtrl {
         session
     }
 
-    pub(crate) fn node(&self) -> Arc<crate::node::core::Node> {
+    pub(crate) fn node(&self) -> Arc<RwLock<crate::node::core::Node>> {
         self.dispatcher.node()
     }
 
@@ -87,7 +87,7 @@ impl CmdCtrl {
         let mut results = vec![];
 
         for cmd in cmds {
-            let _ = results.push(self.push(cmd).await);
+            results.push(self.push(cmd).await);
         }
 
         results

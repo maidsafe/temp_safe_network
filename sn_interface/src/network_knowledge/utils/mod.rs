@@ -46,8 +46,7 @@ pub async fn compare_and_write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap)
         .await
         .map_err(|e| Error::FileHandling(e.to_string()))?;
 
-    let _ = file
-        .write_all(&serialized)
+    file.write_all(&serialized)
         .await
         .map_err(|e| Error::FileHandling(e.to_string()))?;
 

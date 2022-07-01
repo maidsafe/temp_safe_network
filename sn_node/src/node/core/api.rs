@@ -56,15 +56,14 @@ impl Node {
     }
 
     pub(crate) async fn relocate(
-        &self,
+        &mut self,
         new_keypair: Arc<Keypair>,
         new_section: NetworkKnowledge,
     ) -> Result<()> {
         // we first try to relocate section info.
         self.network_knowledge.relocated_to(new_section).await?;
 
-        let mut our_keypair = self.keypair.write().await;
-        *our_keypair = new_keypair;
+        self.keypair = new_keypair;
 
         Ok(())
     }
@@ -78,12 +77,12 @@ impl Node {
     }
 
     /// Is this node an elder?
-    pub(crate) async fn is_elder(&self) -> bool {
-        self.network_knowledge.is_elder(&self.info().await.name())
+    pub(crate) fn is_elder(&self) -> bool {
+        self.network_knowledge.is_elder(&self.info().name())
     }
 
-    pub(crate) async fn is_not_elder(&self) -> bool {
-        !self.is_elder().await
+    pub(crate) fn is_not_elder(&self) -> bool {
+        !self.is_elder()
     }
 
     /// Returns the current BLS public key set
@@ -119,12 +118,9 @@ impl Node {
     //   ---------------------------------- Mut ------------------------------------------
     // ----------------------------------------------------------------------------------------
 
-    pub(crate) async fn handle_dkg_timeout(&self, token: u64) -> Result<Vec<Cmd>> {
-        self.dkg_voter.handle_timeout(
-            &self.info().await,
-            token,
-            self.network_knowledge().section_key(),
-        )
+    pub(crate) fn handle_dkg_timeout(&self, token: u64) -> Result<Vec<Cmd>> {
+        self.dkg_voter
+            .handle_timeout(&self.info(), token, self.network_knowledge().section_key())
     }
 
     // Send message to peers on the network.
@@ -132,7 +128,7 @@ impl Node {
         let dst_location = wire_msg.dst_location();
         let (targets, dg_size) = delivery_group::delivery_targets(
             dst_location,
-            &self.info().await.name(),
+            &self.info().name(),
             &self.network_knowledge,
         )?;
 
@@ -140,7 +136,7 @@ impl Node {
 
         // To avoid loop: if destination is to Node, targets are multiple, self is an elder,
         //     self section prefix matches the destination name, then don't carry out a relay.
-        if self.is_elder().await
+        if self.is_elder()
             && targets.len() > 1
             && dst_location.is_to_node()
             && self.network_knowledge.prefix().matches(&target_name)

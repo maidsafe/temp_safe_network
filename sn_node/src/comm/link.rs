@@ -88,7 +88,7 @@ impl Link {
     /// This is due to the fact that we do never leak the qp2p::Connection outside of this struct,
     /// since that struct is cloneable and uses Arc internally.
     pub(crate) fn disconnect(&mut self) {
-        let _ = self.queue.clear();
+        self.queue.clear();
         for item in self.connections.values() {
             item.conn
                 .close(Some("We disconnected from peer.".to_string()));

@@ -49,7 +49,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
 use xor_name::{Prefix, XorName};
 
 /// Interface for sending and receiving messages to and from other nodes, in the role of a full
@@ -61,7 +61,7 @@ use xor_name::{Prefix, XorName};
 /// role, and can be `use sn_interface::messaging::SrcLocation::Node` or `use sn_interface::messaging::SrcLocation::Section`.
 #[allow(missing_debug_implementations)]
 pub struct NodeApi {
-    node: Arc<Node>,
+    node: Arc<RwLock<Node>>,
     flow_ctrl: FlowCtrl,
 }
 
@@ -98,7 +98,7 @@ impl NodeApi {
         .map_err(|_| Error::JoinTimeout)??;
 
         // Network keypair may have to be changed due to naming criteria or network requirements.
-        let keypair_as_bytes = api.node.keypair.read().await.to_bytes();
+        let keypair_as_bytes = api.node.read().await.keypair.to_bytes();
         store_network_keypair(root_dir, keypair_as_bytes).await?;
 
         let our_pid = std::process::id();
@@ -256,13 +256,13 @@ impl NodeApi {
             )
             .await?;
 
-            info!("{} Joined the network!", node.info().await.name());
-            info!("Our AGE: {}", node.info().await.age());
+            info!("{} Joined the network!", node.info().name());
+            info!("Our AGE: {}", node.info().age());
 
             (node, comm)
         };
 
-        let node = Arc::new(node);
+        let node = Arc::new(RwLock::new(node));
         let cmd_ctrl = CmdCtrl::new(
             Dispatcher::new(node.clone(), comm),
             monitoring,
@@ -276,57 +276,57 @@ impl NodeApi {
 
     /// Returns the current age of this node.
     pub async fn age(&self) -> u8 {
-        self.node.info().await.age()
+        self.node.read().await.info().age()
     }
 
     /// Returns the ed25519 public key of this node.
     pub async fn public_key(&self) -> PublicKey {
-        self.node.keypair.read().await.public
+        self.node.read().await.keypair.public
     }
 
     /// The name of this node.
     pub async fn name(&self) -> XorName {
-        self.node.info().await.name()
+        self.node.read().await.info().name()
     }
 
     /// Returns connection info of this node.
     pub async fn our_connection_info(&self) -> SocketAddr {
-        self.node.info().await.addr
+        self.node.read().await.info().addr
     }
 
     /// Returns the Section Signed Chain
     pub async fn section_chain(&self) -> SecuredLinkedList {
-        self.node.section_chain().await
+        self.node.read().await.section_chain().await
     }
 
     /// Returns the Section Chain's genesis key
     pub async fn genesis_key(&self) -> bls::PublicKey {
-        *self.node.network_knowledge().genesis_key()
+        *self.node.read().await.network_knowledge().genesis_key()
     }
 
     /// Prefix of our section
     pub async fn our_prefix(&self) -> Prefix {
-        self.node.network_knowledge().prefix()
+        self.node.read().await.network_knowledge().prefix()
     }
 
     /// Returns whether the node is Elder.
     pub async fn is_elder(&self) -> bool {
-        self.node.is_elder().await
+        self.node.read().await.is_elder()
     }
 
     /// Returns the information of all the current section elders.
     pub async fn our_elders(&self) -> Vec<Peer> {
-        self.node.network_knowledge().elders()
+        self.node.read().await.network_knowledge().elders()
     }
 
     /// Returns the information of all the current section adults.
     pub async fn our_adults(&self) -> Vec<Peer> {
-        self.node.network_knowledge().adults()
+        self.node.read().await.network_knowledge().adults()
     }
 
     /// Returns the info about the section matching the name.
     pub async fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        self.node.matching_section(name).await
+        self.node.read().await.matching_section(name).await
     }
 
     /// Builds a WireMsg signed by this Node
@@ -336,7 +336,12 @@ impl NodeApi {
         dst: DstLocation,
     ) -> Result<WireMsg> {
         let src_section_pk = *self.section_chain().await.last_key();
-        WireMsg::single_src(&self.node.info().await, dst, node_msg, src_section_pk)
+        WireMsg::single_src(
+            &self.node.read().await.info(),
+            dst,
+            node_msg,
+            src_section_pk,
+        )
     }
 
     /// Send a message.
@@ -348,7 +353,7 @@ impl NodeApi {
             wire_msg.msg_id()
         );
 
-        if let Some(cmd) = self.node.send_msg_to_nodes(wire_msg).await? {
+        if let Some(cmd) = self.node.read().await.send_msg_to_nodes(wire_msg).await? {
             self.flow_ctrl.fire_and_forget(cmd).await?;
         }
 
@@ -358,6 +363,6 @@ impl NodeApi {
     /// Returns the current BLS public key set if this node has one, or
     /// `Error::MissingSecretKeyShare` otherwise.
     pub async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        self.node.public_key_set().await
+        self.node.read().await.public_key_set().await
     }
 }

@@ -103,7 +103,7 @@ mod tests {
         let serialized_keypair_file = tmp_dir.child("serialized_keypair");
 
         let sk = BlsSecretKey::random();
-        let _ = Safe::serialize_bls_key(&sk, serialized_keypair_file.path())?;
+        Safe::serialize_bls_key(&sk, serialized_keypair_file.path())?;
 
         serialized_keypair_file.assert(predicate::path::is_file());
 
@@ -119,7 +119,7 @@ mod tests {
         let serialized_keypair_file = tmp_dir.child("serialized_keypair");
 
         let sk = BlsSecretKey::random();
-        let _ = Safe::serialize_bls_key(&sk, serialized_keypair_file.path())?;
+        Safe::serialize_bls_key(&sk, serialized_keypair_file.path())?;
 
         let sk2 = Safe::deserialize_bls_key(serialized_keypair_file.path())?;
         assert_eq!(sk, sk2);
