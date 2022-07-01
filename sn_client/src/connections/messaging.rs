@@ -28,7 +28,7 @@ use rand::{rngs::OsRng, seq::SliceRandom};
 use secured_linked_list::SecuredLinkedList;
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::{
-    sync::mpsc::{channel, Sender},
+    sync::mpsc::{channel, Receiver, Sender},
     sync::RwLock,
     task::JoinHandle,
 };
@@ -107,12 +107,25 @@ impl Session {
         let wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst_location)?;
 
         // The insertion of channel will be executed AFTER the completion of the `send_message`.
-        let (sender, mut receiver) = channel::<CmdResponse>(elders_len);
+        let (sender, receiver) = channel::<CmdResponse>(elders_len);
         let _ = self.pending_cmds.insert(msg_id, sender);
         trace!("Inserted channel for cmd {:?}", msg_id);
 
         send_msg(self.clone(), elders, wire_msg, msg_id).await?;
 
+        self.wait_for_cmd_acks(elders_len, receiver, msg_id).await?;
+        trace!("Wait for any cmd response/reaction (AE msgs eg), is over)");
+        Ok(())
+    }
+
+    #[instrument(skip(self, receiver), level = "debug")]
+    /// Wait for cmd acks before returning
+    pub(crate) async fn wait_for_cmd_acks(
+        &self,
+        elders_len: usize,
+        mut receiver: Receiver<(SocketAddr, Option<CmdError>)>,
+        msg_id: MsgId,
+    ) -> Result<()> {
         let expected_acks = elders_len * 2 / 3 + 1;
 
         // We are not wait for the receive of majority of cmd Acks.
@@ -123,7 +136,7 @@ impl Session {
         let mut attempts = 0;
         let interval = Duration::from_millis(50);
         let expected_cmd_ack_wait_attempts =
-            std::cmp::max(200, self.cmd_ack_wait.as_millis() / interval.as_millis());
+            std::cmp::max(100, self.cmd_ack_wait.as_millis() / interval.as_millis());
         loop {
             match receiver.try_recv() {
                 Ok((src, None)) => {
@@ -167,7 +180,6 @@ impl Session {
             tokio::time::sleep(interval).await;
         }
 
-        trace!("Wait for any cmd response/reaction (AE msgs eg), is over)");
         Ok(())
     }
 
