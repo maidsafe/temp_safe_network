@@ -92,7 +92,7 @@ impl PeerSession {
         let job = SendJob {
             msg_id,
             msg_bytes,
-            retries: 0,
+            retry_attempt_count: 0,
             reporter,
         };
 
@@ -189,7 +189,7 @@ impl PeerSessionWorker {
     }
 
     async fn send(&mut self, mut job: SendJob) -> SessionStatus {
-        if job.retries > MAX_SENDJOB_RETRIES {
+        if job.retry_attempt_count > MAX_SENDJOB_RETRIES {
             job.reporter.send(SendStatus::MaxRetriesReached);
             return SessionStatus::Ok;
         }
@@ -223,7 +223,7 @@ impl PeerSessionWorker {
                 job.reporter
                     .send(SendStatus::TransientError(format!("{err:?}")));
 
-                job.retries += 1;
+                job.retry_attempt_count += 1;
 
                 if let Err(e) = self.queue.send(SessionCmd::Send(job)).await {
                     warn!("Failed to re-enqueue job after transient error {e:?}");
@@ -269,7 +269,7 @@ pub(crate) struct SendJob {
     msg_id: MsgId,
     #[debug(skip)]
     msg_bytes: Bytes,
-    retries: usize, // TAI: Do we need this if we are using QP2P's retry
+    retry_attempt_count: usize, // TAI: Do we need this if we are using QP2P's retry
     reporter: StatusReporting,
 }
 
@@ -277,7 +277,7 @@ impl PartialEq for SendJob {
     fn eq(&self, other: &Self) -> bool {
         self.msg_id == other.msg_id
             && self.msg_bytes == other.msg_bytes
-            && self.retries == other.retries
+            && self.retry_attempt_count == other.retry_attempt_count
     }
 }
 
@@ -287,7 +287,7 @@ impl std::hash::Hash for SendJob {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.msg_id.hash(state);
         self.msg_bytes.hash(state);
-        self.retries.hash(state);
+        self.retry_attempt_count.hash(state);
     }
 }
 
