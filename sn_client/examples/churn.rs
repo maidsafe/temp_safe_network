@@ -36,6 +36,8 @@ const NODES_DIR: &str = "local-test-network";
 const INTERVAL: &str = "10000";
 const RUST_LOG: &str = "RUST_LOG";
 const ADDITIONAL_NODES_TO_SPLIT: u64 = 12;
+const FILES_TO_PUT: i32 = 40;
+const FILE_SIZE_LENGTH: usize = 1024 * 1024 * 10; // 10mb
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -137,13 +139,10 @@ pub async fn run_split() -> Result<()> {
 
     // leave a longer interval with more nodes to allow for splits if using split amounts
     let _interval_duration = Duration::from_millis(*interval_as_int);
-    // sleep(interval_duration).await;
-    // println!("Done sleeping....");
 
     let mut all_data_put = vec![];
 
-    let files_to_put: i32 = 40;
-    for _i in 0..files_to_put {
+    for _i in 0..FILES_TO_PUT {
         let (address, hash) = upload_data().await?;
         all_data_put.push((address, hash));
     }
@@ -160,15 +159,17 @@ pub async fn run_split() -> Result<()> {
     debug!("Adding testnet nodes with args: {:?}", sn_launch_tool_args);
 
     // We can now call the tool with the args
-    info!("Adding nodes to the local Safe network...");
+    info!("Adding more nodes to the local Safe network...");
     Launch::from_iter_safe(&sn_launch_tool_args)
         .map_err(|error| eyre!(error))
         .and_then(|launch| launch.run())
         .wrap_err("Error adding nodes to the testnet")?;
 
+    info!("nodes added, waiting to ensure all joined");
     let interval_duration = Duration::from_millis(*interval_as_int);
 
     sleep(interval_duration).await;
+    info!("wait over");
 
     // now we read the data
     let (genesis_key, bootstrap_nodes) =
@@ -177,6 +178,7 @@ pub async fn run_split() -> Result<()> {
     let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
     let client = Client::new(config, bootstrap_nodes, None, None).await?;
 
+    info!("=========> new client set up, starting read tests post churn.");
     for (address, hash) in all_data_put {
         println!("...reading bytes at address {:?} ...", address);
         let mut bytes = client.read_bytes(address).await;
@@ -185,7 +187,7 @@ pub async fn run_split() -> Result<()> {
         while bytes.is_err() && attempts < 10 {
             attempts += 1;
             // do some retries to ensure we're not just timing out by chance
-            sleep(Duration::from_secs(1)).await;
+            sleep(Duration::from_millis(100)).await;
             bytes = client.read_bytes(address).await;
         }
 
@@ -215,7 +217,7 @@ async fn upload_data() -> Result<(XorName, [u8; 32])> {
     let config = ClientConfig::new(None, None, genesis_key, None, None, None, None).await;
     let client = Client::new(config, bootstrap_nodes, None, None).await?;
 
-    let bytes = random_bytes(1024 * 1024 * 10);
+    let bytes = random_bytes(FILE_SIZE_LENGTH);
 
     let mut hasher = Sha3::v256();
     let mut output = [0; 32];
@@ -227,9 +229,9 @@ async fn upload_data() -> Result<(XorName, [u8; 32])> {
     let address = client.upload(bytes).await?;
     println!("Bytes stored at address: {:?}", address);
 
-    let delay = 2;
-    println!("Reading bytes from the network in {} secs...", delay);
-    sleep(Duration::from_secs(delay)).await;
+    let delay = 300;
+    println!("Reading bytes from the network in {} millisecs...", delay);
+    sleep(Duration::from_millis(delay)).await;
 
     println!("...reading bytes from the network now...");
     let mut bytes = client.read_bytes(address).await;
@@ -238,7 +240,7 @@ async fn upload_data() -> Result<(XorName, [u8; 32])> {
     while bytes.is_err() && attempts < 10 {
         attempts += 1;
         // do some retries to ensure we're not just timing out by chance
-        sleep(Duration::from_secs(1)).await;
+        sleep(Duration::from_millis(100)).await;
         bytes = client.read_bytes(address).await;
     }
 
