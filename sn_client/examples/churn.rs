@@ -33,7 +33,7 @@ const SAFE_NODE_EXECUTABLE: &str = "sn_node";
 const SAFE_NODE_EXECUTABLE: &str = "sn_node.exe";
 
 const NODES_DIR: &str = "local-test-network";
-const INTERVAL: &str = "10000";
+const INTERVAL: &str = "1000";
 const RUST_LOG: &str = "RUST_LOG";
 const ADDITIONAL_NODES_TO_SPLIT: u64 = 12;
 

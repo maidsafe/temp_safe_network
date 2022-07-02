@@ -150,6 +150,8 @@ impl Dispatcher {
                             .insert(data, Arc::new(RwLock::new(peer_set)));
                     }
                 }
+
+                debug!("data batch added");
                 Ok(vec![])
             }
             Cmd::SendMsgDeliveryGroup {

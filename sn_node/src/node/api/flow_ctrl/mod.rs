@@ -224,6 +224,7 @@ impl FlowCtrl {
                     if let Some((data_address, data_recipients)) =
                         node.pending_data_to_replicate_to_peers.remove(&address)
                     {
+                        debug!("Data queued to be replicated");
                         // get info for the WireMsg
                         let src_section_pk = node.network_knowledge().section_key();
                         let our_info = node.info().await;
