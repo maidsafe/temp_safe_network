@@ -191,6 +191,9 @@ pub enum Error {
     /// Spentbook error
     #[error("Spentbook Error: {0}")]
     SpentbookError(String),
+    /// Error occurred when minting the Genesis DBC.
+    #[error("Genesis DBC error:: {0}")]
+    GenesisDbcError(String),
 }
 
 impl From<qp2p::ClientEndpointError> for Error {

@@ -50,8 +50,17 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::sync::mpsc;
+use tokio::{fs, sync::mpsc};
 use xor_name::{Prefix, XorName};
+
+// Filename for storing the content of the genesis DBC.
+// The Genesis DBC is generated and owned by the genesis PK of the network's section chain,
+// i.e. the very first section key in the chain.
+// The first node mints the genesis DBC (as a bearer DBC) and stores it in a file
+// named `genesis_dbc`, located at it's configured root dir.
+// In current implementation the amount owned by the Genesis DBC is
+// set to GENESIS_DBC_AMOUNT (currently 4,525,524,120 * 10^9) individual units.
+const GENESIS_DBC_FILENAME: &str = "genesis_dbc";
 
 /// Interface for sending and receiving messages to and from other nodes, in the role of a full
 /// routing node.
@@ -154,8 +163,10 @@ impl NodeApi {
             )
             .await?;
 
+            // Generate the genesis key, this will be the first key in the sections chain,
+            // as well as the owner of the genesis DBC minted by this first node of the network.
             let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
-            let node = Node::first_node(
+            let (node, genesis_dbc) = Node::first_node(
                 comm.socket_addr(),
                 Arc::new(keypair),
                 event_sender.clone(),
@@ -164,6 +175,10 @@ impl NodeApi {
                 genesis_sk_set,
             )
             .await?;
+
+            // Write the genesis DBC to disk
+            let path = root_storage_dir.join(GENESIS_DBC_FILENAME);
+            fs::write(path, genesis_dbc.to_hex().unwrap()).await?;
 
             let network_knowledge = node.network_knowledge();
 

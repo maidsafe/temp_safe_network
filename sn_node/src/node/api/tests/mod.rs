@@ -1120,7 +1120,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
         let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
 
         let genesis_sk_set = bls::SecretKeySet::random(0, &mut rand::thread_rng());
-        let node = Node::first_node(
+        let (node, _) = Node::first_node(
             comm.socket_addr(),
             info.keypair.clone(),
             event_sender,
