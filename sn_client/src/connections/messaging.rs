@@ -26,7 +26,7 @@ use futures::future::join_all;
 use qp2p::{Close, Config as QuicP2pConfig, ConnectionError, Endpoint, SendError};
 use rand::{rngs::OsRng, seq::SliceRandom};
 use secured_linked_list::SecuredLinkedList;
-use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     sync::mpsc::{channel, Receiver, Sender},
     sync::RwLock,
@@ -677,19 +677,6 @@ pub(super) async fn send_msg(
     }
 
     Ok(())
-}
-
-#[instrument(skip_all, level = "trace")]
-pub(crate) async fn create_safe_dir() -> Result<PathBuf, Error> {
-    let mut root_dir = dirs_next::home_dir().ok_or(Error::CouldNotReadHomeDir)?;
-    root_dir.push(".safe");
-
-    // Create `.safe/client` dir if not present
-    tokio::fs::create_dir_all(root_dir.clone())
-        .await
-        .map_err(|_| Error::CouldNotCreateSafeDir)?;
-
-    Ok(root_dir)
 }
 
 #[cfg(test)]
