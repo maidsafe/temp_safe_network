@@ -73,6 +73,12 @@ use tokio::sync::RwLock;
 use uluru::LRUCache;
 use xor_name::{Prefix, XorName};
 
+/// Amount of tokens to be owned by the Genesis DBC.
+/// At the inception of the Network a total supply of 4,525,524,120 whole tokens will be created.
+/// Each whole token can be subdivided 10^9 times,
+/// thus creating a total of 4,525,524,120,000,000,000 available units.
+pub const GENESIS_DBC_AMOUNT: u64 = 4_525_524_120 * u64::pow(10, 9);
+
 pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 128;
 pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 10;
 

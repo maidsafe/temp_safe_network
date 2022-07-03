@@ -53,6 +53,7 @@ impl Safe {
         // TODO: check the input DBCs were spent and all other sort of verifications,
         // perhaps all optional, and we may want a separate API to also do these verifications
         // for the user to perform them without depositing the DBC into a wallet.
+
         let dbc_to_deposit = if dbc.is_bearer() {
             if secret_key.is_some() {
                 return Err(Error::DbcDepositError(

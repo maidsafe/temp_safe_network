@@ -771,7 +771,7 @@ mod tests {
             assert_eq!(genesis_pk, *chain.root_key());
 
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-            let mut node = Node::first_node(
+            let (mut node, _) = Node::first_node(
                 create_comm().await?.socket_addr(),
                 info.keypair.clone(),
                 event_channel::new(1).0,

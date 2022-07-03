@@ -14,6 +14,7 @@ use crate::operations::config::Config;
 use bls::{PublicKey, SecretKey};
 use color_eyre::{eyre::eyre, Help, Result};
 use sn_api::{Error, Safe};
+use sn_dbc::Dbc;
 use std::path::Path;
 use structopt::StructOpt;
 
@@ -119,40 +120,40 @@ pub async fn wallet_commander(
                             .suggestion("A file path must be specified for the DBC data."));
                     }
                     let dbc_data = std::fs::read_to_string(path)?;
-                    sn_dbc::Dbc::from_hex(dbc_data.trim()).map_err(|e| {
+                    Dbc::from_hex(dbc_data.trim()).map_err(|e| {
                         eyre!(e.to_string()).suggestion(
                             "This file does not appear to have DBC data. \
                             Please select another file with valid hex-encoded DBC data.",
                         )
                     })?
                 } else {
-                    sn_dbc::Dbc::from_hex(&dbc)?
+                    Dbc::from_hex(&dbc)?
                 }
             } else {
                 let dbc_hex = get_from_arg_or_stdin(dbc, None)?;
-                println!("{}", dbc_hex);
-                sn_dbc::Dbc::from_hex(dbc_hex.trim())?
+                Dbc::from_hex(dbc_hex.trim())?
             };
-            let sk = if !dbc.is_bearer() {
-                // This is an owned DBC, so we need a secret key. Either use the one supplied, or
-                // attempt to use the key configured for use with the CLI.
-                if let Some(sk_hex) = secret_key_hex {
-                    Some(SecretKey::from_hex(&sk_hex)?)
-                } else {
-                    Some(read_key_from_configured_credentials(
-                        config,
-                        "This is an owned DBC. To deposit, it requires a secret key. \
+
+            let sk = if dbc.is_bearer() {
+                None
+            } else if let Some(sk_hex) = secret_key_hex {
+                // This is an owned DBC and its secret key has been supplied
+                Some(SecretKey::from_hex(&sk_hex)?)
+            } else {
+                // This is an owned DBC but its secret key was not provided,
+                // thus attempt to use the key configured for use with the CLI.
+                Some(read_key_from_configured_credentials(
+                    config,
+                    "This is an owned DBC. To deposit, it requires a secret key. \
                          A secret key was not supplied and there were no credentials \
                          configured for use with safe."
-                            .to_string(),
-                        "Please run the command again using the --secret-key \
+                        .to_string(),
+                    "Please run the command again using the --secret-key \
                          argument to specify the key."
-                            .to_string(),
-                    )?)
-                }
-            } else {
-                None
+                        .to_string(),
+                )?)
             };
+
             let name = safe
                 .wallet_deposit(&wallet_url, name.as_deref(), &dbc, sk)
                 .await
