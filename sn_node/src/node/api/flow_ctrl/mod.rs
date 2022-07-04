@@ -176,9 +176,12 @@ impl FlowCtrl {
                 let membership = &node.membership;
 
                 if let Some(membership) = &membership {
+                    trace!("has membership");
                     let last_received_vote_time = membership.last_received_vote_time();
 
                     if let Some(time) = last_received_vote_time {
+                        trace!("has last vote received");
+
                         // we want to resend the prev vote
                         if time.elapsed() >= MISSING_VOTE_INTERVAL {
                             debug!("Vote consensus appears stalled...");
@@ -197,6 +200,8 @@ impl FlowCtrl {
                             }
                         }
                     }
+                } else {
+                    trace!("no membership");
                 }
             }
         });
