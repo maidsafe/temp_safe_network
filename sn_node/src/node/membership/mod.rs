@@ -332,9 +332,10 @@ impl Membership {
         let is_fresh_vote = !consensus.processed_votes_cache.contains(&signed_vote.sig);
 
         info!(
-            "Membership - accepted signed vote from voter {:?}",
-            signed_vote.voter
+            "Membership - accepted signed vote from voter {:?} in generation {}",
+            signed_vote.voter, vote_gen
         );
+
         let vote_response = consensus.handle_signed_vote(signed_vote)?;
 
         debug!("trace, no problems with vote received");
@@ -342,13 +343,14 @@ impl Membership {
             debug!("There is consensus");
             if is_ongoing_consensus {
                 info!(
-                    "Membership - decided {:?}",
+                    "Membership - decided for gen {} {:?}",
+                    vote_gen,
                     BTreeSet::from_iter(decision.proposals.keys())
                 );
 
                 // wipe the last vote time
                 self.last_received_vote_time = None;
-                debug!("wiped last received vote...");
+                debug!("wiped last received vote time...");
 
                 let next_consensus = Consensus::from(
                     self.consensus.secret_key.clone(),
@@ -361,7 +363,7 @@ impl Membership {
                 self.gen = vote_gen
             }
         } else {
-            debug!("no decision reached...");
+            debug!("no decision reached... in gen {}", vote_gen);
             // if this is our ongoing round, lets log the vote
             if is_ongoing_consensus && is_fresh_vote {
                 debug!("recording vote as ongoing and we've not seen it before...");
