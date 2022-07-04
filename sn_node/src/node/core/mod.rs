@@ -543,6 +543,9 @@ impl Node {
                             .await?,
                     );
                 }
+                else{
+                    debug!("As an elder we dont have a key share, so membership is not reinstantiated.");
+                }
 
                 self.print_network_stats().await;
                 self.log_section_stats().await;
