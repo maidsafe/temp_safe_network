@@ -69,7 +69,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::sync::RwLock;
 use uluru::LRUCache;
 use xor_name::{Prefix, XorName};
 
@@ -100,8 +99,7 @@ pub(crate) struct DkgSessionInfo {
 }
 
 // Store up to 100 in use backoffs
-pub(crate) type AeBackoffCache =
-    Arc<RwLock<LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>>>;
+pub(crate) type AeBackoffCache = LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>;
 
 // Core state + logic of a node.
 pub(crate) struct Node {
