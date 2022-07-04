@@ -30,7 +30,7 @@ use std::{path::Path, sync::Arc};
 use tokio::sync::RwLock;
 
 /// Operations on data.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 // exposed as pub due to benches
 pub struct DataStorage {
     chunks: ChunkStorage,
@@ -53,7 +53,7 @@ impl DataStorage {
     /// Store data in the local store
     #[instrument(skip(self))]
     pub async fn store(
-        &self,
+        &mut self,
         data: &ReplicatedData,
         pk_for_spent_book: PublicKey,
         keypair_for_spent_book: Keypair,
@@ -62,29 +62,23 @@ impl DataStorage {
         match data.clone() {
             ReplicatedData::Chunk(chunk) => self.chunks.store(&chunk).await?,
             ReplicatedData::RegisterLog(data) => {
-                self.registers
-                    .update(RegisterStoreExport(vec![data]))
-                    .await?
+                self.registers.update(RegisterStoreExport(vec![data]))?
             }
-            ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd).await?,
+            ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd)?,
             ReplicatedData::SpentbookWrite(cmd) => {
                 // FIMXE: this is temporay logic to create a spentbook to make sure it exists.
                 // Spentbooks shall always exist, and the section nodes shall create them by default.
-                self.registers
-                    .create_spentbook_register(
-                        &cmd.dst_address(),
-                        pk_for_spent_book,
-                        keypair_for_spent_book,
-                    )
-                    .await?;
+                self.registers.create_spentbook_register(
+                    &cmd.dst_address(),
+                    pk_for_spent_book,
+                    keypair_for_spent_book,
+                )?;
 
                 // We now write the cmd received
-                self.registers.write(cmd).await?
+                self.registers.write(cmd)?
             }
             ReplicatedData::SpentbookLog(data) => {
-                self.registers
-                    .update(RegisterStoreExport(vec![data]))
-                    .await?
+                self.registers.update(RegisterStoreExport(vec![data]))?
             }
         };
 
@@ -108,7 +102,7 @@ impl DataStorage {
 
     // Query the local store and return NodeQueryResponse
     pub(crate) async fn query(
-        &self,
+        &mut self,
         query: &DataQueryVariant,
         requester: User,
     ) -> NodeQueryResponse {
@@ -170,7 +164,7 @@ impl DataStorage {
 
     // Read data from local store
     pub(crate) async fn get_from_local_store(
-        &self,
+        &mut self,
         address: &ReplicatedDataAddress,
     ) -> Result<ReplicatedData> {
         match address {
@@ -193,7 +187,7 @@ impl DataStorage {
     }
 
     #[allow(dead_code)]
-    pub(crate) async fn remove(&self, address: &ReplicatedDataAddress) -> Result<()> {
+    pub(crate) async fn remove(&mut self, address: &ReplicatedDataAddress) -> Result<()> {
         match address {
             ReplicatedDataAddress::Chunk(addr) => self.chunks.remove_chunk(addr).await,
             ReplicatedDataAddress::Register(addr) => self.registers.remove_register(addr).await,
@@ -205,7 +199,7 @@ impl DataStorage {
     }
 
     /// Retrieve all keys/ReplicatedDataAddresses of stored data
-    pub async fn keys(&self) -> Result<Vec<ReplicatedDataAddress>> {
+    pub async fn keys(&mut self) -> Result<Vec<ReplicatedDataAddress>> {
         let chunk_keys = self
             .chunks
             .keys()?
