@@ -113,7 +113,7 @@ impl Node {
     }
 
     pub(crate) async fn handle_anti_entropy_redirect_msg(
-        &self,
+        &mut self,
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
         section_chain: SecuredLinkedList,
@@ -260,9 +260,9 @@ impl Node {
 
     /// Checks AE-BackoffCache for backoff, or creates a new instance
     /// waits for any required backoff duration
-    async fn create_or_wait_for_backoff(&self, peer: &Peer) {
-        let mut ae_backoff_guard = self.ae_backoff_cache.write().await;
-        let our_backoff = ae_backoff_guard
+    async fn create_or_wait_for_backoff(&mut self, peer: &Peer) {
+        let our_backoff = self
+            .ae_backoff_cache
             .find(|(node, _)| node == peer)
             .map(|(_, backoff)| backoff);
 
@@ -282,13 +282,13 @@ impl Node {
                 None
             };
 
-            drop(ae_backoff_guard);
-
             if let Some(sleep_time) = sleep_time {
                 tokio::time::sleep(sleep_time).await;
             }
         } else {
-            let _res = ae_backoff_guard.insert((*peer, ExponentialBackoff::default()));
+            let _res = self
+                .ae_backoff_cache
+                .insert((*peer, ExponentialBackoff::default()));
         }
     }
 
