@@ -542,6 +542,8 @@ impl Node {
                         self.propose(Proposal::JoinsAllowed(self.joins_allowed))
                             .await?,
                     );
+                } else {
+                    debug!("As an elder we dont have a key share, so membership is not reinstantiated.");
                 }
 
                 self.print_network_stats().await;

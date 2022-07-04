@@ -321,6 +321,7 @@ impl Membership {
         self.consensus.id()
     }
 
+    #[instrument]
     pub(crate) fn handle_signed_vote(
         &mut self,
         signed_vote: SignedVote<NodeState>,
@@ -332,6 +333,8 @@ impl Membership {
         let is_ongoing_consensus = vote_gen == self.gen + 1;
         let consensus = self.consensus_at_gen_mut(vote_gen)?;
         let is_fresh_vote = !consensus.processed_votes_cache.contains(&signed_vote.sig);
+
+        debug!("is_fresh_vote {is_fresh_vote}, is_ongoing_consensus {is_ongoing_consensus}");
 
         info!(
             "Membership - accepted signed vote from voter {:?}",
@@ -355,7 +358,8 @@ impl Membership {
                     self.consensus.n_elders,
                 );
 
-                let decided_consensus = std::mem::replace(&mut self.consensus, next_consensus);
+                let decided_consensus = self.consensus.clone();
+                self.consensus = next_consensus;
                 let _ = self.history.insert(vote_gen, (decision, decided_consensus));
                 self.gen = vote_gen
             }
