@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1656838266677,
+  "lastUpdate": 1656922931698,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -6953,6 +6953,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 5220031153,
             "range": "± 16277028",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "joshuef@gmail.com",
+            "name": "Josh Wilson",
+            "username": "joshuef"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "d4850ff81d33751ebf9e3a7c7af438f160df6e44",
+          "message": "chore: clippy clea up unused",
+          "timestamp": "2022-07-04T09:44:35+02:00",
+          "tree_id": "0bd463b21cbf08b3197efa5f04b6706252e5cfd1",
+          "url": "https://github.com/maidsafe/safe_network/commit/d4850ff81d33751ebf9e3a7c7af438f160df6e44"
+        },
+        "date": 1656922930161,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 5238878589,
+            "range": "± 37466268",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 5269512386,
+            "range": "± 4582179",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 5526212206,
+            "range": "± 19422869466",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 5012848117,
+            "range": "± 1051089",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 5029125899,
+            "range": "± 4728606",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 5182097668,
+            "range": "± 28279674",
             "unit": "ns/iter"
           }
         ]
