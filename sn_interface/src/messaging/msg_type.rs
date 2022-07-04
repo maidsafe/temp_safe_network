@@ -11,6 +11,8 @@ use super::{
     ServiceAuth,
 };
 
+// Membership voting
+pub(crate) const MEMBERSHIP_MSG_PRIORITY: i32 = 10;
 // highest priority, since we must sort out membership first of all
 pub(crate) const DKG_MSG_PRIORITY: i32 = 8;
 // very high prio, since we must have correct contact details to the network

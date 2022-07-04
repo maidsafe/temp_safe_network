@@ -161,7 +161,7 @@ impl Cmd {
             HandleDkgOutcome { .. } => 10,
             HandleDkgFailure(_) => 10,
             HandlePeerLost(_) => 10,
-            HandleNodeLeft(_) => 10,
+            HandleNodeLeft(_) => 12,
             ProposeOffline(_) => 10,
 
             HandleDkgTimeout(_) => 9,

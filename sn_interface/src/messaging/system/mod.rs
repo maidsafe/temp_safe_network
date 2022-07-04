@@ -212,9 +212,15 @@ impl SystemMsg {
         use super::msg_type::BACKPRESSURE_MSG_PRIORITY;
         use super::msg_type::{
             ANTIENTROPY_MSG_PRIORITY, DKG_MSG_PRIORITY, JOIN_RELOCATE_MSG_PRIORITY,
-            JOIN_RESPONSE_PRIORITY, NODE_DATA_MSG_PRIORITY,
+            JOIN_RESPONSE_PRIORITY, MEMBERSHIP_MSG_PRIORITY, NODE_DATA_MSG_PRIORITY,
         };
         match self {
+            // Membership + Handover
+            SystemMsg::MembershipVotes(_)
+            | SystemMsg::MembershipAE(_)
+            | SystemMsg::HandoverAE(_)
+            | SystemMsg::HandoverVotes(_) => MEMBERSHIP_MSG_PRIORITY,
+
             // DKG messages
             SystemMsg::DkgStart { .. }
             | SystemMsg::DkgSessionUnknown { .. }
@@ -241,11 +247,7 @@ impl SystemMsg {
             | SystemMsg::JoinRequest(_)
             | SystemMsg::JoinAsRelocatedRequest(_)
             | SystemMsg::Propose { .. }
-            | SystemMsg::StartConnectivityTest(_)
-            | SystemMsg::MembershipVotes(_)
-            | SystemMsg::MembershipAE(_)
-            | SystemMsg::HandoverAE(_)
-            | SystemMsg::HandoverVotes(_) => JOIN_RELOCATE_MSG_PRIORITY,
+            | SystemMsg::StartConnectivityTest(_) => JOIN_RELOCATE_MSG_PRIORITY,
 
             #[cfg(feature = "back-pressure")]
             // Inter-node comms for backpressure
