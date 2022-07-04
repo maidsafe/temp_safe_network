@@ -23,7 +23,7 @@ jobs:
       - cargo-udeps
       - cargo-deny
       - e2e
-      - e2e-split
+      # - e2e-split
       - unit
       - checks
       - lint
