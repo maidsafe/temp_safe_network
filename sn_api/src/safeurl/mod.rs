@@ -27,7 +27,7 @@ use url_parts::UrlParts;
 use xor_name::{XorName, XOR_NAME_LEN};
 use xorurl_media_types::{MEDIA_TYPE_CODES, MEDIA_TYPE_STR};
 
-/// Type tag to use for the NrsMapContainer stored on Register
+/// Type tag to use for the `NrsMapContainer` stored on Register
 pub const NRS_MAP_TYPE_TAG: u64 = 1_500;
 
 /// Default base encoding used for XOR URLs
@@ -152,7 +152,7 @@ impl ContentType {
 
 /// We also encode the native SAFE data type where the content is being stored on the SAFE Network,
 /// this allows us to fetch the targetted data using the corresponding API, regardless of the
-/// data that is being held which is identified by the ContentType instead.
+/// data that is being held which is identified by the `ContentType` instead.
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Deserialize, Serialize)]
 pub enum DataType {
     #[allow(missing_docs)]
@@ -171,7 +171,7 @@ impl std::fmt::Display for DataType {
     }
 }
 
-/// An enumeration of possible SafeUrl types.
+/// An enumeration of possible `SafeUrl` types.
 ///
 /// This is the type of safe url itself,
 /// not the content it points to.
@@ -193,35 +193,35 @@ impl UrlType {
     }
 }
 
-/// Represents a SafeUrl
+/// Represents a `SafeUrl`
 ///
-/// A SafeUrl can be in one of two formats:  nrs or xor.
+/// A `SafeUrl` can be in one of two formats:  nrs or xor.
 ///   aka:  nrsurl or xorurl
 ///
 /// Here is a breakdown of how name terminology is used.
 ///
 /// case 1: safe://a.b.shinything:
 ///
-///   public_name()    --> a.b.shinything
-///   top_name()  --> shinything
-///   sub_names()    --> a.b
+///   `public_name`()    --> a.b.shinything
+///   `top_name`()  --> shinything
+///   `sub_names`()    --> a.b
 ///
 /// case 2: safe://shinything:
 ///
-///   public_name()   --> shinything
-///   top_name() --> shinything
-///   sub_names()   --> None
+///   `public_name`()   --> shinything
+///   `top_name`() --> shinything
+///   `sub_names`()   --> None
 ///
 /// case 3: safe://a.b.hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
 ///
-///   public_name()   --> a.b.hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
-///   top_name() --> hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
-///   sub_names()   --> a.b
+///   `public_name`()   --> a.b.hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
+///   `top_name`() --> hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
+///   `sub_names`()   --> a.b
 ///
 /// case 4: safe://hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
-///   public_name()   --> hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
-///   top_name() --> hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
-///   sub_names()   --> None
+///   `public_name`()   --> hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
+///   `top_name`() --> hnyynyzhjjjatqkfkjux8maaojtj8r59aphcnue6a11qgecpcebidkywmybnc
+///   `sub_names`()   --> None
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq, Ord, PartialOrd)]
 pub struct SafeUrl {
     encoding_version: u64,      // currently only v1 supported
@@ -241,15 +241,15 @@ pub struct SafeUrl {
 }
 
 /// This implementation performs semi-rigorous validation,
-/// when parsing a URL using ::from_url(), ::from_xorurl(),
-/// or ::from_nrsurl().
+/// when parsing a URL using `::from_url`(), `::from_xorurl`(),
+/// or `::from_nrsurl`().
 ///
 /// However setters and new() do not enforce all the rules
 /// and using them with invalid input can result in serializing
 /// invalid URLs.  GIGO.
 ///
 /// As such, it is recommended to check validity by
-/// calling SafeUrl::validate() after instantiating
+/// calling `SafeUrl::validate`() after instantiating
 /// or modifying.
 ///
 // TBD: In the future, we may want to perform all validity
@@ -258,19 +258,19 @@ pub struct SafeUrl {
 // bunch of code elsewhere.
 impl SafeUrl {
     #[allow(clippy::too_many_arguments)]
-    /// Instantiates a new SafeUrl
+    /// Instantiates a new `SafeUrl`
     ///
     /// Performs some basic validation checks, however it is
     /// possible to create invalid urls using this method.
     ///
     /// Arguments
-    /// * `xor_name` - XorName hash
+    /// * `xor_name` - `XorName` hash
     /// * `nrs_name` - complete nrs name, or None for xorurl
     /// * `type_tag` - type tag
-    /// * `data_type` - DataType
-    /// * `content_type` - ContentType
+    /// * `data_type` - `DataType`
+    /// * `content_type` - `ContentType`
     /// * `path` - must already be percent-encoded if Some. leading '/' optional.
-    /// * `xorurl_sub_names` - sub_names. ignored if nrs_name is present.
+    /// * `xorurl_sub_names` - `sub_names`. ignored if `nrs_name` is present.
     /// * `query_string` - must already be percent-encoded, without ? separator
     /// * `fragment` - url fragment, without # separator
     /// * `content_version` - overrides value of "?v" in query-string if not None.
@@ -378,7 +378,7 @@ impl SafeUrl {
         MEDIA_TYPE_CODES.get(media_type).is_some()
     }
 
-    /// Parses a safe url into SafeUrl
+    /// Parses a safe url into `SafeUrl`
     ///
     /// # Arguments
     ///
@@ -396,7 +396,7 @@ impl SafeUrl {
         }
     }
 
-    /// Parses an NRS SafeUrl into SafeUrl
+    /// Parses an NRS `SafeUrl` into `SafeUrl`
     ///
     /// # Arguments
     ///
@@ -419,7 +419,7 @@ impl SafeUrl {
         )
     }
 
-    /// Parses a XorUrl into SafeUrl
+    /// Parses a `XorUrl` into `SafeUrl`
     ///
     /// # Arguments
     ///
@@ -592,7 +592,7 @@ impl SafeUrl {
         Ok(())
     }
 
-    /// returns XorName
+    /// returns `XorName`
     pub fn xorname(&self) -> XorName {
         *self.address().name()
     }
@@ -602,20 +602,20 @@ impl SafeUrl {
         self.address
     }
 
-    /// returns public_name portion of xorurl using the
+    /// returns `public_name` portion of xorurl using the
     /// default xorurl encoding.
     ///
-    /// public_name means sub_names + top_name
+    /// `public_name` means `sub_names` + `top_name`
     ///
     /// useful for retrieving xorurl name associated
     /// with an nrsurl.
     ///
-    /// For a different encoding, see name_to_base()
+    /// For a different encoding, see `name_to_base`()
     pub fn xorurl_public_name(&self) -> String {
         self.name_to_base(DEFAULT_XORURL_BASE, true)
     }
 
-    /// The public_name in url.  Either nrs_name or xor_name.
+    /// The `public_name` in url.  Either `nrs_name` or `xor_name`.
     ///
     /// eg a.b.name --> a.b.name
     pub fn public_name(&self) -> &str {
@@ -629,21 +629,21 @@ impl SafeUrl {
         &self.top_name
     }
 
-    /// returns sub_names
+    /// returns `sub_names`
     ///
     /// eg: a.b.name --> a.b
     pub fn sub_names(&self) -> &str {
         &self.sub_names
     }
 
-    /// returns sub_names in an array slice
+    /// returns `sub_names` in an array slice
     ///
     /// eg: a.b.name --> &["a", "b"]
     pub fn sub_names_vec(&self) -> &[String] {
         &self.sub_names_vec
     }
 
-    /// sets sub_names portion of URL
+    /// sets `sub_names` portion of URL
     pub fn set_sub_names(&mut self, sub_names: &str) -> Result<()> {
         let sep = if sub_names.is_empty() { "" } else { "." };
         let tmpurl = format!("{}{}{}{}", URL_PROTOCOL, sub_names, sep, self.top_name());
@@ -654,7 +654,7 @@ impl SafeUrl {
         Ok(())
     }
 
-    /// returns XorUrl type tag
+    /// returns `XorUrl` type tag
     pub fn type_tag(&self) -> u64 {
         self.type_tag
     }
@@ -769,7 +769,7 @@ impl SafeUrl {
     /// sets query string.
     ///
     /// If the query string contains ?v=<version> then it
-    /// will take effect as if set_content_version() had been
+    /// will take effect as if `set_content_version`() had been
     /// called.
     ///
     /// # Arguments
@@ -853,12 +853,12 @@ impl SafeUrl {
         }
     }
 
-    /// returns true if an NrsUrl, false if an XorUrl
+    /// returns true if an `NrsUrl`, false if an `XorUrl`
     pub fn is_nrsurl(&self) -> bool {
         self.url_type == UrlType::NrsUrl
     }
 
-    /// returns true if an XorUrl, false if an NrsUrl
+    /// returns true if an `XorUrl`, false if an `NrsUrl`
     pub fn is_xorurl(&self) -> bool {
         self.url_type == UrlType::XorUrl
     }
@@ -866,7 +866,7 @@ impl SafeUrl {
     /// returns type of this url.
     ///
     /// for type of the linked content, see
-    ///   ::content_type()
+    ///   `::content_type`()
     pub fn url_type(&self) -> &UrlType {
         &self.url_type
     }
@@ -879,17 +879,17 @@ impl SafeUrl {
     // and up to 8 bytes for type_tag
     // query param "v=" is treated as the content version
 
-    /// serializes the URL to an XorUrl string.
+    /// serializes the URL to an `XorUrl` string.
     ///
-    /// This function may be called on an NrsUrl and
-    /// the corresponding XorUrl will be returned.
+    /// This function may be called on an `NrsUrl` and
+    /// the corresponding `XorUrl` will be returned.
     pub fn to_xorurl_string(&self) -> String {
         self.encode(DEFAULT_XORURL_BASE)
     }
 
-    /// serializes the URL to an NrsUrl string.
+    /// serializes the URL to an `NrsUrl` string.
     ///
-    /// This function returns None when is_nrsurl() is false.
+    /// This function returns None when `is_nrsurl`() is false.
     pub fn to_nrsurl_string(&self) -> Option<String> {
         if !self.is_nrsurl() {
             return None;
@@ -953,9 +953,9 @@ impl SafeUrl {
         urlencoding::encode(s)
     }
 
-    /// Validates that a SafeUrl instance can be parsed correctly.
+    /// Validates that a `SafeUrl` instance can be parsed correctly.
     ///
-    /// SafeUrl::from_url() performs rigorous validation,
+    /// `SafeUrl::from_url`() performs rigorous validation,
     /// however setters and new() do not enforce all the rules
     ///
     /// This routine enables a caller to easily validate
@@ -1115,12 +1115,12 @@ impl SafeUrl {
 impl fmt::Display for SafeUrl {
     /// serializes the URL to a string.
     ///
-    /// an NrsUrl will be serialized in NrsUrl form.
-    /// an XorUrl will be serialized in XorUrl form.
+    /// an `NrsUrl` will be serialized in `NrsUrl` form.
+    /// an `XorUrl` will be serialized in `XorUrl` form.
     ///
     /// See also:
-    ///  * ::to_xorurl_string()
-    ///  * ::to_nrs_url_string()
+    ///  * `::to_xorurl_string`()
+    ///  * `::to_nrs_url_string`()
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         let buf = if self.is_nrsurl() {
             match self.to_nrsurl_string() {

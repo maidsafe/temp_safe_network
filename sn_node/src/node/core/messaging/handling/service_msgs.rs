@@ -163,7 +163,7 @@ impl Node {
         Ok(cmds)
     }
 
-    /// Handle ServiceMsgs received from EndUser
+    /// Handle `ServiceMsgs` received from `EndUser`
     pub(crate) async fn handle_service_msg_received(
         &self,
         msg_id: MsgId,

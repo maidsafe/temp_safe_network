@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! sn_node provides the interface to Safe routing.  The resulting executable is the node
+//! `sn_node` provides the interface to Safe routing.  The resulting executable is the node
 //! for the Safe network.
 
 use sn_client::{utils::test_utils::read_network_conn_info, Client, ClientConfig};
@@ -78,7 +78,7 @@ fn get_node_bin_path(node_path: Option<PathBuf>) -> Result<PathBuf> {
     }
 }
 
-/// Uses sn_launch_tool to create a local network of nodes
+/// Uses `sn_launch_tool` to create a local network of nodes
 pub async fn run_split() -> Result<()> {
     info!("Starting local network");
     let node_path = Some(PathBuf::from("./target/release"));

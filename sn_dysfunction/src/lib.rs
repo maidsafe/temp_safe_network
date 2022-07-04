@@ -132,7 +132,7 @@ impl DysfunctionDetection {
         Ok(())
     }
 
-    /// Removes a pending_operation from the node liveness records. Returns true if a record was removed
+    /// Removes a `pending_operation` from the node liveness records. Returns true if a record was removed
     pub async fn request_operation_fulfilled(
         &self,
         node_id: &NodeIdentifier,

@@ -17,7 +17,7 @@ mod proposal;
 mod relocation;
 mod split_barrier;
 
-/// DataStorage apis.
+/// `DataStorage` apis.
 pub use self::data::DataStorage;
 use self::{data::Capacity, split_barrier::SplitBarrier};
 
@@ -338,7 +338,7 @@ impl Node {
 
     /// Generate a new section info(s) based on the current set of members,
     /// excluding any member matching a name in the provided `excluded_names` set.
-    /// Returns a set of candidate DkgSessionId's.
+    /// Returns a set of candidate `DkgSessionId`'s.
     pub(super) async fn promote_and_demote_elders(
         &self,
         excluded_names: &BTreeSet<XorName>,

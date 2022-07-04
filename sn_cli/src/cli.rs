@@ -166,9 +166,9 @@ pub async fn run() -> Result<()> {
 
 /// Gets the configuration, which is used by various parts of the application.
 ///
-/// The SN_CLI_CONFIG_PATH allows the user to define a custom location as an alternative to
+/// The `SN_CLI_CONFIG_PATH` allows the user to define a custom location as an alternative to
 /// ~/.safe, but this has mainly been added to enable integration tests to use a temporary location
-/// for the config files, and you can then use assert_fs to to assert against those temp files.
+/// for the config files, and you can then use `assert_fs` to to assert against those temp files.
 /// Using a temporary location also means the test suites don't manipulate the current user's home
 /// directory.
 async fn get_config() -> Result<Config> {

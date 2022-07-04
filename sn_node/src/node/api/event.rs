@@ -256,7 +256,7 @@ impl std::fmt::Display for CmdProcessEvent {
     }
 }
 
-/// A flag in EldersChanged event, indicating
+/// A flag in `EldersChanged` event, indicating
 /// whether the node got promoted, demoted or did not change.
 #[derive(Debug)]
 pub enum NodeElderChange {
@@ -268,7 +268,7 @@ pub enum NodeElderChange {
     None,
 }
 
-/// Bound name of elders and section_key, section_prefix info together.
+/// Bound name of elders and `section_key`, `section_prefix` info together.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Elders {
     /// The prefix of the section.

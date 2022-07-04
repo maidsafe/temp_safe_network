@@ -186,7 +186,7 @@ async fn gen_new_file_item(
     Ok(file_item)
 }
 
-/// Returns a new files_map at the given path if the given path is a dir.
+/// Returns a new `files_map` at the given path if the given path is a dir.
 pub(crate) fn file_map_for_path(files_map: FilesMap, path: &str) -> Result<FilesMap> {
     let realpath = files_map.realpath(path)?;
 

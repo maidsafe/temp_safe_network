@@ -33,7 +33,7 @@ const SN_QUERY_TIMEOUT: &str = "SN_QUERY_TIMEOUT";
 const SN_CMD_TIMEOUT: &str = "SN_CMD_TIMEOUT";
 const SN_AE_WAIT: &str = "SN_AE_WAIT";
 
-/// Configuration for sn_client.
+/// Configuration for `sn_client`.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ClientConfig {
     /// The local address to bind to.
@@ -55,8 +55,8 @@ pub struct ClientConfig {
 impl ClientConfig {
     /// Returns a new `Config` instance.
     ///
-    /// This will try to read QuicP2P configuration from `config_file_path`, or else use the default
-    /// QuicP2P config. In either case, `bootstrap_nodes` will be used to override the initial
+    /// This will try to read `QuicP2P` configuration from `config_file_path`, or else use the default
+    /// `QuicP2P` config. In either case, `bootstrap_nodes` will be used to override the initial
     /// network contacts.
     ///
     /// If `local_addr` is not specified, `127.0.0.1:0` will be used (e.g. localhost with a random

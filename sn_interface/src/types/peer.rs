@@ -14,7 +14,7 @@ use std::{
 };
 use xor_name::{XorName, XOR_NAME_LEN};
 
-/// A Peer with name, derived from its PublicKey, and an address.
+/// A Peer with name, derived from its `PublicKey`, and an address.
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Peer {
     name: XorName,

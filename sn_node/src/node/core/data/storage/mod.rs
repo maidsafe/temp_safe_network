@@ -40,7 +40,7 @@ pub struct DataStorage {
 }
 
 impl DataStorage {
-    /// Set up a new DataStorage instance
+    /// Set up a new `DataStorage` instance
     pub fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
             chunks: ChunkStorage::new(path, used_space.clone())?,

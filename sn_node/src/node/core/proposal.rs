@@ -27,7 +27,7 @@ pub(crate) enum Proposal {
 }
 
 impl Proposal {
-    /// Create SigShare for this proposal.
+    /// Create `SigShare` for this proposal.
     pub(crate) fn sign_with_key_share(
         &self,
         public_key_set: bls::PublicKeySet,

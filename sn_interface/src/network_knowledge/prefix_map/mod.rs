@@ -80,7 +80,7 @@ impl NetworkPrefixMap {
         true
     }
 
-    /// For testing purpose, we may need to populate a prefix_map without a proof chain.
+    /// For testing purpose, we may need to populate a `prefix_map` without a proof chain.
     #[cfg(any(test, feature = "test-utils"))]
     pub fn insert_without_chain(&self, sap: SectionAuth<SectionAuthorityProvider>) -> bool {
         self.insert(sap)

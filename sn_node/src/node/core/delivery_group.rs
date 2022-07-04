@@ -19,7 +19,7 @@ use itertools::Itertools;
 use std::{cmp, iter};
 use xor_name::XorName;
 
-/// Returns a set of nodes and their section PublicKey to which a message for the given
+/// Returns a set of nodes and their section `PublicKey` to which a message for the given
 /// `DstLocation` could be sent onwards, sorted by priority, along with the number of targets the
 /// message should be sent to. If the total number of targets returned is larger than this number,
 /// the spare targets can be used if the message can't be delivered to some of the initial ones.

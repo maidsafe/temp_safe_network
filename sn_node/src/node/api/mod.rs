@@ -323,7 +323,7 @@ impl NodeApi {
         self.node.matching_section(name).await
     }
 
-    /// Builds a WireMsg signed by this Node
+    /// Builds a `WireMsg` signed by this Node
     pub async fn sign_single_src_msg(
         &self,
         node_msg: SystemMsg,

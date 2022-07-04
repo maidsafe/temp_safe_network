@@ -21,7 +21,7 @@ use xor_name::XorName;
 
 // Utilities for WireMsg.
 pub(crate) trait WireMsgUtils {
-    /// Creates a message signed using a BLS KeyShare for destination accumulation
+    /// Creates a message signed using a BLS `KeyShare` for destination accumulation
     fn for_dst_accumulation(
         key_share: &SectionKeyShare,
         src_name: XorName,
@@ -40,7 +40,7 @@ pub(crate) trait WireMsgUtils {
 }
 
 impl WireMsgUtils for WireMsg {
-    /// Creates a message signed using a BLS KeyShare for destination accumulation
+    /// Creates a message signed using a BLS `KeyShare` for destination accumulation
     fn for_dst_accumulation(
         key_share: &SectionKeyShare,
         src_name: XorName,

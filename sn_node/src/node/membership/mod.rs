@@ -52,7 +52,7 @@ fn get_split_info(
 }
 
 /// Checks if we can split the section
-/// If we have enough nodes for both subsections, returns the DkgSessionId's
+/// If we have enough nodes for both subsections, returns the `DkgSessionId`'s
 pub(crate) fn try_split_dkg(
     members: &BTreeMap<XorName, NodeState>,
     sap: &SectionAuthorityProvider,

@@ -63,7 +63,7 @@ pub struct Client {
 
 /// Easily manage connections to/from The Safe Network with the client and its APIs.
 /// Use a random client for read-only or one-time operations.
-/// Supply an existing, SecretKey which holds a SafeCoin balance to be able to perform
+/// Supply an existing, `SecretKey` which holds a `SafeCoin` balance to be able to perform
 /// write operations.
 impl Client {
     /// Create a Safe Network client instance. Either for an existing SecretKey (in which case) the client will attempt
@@ -263,7 +263,7 @@ impl Client {
 
     /// Return the client's keypair.
     ///
-    /// Useful for retrieving the PublicKey or KeyPair in the event you need to _sign_ something
+    /// Useful for retrieving the `PublicKey` or `KeyPair` in the event you need to _sign_ something
     ///
     /// # Examples
     ///
@@ -273,7 +273,7 @@ impl Client {
         self.keypair.clone()
     }
 
-    /// Return the client's PublicKey.
+    /// Return the client's `PublicKey`.
     ///
     /// # Examples
     ///

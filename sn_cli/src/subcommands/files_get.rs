@@ -310,7 +310,7 @@ fn prompt_yes_no(prompt_msg: &str, default: &str) -> bool {
     }
 }
 
-/// # Downloads all files within a FilesContainer and writes them to disk, preserving paths.
+/// # Downloads all files within a `FilesContainer` and writes them to disk, preserving paths.
 ///
 /// TODO: In the future, this will have options for preserving symlinks and
 /// file attributes.
@@ -440,7 +440,7 @@ fn ensure_parent_dir_exists(path: &str) -> Result<()> {
     }
 }
 
-/// # Downloads files within a FilesMap and writes them to disk, preserving paths.
+/// # Downloads files within a `FilesMap` and writes them to disk, preserving paths.
 ///
 /// TODO: In the future, this will have options for preserving file attributes.
 async fn files_map_get_files(

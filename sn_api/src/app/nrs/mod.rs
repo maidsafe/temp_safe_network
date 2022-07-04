@@ -22,7 +22,7 @@ use std::str;
 pub(crate) const NRS_MAP_TYPE_TAG: u64 = 1_500;
 
 impl Safe {
-    /// # Creates a nrs_map_container for a chosen top name
+    /// # Creates a `nrs_map_container` for a chosen top name
     /// ```
     /// safe://<subName>.<topName>/path/to/whatever?var=value
     ///        |-----------------|
@@ -58,9 +58,9 @@ impl Safe {
     ///        |-----------------|
     ///            Public Name
     /// ```
-    /// Associates the given public_name to the link.
+    /// Associates the given `public_name` to the link.
     /// Errors out if the topname is not registered.
-    /// Returns the versioned NRS SafeUrl (containing a VersionHash) now pointing to the provided link:
+    /// Returns the versioned NRS `SafeUrl` (containing a `VersionHash`) now pointing to the provided link:
     /// `safe://{public_name}?v={version_hash}`
     pub async fn nrs_associate(&self, public_name: &str, link: &SafeUrl) -> Result<SafeUrl> {
         info!(
@@ -92,8 +92,8 @@ impl Safe {
 
     /// # Associates any public name to a link
     ///
-    /// Associates the given public_name to the link registering the topname on the way if needed.
-    /// Returns the versioned NRS SafeUrl (containing a VersionHash) now pointing to the provided link:
+    /// Associates the given `public_name` to the link registering the topname on the way if needed.
+    /// Returns the versioned NRS `SafeUrl` (containing a `VersionHash`) now pointing to the provided link:
     /// `safe://{public_name}?v={version_hash}`
     /// Also returns a bool to indicate whether it registered the topname in the process or not.
     pub async fn nrs_add(&self, public_name: &str, link: &SafeUrl) -> Result<(SafeUrl, bool)> {
@@ -122,9 +122,9 @@ impl Safe {
     ///        |-----------------|
     ///            Public Name
     /// ```
-    /// Removes the given public_name from the NrsMap registered for the public name's top name
+    /// Removes the given `public_name` from the `NrsMap` registered for the public name's top name
     /// on the network.
-    /// Returns a versioned NRS SafeUrl (containing a VersionHash) pointing to the latest version
+    /// Returns a versioned NRS `SafeUrl` (containing a `VersionHash`) pointing to the latest version
     /// (including the deletion) for the provided public name.
     /// `safe://{public_name}?v={version_hash}`
     pub async fn nrs_remove(&self, public_name: &str) -> Result<SafeUrl> {
@@ -156,12 +156,12 @@ impl Safe {
     ///        |-----------------|
     ///            Public Name
     /// ```
-    /// Finds the SafeUrl associated with the given public name on the network.
+    /// Finds the `SafeUrl` associated with the given public name on the network.
     /// If multiple entries are found for the same public name, there's a conflict.
     /// If there are conflicts for subnames other than the one requested, get proceeds as usual,
-    /// but the NrsMap returned will ignore those conflicts.
+    /// but the `NrsMap` returned will ignore those conflicts.
     /// Otherwise, it returns an error.
-    /// Returns the associated SafeUrl for the given public name for that version along with an NrsMap
+    /// Returns the associated `SafeUrl` for the given public name for that version along with an `NrsMap`
     pub async fn nrs_get(
         &self,
         public_name: &str,
@@ -189,7 +189,7 @@ impl Safe {
         Ok((url, nrs_map))
     }
 
-    /// Get the mapping of all subNames and their associated SafeUrl for the Nrs Map Container at the given public name
+    /// Get the mapping of all subNames and their associated `SafeUrl` for the Nrs Map Container at the given public name
     pub async fn nrs_get_subnames_map(
         &self,
         public_name: &str,
@@ -336,7 +336,7 @@ fn validate_nrs_public_name(public_name: &str) -> Result<SafeUrl> {
     Ok(url)
 }
 
-/// Helper to check if an NRS SafeUrl:
+/// Helper to check if an NRS `SafeUrl`:
 /// - is valid
 /// - has a version (if its data is versionable)
 fn validate_nrs_url(link: &SafeUrl) -> Result<()> {

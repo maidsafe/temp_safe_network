@@ -26,7 +26,7 @@ impl MsgId {
         Self(rand::random())
     }
 
-    /// Convert an XorName into a MsgId
+    /// Convert an `XorName` into a `MsgId`
     pub fn from_xor_name(xor_name: XorName) -> Self {
         Self(xor_name.0)
     }

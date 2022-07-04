@@ -117,7 +117,7 @@ impl PeerSession {
     }
 }
 
-/// After processing each SessionCmd, we decide whether to keep going
+/// After processing each `SessionCmd`, we decide whether to keep going
 #[must_use]
 enum SessionStatus {
     Ok,

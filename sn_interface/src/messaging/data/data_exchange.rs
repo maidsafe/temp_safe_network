@@ -69,7 +69,7 @@ impl StorageLevel {
     }
 
     /// Creates a new instance with provided level.
-    /// Returns an OutOfRange error if the value is above StorageLevel::MAX.
+    /// Returns an `OutOfRange` error if the value is above `StorageLevel::MAX`.
     pub fn from(value: u8) -> Result<Self> {
         if value > Self::MAX {
             Err(Error::OutOfRange)
@@ -79,13 +79,13 @@ impl StorageLevel {
     }
 
     /// The next level.
-    /// Returns an OutOfRange error if called on an instance with StorageLevel::MAX value.
+    /// Returns an `OutOfRange` error if called on an instance with `StorageLevel::MAX` value.
     pub fn next(&self) -> Result<StorageLevel> {
         StorageLevel::from(self.0 + 1)
     }
 
     /// The previous level.
-    /// Returns an OutOfRange error if called on a StorageLevel with value 0.
+    /// Returns an `OutOfRange` error if called on a `StorageLevel` with value 0.
     pub fn previous(&self) -> Result<StorageLevel> {
         if self.0 == 0 {
             Err(Error::OutOfRange)

@@ -15,13 +15,13 @@ use sn_interface::types::Keypair;
 use std::time::Duration;
 use tempfile::tempdir;
 
-/// Create a test client without providing any specific keypair, DBC owner, bootstrap_config, or
+/// Create a test client without providing any specific keypair, DBC owner, `bootstrap_config`, or
 /// timeout.
 pub async fn create_test_client() -> Result<Client> {
     create_test_client_with(None, None, None, false).await
 }
 
-/// Create a test client optionally providing keypair and/or bootstrap_config
+/// Create a test client optionally providing keypair and/or `bootstrap_config`
 /// If no keypair is provided, a check is run that a balance has been generated for the client
 pub async fn create_test_client_with(
     optional_keypair: Option<Keypair>,

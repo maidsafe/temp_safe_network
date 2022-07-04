@@ -33,7 +33,7 @@ impl SecretKey {
     /// Construct a secret key from a hex string
     ///
     /// Similar to public key, it is often useful in user facing apps to be able to set your own
-    /// secret key without depending on both the ed25519_dalek and hex crates just to reimplement
+    /// secret key without depending on both the `ed25519_dalek` and hex crates just to reimplement
     /// this function.
     pub fn ed25519_from_hex(hex: &str) -> Result<Self> {
         let bytes = hex::decode(hex).map_err(|err| {

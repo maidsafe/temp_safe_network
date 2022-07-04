@@ -86,7 +86,7 @@ impl Node {
         }
     }
 
-    /// Helper function to propose a NewElders list to sign from a SAP
+    /// Helper function to propose a `NewElders` list to sign from a SAP
     /// Send the `NewElders` proposal to all of the to-be-Elders so it's aggregated by them.
     async fn propose_new_elders(
         &self,

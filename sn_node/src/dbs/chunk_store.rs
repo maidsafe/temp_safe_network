@@ -31,7 +31,7 @@ pub(crate) struct ChunkStore {
 impl ChunkStore {
     /// Creates a new `ChunkStore` at location `root/CHUNK_DB_DIR`
     ///
-    /// If the location specified already contains a ChunkStore, it is simply used
+    /// If the location specified already contains a `ChunkStore`, it is simply used
     ///
     /// Used space of the dir is tracked
     pub(crate) fn new<P: AsRef<Path>>(root: P, used_space: UsedSpace) -> Result<Self> {

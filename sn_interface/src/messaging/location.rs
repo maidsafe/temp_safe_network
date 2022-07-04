@@ -10,7 +10,7 @@ use bls::PublicKey as BlsPublicKey;
 use serde::{Deserialize, Serialize};
 use xor_name::{Prefix, XorName};
 
-/// An EndUser is represented by a name which is mapped to
+/// An `EndUser` is represented by a name which is mapped to
 // a SocketAddr at the Elders where the `EndUser` is proxied through.
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
 pub struct EndUser(pub XorName);
@@ -46,7 +46,7 @@ impl SrcLocation {
         }
     }
 
-    /// Did this come from an EndUser
+    /// Did this come from an `EndUser`
     pub fn is_end_user(&self) -> bool {
         matches!(self, Self::EndUser(_))
     }
@@ -85,7 +85,7 @@ pub enum DstLocation {
 }
 
 impl DstLocation {
-    /// Returns the section pk if it's not EndUser.
+    /// Returns the section pk if it's not `EndUser`.
     pub fn section_pk(&self) -> Option<BlsPublicKey> {
         match self {
             Self::EndUser(_) => None,
@@ -94,7 +94,7 @@ impl DstLocation {
         }
     }
 
-    /// Updates the section pk if it's not EndUser.
+    /// Updates the section pk if it's not `EndUser`.
     pub fn set_section_pk(&mut self, pk: BlsPublicKey) {
         match self {
             Self::EndUser(_) => {}

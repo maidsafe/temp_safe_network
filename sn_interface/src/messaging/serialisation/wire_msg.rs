@@ -21,9 +21,9 @@ use std::io::Write;
 use xor_name::XorName;
 
 /// In order to send a message over the wire, it needs to be serialized
-/// along with a header (WireMsgHeader) which contains the information needed
+/// along with a header (`WireMsgHeader`) which contains the information needed
 /// by the recipient to properly deserialize it.
-/// The WireMsg struct provides the utilities to serialize and deserialize messages.
+/// The `WireMsg` struct provides the utilities to serialize and deserialize messages.
 #[derive(Clone, Debug)]
 pub struct WireMsg {
     /// Message header
@@ -76,8 +76,8 @@ impl WireMsg {
         })
     }
 
-    /// Attempts to create an instance of WireMsg by deserialising the bytes provided.
-    /// To succeed, the bytes should contain at least a valid WireMsgHeader.
+    /// Attempts to create an instance of `WireMsg` by deserialising the bytes provided.
+    /// To succeed, the bytes should contain at least a valid `WireMsgHeader`.
     pub fn from(bytes: Bytes) -> Result<Self> {
         // Deserialize the header bytes first
         let (header, payload) = WireMsgHeader::from(bytes)?;
@@ -91,7 +91,7 @@ impl WireMsg {
         })
     }
 
-    /// Return the serialized WireMsg, which contains the WireMsgHeader bytes,
+    /// Return the serialized `WireMsg`, which contains the `WireMsgHeader` bytes,
     /// followed by the payload bytes, i.e. the serialized Message.
     pub fn serialize(&self) -> Result<Bytes> {
         // First we create a buffer with the capacity
@@ -116,7 +116,7 @@ impl WireMsg {
         Ok(Bytes::from(buffer))
     }
 
-    /// Deserialize the payload from this WireMsg returning a MsgType instance.
+    /// Deserialize the payload from this `WireMsg` returning a `MsgType` instance.
     pub fn into_msg(&self) -> Result<MsgType> {
         match self.header.msg_envelope.auth_kind.clone() {
             #[cfg(any(feature = "chunks", feature = "registers"))]
@@ -193,8 +193,8 @@ impl WireMsg {
     /// The priority of the msg will be that of the underlying
     /// [`MsgType`] variant, i.e. [`SystemMsg`] or [`ServiceMsg`].
     /// This means that we do the same ordering in both incoming
-    /// and outgoing msg queues. We decide which outgoing WireMsg
-    /// should be sent first, and which incoming WireMsg should
+    /// and outgoing msg queues. We decide which outgoing `WireMsg`
+    /// should be sent first, and which incoming `WireMsg` should
     /// be deserialized and handled first, in the same way that
     /// the underlying Cmd/Query/Event will be prioritized when
     /// handled at dst.
@@ -208,13 +208,13 @@ impl WireMsg {
         }
     }
 
-    /// Return the destination section PublicKey for this message
+    /// Return the destination section `PublicKey` for this message
     pub fn dst_section_pk(&self) -> Option<BlsPublicKey> {
         self.header.msg_envelope.dst_location.section_pk()
     }
 
-    /// Return the source section PublicKey for this
-    /// message if it's a NodeMsg
+    /// Return the source section `PublicKey` for this
+    /// message if it's a `NodeMsg`
     pub fn src_section_pk(&self) -> Option<BlsPublicKey> {
         match &self.header.msg_envelope.auth_kind {
             AuthKind::Node(node_signed) => Some(node_signed.section_pk),
@@ -228,12 +228,12 @@ impl WireMsg {
         self.header.msg_envelope.msg_id = msg_id;
     }
 
-    /// Update the destination section PublicKey for this message
+    /// Update the destination section `PublicKey` for this message
     pub fn set_dst_section_pk(&mut self, pk: BlsPublicKey) {
         self.header.msg_envelope.dst_location.set_section_pk(pk)
     }
 
-    /// Update the destination XorName for this message
+    /// Update the destination `XorName` for this message
     pub fn set_dst_xorname(&mut self, name: XorName) {
         self.header.msg_envelope.dst_location.set_name(name)
     }
@@ -243,13 +243,13 @@ impl WireMsg {
         &self.header.msg_envelope.dst_location
     }
 
-    /// Convenience function which creates a temporary WireMsg from the provided
+    /// Convenience function which creates a temporary `WireMsg` from the provided
     /// bytes, returning the deserialized message.
     pub fn deserialize(bytes: Bytes) -> Result<MsgType> {
         Self::from(bytes)?.into_msg()
     }
 
-    /// Convenience function which validates the signature on a ServiceMsg.
+    /// Convenience function which validates the signature on a `ServiceMsg`.
     pub fn verify_sig(auth: ServiceAuth, msg: ServiceMsg) -> Result<AuthorityProof<ServiceAuth>> {
         Self::serialize_msg_payload(&msg).and_then(|payload| AuthorityProof::verify(auth, &payload))
     }

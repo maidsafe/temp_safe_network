@@ -20,7 +20,7 @@ use std::{io, net::SocketAddr};
 use thiserror::Error;
 use xor_name::XorName;
 
-/// The type returned by the sn_routing message handling methods.
+/// The type returned by the `sn_routing` message handling methods.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Internal error.

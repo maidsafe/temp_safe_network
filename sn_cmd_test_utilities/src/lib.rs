@@ -215,7 +215,7 @@ pub mod util {
         ))
     }
 
-    /// Generates a sha3_256 digest/hash of a directory tree, for the purposes of comparing it to
+    /// Generates a `sha3_256` digest/hash of a directory tree, for the purposes of comparing it to
     /// another tree.
     ///
     /// This function was originally written to ignore 'hidden' files, because safe didn't upload
@@ -339,7 +339,7 @@ pub mod util {
 
     /// Runs safe with the arguments specified, with the option to assert on the exit code.
     ///
-    /// This was changed to use the assert_cmd crate because the newer version of this crate
+    /// This was changed to use the `assert_cmd` crate because the newer version of this crate
     /// provides *both* the stdout and stderr if the process doesn't exit as expected. This is
     /// extremely useful in this test suite because there are lots of cmds used to setup the
     /// context for the tests, and you need to be able to see why those fail too.
