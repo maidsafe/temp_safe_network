@@ -111,13 +111,15 @@ impl FlowCtrl {
 
             loop {
                 let _instant = interval.tick().await;
+                let node = &self.node.read().await;
+                let is_elder = node.is_elder();
+                let prefix = node.network_knowledge().prefix();
 
                 // Send a probe message if we are an elder
-                let node = &self.node;
-                if node.read().await.is_elder()
-                    && !node.read().await.network_knowledge().prefix().is_empty()
-                {
-                    match node.read().await.generate_probe_msg().await {
+                if is_elder && !prefix.is_empty() {
+                    let probe = self.node.read().await.generate_probe_msg().await;
+
+                    match probe {
                         Ok(cmd) => {
                             info!("Sending probe msg");
                             if let Err(e) = self.cmd_ctrl.push(cmd).await {
@@ -140,10 +142,12 @@ impl FlowCtrl {
             loop {
                 let _instant = interval.tick().await;
 
+                let prefix = self.node.read().await.network_knowledge().prefix();
+
                 // Send a probe message to an elder
-                let node = &self.node;
-                if !node.read().await.network_knowledge().prefix().is_empty() {
-                    match node.read().await.generate_section_probe_msg().await {
+                if !prefix.is_empty() {
+                    let probe = self.node.read().await.generate_section_probe_msg().await;
+                    match probe {
                         Ok(cmd) => {
                             info!("Sending section probe msg");
                             if let Err(e) = self.cmd_ctrl.push(cmd).await {
@@ -182,12 +186,7 @@ impl FlowCtrl {
                         // we want to resend the prev vote
                         if time.elapsed() >= MISSING_VOTE_INTERVAL {
                             debug!("Vote consensus appears stalled...");
-                            let cmds = self
-                                .node
-                                .read()
-                                .await
-                                .resend_our_last_vote_to_elders()
-                                .await?;
+                            let cmds = node.resend_our_last_vote_to_elders().await?;
 
                             trace!("Vote resending cmds: {:?}", cmds.len());
                             for cmd in cmds {
@@ -318,16 +317,15 @@ impl FlowCtrl {
             loop {
                 let _instant = interval.tick().await;
 
-                let node = &self.node;
-
-                let unresponsive_nodes =
-                    match node.read().await.get_dysfunctional_node_names().await {
-                        Ok(nodes) => nodes,
-                        Err(error) => {
-                            error!("Error getting dysfunctional nodes: {error}");
-                            BTreeSet::default()
-                        }
-                    };
+                let dysfunctional_nodes =
+                    self.node.read().await.get_dysfunctional_node_names().await;
+                let unresponsive_nodes = match dysfunctional_nodes {
+                    Ok(nodes) => nodes,
+                    Err(error) => {
+                        error!("Error getting dysfunctional nodes: {error}");
+                        BTreeSet::default()
+                    }
+                };
 
                 if !unresponsive_nodes.is_empty() {
                     debug!("{:?} : {unresponsive_nodes:?}", LogMarker::ProposeOffline);
@@ -437,7 +435,8 @@ async fn handle_connection_events(ctrl: FlowCtrl, mut incoming_conns: mpsc::Rece
 
                 let span = {
                     let node = &ctrl.node;
-                    trace_span!("handle_message", name = %node.read().await.info().name(), ?sender, msg_id = ?wire_msg.msg_id())
+                    let name = node.read().await.info().name();
+                    trace_span!("handle_message", name = %name, ?sender, msg_id = ?wire_msg.msg_id())
                 };
                 let _span_guard = span.enter();
 

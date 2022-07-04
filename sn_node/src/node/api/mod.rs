@@ -359,7 +359,9 @@ impl NodeApi {
             wire_msg.msg_id()
         );
 
-        if let Some(cmd) = self.node.read().await.send_msg_to_nodes(wire_msg).await? {
+        let cmds = self.node.read().await.send_msg_to_nodes(wire_msg).await?;
+
+        if let Some(cmd) = cmds {
             self.flow_ctrl.fire_and_forget(cmd).await?;
         }
 
