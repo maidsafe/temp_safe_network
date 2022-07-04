@@ -142,13 +142,14 @@ pub(crate) struct Membership {
 }
 
 impl Membership {
+    #[instrument]
     pub(crate) fn from(
         secret_key: (NodeId, SecretKeyShare),
         elders: PublicKeySet,
         n_elders: usize,
         bootstrap_members: BTreeSet<NodeState>,
     ) -> Self {
-        trace!("==============> Creating a new membership instance");
+        trace!("Membership - Creating new membership instance");
         Membership {
             consensus: Consensus::from(secret_key, elders, n_elders),
             bootstrap_members,

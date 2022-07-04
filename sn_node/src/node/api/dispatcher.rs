@@ -120,7 +120,7 @@ impl Dispatcher {
                 }
             },
             Cmd::HandlePeerLost(peer) => {
-                let node = self.node.write().await;
+                let node = self.node.read().await;
 
                 node.handle_peer_lost(&peer.addr()).await
             }
