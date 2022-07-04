@@ -337,7 +337,9 @@ impl Membership {
         );
         let vote_response = consensus.handle_signed_vote(signed_vote)?;
 
+        debug!("trace, no problems with vote received");
         if let Some(decision) = consensus.decision.clone() {
+            debug!("There is consensus");
             if is_ongoing_consensus {
                 info!(
                     "Membership - decided {:?}",
@@ -346,6 +348,7 @@ impl Membership {
 
                 // wipe the last vote time
                 self.last_received_vote_time = None;
+                debug!("wiped last received vote...");
 
                 let next_consensus = Consensus::from(
                     self.consensus.secret_key.clone(),
@@ -358,8 +361,10 @@ impl Membership {
                 self.gen = vote_gen
             }
         } else {
+            debug!("no decision reached...");
             // if this is our ongoing round, lets log the vote
             if is_ongoing_consensus && is_fresh_vote {
+                debug!("recording vote as ongoing and we've not seen it before...");
                 self.last_received_vote_time = Some(Instant::now());
             }
         }
