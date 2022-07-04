@@ -25,7 +25,7 @@ impl Node {
     /// we have, and send such data to the peer.
     #[instrument(skip(self, data_sender_has))]
     pub(crate) async fn get_missing_data_for_node(
-        &self,
+        &mut self,
         sender: Peer,
         data_sender_has: Vec<ReplicatedDataAddress>,
     ) -> Result<Vec<Cmd>> {
@@ -85,7 +85,7 @@ impl Node {
     /// These nodes should send back anything missing (in batches).
     /// Relevant nodes should be all _prior_ neighbours + _new_ elders.
     #[instrument(skip(self))]
-    pub(crate) async fn ask_for_any_new_data(&self) -> Result<Vec<Cmd>> {
+    pub(crate) async fn ask_for_any_new_data(&mut self) -> Result<Vec<Cmd>> {
         debug!("Querying section for any new data");
         let data_i_have = self.data_storage.keys().await?;
         let mut cmds = vec![];
@@ -132,7 +132,7 @@ impl Node {
 
     /// Will reorganize data if we are an adult,
     /// and there were changes to adults (any added or removed).
-    pub(crate) async fn try_reorganize_data(&self) -> Result<Vec<Cmd>> {
+    pub(crate) async fn try_reorganize_data(&mut self) -> Result<Vec<Cmd>> {
         // as an elder we dont want to get any more data for our name
         // (elders will eventually be caching data in general)
         if self.is_elder() {

@@ -257,7 +257,7 @@ impl FlowCtrl {
                         };
 
                         let data_to_send = node
-                            .read()
+                            .write()
                             .await
                             .data_storage
                             .get_from_local_store(&data_address)

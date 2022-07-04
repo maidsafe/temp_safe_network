@@ -36,7 +36,7 @@ use xor_name::XorName;
 impl Node {
     /// Handle data query
     pub(crate) async fn handle_data_query_at_adult(
-        &self,
+        &mut self,
         correlation_id: MsgId,
         query: &DataQueryVariant,
         auth: ServiceAuth,
