@@ -136,7 +136,7 @@ impl Session {
         let mut attempts = 0;
         let interval = Duration::from_millis(50);
         let expected_cmd_ack_wait_attempts =
-            std::cmp::max(100, self.cmd_ack_wait.as_millis() / interval.as_millis());
+            std::cmp::max(200, self.cmd_ack_wait.as_millis() / interval.as_millis());
         loop {
             match receiver.try_recv() {
                 Ok((src, None)) => {
@@ -177,6 +177,7 @@ impl Session {
                 attempts,
                 expected_cmd_ack_wait_attempts
             );
+            trace!("Wait for any cmd response/reaction (AE msgs eg), is over)");
             tokio::time::sleep(interval).await;
         }
 
