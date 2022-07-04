@@ -133,7 +133,7 @@ pub fn convert_bincode_error(err: bincode::Error) -> Error {
     Error::Serialisation(err.as_ref().to_string())
 }
 
-/// Convert type errors to messaging::Errors for sending scross the network
+/// Convert type errors to `messaging::Errors` for sending scross the network
 pub fn convert_dt_error_to_error_msg(error: Error) -> ErrorMsg {
     match error {
         Error::InvalidOperation => {

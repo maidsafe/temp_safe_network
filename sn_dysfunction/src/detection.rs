@@ -258,9 +258,9 @@ impl DysfunctionDetection {
         Ok(())
     }
 
-    /// Get a list of nodes whose score is above mean * DysfunctionalSeverity weighting
+    /// Get a list of nodes whose score is above mean * `DysfunctionalSeverity` weighting
     /// TODO: order these to act upon _most_ dysfunctional first
-    /// (the nodes must all ProposeOffline over a dysfunctional node and then _immediately_ vote it off. So any other membershipn changes in flight could block this.
+    /// (the nodes must all `ProposeOffline` over a dysfunctional node and then _immediately_ vote it off. So any other membershipn changes in flight could block this.
     /// thus, we need to be callling this function often until nodes are removed.)
     pub async fn get_nodes_beyond_severity(
         &self,
@@ -317,7 +317,7 @@ mod tests {
     /// In a standard network startup (as of 24/06/22)
     /// we see:
     /// 0 op requests
-    /// 2407 DkgBroadcastMsg DKG (each are tracked as an eror until a respnose comes in...) this is total across all nodes...
+    /// 2407 `DkgBroadcastMsg` DKG (each are tracked as an eror until a respnose comes in...) this is total across all nodes...
     ///
     /// This includes:
     /// 510 "tracker: Dkg..." (the initial black mark)
@@ -325,7 +325,7 @@ mod tests {
     /// only the stains that stick... So in reality, over time we' see 0 DKG issues in a normal startup
     /// ~469 "tracker: Know"
     /// ~230 "tracker: Communication""
-    /// 0 "tracker: PendingOp..." (equally a lot of these are being responded to...)
+    /// 0 "tracker: `PendingOp`..." (equally a lot of these are being responded to...)
     fn generate_network_startup_msg_issues() -> impl Strategy<Value = IssueType> {
         // higher numbers here are more frequent
         prop_oneof![
@@ -343,7 +343,7 @@ mod tests {
     /// ~2394 "Attempting to remove logged dkg"
     /// ~469 "tracker: Know"
     /// ~1588 "tracker: Communication""
-    /// ~3376 "tracker: PendingOp..." (equally a lot of these are being responded to...)
+    /// ~3376 "tracker: `PendingOp`..." (equally a lot of these are being responded to...)
     fn generate_no_churn_normal_use_msg_issues() -> impl Strategy<Value = IssueType> {
         // higher numbers here are more frequent
         prop_oneof![
@@ -355,7 +355,7 @@ mod tests {
         ]
     }
 
-    /// Generate proptest issues, in a range from 1000 to...max_uantity
+    /// Generate proptest issues, in a range from 1000 `to...max_uantity`
     fn generate_msg_issues(
         min: usize,
         max: usize,
@@ -371,9 +371,9 @@ mod tests {
         )
     }
 
-    /// Generate proptest issues, in a range from 1000 to...max_quantity
+    /// Generate proptest issues, in a range from 1000 `to...max_quantity`
     /// issues had a name for reliably routing
-    /// issues come with a random f32 0-1 to use as our test against NodeQuality
+    /// issues come with a random f32 0-1 to use as our test against `NodeQuality`
     fn generate_startup_issues(
         min: usize,
         max: usize,
@@ -396,7 +396,7 @@ mod tests {
         str_val.prop_map(|s| XorName::from_content(s.as_bytes()))
     }
 
-    /// Generate proptest nodes, each a Xorname, this will generate nodes with different NodeQualities
+    /// Generate proptest nodes, each a Xorname, this will generate nodes with different `NodeQualities`
     fn generate_nodes_and_quality(
         min: usize,
         max: usize,
@@ -444,7 +444,7 @@ mod tests {
 
     /// for a given issue and a "Root address" to base elder selection off, this returns
     /// the nodes we should target for this specific issue:
-    /// eg if DKG, it's the closest to the root_addr
+    /// eg if DKG, it's the closest to the `root_addr`
     /// if anything else, we base it off issue name closeness
     fn get_target_nodes_for_issue(
         issue: IssueType,

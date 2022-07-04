@@ -50,7 +50,7 @@ impl Safe {
     ///
     /// ## Examples
     ///
-    /// ### Fetch FilesContainer relative path file
+    /// ### Fetch `FilesContainer` relative path file
     /// ```no_run
     /// # use sn_api::{Safe, resolver::SafeData};
     /// # use std::collections::BTreeMap;
@@ -94,12 +94,12 @@ impl Safe {
     /// # As opposed to 'fetch' function, the actual target content won't be fetched, and only
     /// # the URL will be inspected resolving it as necessary to find the target location.
     /// # This is helpful if you are interested in knowing about the target content,
-    /// # and/or each of the SafeUrl resolution steps taken to the target content, rather than
+    /// # and/or each of the `SafeUrl` resolution steps taken to the target content, rather than
     /// # trying to revieve the actual content.
     ///
     /// ## Examples
     ///
-    /// ### Inspect FilesContainer relative path file
+    /// ### Inspect `FilesContainer` relative path file
     /// ```no_run
     /// # use sn_api::{Safe, resolver::SafeData};
     /// # use std::collections::BTreeMap;

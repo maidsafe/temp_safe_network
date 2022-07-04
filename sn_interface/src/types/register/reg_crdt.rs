@@ -24,7 +24,7 @@ use std::{
     hash::Hash,
 };
 
-/// Hash of the register entry. Logging as the same format of XorName.
+/// Hash of the register entry. Logging as the same format of `XorName`.
 #[derive(Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct EntryHash(pub crdts::merkle_reg::Hash);
 
@@ -80,7 +80,7 @@ impl Display for RegisterCrdt {
 }
 
 impl RegisterCrdt {
-    /// Constructs a new 'RegisterCrdt'.
+    /// Constructs a new '`RegisterCrdt`'.
     pub(crate) fn new(address: RegisterAddress) -> Self {
         Self {
             address,
@@ -98,7 +98,7 @@ impl RegisterCrdt {
         (self.data.num_nodes() + self.data.num_orphans()) as u64
     }
 
-    /// Write a new entry to the RegisterCrdt, returning the hash
+    /// Write a new entry to the `RegisterCrdt`, returning the hash
     /// of the entry and the CRDT operation without a signature
     pub(crate) fn write(
         &mut self,
@@ -124,7 +124,7 @@ impl RegisterCrdt {
         Ok((EntryHash(hash), op))
     }
 
-    /// Apply a remote data CRDT operation to this replica of the RegisterCrdt.
+    /// Apply a remote data CRDT operation to this replica of the `RegisterCrdt`.
     pub(crate) fn apply_op(&mut self, op: CrdtOperation<Entry>) -> Result<()> {
         // Let's first check the op is validly signed.
         // Note: Perms and valid sig for the op are checked at the upper Register layer.

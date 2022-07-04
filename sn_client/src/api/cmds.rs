@@ -99,7 +99,7 @@ impl Client {
         }
     }
 
-    /// Send a signed DataCmd to the network.
+    /// Send a signed `DataCmd` to the network.
     /// This is to be part of a public API, for the user to
     /// provide the serialised and already signed cmd.
     pub async fn send_signed_cmd(

@@ -20,7 +20,7 @@ use bytes::Bytes;
 use ed25519_dalek::Signer;
 
 impl Node {
-    /// Forms a CmdError msg to send back to the client
+    /// Forms a `CmdError` msg to send back to the client
     pub(crate) async fn send_cmd_error_response(
         &self,
         error: CmdError,
@@ -34,7 +34,7 @@ impl Node {
         self.send_cmd_response(target, the_error_msg).await
     }
 
-    /// Forms a CmdAck msg to send back to the client
+    /// Forms a `CmdAck` msg to send back to the client
     pub(crate) async fn send_cmd_ack(&self, target: Peer, msg_id: MsgId) -> Result<Vec<Cmd>> {
         let the_ack_msg = ServiceMsg::CmdAck {
             correlation_id: msg_id,

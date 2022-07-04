@@ -104,7 +104,7 @@ impl Safe {
         self.fetch_wallet(&safeurl).await
     }
 
-    /// Fetch a wallet from a SafeUrl without performing any type of URL resolution
+    /// Fetch a wallet from a `SafeUrl` without performing any type of URL resolution
     pub(crate) async fn fetch_wallet(&self, safeurl: &SafeUrl) -> Result<WalletSpendableDbcs> {
         let entries = match self.fetch_multimap(safeurl).await {
             Ok(entries) => entries,

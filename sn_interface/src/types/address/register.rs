@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
 /// Address of a Register, different from
-/// a ChunkAddress in that it also includes a tag.
+/// a `ChunkAddress` in that it also includes a tag.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub struct RegisterAddress {
     /// Name.

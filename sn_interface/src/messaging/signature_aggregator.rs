@@ -103,7 +103,7 @@ impl Default for SignatureAggregator {
     }
 }
 
-/// Error returned from SignatureAggregator::add.
+/// Error returned from `SignatureAggregator::add`.
 #[derive(Debug, Error)]
 pub enum Error {
     /// There are not enough signature shares yet, more need to be added. This is not a failure.

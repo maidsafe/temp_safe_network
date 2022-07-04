@@ -81,7 +81,7 @@ impl DkgSessionId {
     }
 }
 
-/// One signed failure for a DKG round by a given PublicKey
+/// One signed failure for a DKG round by a given `PublicKey`
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 pub struct DkgFailureSig {
     #[allow(missing_docs)]

@@ -27,7 +27,7 @@ pub struct NodeState {
 }
 
 impl NodeState {
-    /// Build a NodeState in the Joined state.
+    /// Build a `NodeState` in the Joined state.
     pub fn joined(name: XorName, addr: SocketAddr, previous_name: Option<XorName>) -> Self {
         Self {
             name,

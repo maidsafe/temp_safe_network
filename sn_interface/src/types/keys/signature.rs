@@ -42,7 +42,7 @@ pub enum Signature {
 }
 
 impl Signature {
-    /// Returns bls::Signature if Self is a BLS variant.
+    /// Returns `bls::Signature` if Self is a BLS variant.
     pub fn into_bls(self) -> Option<bls::Signature> {
         match self {
             Self::Bls(sig) => Some(sig),
@@ -50,7 +50,7 @@ impl Signature {
         }
     }
 
-    /// Returns ed25519_dalek::Signature if Self is a Ed25519 variant.
+    /// Returns `ed25519_dalek::Signature` if Self is a Ed25519 variant.
     pub fn into_ed(self) -> Option<ed25519_dalek::Signature> {
         match self {
             Self::Ed25519(sig) => Some(sig),

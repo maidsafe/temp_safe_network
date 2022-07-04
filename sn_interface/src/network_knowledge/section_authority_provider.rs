@@ -68,7 +68,7 @@ pub struct SectionAuthorityProvider {
     membership_gen: Generation,
 }
 
-/// SectionAuthorityProvider candidates for handover consensus to vote on
+/// `SectionAuthorityProvider` candidates for handover consensus to vote on
 #[allow(clippy::large_enum_variant)]
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Serialize, Deserialize)]
 pub enum SapCandidate {
@@ -189,7 +189,7 @@ impl SectionAuthorityProvider {
         self.elders.len()
     }
 
-    /// Returns a map of name to socket_addr.
+    /// Returns a map of name to `socket_addr`.
     pub fn contains_elder(&self, name: &XorName) -> bool {
         self.elders.iter().any(|elder| &elder.name() == name)
     }

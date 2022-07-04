@@ -66,7 +66,7 @@ struct CacheEntry {
 }
 
 impl RegisterStorage {
-    /// Create new RegisterStorage
+    /// Create new `RegisterStorage`
     pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         let create_path = |name: &str| path.join("db").join(name);
         let create_db = |db_dir| {

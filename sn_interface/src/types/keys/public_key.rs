@@ -219,7 +219,7 @@ impl Display for PublicKey {
 
 impl LowerHex for PublicKey {
     /// Useful for displaying public key in user-facing apps
-    /// E.g. in cli and in human-readable messaging like for sn_authd
+    /// E.g. in cli and in human-readable messaging like for `sn_authd`
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}", hex::encode(self.to_bytes()))
     }
@@ -227,7 +227,7 @@ impl LowerHex for PublicKey {
 
 impl UpperHex for PublicKey {
     /// Useful for displaying public key in user-facing apps
-    /// E.g. in cli and in human-readable messaging like for sn_authd
+    /// E.g. in cli and in human-readable messaging like for `sn_authd`
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}", hex::encode_upper(self.to_bytes()))
     }

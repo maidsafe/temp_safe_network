@@ -141,7 +141,7 @@ impl Capacity {
     }
 
     /// Registered holders not present in provided list of members
-    /// will be removed from adult_levels and no longer tracked for liveness.
+    /// will be removed from `adult_levels` and no longer tracked for liveness.
     pub(super) async fn retain_members_only(&self, members: &BTreeSet<XorName>) {
         let mut adult_levels = self.adult_levels.write().await;
         let absent_adults: Vec<_> = adult_levels

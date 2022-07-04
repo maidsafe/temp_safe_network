@@ -85,7 +85,7 @@ impl Link {
 
     /// Disposes of the link and all underlying resources.
     /// Also any clones of this link that are held, will be cleaned up.
-    /// This is due to the fact that we do never leak the qp2p::Connection outside of this struct,
+    /// This is due to the fact that we do never leak the `qp2p::Connection` outside of this struct,
     /// since that struct is cloneable and uses Arc internally.
     pub(crate) fn disconnect(&mut self) {
         self.queue.clear();

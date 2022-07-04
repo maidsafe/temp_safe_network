@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-//! sn_node provides the interface to Safe routing.  The resulting executable is the node
+//! `sn_node` provides the interface to Safe routing.  The resulting executable is the node
 //! for the Safe network.
 
 use sn_client::{utils::test_utils::read_network_conn_info, Client, ClientConfig, Error, Result};
@@ -30,7 +30,7 @@ const TEST_FILES_COUNT: &str = "TEST_FILES_COUNT";
 const DEFAULT_FILES_COUNT: usize = 10;
 
 /// Get the expected elder count for our network.
-/// Defaults to DEFAULT_ELDER_COUNT, but can be overridden by the env var FILES_COUNT.
+/// Defaults to `DEFAULT_ELDER_COUNT`, but can be overridden by the env var `FILES_COUNT`.
 pub(crate) fn files_count() -> usize {
     // if we have an env var for this, lets override
     match std::env::var(TEST_FILES_COUNT) {

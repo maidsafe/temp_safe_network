@@ -16,7 +16,7 @@ use std::{
 
 const BASE_DOWNLOAD_URL: &str = "https://sn-node.s3.eu-west-2.amazonaws.com";
 
-/// Downloads and installs either the latest sn_node binary or a specific version.
+/// Downloads and installs either the latest `sn_node` binary or a specific version.
 ///
 /// The self update crate is used to query the Github API to find the latest version number.
 /// After we have the version (or if it was optionally supplied by the user), we download the
@@ -166,8 +166,8 @@ fn set_exec_perms(file_path: PathBuf) -> Result<()> {
 /// Gets the version number from the full version number string.
 ///
 /// The `release_version` input is in the form "0.1.0-0.1.1-0.62.0-0.51.6-0.46.2-0.39.1", which is the
-/// sn_dysfunction, sn_interface, sn_client, sn_node, sn_api, sn_cli versions, respectively. This
-/// function will return the safe_network part.
+/// `sn_dysfunction`, `sn_interface`, `sn_client`, `sn_node`, `sn_api`, `sn_cli` versions, respectively. This
+/// function will return the `safe_network` part.
 fn get_version_from_release_version(release_version: &str) -> Result<String> {
     let mut parts = release_version.split('-');
     parts.next();

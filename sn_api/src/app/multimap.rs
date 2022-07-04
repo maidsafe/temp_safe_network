@@ -112,7 +112,7 @@ impl Safe {
     /// Remove entries from a Multimap on the network
     /// This tombstones the removed entries, effectively hiding them if they where the latest
     /// Note that they are still stored on the network as history is kept,
-    /// and you can still access them with their EntryHash
+    /// and you can still access them with their `EntryHash`
     pub async fn multimap_remove(
         &self,
         url: &str,

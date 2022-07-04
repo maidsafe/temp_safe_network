@@ -195,7 +195,7 @@ impl FlowCtrl {
         });
     }
 
-    /// Periodically loop over any pending data batches and queue up send_msg for those
+    /// Periodically loop over any pending data batches and queue up `send_msg` for those
     fn start_data_replication(self) {
         info!("Starting sending any queued data for replication in batches");
 

@@ -247,7 +247,7 @@ fn files_get_src_is_container_and_dst_is_unspecified() -> Result<()> {
 
 /// Synopsis
 /// --------
-/// From files_get.rs
+/// From `files_get.rs`
 ///
 /// It is an error/warning if the dst path attempts to use
 /// an existing file as a directory. But other files should
@@ -261,7 +261,7 @@ fn files_get_src_is_container_and_dst_is_unspecified() -> Result<()> {
 ///      -rw-rw-r-- 1 user user 0 Mar 31 14:38 b         (b still a file)
 ///      -rw-rw-r-- 1 user user 0 Mar 31 14:38 file.txt  (other file written)
 ///
-/// note: cp returns exit code of 1 when this occurs, but sn_cli
+/// note: cp returns exit code of 1 when this occurs, but `sn_cli`
 ///       presently returns 0.
 ///
 /// ----------------
@@ -350,7 +350,7 @@ fn files_get_attempt_overwrite_sub_file_with_dir() -> Result<()> {
 
 /// Synopsis
 /// --------
-/// Test:  safe files get <nrs_url>
+/// Test:  safe files get <`nrs_url`>
 ///    src is an nrs url, linked to a container url, testdata put without slash.
 ///    dst is unspecified.  (should default to the current working directory)
 ///    expected result: ../resources/testdata matches ../resources/testdata
@@ -418,7 +418,7 @@ fn files_get_src_is_nrs_and_dst_is_unspecified() -> Result<()> {
 
 /// Synopsis
 /// --------
-/// Test:  safe files get <nrs_url>
+/// Test:  safe files get <`nrs_url`>
 ///    src is an nrs url, linked to a container url, testdata put without slash.
 ///    dst is unspecified.  (should default to the current working directory)
 ///    expected result: ../resources/testdata matches ../resources/testdata
@@ -857,7 +857,7 @@ fn files_get_exists_overwrite() -> Result<()> {
 ///
 /// Then the command should fail
 /// And the the error output should contain "No data found for path '/path/is/invalid' on the
-/// FilesContainer"
+/// `FilesContainer`"
 #[test]
 fn files_get_src_path_is_invalid() -> Result<()> {
     // Arrange
@@ -1060,7 +1060,7 @@ fn files_get_src_is_dir_and_dst_exists_as_dir() -> Result<()> {
 ///    dst exists, and is a file
 ///    expected result:
 ///        exit code = 1 and
-///        stderr contains: "[Error] FileSystemError - cannot overwrite non-directory"
+///        stderr contains: "[Error] `FileSystemError` - cannot overwrite non-directory"
 ///
 /// Details
 /// -------
@@ -1247,7 +1247,7 @@ fn files_get_src_is_dir_and_dst_exists_as_newname_dir() -> Result<()> {
 ///    dst exists, and is a file
 ///    expected result:
 ///        exit code = 1 and
-///        stderr contains: "[Error] FileSystemError - cannot overwrite non-directory"
+///        stderr contains: "[Error] `FileSystemError` - cannot overwrite non-directory"
 ///
 /// Details
 /// -------
@@ -1700,7 +1700,7 @@ fn files_get_src_is_file_and_dst_newname_not_existing() -> Result<()> {
 /// Test:  safe files get <src> /tmp/newname
 ///    src is xor-url generated from `safe files put ./test_symlinks`
 ///    dst does not exist
-///    expected result: ./test_symlinks matches /tmp/newname
+///    expected result: ./`test_symlinks` matches /tmp/newname
 ///
 /// Details
 /// -------
@@ -1757,7 +1757,7 @@ fn files_get_symlinks_relative() -> Result<()> {
 
 /// Synopsis
 /// --------
-/// Test:  safe files get <xor-url>/absolute_symlinks /tmp/newname
+/// Test:  safe files get <xor-url>/`absolute_symlinks` /tmp/newname
 ///    src is symlinks test dir containing absolute-path links
 ///    dst does not exist
 ///    expected result: source directory matches /tmp/newname
@@ -1821,7 +1821,7 @@ fn files_get_symlinks_absolute() -> Result<()> {
 
 /// Synopsis
 /// --------
-/// Test:  safe files get <xor-url>/absolute_symlinks /tmp/newname
+/// Test:  safe files get <xor-url>/`absolute_symlinks` /tmp/newname
 ///    src is symlinks test dir containing absolute-path links
 ///    dst does not exist
 ///    expected result: source directory matches /tmp/newname

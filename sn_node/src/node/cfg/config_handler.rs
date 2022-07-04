@@ -287,7 +287,7 @@ impl Config {
         }
     }
 
-    /// The address to be credited when this node farms SafeCoin.
+    /// The address to be credited when this node farms `SafeCoin`.
     pub fn wallet_id(&self) -> Option<&String> {
         self.wallet_id.as_ref()
     }

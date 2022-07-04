@@ -17,7 +17,7 @@ use super::{AuthorityProof, BlsShareAuth, NodeAuth, SectionAuth};
 
 use xor_name::XorName;
 
-/// Authority of a NodeMsg.
+/// Authority of a `NodeMsg`.
 /// Src of message and authority to send it. Authority is validated by the signature.
 #[derive(PartialEq, Debug, Clone)]
 pub enum NodeMsgAuthority {
@@ -30,7 +30,7 @@ pub enum NodeMsgAuthority {
 }
 
 impl NodeMsgAuthority {
-    /// Returns the XorName of the authority used for the auth signing
+    /// Returns the `XorName` of the authority used for the auth signing
     pub fn get_auth_xorname(&self) -> XorName {
         match self.clone() {
             NodeMsgAuthority::BlsShare(auth_proof) => {

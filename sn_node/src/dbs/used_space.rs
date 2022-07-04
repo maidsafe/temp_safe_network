@@ -21,7 +21,7 @@ pub struct UsedSpace {
 }
 
 impl UsedSpace {
-    /// Create new UsedSpace tracker
+    /// Create new `UsedSpace` tracker
     pub fn new(max_capacity: usize) -> Self {
         Self {
             max_capacity,

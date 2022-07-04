@@ -86,7 +86,7 @@ impl Safe {
         self.register_fetch_entry(&safeurl, hash).await
     }
 
-    /// Fetch a Register from a SafeUrl without performing any type of URL resolution
+    /// Fetch a Register from a `SafeUrl` without performing any type of URL resolution
     /// Supports version hashes:
     /// e.g. safe://mysafeurl?v=ce56a3504c8f27bfeb13bdf9051c2e91409230ea
     pub(crate) async fn register_fetch_entries(
@@ -143,7 +143,7 @@ impl Safe {
         }
     }
 
-    /// Fetch a Register from a SafeUrl without performing any type of URL resolution
+    /// Fetch a Register from a `SafeUrl` without performing any type of URL resolution
     pub(crate) async fn register_fetch_entry(
         &self,
         url: &SafeUrl,

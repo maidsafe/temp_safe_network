@@ -45,7 +45,7 @@ pub fn at_least_one_correct_elder() -> usize {
 }
 
 /// Get the expected chunk copy count for our network.
-/// Defaults to DEFAULT_DATA_COPY_COUNT, but can be overridden by the env var SN_DATA_COPY_COUNT.
+/// Defaults to `DEFAULT_DATA_COPY_COUNT`, but can be overridden by the env var `SN_DATA_COPY_COUNT`.
 pub fn data_copy_count() -> usize {
     // if we have an env var for this, lets override
     match std::env::var(SN_DATA_COPY_COUNT) {

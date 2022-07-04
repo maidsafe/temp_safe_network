@@ -57,7 +57,7 @@ const SN_ELDER_COUNT: &str = "SN_ELDER_COUNT";
 pub const DEFAULT_ELDER_COUNT: usize = 7;
 
 /// Get the expected elder count for our network.
-/// Defaults to DEFAULT_ELDER_COUNT, but can be overridden by the env var SN_ELDER_COUNT.
+/// Defaults to `DEFAULT_ELDER_COUNT`, but can be overridden by the env var `SN_ELDER_COUNT`.
 pub fn elder_count() -> usize {
     // if we have an env var for this, lets override
     match std::env::var(SN_ELDER_COUNT) {
@@ -85,7 +85,7 @@ pub fn recommended_section_size() -> usize {
     2 * crate::network_knowledge::elder_count()
 }
 
-/// SuperMajority of a given group (i.e. > 2/3)
+/// `SuperMajority` of a given group (i.e. > 2/3)
 #[inline]
 pub const fn supermajority(group_size: usize) -> usize {
     1 + group_size * 2 / 3
@@ -345,7 +345,7 @@ impl NetworkKnowledge {
         }
     }
 
-    /// Given a NodeMsg can we trust it (including verifying contents of an AE message)
+    /// Given a `NodeMsg` can we trust it (including verifying contents of an AE message)
     pub fn verify_node_msg_can_be_trusted(
         msg_authority: NodeMsgAuthority,
         msg: SystemMsg,
@@ -376,7 +376,7 @@ impl NetworkKnowledge {
 
     /// Update our network knowledge if the provided SAP is valid and can be verified
     /// with the provided proof chain.
-    /// If the 'update_sap' flag is set to 'true', the provided SAP and chain will be
+    /// If the '`update_sap`' flag is set to 'true', the provided SAP and chain will be
     /// set as our current.
     pub async fn update_knowledge_if_valid(
         &self,

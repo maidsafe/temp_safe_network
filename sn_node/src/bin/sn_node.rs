@@ -212,7 +212,7 @@ fn init_node_logging(config: Config) -> Result<Option<WorkerGuard>> {
     Ok(_optional_guard)
 }
 
-/// `FileRotateAppender` is a tracing_appender with extra logrotate features:
+/// `FileRotateAppender` is a `tracing_appender` with extra logrotate features:
 ///  - most recent logfile name re-used to support following (e.g. 'tail -f=logfile')
 ///  - numbered rotation (logfile.1, logfile.2 etc)
 ///  - limit logfile by size, lines or time

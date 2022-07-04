@@ -14,12 +14,12 @@ use rand::{rngs::OsRng, Rng};
 use rayon::current_num_threads;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-/// Wrapper for raw bincode::serialise.
+/// Wrapper for raw `bincode::serialise`.
 pub fn serialise<T: Serialize>(data: &T) -> Result<Vec<u8>> {
     bincode::serialize(data).map_err(convert_bincode_error)
 }
 
-/// Wrapper for bincode::deserialize.
+/// Wrapper for `bincode::deserialize`.
 pub fn deserialise<'a, T>(bytes: &'a [u8]) -> Result<T>
 where
     T: Deserialize<'a>,
@@ -27,13 +27,13 @@ where
     bincode::deserialize(bytes).map_err(convert_bincode_error)
 }
 
-/// Wrapper for z-Base-32 multibase::encode.
+/// Wrapper for z-Base-32 `multibase::encode`.
 pub fn encode<T: Serialize>(data: &T) -> Result<String> {
     let bytes = serialise(&data)?;
     Ok(multibase::encode(Base::Base32Z, &bytes))
 }
 
-/// Wrapper for z-Base-32 multibase::decode.
+/// Wrapper for z-Base-32 `multibase::decode`.
 pub fn decode<I: AsRef<str>, O: DeserializeOwned>(encoded: I) -> Result<O> {
     let (base, decoded) =
         multibase::decode(encoded).map_err(|e| Error::FailedToParse(e.to_string()))?;

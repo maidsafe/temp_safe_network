@@ -45,7 +45,7 @@ const ERROR_MSG_NO_FILES_CONTAINER_FOUND: &str = "No FilesContainer found at thi
 pub(crate) const FILES_CONTAINER_TYPE_TAG: u64 = 1_100;
 
 impl Safe {
-    /// # Create an empty FilesContainer.
+    /// # Create an empty `FilesContainer`.
     ///
     /// ## Example
     ///
@@ -68,7 +68,7 @@ impl Safe {
         Ok(xorurl)
     }
 
-    /// # Create a FilesContainer containing files uploaded from a local folder.
+    /// # Create a `FilesContainer` containing files uploaded from a local folder.
     ///
     /// ## Example
     ///
@@ -132,7 +132,7 @@ impl Safe {
         }
     }
 
-    /// # Fetch an existing FilesContainer.
+    /// # Fetch an existing `FilesContainer`.
     ///
     /// ## Example
     ///
@@ -155,7 +155,7 @@ impl Safe {
         self.fetch_files_container(&safe_url).await
     }
 
-    /// Fetch a FilesContainer from a SafeUrl without performing any type of URL resolution
+    /// Fetch a `FilesContainer` from a `SafeUrl` without performing any type of URL resolution
     pub(crate) async fn fetch_files_container(
         &self,
         safe_url: &SafeUrl,
@@ -216,7 +216,7 @@ impl Safe {
         Ok(Some((version, files_map)))
     }
 
-    /// # Sync up local folder with the content on a FilesContainer.
+    /// # Sync up local folder with the content on a `FilesContainer`.
     ///
     /// ## Example
     ///
@@ -303,7 +303,7 @@ impl Safe {
         .await
     }
 
-    /// # Add a file, either a local path or an already uploaded file, on an existing FilesContainer.
+    /// # Add a file, either a local path or an already uploaded file, on an existing `FilesContainer`.
     ///
     /// ## Example
     ///
@@ -374,7 +374,7 @@ impl Safe {
         .await
     }
 
-    /// # Add a file, from raw bytes, on an existing FilesContainer.
+    /// # Add a file, from raw bytes, on an existing `FilesContainer`.
     ///
     /// ## Example
     ///
@@ -420,7 +420,7 @@ impl Safe {
         .await
     }
 
-    /// # Remove a file from an existing FilesContainer.
+    /// # Remove a file from an existing `FilesContainer`.
     ///
     /// ## Example
     ///
@@ -653,7 +653,7 @@ impl Safe {
         self.fetch_data(&safe_url, range).await
     }
 
-    /// Fetch a file from a SafeUrl without performing any type of URL resolution
+    /// Fetch a file from a `SafeUrl` without performing any type of URL resolution
     pub(crate) async fn fetch_data(&self, safe_url: &SafeUrl, range: Range) -> Result<Bytes> {
         match safe_url.data_type() {
             DataType::File => self.get_bytes(safe_url.xorname(), range).await,

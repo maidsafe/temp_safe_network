@@ -18,10 +18,10 @@ pub(crate) type PublicName = String;
 /// Each subname will link to some content, e.g., a `FilesContainer`, and the topname can also
 /// optionally link to something.
 ///
-/// The struct is stored on the network using a Multimap. The entries are public name -> SafeUrl
+/// The struct is stored on the network using a Multimap. The entries are public name -> `SafeUrl`
 /// mappings.
 ///
-/// | PublicName Key    | Full Name        | SafeUrl Value            |
+/// | `PublicName` Key    | Full Name        | `SafeUrl` Value            |
 /// |-------------------|------------------|--------------------------|
 /// | "example"         | "example"        | "safe://example"         |
 /// | "sub.example"     | "sub.example"    | "safe://sub.example"     |
@@ -36,20 +36,20 @@ pub struct NrsMap {
 }
 
 impl NrsMap {
-    /// Get the SafeUrl associated with the given public name.
+    /// Get the `SafeUrl` associated with the given public name.
     ///
     /// There are 3 possible inputs for `public_name`:
     /// * The topname, e.g., "example".
     /// * A subname with a topname, e.g. "a.example".
-    /// * An XorUrl string.
+    /// * An `XorUrl` string.
     ///
     /// The calling `nrs_get` function would have already returned if it couldn't find, say,
     /// "example2".
     ///
     /// If `public_name` isn't in the map, we then check to see if it contains subnames, in which
-    /// case, we return a ContentError. If it doesn't, we return None. At this point, either the
-    /// topname has no link associated, or we have an XorUrl string. In both cases, the resolver is
-    /// going to return the NrsMapContainer content.
+    /// case, we return a `ContentError`. If it doesn't, we return None. At this point, either the
+    /// topname has no link associated, or we have an `XorUrl` string. In both cases, the resolver is
+    /// going to return the `NrsMapContainer` content.
     ///
     /// We're doing this because we want to return no target link if the address of the container
     /// has been passed to `nrs_get`.
