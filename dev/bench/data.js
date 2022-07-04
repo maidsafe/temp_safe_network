@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1656922931698,
+  "lastUpdate": 1656926514873,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -7013,6 +7013,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 5182097668,
             "range": "± 28279674",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "david.irvine@maidsafe.net",
+            "name": "David Irvine",
+            "username": "dirvine"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "9314a2db5dc1ae91bc4d80a65c1a8825492fc7c7",
+          "message": "chore: Docs - put symbols in backticks",
+          "timestamp": "2022-07-04T10:52:50+02:00",
+          "tree_id": "60cc2940cfd15aa2a500533a3303d196f5d7ae95",
+          "url": "https://github.com/maidsafe/safe_network/commit/9314a2db5dc1ae91bc4d80a65c1a8825492fc7c7"
+        },
+        "date": 1656926512587,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 5243537295,
+            "range": "± 4494245",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 5282541761,
+            "range": "± 8846029",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 5530708788,
+            "range": "± 16110729028",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 5016103670,
+            "range": "± 2209368",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 5038515554,
+            "range": "± 3933020",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 5241937162,
+            "range": "± 36968041",
             "unit": "ns/iter"
           }
         ]
