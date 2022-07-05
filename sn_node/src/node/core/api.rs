@@ -184,7 +184,7 @@ impl Node {
     // excluding the ones in the provided list. And if the outcome list of candidates
     // differs from the current elders, trigger a DKG.
     pub(crate) async fn promote_and_demote_elders_except(
-        &self,
+        &mut self,
         excluded_names: &BTreeSet<XorName>,
     ) -> Result<Vec<Cmd>> {
         debug!("{}", LogMarker::TriggeringPromotionAndDemotion);

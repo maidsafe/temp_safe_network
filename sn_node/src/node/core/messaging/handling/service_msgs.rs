@@ -73,7 +73,7 @@ impl Node {
     /// Records response in liveness tracking
     /// Forms a response to send to the requester
     pub(crate) async fn handle_data_query_response_at_elder(
-        &self,
+        &mut self,
         correlation_id: MsgId,
         response: NodeQueryResponse,
         user: EndUser,
@@ -109,8 +109,7 @@ impl Node {
 
         let pending_removed = self
             .dysfunction_tracking
-            .request_operation_fulfilled(&node_id, op_id)
-            .await;
+            .request_operation_fulfilled(&node_id, op_id);
 
         if !pending_removed {
             trace!("Ignoring un-expected response");
@@ -164,7 +163,7 @@ impl Node {
 
     /// Handle `ServiceMsgs` received from `EndUser`
     pub(crate) async fn handle_service_msg_received(
-        &self,
+        &mut self,
         msg_id: MsgId,
         msg: ServiceMsg,
         auth: AuthorityProof<ServiceAuth>,
@@ -227,7 +226,7 @@ impl Node {
 
     /// Handle incoming data msgs.
     pub(crate) async fn handle_service_msg(
-        &self,
+        &mut self,
         msg_id: MsgId,
         msg: ServiceMsg,
         dst_location: DstLocation,
