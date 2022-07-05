@@ -217,28 +217,33 @@ impl FlowCtrl {
                 let mut rng = rand::rngs::OsRng;
                 let mut this_batch_address = None;
 
-                trace!("about to query pending data to replx");
-
-                let node = &self.node.read().await;
-                // choose a data to replicate at random
-                if let Some((data_addr, _peers_set)) = node
-                    .pending_data_to_replicate_to_peers
-                    .iter()
-                    .choose(&mut rng)
-                {
-                    this_batch_address = Some(data_addr);
-                }
-
-                trace!("queried");
-                if let Some(address) = this_batch_address {
-                    trace!("data found to send out");
-
+                let (src_section_pk, our_info, data_queued) = {
+                    let node = self.node.read().await;
                     // get info for the WireMsg
                     let src_section_pk = node.network_knowledge().section_key();
                     let our_info = node.info();
+                    // choose a data to replicate at random
+                    let data_queued = node
+                        .pending_data_to_replicate_to_peers
+                        .iter()
+                        .choose(&mut rng)
+                        .map(|(address, _)| *address);
 
-                    let mut node = self.node.write().await;
-                    let target_peer = node.pending_data_to_replicate_to_peers.remove(address);
+                    (src_section_pk, our_info, data_queued)
+                };
+
+                if let Some(data_addr) = data_queued {
+                    this_batch_address = Some(data_addr);
+                }
+
+                if let Some(address) = this_batch_address {
+                    trace!("Data found in queue to send out");
+
+                    let target_peer = {
+                        // careful now, if we're holding any ref into the read above we'll lock here.
+                        let mut node = self.node.write().await;
+                        node.pending_data_to_replicate_to_peers.remove(&address)
+                    };
 
                     if let Some(data_recipients) = target_peer {
                         debug!("Data queued to be replicated");
@@ -260,10 +265,14 @@ impl FlowCtrl {
                             section_pk: src_section_pk,
                         };
 
-                        debug!("before write lock");
-                        let data_to_send = node.data_storage.get_from_local_store(address).await?;
+                        let data_to_send = self
+                            .node
+                            .read()
+                            .await
+                            .data_storage
+                            .get_from_local_store(&address)
+                            .await?;
 
-                        debug!("after write lock");
                         let system_msg =
                             SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
                         let wire_msg =

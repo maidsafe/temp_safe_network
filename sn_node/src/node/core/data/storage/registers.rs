@@ -130,8 +130,8 @@ impl RegisterStorage {
     }
 
     /// Used for replication of data to new Adults.
-    pub(crate) async fn get_register_replica(
-        &mut self,
+    pub(crate) fn get_register_replica(
+        &self,
         address: &RegisterAddress,
     ) -> Result<ReplicatedRegisterLog> {
         let key = address.id()?;

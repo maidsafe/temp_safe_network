@@ -163,7 +163,7 @@ impl DataStorage {
 
     // Read data from local store
     pub(crate) async fn get_from_local_store(
-        &mut self,
+        &self,
         address: &ReplicatedDataAddress,
     ) -> Result<ReplicatedData> {
         match address {
@@ -173,13 +173,11 @@ impl DataStorage {
             ReplicatedDataAddress::Register(addr) => self
                 .registers
                 .get_register_replica(addr)
-                .await
                 .map(ReplicatedData::RegisterLog),
             ReplicatedDataAddress::Spentbook(addr) => {
                 let reg_addr = RegisterAddress::new(*addr.name(), SPENTBOOK_TYPE_TAG);
                 self.registers
                     .get_register_replica(&reg_addr)
-                    .await
                     .map(ReplicatedData::SpentbookLog)
             }
         }
