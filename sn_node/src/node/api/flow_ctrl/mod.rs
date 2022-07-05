@@ -210,6 +210,7 @@ impl FlowCtrl {
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
             loop {
+                trace!("data replication loop");
                 let _ = interval.tick().await;
 
                 use rand::seq::IteratorRandom;
@@ -217,6 +218,7 @@ impl FlowCtrl {
                 let mut this_batch_address = None;
                 let node = &self.node;
 
+                trace!("about to query pending data to replx");
                 // choose a data to replicate at random
                 if let Some(data_queued) = node
                     .read()
@@ -228,7 +230,9 @@ impl FlowCtrl {
                     this_batch_address = Some(*data_queued.key());
                 }
 
+                trace!("queried");
                 if let Some(address) = this_batch_address {
+                    trace!("data found to send out");
                     if let Some((data_address, data_recipients)) = node
                         .read()
                         .await
@@ -284,6 +288,8 @@ impl FlowCtrl {
                             error!("Error in data replication loop: {:?}", e);
                         }
                     }
+                } else {
+                    trace!("no data to be sending");
                 }
             }
         });

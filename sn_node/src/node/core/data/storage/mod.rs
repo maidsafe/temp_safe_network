@@ -198,7 +198,7 @@ impl DataStorage {
     }
 
     /// Retrieve all keys/ReplicatedDataAddresses of stored data
-    pub async fn keys(&self) -> Result<Vec<ReplicatedDataAddress>> {
+    pub fn keys(&self) -> Result<Vec<ReplicatedDataAddress>> {
         let chunk_keys = self
             .chunks
             .keys()?
