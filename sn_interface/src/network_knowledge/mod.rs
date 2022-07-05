@@ -345,6 +345,11 @@ impl NetworkKnowledge {
         }
     }
 
+    /// Verify the given public key corresponds to any (current/old) section known to us
+    pub fn verify_section_key_is_known(&self, section_key: &BlsPublicKey) -> bool {
+        self.all_sections_chains.borrow().has_key(section_key)
+    }
+
     /// Given a `NodeMsg` can we trust it (including verifying contents of an AE message)
     pub fn verify_node_msg_can_be_trusted(
         msg_authority: NodeMsgAuthority,
