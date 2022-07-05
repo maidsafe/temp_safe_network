@@ -55,7 +55,7 @@ impl Node {
     }
 
     pub(crate) async fn read_data_from_adults(
-        &self,
+        &mut self,
         query: DataQuery,
         msg_id: MsgId,
         auth: AuthorityProof<ServiceAuth>,
@@ -122,8 +122,7 @@ impl Node {
                     .track_issue(
                         *target,
                         IssueType::PendingRequestOperation(Some(operation_id)),
-                    )
-                    .await?;
+                    )?;
             }
 
             trace!(

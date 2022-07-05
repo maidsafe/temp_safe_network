@@ -204,7 +204,7 @@ impl Dispatcher {
 
                 if let Some(member_info) = node_state {
                     if self.comm.is_reachable(&member_info.addr()).await.is_err() {
-                        let node = self.node.write().await;
+                        let mut node = self.node.write().await;
 
                         node.log_comm_issue(member_info.name()).await?
                     }

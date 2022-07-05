@@ -290,44 +290,40 @@ impl Node {
     }
 
     /// returns names that are relatively dysfunctional
-    pub(crate) async fn get_dysfunctional_node_names(&self) -> Result<BTreeSet<XorName>> {
+    pub(crate) async fn get_dysfunctional_node_names(&mut self) -> Result<BTreeSet<XorName>> {
         self.dysfunction_tracking
             .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
-            .await
             .map_err(Error::from)
     }
 
     /// Log a communication problem
-    pub(crate) async fn log_comm_issue(&self, name: XorName) -> Result<()> {
+    pub(crate) async fn log_comm_issue(&mut self, name: XorName) -> Result<()> {
         trace!("Logging comms issue in dysfunction");
         self.dysfunction_tracking
             .track_issue(name, IssueType::Communication)
-            .await
             .map_err(Error::from)
     }
 
     /// Log a knowledge issue
-    pub(crate) async fn log_knowledge_issue(&self, name: XorName) -> Result<()> {
+    pub(crate) async fn log_knowledge_issue(&mut self, name: XorName) -> Result<()> {
         trace!("Logging Knowledge issue in dysfunction");
         self.dysfunction_tracking
             .track_issue(name, IssueType::Knowledge)
-            .await
             .map_err(Error::from)
     }
 
     /// Log a dkg issue (ie, an initialised but unfinished dkg round for a given participant)
-    pub(crate) async fn log_dkg_issue(&self, name: XorName) -> Result<()> {
+    pub(crate) async fn log_dkg_issue(&mut self, name: XorName) -> Result<()> {
         trace!("Logging Dkg issue in dysfunction");
         self.dysfunction_tracking
             .track_issue(name, IssueType::Dkg)
-            .await
             .map_err(Error::from)
     }
 
     /// Log a dkg session as responded to
-    pub(crate) async fn log_dkg_session(&self, name: &XorName) {
+    pub(crate) async fn log_dkg_session(&mut self, name: &XorName) {
         trace!("Logging Dkg session as responded to in dysfunction");
-        self.dysfunction_tracking.dkg_ack_fulfilled(name).await;
+        self.dysfunction_tracking.dkg_ack_fulfilled(name);
     }
 
     pub(super) async fn state_snapshot(&self) -> StateSnapshot {
@@ -343,7 +339,7 @@ impl Node {
     /// excluding any member matching a name in the provided `excluded_names` set.
     /// Returns a set of candidate `DkgSessionId`'s.
     pub(super) async fn promote_and_demote_elders(
-        &self,
+        &mut self,
         excluded_names: &BTreeSet<XorName>,
     ) -> Result<Vec<DkgSessionId>> {
         let sap = self.network_knowledge.authority_provider();
