@@ -187,14 +187,14 @@ impl DysfunctionDetection {
     /// If there are no unfulfilled operations tracked, an empty list will be returned.
     pub fn get_unfulfilled_ops(&self, adult: XorName) -> Vec<OperationId> {
         if let Some(val) = self.unfulfilled_ops.get(&adult) {
-            return val.iter().copied().collect::<Vec<OperationId>>();
+            return val.to_vec();
         }
         Vec::new()
     }
 
     /// List all current tracked nodes
     pub fn current_nodes(&self) -> Vec<XorName> {
-        self.adults.iter().copied().collect::<Vec<XorName>>()
+        self.adults.to_vec()
     }
 
     /// Add a new node to the tracker and recompute closest nodes.

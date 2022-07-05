@@ -118,11 +118,10 @@ impl Node {
             // ensure we only add a pending request when we're actually sending out requests.
             for target in &targets {
                 trace!("adding pending req for {target:?} in dysfunction tracking");
-                self.dysfunction_tracking
-                    .track_issue(
-                        *target,
-                        IssueType::PendingRequestOperation(Some(operation_id)),
-                    )?;
+                self.dysfunction_tracking.track_issue(
+                    *target,
+                    IssueType::PendingRequestOperation(Some(operation_id)),
+                )?;
             }
 
             trace!(

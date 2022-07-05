@@ -318,7 +318,7 @@ impl FlowCtrl {
                 let _instant = interval.tick().await;
 
                 let dysfunctional_nodes =
-                    self.node.read().await.get_dysfunctional_node_names().await;
+                    self.node.write().await.get_dysfunctional_node_names().await;
                 let unresponsive_nodes = match dysfunctional_nodes {
                     Ok(nodes) => nodes,
                     Err(error) => {
