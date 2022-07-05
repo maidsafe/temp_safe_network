@@ -6,9 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::dbs::{
-    convert_to_error_msg, Error, EventStore, LruCache, Result, UsedSpace, SLED_FLUSH_TIME_MS,
-};
+use crate::dbs::{convert_to_error_msg, Error, EventStore, Result, UsedSpace, SLED_FLUSH_TIME_MS};
 
 use sn_interface::{
     messaging::{
@@ -41,23 +39,20 @@ use xor_name::{XorName, XOR_NAME_LEN};
 
 const REG_DB_NAME: &str = "register";
 const KEY_DB_NAME: &str = "addresses";
-const CACHE_SIZE: u16 = 100;
 
 type RegOpStore = EventStore<RegisterCmd>;
-type Cache = LruCache<CacheEntry>;
 
 /// Operations over the data type Register.
 // TODO: dont expose this
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct RegisterStorage {
     key_db: Db,
     reg_db: Db,
-    cache: Cache,
     used_space: UsedSpace,
 }
 
 #[derive(Clone, Debug)]
-struct CacheEntry {
+struct RegisterEntry {
     state: Register,
     store: RegOpStore,
     section_auth: SectionAuth,
@@ -77,7 +72,6 @@ impl RegisterStorage {
 
         Ok(Self {
             used_space,
-            cache: Cache::new(CACHE_SIZE),
             key_db: create_db(&create_path(KEY_DB_NAME))?,
             reg_db: create_db(&create_path(REG_DB_NAME))?,
         })
@@ -91,7 +85,7 @@ impl RegisterStorage {
         self.drop_register_key(address.id()?)
     }
 
-    pub(crate) async fn keys(&mut self) -> Result<Vec<RegisterAddress>> {
+    pub(crate) fn keys(&self) -> Result<Vec<RegisterAddress>> {
         type KeyResults = Vec<Result<XorName>>;
         let mut the_data = vec![];
         let current_db = self.key_db.export();
@@ -123,7 +117,7 @@ impl RegisterStorage {
 
         // TODO: make this concurrent
         for key in ok.iter().flatten() {
-            match self.try_load_cache_entry(key) {
+            match self.try_load_register_entry(key) {
                 Ok(entry) => {
                     the_data.push(*entry.state.address());
                 }
@@ -131,6 +125,7 @@ impl RegisterStorage {
                 Err(e) => return Err(e),
             }
         }
+
         Ok(the_data)
     }
 
@@ -140,7 +135,7 @@ impl RegisterStorage {
         address: &RegisterAddress,
     ) -> Result<ReplicatedRegisterLog> {
         let key = address.id()?;
-        let entry = match self.try_load_cache_entry(&key) {
+        let entry = match self.try_load_register_entry(&key) {
             Ok(entry) => entry,
             Err(Error::KeyNotFound(_key)) => {
                 return Err(Error::NoSuchData(DataAddress::Register(*address)))
@@ -151,7 +146,7 @@ impl RegisterStorage {
         self.create_replica(key, entry)
     }
 
-    fn create_replica(&self, key: XorName, entry: CacheEntry) -> Result<ReplicatedRegisterLog> {
+    fn create_replica(&self, key: XorName, entry: RegisterEntry) -> Result<ReplicatedRegisterLog> {
         let mut address = None;
         let op_log = entry
             .store
@@ -234,7 +229,7 @@ impl RegisterStorage {
 
         // TODO: make this concurrent
         for key in ok.into_iter().flatten() {
-            match self.try_load_cache_entry(&key) {
+            match self.try_load_register_entry(&key) {
                 Ok(entry) => {
                     let read_only = entry.state.clone();
                     if prefix.matches(read_only.name()) {
@@ -250,7 +245,7 @@ impl RegisterStorage {
     }
 
     /// On receiving data from Elders when promoted.
-    pub(crate) fn update(&mut self, store_data: RegisterStoreExport) -> Result<()> {
+    pub(crate) fn update(&self, store_data: RegisterStoreExport) -> Result<()> {
         debug!("Updating Register store");
 
         let RegisterStoreExport(registers) = store_data;
@@ -275,7 +270,7 @@ impl RegisterStorage {
 
     /// --- Writing ---
 
-    pub(crate) fn write(&mut self, cmd: RegisterCmd) -> Result<()> {
+    pub(crate) fn write(&self, cmd: RegisterCmd) -> Result<()> {
         // rough estimate ignoring the extra space used by sled
         let required_space = std::mem::size_of::<RegisterCmd>();
         if !self.used_space.can_add(required_space) {
@@ -284,7 +279,7 @@ impl RegisterStorage {
         self.apply(cmd)
     }
 
-    fn apply(&mut self, cmd: RegisterCmd) -> Result<()> {
+    fn apply(&self, cmd: RegisterCmd) -> Result<()> {
         // rough estimate ignoring the extra space used by sled
         let required_space = std::mem::size_of::<RegisterCmd>();
 
@@ -335,7 +330,7 @@ impl RegisterStorage {
 
                 let EditRegister { edit, .. } = op;
 
-                let mut entry = self.try_load_cache_entry(&key)?;
+                let mut entry = self.try_load_register_entry(&key)?;
 
                 info!("Editing Register");
                 entry
@@ -372,7 +367,7 @@ impl RegisterStorage {
 
                 let ExtendRegister { extend_with, .. } = op;
 
-                let mut entry = self.try_load_cache_entry(&key)?;
+                let mut entry = self.try_load_register_entry(&key)?;
                 entry.store.append(cmd)?;
 
                 let prev = entry.state.cap();
@@ -452,7 +447,7 @@ impl RegisterStorage {
         action: Action,
         requester: User,
     ) -> Result<Register> {
-        let entry = match self.try_load_cache_entry(&address.id()?) {
+        let entry = match self.try_load_register_entry(&address.id()?) {
             Ok(entry) => entry,
             Err(Error::KeyNotFound(_key)) => {
                 return Err(Error::NoSuchData(DataAddress::Register(*address)))
@@ -586,21 +581,14 @@ impl RegisterStorage {
         let _removed = self.key_db.remove(key)?;
         let _removed = self.reg_db.drop_tree(key)?;
 
-        self.cache.remove(&key);
+        // self.cache.remove(&key);
         self.used_space.decrease(key_used_space);
 
         Ok(())
     }
 
     // gets entry from the cache, or populates cache from disk if expired
-    fn try_load_cache_entry(&mut self, key: &XorName) -> Result<CacheEntry> {
-        let entry = self.cache.get(key);
-
-        // return early on cache hit
-        if let Some(entry) = entry {
-            return Ok(entry.clone());
-        }
-
+    fn try_load_register_entry(&self, key: &XorName) -> Result<RegisterEntry> {
         // read from disk
         let store = self.get_or_create_store(key)?;
         let mut hydrated_register = None;
@@ -658,13 +646,11 @@ impl RegisterStorage {
         match hydrated_register {
             None => Err(Error::KeyNotFound(key.to_string())), // nothing found on disk
             Some((reg, section_auth)) => {
-                let entry = CacheEntry {
+                let entry = RegisterEntry {
                     state: reg,
                     store,
                     section_auth,
                 };
-                // populate cache
-                self.cache.insert(key, entry.clone());
                 Ok(entry)
             }
         }
@@ -746,7 +732,7 @@ mod test {
     #[tokio::test]
     async fn test_register_write() -> Result<()> {
         // setup store
-        let store = new_store()?;
+        let mut store = new_store()?;
 
         // create register
         let (cmd, authority) = create_register()?;
@@ -781,7 +767,7 @@ mod test {
     #[tokio::test]
     async fn test_register_export() -> Result<()> {
         // setup store
-        let store = new_store()?;
+        let mut store = new_store()?;
 
         // create register
         let (cmd, authority) = create_register()?;
@@ -793,7 +779,7 @@ mod test {
         let for_update = store.get_data_of(prefix).await?;
 
         // create new db and update it with the data from first db
-        let new_store = new_store()?;
+        let mut new_store = new_store()?;
 
         new_store.update(for_update)?;
         let address = cmd.dst_address();
@@ -827,7 +813,7 @@ mod test {
     #[tokio::test]
     async fn test_register_non_existing_entry() -> Result<()> {
         // setup store
-        let store = new_store()?;
+        let mut store = new_store()?;
 
         // create register
         let (cmd, authority) = create_register()?;
@@ -856,7 +842,7 @@ mod test {
     #[tokio::test]
     async fn test_register_non_existing_permissions() -> Result<()> {
         // setup store
-        let store = new_store()?;
+        let mut store = new_store()?;
 
         // create register
         let (cmd, authority) = create_register()?;

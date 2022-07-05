@@ -29,7 +29,7 @@ use sn_interface::{
 use std::path::Path;
 
 /// Operations on data.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 // exposed as pub due to benches
 pub struct DataStorage {
     chunks: ChunkStorage,
@@ -198,7 +198,7 @@ impl DataStorage {
     }
 
     /// Retrieve all keys/ReplicatedDataAddresses of stored data
-    pub async fn keys(&mut self) -> Result<Vec<ReplicatedDataAddress>> {
+    pub async fn keys(&self) -> Result<Vec<ReplicatedDataAddress>> {
         let chunk_keys = self
             .chunks
             .keys()?
@@ -206,8 +206,7 @@ impl DataStorage {
             .map(ReplicatedDataAddress::Chunk);
         let reg_keys = self
             .registers
-            .keys()
-            .await?
+            .keys()?
             .into_iter()
             .map(ReplicatedDataAddress::Register);
         Ok(reg_keys.chain(chunk_keys).collect())
@@ -338,7 +337,7 @@ mod tests {
         let path = temp_dir.path();
         let used_space = UsedSpace::new(usize::MAX);
         let runtime = Runtime::new()?;
-        let storage = DataStorage::new(path, used_space)?;
+        let mut storage = DataStorage::new(path, used_space)?;
         let owner_pk = PublicKey::Bls(bls::SecretKey::random().public_key());
         let owner_keypair = Keypair::new_ed25519();
         for op in ops.into_iter() {

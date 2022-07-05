@@ -101,7 +101,7 @@ mod test {
 
     #[tokio::test]
     async fn test_basic() {
-        let cache = LruCache::new(3);
+        let mut cache = LruCache::new(3);
 
         let key_1 = &xor_name::rand::random();
         let key_2 = &xor_name::rand::random();
@@ -118,7 +118,7 @@ mod test {
 
     #[tokio::test]
     async fn test_lru() {
-        let cache = LruCache::new(3);
+        let mut cache = LruCache::new(3);
 
         let key_1 = &xor_name::rand::random();
         let key_2 = &xor_name::rand::random();
@@ -137,7 +137,7 @@ mod test {
 
     #[tokio::test]
     async fn test_remove() {
-        let cache = LruCache::new(3);
+        let mut cache = LruCache::new(3);
 
         let key_1 = &xor_name::rand::random();
         let key_2 = &xor_name::rand::random();
