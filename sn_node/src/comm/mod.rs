@@ -141,8 +141,7 @@ impl Comm {
                     peers_to_cleanup.push(*peer);
                 }
 
-                dysfunction
-                    .track_issue(peer.name(), sn_dysfunction::IssueType::Communication)?;
+                dysfunction.track_issue(peer.name(), sn_dysfunction::IssueType::Communication)?;
             }
         }
 

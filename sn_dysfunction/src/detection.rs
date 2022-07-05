@@ -71,7 +71,7 @@ impl DysfunctionDetection {
         let mut op_scores = BTreeMap::new();
         let mut dkg_scores = BTreeMap::new();
 
-        let adults = self.adults.iter().copied().collect::<Vec<XorName>>();
+        let adults = self.adults.to_vec();
         for node in adults.iter() {
             let _ = dkg_scores.insert(
                 *node,
@@ -110,7 +110,7 @@ impl DysfunctionDetection {
     ) -> f32 {
         let node_count = self.get_node_issue_count(node, issue_type);
         let mut other_node_counts = Vec::new();
-        for adult in adults.clone() {
+        for adult in adults {
             if adult == *node {
                 continue;
             }

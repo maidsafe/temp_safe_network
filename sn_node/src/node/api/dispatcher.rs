@@ -120,7 +120,7 @@ impl Dispatcher {
                 }
             },
             Cmd::HandlePeerLost(peer) => {
-                let node = self.node.read().await;
+                let mut node = self.node.write().await;
 
                 node.handle_peer_lost(&peer.addr()).await
             }
@@ -135,7 +135,7 @@ impl Dispatcher {
                     .await
             }
             Cmd::HandleDkgFailure(signeds) => {
-                let node = self.node.read().await;
+                let mut node = self.node.write().await;
 
                 node.handle_dkg_failure(signeds).await.map(|cmd| vec![cmd])
             }
