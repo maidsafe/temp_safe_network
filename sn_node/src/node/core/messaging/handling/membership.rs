@@ -58,7 +58,7 @@ impl Node {
 
         if let Some(membership) = membership {
             if let Some(prev_vote) = membership.get_our_latest_vote() {
-                trace!("{}", LogMarker::ResendingLastMembershipVote);
+                trace!("Membership - {}", LogMarker::ResendingLastMembershipVote);
                 let cmds = self
                     .send_msg_to_our_elders(SystemMsg::MembershipVotes(vec![prev_vote.clone()]))
                     .await?;
