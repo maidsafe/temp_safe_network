@@ -26,8 +26,7 @@ use sn_interface::{
     },
 };
 
-use std::{path::Path, sync::Arc};
-use tokio::sync::RwLock;
+use std::path::Path;
 
 /// Operations on data.
 #[derive(Debug)]
@@ -36,7 +35,7 @@ pub struct DataStorage {
     chunks: ChunkStorage,
     registers: RegisterStorage,
     used_space: UsedSpace,
-    last_recorded_level: Arc<RwLock<StorageLevel>>,
+    last_recorded_level: StorageLevel,
 }
 
 impl DataStorage {
@@ -46,7 +45,7 @@ impl DataStorage {
             chunks: ChunkStorage::new(path, used_space.clone())?,
             registers: RegisterStorage::new(path, used_space.clone())?,
             used_space,
-            last_recorded_level: Arc::new(RwLock::new(StorageLevel::zero())),
+            last_recorded_level: StorageLevel::zero(),
         })
     }
 
@@ -84,7 +83,7 @@ impl DataStorage {
 
         // check if we've filled another approx. 10%-points of our storage
         // if so, update the recorded level
-        let last_recorded_level = { *self.last_recorded_level.read().await };
+        let last_recorded_level = self.last_recorded_level;
         if let Ok(next_level) = last_recorded_level.next() {
             // used_space_ratio is a heavy task that's why we don't do it all the time
             let used_space_ratio = self.used_space.ratio();
@@ -92,7 +91,7 @@ impl DataStorage {
             // every level represents 10 percentage points
             if used_space_level as u8 >= next_level.value() {
                 debug!("Next level for storage has been reached");
-                *self.last_recorded_level.write().await = next_level;
+                self.last_recorded_level = next_level;
                 return Ok(Some(next_level));
             }
         }
