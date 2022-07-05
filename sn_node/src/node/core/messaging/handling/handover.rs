@@ -88,7 +88,7 @@ impl Node {
     }
 
     async fn get_members_at_gen(&self, gen: Generation) -> Result<BTreeMap<XorName, NodeState>> {
-        if let Some(m) = self.membership.read().await.as_ref() {
+        if let Some(m) = self.membership.as_ref() {
             Ok(m.section_members(gen)?)
         } else {
             error!("Missing membership instance when checking handover SAP candidates");
@@ -231,14 +231,13 @@ impl Node {
     }
 
     async fn handle_handover_vote(
-        &self,
+        &mut self,
         peer: Peer,
         signed_vote: SignedVote<SapCandidate>,
     ) -> Result<Vec<Cmd>> {
         self.check_signed_vote_saps(&signed_vote).await?;
 
-        let mut wlock = self.handover_voting.write().await;
-        match &*wlock {
+        match &self.handover_voting {
             Some(handover_state) => {
                 let mut state = handover_state.clone();
                 let mut cmds = self.handle_vote(&mut state, signed_vote, peer).await?;
@@ -257,7 +256,7 @@ impl Node {
                     let bcast_cmds = self.broadcast_handover_decision(candidates_sap).await;
                     cmds.extend(bcast_cmds);
                 }
-                *wlock = Some(state);
+                self.handover_voting = Some(state);
                 Ok(cmds)
             }
             None => {
@@ -268,7 +267,7 @@ impl Node {
     }
 
     pub(crate) async fn handle_handover_msg(
-        &self,
+        &mut self,
         peer: Peer,
         signed_votes: Vec<SignedVote<SapCandidate>>,
     ) -> Result<Vec<Cmd>> {
@@ -319,7 +318,7 @@ impl Node {
             peer,
         );
 
-        let cmds = if let Some(handover) = self.handover_voting.read().await.as_ref() {
+        let cmds = if let Some(handover) = self.handover_voting.as_ref() {
             match handover.anti_entropy(gen) {
                 Ok(catchup_votes) => {
                     vec![

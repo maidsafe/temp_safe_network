@@ -125,7 +125,7 @@ impl Comm {
     pub(crate) async fn cleanup_peers(
         &self,
         retain_peers: Vec<Peer>,
-        dysfunction: DysfunctionDetection,
+        mut dysfunction: DysfunctionDetection,
     ) -> Result<()> {
         let mut peers_to_cleanup = vec![];
         for entry in self.sessions.iter() {
@@ -141,9 +141,7 @@ impl Comm {
                     peers_to_cleanup.push(*peer);
                 }
 
-                dysfunction
-                    .track_issue(peer.name(), sn_dysfunction::IssueType::Communication)
-                    .await?;
+                dysfunction.track_issue(peer.name(), sn_dysfunction::IssueType::Communication)?;
             }
         }
 

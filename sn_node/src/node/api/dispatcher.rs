@@ -24,13 +24,13 @@ use tokio::{sync::watch, sync::RwLock, time};
 
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
-    node: Arc<Node>,
+    node: Arc<RwLock<Node>>,
     comm: Comm,
     dkg_timeout: Arc<DkgTimeout>,
 }
 
 impl Dispatcher {
-    pub(super) fn new(node: Arc<Node>, comm: Comm) -> Self {
+    pub(super) fn new(node: Arc<RwLock<Node>>, comm: Comm) -> Self {
         let (cancel_timer_tx, cancel_timer_rx) = watch::channel(false);
         let dkg_timeout = Arc::new(DkgTimeout {
             cancel_timer_tx,
@@ -44,7 +44,7 @@ impl Dispatcher {
         }
     }
 
-    pub(crate) fn node(&self) -> Arc<Node> {
+    pub(crate) fn node(&self) -> Arc<RwLock<Node>> {
         self.node.clone()
     }
 
@@ -58,19 +58,21 @@ impl Dispatcher {
     pub(crate) async fn process_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
         match cmd {
             Cmd::CleanupPeerLinks => {
-                let elders = self.node.network_knowledge.elders();
+                let node = self.node.read().await;
+                let elders = node.network_knowledge.elders();
                 self.comm
-                    .cleanup_peers(elders, self.node.dysfunction_tracking.clone())
+                    .cleanup_peers(elders, node.dysfunction_tracking.clone())
                     .await?;
                 Ok(vec![])
             }
             Cmd::SignOutgoingSystemMsg { msg, dst } => {
-                let src_section_pk = self.node.network_knowledge().section_key();
-                let wire_msg =
-                    WireMsg::single_src(&self.node.info().await, dst, msg, src_section_pk)?;
+                let node = self.node.read().await;
+
+                let src_section_pk = node.network_knowledge().section_key();
+                let wire_msg = WireMsg::single_src(&node.info(), dst, msg, src_section_pk)?;
 
                 let mut cmds = vec![];
-                cmds.extend(self.node.send_msg_to_nodes(wire_msg).await?);
+                cmds.extend(node.send_msg_to_nodes(wire_msg).await?);
 
                 Ok(cmds)
             }
@@ -79,50 +81,64 @@ impl Dispatcher {
                 wire_msg,
                 original_bytes,
             } => {
-                self.node
-                    .handle_msg(sender, wire_msg, original_bytes, &self.comm)
+                let mut node = self.node.write().await;
+
+                node.handle_msg(sender, wire_msg, original_bytes, &self.comm)
                     .await
             }
-            Cmd::HandleDkgTimeout(token) => self.node.handle_dkg_timeout(token).await,
+            Cmd::HandleDkgTimeout(token) => {
+                let node = self.node.read().await;
+
+                node.handle_dkg_timeout(token)
+            }
             Cmd::HandleAgreement { proposal, sig } => {
-                self.node.handle_general_agreements(proposal, sig).await
+                let mut node = self.node.write().await;
+
+                node.handle_general_agreements(proposal, sig).await
             }
             Cmd::HandleNewNodeOnline(auth) => {
-                self.node
-                    .handle_online_agreement(auth.value.into_state(), auth.sig)
+                let mut node = self.node.write().await;
+
+                node.handle_online_agreement(auth.value.into_state(), auth.sig)
                     .await
             }
             Cmd::HandleNodeLeft(auth) => {
-                self.node
-                    .handle_node_left(auth.value.into_state(), auth.sig)
+                let mut node = self.node.write().await;
+
+                node.handle_node_left(auth.value.into_state(), auth.sig)
                     .await
             }
             Cmd::HandleNewEldersAgreement { proposal, sig } => match proposal {
                 Proposal::NewElders(section_auth) => {
-                    self.node
-                        .handle_new_elders_agreement(section_auth, sig)
-                        .await
+                    let mut node = self.node.write().await;
+
+                    node.handle_new_elders_agreement(section_auth, sig).await
                 }
                 _ => {
                     error!("Other agreement messages should be handled in `HandleAgreement`, which is non-blocking ");
                     Ok(vec![])
                 }
             },
-            Cmd::HandlePeerLost(peer) => self.node.handle_peer_lost(&peer.addr()).await,
+            Cmd::HandlePeerLost(peer) => {
+                let mut node = self.node.write().await;
+
+                node.handle_peer_lost(&peer.addr()).await
+            }
             Cmd::HandleDkgOutcome {
                 section_auth,
                 outcome,
                 generation,
             } => {
-                self.node
-                    .handle_dkg_outcome(section_auth, outcome, generation)
+                let mut node = self.node.write().await;
+
+                node.handle_dkg_outcome(section_auth, outcome, generation)
                     .await
             }
-            Cmd::HandleDkgFailure(signeds) => self
-                .node
-                .handle_dkg_failure(signeds)
-                .await
-                .map(|cmd| vec![cmd]),
+            Cmd::HandleDkgFailure(signeds) => {
+                let mut node = self.node.write().await;
+
+                node.handle_dkg_failure(signeds).await.map(|cmd| vec![cmd])
+            }
             Cmd::SendMsg {
                 recipients,
                 wire_msg,
@@ -134,21 +150,19 @@ impl Dispatcher {
             } => {
                 // we should queue this
                 for data in data_batch {
-                    if let Some(data_entry) =
-                        self.node.pending_data_to_replicate_to_peers.get_mut(&data)
+                    trace!("data being enqueued for replication {:?}", data);
+                    let mut node = self.node.write().await;
+                    if let Some(peers_set) = node.pending_data_to_replicate_to_peers.get_mut(&data)
                     {
-                        let peer_set = data_entry.value();
                         debug!("data already queued, adding peer");
-                        let _existed = peer_set.write().await.insert(recipient);
+                        let _existed = peers_set.insert(recipient);
                     } else {
-                        // let queue = DashSet::new();
-                        let mut peer_set = BTreeSet::new();
-                        let _existed = peer_set.insert(recipient);
-                        let _existed = self
-                            .node
+                        let mut peers_set = BTreeSet::new();
+                        let _existed = peers_set.insert(recipient);
+                        let _existed = node
                             .pending_data_to_replicate_to_peers
-                            .insert(data, Arc::new(RwLock::new(peer_set)));
-                    }
+                            .insert(data, peers_set);
+                    };
                 }
                 Ok(vec![])
             }
@@ -165,16 +179,32 @@ impl Dispatcher {
                 .await
                 .into_iter()
                 .collect()),
-            Cmd::ProposeOffline(names) => self.node.cast_offline_proposals(&names).await,
-            Cmd::StartConnectivityTest(name) => Ok(vec![
-                self.node
-                    .send_msg_to_our_elders(SystemMsg::StartConnectivityTest(name))
-                    .await?,
-            ]),
+            Cmd::ProposeOffline(names) => {
+                let node = self.node.read().await;
+
+                node.cast_offline_proposals(&names).await
+            }
+            Cmd::StartConnectivityTest(name) => {
+                let node = self.node.read().await;
+
+                Ok(vec![
+                    node.send_msg_to_our_elders(SystemMsg::StartConnectivityTest(name))
+                        .await?,
+                ])
+            }
             Cmd::TestConnectivity(name) => {
-                if let Some(member_info) = self.node.network_knowledge().get_section_member(&name) {
+                let node_state = self
+                    .node
+                    .read()
+                    .await
+                    .network_knowledge()
+                    .get_section_member(&name);
+
+                if let Some(member_info) = node_state {
                     if self.comm.is_reachable(&member_info.addr()).await.is_err() {
-                        self.node.log_comm_issue(member_info.name()).await?
+                        let mut node = self.node.write().await;
+
+                        node.log_comm_issue(member_info.name()).await?
                     }
                 }
                 Ok(vec![])

@@ -36,7 +36,7 @@ use xor_name::XorName;
 impl Node {
     /// Handle data query
     pub(crate) async fn handle_data_query_at_adult(
-        &self,
+        &mut self,
         correlation_id: MsgId,
         query: &DataQueryVariant,
         auth: ServiceAuth,
@@ -73,7 +73,7 @@ impl Node {
     /// Records response in liveness tracking
     /// Forms a response to send to the requester
     pub(crate) async fn handle_data_query_response_at_elder(
-        &self,
+        &mut self,
         correlation_id: MsgId,
         response: NodeQueryResponse,
         user: EndUser,
@@ -109,8 +109,7 @@ impl Node {
 
         let pending_removed = self
             .dysfunction_tracking
-            .request_operation_fulfilled(&node_id, op_id)
-            .await;
+            .request_operation_fulfilled(&node_id, op_id);
 
         if !pending_removed {
             trace!("Ignoring un-expected response");
@@ -123,7 +122,6 @@ impl Node {
                 && self
                     .capacity
                     .is_full(&XorName::from(sending_node_pk))
-                    .await
                     .unwrap_or(false))
         {
             // lets requeue waiting peers in case another adult has the data...
@@ -146,7 +144,7 @@ impl Node {
             response: query_response,
             correlation_id,
         };
-        let (auth_kind, payload) = self.ed_sign_client_msg(&msg).await?;
+        let (auth_kind, payload) = self.ed_sign_client_msg(&msg)?;
 
         for peer in waiting_peers.iter() {
             let dst = DstLocation::EndUser(EndUser(peer.name()));
@@ -165,7 +163,7 @@ impl Node {
 
     /// Handle `ServiceMsgs` received from `EndUser`
     pub(crate) async fn handle_service_msg_received(
-        &self,
+        &mut self,
         msg_id: MsgId,
         msg: ServiceMsg,
         auth: AuthorityProof<ServiceAuth>,
@@ -228,7 +226,7 @@ impl Node {
 
     /// Handle incoming data msgs.
     pub(crate) async fn handle_service_msg(
-        &self,
+        &mut self,
         msg_id: MsgId,
         msg: ServiceMsg,
         dst_location: DstLocation,
@@ -244,7 +242,7 @@ impl Node {
             return Ok(vec![]);
         }
 
-        if self.is_not_elder().await {
+        if self.is_not_elder() {
             error!("Received unexpected message while Adult: {:?}", msg_id);
             return Ok(vec![]);
         }
@@ -365,7 +363,7 @@ impl Node {
         let _ = permissions.insert(User::Anyone, Permissions::new(true));
 
         // use our own keypair for generating the register command
-        let own_keypair = Keypair::Ed25519(self.info().await.keypair);
+        let own_keypair = Keypair::Ed25519(self.info().keypair);
         let owner = User::Key(own_keypair.public_key());
         let policy = Policy { owner, permissions };
 

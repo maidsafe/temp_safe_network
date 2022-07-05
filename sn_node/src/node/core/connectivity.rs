@@ -15,7 +15,7 @@ use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;
 
 impl Node {
-    pub(crate) async fn handle_peer_lost(&self, addr: &SocketAddr) -> Result<Vec<Cmd>> {
+    pub(crate) async fn handle_peer_lost(&mut self, addr: &SocketAddr) -> Result<Vec<Cmd>> {
         let name = if let Some(peer) = self.network_knowledge.find_member_by_addr(addr) {
             debug!("Lost known peer {}", peer);
             peer.name()
@@ -24,7 +24,7 @@ impl Node {
             return Ok(vec![]);
         };
 
-        if self.is_not_elder().await {
+        if self.is_not_elder() {
             // Adults cannot complain about connectivity.
             return Ok(vec![]);
         }

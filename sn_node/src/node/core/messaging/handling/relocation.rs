@@ -85,7 +85,7 @@ impl Node {
     }
 
     pub(crate) async fn handle_relocate(
-        &self,
+        &mut self,
         relocate_proof: SectionAuth<NodeStateMsg>,
     ) -> Result<Option<Cmd>> {
         let (dst_xorname, dst_section_key, new_age) =
@@ -103,7 +103,7 @@ impl Node {
                 return Ok(None);
             };
 
-        let node = self.info().await;
+        let node = self.info();
         if dst_xorname != node.name() {
             // This `Relocate` message is not for us - it's most likely a duplicate of a previous
             // message that we already handled.
@@ -115,7 +115,7 @@ impl Node {
             dst_xorname
         );
 
-        match *self.relocate_state.read().await {
+        match self.relocate_state {
             Some(_) => {
                 trace!("Ignore Relocate - relocation already in progress");
                 return Ok(None);
@@ -149,7 +149,7 @@ impl Node {
             new_age,
         )?;
 
-        *self.relocate_state.write().await = Some(Box::new(joining_as_relocated));
+        self.relocate_state = Some(Box::new(joining_as_relocated));
 
         Ok(Some(cmd))
     }

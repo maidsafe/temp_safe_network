@@ -11,19 +11,18 @@ use crate::node::dkg::KeyedSig;
 use sn_consensus::Generation;
 use sn_interface::{messaging::system::SectionAuth, network_knowledge::SectionAuthorityProvider};
 
-use std::{collections::BTreeMap, sync::Arc};
-use tokio::sync::RwLock;
+use std::collections::BTreeMap;
 use xor_name::Prefix;
 
 type Entry = (SectionAuth<SectionAuthorityProvider>, KeyedSig);
 
 // Helper structure to make sure we process a split by updating info about both our section and the
 // sibling section at the same time.
-pub(crate) struct SplitBarrier(Arc<RwLock<BTreeMap<Generation, Vec<Entry>>>>);
+pub(crate) struct SplitBarrier(BTreeMap<Generation, Vec<Entry>>);
 
 impl SplitBarrier {
     pub(crate) fn new() -> Self {
-        Self(Arc::new(RwLock::new(BTreeMap::default())))
+        Self(BTreeMap::default())
     }
 
     // Pass an agreed-on proposal for `NewElders` through this function. If there is no split, it
@@ -46,8 +45,8 @@ impl SplitBarrier {
             return vec![(section_auth, keyed_sig)];
         }
 
-        let mut gen_map_guard = self.0.write().await;
-        let gen_entries = gen_map_guard.remove(&generation).unwrap_or_default();
+        let gen_map = &mut self.0;
+        let gen_entries = gen_map.remove(&generation).unwrap_or_default();
 
         // Split detected. Find all cached siblings.
         let (mut give, mut keep): (Vec<Entry>, Vec<Entry>) =
@@ -60,7 +59,7 @@ impl SplitBarrier {
         if give.is_empty() {
             // No sibling found. Cache this update until we see the sibling update.
             keep.push((section_auth, keyed_sig));
-            let _prev = gen_map_guard.insert(generation, keep);
+            let _prev = gen_map.insert(generation, keep);
             vec![]
         } else {
             // Sibling found. We can proceed with the update.

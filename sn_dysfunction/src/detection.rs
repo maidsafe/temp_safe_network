@@ -65,34 +65,25 @@ impl DysfunctionDetection {
     ///
     /// These scores can then be used to highlight nodes that have a higher score than some
     /// particular ratio.
-    pub async fn calculate_scores(&self) -> ScoreResults {
+    pub fn calculate_scores(&self) -> ScoreResults {
         let mut communication_scores = BTreeMap::new();
         let mut knowledge_scores = BTreeMap::new();
         let mut op_scores = BTreeMap::new();
         let mut dkg_scores = BTreeMap::new();
 
-        let adults = self
-            .adults
-            .read()
-            .await
-            .iter()
-            .copied()
-            .collect::<Vec<XorName>>();
+        let adults = self.adults.to_vec();
         for node in adults.iter() {
             let _ = dkg_scores.insert(
                 *node,
-                self.calculate_node_score(node, adults.clone(), &IssueType::Dkg)
-                    .await,
+                self.calculate_node_score(node, adults.clone(), &IssueType::Dkg),
             );
             let _ = communication_scores.insert(
                 *node,
-                self.calculate_node_score(node, adults.clone(), &IssueType::Communication)
-                    .await,
+                self.calculate_node_score(node, adults.clone(), &IssueType::Communication),
             );
             let _ = knowledge_scores.insert(
                 *node,
-                self.calculate_node_score(node, adults.clone(), &IssueType::Knowledge)
-                    .await,
+                self.calculate_node_score(node, adults.clone(), &IssueType::Knowledge),
             );
             let _ = op_scores.insert(
                 *node,
@@ -100,8 +91,7 @@ impl DysfunctionDetection {
                     node,
                     adults.clone(),
                     &IssueType::PendingRequestOperation(None),
-                )
-                .await,
+                ),
             );
         }
         ScoreResults {
@@ -112,19 +102,19 @@ impl DysfunctionDetection {
         }
     }
 
-    async fn calculate_node_score(
+    fn calculate_node_score(
         &self,
         node: &XorName,
         adults: Vec<XorName>,
         issue_type: &IssueType,
     ) -> f32 {
-        let node_count = self.get_node_issue_count(node, issue_type).await;
+        let node_count = self.get_node_issue_count(node, issue_type);
         let mut other_node_counts = Vec::new();
-        for adult in adults.clone() {
+        for adult in adults {
             if adult == *node {
                 continue;
             }
-            other_node_counts.push(self.get_node_issue_count(&adult, issue_type).await as f32);
+            other_node_counts.push(self.get_node_issue_count(&adult, issue_type) as f32);
         }
         let average = get_mean_of(&other_node_counts).unwrap_or(1.0);
         let score = node_count.checked_sub(average as usize).unwrap_or(1) as f32;
@@ -135,35 +125,35 @@ impl DysfunctionDetection {
         }
     }
 
-    async fn get_node_issue_count(&self, node: &XorName, issue_type: &IssueType) -> usize {
+    fn get_node_issue_count(&self, node: &XorName, issue_type: &IssueType) -> usize {
         match issue_type {
             IssueType::Communication => {
-                let count = if let Some(entry) = self.communication_issues.get(node) {
-                    entry.value().read().await.len()
+                let count = if let Some(issues) = self.communication_issues.get(node) {
+                    issues.len()
                 } else {
                     1
                 };
                 count
             }
             IssueType::Dkg => {
-                let count = if let Some(entry) = self.dkg_issues.get(node) {
-                    entry.value().read().await.len()
+                let count = if let Some(issues) = self.dkg_issues.get(node) {
+                    issues.len()
                 } else {
                     1
                 };
                 count
             }
             IssueType::Knowledge => {
-                let count = if let Some(entry) = self.knowledge_issues.get(node) {
-                    entry.value().read().await.len()
+                let count = if let Some(issues) = self.knowledge_issues.get(node) {
+                    issues.len()
                 } else {
                     1
                 };
                 count
             }
             IssueType::PendingRequestOperation(_) => {
-                let count = if let Some(entry) = self.unfulfilled_ops.get(node) {
-                    entry.value().read().await.len()
+                let count = if let Some(issues) = self.unfulfilled_ops.get(node) {
+                    issues.len()
                 } else {
                     1
                 };
@@ -173,9 +163,9 @@ impl DysfunctionDetection {
     }
 
     /// get scores mapped by name, to score and z-score, which is std dev's from the mean
-    async fn get_weighted_scores(&self) -> BTreeMap<XorName, Option<f32>> {
+    fn get_weighted_scores(&self) -> BTreeMap<XorName, Option<f32>> {
         trace!("Getting weighted scores");
-        let scores = self.calculate_scores().await;
+        let scores = self.calculate_scores();
         let ops_scores = scores.op_scores;
         let conn_scores = scores.communication_scores;
         let dkg_scores = scores.dkg_scores;
@@ -239,19 +229,16 @@ impl DysfunctionDetection {
         final_scores
     }
 
-    async fn cleanup_time_sensistive_checks(&self) -> Result<()> {
-        for node in self.communication_issues.iter() {
-            let mut issues = node.value().write().await;
+    fn cleanup_time_sensistive_checks(&mut self) -> Result<()> {
+        for (_name, issues) in self.communication_issues.iter_mut() {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
 
-        for node in self.knowledge_issues.iter() {
-            let mut issues = node.value().write().await;
+        for (_name, issues) in self.knowledge_issues.iter_mut() {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
 
-        for node in self.dkg_issues.iter() {
-            let mut issues = node.value().write().await;
+        for (_name, issues) in self.dkg_issues.iter_mut() {
             issues.retain(|time| time.elapsed() < RECENT_ISSUE_DURATION);
         }
 
@@ -262,15 +249,15 @@ impl DysfunctionDetection {
     /// TODO: order these to act upon _most_ dysfunctional first
     /// (the nodes must all `ProposeOffline` over a dysfunctional node and then _immediately_ vote it off. So any other membershipn changes in flight could block this.
     /// thus, we need to be callling this function often until nodes are removed.)
-    pub async fn get_nodes_beyond_severity(
-        &self,
+    pub fn get_nodes_beyond_severity(
+        &mut self,
         severity: DysfunctionSeverity,
     ) -> Result<BTreeSet<XorName>> {
-        self.cleanup_time_sensistive_checks().await?;
+        self.cleanup_time_sensistive_checks()?;
 
         let mut dysfunctional_nodes = BTreeSet::new();
 
-        let final_scores = self.get_weighted_scores().await;
+        let final_scores = self.get_weighted_scores();
 
         for (name, node_zscore) in final_scores {
             if let Some(z) = node_zscore {
@@ -480,15 +467,14 @@ mod tests {
         {
             Runtime::new().unwrap().block_on(async {
                 let adults = (0..adult_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
-                let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+                let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
                 for _ in 0..5 {
                     let _ = dysfunctional_detection.track_issue(
-                        adults[0], issue_type.clone()).await;
+                        adults[0], issue_type.clone());
                 }
 
                 let score_results = dysfunctional_detection
-                    .calculate_scores()
-                    .await;
+                    .calculate_scores();
                 match issue_type {
                     IssueType::Dkg => {
                         assert_eq!(score_results.dkg_scores.len(), adult_count);
@@ -512,15 +498,14 @@ mod tests {
         {
             Runtime::new().unwrap().block_on(async {
                 let adults = (0..adult_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
-                let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+                let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
                 for _ in 0..issue_count {
                     let _ = dysfunctional_detection.track_issue(
-                        adults[0], issue_type.clone()).await;
+                        adults[0], issue_type.clone());
                 }
 
                 let score_results = dysfunctional_detection
-                    .calculate_scores()
-                    .await;
+                    .calculate_scores();
                 let scores = match issue_type {
                     IssueType::Dkg => {
                         score_results.dkg_scores
@@ -588,7 +573,7 @@ mod tests {
                     // add dysf to our all_nodes
                     let all_node_names = nodes.clone().iter().map(|(name, _)| *name).collect::<Vec<XorName>>();
 
-                    let dysfunctional_detection = DysfunctionDetection::new(all_node_names);
+                    let mut dysfunctional_detection = DysfunctionDetection::new(all_node_names);
 
                     // Now we loop through each issue/msg
                     for (issue, issue_location, fail_test ) in issues {
@@ -603,15 +588,14 @@ mod tests {
 
                             if msg_failed {
                                 let _ = dysfunctional_detection.track_issue(
-                                    node, issue.clone()).await;
+                                    node, issue.clone());
                             }
 
                         }
                     }
                     // now we can see what we have...
                     let dysfunctional_nodes_found = match dysfunctional_detection
-                        .get_nodes_beyond_severity( DysfunctionSeverity::Dysfunctional)
-                        .await {
+                        .get_nodes_beyond_severity( DysfunctionSeverity::Dysfunctional) {
                             Ok(nodes) => nodes,
                             Err(error) => bail!("Failed getting dysfunctional nodes from DysfunctionDetector: {error}")
                         };
@@ -682,7 +666,7 @@ mod tests {
                 // add dysf to our all_nodes
                 let all_node_names = nodes.clone().iter().map(|(name, _)| *name).collect::<Vec<XorName>>();
 
-                let dysfunctional_detection = DysfunctionDetection::new(all_node_names);
+                let mut dysfunctional_detection = DysfunctionDetection::new(all_node_names);
 
                 // Now we loop through each issue/msg
                 for (issue, issue_location, fail_test ) in issues {
@@ -698,15 +682,14 @@ mod tests {
 
                         if msg_failed {
                             let _ = dysfunctional_detection.track_issue(
-                                node, issue.clone()).await;
+                                node, issue.clone());
                         }
 
                     }
                 }
                 // now we can see what we have...
                 let dysfunctional_nodes_found = match dysfunctional_detection
-                    .get_nodes_beyond_severity( DysfunctionSeverity::Dysfunctional)
-                    .await {
+                    .get_nodes_beyond_severity( DysfunctionSeverity::Dysfunctional) {
                         Ok(nodes) => nodes,
                         Err(error) => bail!("Failed getting dysfunctional nodes from DysfunctionDetector: {error}")
                     };
@@ -744,17 +727,16 @@ mod tests {
         {
             Runtime::new().unwrap().block_on(async {
                 let adults = (0..adult_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
-                let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+                let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
                 for adult in adults.iter() {
                     for _ in 0..issue_count {
                         let _ = dysfunctional_detection.track_issue(
-                            *adult, issue_type.clone()).await;
+                            *adult, issue_type.clone());
                     }
                 }
 
                 let score_results = dysfunctional_detection
-                    .calculate_scores()
-                    .await;
+                    .calculate_scores();
                 let scores = match issue_type {
                     IssueType::Communication => {
                         score_results.communication_scores
@@ -795,29 +777,25 @@ mod ops_tests {
     #[tokio::test]
     async fn op_dysfunction_no_variance_is_okay() -> Result<()> {
         let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
         for adult in &adults {
             for _ in 0..NORMAL_OPERATIONS_ISSUES {
-                let _ = dysfunctional_detection
-                    .track_issue(
-                        *adult,
-                        IssueType::PendingRequestOperation(get_random_operation_id()),
-                    )
-                    .await;
+                let _ = dysfunctional_detection.track_issue(
+                    *adult,
+                    IssueType::PendingRequestOperation(get_random_operation_id()),
+                );
             }
         }
 
         assert_eq!(
             dysfunctional_detection
-                .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
-                .await?
+                .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)?
                 .len(),
             0
         );
         assert_eq!(
             dysfunctional_detection
-                .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
-                .await?
+                .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)?
                 .len(),
             0
         );
@@ -843,28 +821,24 @@ mod comm_tests {
     async fn conn_dys_is_tolerant_of_norms() -> Result<()> {
         let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
 
-        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
 
         for adult in &adults {
             for _ in 0..NORMAL_CONNECTION_PROBLEM_COUNT {
-                dysfunctional_detection
-                    .track_issue(*adult, IssueType::Communication)
-                    .await?;
+                dysfunctional_detection.track_issue(*adult, IssueType::Communication)?;
             }
         }
 
         assert_eq!(
             dysfunctional_detection
-                .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
-                .await?
+                .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)?
                 .len(),
             0,
             "no nodes are dysfunctional"
         );
         assert_eq!(
             dysfunctional_detection
-                .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
-                .await?
+                .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)?
                 .len(),
             0,
             "no nodes are suspect"
@@ -892,14 +866,12 @@ mod knowledge_tests {
     async fn knowledge_dys_is_tolerant_of_norms() -> Result<()> {
         let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
 
-        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
 
         // Write data NORMAL_KNOWLEDGE_ISSUES times to the 10 adults
         for adult in &adults {
             for _ in 0..NORMAL_KNOWLEDGE_ISSUES {
-                dysfunctional_detection
-                    .track_issue(*adult, IssueType::Knowledge)
-                    .await?;
+                dysfunctional_detection.track_issue(*adult, IssueType::Knowledge)?;
             }
         }
 
@@ -907,16 +879,14 @@ mod knowledge_tests {
         // This is because all of them are within the tolerance ratio of each other
         assert_eq!(
             dysfunctional_detection
-                .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
-                .await?
+                .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)?
                 .len(),
             0,
             "no nodes are dysfunctional"
         );
         assert_eq!(
             dysfunctional_detection
-                .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
-                .await?
+                .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)?
                 .len(),
             0,
             "no nodes are suspect"
@@ -932,7 +902,7 @@ mod knowledge_tests {
 
         let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
 
-        let dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
 
         // Add a new adults
         let new_adult = random_xorname();
@@ -940,22 +910,18 @@ mod knowledge_tests {
 
         // Add just one knowledge issue...
         for _ in 0..1 {
-            dysfunctional_detection
-                .track_issue(new_adult, IssueType::Knowledge)
-                .await?;
+            dysfunctional_detection.track_issue(new_adult, IssueType::Knowledge)?;
         }
 
-        let sus = dysfunctional_detection
-            .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)
-            .await?;
+        let sus =
+            dysfunctional_detection.get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)?;
 
         // Assert that the new adult is not detected as suspect.
         assert!(!sus.contains(&new_adult), "our adult should not be sus");
         assert_eq!(sus.len(), 0, "no node is sus");
 
         let dysfunctional_nodes = dysfunctional_detection
-            .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
-            .await?;
+            .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)?;
 
         // Assert that the new adult is not dysfuncitonal
         assert!(

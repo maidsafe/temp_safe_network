@@ -23,7 +23,7 @@ use std::{collections::BTreeSet, vec};
 // Message handling
 impl Node {
     pub(crate) async fn propose_membership_change(
-        &self,
+        &mut self,
         node_state: NodeState,
     ) -> Result<Vec<Cmd>> {
         info!(
@@ -31,7 +31,7 @@ impl Node {
             node_state.name, node_state.state
         );
         let prefix = self.network_knowledge.prefix();
-        if let Some(membership) = self.membership.write().await.as_mut() {
+        if let Some(membership) = self.membership.as_mut() {
             let membership_vote = match membership.propose(node_state, &prefix) {
                 Ok(vote) => vote,
                 Err(e) => {
@@ -54,7 +54,7 @@ impl Node {
     /// (which should in turn trigger them to resend their votes)
     #[instrument(skip_all)]
     pub(crate) async fn resend_our_last_vote_to_elders(&self) -> Result<Vec<Cmd>> {
-        let membership = self.membership.read().await.clone();
+        let membership = self.membership.clone();
 
         if let Some(membership) = membership {
             if let Some(prev_vote) = membership.get_our_latest_vote() {
@@ -70,7 +70,7 @@ impl Node {
     }
 
     pub(crate) async fn handle_membership_votes(
-        &self,
+        &mut self,
         peer: Peer,
         signed_votes: Vec<SignedVote<NodeState>>,
     ) -> Result<Vec<Cmd>> {
@@ -83,15 +83,11 @@ impl Node {
         let mut cmds = vec![];
 
         for signed_vote in signed_votes {
-            if let Some(membership) = self.membership.write().await.as_mut() {
+            let mut vote_broadcast = None;
+            if let Some(membership) = self.membership.as_mut() {
                 match membership.handle_signed_vote(signed_vote, &prefix) {
                     Ok(VoteResponse::Broadcast(response_vote)) => {
-                        cmds.push(
-                            self.send_msg_to_our_elders(SystemMsg::MembershipVotes(vec![
-                                response_vote,
-                            ]))
-                            .await?,
-                        );
+                        vote_broadcast = Some(SystemMsg::MembershipVotes(vec![response_vote]));
                     }
                     Ok(VoteResponse::WaitingForMoreVotes) => {
                         //do nothing
@@ -153,6 +149,10 @@ impl Node {
                     "Attempted to handle membership vote when we don't yet have a membership instance"
                 );
             };
+
+            if let Some(vote_msg) = vote_broadcast {
+                cmds.push(self.send_msg_to_our_elders(vote_msg).await?);
+            }
         }
 
         Ok(cmds)
@@ -170,7 +170,7 @@ impl Node {
             peer
         );
 
-        let cmds = if let Some(membership) = self.membership.read().await.as_ref() {
+        let cmds = if let Some(membership) = self.membership.as_ref() {
             match membership.anti_entropy(gen) {
                 Ok(catchup_votes) => {
                     vec![
