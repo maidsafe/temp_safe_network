@@ -152,20 +152,20 @@ impl Node {
 
     pub(crate) async fn get_metadata_of(&self, prefix: &Prefix) -> MetadataExchange {
         // Load tracked adult_levels
-        let adult_levels = self.capacity.levels_matching(*prefix).await;
+        let adult_levels = self.capacity.levels_matching(*prefix);
         MetadataExchange { adult_levels }
     }
 
-    pub(crate) async fn set_adult_levels(&self, adult_levels: MetadataExchange) {
+    pub(crate) async fn set_adult_levels(&mut self, adult_levels: MetadataExchange) {
         let MetadataExchange { adult_levels } = adult_levels;
-        self.capacity.set_adult_levels(adult_levels).await
+        self.capacity.set_adult_levels(adult_levels)
     }
 
     /// Registered holders not present in provided list of members
     /// will be removed from `adult_storage_info` and no longer tracked for liveness.
-    pub(crate) async fn liveness_retain_only(&self, members: BTreeSet<XorName>) -> Result<()> {
+    pub(crate) async fn liveness_retain_only(&mut self, members: BTreeSet<XorName>) -> Result<()> {
         // full adults
-        self.capacity.retain_members_only(&members).await;
+        self.capacity.retain_members_only(&members);
 
         // stop tracking liveness of absent holders
         self.dysfunction_tracking.retain_members_only(members).await;
@@ -174,22 +174,25 @@ impl Node {
     }
 
     /// Adds the new adult to the Capacity and Liveness trackers.
-    pub(crate) async fn add_new_adult_to_trackers(&self, adult: XorName) {
+    pub(crate) async fn add_new_adult_to_trackers(&mut self, adult: XorName) {
         info!("Adding new Adult: {adult} to trackers");
-        self.capacity.add_new_adult(adult).await;
+        self.capacity.add_new_adult(adult);
 
         self.dysfunction_tracking.add_new_node(adult).await;
     }
 
     /// Set storage level of a given node.
     /// Returns whether the level changed or not.
-    pub(crate) async fn set_storage_level(&self, node_id: &PublicKey, level: StorageLevel) -> bool {
+    pub(crate) async fn set_storage_level(
+        &mut self,
+        node_id: &PublicKey,
+        level: StorageLevel,
+    ) -> bool {
         info!("Setting new storage level..");
         let changed = self
             .capacity
-            .set_adult_level(XorName::from(*node_id), level)
-            .await;
-        let avg_usage = self.capacity.avg_usage().await;
+            .set_adult_level(XorName::from(*node_id), level);
+        let avg_usage = self.capacity.avg_usage();
         info!(
             "Avg storage usage among Adults is between {}-{} %",
             avg_usage * 10,
@@ -199,7 +202,7 @@ impl Node {
     }
 
     pub(crate) async fn full_adults(&self) -> BTreeSet<XorName> {
-        self.capacity.full_adults().await
+        self.capacity.full_adults()
     }
 
     /// Construct list of adults that hold target data, including full nodes.

@@ -123,7 +123,6 @@ impl Node {
                 && self
                     .capacity
                     .is_full(&XorName::from(sending_node_pk))
-                    .await
                     .unwrap_or(false))
         {
             // lets requeue waiting peers in case another adult has the data...
