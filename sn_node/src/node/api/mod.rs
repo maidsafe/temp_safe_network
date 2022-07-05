@@ -50,7 +50,10 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::{fs, sync::{mpsc, RwLock} };
+use tokio::{
+    fs,
+    sync::{mpsc, RwLock},
+};
 use xor_name::{Prefix, XorName};
 
 // Filename for storing the content of the genesis DBC.
