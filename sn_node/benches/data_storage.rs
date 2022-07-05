@@ -132,7 +132,7 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
     //         println!("finished {size} writes");
 
     //         b.to_async(&runtime).iter(|| async {
-    //             match storage.keys().await {
+    //             match storage.keys() {
     //                 Ok(_) => {
     //                     let random_filename: String = thread_rng()
     //                         .sample_iter(&Alphanumeric)
@@ -169,7 +169,7 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
             println!("finished {size} writes");
 
             b.to_async(&runtime).iter(|| async {
-                match &storage.keys().await {
+                match &storage.keys() {
                     Ok(_keys) => {
                         let random_filename: String = thread_rng()
                             .sample_iter(&Alphanumeric)

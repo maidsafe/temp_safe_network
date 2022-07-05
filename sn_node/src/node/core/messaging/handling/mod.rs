@@ -710,7 +710,6 @@ impl Node {
                 );
 
                 self.get_missing_data_for_node(sender, known_data_addresses)
-                    .await
             }
             SystemMsg::NodeQuery(node_query) => {
                 match node_query {
