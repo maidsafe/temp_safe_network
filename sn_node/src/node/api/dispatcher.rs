@@ -155,16 +155,14 @@ impl Dispatcher {
                     if let Some(mut data_entry) =
                         node.pending_data_to_replicate_to_peers.get_mut(&data)
                     {
-                        let peer_set = data_entry.value_mut();
                         debug!("data already queued, adding peer");
-                        let _existed = peer_set.insert(recipient);
+                        let _existed = peers_set.insert(recipient);
                     } else {
-                        // let queue = DashSet::new();
-                        let mut peer_set = BTreeSet::new();
-                        let _existed = peer_set.insert(recipient);
+                        let mut peers_set = BTreeSet::new();
+                        let _existed = peers_set.insert(recipient);
                         let _existed = node
                             .pending_data_to_replicate_to_peers
-                            .insert(data, peer_set);
+                            .insert(data, peers_set);
                     };
                 }
                 Ok(vec![])

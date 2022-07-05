@@ -216,32 +216,32 @@ impl FlowCtrl {
                 use rand::seq::IteratorRandom;
                 let mut rng = rand::rngs::OsRng;
                 let mut this_batch_address = None;
-                let node = &self.node;
 
                 trace!("about to query pending data to replx");
+
+                let node = &self.node.read().await;
                 // choose a data to replicate at random
-                if let Some(data_queued) = node
-                    .read()
-                    .await
+                if let Some((data_addr, _peers_set)) = node
                     .pending_data_to_replicate_to_peers
                     .iter()
                     .choose(&mut rng)
                 {
-                    this_batch_address = Some(*data_queued.key());
+                    this_batch_address = Some(data_addr);
                 }
 
                 trace!("queried");
                 if let Some(address) = this_batch_address {
                     trace!("data found to send out");
-                    if let Some((data_address, data_recipients)) = node
-                        .read()
-                        .await
-                        .pending_data_to_replicate_to_peers
-                        .remove(&address)
-                    {
-                        // get info for the WireMsg
-                        let src_section_pk = node.read().await.network_knowledge().section_key();
-                        let our_info = node.read().await.info();
+
+                    // get info for the WireMsg
+                    let src_section_pk = node.network_knowledge().section_key();
+                    let our_info = node.info();
+
+                    let mut node = self.node.write().await;
+                    let target_peer = node.pending_data_to_replicate_to_peers.remove(address);
+
+                    if let Some(data_recipients) = target_peer {
+                        debug!("Data queued to be replicated");
 
                         let mut recipients = vec![];
 
@@ -260,13 +260,10 @@ impl FlowCtrl {
                             section_pk: src_section_pk,
                         };
 
-                        let data_to_send = node
-                            .write()
-                            .await
-                            .data_storage
-                            .get_from_local_store(&data_address)
-                            .await?;
+                        debug!("before write lock");
+                        let data_to_send = node.data_storage.get_from_local_store(address).await?;
 
+                        debug!("after write lock");
                         let system_msg =
                             SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
                         let wire_msg =
