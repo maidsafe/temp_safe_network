@@ -151,7 +151,7 @@ jobs:
           filters: "messaging prefix_map types"
 
       - name: Run sn_dysfunction unit tests
-        timeout-minutes: 5
+        timeout-minutes: 15
         uses: maidsafe/cargo-nextest@main
         with:
           test-run-name: dysfunction-unit-tests-${{ matrix.os }}
