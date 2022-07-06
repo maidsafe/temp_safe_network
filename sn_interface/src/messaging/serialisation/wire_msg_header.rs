@@ -22,7 +22,7 @@ const MESSAGING_PROTO_VERSION: u16 = 1u16;
 
 // Header to be serialisied at the front of the wire message.
 // This header contains the information needed to deserialize the payload.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct WireMsgHeader {
     // We serialise a header size field, but we don't know it up front until we deserialise it.
     // header_size: u16,
@@ -35,7 +35,7 @@ pub struct WireMsgHeader {
 // This is all part of the message header, and it gets deserialized
 // when the `WireMsgHeader` is deserialized, allowing the caller to read
 // all this information before deciding to deserialise the actual message payload.
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct MsgEnvelope {
     pub msg_id: MsgId,
     pub auth_kind: AuthKind,

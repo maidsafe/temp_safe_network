@@ -251,7 +251,7 @@ impl From<ed25519_dalek::SecretKey> for Keypair {
 }
 
 /// BLS keypair share.
-#[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 pub struct BlsKeypairShare {
     /// Share index.
     pub index: usize,
@@ -265,7 +265,7 @@ pub struct BlsKeypairShare {
 }
 
 /// BLS keypair.
-#[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 pub struct BlsKeypair {
     pub public: bls::PublicKey,
     pub secret: SerdeSecret<bls::SecretKey>,
