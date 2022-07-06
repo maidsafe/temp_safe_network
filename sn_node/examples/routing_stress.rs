@@ -18,6 +18,7 @@ use sn_node::node::{
 };
 
 use bls::PublicKey;
+use clap::Parser;
 use eyre::{eyre, Context, Error, Result};
 use futures::{
     future,
@@ -35,7 +36,6 @@ use std::{
     io::BufWriter,
     time::{Duration, Instant},
 };
-use structopt::StructOpt;
 use tokio::{
     sync::mpsc::{self, Sender},
     time,
@@ -52,17 +52,17 @@ const MIN_PRINT_DELAY: Duration = Duration::from_millis(500);
 const PROBE_WINDOW: Duration = Duration::from_secs(60);
 
 /// Stress test for sn-routing.
-#[derive(Debug, StructOpt)]
+#[derive(Debug, clap::StructOpt)]
 struct Options {
     /// Enable logging. Takes path to a file to log to or "-" to log to stdout. If omitted, logging
     /// is disabled.
-    #[structopt(short, long, name = "PATH")]
+    #[clap(short, long, name = "PATH")]
     log: Option<String>,
     /// How many probe messages to send per second.
     ///
     /// Probe messages are used to determine network health. The higher the percentage of
     /// successfully delivered probe messages, the healthier the network is.
-    #[structopt(short, long, default_value = "1")]
+    #[clap(short, long, default_value = "1")]
     probe_frequency: f64,
     /// Churn schedule: DURATION1 JOINS1 DROPS1 DURATION2 JOINS2 DROPS2, ...
     ///
