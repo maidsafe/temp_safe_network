@@ -7,6 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{Error, NetworkConfig, Result};
+use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::{
     io::{self},
@@ -14,7 +15,6 @@ use std::{
     path::PathBuf,
     time::Duration,
 };
-use structopt::StructOpt;
 use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
@@ -29,63 +29,63 @@ const DEFAULT_MAX_CAPACITY: usize = 10 * 1024 * 1024 * 1024; // 10GB
 const DEFAULT_MAX_CAPACITY: usize = usize::MAX; // This will be 2^32 on these architectures.
 
 /// Node configuration
-#[derive(Default, Clone, Debug, Serialize, Deserialize, StructOpt)]
-#[structopt(rename_all = "kebab-case", bin_name = "sn_node")]
-#[structopt(global_settings = &[structopt::clap::AppSettings::ColoredHelp])]
+#[derive(Default, Clone, Debug, Serialize, Deserialize, clap::StructOpt)]
+#[clap(rename_all = "kebab-case", bin_name = "sn_node", version)]
+#[clap(global_settings = &[clap::AppSettings::ColoredHelp])]
 pub struct Config {
     /// The address to be credited when this node farms SafeCoin.
     /// A hex formatted BLS public key.
-    #[structopt(short, long, parse(try_from_str))]
+    #[clap(short, long, parse(try_from_str))]
     pub wallet_id: Option<String>,
     /// Root directory for dbs and cached state. If not set, it defaults to "root_dir"
     /// within the sn_node project data directory, located at:
     /// Linux: $HOME/.safe/node/root_dir
     /// Windows: {FOLDERID_Profile}/.safe/node/root_dir
     /// MacOS: $HOME/.safe/node/root_dir
-    #[structopt(short, long, parse(from_os_str))]
+    #[clap(short, long, parse(from_os_str))]
     pub root_dir: Option<PathBuf>,
     /// Verbose output. `-v` is equivalent to logging with `warn`, `-vv` to `info`, `-vvv` to
     /// `debug`, `-vvvv` to `trace`. This flag overrides RUST_LOG.
-    #[structopt(short, long, parse(from_occurrences))]
+    #[clap(short, long, parse(from_occurrences))]
     pub verbose: u8,
     /// dump shell completions for: [bash, fish, zsh, powershell, elvish]
-    #[structopt(long)]
+    #[clap(long)]
     pub completions: Option<String>,
     /// Send logs to a file within the specified directory
-    #[structopt(long)]
+    #[clap(long)]
     pub log_dir: Option<PathBuf>,
     /// Number of rotated log files to keep (0 to keep all)
-    #[structopt(long, default_value = "0")]
+    #[clap(long, default_value = "0")]
     pub logs_retained: usize,
     /// Maximum bytes per log file
-    #[structopt(long, default_value = "10485760")]
+    #[clap(long, default_value = "10485760")]
     pub logs_max_bytes: usize,
     /// Maximum lines per log file (overrides logs_max_bytes)
-    #[structopt(long, default_value = "0")]
+    #[clap(long, default_value = "0")]
     pub logs_max_lines: usize,
     /// Number of rotated files left not compressed
-    #[structopt(long, default_value = "100")] // 100*10mb files by default
+    #[clap(long, default_value = "100")] // 100*10mb files by default
     pub logs_uncompressed: usize,
     /// Attempt to self-update?
-    #[structopt(long)]
+    #[clap(long)]
     pub update: bool,
     /// Attempt to self-update without starting the node process
-    #[structopt(long)]
+    #[clap(long)]
     pub update_only: bool,
     /// Outputs logs in json format for easier processing
-    #[structopt(short, long)]
+    #[clap(short, long)]
     pub json_logs: bool,
     /// print node resourse usage to stdout
-    #[structopt(long)]
+    #[clap(long)]
     pub resource_logs: bool,
     /// Delete all data from a previous node running on the same PC
-    #[structopt(long)]
+    #[clap(long)]
     pub clear_data: bool,
     /// Whether the node is the first on the network.
     ///
     /// When set, you must specify either `--local-addr` or `--public-addr` to ensure the correct
     /// connection info is stored.
-    #[structopt(long)]
+    #[clap(long)]
     pub first: bool,
     /// Local address to be used for the node.
     ///
@@ -93,40 +93,40 @@ pub struct Config {
     /// running a local-only network, you should set this to `127.0.0.1:0` to prevent any external
     /// traffic from reaching the node (but note that the node will also be unable to connect to
     /// non-local nodes).
-    #[structopt(long)]
+    #[clap(long)]
     pub local_addr: Option<SocketAddr>,
     /// External address of the node, to use when writing connection info.
     ///
     /// If unspecified, it will be queried from a peer; if there are no peers, the `local-addr` will
     /// be used, if specified.
-    #[structopt(long, parse(try_from_str = parse_public_addr))]
+    #[clap(long, parse(try_from_str = parse_public_addr))]
     pub public_addr: Option<SocketAddr>,
     /// This flag can be used to skip automated port forwarding using IGD. This is used when running
     /// a network on a LAN or when a node is connected to the internet directly, without a router,
     /// e.g. Digital Ocean droplets.
-    #[structopt(long)]
+    #[clap(long)]
     pub skip_auto_port_forwarding: bool,
     /// This is the maximum message size we'll allow the peer to send to us. Any bigger message and
     /// we'll error out probably shutting down the connection to the peer. If none supplied we'll
     /// default to the documented constant.
-    #[structopt(long)]
+    #[clap(long)]
     pub max_msg_size_allowed: Option<u32>,
     /// If we hear nothing from the peer in the given interval we declare it offline to us. If none
     /// supplied we'll default to the documented constant.
     ///
     /// The interval is in milliseconds. A value of 0 disables this feature.
-    #[structopt(long)]
+    #[clap(long)]
     pub idle_timeout_msec: Option<u64>,
     /// Interval to send keep-alives if we are idling so that the peer does not disconnect from us
     /// declaring us offline. If none is supplied we'll default to the documented constant.
     ///
     /// The interval is in milliseconds. A value of 0 disables this feature.
-    #[structopt(long)]
+    #[clap(long)]
     pub keep_alive_interval_msec: Option<u32>,
     /// Duration of a UPnP port mapping.
-    #[structopt(long)]
+    #[clap(long)]
     pub upnp_lease_duration: Option<u32>,
-    #[structopt(skip)]
+    #[clap(skip)]
     #[allow(missing_docs)]
     pub network_config: NetworkConfig,
 }
@@ -143,7 +143,7 @@ impl Config {
 
         let mut config = Config::default();
 
-        let cmd_line_args = Config::from_args();
+        let cmd_line_args = Config::parse();
         cmd_line_args.validate().map_err(Error::Configuration)?;
 
         config.merge(cmd_line_args);

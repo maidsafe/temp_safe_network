@@ -13,13 +13,13 @@ use sn_client::{Client, ClientConfig};
 use sn_interface::types::utils::random_bytes;
 use sn_launch_tool::Launch;
 
+use clap::Parser;
 use dirs_next::home_dir;
 use eyre::{eyre, Context, Result};
 use std::{
     path::PathBuf,
     process::{Command, Stdio},
 };
-use structopt::StructOpt;
 use tiny_keccak::{Hasher, Sha3};
 use tokio::fs::create_dir_all;
 use tokio::time::{sleep, Duration};

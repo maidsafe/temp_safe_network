@@ -7,24 +7,24 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::operations::config::{Config, NetworkInfo};
+use clap::Subcommand;
 use color_eyre::Result;
 use std::path::PathBuf;
-use structopt::StructOpt;
 use tracing::debug;
 use url::Url;
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 pub enum NetworksSubCommands {
-    #[structopt(name = "switch")]
+    #[clap(name = "switch")]
     /// Switch to a different SAFE network
     Switch {
         /// Network to switch to
         network_name: String,
     },
-    #[structopt(name = "check")]
+    #[clap(name = "check")]
     /// Check where the default hardlink points and try to match it to the networks in the CLI config
     Check {},
-    #[structopt(name = "add")]
+    #[clap(name = "add")]
     /// Add a network to the CLI config using an existing network map
     Add {
         /// Network name. If network_name already exists, then it's updated with the new network map
@@ -32,7 +32,7 @@ pub enum NetworksSubCommands {
         /// Local path or a remote URL to fetch the network map from
         prefix_location: String,
     },
-    #[structopt(name = "remove")]
+    #[clap(name = "remove")]
     /// Remove a network from the CLI config
     Remove {
         /// Network to remove

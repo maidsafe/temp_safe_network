@@ -12,15 +12,15 @@ use super::{
     },
     OutputFmt,
 };
+use clap::Args;
 use color_eyre::Result;
 use sn_api::{
     resolver::{ContentType, SafeData},
     Safe, SafeUrl,
 };
-use structopt::StructOpt;
 use tracing::debug;
 
-#[derive(StructOpt, Debug)]
+#[derive(Args, Debug)]
 pub struct DogCommands {
     /// The safe:// location to inspect
     location: Option<String>,

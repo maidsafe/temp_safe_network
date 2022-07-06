@@ -10,24 +10,24 @@ use super::{helpers::serialise_output, OutputFmt};
 use crate::operations::auth_and_connect::{get_credentials_file_path, read_credentials};
 use crate::operations::config::Config;
 use bls::SecretKey;
+use clap::Subcommand;
 use color_eyre::{eyre::WrapErr, Result};
 use sn_api::Safe;
-use structopt::StructOpt;
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 pub enum KeysSubCommands {
     /// Show information about a SafeKey. By default it will show the one owned by CLI (if found).
     Show {
         /// Set this flag to show the secret key
-        #[structopt(long = "show-sk")]
+        #[clap(long = "show-sk")]
         show_sk: bool,
     },
-    #[structopt(name = "create")]
+    #[clap(name = "create")]
     /// Create a new SafeKey in BLS format.
     Create {
         /// Set this flag to output the generated keypair to file at ~/.safe/cli/credentials. The
         /// CLI will then sign all commands using this keypair.
-        #[structopt(long = "for-cli")]
+        #[clap(long = "for-cli")]
         for_cli: bool,
     },
 }
