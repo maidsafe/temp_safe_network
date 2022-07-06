@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1657104967734,
+  "lastUpdate": 1657111301085,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -7367,6 +7367,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 647798294,
             "range": "± 263130870",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "joshuef@gmail.com",
+            "name": "Josh Wilson",
+            "username": "joshuef"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "77cef496695e8cac9ccefccaf99cf350fb479eb9",
+          "message": "chore(client): now we only contact one adult at a time increase retry count\n\nThis should get us more contact with more elders in the same amount of time as previous.\nOnly returning faster if initial adult query returns",
+          "timestamp": "2022-07-06T14:08:48+02:00",
+          "tree_id": "1b1afc439ceecbecf4d0b2674744b1e7970c1b24",
+          "url": "https://github.com/maidsafe/safe_network/commit/77cef496695e8cac9ccefccaf99cf350fb479eb9"
+        },
+        "date": 1657111300108,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 510856936,
+            "range": "± 10228824",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 547917263,
+            "range": "± 14582699",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 1965341330,
+            "range": "± 5974919400",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 295916431,
+            "range": "± 3703985",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 319421154,
+            "range": "± 4702423",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 590708159,
+            "range": "± 5076227",
             "unit": "ns/iter"
           }
         ]
