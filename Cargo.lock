@@ -635,6 +635,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "clap_complete"
+version = "3.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ead064480dfc4880a10764488415a97fdd36a4cf1bb022d372f02e8faf8386e1"
+dependencies = [
+ "clap 3.2.8",
+]
+
+[[package]]
 name = "clap_derive"
 version = "3.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3718,6 +3727,8 @@ dependencies = [
  "bytes",
  "cargo-husky",
  "chrono",
+ "clap 3.2.8",
+ "clap_complete",
  "color-eyre",
  "console-subscriber",
  "crdts",
@@ -3758,7 +3769,6 @@ dependencies = [
  "sn_dbc",
  "sn_dysfunction",
  "sn_interface",
- "structopt",
  "strum",
  "strum_macros",
  "sysinfo",

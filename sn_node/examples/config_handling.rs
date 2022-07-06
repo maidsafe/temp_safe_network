@@ -6,18 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use clap::Parser;
 use eyre::Result;
 use sn_node::node::Config;
 use std::time::Duration;
-use structopt::StructOpt;
 use tokio::{fs::remove_file, io};
 
 // This example is to demonstrate how the node configuration is constructed
 // The node will attempt to read a cached config file from disk
 // The node will then overwrite the config using the provided command line args
 
-// Note: This is essentially a test, but, when using test filtering, StructOpt
-// tries to parse the filter as an argument passed resulting in a `UnmatchedArgument` error.
+// Note: This is essentially a test, but, when using test filtering, Clap tries to
+// parse the filter as an argument passed resulting in a `UnmatchedArgument` error.
 
 #[tokio::main]
 async fn main() -> Result<()> {
