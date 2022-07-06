@@ -3497,7 +3497,7 @@ dependencies = [
  "sn_api",
  "sn_cmd_test_utilities",
  "sn_dbc",
- "sn_launch_tool 0.9.9",
+ "sn_launch_tool",
  "tokio",
  "tracing",
  "tracing-subscriber 0.2.25",
@@ -3517,6 +3517,7 @@ dependencies = [
  "blsttc",
  "bytes",
  "cargo-husky",
+ "clap 3.2.8",
  "console-subscriber",
  "crdts",
  "criterion",
@@ -3549,8 +3550,7 @@ dependencies = [
  "signature",
  "sn_dbc",
  "sn_interface",
- "sn_launch_tool 0.9.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "structopt",
+ "sn_launch_tool",
  "strum",
  "strum_macros",
  "tempfile",
@@ -3702,20 +3702,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sn_launch_tool"
-version = "0.9.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed0ee2674871b9ee1025f46e144a0a37e1d240f054a05db5eed7ffcb4278f0f1"
-dependencies = [
- "color-eyre",
- "dirs-next 1.0.2",
- "eyre",
- "structopt",
- "tracing",
- "tracing-subscriber 0.3.11",
-]
-
-[[package]]
 name = "sn_node"
 version = "0.64.0"
 dependencies = [
@@ -3816,30 +3802,6 @@ name = "strsim"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
-
-[[package]]
-name = "structopt"
-version = "0.3.26"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c6b5c64445ba8094a6ab0c3cd2ad323e07171012d9c98b0b15651daf1787a10"
-dependencies = [
- "clap 2.33.4",
- "lazy_static",
- "structopt-derive",
-]
-
-[[package]]
-name = "structopt-derive"
-version = "0.4.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcb5ae327f9cc13b68763b5749770cb9e048a99bd9dfdfa58d0cf05d5f64afe0"
-dependencies = [
- "heck 0.3.3",
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "syn",
-]
 
 [[package]]
 name = "strum"
@@ -3987,7 +3949,7 @@ dependencies = [
  "console-subscriber",
  "dirs-next 2.0.0",
  "eyre",
- "sn_launch_tool 0.9.9",
+ "sn_launch_tool",
  "tokio",
  "tracing",
  "tracing-core",
