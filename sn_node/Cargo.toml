@@ -114,7 +114,7 @@ sn_interface = { path = "../sn_interface", version = "^0.8.0", features= ["test-
 [dev-dependencies.cargo-husky]
 version = "1.5.0"
 default-features = false # Disable features which are enabled by default
-features = ["precommit-hook", "run-cargo-clippy", "run-cargo-fmt", "run-cargo-check"]
+features = ["precommit-hook", "run-cargo-clippy", "run-cargo-fmt"]
 
 [package.metadata.cargo-udeps.ignore]
 development = ["cargo-husky"]
