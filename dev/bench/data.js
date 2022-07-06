@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1657111301085,
+  "lastUpdate": 1657114865761,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -7427,6 +7427,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 590708159,
             "range": "± 5076227",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "00dc24c9263a276797b4abdff0963df5e70c4231",
+          "message": "Merge #1312\n\n1312: refactor(messaging): combine handling, sending sub-modules r=joshuef a=RolandSherwin\n\nFixes #1305 \r\nExtra changes:\r\n - Make `handle_proposal` as a static method inside `Node`.\r\n- `messaging::handling::mod::handle_msg` fn moved to `messaging::mod`, rest (inside `messaging::handling::mod`) are moved to `messaging::system_msgs`\n\nCo-authored-by: RolandSherwin <RolandSherwin@protonmail.com>\nCo-authored-by: joshuef <joshuef@gmail.com>",
+          "timestamp": "2022-07-06T12:11:05Z",
+          "tree_id": "19682739415b5e229e71289f7fdf70e9a7448143",
+          "url": "https://github.com/maidsafe/safe_network/commit/00dc24c9263a276797b4abdff0963df5e70c4231"
+        },
+        "date": 1657114865047,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 512028847,
+            "range": "± 6975277",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 542403015,
+            "range": "± 23022860",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 1235048060,
+            "range": "± 6182591358",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 279894468,
+            "range": "± 5791563",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 307969223,
+            "range": "± 5424384",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 519965578,
+            "range": "± 3993026",
             "unit": "ns/iter"
           }
         ]
