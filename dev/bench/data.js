@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1657114865761,
+  "lastUpdate": 1657126088371,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -7487,6 +7487,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 519965578,
             "range": "± 3993026",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "f9fa4f7857d8161e8c036cca06006bf187a6c6c3",
+          "message": "Merge #1309\n\n1309: chore(rustfmt): `try!` macro is deprecated r=joshuef a=b-zee\n\nNo need for rustfmt to check/replace this, as the compiler will already\nwarn for this. Deprecated since 1.39.\n\nRemoving the option seems to trigger a couple of formatting changes that\nrustfmt did not seem to pick on before.\n\n<!--\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\n\nWrite your comment below this line: -->\n\n\nCo-authored-by: Benno Zeeman <bzeeman@live.nl>",
+          "timestamp": "2022-07-06T15:14:37Z",
+          "tree_id": "0de7f524b52ffcb08a20229e6562a2b59f2b47c2",
+          "url": "https://github.com/maidsafe/safe_network/commit/f9fa4f7857d8161e8c036cca06006bf187a6c6c3"
+        },
+        "date": 1657126086795,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 513211149,
+            "range": "± 10658249",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 543562623,
+            "range": "± 22655764",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 809339031,
+            "range": "± 8040910858",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 281454108,
+            "range": "± 2467703",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 304148491,
+            "range": "± 4152965",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 516834470,
+            "range": "± 6089920",
             "unit": "ns/iter"
           }
         ]
