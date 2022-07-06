@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1657029278667,
+  "lastUpdate": 1657066561239,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -7253,6 +7253,60 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 5253734871,
             "range": "± 27286676",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "6af41dcbad76903cb5526b270100e650aa483191",
+          "message": "Merge #1304\n\n1304: Less arc  r=davidrusu a=joshuef\n\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\n\nCo-authored-by: Josh Wilson <joshuef@gmail.com>\nCo-authored-by: David Rusu <davidrusu.me@gmail.com>\nCo-authored-by: qima <qi.ma@maidsafe.net>",
+          "timestamp": "2022-07-05T22:40:29Z",
+          "tree_id": "dd3a0b7466a98e1409151e1e6d425e6667fb3ba4",
+          "url": "https://github.com/maidsafe/safe_network/commit/6af41dcbad76903cb5526b270100e650aa483191"
+        },
+        "date": 1657066558817,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 524050729,
+            "range": "± 13648558",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 571200945,
+            "range": "± 21944693",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 306075762,
+            "range": "± 38137586",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 363655858,
+            "range": "± 12137158",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 978640203,
+            "range": "± 142946443",
             "unit": "ns/iter"
           }
         ]
