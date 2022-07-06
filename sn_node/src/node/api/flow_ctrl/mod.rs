@@ -22,7 +22,7 @@ use sn_interface::{
 
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::{
-    sync::mpsc,
+    sync::{mpsc, RwLock},
     task::{self, JoinHandle},
     time::MissedTickBehavior,
 };
@@ -38,7 +38,7 @@ const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(30);
 
 #[derive(Clone)]
 pub(crate) struct FlowCtrl {
-    node: Arc<Node>,
+    node: Arc<RwLock<Node>>,
     cmd_ctrl: CmdCtrl,
 }
 
@@ -111,11 +111,15 @@ impl FlowCtrl {
 
             loop {
                 let _instant = interval.tick().await;
+                let node = &self.node.read().await;
+                let is_elder = node.is_elder();
+                let prefix = node.network_knowledge().prefix();
 
                 // Send a probe message if we are an elder
-                let node = &self.node;
-                if node.is_elder().await && !node.network_knowledge().prefix().is_empty() {
-                    match node.generate_probe_msg().await {
+                if is_elder && !prefix.is_empty() {
+                    let probe = self.node.read().await.generate_probe_msg().await;
+
+                    match probe {
                         Ok(cmd) => {
                             info!("Sending probe msg");
                             if let Err(e) = self.cmd_ctrl.push(cmd).await {
@@ -138,10 +142,12 @@ impl FlowCtrl {
             loop {
                 let _instant = interval.tick().await;
 
+                let prefix = self.node.read().await.network_knowledge().prefix();
+
                 // Send a probe message to an elder
-                let node = &self.node;
-                if !node.network_knowledge().prefix().is_empty() {
-                    match node.generate_section_probe_msg().await {
+                if !prefix.is_empty() {
+                    let probe = self.node.read().await.generate_section_probe_msg().await;
+                    match probe {
                         Ok(cmd) => {
                             info!("Sending section probe msg");
                             if let Err(e) = self.cmd_ctrl.push(cmd).await {
@@ -166,21 +172,21 @@ impl FlowCtrl {
             loop {
                 let _instant = interval.tick().await;
 
-                if !dispatcher.node.is_elder().await {
+                if !dispatcher.node.read().await.is_elder() {
                     continue;
                 }
                 trace!("looping vote check in elder");
+                let node = dispatcher.node.read().await;
+                let membership = &node.membership;
 
-                let membership = dispatcher.node.membership.read().await;
-
-                if let Some(membership) = &*membership {
+                if let Some(membership) = &membership {
                     let last_received_vote_time = membership.last_received_vote_time();
 
                     if let Some(time) = last_received_vote_time {
                         // we want to resend the prev vote
                         if time.elapsed() >= MISSING_VOTE_INTERVAL {
                             debug!("Vote consensus appears stalled...");
-                            let cmds = self.node.resend_our_last_vote_to_elders().await?;
+                            let cmds = node.resend_our_last_vote_to_elders().await?;
 
                             trace!("Vote resending cmds: {:?}", cmds.len());
                             for cmd in cmds {
@@ -204,33 +210,47 @@ impl FlowCtrl {
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
             loop {
+                trace!("data replication loop");
                 let _ = interval.tick().await;
 
                 use rand::seq::IteratorRandom;
                 let mut rng = rand::rngs::OsRng;
                 let mut this_batch_address = None;
-                let node = &self.node;
 
-                // choose a data to replicate at random
-                if let Some(data_queued) = node
-                    .pending_data_to_replicate_to_peers
-                    .iter()
-                    .choose(&mut rng)
-                {
-                    this_batch_address = Some(*data_queued.key());
+                let (src_section_pk, our_info, data_queued) = {
+                    let node = self.node.read().await;
+                    // get info for the WireMsg
+                    let src_section_pk = node.network_knowledge().section_key();
+                    let our_info = node.info();
+                    // choose a data to replicate at random
+                    let data_queued = node
+                        .pending_data_to_replicate_to_peers
+                        .iter()
+                        .choose(&mut rng)
+                        .map(|(address, _)| *address);
+
+                    (src_section_pk, our_info, data_queued)
+                };
+
+                if let Some(data_addr) = data_queued {
+                    this_batch_address = Some(data_addr);
                 }
 
                 if let Some(address) = this_batch_address {
-                    if let Some((data_address, data_recipients)) =
+                    trace!("Data found in queue to send out");
+
+                    let target_peer = {
+                        // careful now, if we're holding any ref into the read above we'll lock here.
+                        let mut node = self.node.write().await;
                         node.pending_data_to_replicate_to_peers.remove(&address)
-                    {
-                        // get info for the WireMsg
-                        let src_section_pk = node.network_knowledge().section_key();
-                        let our_info = node.info().await;
+                    };
+
+                    if let Some(data_recipients) = target_peer {
+                        debug!("Data queued to be replicated");
 
                         let mut recipients = vec![];
 
-                        for peer in data_recipients.read().await.iter() {
+                        for peer in data_recipients.iter() {
                             recipients.push(*peer);
                         }
 
@@ -245,9 +265,12 @@ impl FlowCtrl {
                             section_pk: src_section_pk,
                         };
 
-                        let data_to_send = node
+                        let data_to_send = self
+                            .node
+                            .read()
+                            .await
                             .data_storage
-                            .get_from_local_store(&data_address)
+                            .get_from_local_store(&address)
                             .await?;
 
                         let system_msg =
@@ -271,6 +294,8 @@ impl FlowCtrl {
                             error!("Error in data replication loop: {:?}", e);
                         }
                     }
+                } else {
+                    trace!("no data to be sending");
                 }
             }
         });
@@ -304,9 +329,9 @@ impl FlowCtrl {
             loop {
                 let _instant = interval.tick().await;
 
-                let node = &self.node;
-
-                let unresponsive_nodes = match node.get_dysfunctional_node_names().await {
+                let dysfunctional_nodes =
+                    self.node.write().await.get_dysfunctional_node_names().await;
+                let unresponsive_nodes = match dysfunctional_nodes {
                     Ok(nodes) => nodes,
                     Err(error) => {
                         error!("Error getting dysfunctional nodes: {error}");
@@ -348,8 +373,8 @@ impl FlowCtrl {
             loop {
                 let _ = interval.tick().await;
 
-                let node = &self.node;
-                let our_info = node.info().await;
+                let node = self.node.read().await;
+                let our_info = node.info();
                 let our_name = our_info.name();
 
                 let members = node.network_knowledge().section_members();
@@ -422,7 +447,8 @@ async fn handle_connection_events(ctrl: FlowCtrl, mut incoming_conns: mpsc::Rece
 
                 let span = {
                     let node = &ctrl.node;
-                    trace_span!("handle_message", name = %node.info().await.name(), ?sender, msg_id = ?wire_msg.msg_id())
+                    let name = node.read().await.info().name();
+                    trace_span!("handle_message", name = %name, ?sender, msg_id = ?wire_msg.msg_id())
                 };
                 let _span_guard = span.enter();
 

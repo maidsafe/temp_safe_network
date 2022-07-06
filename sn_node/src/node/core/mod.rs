@@ -58,7 +58,7 @@ use sn_interface::{
 };
 
 use backoff::ExponentialBackoff;
-use dashmap::{DashMap, DashSet};
+use dashmap::DashSet;
 use ed25519_dalek::Keypair;
 use itertools::Itertools;
 use resource_proof::ResourceProof;
@@ -69,9 +69,14 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::sync::RwLock;
 use uluru::LRUCache;
 use xor_name::{Prefix, XorName};
+
+/// Amount of tokens to be owned by the Genesis DBC.
+/// At the inception of the Network a total supply of 4,525,524,120 whole tokens will be created.
+/// Each whole token can be subdivided 10^9 times,
+/// thus creating a total of 4,525,524,120,000,000,000 available units.
+pub const GENESIS_DBC_AMOUNT: u64 = 4_525_524_120 * u64::pow(10, 9);
 
 pub(super) const RESOURCE_PROOF_DATA_SIZE: usize = 128;
 pub(super) const RESOURCE_PROOF_DIFFICULTY: u8 = 10;
@@ -100,20 +105,18 @@ pub(crate) struct DkgSessionInfo {
 }
 
 // Store up to 100 in use backoffs
-pub(crate) type AeBackoffCache =
-    Arc<RwLock<LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>>>;
+pub(crate) type AeBackoffCache = LRUCache<(Peer, ExponentialBackoff), BACKOFF_CACHE_LIMIT>;
 
 // Core state + logic of a node.
 pub(crate) struct Node {
     addr: SocketAddr, // does this change? if so... when? only at node start atm?
     pub(super) event_sender: EventSender,
     pub(super) data_storage: DataStorage, // Adult only before cache
-    pub(crate) keypair: Arc<RwLock<Arc<Keypair>>>,
+    pub(crate) keypair: Arc<Keypair>,
     /// queue up all batch data to be replicated (as a result of churn events atm)
     // TODO: This can probably be reworked into the general per peer msg queue, but as
     // we need to pull data first before we form the WireMsg, we won't do that just now
-    pub(crate) pending_data_to_replicate_to_peers:
-        Arc<DashMap<ReplicatedDataAddress, Arc<RwLock<BTreeSet<Peer>>>>>,
+    pub(crate) pending_data_to_replicate_to_peers: BTreeMap<ReplicatedDataAddress, BTreeSet<Peer>>,
     resource_proof: ResourceProof,
     // Network resources
     pub(crate) section_keys_provider: SectionKeysProvider,
@@ -122,19 +125,19 @@ pub(crate) struct Node {
     message_aggregator: SignatureAggregator,
     proposal_aggregator: SignatureAggregator,
     // DKG/Split/Churn modules
-    split_barrier: Arc<RwLock<SplitBarrier>>,
-    dkg_sessions: Arc<RwLock<HashMap<Digest256, DkgSessionInfo>>>,
+    split_barrier: SplitBarrier,
+    dkg_sessions: HashMap<Digest256, DkgSessionInfo>,
     dkg_voter: DkgVoter,
-    relocate_state: Arc<RwLock<Option<Box<JoiningAsRelocated>>>>,
+    relocate_state: Option<Box<JoiningAsRelocated>>,
     // ======================== Elder only ========================
-    pub(crate) membership: Arc<RwLock<Option<Membership>>>,
+    pub(crate) membership: Option<Membership>,
     // Section handover consensus state (Some for Elders, None for others)
-    pub(crate) handover_voting: Arc<RwLock<Option<Handover>>>,
-    joins_allowed: Arc<RwLock<bool>>,
+    pub(crate) handover_voting: Option<Handover>,
+    joins_allowed: bool,
     // Trackers
     capacity: Capacity,
     pub(crate) dysfunction_tracking: DysfunctionDetection,
-    pending_data_queries: Arc<Cache<OperationId, Arc<DashSet<Peer>>>>,
+    pending_data_queries: Cache<OperationId, Arc<DashSet<Peer>>>,
     // Caches
     ae_backoff_cache: AeBackoffCache,
 }
@@ -205,26 +208,26 @@ impl Node {
 
         let node = Self {
             addr,
-            keypair: Arc::new(RwLock::new(keypair)),
+            keypair,
             network_knowledge,
             section_keys_provider,
-            dkg_sessions: Arc::new(RwLock::new(HashMap::default())),
+            dkg_sessions: HashMap::default(),
             proposal_aggregator: SignatureAggregator::default(),
-            split_barrier: Arc::new(RwLock::new(SplitBarrier::new())),
+            split_barrier: SplitBarrier::new(),
             message_aggregator: SignatureAggregator::default(),
             dkg_voter: DkgVoter::default(),
-            relocate_state: Arc::new(RwLock::new(None)),
+            relocate_state: None,
             event_sender,
-            handover_voting: Arc::new(RwLock::new(handover)),
-            joins_allowed: Arc::new(RwLock::new(true)),
+            handover_voting: handover,
+            joins_allowed: true,
             resource_proof: ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY),
             data_storage,
             capacity: Capacity::default(),
             dysfunction_tracking: node_dysfunction_detector,
-            pending_data_queries: Arc::new(Cache::with_expiry_duration(DATA_QUERY_TIMEOUT)),
-            pending_data_to_replicate_to_peers: Arc::new(DashMap::new()),
+            pending_data_queries: Cache::with_expiry_duration(DATA_QUERY_TIMEOUT),
+            pending_data_to_replicate_to_peers: BTreeMap::new(),
             ae_backoff_cache: AeBackoffCache::default(),
-            membership: Arc::new(RwLock::new(membership)),
+            membership,
         };
 
         node.write_prefix_map().await;
@@ -232,8 +235,8 @@ impl Node {
         Ok(node)
     }
 
-    pub(crate) async fn info(&self) -> NodeInfo {
-        let keypair = self.keypair.read().await.clone();
+    pub(crate) fn info(&self) -> NodeInfo {
+        let keypair = self.keypair.clone();
         let addr = self.addr;
         NodeInfo { keypair, addr }
     }
@@ -287,49 +290,45 @@ impl Node {
     }
 
     /// returns names that are relatively dysfunctional
-    pub(crate) async fn get_dysfunctional_node_names(&self) -> Result<BTreeSet<XorName>> {
+    pub(crate) async fn get_dysfunctional_node_names(&mut self) -> Result<BTreeSet<XorName>> {
         self.dysfunction_tracking
             .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
-            .await
             .map_err(Error::from)
     }
 
     /// Log a communication problem
-    pub(crate) async fn log_comm_issue(&self, name: XorName) -> Result<()> {
+    pub(crate) async fn log_comm_issue(&mut self, name: XorName) -> Result<()> {
         trace!("Logging comms issue in dysfunction");
         self.dysfunction_tracking
             .track_issue(name, IssueType::Communication)
-            .await
             .map_err(Error::from)
     }
 
     /// Log a knowledge issue
-    pub(crate) async fn log_knowledge_issue(&self, name: XorName) -> Result<()> {
+    pub(crate) async fn log_knowledge_issue(&mut self, name: XorName) -> Result<()> {
         trace!("Logging Knowledge issue in dysfunction");
         self.dysfunction_tracking
             .track_issue(name, IssueType::Knowledge)
-            .await
             .map_err(Error::from)
     }
 
     /// Log a dkg issue (ie, an initialised but unfinished dkg round for a given participant)
-    pub(crate) async fn log_dkg_issue(&self, name: XorName) -> Result<()> {
+    pub(crate) async fn log_dkg_issue(&mut self, name: XorName) -> Result<()> {
         trace!("Logging Dkg issue in dysfunction");
         self.dysfunction_tracking
             .track_issue(name, IssueType::Dkg)
-            .await
             .map_err(Error::from)
     }
 
     /// Log a dkg session as responded to
-    pub(crate) async fn log_dkg_session(&self, name: &XorName) {
+    pub(crate) async fn log_dkg_session(&mut self, name: &XorName) {
         trace!("Logging Dkg session as responded to in dysfunction");
-        self.dysfunction_tracking.dkg_ack_fulfilled(name).await;
+        self.dysfunction_tracking.dkg_ack_fulfilled(name);
     }
 
     pub(super) async fn state_snapshot(&self) -> StateSnapshot {
         StateSnapshot {
-            is_elder: self.is_elder().await,
+            is_elder: self.is_elder(),
             section_key: self.network_knowledge.section_key(),
             prefix: self.network_knowledge.prefix(),
             elders: self.network_knowledge().authority_provider().names(),
@@ -340,7 +339,7 @@ impl Node {
     /// excluding any member matching a name in the provided `excluded_names` set.
     /// Returns a set of candidate `DkgSessionId`'s.
     pub(super) async fn promote_and_demote_elders(
-        &self,
+        &mut self,
         excluded_names: &BTreeSet<XorName>,
     ) -> Result<Vec<DkgSessionId>> {
         let sap = self.network_knowledge.authority_provider();
@@ -348,20 +347,19 @@ impl Node {
 
         // get current gen and members
         let current_gen;
-        let members: BTreeMap<XorName, NodeState> =
-            if let Some(m) = self.membership.read().await.as_ref() {
-                current_gen = m.generation();
-                m.current_section_members()
-                    .iter()
-                    .filter(|(name, _node_state)| !excluded_names.contains(*name))
-                    .map(|(n, s)| (*n, s.clone()))
-                    .collect()
-            } else {
-                error!(
+        let members: BTreeMap<XorName, NodeState> = if let Some(m) = self.membership.as_ref() {
+            current_gen = m.generation();
+            m.current_section_members()
+                .iter()
+                .filter(|(name, _node_state)| !excluded_names.contains(*name))
+                .map(|(n, s)| (*n, s.clone()))
+                .collect()
+        } else {
+            error!(
                 "attempted to promote and demote elders when we don't have a membership instance"
             );
-                return Ok(vec![]);
-            };
+            return Ok(vec![]);
+        };
 
         // Try splitting
         trace!("{}", LogMarker::SplitAttempt);
@@ -448,15 +446,13 @@ impl Node {
         Ok(res)
     }
 
-    async fn initialize_membership(&self, sap: SectionAuthorityProvider) -> Result<()> {
+    async fn initialize_membership(&mut self, sap: SectionAuthorityProvider) -> Result<()> {
         let key = self
             .section_keys_provider
             .key_share(&self.network_knowledge.section_key())
             .await?;
 
-        let mut membership = self.membership.write().await;
-
-        *membership = Some(Membership::from(
+        self.membership = Some(Membership::from(
             (key.index as u8, key.secret_key_share),
             key.public_key_set,
             sap.elders.len(),
@@ -466,7 +462,7 @@ impl Node {
         Ok(())
     }
 
-    async fn initialize_handover(&self) -> Result<()> {
+    async fn initialize_handover(&mut self) -> Result<()> {
         let key = self
             .section_keys_provider
             .key_share(&self.network_knowledge.section_key())
@@ -474,11 +470,9 @@ impl Node {
         let n_elders = self.network_knowledge.authority_provider().elder_count();
 
         // reset split barrier for
-        let mut split_barrier = self.split_barrier.write().await;
-        *split_barrier = SplitBarrier::new();
+        self.split_barrier = SplitBarrier::new();
 
-        let mut handover_voting = self.handover_voting.write().await;
-        *handover_voting = Some(Handover::from(
+        self.handover_voting = Some(Handover::from(
             (key.index as u8, key.secret_key_share),
             key.public_key_set,
             n_elders,
@@ -487,7 +481,7 @@ impl Node {
         Ok(())
     }
 
-    async fn initialize_elder_state(&self) -> Result<()> {
+    async fn initialize_elder_state(&mut self) -> Result<()> {
         let sap = self
             .network_knowledge
             .section_signed_authority_provider()
@@ -500,7 +494,7 @@ impl Node {
 
     /// Generate cmds and fire events based upon any node state changes.
     pub(super) async fn update_self_for_new_node_state(
-        &self,
+        &mut self,
         old: StateSnapshot,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
@@ -545,7 +539,7 @@ impl Node {
                     // Whenever there is an elders change, casting a round of joins_allowed
                     // proposals to sync.
                     cmds.extend(
-                        self.propose(Proposal::JoinsAllowed(*self.joins_allowed.read().await))
+                        self.propose(Proposal::JoinsAllowed(self.joins_allowed))
                             .await?,
                     );
                 }
@@ -554,8 +548,7 @@ impl Node {
                 self.log_section_stats().await;
             } else {
                 // if not elder
-                let mut handover_voting = self.handover_voting.write().await;
-                *handover_voting = None;
+                self.handover_voting = None;
             }
 
             if new.is_elder || old.is_elder {
@@ -671,7 +664,7 @@ impl Node {
     }
 
     pub(super) async fn log_section_stats(&self) {
-        if let Some(m) = self.membership.read().await.as_ref() {
+        if let Some(m) = self.membership.as_ref() {
             let adults = self.network_knowledge.adults().len();
 
             let elders = self.network_knowledge.authority_provider().elder_count();

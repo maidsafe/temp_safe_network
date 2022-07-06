@@ -8,6 +8,7 @@
 
 use sn_interface::types::log_markers::LogMarker;
 
+use clap::{AppSettings::ColoredHelp, Parser, Subcommand};
 use eyre::{bail, Error, Result};
 use grep::{matcher::Matcher, regex::RegexMatcher, searcher::sinks::UTF8, searcher::Searcher};
 use std::{
@@ -15,25 +16,24 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
-use structopt::{clap::AppSettings::ColoredHelp, StructOpt};
 use strum::IntoEnumIterator;
 use walkdir::WalkDir;
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 /// Inspect Safe Network local testnet logs
-#[structopt(global_settings(&[ColoredHelp]))]
+#[clap(global_settings(&[ColoredHelp]), version)]
 struct CmdArgs {
     /// sub cmds
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     pub cmd: Option<SubCmds>,
     /// Path to the testnet logs folder, e.g. ~/.safe/node/local-test-network
     pub logs_path: PathBuf,
     /// Show stats per node? (this is slower)
-    #[structopt(short)]
+    #[clap(short)]
     pub nodes: bool,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 enum SubCmds {
     /// Generate a report of cmds and corresponding sub-cmds
     // TODO: make the cmd-id optional, to report all cmds
@@ -52,7 +52,7 @@ enum SubCmds {
 }
 
 fn main() -> Result<()> {
-    let args = CmdArgs::from_args();
+    let args = CmdArgs::parse();
     let report = inspect_log_files(&args)?;
 
     println!();

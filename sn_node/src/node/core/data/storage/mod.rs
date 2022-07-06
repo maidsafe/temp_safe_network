@@ -26,17 +26,16 @@ use sn_interface::{
     },
 };
 
-use std::{path::Path, sync::Arc};
-use tokio::sync::RwLock;
+use std::path::Path;
 
 /// Operations on data.
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 // exposed as pub due to benches
 pub struct DataStorage {
     chunks: ChunkStorage,
     registers: RegisterStorage,
     used_space: UsedSpace,
-    last_recorded_level: Arc<RwLock<StorageLevel>>,
+    last_recorded_level: StorageLevel,
 }
 
 impl DataStorage {
@@ -46,14 +45,14 @@ impl DataStorage {
             chunks: ChunkStorage::new(path, used_space.clone())?,
             registers: RegisterStorage::new(path, used_space.clone())?,
             used_space,
-            last_recorded_level: Arc::new(RwLock::new(StorageLevel::zero())),
+            last_recorded_level: StorageLevel::zero(),
         })
     }
 
     /// Store data in the local store
     #[instrument(skip(self))]
     pub async fn store(
-        &self,
+        &mut self,
         data: &ReplicatedData,
         pk_for_spent_book: PublicKey,
         keypair_for_spent_book: Keypair,
@@ -62,35 +61,29 @@ impl DataStorage {
         match data.clone() {
             ReplicatedData::Chunk(chunk) => self.chunks.store(&chunk).await?,
             ReplicatedData::RegisterLog(data) => {
-                self.registers
-                    .update(RegisterStoreExport(vec![data]))
-                    .await?
+                self.registers.update(RegisterStoreExport(vec![data]))?
             }
-            ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd).await?,
+            ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd)?,
             ReplicatedData::SpentbookWrite(cmd) => {
                 // FIMXE: this is temporay logic to create a spentbook to make sure it exists.
                 // Spentbooks shall always exist, and the section nodes shall create them by default.
-                self.registers
-                    .create_spentbook_register(
-                        &cmd.dst_address(),
-                        pk_for_spent_book,
-                        keypair_for_spent_book,
-                    )
-                    .await?;
+                self.registers.create_spentbook_register(
+                    &cmd.dst_address(),
+                    pk_for_spent_book,
+                    keypair_for_spent_book,
+                )?;
 
                 // We now write the cmd received
-                self.registers.write(cmd).await?
+                self.registers.write(cmd)?
             }
             ReplicatedData::SpentbookLog(data) => {
-                self.registers
-                    .update(RegisterStoreExport(vec![data]))
-                    .await?
+                self.registers.update(RegisterStoreExport(vec![data]))?
             }
         };
 
         // check if we've filled another approx. 10%-points of our storage
         // if so, update the recorded level
-        let last_recorded_level = { *self.last_recorded_level.read().await };
+        let last_recorded_level = self.last_recorded_level;
         if let Ok(next_level) = last_recorded_level.next() {
             // used_space_ratio is a heavy task that's why we don't do it all the time
             let used_space_ratio = self.used_space.ratio();
@@ -98,7 +91,7 @@ impl DataStorage {
             // every level represents 10 percentage points
             if used_space_level as u8 >= next_level.value() {
                 debug!("Next level for storage has been reached");
-                *self.last_recorded_level.write().await = next_level;
+                self.last_recorded_level = next_level;
                 return Ok(Some(next_level));
             }
         }
@@ -108,7 +101,7 @@ impl DataStorage {
 
     // Query the local store and return NodeQueryResponse
     pub(crate) async fn query(
-        &self,
+        &mut self,
         query: &DataQueryVariant,
         requester: User,
     ) -> NodeQueryResponse {
@@ -180,20 +173,18 @@ impl DataStorage {
             ReplicatedDataAddress::Register(addr) => self
                 .registers
                 .get_register_replica(addr)
-                .await
                 .map(ReplicatedData::RegisterLog),
             ReplicatedDataAddress::Spentbook(addr) => {
                 let reg_addr = RegisterAddress::new(*addr.name(), SPENTBOOK_TYPE_TAG);
                 self.registers
                     .get_register_replica(&reg_addr)
-                    .await
                     .map(ReplicatedData::SpentbookLog)
             }
         }
     }
 
     #[allow(dead_code)]
-    pub(crate) async fn remove(&self, address: &ReplicatedDataAddress) -> Result<()> {
+    pub(crate) async fn remove(&mut self, address: &ReplicatedDataAddress) -> Result<()> {
         match address {
             ReplicatedDataAddress::Chunk(addr) => self.chunks.remove_chunk(addr).await,
             ReplicatedDataAddress::Register(addr) => self.registers.remove_register(addr).await,
@@ -205,7 +196,7 @@ impl DataStorage {
     }
 
     /// Retrieve all keys/ReplicatedDataAddresses of stored data
-    pub async fn keys(&self) -> Result<Vec<ReplicatedDataAddress>> {
+    pub fn keys(&self) -> Result<Vec<ReplicatedDataAddress>> {
         let chunk_keys = self
             .chunks
             .keys()?
@@ -213,8 +204,7 @@ impl DataStorage {
             .map(ReplicatedDataAddress::Chunk);
         let reg_keys = self
             .registers
-            .keys()
-            .await?
+            .keys()?
             .into_iter()
             .map(ReplicatedDataAddress::Register);
         Ok(reg_keys.chain(chunk_keys).collect())
@@ -259,7 +249,7 @@ mod tests {
         let used_space = UsedSpace::new(usize::MAX);
 
         // Create instance
-        let storage = DataStorage::new(path, used_space)?;
+        let mut storage = DataStorage::new(path, used_space)?;
 
         // 5mb random data chunk
         let bytes = random_bytes(5 * 1024 * 1024);
@@ -345,7 +335,7 @@ mod tests {
         let path = temp_dir.path();
         let used_space = UsedSpace::new(usize::MAX);
         let runtime = Runtime::new()?;
-        let storage = DataStorage::new(path, used_space)?;
+        let mut storage = DataStorage::new(path, used_space)?;
         let owner_pk = PublicKey::Bls(bls::SecretKey::random().public_key());
         let owner_keypair = Keypair::new_ed25519();
         for op in ops.into_iter() {

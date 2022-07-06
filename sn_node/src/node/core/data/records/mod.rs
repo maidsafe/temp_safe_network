@@ -38,7 +38,7 @@ impl Node {
     // Locate ideal holders for this data, line up wiremsgs for those to instruct them to store the data
     pub(crate) async fn replicate_data(&self, data: ReplicatedData) -> Result<Vec<Cmd>> {
         trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
-        if self.is_elder().await {
+        if self.is_elder() {
             let targets = self.get_adults_who_should_store_data(data.name()).await;
 
             info!(
@@ -55,7 +55,7 @@ impl Node {
     }
 
     pub(crate) async fn read_data_from_adults(
-        &self,
+        &mut self,
         query: DataQuery,
         msg_id: MsgId,
         auth: AuthorityProof<ServiceAuth>,
@@ -118,12 +118,10 @@ impl Node {
             // ensure we only add a pending request when we're actually sending out requests.
             for target in &targets {
                 trace!("adding pending req for {target:?} in dysfunction tracking");
-                self.dysfunction_tracking
-                    .track_issue(
-                        *target,
-                        IssueType::PendingRequestOperation(Some(operation_id)),
-                    )
-                    .await?;
+                self.dysfunction_tracking.track_issue(
+                    *target,
+                    IssueType::PendingRequestOperation(Some(operation_id)),
+                )?;
             }
 
             trace!(
@@ -152,20 +150,20 @@ impl Node {
 
     pub(crate) async fn get_metadata_of(&self, prefix: &Prefix) -> MetadataExchange {
         // Load tracked adult_levels
-        let adult_levels = self.capacity.levels_matching(*prefix).await;
+        let adult_levels = self.capacity.levels_matching(*prefix);
         MetadataExchange { adult_levels }
     }
 
-    pub(crate) async fn set_adult_levels(&self, adult_levels: MetadataExchange) {
+    pub(crate) async fn set_adult_levels(&mut self, adult_levels: MetadataExchange) {
         let MetadataExchange { adult_levels } = adult_levels;
-        self.capacity.set_adult_levels(adult_levels).await
+        self.capacity.set_adult_levels(adult_levels)
     }
 
     /// Registered holders not present in provided list of members
     /// will be removed from `adult_storage_info` and no longer tracked for liveness.
-    pub(crate) async fn liveness_retain_only(&self, members: BTreeSet<XorName>) -> Result<()> {
+    pub(crate) async fn liveness_retain_only(&mut self, members: BTreeSet<XorName>) -> Result<()> {
         // full adults
-        self.capacity.retain_members_only(&members).await;
+        self.capacity.retain_members_only(&members);
 
         // stop tracking liveness of absent holders
         self.dysfunction_tracking.retain_members_only(members).await;
@@ -174,22 +172,25 @@ impl Node {
     }
 
     /// Adds the new adult to the Capacity and Liveness trackers.
-    pub(crate) async fn add_new_adult_to_trackers(&self, adult: XorName) {
+    pub(crate) async fn add_new_adult_to_trackers(&mut self, adult: XorName) {
         info!("Adding new Adult: {adult} to trackers");
-        self.capacity.add_new_adult(adult).await;
+        self.capacity.add_new_adult(adult);
 
         self.dysfunction_tracking.add_new_node(adult).await;
     }
 
     /// Set storage level of a given node.
     /// Returns whether the level changed or not.
-    pub(crate) async fn set_storage_level(&self, node_id: &PublicKey, level: StorageLevel) -> bool {
+    pub(crate) async fn set_storage_level(
+        &mut self,
+        node_id: &PublicKey,
+        level: StorageLevel,
+    ) -> bool {
         info!("Setting new storage level..");
         let changed = self
             .capacity
-            .set_adult_level(XorName::from(*node_id), level)
-            .await;
-        let avg_usage = self.capacity.avg_usage().await;
+            .set_adult_level(XorName::from(*node_id), level);
+        let avg_usage = self.capacity.avg_usage();
         info!(
             "Avg storage usage among Adults is between {}-{} %",
             avg_usage * 10,
@@ -199,7 +200,7 @@ impl Node {
     }
 
     pub(crate) async fn full_adults(&self) -> BTreeSet<XorName> {
-        self.capacity.full_adults().await
+        self.capacity.full_adults()
     }
 
     /// Construct list of adults that hold target data, including full nodes.
@@ -284,15 +285,14 @@ impl Node {
         // we create a dummy/random dst location,
         // we will set it correctly for each msg and target
         let section_pk = self.network_knowledge().section_key();
-        let our_name = self.info().await.name();
+        let our_name = self.info().name();
         let dummy_dst_location = DstLocation::Node {
             name: our_name,
             section_pk,
         };
 
         // separate this into form_wire_msg based on agg
-        let wire_msg =
-            WireMsg::single_src(&self.info().await, dummy_dst_location, msg, section_pk)?;
+        let wire_msg = WireMsg::single_src(&self.info(), dummy_dst_location, msg, section_pk)?;
 
         let mut cmds = vec![];
 

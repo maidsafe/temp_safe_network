@@ -10,14 +10,14 @@ use super::{
     helpers::{gen_processed_files_table, get_from_arg_or_stdin, serialise_output, xorname_to_hex},
     OutputFmt,
 };
+use clap::Subcommand;
 use color_eyre::{eyre::eyre, Result};
 use sn_api::{files::FilesMapChange, PublicKey, Safe, SafeUrl, XorName, XorUrlBase};
-use structopt::StructOpt;
 
 // Defines subcommands of 'xorurl'
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 pub enum XorurlSubCommands {
-    #[structopt(name = "decode")]
+    #[clap(name = "decode")]
     /// Decode a XOR-URL extracting all the information encoded it in
     Decode {
         /// The XOR-URL to decode

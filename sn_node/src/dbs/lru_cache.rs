@@ -6,13 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use dashmap::DashMap;
 use priority_queue::PriorityQueue;
-use std::sync::{
-    atomic::{AtomicU16, Ordering},
-    Arc,
-};
-use tokio::sync::RwLock;
+use std::{collections::BTreeMap, ops::Sub};
 use xor_name::XorName;
 
 type Priority = u16;
@@ -26,25 +21,25 @@ type Priority = u16;
 ///
 /// At an insert of a new value, when the cache is full, the priority queue will simply be popped, and the least
 /// recently used value will have the largest number, so it will be at the top of the queue.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct LruCache<T> {
-    data: DashMap<XorName, Arc<T>>,
-    queue: Arc<RwLock<PriorityQueue<XorName, Priority>>>,
+    data: BTreeMap<XorName, T>,
+    queue: PriorityQueue<XorName, Priority>,
     size: u16,
-    start: Arc<AtomicU16>,
+    start: u16,
 }
 
 impl<T> LruCache<T> {
     pub(crate) fn new(size: u16) -> Self {
         Self {
-            data: DashMap::new(),
-            queue: Arc::new(RwLock::new(PriorityQueue::new())),
+            data: BTreeMap::new(),
+            queue: PriorityQueue::new(),
             size,
-            start: Arc::new(AtomicU16::new(u16::MAX)),
+            start: u16::MAX,
         }
     }
 
-    pub(crate) async fn insert(&self, key: &XorName, val: Arc<T>) {
+    pub(crate) fn insert(&mut self, key: &XorName, val: T) {
         if self.data.contains_key(key) {
             return;
         }
@@ -54,50 +49,49 @@ impl<T> LruCache<T> {
             let mut prio = self.priority();
             if prio == 0 {
                 // empty the cache when we overflow
-                self.queue.write().await.clear();
+                self.queue.clear();
                 self.data.clear();
-                prio = self.start.fetch_sub(1, Ordering::SeqCst)
+                prio = self.start.sub(1)
             }
 
-            let _ = self.queue.write().await.push(*key, prio);
+            let _ = self.queue.push(*key, prio);
         }
 
-        let len = { self.queue.read().await.len() as u16 };
+        let len = { self.queue.len() as u16 };
         if len > self.size {
-            let mut write = self.queue.write().await;
-            if let Some((evicted, _)) = write.pop() {
+            if let Some((evicted, _)) = self.queue.pop() {
                 let _ = self.data.remove(&evicted);
             }
         }
     }
 
-    pub(crate) async fn get(&self, key: &XorName) -> Option<Arc<T>> {
+    pub(crate) fn get(&mut self, key: &XorName) -> Option<&T> {
         let exists = {
-            let read_only = self.queue.read().await;
+            let read_only = &self.queue;
             read_only.get(key).is_some()
         };
         if exists {
             let mut prio = self.priority();
             if prio == 0 {
                 // empty the cache when we overflow
-                self.queue.write().await.clear();
+                self.queue.clear();
                 self.data.clear();
-                prio = self.start.fetch_sub(1, Ordering::SeqCst)
+                prio = self.start.sub(1)
             }
 
-            let _ = self.queue.write().await.change_priority(key, prio);
+            let _ = self.queue.change_priority(key, prio);
         }
-        self.data.get(key).as_deref().cloned()
+        self.data.get(key)
     }
 
-    pub(crate) async fn remove(&self, key: &XorName) {
-        let _ = self.queue.write().await.remove(key);
+    pub(crate) fn remove(&mut self, key: &XorName) {
+        let _ = self.queue.remove(key);
         let _ = self.data.remove(key);
     }
 
     /// returns current priority
     fn priority(&self) -> Priority {
-        self.start.fetch_sub(1, Ordering::SeqCst)
+        self.start.sub(1)
     }
 }
 
@@ -105,20 +99,18 @@ impl<T> LruCache<T> {
 mod test {
     use super::LruCache;
 
-    use std::sync::Arc;
-
     #[tokio::test]
     async fn test_basic() {
-        let cache = LruCache::new(3);
+        let mut cache = LruCache::new(3);
 
         let key_1 = &xor_name::rand::random();
         let key_2 = &xor_name::rand::random();
         let key_3 = &xor_name::rand::random();
-        cache.insert(key_1, Arc::new("Strawberries")).await;
-        cache.insert(key_2, Arc::new("Bananas")).await;
-        cache.insert(key_3, Arc::new("Peaches")).await;
+        cache.insert(key_1, "Strawberries");
+        cache.insert(key_2, "Bananas");
+        cache.insert(key_3, "Peaches");
 
-        let result_string = format!("{:?}", cache.get(key_2).await);
+        let result_string = format!("{:?}", cache.get(key_2));
         let expected_string = format!("{:?}", Some("Bananas"));
 
         assert_eq!(result_string, expected_string);
@@ -126,18 +118,18 @@ mod test {
 
     #[tokio::test]
     async fn test_lru() {
-        let cache = LruCache::new(3);
+        let mut cache = LruCache::new(3);
 
         let key_1 = &xor_name::rand::random();
         let key_2 = &xor_name::rand::random();
         let key_3 = &xor_name::rand::random();
         let key_4 = &xor_name::rand::random();
-        cache.insert(key_1, Arc::new("Strawberries")).await;
-        cache.insert(key_2, Arc::new("Bananas")).await;
-        cache.insert(key_3, Arc::new("Peaches")).await;
-        cache.insert(key_4, Arc::new("Blueberries")).await;
+        cache.insert(key_1, "Strawberries");
+        cache.insert(key_2, "Bananas");
+        cache.insert(key_3, "Peaches");
+        cache.insert(key_4, "Blueberries");
 
-        let result_string = format!("{:?}", cache.get(key_1).await);
+        let result_string = format!("{:?}", cache.get(key_1));
         let expected_string = format!("{:?}", None::<String>);
 
         assert_eq!(result_string, expected_string);
@@ -145,23 +137,23 @@ mod test {
 
     #[tokio::test]
     async fn test_remove() {
-        let cache = LruCache::new(3);
+        let mut cache = LruCache::new(3);
 
         let key_1 = &xor_name::rand::random();
         let key_2 = &xor_name::rand::random();
         let key_3 = &xor_name::rand::random();
-        cache.insert(key_1, Arc::new("Strawberries")).await;
-        cache.insert(key_2, Arc::new("Bananas")).await;
-        cache.insert(key_3, Arc::new("Peaches")).await;
+        cache.insert(key_1, "Strawberries");
+        cache.insert(key_2, "Bananas");
+        cache.insert(key_3, "Peaches");
 
-        let result_string = format!("{:?}", cache.get(key_2).await);
+        let result_string = format!("{:?}", cache.get(key_2));
         let expected_string = format!("{:?}", Some("Bananas"));
 
         assert_eq!(result_string, expected_string);
 
-        cache.remove(key_2).await;
+        cache.remove(key_2);
 
-        let result_string = format!("{:?}", cache.get(key_2).await);
+        let result_string = format!("{:?}", cache.get(key_2));
         let expected_string = format!("{:?}", None::<String>);
 
         assert_eq!(result_string, expected_string);

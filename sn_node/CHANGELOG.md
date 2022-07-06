@@ -5,11 +5,128 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.64.0 (2022-07-04)
+
+### Chore
+
+ - <csr-id-9314a2db5dc1ae91bc4d80a65c1a8825492fc7c7/> Docs - put symbols in backticks
+ - <csr-id-c09a983cf17fb41cd92c9f05b5605888f202af11/> tweak join_timeout and bootstra_retry_time
+   Aiming for 30s total to be in line with previous total.
+   
+   The larger total time of 15s per retry appears to be slowing down joins on CI a fair bit.
+ - <csr-id-ddb7798a7b0c5e60960e123414277d58f3da27eb/> remove let bindings for unit returns
+ - <csr-id-2ab264744de8eeff8e26ff1423de32dadded688f/> small cleanup tweaks to node bin
+ - <csr-id-ea46890a1706fc72787a8251b6d289a075e8ad2b/> cleanup link code now that it doesn't make use of locking
+ - <csr-id-871cd9e09bde31a7f99729fd1f7db1884e533037/> clippy
+ - <csr-id-bb1cf29c2ff5d5a4ff315cab3d1affe0efd30290/> reenable reachability check
+   Even if we're passing around comm, it's still
+   a big improvement
+ - <csr-id-e03e5c87cdb46c74ba48ea3a2467f0193be7315b/> remove Link locks
+ - <csr-id-a348b52a40f23040adfec51e70d5d8652636d4f9/> clippy
+ - <csr-id-c756918f09e742753b8686edf9472b15ec785abb/> temporarily disable reachability check on join
+ - <csr-id-3fc8df35510464e9003f6619cd4b98a929d6648a/> move Comm out of node
+
+ - <csr-id-4e04a2b0acc79140bf1d0aefd82c0ad5b046a3cd/> remove unused asyncs (clippy)
+   Upon removing async keywords from
+   sn_interface/src/network_knowledge/mod.rs a lot of removal propagated up
+   and removed most of it with help of Clippy. Clippy does not yet detect
+   unnecessary async in methods
+   (https://github.com/rust-lang/rust-clippy/issues/9024), but will soon.
+   
+   With the help of a new Clippy lint:
+   cargo clippy --all-targets --all-features -- -W clippy::unused_async
+   And automatically fixing code with:
+   cargo fix --broken-code --allow-dirty --all-targets --all-features
+   
+   Results mostly from the single thread work of @joshuef in #1253 (and
+   ongoing efforts).
+
+### New Features
+
+ - <csr-id-26aa5b62742d09ad150db7565a4e7e694a9e2daa/> rewrite PeerSession to use a channel
+ - <csr-id-5c8bbf5397ae83070644ccd6dace12efb720fa2a/> add Comm command delegation; add Regulate cmd
+
+### Bug Fixes
+
+ - <csr-id-cdec0693613008320c4dccc0753b2ef3ce82633c/> do not leave loop running on timeout
+ - <csr-id-649e58a8608fb5a195160b56a29007cd3c578d57/> re-enable send job retries on transient errors
+ - <csr-id-fe75d0575b215eaa29908783e6ee9b7daa6dc455/> rename SessionStatus::Terminate to Terminating
+ - <csr-id-94fe2b5fa22390402a9ba6f55ce075bb3e34dcb5/> don't break out of watcher on transient errors
+
+### Refactor
+
+ - <csr-id-976e8c3d8c610d2a34c1bfa6678132a1bad234e8/> sn_cli uses NetworkPrefixMap instead of node_conn_info.config
+ - <csr-id-849dfba283362d8fbdddd92be1078c3a963fb564/> update PrefixMap symlink if incorrect
+ - <csr-id-91da4d4ac7aab039853b0651e5aafd9cdd31b9c4/> remove node_connection_info.config from sn_node, sn_interface, sn_client
+ - <csr-id-5f085f3765ab3156c74a4b7a7d7ab63a3bf6a670/> remove NodeInfo in Node struct
+   NodeInfo store a copy of our current socket address, which is
+   available from `Comm`.
+   
+   Throughout our code we have to ask Comm for our current address and
+   replace the copy in NodeInfo with the address from Comm.
+   
+   Next changes will hopefully remove more of our reliance on Comm inside
+   of Node.
+
+### New Features (BREAKING)
+
+ - <csr-id-5dad80d3f239f5844243fedb89f8d4baaee3b640/> have the nodes to attach valid Commitments to signed SpentProofShares
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 23 commits contributed to the release over the course of 6 calendar days.
+ - 6 days passed between releases.
+ - 23 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_cli uses NetworkPrefixMap instead of node_conn_info.config ([`976e8c3`](https://github.com/maidsafe/safe_network/commit/976e8c3d8c610d2a34c1bfa6678132a1bad234e8))
+    - update PrefixMap symlink if incorrect ([`849dfba`](https://github.com/maidsafe/safe_network/commit/849dfba283362d8fbdddd92be1078c3a963fb564))
+    - remove node_connection_info.config from sn_node, sn_interface, sn_client ([`91da4d4`](https://github.com/maidsafe/safe_network/commit/91da4d4ac7aab039853b0651e5aafd9cdd31b9c4))
+    - Docs - put symbols in backticks ([`9314a2d`](https://github.com/maidsafe/safe_network/commit/9314a2db5dc1ae91bc4d80a65c1a8825492fc7c7))
+    - tweak join_timeout and bootstra_retry_time ([`c09a983`](https://github.com/maidsafe/safe_network/commit/c09a983cf17fb41cd92c9f05b5605888f202af11))
+    - do not leave loop running on timeout ([`cdec069`](https://github.com/maidsafe/safe_network/commit/cdec0693613008320c4dccc0753b2ef3ce82633c))
+    - re-enable send job retries on transient errors ([`649e58a`](https://github.com/maidsafe/safe_network/commit/649e58a8608fb5a195160b56a29007cd3c578d57))
+    - remove let bindings for unit returns ([`ddb7798`](https://github.com/maidsafe/safe_network/commit/ddb7798a7b0c5e60960e123414277d58f3da27eb))
+    - have the nodes to attach valid Commitments to signed SpentProofShares ([`5dad80d`](https://github.com/maidsafe/safe_network/commit/5dad80d3f239f5844243fedb89f8d4baaee3b640))
+    - small cleanup tweaks to node bin ([`2ab2647`](https://github.com/maidsafe/safe_network/commit/2ab264744de8eeff8e26ff1423de32dadded688f))
+    - rename SessionStatus::Terminate to Terminating ([`fe75d05`](https://github.com/maidsafe/safe_network/commit/fe75d0575b215eaa29908783e6ee9b7daa6dc455))
+    - cleanup link code now that it doesn't make use of locking ([`ea46890`](https://github.com/maidsafe/safe_network/commit/ea46890a1706fc72787a8251b6d289a075e8ad2b))
+    - clippy ([`871cd9e`](https://github.com/maidsafe/safe_network/commit/871cd9e09bde31a7f99729fd1f7db1884e533037))
+    - reenable reachability check ([`bb1cf29`](https://github.com/maidsafe/safe_network/commit/bb1cf29c2ff5d5a4ff315cab3d1affe0efd30290))
+    - remove Link locks ([`e03e5c8`](https://github.com/maidsafe/safe_network/commit/e03e5c87cdb46c74ba48ea3a2467f0193be7315b))
+    - don't break out of watcher on transient errors ([`94fe2b5`](https://github.com/maidsafe/safe_network/commit/94fe2b5fa22390402a9ba6f55ce075bb3e34dcb5))
+    - clippy ([`a348b52`](https://github.com/maidsafe/safe_network/commit/a348b52a40f23040adfec51e70d5d8652636d4f9))
+    - rewrite PeerSession to use a channel ([`26aa5b6`](https://github.com/maidsafe/safe_network/commit/26aa5b62742d09ad150db7565a4e7e694a9e2daa))
+    - temporarily disable reachability check on join ([`c756918`](https://github.com/maidsafe/safe_network/commit/c756918f09e742753b8686edf9472b15ec785abb))
+    - add Comm command delegation; add Regulate cmd ([`5c8bbf5`](https://github.com/maidsafe/safe_network/commit/5c8bbf5397ae83070644ccd6dace12efb720fa2a))
+    - move Comm out of node ([`3fc8df3`](https://github.com/maidsafe/safe_network/commit/3fc8df35510464e9003f6619cd4b98a929d6648a))
+    - remove unused asyncs (clippy) ([`4e04a2b`](https://github.com/maidsafe/safe_network/commit/4e04a2b0acc79140bf1d0aefd82c0ad5b046a3cd))
+    - remove NodeInfo in Node struct ([`5f085f3`](https://github.com/maidsafe/safe_network/commit/5f085f3765ab3156c74a4b7a7d7ab63a3bf6a670))
+</details>
+
 ## v0.63.1 (2022-06-28)
+
+<csr-id-b5b833a18b2b0ec9a5083036ccb4c068be3f1d7b/>
+<csr-id-8c69306dc86a99a8be443ab8213253983540f1cf/>
+<csr-id-eebbc30f5dd449b786115c37813a4554309875e0/>
 
 ### Chore
 
  - <csr-id-b5b833a18b2b0ec9a5083036ccb4c068be3f1d7b/> only log vote time if fresh vote
+
+### Chore
+
+ - <csr-id-58890e5c919ada30f27d4e80c6b5e7291b99ed5c/> sn_interface-0.7.1/sn_dysfunction-0.6.1/sn_client-0.67.1/sn_node-0.63.1
 
 ### New Features
 
@@ -38,9 +155,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 6 commits contributed to the release.
- - 1 day passed between releases.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 7 commits contributed to the release.
+ - 2 days passed between releases.
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -50,6 +167,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.7.1/sn_dysfunction-0.6.1/sn_client-0.67.1/sn_node-0.63.1 ([`58890e5`](https://github.com/maidsafe/safe_network/commit/58890e5c919ada30f27d4e80c6b5e7291b99ed5c))
     - use node's section_key and own key for register ([`44b93fd`](https://github.com/maidsafe/safe_network/commit/44b93fde435214b363c009e555a2579bb3404e75))
     - only log vote time if fresh vote ([`b5b833a`](https://github.com/maidsafe/safe_network/commit/b5b833a18b2b0ec9a5083036ccb4c068be3f1d7b))
     - resend last vote if nothing received after an interval. ([`7528247`](https://github.com/maidsafe/safe_network/commit/752824774884ef77616d26734517c58530cdae1f))
@@ -59,6 +177,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 </details>
 
 ## v0.63.0 (2022-06-26)
+
+<csr-id-243cfc48a7f4a9b60b5b7f1fdd609c02197aba5e/>
 
 ### Chore
 

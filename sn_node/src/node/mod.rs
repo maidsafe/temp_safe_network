@@ -32,7 +32,7 @@ pub use self::{
         NodeApi,
     },
     cfg::config_handler::Config,
-    core::DataStorage,
+    core::{DataStorage, GENESIS_DBC_AMOUNT},
     error::{Error, Result},
     test_utils::*,
 };

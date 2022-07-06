@@ -12,23 +12,24 @@ use super::{
 };
 use crate::operations::config::Config;
 use bls::{PublicKey, SecretKey};
+use clap::Subcommand;
 use color_eyre::{eyre::eyre, Help, Result};
 use sn_api::{Error, Safe};
+use sn_dbc::Dbc;
 use std::path::Path;
-use structopt::StructOpt;
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 pub enum WalletSubCommands {
-    #[structopt(name = "create")]
+    #[clap(name = "create")]
     /// Create a new wallet
     Create {},
-    #[structopt(name = "balance")]
+    #[clap(name = "balance")]
     /// Query a wallet's balance
     Balance {
         /// The URL of wallet to query
         target: Option<String>,
     },
-    #[structopt(name = "deposit")]
+    #[clap(name = "deposit")]
     /// Deposit a spendable DBC in a wallet. If the DBC is not bearer, we will try to deposit using
     /// the secret key configured for use with safe. If you wish to use a different key, use the
     /// --secret-key argument.
@@ -36,34 +37,34 @@ pub enum WalletSubCommands {
         /// The URL of the wallet for the deposit
         wallet_url: String,
         /// The name to give this spendable DBC
-        #[structopt(long = "name")]
+        #[clap(long = "name")]
         name: Option<String>,
         /// A path to a file containing hex encoded DBC data, or you can supply the data directly.
         /// Depending on the shell or OS in use, due to the length of the data string, supplying
         /// directly may not work.
-        #[structopt(long = "dbc")]
+        #[clap(long = "dbc")]
         dbc: Option<String>,
-        #[structopt(long = "secret-key")]
+        #[clap(long = "secret-key")]
         /// Use this argument to specify a secret key for an owned DBC. It should be a hex-encoded
         /// BLS key.
         secret_key_hex: Option<String>,
     },
-    #[structopt(name = "reissue")]
+    #[clap(name = "reissue")]
     /// Reissue a DBC from a wallet to a SafeKey.
     Reissue {
         /// The amount to reissue
         amount: String,
         /// The URL of wallet to reissue from
-        #[structopt(long = "from")]
+        #[clap(long = "from")]
         from: String,
         /// To reissue the DBC to a particular owner, provide their public key. This should be a
         /// hex-encoded BLS key. Otherwise the DBC will be reissued as bearer, meaning anyone can
         /// spend it. This argument and the --owned argument are mutually exclusive.
-        #[structopt(long = "public-key")]
+        #[clap(long = "public-key")]
         public_key_hex: Option<String>,
         /// Set this flag to reissue as an owned DBC, using the public key configured for use with
         /// safe. This argument and the --public-key argument are mutually exclusive.
-        #[structopt(long = "owned")]
+        #[clap(long = "owned")]
         owned: bool,
     },
 }
@@ -119,40 +120,40 @@ pub async fn wallet_commander(
                             .suggestion("A file path must be specified for the DBC data."));
                     }
                     let dbc_data = std::fs::read_to_string(path)?;
-                    sn_dbc::Dbc::from_hex(dbc_data.trim()).map_err(|e| {
+                    Dbc::from_hex(dbc_data.trim()).map_err(|e| {
                         eyre!(e.to_string()).suggestion(
                             "This file does not appear to have DBC data. \
                             Please select another file with valid hex-encoded DBC data.",
                         )
                     })?
                 } else {
-                    sn_dbc::Dbc::from_hex(&dbc)?
+                    Dbc::from_hex(&dbc)?
                 }
             } else {
                 let dbc_hex = get_from_arg_or_stdin(dbc, None)?;
-                println!("{}", dbc_hex);
-                sn_dbc::Dbc::from_hex(dbc_hex.trim())?
+                Dbc::from_hex(dbc_hex.trim())?
             };
-            let sk = if !dbc.is_bearer() {
-                // This is an owned DBC, so we need a secret key. Either use the one supplied, or
-                // attempt to use the key configured for use with the CLI.
-                if let Some(sk_hex) = secret_key_hex {
-                    Some(SecretKey::from_hex(&sk_hex)?)
-                } else {
-                    Some(read_key_from_configured_credentials(
-                        config,
-                        "This is an owned DBC. To deposit, it requires a secret key. \
+
+            let sk = if dbc.is_bearer() {
+                None
+            } else if let Some(sk_hex) = secret_key_hex {
+                // This is an owned DBC and its secret key has been supplied
+                Some(SecretKey::from_hex(&sk_hex)?)
+            } else {
+                // This is an owned DBC but its secret key was not provided,
+                // thus attempt to use the key configured for use with the CLI.
+                Some(read_key_from_configured_credentials(
+                    config,
+                    "This is an owned DBC. To deposit, it requires a secret key. \
                          A secret key was not supplied and there were no credentials \
                          configured for use with safe."
-                            .to_string(),
-                        "Please run the command again using the --secret-key \
+                        .to_string(),
+                    "Please run the command again using the --secret-key \
                          argument to specify the key."
-                            .to_string(),
-                    )?)
-                }
-            } else {
-                None
+                        .to_string(),
+                )?)
             };
+
             let name = safe
                 .wallet_deposit(&wallet_url, name.as_deref(), &dbc, sk)
                 .await

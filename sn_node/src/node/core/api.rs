@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{delivery_group, Node};
+use super::{delivery_group, Node, GENESIS_DBC_AMOUNT};
 
 use crate::node::{
     api::{cmds::Cmd, event_channel::EventSender},
@@ -23,6 +23,11 @@ use sn_interface::{
 
 use ed25519_dalek::Keypair;
 use secured_linked_list::SecuredLinkedList;
+use sn_dbc::{
+    bls_ringct::{bls_bulletproofs::PedersenGens, group::Curve},
+    rng, Dbc, Hash, IndexedSignatureShare, MlsagMaterial, Output, Owner, OwnerOnce,
+    RevealedCommitment, SpentProofContent, SpentProofShare, TransactionBuilder, TrueInput,
+};
 use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf, sync::Arc};
 use xor_name::XorName;
 
@@ -35,36 +40,43 @@ impl Node {
         used_space: UsedSpace,
         root_storage_dir: PathBuf,
         genesis_sk_set: bls::SecretKeySet,
-    ) -> Result<Self> {
+    ) -> Result<(Self, Dbc)> {
         let info = NodeInfo {
             keypair: keypair.clone(),
             addr: our_addr,
         };
 
-        let (section, section_key_share) =
+        let genesis_sk = genesis_sk_set.secret_key();
+
+        // Mint the genesis DBC to be owned by the provided genesis key
+        let genesis_dbc = gen_genesis_dbc(genesis_sk)?;
+
+        let (network_knowledge, section_key_share) =
             NetworkKnowledge::first_node(info.peer(), genesis_sk_set).await?;
-        Self::new(
+
+        let node = Self::new(
             our_addr,
             keypair.clone(),
-            section,
+            network_knowledge,
             Some(section_key_share),
             event_sender,
             used_space,
             root_storage_dir,
         )
-        .await
+        .await?;
+
+        Ok((node, genesis_dbc))
     }
 
     pub(crate) async fn relocate(
-        &self,
+        &mut self,
         new_keypair: Arc<Keypair>,
         new_section: NetworkKnowledge,
     ) -> Result<()> {
         // we first try to relocate section info.
         self.network_knowledge.relocated_to(new_section).await?;
 
-        let mut our_keypair = self.keypair.write().await;
-        *our_keypair = new_keypair;
+        self.keypair = new_keypair;
 
         Ok(())
     }
@@ -78,12 +90,12 @@ impl Node {
     }
 
     /// Is this node an elder?
-    pub(crate) async fn is_elder(&self) -> bool {
-        self.network_knowledge.is_elder(&self.info().await.name())
+    pub(crate) fn is_elder(&self) -> bool {
+        self.network_knowledge.is_elder(&self.info().name())
     }
 
-    pub(crate) async fn is_not_elder(&self) -> bool {
-        !self.is_elder().await
+    pub(crate) fn is_not_elder(&self) -> bool {
+        !self.is_elder()
     }
 
     /// Returns the current BLS public key set
@@ -119,12 +131,9 @@ impl Node {
     //   ---------------------------------- Mut ------------------------------------------
     // ----------------------------------------------------------------------------------------
 
-    pub(crate) async fn handle_dkg_timeout(&self, token: u64) -> Result<Vec<Cmd>> {
-        self.dkg_voter.handle_timeout(
-            &self.info().await,
-            token,
-            self.network_knowledge().section_key(),
-        )
+    pub(crate) fn handle_dkg_timeout(&self, token: u64) -> Result<Vec<Cmd>> {
+        self.dkg_voter
+            .handle_timeout(&self.info(), token, self.network_knowledge().section_key())
     }
 
     // Send message to peers on the network.
@@ -132,7 +141,7 @@ impl Node {
         let dst_location = wire_msg.dst_location();
         let (targets, dg_size) = delivery_group::delivery_targets(
             dst_location,
-            &self.info().await.name(),
+            &self.info().name(),
             &self.network_knowledge,
         )?;
 
@@ -140,7 +149,7 @@ impl Node {
 
         // To avoid loop: if destination is to Node, targets are multiple, self is an elder,
         //     self section prefix matches the destination name, then don't carry out a relay.
-        if self.is_elder().await
+        if self.is_elder()
             && targets.len() > 1
             && dst_location.is_to_node()
             && self.network_knowledge.prefix().matches(&target_name)
@@ -175,7 +184,7 @@ impl Node {
     // excluding the ones in the provided list. And if the outcome list of candidates
     // differs from the current elders, trigger a DKG.
     pub(crate) async fn promote_and_demote_elders_except(
-        &self,
+        &mut self,
         excluded_names: &BTreeSet<XorName>,
     ) -> Result<Vec<Cmd>> {
         debug!("{}", LogMarker::TriggeringPromotionAndDemotion);
@@ -187,4 +196,90 @@ impl Node {
 
         Ok(cmds)
     }
+}
+
+// Helper to generate the (currently bearer) genesis DBC to be owned by the provided key.
+fn gen_genesis_dbc(output_sk: bls::SecretKey) -> Result<Dbc> {
+    let output_owner = Output::new(output_sk.public_key(), GENESIS_DBC_AMOUNT);
+
+    let revealed_commitment =
+        RevealedCommitment::from_value(GENESIS_DBC_AMOUNT, &mut rng::thread_rng());
+
+    // Make a secret key set (with threshold == 0) for the input of Genesis Tx.
+    let input_sk_set = bls::SecretKeySet::random(0, &mut rng::thread_rng());
+    let true_input = TrueInput::new(input_sk_set.secret_key(), revealed_commitment);
+
+    // build our MlsagMaterial manually without randomness.
+    // note: no decoy inputs because no other DBCs exist prior to genesis DBC.
+    let mlsag_material = MlsagMaterial {
+        true_input,
+        decoy_inputs: vec![],
+        pi_base: 0,
+        alpha: (Default::default(), Default::default()),
+        r: vec![(Default::default(), Default::default())],
+    };
+
+    let output_owner_once = OwnerOnce {
+        owner_base: Owner::from(output_sk),
+        derivation_index: [1; 32],
+    };
+
+    let mut dbc_builder = TransactionBuilder::default()
+        .add_input(mlsag_material)
+        .add_output(output_owner, output_owner_once)
+        .build(&mut rng::thread_rng())
+        .map_err(|err| {
+            Error::GenesisDbcError(format!(
+                "Failed to build the ringct transaction for genesis DBC: {}",
+                err
+            ))
+        })?;
+
+    let (key_image, tx) = dbc_builder.inputs().into_iter().next().ok_or_else(|| {
+        Error::GenesisDbcError(
+            "DBC builder (unexpectedly) contains an empty set of inputs.".to_string(),
+        )
+    })?;
+
+    // let's build the spent proof and add it to the DBC builder
+    let content = SpentProofContent {
+        key_image,
+        transaction_hash: Hash::from(tx.hash()),
+        public_commitments: vec![revealed_commitment
+            .commit(&PedersenGens::default())
+            .to_affine()],
+    };
+
+    let sk_share_index = 0;
+    let sig_share = input_sk_set
+        .secret_key_share(sk_share_index)
+        .sign(content.hash().as_ref());
+    let spentbook_sig_share = IndexedSignatureShare::new(sk_share_index, sig_share);
+
+    let spent_proof_share = SpentProofShare {
+        content,
+        spentbook_pks: input_sk_set.public_keys(),
+        spentbook_sig_share,
+    };
+
+    dbc_builder = dbc_builder
+        .add_spent_proof_share(spent_proof_share)
+        .add_spent_transaction(tx);
+
+    // build the output DBCs
+    let outputs = dbc_builder.build_without_verifying().map_err(|err| {
+        Error::GenesisDbcError(format!(
+            "DBC builder failed to create output genesis DBC: {}",
+            err
+        ))
+    })?;
+
+    // just one output DBC is expected which is the genesis DBC
+    let (genesis_dbc, _, _) = outputs.into_iter().next().ok_or_else(|| {
+        Error::GenesisDbcError(
+            "DBC builder (unexpectedly) contains an empty set of outputs.".to_string(),
+        )
+    })?;
+
+    Ok(genesis_dbc)
 }

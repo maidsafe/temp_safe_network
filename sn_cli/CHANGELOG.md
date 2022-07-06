@@ -4,19 +4,50 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.57.6 (2022-06-24)
+## v0.59.0 (2022-07-04)
 
 ### Chore
 
- - <csr-id-9bf7a9f710632768fff82f5abc2d10127b844160/> use atty instead of isatty
+ - <csr-id-da2664dd258aace2d83ea4a425cc095635e047fb/> remove node_connection_info.config from readme
+ - <csr-id-9314a2db5dc1ae91bc4d80a65c1a8825492fc7c7/> Docs - put symbols in backticks
+ - <csr-id-0722d8ff1f41b7611b283ae680e0993ea759058d/> replace str.push_str(format!(..)) with write!(str, ..)
+ - <csr-id-4e04a2b0acc79140bf1d0aefd82c0ad5b046a3cd/> remove unused asyncs (clippy)
+   Upon removing async keywords from
+   sn_interface/src/network_knowledge/mod.rs a lot of removal propagated up
+   and removed most of it with help of Clippy. Clippy does not yet detect
+   unnecessary async in methods
+   (https://github.com/rust-lang/rust-clippy/issues/9024), but will soon.
+   
+   With the help of a new Clippy lint:
+   cargo clippy --all-targets --all-features -- -W clippy::unused_async
+   And automatically fixing code with:
+   cargo fix --broken-code --allow-dirty --all-targets --all-features
+   
+   Results mostly from the single thread work of @joshuef in #1253 (and
+   ongoing efforts).
+
+### Refactor
+
+ - <csr-id-6a2553a11b1404ad404e67df29bf3ec535d1b954/> remove NetworkInfo::GenesisKey variant
+ - <csr-id-b94492ae3475aecf69cea9fa4ee70c805bd5bcdd/> code cleanup, refactor methods
+ - <csr-id-2aae965ca2fdd4ff59034547b5ee8dcef0b7253e/> use hardlink instead of symlink
+ - <csr-id-5dbf50d92bf7e93acbb00e85f51910f32ac4a124/> remove NodeConfig from sn_api::ipc, add sn_cli tests
+ - <csr-id-068327834c8d07ada6bf42cf78d6f7a117715466/> sn_cli modify tests
+ - <csr-id-976e8c3d8c610d2a34c1bfa6678132a1bad234e8/> sn_cli uses NetworkPrefixMap instead of node_conn_info.config
+ - <csr-id-91da4d4ac7aab039853b0651e5aafd9cdd31b9c4/> remove node_connection_info.config from sn_node, sn_interface, sn_client
+
+### New Features (BREAKING)
+
+ - <csr-id-5dad80d3f239f5844243fedb89f8d4baaee3b640/> have the nodes to attach valid Commitments to signed SpentProofShares
+
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 2 commits contributed to the release over the course of 2 calendar days.
- - 5 days passed between releases.
- - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 12 commits contributed to the release over the course of 5 calendar days.
+ - 8 days passed between releases.
+ - 12 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -26,6 +57,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - remove node_connection_info.config from readme ([`da2664d`](https://github.com/maidsafe/safe_network/commit/da2664dd258aace2d83ea4a425cc095635e047fb))
+    - remove NetworkInfo::GenesisKey variant ([`6a2553a`](https://github.com/maidsafe/safe_network/commit/6a2553a11b1404ad404e67df29bf3ec535d1b954))
+    - code cleanup, refactor methods ([`b94492a`](https://github.com/maidsafe/safe_network/commit/b94492ae3475aecf69cea9fa4ee70c805bd5bcdd))
+    - use hardlink instead of symlink ([`2aae965`](https://github.com/maidsafe/safe_network/commit/2aae965ca2fdd4ff59034547b5ee8dcef0b7253e))
+    - remove NodeConfig from sn_api::ipc, add sn_cli tests ([`5dbf50d`](https://github.com/maidsafe/safe_network/commit/5dbf50d92bf7e93acbb00e85f51910f32ac4a124))
+    - sn_cli modify tests ([`0683278`](https://github.com/maidsafe/safe_network/commit/068327834c8d07ada6bf42cf78d6f7a117715466))
+    - sn_cli uses NetworkPrefixMap instead of node_conn_info.config ([`976e8c3`](https://github.com/maidsafe/safe_network/commit/976e8c3d8c610d2a34c1bfa6678132a1bad234e8))
+    - remove node_connection_info.config from sn_node, sn_interface, sn_client ([`91da4d4`](https://github.com/maidsafe/safe_network/commit/91da4d4ac7aab039853b0651e5aafd9cdd31b9c4))
+    - Docs - put symbols in backticks ([`9314a2d`](https://github.com/maidsafe/safe_network/commit/9314a2db5dc1ae91bc4d80a65c1a8825492fc7c7))
+    - replace str.push_str(format!(..)) with write!(str, ..) ([`0722d8f`](https://github.com/maidsafe/safe_network/commit/0722d8ff1f41b7611b283ae680e0993ea759058d))
+    - have the nodes to attach valid Commitments to signed SpentProofShares ([`5dad80d`](https://github.com/maidsafe/safe_network/commit/5dad80d3f239f5844243fedb89f8d4baaee3b640))
+    - remove unused asyncs (clippy) ([`4e04a2b`](https://github.com/maidsafe/safe_network/commit/4e04a2b0acc79140bf1d0aefd82c0ad5b046a3cd))
+</details>
+
+## v0.57.6 (2022-06-24)
+
+<csr-id-9bf7a9f710632768fff82f5abc2d10127b844160/>
+
+### Chore
+
+ - <csr-id-9bf7a9f710632768fff82f5abc2d10127b844160/> use atty instead of isatty
+
+### Chore
+
+ - <csr-id-dc69a62eec590b2d621ab2cbc3009cb052955e66/> sn_interface-0.6.5/sn_dysfunction-0.5.3/sn_client-0.66.5/sn_node-0.62.8/sn_cli-0.57.6
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 3 commits contributed to the release over the course of 3 calendar days.
+ - 5 days passed between releases.
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.6.5/sn_dysfunction-0.5.3/sn_client-0.66.5/sn_node-0.62.8/sn_cli-0.57.6 ([`dc69a62`](https://github.com/maidsafe/safe_network/commit/dc69a62eec590b2d621ab2cbc3009cb052955e66))
     - Merge #1255 #1258 ([`ed0b5d8`](https://github.com/maidsafe/safe_network/commit/ed0b5d890e8404a59c25f8131eab5d23ce12eb7d))
     - use atty instead of isatty ([`9bf7a9f`](https://github.com/maidsafe/safe_network/commit/9bf7a9f710632768fff82f5abc2d10127b844160))
 </details>
@@ -34,6 +108,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 <csr-id-4d1b0915ce6ab21c13d27b7be66a455e4fbd3133/>
 <csr-id-b55f8a78988c28369cc998f53b019b14a4ff024e/>
+<csr-id-eda5d22e57779a7d1ecab1707f01bccd5f94706d/>
 
 ### Chore
 
@@ -222,6 +297,142 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
     - sn_cli-0.57.1 ([`9aa6667`](https://github.com/maidsafe/safe_network/commit/9aa666763c381ed589343e306c583f558d935251))
     - dbc arg can refer to file or dbc data ([`80e2734`](https://github.com/maidsafe/safe_network/commit/80e27349fb4ebeb19be3aa3e5ae9f2d8d8095313))
     - Merge #1217 ([`2f26043`](https://github.com/maidsafe/safe_network/commit/2f2604325d533357bad7d917315cf4cba0b2d3c0))
+</details>
+
+## v0.58.0 (2022-06-26)
+
+### Chore
+
+ - <csr-id-243cfc48a7f4a9b60b5b7f1fdd609c02197aba5e/> sn_interface-0.7.0/sn_dysfunction-0.6.0/sn_client-0.67.0/sn_node-0.63.0/sn_api-0.65.0/sn_cli-0.58.0
+ - <csr-id-3f3c39a14987910bb424df51f89d948333ca3e87/> changes based on review feedback
+   * Prefer `map_err` in various places rather than a full `match`.
+   * Change key serialization utility functions to static rather than instance.
+   * Change `dog` command to print non-support of `SafeKey` data type rather than panic.
+   * Remove unnecessary clone on `public_key_hex`.
+   * Remove unnecessary match in various tests.
+   * Ignore wallet CLI tests that deleted the credentials file. They are problematic when running in
+     parallel with other tests. We need better isolated testing mechanisms for these. Will address in a
+     separate PR.
+   * Use different deposit names in wallet tests where multiple DBCs are deposited.
+ - <csr-id-5ea4c3d60bf84384ed37b5dde25ac4dc26147c24/> changes based on review feedback
+   * Prefer `map_err` in various places rather than a full `match`.
+   * Change key serialization utility functions to static rather than instance.
+   * Change `dog` command to print non-support of `SafeKey` data type rather than panic.
+   * Remove unnecessary clone on `public_key_hex`.
+   * Remove unnecessary match in various tests.
+   * Ignore wallet CLI tests that deleted the credentials file. They are problematic when running in
+     parallel with other tests. We need better isolated testing mechanisms for these. Will address in a
+     separate PR.
+   * Use different deposit names in wallet tests where multiple DBCs are deposited.
+
+### New Features
+
+ - <csr-id-341306acd1e16290fe9a8ec676499feec8ef7639/> extend cli wallet deposit for owned dbcs
+   The CLI is now extended to support the deposit of owned DBCs.
+   
+   The `deposit` command will check if the supplied DBC is owned, and if it is, it will check to see if
+   the `--secret-key` argument is present and use that. If that argument isn't present, it will attempt
+   to use the secret key that's configured for use with the CLI, i.e., the `keys create --for-cli`
+   command.
+   
+   The `reissue` command was also extended to provide an `--owned` flag, which when used, will reissue
+   an owned DBC using the public key configured for use with the CLI. This argument is mutually
+   exclusive with the `--public-key` argument, which will reissue the DBC using a specified key.
+   
+   So we could offer the user a suggestion when a supplied secret key didn't match, this also involved
+   making a little extension to the API, to return a specific type of error. We will need to modify
+   `sn_dbc` to return a specific error type for this too, so we can avoid checking the string content
+   of the error message, but this will be covered on a separate PR.
+ - <csr-id-69079d698a539a6fe42e87ab1603bbb41ac91f50/> extend cli wallet deposit for owned dbcs
+   The CLI is now extended to support the deposit of owned DBCs.
+   
+   The `deposit` command will check if the supplied DBC is owned, and if it is, it will check to see if
+   the `--secret-key` argument is present and use that. If that argument isn't present, it will attempt
+   to use the secret key that's configured for use with the CLI, i.e., the `keys create --for-cli`
+   command.
+   
+   The `reissue` command was also extended to provide an `--owned` flag, which when used, will reissue
+   an owned DBC using the public key configured for use with the CLI. This argument is mutually
+   exclusive with the `--public-key` argument, which will reissue the DBC using a specified key.
+   
+   So we could offer the user a suggestion when a supplied secret key didn't match, this also involved
+   making a little extension to the API, to return a specific type of error. We will need to modify
+   `sn_dbc` to return a specific error type for this too, so we can avoid checking the string content
+   of the error message, but this will be covered on a separate PR.
+
+### New Features (BREAKING)
+
+ - <csr-id-93baf94d0c347b02bf803d4b3a867fd07cdebaf5/> remove use of xorurl with keys command
+   The use of BLS keys means the XorUrl that was displayed to the user will no longer be usable, since
+   the BLS key is a 48-byte structure, and not 32 bytes like the Dalek key. We will come back and
+   address this issue later, possibly re-introducing the `SafeKey` type in some kind of different form.
+   
+   The functionality and corresponding test cases for the `cat` and `dog` command that were working
+   with the `SafeKey` data type were removed.
+   
+   The test cases for the `keys` commands were elaborated here to check the output of both the pretty
+   print and the json formats and to make sure the CLI prints out a matching keypair.
+ - <csr-id-5577695b5d3291c46cd475df8c0933a067b4cfc5/> serialize to bls keys in util functions
+   Utility functions were recently added to the API for serializing to the `Keypair` type. This was
+   changed to serialize directly to BLS to make it easier for the CLI to deal directly with BLS keys.
+   Soon we will be refactoring the `Keypair` type to have a different use case and things like
+   `sn_client` would be refactored to directly work with BLS keys. This is a little step in that
+   direction.
+   
+   There was a utility function added to `sn_interface` to create a `Keypair` from a hex-based BLS key
+   because we still need to use the `Keypair` at this point in time.
+ - <csr-id-3e757bb626d71c03608a625fa435a312b8fc0beb/> extend wallet_deposit for owned dbcs
+
+ - <csr-id-f7940c5cda4ee4ea286c52252b8ab531b9098c31/> remove use of xorurl with keys command
+   The use of BLS keys means the XorUrl that was displayed to the user will no longer be usable, since
+   the BLS key is a 48-byte structure, and not 32 bytes like the Dalek key. We will come back and
+   address this issue later, possibly re-introducing the `SafeKey` type in some kind of different form.
+   
+   The functionality and corresponding test cases for the `cat` and `dog` command that were working
+   with the `SafeKey` data type were removed.
+   
+   The test cases for the `keys` commands were elaborated here to check the output of both the pretty
+   print and the json formats and to make sure the CLI prints out a matching keypair.
+ - <csr-id-67006eb2e84b750a6b9b03d04aafdcfc85b38955/> serialize to bls keys in util functions
+   Utility functions were recently added to the API for serializing to the `Keypair` type. This was
+   changed to serialize directly to BLS to make it easier for the CLI to deal directly with BLS keys.
+   Soon we will be refactoring the `Keypair` type to have a different use case and things like
+   `sn_client` would be refactored to directly work with BLS keys. This is a little step in that
+   direction.
+   
+   There was a utility function added to `sn_interface` to create a `Keypair` from a hex-based BLS key
+   because we still need to use the `Keypair` at this point in time.
+ - <csr-id-23802f8e357831b0166307934ca19658d9107039/> extend wallet_deposit for owned dbcs
+
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 12 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 11 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.7.0/sn_dysfunction-0.6.0/sn_client-0.67.0/sn_node-0.63.0/sn_api-0.65.0/sn_cli-0.58.0 ([`243cfc4`](https://github.com/maidsafe/safe_network/commit/243cfc48a7f4a9b60b5b7f1fdd609c02197aba5e))
+    - changes based on review feedback ([`3f3c39a`](https://github.com/maidsafe/safe_network/commit/3f3c39a14987910bb424df51f89d948333ca3e87))
+    - extend cli wallet deposit for owned dbcs ([`341306a`](https://github.com/maidsafe/safe_network/commit/341306acd1e16290fe9a8ec676499feec8ef7639))
+    - remove use of xorurl with keys command ([`93baf94`](https://github.com/maidsafe/safe_network/commit/93baf94d0c347b02bf803d4b3a867fd07cdebaf5))
+    - serialize to bls keys in util functions ([`5577695`](https://github.com/maidsafe/safe_network/commit/5577695b5d3291c46cd475df8c0933a067b4cfc5))
+    - extend wallet_deposit for owned dbcs ([`3e757bb`](https://github.com/maidsafe/safe_network/commit/3e757bb626d71c03608a625fa435a312b8fc0beb))
+    - changes based on review feedback ([`5ea4c3d`](https://github.com/maidsafe/safe_network/commit/5ea4c3d60bf84384ed37b5dde25ac4dc26147c24))
+    - extend cli wallet deposit for owned dbcs ([`69079d6`](https://github.com/maidsafe/safe_network/commit/69079d698a539a6fe42e87ab1603bbb41ac91f50))
+    - remove use of xorurl with keys command ([`f7940c5`](https://github.com/maidsafe/safe_network/commit/f7940c5cda4ee4ea286c52252b8ab531b9098c31))
+    - serialize to bls keys in util functions ([`67006eb`](https://github.com/maidsafe/safe_network/commit/67006eb2e84b750a6b9b03d04aafdcfc85b38955))
+    - extend wallet_deposit for owned dbcs ([`23802f8`](https://github.com/maidsafe/safe_network/commit/23802f8e357831b0166307934ca19658d9107039))
+    - Merge #1268 ([`e9adc0d`](https://github.com/maidsafe/safe_network/commit/e9adc0d3ba2f33fe0b4590a5fe11fea56bd4bda9))
 </details>
 
 ## v0.57.0 (2022-06-05)

@@ -6,9 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::dbs::{
-    convert_to_error_msg, Error, EventStore, LruCache, Result, UsedSpace, SLED_FLUSH_TIME_MS,
-};
+use crate::dbs::{convert_to_error_msg, Error, EventStore, Result, UsedSpace, SLED_FLUSH_TIME_MS};
 
 use sn_interface::{
     messaging::{
@@ -33,9 +31,7 @@ use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
     path::Path,
-    sync::Arc,
 };
-use tokio::sync::RwLock;
 use tracing::info;
 #[cfg(test)]
 use xor_name::Prefix;
@@ -43,24 +39,21 @@ use xor_name::{XorName, XOR_NAME_LEN};
 
 const REG_DB_NAME: &str = "register";
 const KEY_DB_NAME: &str = "addresses";
-const CACHE_SIZE: u16 = 100;
 
 type RegOpStore = EventStore<RegisterCmd>;
-type Cache = LruCache<CacheEntry>;
 
 /// Operations over the data type Register.
 // TODO: dont expose this
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct RegisterStorage {
     key_db: Db,
     reg_db: Db,
-    cache: Cache,
     used_space: UsedSpace,
 }
 
 #[derive(Clone, Debug)]
-struct CacheEntry {
-    state: Arc<RwLock<Register>>,
+struct RegisterEntry {
+    state: Register,
     store: RegOpStore,
     section_auth: SectionAuth,
 }
@@ -79,7 +72,6 @@ impl RegisterStorage {
 
         Ok(Self {
             used_space,
-            cache: Cache::new(CACHE_SIZE),
             key_db: create_db(&create_path(KEY_DB_NAME))?,
             reg_db: create_db(&create_path(REG_DB_NAME))?,
         })
@@ -88,12 +80,12 @@ impl RegisterStorage {
     /// --- Node Synching ---
     /// These are node internal functions, not to be exposed to users.
     #[allow(dead_code)]
-    pub(crate) async fn remove_register(&self, address: &RegisterAddress) -> Result<()> {
+    pub(crate) async fn remove_register(&mut self, address: &RegisterAddress) -> Result<()> {
         trace!("Removing register, {:?}", address);
-        self.drop_register_key(address.id()?).await
+        self.drop_register_key(address.id()?)
     }
 
-    pub(crate) async fn keys(&self) -> Result<Vec<RegisterAddress>> {
+    pub(crate) fn keys(&self) -> Result<Vec<RegisterAddress>> {
         type KeyResults = Vec<Result<XorName>>;
         let mut the_data = vec![];
         let current_db = self.key_db.export();
@@ -125,24 +117,25 @@ impl RegisterStorage {
 
         // TODO: make this concurrent
         for key in ok.iter().flatten() {
-            match self.try_load_cache_entry(key).await {
+            match self.try_load_register_entry(key) {
                 Ok(entry) => {
-                    the_data.push(*entry.state.read().await.address());
+                    the_data.push(*entry.state.address());
                 }
                 Err(Error::KeyNotFound(_)) => return Err(Error::InvalidStore),
                 Err(e) => return Err(e),
             }
         }
+
         Ok(the_data)
     }
 
     /// Used for replication of data to new Adults.
-    pub(crate) async fn get_register_replica(
+    pub(crate) fn get_register_replica(
         &self,
         address: &RegisterAddress,
     ) -> Result<ReplicatedRegisterLog> {
         let key = address.id()?;
-        let entry = match self.try_load_cache_entry(&key).await {
+        let entry = match self.try_load_register_entry(&key) {
             Ok(entry) => entry,
             Err(Error::KeyNotFound(_key)) => {
                 return Err(Error::NoSuchData(DataAddress::Register(*address)))
@@ -153,11 +146,7 @@ impl RegisterStorage {
         self.create_replica(key, entry)
     }
 
-    fn create_replica(
-        &self,
-        key: XorName,
-        entry: Arc<CacheEntry>,
-    ) -> Result<ReplicatedRegisterLog> {
+    fn create_replica(&self, key: XorName, entry: RegisterEntry) -> Result<ReplicatedRegisterLog> {
         let mut address = None;
         let op_log = entry
             .store
@@ -199,14 +188,14 @@ impl RegisterStorage {
 
         Ok(ReplicatedRegisterLog {
             address: address.ok_or(Error::InvalidStore)?,
-            section_auth: entry.section_auth.clone(),
+            section_auth: entry.section_auth,
             op_log,
         })
     }
 
     /// Used for replication of data to new Adults.
     #[cfg(test)]
-    pub(crate) async fn get_data_of(&self, prefix: Prefix) -> Result<RegisterStoreExport> {
+    pub(crate) async fn get_data_of(&mut self, prefix: Prefix) -> Result<RegisterStoreExport> {
         type KeyResults = Vec<Result<XorName>>;
 
         // parse keys in parallel
@@ -240,9 +229,9 @@ impl RegisterStorage {
 
         // TODO: make this concurrent
         for key in ok.into_iter().flatten() {
-            match self.try_load_cache_entry(&key).await {
+            match self.try_load_register_entry(&key) {
                 Ok(entry) => {
-                    let read_only = entry.state.read().await;
+                    let read_only = entry.state.clone();
                     if prefix.matches(read_only.name()) {
                         the_data.push(self.create_replica(key, entry.clone())?);
                     }
@@ -256,7 +245,7 @@ impl RegisterStorage {
     }
 
     /// On receiving data from Elders when promoted.
-    pub(crate) async fn update(&self, store_data: RegisterStoreExport) -> Result<()> {
+    pub(crate) fn update(&self, store_data: RegisterStoreExport) -> Result<()> {
         debug!("Updating Register store");
 
         let RegisterStoreExport(registers) = store_data;
@@ -272,7 +261,7 @@ impl RegisterStorage {
                     );
                     continue;
                 }
-                self.apply(replicated_cmd).await?;
+                self.apply(replicated_cmd)?;
             }
         }
 
@@ -281,16 +270,16 @@ impl RegisterStorage {
 
     /// --- Writing ---
 
-    pub(crate) async fn write(&self, cmd: RegisterCmd) -> Result<()> {
+    pub(crate) fn write(&self, cmd: RegisterCmd) -> Result<()> {
         // rough estimate ignoring the extra space used by sled
         let required_space = std::mem::size_of::<RegisterCmd>();
         if !self.used_space.can_add(required_space) {
             return Err(Error::NotEnoughSpace);
         }
-        self.apply(cmd).await
+        self.apply(cmd)
     }
 
-    async fn apply(&self, cmd: RegisterCmd) -> Result<()> {
+    fn apply(&self, cmd: RegisterCmd) -> Result<()> {
         // rough estimate ignoring the extra space used by sled
         let required_space = std::mem::size_of::<RegisterCmd>();
 
@@ -341,20 +330,13 @@ impl RegisterStorage {
 
                 let EditRegister { edit, .. } = op;
 
-                let entry = self.try_load_cache_entry(&key).await?;
+                let mut entry = self.try_load_register_entry(&key)?;
 
                 info!("Editing Register");
                 entry
                     .state
-                    .read()
-                    .await
                     .check_permissions(Action::Write, Some(User::Key(public_key)))?;
-                let result = entry
-                    .state
-                    .write()
-                    .await
-                    .apply_op(edit)
-                    .map_err(Error::NetworkData);
+                let result = entry.state.apply_op(edit).map_err(Error::NetworkData);
 
                 match result {
                     Ok(()) => {
@@ -385,12 +367,11 @@ impl RegisterStorage {
 
                 let ExtendRegister { extend_with, .. } = op;
 
-                let entry = self.try_load_cache_entry(&key).await?;
+                let mut entry = self.try_load_register_entry(&key)?;
                 entry.store.append(cmd)?;
 
-                let mut write = entry.state.write().await;
-                let prev = write.cap();
-                write.increment_cap(extend_with);
+                let prev = entry.state.cap();
+                entry.state.increment_cap(extend_with);
 
                 info!(
                     "Extended Register size from {} to {}",
@@ -406,8 +387,8 @@ impl RegisterStorage {
 
     /// Temporary helper function which makes sure there exists a Register for the spentbook,
     /// this shouldn't be required once we have a Spentbook data type.
-    pub(crate) async fn create_spentbook_register(
-        &self,
+    pub(crate) fn create_spentbook_register(
+        &mut self,
         address: &RegisterAddress,
         pk: PublicKey,
         keypair: Keypair,
@@ -421,7 +402,7 @@ impl RegisterStorage {
 
         let cmd = create_reg_w_policy(*address.name(), SPENTBOOK_TYPE_TAG, policy, keypair)?;
 
-        match self.write(cmd).await {
+        match self.write(cmd) {
             Ok(()) | Err(Error::DataExists) => Ok(()),
             other => other,
         }
@@ -429,7 +410,11 @@ impl RegisterStorage {
 
     /// --- Reading ---
 
-    pub(crate) async fn read(&self, read: &RegisterQuery, requester: User) -> NodeQueryResponse {
+    pub(crate) async fn read(
+        &mut self,
+        read: &RegisterQuery,
+        requester: User,
+    ) -> NodeQueryResponse {
         trace!("Reading register {:?}", read.dst_address());
         let operation_id = match read.operation_id() {
             Ok(id) => id,
@@ -440,7 +425,7 @@ impl RegisterStorage {
         trace!("Operation of register read: {:?}", operation_id);
         use RegisterQuery::*;
         match read {
-            Get(address) => self.get(*address, requester, operation_id).await,
+            Get(address) => self.get(*address, requester, operation_id),
             Read(address) => self.read_register(*address, requester, operation_id).await,
             GetOwner(address) => self.get_owner(*address, requester, operation_id).await,
             GetEntry { address, hash } => {
@@ -456,13 +441,13 @@ impl RegisterStorage {
     }
 
     /// Get `Register` from the store and check permissions.
-    async fn get_register(
-        &self,
+    fn get_register(
+        &mut self,
         address: &RegisterAddress,
         action: Action,
         requester: User,
     ) -> Result<Register> {
-        let entry = match self.try_load_cache_entry(&address.id()?).await {
+        let entry = match self.try_load_register_entry(&address.id()?) {
             Ok(entry) => entry,
             Err(Error::KeyNotFound(_key)) => {
                 return Err(Error::NoSuchData(DataAddress::Register(*address)))
@@ -470,22 +455,22 @@ impl RegisterStorage {
             Err(e) => return Err(e),
         };
 
-        let read_only = entry.state.read().await;
+        let read_only = entry.state;
         read_only
             .check_permissions(action, Some(requester))
             .map_err(Error::from)?;
 
-        Ok(read_only.clone())
+        Ok(read_only)
     }
 
     /// Get entire Register.
-    async fn get(
-        &self,
+    fn get(
+        &mut self,
         address: RegisterAddress,
         requester: User,
         operation_id: OperationId,
     ) -> NodeQueryResponse {
-        let result = match self.get_register(&address, Action::Read, requester).await {
+        let result = match self.get_register(&address, Action::Read, requester) {
             Ok(register) => Ok(register),
             Err(error) => Err(convert_to_error_msg(error)),
         };
@@ -494,12 +479,12 @@ impl RegisterStorage {
     }
 
     async fn read_register(
-        &self,
+        &mut self,
         address: RegisterAddress,
         requester: User,
         operation_id: OperationId,
     ) -> NodeQueryResponse {
-        let result = match self.get_register(&address, Action::Read, requester).await {
+        let result = match self.get_register(&address, Action::Read, requester) {
             Ok(register) => Ok(register.read()),
             Err(error) => Err(error),
         };
@@ -508,12 +493,12 @@ impl RegisterStorage {
     }
 
     async fn get_owner(
-        &self,
+        &mut self,
         address: RegisterAddress,
         requester: User,
         operation_id: OperationId,
     ) -> NodeQueryResponse {
-        let result = match self.get_register(&address, Action::Read, requester).await {
+        let result = match self.get_register(&address, Action::Read, requester) {
             Ok(res) => Ok(res.owner()),
             Err(error) => Err(convert_to_error_msg(error)),
         };
@@ -522,7 +507,7 @@ impl RegisterStorage {
     }
 
     async fn get_entry(
-        &self,
+        &mut self,
         address: RegisterAddress,
         hash: EntryHash,
         requester: User,
@@ -530,7 +515,6 @@ impl RegisterStorage {
     ) -> NodeQueryResponse {
         let result = match self
             .get_register(&address, Action::Read, requester)
-            .await
             .and_then(|register| register.get(hash).map(|c| c.clone()).map_err(Error::from))
         {
             Ok(res) => Ok(res),
@@ -541,7 +525,7 @@ impl RegisterStorage {
     }
 
     async fn get_user_permissions(
-        &self,
+        &mut self,
         address: RegisterAddress,
         user: User,
         requester: User,
@@ -549,7 +533,6 @@ impl RegisterStorage {
     ) -> NodeQueryResponse {
         let result = match self
             .get_register(&address, Action::Read, requester)
-            .await
             .and_then(|register| register.permissions(user).map_err(Error::from))
         {
             Ok(res) => Ok(res),
@@ -560,14 +543,13 @@ impl RegisterStorage {
     }
 
     async fn get_policy(
-        &self,
+        &mut self,
         address: RegisterAddress,
         requester_pk: User,
         operation_id: OperationId,
     ) -> NodeQueryResponse {
         let result = match self
             .get_register(&address, Action::Read, requester_pk)
-            .await
             .map(|register| register.policy().clone())
         {
             Ok(res) => Ok(res),
@@ -590,7 +572,7 @@ impl RegisterStorage {
     // decreases the used space by a rough estimate of the size before deletion
     // as with addition this estimate ignores the extra space used by sled
     // (that estimate can fall victim to a race condition if someone writes to a register that is being deleted)
-    async fn drop_register_key(&self, key: XorName) -> Result<()> {
+    fn drop_register_key(&mut self, key: XorName) -> Result<()> {
         let regcmd_size = std::mem::size_of::<RegisterCmd>();
         let reg_tree = self.reg_db.open_tree(key)?;
         let len = reg_tree.len();
@@ -599,21 +581,14 @@ impl RegisterStorage {
         let _removed = self.key_db.remove(key)?;
         let _removed = self.reg_db.drop_tree(key)?;
 
-        self.cache.remove(&key).await;
+        // self.cache.remove(&key);
         self.used_space.decrease(key_used_space);
 
         Ok(())
     }
 
     // gets entry from the cache, or populates cache from disk if expired
-    async fn try_load_cache_entry(&self, key: &XorName) -> Result<Arc<CacheEntry>> {
-        let entry = self.cache.get(key).await;
-
-        // return early on cache hit
-        if let Some(entry) = entry {
-            return Ok(entry);
-        }
-
+    fn try_load_register_entry(&self, key: &XorName) -> Result<RegisterEntry> {
         // read from disk
         let store = self.get_or_create_store(key)?;
         let mut hydrated_register = None;
@@ -671,13 +646,11 @@ impl RegisterStorage {
         match hydrated_register {
             None => Err(Error::KeyNotFound(key.to_string())), // nothing found on disk
             Some((reg, section_auth)) => {
-                let entry = Arc::new(CacheEntry {
-                    state: Arc::new(RwLock::new(reg)),
+                let entry = RegisterEntry {
+                    state: reg,
                     store,
                     section_auth,
-                });
-                // populate cache
-                self.cache.insert(key, entry.clone()).await;
+                };
                 Ok(entry)
             }
         }
@@ -759,11 +732,11 @@ mod test {
     #[tokio::test]
     async fn test_register_write() -> Result<()> {
         // setup store
-        let store = new_store()?;
+        let mut store = new_store()?;
 
         // create register
         let (cmd, authority) = create_register()?;
-        store.write(cmd.clone()).await?;
+        store.write(cmd.clone())?;
 
         // get register
 
@@ -780,7 +753,7 @@ mod test {
         // try to create the register again
         // (should fail)
 
-        let res = store.write(cmd.clone()).await;
+        let res = store.write(cmd.clone());
 
         assert_eq!(
             res.err().unwrap().to_string(),
@@ -794,11 +767,11 @@ mod test {
     #[tokio::test]
     async fn test_register_export() -> Result<()> {
         // setup store
-        let store = new_store()?;
+        let mut store = new_store()?;
 
         // create register
         let (cmd, authority) = create_register()?;
-        store.write(cmd.clone()).await?;
+        store.write(cmd.clone())?;
 
         // export db
         // get all data in db
@@ -806,14 +779,14 @@ mod test {
         let for_update = store.get_data_of(prefix).await?;
 
         // create new db and update it with the data from first db
-        let new_store = new_store()?;
+        let mut new_store = new_store()?;
 
-        new_store.update(for_update).await?;
+        new_store.update(for_update)?;
         let address = cmd.dst_address();
         // assert the same tests hold as for the first db
 
         // should fail to write same register again, also on this new store
-        let res = new_store.write(cmd).await;
+        let res = new_store.write(cmd);
 
         assert_eq!(
             res.err().unwrap().to_string(),
@@ -840,11 +813,11 @@ mod test {
     #[tokio::test]
     async fn test_register_non_existing_entry() -> Result<()> {
         // setup store
-        let store = new_store()?;
+        let mut store = new_store()?;
 
         // create register
         let (cmd, authority) = create_register()?;
-        store.write(cmd.clone()).await?;
+        store.write(cmd.clone())?;
 
         let hash = EntryHash(rand::thread_rng().gen::<[u8; 32]>());
 
@@ -869,11 +842,11 @@ mod test {
     #[tokio::test]
     async fn test_register_non_existing_permissions() -> Result<()> {
         // setup store
-        let store = new_store()?;
+        let mut store = new_store()?;
 
         // create register
         let (cmd, authority) = create_register()?;
-        store.write(cmd.clone()).await?;
+        store.write(cmd.clone())?;
 
         let (user, _) = random_user();
 
