@@ -35,7 +35,8 @@
     unused_import_braces,
     unused_qualifications,
     unused_results,
-    clippy::unicode_not_nfc
+    clippy::unicode_not_nfc,
+    clippy::drop_ref
 )]
 
 #[macro_use]
