@@ -21,7 +21,7 @@ use priority_queue::PriorityQueue;
 use std::time::SystemTime;
 use std::{
     sync::{
-        atomic::{AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicUsize, Ordering},
         Arc,
     },
     time::Duration,
@@ -52,7 +52,7 @@ pub(crate) struct CmdCtrl {
     monitoring: RateLimits,
     stopped: Arc<RwLock<bool>>,
     pub(crate) dispatcher: Arc<Dispatcher>,
-    id_counter: Arc<AtomicU64>,
+    id_counter: Arc<AtomicUsize>,
     event_sender: EventSender,
 }
 
@@ -68,7 +68,7 @@ impl CmdCtrl {
             monitoring,
             stopped: Arc::new(RwLock::new(false)),
             dispatcher: Arc::new(dispatcher),
-            id_counter: Arc::new(AtomicU64::new(0)),
+            id_counter: Arc::new(AtomicUsize::new(0)),
             event_sender,
         };
 
@@ -82,18 +82,29 @@ impl CmdCtrl {
         self.dispatcher.node()
     }
 
-    // todo: take parent id
-    pub(crate) async fn extend(&self, cmds: Vec<Cmd>) -> Vec<Result<SendWatcher>> {
+    pub(crate) async fn push(&self, cmd: Cmd) -> Result<SendWatcher> {
+        self.push_internal(cmd, None).await
+    }
+
+    // consume self
+    // NB that clones could still exist, however they would be in the disconnected state
+    #[allow(unused)]
+    pub(crate) async fn stop(self) {
+        *self.stopped.write().await = true;
+        self.cmd_queue.write().await.clear();
+    }
+
+    async fn extend(&self, cmds: Vec<Cmd>, parent_id: Option<usize>) -> Vec<Result<SendWatcher>> {
         let mut results = vec![];
 
         for cmd in cmds {
-            results.push(self.push(cmd).await);
+            results.push(self.push_internal(cmd, parent_id).await);
         }
 
         results
     }
 
-    pub(crate) async fn push(&self, cmd: Cmd) -> Result<SendWatcher> {
+    async fn push_internal(&self, cmd: Cmd, parent_id: Option<usize>) -> Result<SendWatcher> {
         if self.stopped().await {
             // should not happen (be reachable)
             return Err(Error::InvalidState);
@@ -104,7 +115,12 @@ impl CmdCtrl {
         let (watcher, reporter) = status_watching();
 
         let job = EnqueuedJob {
-            job: CmdJob::new(self.id_counter.fetch_add(1, ORDER), cmd, SystemTime::now()),
+            job: CmdJob::new(
+                self.id_counter.fetch_add(1, ORDER),
+                parent_id,
+                cmd,
+                SystemTime::now(),
+            ),
             retries: 0,
             reporter,
         };
@@ -112,14 +128,6 @@ impl CmdCtrl {
         let _ = self.cmd_queue.write().await.push(job, priority);
 
         Ok(watcher)
-    }
-
-    // consume self
-    // NB that clones could still exist, however they would be in the disconnected state
-    #[allow(unused)]
-    pub(crate) async fn stop(self) {
-        *self.stopped.write().await = true;
-        self.cmd_queue.write().await.clear();
     }
 
     // could be accessed via a clone
@@ -197,7 +205,7 @@ impl CmdCtrl {
                             clone.monitoring.increment_cmds().await;
 
                             // evaluate: handle these watchers?
-                            let _watchers = clone.extend(cmds).await;
+                            let _watchers = clone.extend(cmds, enqueued.job.parent_id()).await;
                             clone
                                 .notify(Event::CmdProcessing(CmdProcessEvent::Finished {
                                     job: enqueued.job,
