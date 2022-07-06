@@ -14,7 +14,7 @@ use crate::operations::config::Config;
 use bls::{PublicKey, SecretKey};
 use clap::Subcommand;
 use color_eyre::{eyre::eyre, Help, Result};
-use sn_api::{Error, Safe};
+use sn_api::{Error, Safe, Token};
 use sn_dbc::Dbc;
 use std::path::Path;
 
@@ -167,10 +167,17 @@ pub async fn wallet_commander(
                     }
                     _ => e.into(),
                 })?;
+
             if OutputFmt::Pretty == output_fmt {
+                let balance = match dbc.amount_secrets_bearer() {
+                    Ok(amount_secrets) => {
+                        format!("{} safecoins", Token::from_nano(amount_secrets.amount()))
+                    }
+                    Err(_) => "unknown amount".to_string(),
+                };
                 println!(
-                    "Spendable DBC deposited with name '{}' in wallet located at \"{}\"",
-                    name, wallet_url
+                    "Spendable DBC deposited ({}) with name '{}' in wallet located at \"{}\"",
+                    balance, name, wallet_url
                 );
             } else {
                 println!("{}", serialise_output(&(wallet_url, name), output_fmt));
