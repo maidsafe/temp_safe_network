@@ -277,7 +277,8 @@ mod tests {
                 .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
                 .with_target(false)
                 // .event_format(LogFormatter::default())
-                .try_init().unwrap_or_else(|_| println!("Error initializing logger"));
+                .try_init()
+                .unwrap_or_else(|_| println!("Error initializing logger"));
         });
     }
 

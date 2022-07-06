@@ -59,11 +59,11 @@ pub(super) fn find_nodes_to_relocate(
 
     // Find the peers that pass the relocation check
     let mut candidates: Vec<_> = joined_nodes
-            .into_iter()
-            .filter(|info| check(info.age(), churn_id))
-            // the newly joined node shall not be relocated immediately
-            .filter(|info| !excluded.contains(&info.name()))
-            .collect();
+        .into_iter()
+        .filter(|info| check(info.age(), churn_id))
+        // the newly joined node shall not be relocated immediately
+        .filter(|info| !excluded.contains(&info.name()))
+        .collect();
     // To avoid a node to manipulate its name to gain priority of always being first in XorName,
     // here we sort the nodes by its distance to the churn_id.
     let target_name = XorName::from_content(&churn_id.0);

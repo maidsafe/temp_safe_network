@@ -11,20 +11,45 @@ use crate::node::{
     core::{relocation::ChurnId, Node, Proposal},
     Event, MembershipEvent, Result,
 };
-
 use sn_consensus::Generation;
 use sn_interface::{
-    messaging::system::{KeyedSig, MembershipState, SectionAuth},
+    messaging::system::{JoinResponse, KeyedSig, MembershipState, SectionAuth, SystemMsg},
     network_knowledge::{
         NodeState, SapCandidate, SectionAuthUtils, SectionAuthorityProvider, MIN_ADULT_AGE,
     },
     types::log_markers::LogMarker,
 };
-
 use std::{cmp, collections::BTreeSet};
 
 // Agreement
 impl Node {
+    // Send `NodeApproval` to a joining node which makes it a section member
+    pub(crate) async fn send_node_approval(&self, node_state: SectionAuth<NodeState>) -> Vec<Cmd> {
+        let peer = *node_state.peer();
+        let prefix = self.network_knowledge.prefix();
+        info!("Our section with {:?} has approved peer {}.", prefix, peer,);
+
+        let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
+            genesis_key: *self.network_knowledge.genesis_key(),
+            section_auth: self
+                .network_knowledge
+                .section_signed_authority_provider()
+                .into_authed_msg(),
+            node_state: node_state.into_authed_msg(),
+            section_chain: self.network_knowledge.section_chain().await,
+        }));
+
+        let dst_section_pk = self.network_knowledge.section_key();
+        trace!("{}", LogMarker::SendNodeApproval);
+        match self.send_direct_msg(peer, node_msg, dst_section_pk).await {
+            Ok(cmd) => vec![cmd],
+            Err(err) => {
+                error!("Failed to send join approval to node {}: {:?}", peer, err);
+                vec![]
+            }
+        }
+    }
+
     #[instrument(skip(self), level = "trace")]
     pub(crate) async fn handle_general_agreements(
         &mut self,
