@@ -55,7 +55,8 @@ async fn main() -> Result<()> {
         .map_err(|err| {
             eyre!(
                 "Failed to run build command with args '{:?}': {}",
-                args, err
+                args,
+                err
             )
         })?;
 
