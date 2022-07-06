@@ -8,6 +8,7 @@
 
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
+use clap::Parser;
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Help, Report, Result};
 use comfy_table::Table;
 use reqwest::StatusCode;
@@ -22,7 +23,6 @@ use std::{
     thread,
     time::Duration,
 };
-use structopt::StructOpt;
 use tokio::fs;
 use tracing::debug;
 use url::Url;

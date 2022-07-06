@@ -27,15 +27,14 @@
     unused_results
 )]
 
+use clap::Parser;
 use dirs_next::home_dir;
 use eyre::{eyre, Result, WrapErr as _};
 use sn_launch_tool::Launch;
 #[cfg(not(target_os = "windows"))]
 use std::process::{Command, Stdio};
 use std::{io, path::PathBuf};
-use structopt::StructOpt;
 use tokio::fs::{create_dir_all, remove_dir_all};
-use tokio::time::{sleep, Duration};
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 
@@ -50,26 +49,26 @@ const NODES_DIR: &str = "local-test-network";
 const DEFAULT_INTERVAL: &str = "10000";
 const DEFAULT_NODE_COUNT: u32 = 30;
 
-#[derive(Debug, StructOpt)]
-#[structopt(name = "testnet")]
+#[derive(Debug, clap::StructOpt)]
+#[clap(name = "testnet", version)]
 struct Cmd {
     /// All nodes will be joining existing testnet, none will be started as a genesis node.
-    #[structopt(long = "add")]
+    #[clap(long = "add", value_parser)]
     add_nodes_to_existing_network: bool,
 
     /// Interval in milliseconds between launching each of the nodes.
-    #[structopt(long = "interval", default_value = DEFAULT_INTERVAL)]
+    #[clap(long = "interval", default_value = DEFAULT_INTERVAL)]
     interval: u64,
 
     /// Format logs as JSON.
-    #[structopt(long)]
+    #[clap(long)]
     json_logs: bool,
 
     /// Use flamegraph setup.
     /// NB. This requires cargo flamegraph to be installed
     /// NB. This runs nodes as `sudo`, so any files created will
     /// have to be handled as such (ie, `sudo rm -rf ~/.safe/node/local-test-network`)
-    #[structopt(long)]
+    #[clap(long)]
     flame: bool,
 }
 
@@ -159,16 +158,8 @@ pub async fn run_network() -> Result<()> {
     let arg_node_log_dir = node_log_dir.display().to_string();
     info!("Storing nodes' generated data at {}", arg_node_log_dir);
 
-    let node_count = std::env::var("NODE_COUNT")
-        .map_or_else(
-            |error| match error {
-                std::env::VarError::NotPresent => Ok(DEFAULT_NODE_COUNT),
-                _ => Err(eyre!(error)),
-            },
-            |node_count| Ok(node_count.parse()?),
-        )
-        .wrap_err("Invalid value for NODE_COUNT")?;
-    let node_count_str = node_count.to_string();
+    let node_count_str =
+        std::env::var("NODE_COUNT").unwrap_or_else(|_| DEFAULT_NODE_COUNT.to_string());
 
     // Let's create an args array to pass to the network launcher tool
     let interval_str = args.interval.to_string();
@@ -215,11 +206,6 @@ pub async fn run_network() -> Result<()> {
     // We can now call the tool with the args
     info!("Launching local Safe network...");
     Launch::from_iter_safe(&sn_launch_tool_args)?.run()?;
-
-    // leave a longer interval with more nodes to allow for splits if using split amounts
-    let interval_duration = Duration::from_millis(args.interval * (node_count as u64 / 10));
-
-    sleep(interval_duration).await;
 
     Ok(())
 }

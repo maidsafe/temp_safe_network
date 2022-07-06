@@ -31,6 +31,8 @@
 use sn_interface::LogFormatter;
 use sn_node::node::{Config, Error as NodeError, Event, MembershipEvent, NodeApi};
 
+use clap::{CommandFactory, Parser};
+use clap_complete::{generate, Shell};
 use color_eyre::{Section, SectionExt};
 #[cfg(not(feature = "tokio-console"))]
 use eyre::Error;
@@ -38,7 +40,6 @@ use eyre::{eyre, Context, ErrReport, Result};
 use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
 use self_update::{cargo_crate_version, Status};
 use std::{fmt::Debug, io, io::Write, path::Path, process::exit};
-use structopt::{clap, StructOpt};
 use tokio::time::{sleep, Duration};
 use tracing::{self, debug, error, info, trace, warn};
 
@@ -275,7 +276,7 @@ impl Debug for FileRotateAppender {
 async fn run_node(config: Config) -> Result<()> {
     if let Some(c) = &config.completions() {
         let shell = c.parse().map_err(|err: String| eyre!(err))?;
-        let buf = gen_completions_for_shell(shell).map_err(|err| eyre!(err))?;
+        let buf = gen_completions_for_shell(shell, Config::command()).map_err(|err| eyre!(err))?;
         std::io::stdout().write_all(&buf)?;
 
         return Ok(());
@@ -436,7 +437,7 @@ fn update() -> Result<Status, Box<dyn (::std::error::Error)>> {
     Ok(status)
 }
 
-fn gen_completions_for_shell(shell: clap::Shell) -> Result<Vec<u8>, String> {
+fn gen_completions_for_shell(shell: Shell, mut cmd: clap::Command) -> Result<Vec<u8>, String> {
     // Get exe path
     let exe_path =
         std::env::current_exe().map_err(|err| format!("Can't get the exec path: {}", err))?;
@@ -465,7 +466,7 @@ fn gen_completions_for_shell(shell: clap::Shell) -> Result<Vec<u8>, String> {
 
     // Generates shell completions for <shell> and prints to stdout
     let mut buf: Vec<u8> = vec![];
-    Config::clap().gen_completions_to(exec_name, shell, &mut buf);
+    generate(shell, &mut cmd, exec_name, &mut buf);
 
     Ok(buf)
 }
