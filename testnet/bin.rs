@@ -124,8 +124,16 @@ async fn main() -> Result<()> {
                 .stderr(Stdio::inherit())
                 .output()
                 .map_err(Into::into)
-                .and_then(|result| result.status.success().then(|| ()).ok_or_else(|| eyre!("Command exited with error")))
-                .wrap_err_with(|| format!("Failed to run build command with args: {:?}", build_args))?;
+                .and_then(|result| {
+                    result
+                        .status
+                        .success()
+                        .then(|| ())
+                        .ok_or_else(|| eyre!("Command exited with error"))
+                })
+                .wrap_err_with(|| {
+                    format!("Failed to run build command with args: {:?}", build_args)
+                })?;
             info!("sn_node built successfully");
         }
     }

@@ -451,12 +451,12 @@ mod tests {
             // we use the "issue location" to determine which four nodes to send to
             // this should therefore be reproducible amongst proptest retries/shrinking etc
             nodes
-            .iter()
-            .sorted_by(|lhs, rhs| issue_location.cmp_distance(&lhs.0, &rhs.0))
-            // and we simul-send it to 4 nodes
-            .take(4)
-            .cloned()
-            .collect::<Vec<_>>()
+                .iter()
+                .sorted_by(|lhs, rhs| issue_location.cmp_distance(&lhs.0, &rhs.0))
+                // and we simul-send it to 4 nodes
+                .take(4)
+                .cloned()
+                .collect::<Vec<_>>()
         }
     }
 
