@@ -50,7 +50,7 @@ const DEFAULT_INTERVAL: &str = "10000";
 const DEFAULT_NODE_COUNT: u32 = 30;
 
 #[derive(Debug, clap::StructOpt)]
-#[structopt(name = "testnet", version)]
+#[clap(name = "testnet", version)]
 struct Cmd {
     /// All nodes will be joining existing testnet, none will be started as a genesis node.
     #[clap(long = "add", value_parser)]
