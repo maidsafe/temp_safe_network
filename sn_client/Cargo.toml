@@ -40,7 +40,7 @@ bls = { package = "blsttc", version = "6.0.0" }
 bls_dkg = "~0.10.3"
 bytes = { version = "1.0.1", features = ["serde"] }
 console-subscriber = { version = "~0.1.0", optional = true }
-crdts = "7.0"
+crdts = { version = "7.1", default-features=false, features = ["merkle"] }
 custom_debug = "~0.5.0"
 dashmap = { version = "5.1.0", features = [ "serde" ] }
 dirs-next = "2.0.0"
