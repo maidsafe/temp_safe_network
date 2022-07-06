@@ -389,7 +389,16 @@ impl Config {
 
     /// Writes the config file to disk
     pub async fn write_to_disk(&self) -> Result<()> {
-        write_file(CONFIG_FILE, self).await
+        let project_dirs = project_dirs()?;
+        fs::create_dir_all(project_dirs.clone()).await?;
+
+        let path = project_dirs.join(CONFIG_FILE);
+        let mut file = File::create(&path).await?;
+        let serialized = serde_json::to_string_pretty(self)?;
+        file.write_all(serialized.as_bytes()).await?;
+        file.sync_all().await?;
+
+        Ok(())
     }
 }
 
@@ -413,21 +422,6 @@ fn parse_public_addr(public_addr: &str) -> Result<SocketAddr, String> {
     }
 
     Ok(public_addr)
-}
-
-async fn write_file<T: ?Sized>(file: &str, config: &T) -> Result<()>
-where
-    T: Serialize,
-{
-    let project_dirs = project_dirs()?;
-    fs::create_dir_all(project_dirs.clone()).await?;
-
-    let path = project_dirs.join(file);
-    let mut file = File::create(&path).await?;
-    let serialized = serde_json::to_string_pretty(config)?;
-    file.write_all(serialized.as_bytes()).await?;
-    file.sync_all().await?;
-    Ok(())
 }
 
 fn project_dirs() -> Result<PathBuf> {
