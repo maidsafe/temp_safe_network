@@ -12,15 +12,15 @@ use super::{
     helpers::{get_from_arg_or_stdin, get_target_url, serialise_output},
     OutputFmt,
 };
+use clap::Subcommand;
 use color_eyre::{eyre::eyre, Help, Result};
 use comfy_table::Table;
 use sn_api::Error::{InvalidInput, NetDataError, NrsNameAlreadyExists, UnversionedContentError};
 use sn_api::{Safe, SafeUrl};
-use structopt::StructOpt;
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 pub enum NrsSubCommands {
-    #[structopt(name = "add")]
+    #[clap(name = "add")]
     /// Add a subname to a registered NRS name and link it to some content, or update an existing
     /// subname with a new link.
     Add {
@@ -32,27 +32,27 @@ pub enum NrsSubCommands {
         /// wrapped in double quotes on bash based systems. A link must be provided for a subname.
         /// If you don't provide it with this argument, you will be prompted to provide it
         /// interactively.
-        #[structopt(short = "l", long = "link")]
+        #[clap(short = 'l', long = "link")]
         link: Option<String>,
         /// Set this flag to register the topname if it hasn't already been registered.
-        #[structopt(short = "y", long = "register-top-name")]
+        #[clap(short = 'y', long = "register-top-name")]
         register_top_name: bool,
         /// Set this flag to register this link as default for the topname when no subname is
         /// specified.
-        #[structopt(long = "default")]
+        #[clap(long = "default")]
         default: bool,
     },
-    #[structopt(name = "register")]
+    #[clap(name = "register")]
     /// Register a new top name in Safe NRS
     Register {
         /// The name of the new topname to register
         name: String,
         /// Optional safe:// URL to link the topname to. Usually a FilesContainer for a website.
         /// This should be wrapped in double quotes on bash based systems.
-        #[structopt(short = "l", long = "link")]
+        #[clap(short = 'l', long = "link")]
         link: Option<String>,
     },
-    #[structopt(name = "remove")]
+    #[clap(name = "remove")]
     /// Remove a subname from an NRS name
     Remove {
         /// The name to remove

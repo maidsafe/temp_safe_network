@@ -38,6 +38,7 @@ use sn_node::node::{
     MessagingEvent, NodeApi,
 };
 
+use clap::Parser;
 use eyre::Result;
 use futures::future::join_all;
 use std::{
@@ -46,16 +47,15 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     time::Duration,
 };
-use structopt::StructOpt;
 use tokio::task::JoinHandle;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 /// Minimal example node.
-#[derive(Debug, StructOpt)]
+#[derive(Debug, clap::StructOpt)]
 struct Options {
     /// Whether this is the first node ("genesis node") of the network. Only one node can be first.
-    #[structopt(short, long)]
+    #[clap(short, long)]
     first: bool,
     /// IP address to bind to. Default is localhost which is fine when spawning example nodes
     /// on a single machine. If one wants to run nodes on multiple machines, an address that is
@@ -66,26 +66,26 @@ struct Options {
     ///
     /// If starting multiple nodes (see --count), then this option applies only to the first one.
     /// The rest are started as regular nodes.
-    #[structopt(short, long, value_name = "IP")]
+    #[clap(short, long, value_name = "IP")]
     ip: Option<IpAddr>,
     /// Port to listen to. If omitted, a randomly assigned port is used.
     ///
     /// If starting multiple nodes (see --count), then this is used as base port and the actual
     /// port of `n-th` node is calculated as `port + n` (if available)
-    #[structopt(short, long, value_name = "PORT")]
+    #[clap(short, long, value_name = "PORT")]
     port: Option<u16>,
     /// Number of nodes to start. Each node is started in its own thread. Default is to start just
     /// one node.
-    #[structopt(
+    #[clap(
         short,
         long,
-        default_value,
+        default_value_t,
         value_name = "COUNT",
         hide_default_value = true
     )]
     count: usize,
     /// Enable verbose output. Can be specified multiple times for increased verbosity.
-    #[structopt(short, parse(from_occurrences))]
+    #[clap(short, parse(from_occurrences))]
     verbosity: u8,
 }
 

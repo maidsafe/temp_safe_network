@@ -8,18 +8,19 @@
 
 use super::{helpers::serialise_output, OutputFmt};
 use crate::cli::CmdArgs;
-use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
+use clap::{CommandFactory, Subcommand, ValueEnum};
+use clap_complete::{generate, Shell};
+use color_eyre::{eyre::bail, eyre::WrapErr, Result};
 use std::io::Write;
-use structopt::{clap, StructOpt};
 
 // Defines subcommands of 'setup'
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 pub enum SetupSubCommands {
     /// Dump shell completions.
-    #[structopt(name = "completions")]
+    #[clap(name = "completions")]
     Completions {
         /// one of: [bash, fish, zsh, powershell, elvish]  default = all shells
-        shell: Option<clap::Shell>,
+        shell: Option<Shell>,
     },
 }
 
@@ -32,7 +33,7 @@ pub fn setup_commander(cmd: SetupSubCommands, output_fmt: OutputFmt) -> Result<(
 }
 
 // differentiates between 'setup completions' and 'setup completions <shell>'
-fn setup_completions(shell: Option<clap::Shell>, output_fmt: OutputFmt) -> Result<()> {
+fn setup_completions(shell: Option<Shell>, output_fmt: OutputFmt) -> Result<()> {
     match shell {
         Some(shell_id) => setup_completions_dumpone(shell_id, output_fmt),
         None => setup_completions_dumpall(output_fmt),
@@ -40,7 +41,7 @@ fn setup_completions(shell: Option<clap::Shell>, output_fmt: OutputFmt) -> Resul
 }
 
 // handles 'setup completions <shell>' command.  dumps completions for single shell.
-fn setup_completions_dumpone(shell: clap::Shell, output_fmt: OutputFmt) -> Result<()> {
+fn setup_completions_dumpone(shell: Shell, output_fmt: OutputFmt) -> Result<()> {
     let buf = gen_completions_for_shell(shell)?;
 
     if OutputFmt::Pretty == output_fmt {
@@ -63,20 +64,16 @@ fn setup_completions_dumpone(shell: clap::Shell, output_fmt: OutputFmt) -> Resul
 // handles 'setup completions' command.  dumps completions for all shells.
 fn setup_completions_dumpall(output_fmt: OutputFmt) -> Result<()> {
     // get names of available shells and sort them.
-    let mut shellnames = clap::Shell::variants();
-    shellnames.sort_unstable();
+    let shells = Vec::from_iter(Shell::value_variants());
 
     if OutputFmt::Pretty == output_fmt {
         // Pretty format outputs shell completions with header --- <shellname> --- above each
         // Only useful for human readability/review.  Installers should use --json
-        for shellname in shellnames.iter() {
-            let shell = shellname
-                .parse::<clap::Shell>()
-                .map_err(|err| eyre!("Failed to parse shell name: {}", err))?;
+        for shell in shells {
+            let buf = gen_completions_for_shell(*shell)?;
 
-            let buf = gen_completions_for_shell(shell)?;
+            println!("--- {} ---", shell);
 
-            println!("--- {} ---", shellname);
             std::io::stdout()
                 .write_all(&buf)
                 .wrap_err("Failed to print shell completions")?
@@ -87,14 +84,11 @@ fn setup_completions_dumpall(output_fmt: OutputFmt) -> Result<()> {
         // { "bash": "completion_buf", "powershell": "completion_buf", ... }
         let mut map = serde_json::map::Map::new();
 
-        for shellname in shellnames.iter() {
-            let shell = shellname
-                .parse::<clap::Shell>()
-                .map_err(|err| eyre!("Failed to parse shell name: {}", err))?;
-            let buf = gen_completions_for_shell(shell)?;
+        for shell in shells {
+            let buf = gen_completions_for_shell(*shell)?;
             match std::str::from_utf8(&buf) {
                 Ok(v) => {
-                    map.insert((*shellname).to_string(), serde_json::json!(v));
+                    map.insert(shell.to_string(), serde_json::json!(v));
                 }
                 Err(e) => println!("Invalid UTF-8 sequence: {}", e),
             };
@@ -109,7 +103,7 @@ fn setup_completions_dumpall(output_fmt: OutputFmt) -> Result<()> {
 }
 
 // generates completions for a given shell, eg bash.
-fn gen_completions_for_shell(shell: clap::Shell) -> Result<Vec<u8>> {
+fn gen_completions_for_shell(shell: Shell) -> Result<Vec<u8>> {
     // Get exe path
     let exe_path = std::env::current_exe().wrap_err("Can't get the exec path")?;
 
@@ -127,7 +121,7 @@ fn gen_completions_for_shell(shell: clap::Shell) -> Result<Vec<u8>> {
 
     // Generates shell completions for <shell> and prints to stdout
     let mut buf: Vec<u8> = vec![];
-    CmdArgs::clap().gen_completions_to(exec_name, shell, &mut buf);
+    generate(shell, &mut CmdArgs::command(), exec_name, &mut buf);
 
     Ok(buf)
 }

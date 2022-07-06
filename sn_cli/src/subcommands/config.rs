@@ -7,35 +7,35 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::operations::config::{Config, NetworkInfo};
+use clap::Subcommand;
 use color_eyre::Result;
 use std::path::PathBuf;
-use structopt::StructOpt;
 use tracing::debug;
 use url::Url;
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 pub enum ConfigSubCommands {
-    #[structopt(name = "add")]
+    #[clap(name = "add", subcommand)]
     /// Add a config setting
     Add(SettingAddCmd),
-    #[structopt(name = "remove")]
+    #[clap(name = "remove", subcommand)]
     /// Remove a config setting
     Remove(SettingRemoveCmd),
-    #[structopt(name = "clear")]
+    #[clap(name = "clear")]
     /// Remove all config settings and network maps
     Clear,
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 pub enum SettingAddCmd {
-    #[structopt(name = "network")]
+    #[clap(name = "network")]
     Network {
         /// Network name
         network_name: String,
         /// Local path or a remote URL to fetch the network map from
         prefix_location: String,
     },
-    // #[structopt(name = "contact")]
+    // #[clap(name = "contact")]
     // Contact {
     //    /// Contact friendly name
     //    name: String,
@@ -44,14 +44,14 @@ pub enum SettingAddCmd {
     // },
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 pub enum SettingRemoveCmd {
-    #[structopt(name = "network")]
+    #[clap(name = "network")]
     Network {
         /// Network to remove
         network_name: String,
     },
-    // #[structopt(name = "contact")]
+    // #[clap(name = "contact")]
     // Contact {
     //    /// Name of the contact to remove
     //    name: String,
