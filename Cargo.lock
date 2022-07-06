@@ -1970,11 +1970,11 @@ dependencies = [
 name = "log_cmds_inspector"
 version = "0.1.0"
 dependencies = [
+ "clap 3.2.8",
  "console-subscriber",
  "eyre",
  "grep",
  "sn_interface",
- "structopt",
  "strum",
  "strum_macros",
  "walkdir",
@@ -3467,6 +3467,8 @@ dependencies = [
  "blsttc",
  "bytes",
  "chrono",
+ "clap 3.2.8",
+ "clap_complete",
  "color-eyre",
  "comfy-table",
  "console 0.14.1",
@@ -3495,8 +3497,7 @@ dependencies = [
  "sn_api",
  "sn_cmd_test_utilities",
  "sn_dbc",
- "sn_launch_tool 0.9.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "structopt",
+ "sn_launch_tool 0.9.9",
  "tokio",
  "tracing",
  "tracing-subscriber 0.2.25",

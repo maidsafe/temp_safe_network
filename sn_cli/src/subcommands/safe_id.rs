@@ -6,46 +6,46 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use structopt::StructOpt;
+use clap::Subcommand;
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 pub enum SafeIdSubCommands {
-    #[structopt(name = "create")]
+    #[clap(name = "create")]
     /// Create a new SafeId
     Create {
         /// The SafeId name
-        #[structopt(long = "name")]
+        #[clap(long = "name")]
         name: String,
         /// The SafeId surname
-        #[structopt(long = "surname")]
+        #[clap(long = "surname")]
         surname: String,
         /// The SafeId email
-        #[structopt(long = "email")]
+        #[clap(long = "email")]
         email: String,
         /// The SafeId website
-        #[structopt(long = "website")]
+        #[clap(long = "website")]
         website: String,
         /// The SafeId wallet
-        #[structopt(long = "wallet")]
+        #[clap(long = "wallet")]
         wallet: String,
     },
-    #[structopt(name = "update")]
+    #[clap(name = "update")]
     /// Manage files on the network
     Update {
         /// The SafeId name
-        #[structopt(long = "name")]
+        #[clap(long = "name")]
         name: String,
         /// The SafeId surname
-        #[structopt(long = "surname")]
+        #[clap(long = "surname")]
         surname: String,
         /// The SafeId email
-        #[structopt(long = "email")]
+        #[clap(long = "email")]
         email: String,
         /// The SafeId website
-        #[structopt(long = "website")]
+        #[clap(long = "website")]
         website: String,
         /// The SafeId wallet
-        #[structopt(long = "wallet")]
+        #[clap(long = "wallet")]
         wallet: String,
     },
 }

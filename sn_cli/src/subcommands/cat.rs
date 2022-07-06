@@ -12,22 +12,22 @@ use super::{
     },
     OutputFmt,
 };
+use clap::Args;
 use color_eyre::{eyre::WrapErr, Result};
 use comfy_table::Table;
 use sn_api::{resolver::SafeData, ContentType, Safe, SafeUrl};
 use std::io::{self, Write};
-use structopt::StructOpt;
 use tokio::time::{sleep, Duration};
 use tracing::{debug, trace};
 
 const MAX_RETRY_ATTEMPTS: usize = 5;
 
-#[derive(StructOpt, Debug)]
+#[derive(Args, Debug)]
 pub struct CatCommands {
     /// The safe:// location to retrieve
     location: Option<String>,
     /// Renders file output as hex
-    #[structopt(short = "x", long = "hexdump")]
+    #[clap(short = 'x', long = "hexdump")]
     hexdump: bool,
 }
 
