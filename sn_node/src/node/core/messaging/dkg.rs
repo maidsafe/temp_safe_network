@@ -30,6 +30,75 @@ use std::collections::BTreeSet;
 use xor_name::XorName;
 
 impl Node {
+    /// Send a `DkgStart` message to the provided set of candidates
+    pub(crate) async fn send_dkg_start(&self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
+        // Send DKG start to all candidates
+        let recipients = Vec::from_iter(session_id.elder_peers());
+
+        trace!(
+            "{} for {:?} with {:?} to {:?}",
+            LogMarker::SendDkgStart,
+            session_id.elders,
+            session_id,
+            recipients
+        );
+
+        let prefix = session_id.prefix;
+        let node_msg = SystemMsg::DkgStart(session_id);
+        let section_pk = self.network_knowledge.section_key();
+        self.send_msg_for_dst_accumulation(
+            prefix.name(),
+            DstLocation::Section {
+                name: prefix.name(),
+                section_pk,
+            },
+            node_msg,
+            recipients,
+        )
+        .await
+    }
+
+    async fn send_msg_for_dst_accumulation(
+        &self,
+        src: XorName,
+        dst: DstLocation,
+        node_msg: SystemMsg,
+        recipients: Vec<Peer>,
+    ) -> Result<Vec<Cmd>> {
+        let section_key = self.network_knowledge.section_key();
+
+        let key_share = self
+            .section_keys_provider
+            .key_share(&section_key)
+            .await
+            .map_err(|err| {
+                trace!(
+                    "Can't create message {:?} for accumulation at dst {:?}: {:?}",
+                    node_msg,
+                    dst,
+                    err
+                );
+                err
+            })?;
+
+        #[cfg(feature = "test-utils")]
+        let node_msg_clone = node_msg.clone();
+
+        let wire_msg = WireMsg::for_dst_accumulation(&key_share, src, dst, node_msg, section_key)?;
+
+        #[cfg(feature = "test-utils")]
+        let wire_msg = wire_msg.set_payload_debug(node_msg_clone);
+
+        trace!(
+            "Send {:?} for accumulation at dst to {:?}",
+            wire_msg,
+            recipients
+        );
+
+        self.send_messages_to_all_nodes_or_directly_handle_for_accumulation(recipients, wire_msg)
+            .await
+    }
+
     pub(crate) async fn handle_dkg_start(&mut self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
         let current_generation = self.network_knowledge.chain_len();
         if session_id.section_chain_len < current_generation {
