@@ -9,7 +9,6 @@
 use crate::node::{
     api::cmds::Cmd,
     core::{Node, Proposal},
-    dkg::DkgFailureSigSetUtils,
     messages::WireMsgUtils,
     Error, Result,
 };
