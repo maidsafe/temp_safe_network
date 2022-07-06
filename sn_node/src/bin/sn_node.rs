@@ -172,18 +172,18 @@ fn init_node_logging(config: Config) -> Result<Option<WorkerGuard>> {
         let non_blocking_builder = tracing_appender::non_blocking::NonBlockingBuilder::default();
 
         let (non_blocking, guard) = non_blocking_builder
-                  // lose lines and keep perf, or exert backpressure?
-                  .lossy(false)
-                  // optionally change buffered lines limit
-                  // .buffered_lines_limit(buffered_lines_limit)
-                  .finish(file_appender);
+            // lose lines and keep perf, or exert backpressure?
+            .lossy(false)
+            // optionally change buffered lines limit
+            // .buffered_lines_limit(buffered_lines_limit)
+            .finish(file_appender);
 
         let builder = tracing_subscriber::fmt()
-              // eg : RUST_LOG=my_crate=info,my_crate::my_mod=debug,[my_span]=trace
-                  .with_env_filter(filter)
-                  .with_thread_names(true)
-                  .with_ansi(false)
-                  .with_writer(non_blocking);
+            // eg : RUST_LOG=my_crate=info,my_crate::my_mod=debug,[my_span]=trace
+            .with_env_filter(filter)
+            .with_thread_names(true)
+            .with_ansi(false)
+            .with_writer(non_blocking);
 
         if config.json_logs {
             builder.json().init();
