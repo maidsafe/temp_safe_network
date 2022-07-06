@@ -25,36 +25,36 @@ use crate::{
         OutputFmt, SubCommands,
     },
 };
+use clap::{AppSettings::ColoredHelp, Parser};
 use color_eyre::{eyre::eyre, Result};
 use sn_api::{Safe, XorUrlBase};
 use std::env;
 use std::path::PathBuf;
 use std::time::Duration;
-use structopt::{clap::AppSettings::ColoredHelp, StructOpt};
 use tracing::debug;
 
 use sn_api::SN_PREFIX_MAP_DIR;
 const DEFAULT_OPERATION_TIMEOUT_SECS: u64 = 120; // 2mins
 const SN_CLI_QUERY_TIMEOUT: &str = "SN_CLI_QUERY_TIMEOUT";
 
-#[derive(StructOpt, Debug)]
+#[derive(clap::StructOpt, Debug)]
 /// Interact with the Safe Network
-#[structopt(global_settings(&[ColoredHelp]))]
+#[clap(global_settings(&[ColoredHelp]), version)]
 pub struct CmdArgs {
     /// subcommands
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     pub cmd: SubCommands,
     /// Output data serialisation: [json, jsoncompact, yaml]
-    #[structopt(short = "o", long = "output", global(true))]
+    #[clap(short = 'o', long = "output", global(true))]
     output_fmt: Option<OutputFmt>,
     /// Sets JSON as output serialisation format (alias of '--output json')
-    #[structopt(long = "json", global(true))]
+    #[clap(long = "json", global(true))]
     output_json: bool,
     // /// Increase output verbosity. (More logs!)
-    // #[structopt(short = "v", long = "verbose", global(true))]
+    // #[clap(short = 'v', long = "verbose", global(true))]
     // verbose: bool,
     /// Dry run of command. No data will be written. No coins spent
-    #[structopt(short = "n", long = "dry-run", global(true))]
+    #[clap(short = 'n', long = "dry-run", global(true))]
     dry: bool,
     /// Base encoding to be used for XOR-URLs generated. Currently supported: base32z (default), base32 and base64
     #[structopt(long = "xorurl", global(true))]

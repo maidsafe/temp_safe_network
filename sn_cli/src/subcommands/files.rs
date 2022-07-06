@@ -16,6 +16,7 @@ use super::{
 };
 use ansi_term::Colour;
 use bytes::Bytes;
+use clap::Subcommand;
 use color_eyre::{eyre::bail, eyre::eyre, Result};
 use comfy_table::Table;
 use serde::Serialize;
@@ -29,7 +30,6 @@ use std::{
     collections::{BTreeMap, HashMap},
     path::{Component, Path, PathBuf},
 };
-use structopt::StructOpt;
 use tracing::debug;
 
 type FileDetails = BTreeMap<String, String>;
@@ -95,9 +95,9 @@ impl FileTreeNode {
     }
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 pub enum FilesSubCommands {
-    #[structopt(name = "put")]
+    #[clap(name = "put")]
     /// Put a file or folder's files onto the SAFE Network
     Put {
         /// The source file/folder local path
@@ -105,10 +105,10 @@ pub enum FilesSubCommands {
         /// The destination path (in the FilesContainer) for the uploaded files and folders (default is '/')
         dst: Option<PathBuf>,
         /// Recursively upload folders and files found in the source location
-        #[structopt(short = "r", long = "recursive")]
+        #[clap(short = 'r', long = "recursive")]
         recursive: bool,
         /// Follow symlinks
-        #[structopt(short = "l", long = "follow-links")]
+        #[clap(short = 'l', long = "follow-links")]
         follow_links: bool,
     },
     /// Get a file or folder from the SAFE Network
@@ -118,16 +118,16 @@ pub enum FilesSubCommands {
         /// The local destination path for the retrieved files and folders (default is '.')
         dst: Option<String>,
         /// How to handle pre-existing files.
-        #[structopt(short = "e", long = "exists", possible_values = &["ask", "preserve", "overwrite"], default_value="ask")]
+        #[clap(short = 'e', long = "exists", possible_values = &["ask", "preserve", "overwrite"], default_value="ask")]
         exists: FileExistsAction,
         /// How to display progress.
-        #[structopt(short = "i", long = "progress", possible_values = &["text", "none"], default_value="text")]
+        #[clap(short = 'i', long = "progress", possible_values = &["text", "none"], default_value="text")]
         progress: ProgressIndicator,
         /// Preserves modification times, access times, and modes from the original file
-        #[structopt(short = "p", long = "preserve")]
+        #[clap(short = 'p', long = "preserve")]
         preserve: bool,
     },
-    #[structopt(name = "sync")]
+    #[clap(name = "sync")]
     /// Sync files to the SAFE Network
     Sync {
         /// The source location
@@ -135,66 +135,66 @@ pub enum FilesSubCommands {
         /// The target FilesContainer to sync up source files with, optionally including the destination path (default is '/')
         target: Option<String>,
         /// Recursively sync folders and files found in the source location
-        #[structopt(short = "r", long = "recursive")]
+        #[clap(short = 'r', long = "recursive")]
         recursive: bool,
         /// Follow symlinks
-        #[structopt(short = "l", long = "follow-links")]
+        #[clap(short = 'l', long = "follow-links")]
         follow_links: bool,
         /// Delete files found at the target FilesContainer that are not in the source location. This is only allowed when --recursive is passed as well
-        #[structopt(short = "d", long = "delete")]
+        #[clap(short = 'd', long = "delete")]
         delete: bool,
         /// Automatically update the NRS name to link to the new version of the FilesContainer. This is only allowed if an NRS URL was provided, and if the NRS name is currently linked to a specific version of the FilesContainer
-        #[structopt(short = "u", long = "update-nrs")]
+        #[clap(short = 'u', long = "update-nrs")]
         update_nrs: bool,
     },
-    #[structopt(name = "add")]
+    #[clap(name = "add")]
     /// Add a file to an existing FilesContainer on the network
     Add {
         /// The source file location.  Specify '-' to read from stdin
-        #[structopt(
+        #[clap(
             parse(from_str = parse_stdin_arg),
             requires_if("", "target"),
             requires_if("-", "target")
         )]
         location: String,
         /// The target FilesContainer to add the source file to, optionally including the destination path (default is '/') and new file name
-        #[structopt(parse(from_str = parse_stdin_arg))]
+        #[clap(parse(from_str = parse_stdin_arg))]
         target: Option<String>,
         /// Automatically update the NRS name to link to the new version of the FilesContainer. This is only allowed if an NRS URL was provided, and if the NRS name is currently linked to a specific version of the FilesContainer
-        #[structopt(short = "u", long = "update-nrs")]
+        #[clap(short = 'u', long = "update-nrs")]
         update_nrs: bool,
         /// Overwrite the file on the FilesContainer if there already exists a file with the same name
-        #[structopt(short = "f", long = "force")]
+        #[clap(short = 'f', long = "force")]
         force: bool,
         /// Follow symlinks
-        #[structopt(short = "l", long = "follow-links")]
+        #[clap(short = 'l', long = "follow-links")]
         follow_links: bool,
     },
-    #[structopt(name = "rm")]
+    #[clap(name = "rm")]
     /// Remove a file from an existing FilesContainer on the network
     Rm {
         /// The full URL of the file to remove from its FilesContainer
         target: String,
         /// Automatically update the NRS name to link to the new version of the FilesContainer. This is only allowed if an NRS URL was provided, and if the NRS name is currently linked to a specific version of the FilesContainer
-        #[structopt(short = "u", long = "update-nrs")]
+        #[clap(short = 'u', long = "update-nrs")]
         update_nrs: bool,
         /// Recursively remove files found in the target path
-        #[structopt(short = "r", long = "recursive")]
+        #[clap(short = 'r', long = "recursive")]
         recursive: bool,
     },
-    #[structopt(name = "ls")]
+    #[clap(name = "ls")]
     /// List files found in an existing FilesContainer on the network
     Ls {
         /// The target FilesContainer to list files from, optionally including a path (default is '/')
         target: Option<String>,
     },
-    #[structopt(name = "tree")]
+    #[clap(name = "tree")]
     /// Recursively list files found in an existing FilesContainer on the network
     Tree {
         /// The target FilesContainer to list files from, optionally including a path (default is '/')
         target: Option<String>,
         /// Include file details
-        #[structopt(short = "d", long = "details")]
+        #[clap(short = 'd', long = "details")]
         details: bool,
     },
 }

@@ -10,48 +10,48 @@ use crate::operations::{
     config::{Config, NetworkInfo, NetworkLauncher},
     node::*,
 };
+use clap::Subcommand;
 use color_eyre::{eyre::eyre, Result};
 use std::{net::SocketAddr, path::PathBuf};
-use structopt::StructOpt;
 
 use sn_api::DEFAULT_PREFIX_HARDLINK_NAME;
 
 const NODES_DATA_DIR_NAME: &str = "baby-fleming-nodes";
 const LOCAL_NODE_DIR_NAME: &str = "local-node";
 
-#[derive(StructOpt, Debug)]
+#[derive(Subcommand, Debug)]
 pub enum NodeSubCommands {
     /// Gets the version of `sn_node` binary
     BinVersion {
-        #[structopt(long = "node-path", env = "SN_NODE_PATH")]
+        #[clap(long = "node-path", env = "SN_NODE_PATH")]
         node_path: Option<PathBuf>,
     },
-    #[structopt(name = "install")]
+    #[clap(name = "install")]
     /// Install an sn_node binary
     Install {
         /// Optional destination directory path for the installation. The SN_NODE_PATH environment
         /// variable can also be used to supply this path. If this argument is not used, the
         /// binary will be installed at ~/.safe/node/sn_node, or the equivalent user directory
         /// path on Windows.
-        #[structopt(long = "node-path", env = "SN_NODE_PATH")]
+        #[clap(long = "node-path", env = "SN_NODE_PATH")]
         node_path: Option<PathBuf>,
         /// Specify the version of sn_node to install. If not supplied, the latest version will be
         /// installed. Note: just the version number should be supplied, with no 'v' prefix.
-        #[structopt(short = "v", long)]
+        #[clap(short = 'v', long)]
         version: Option<String>,
     },
-    #[structopt(name = "join")]
+    #[clap(name = "join")]
     /// Join an existing network
     Join {
         /// The name of a network from the `networks` command list. Use this argument to join one
         /// of those networks.
-        #[structopt(long = "network-name")]
+        #[clap(long = "network-name")]
         network_name: String,
         /// Path of the directory where sn_node is located (default is ~/.safe/node/). The SN_NODE_PATH env var can also be used to set the path
-        #[structopt(long = "node-dir-path", env = "SN_NODE_PATH")]
+        #[clap(long = "node-dir-path", env = "SN_NODE_PATH")]
         node_dir_path: Option<PathBuf>,
         /// Verbosity level for nodes logs
-        #[structopt(short = "y", parse(from_occurrences))]
+        #[clap(short = 'y', parse(from_occurrences))]
         verbosity: u8,
         /// Local address to be used for the node.
         ///
@@ -65,7 +65,7 @@ pub enum NodeSubCommands {
         /// case, you can setup 'manual' port forwarding on your router, then use this option to set
         /// the address where local packets are being forwarded to. For example, --local-addr
         /// 192.168.1.50:12000.
-        #[structopt(short = "a", long)]
+        #[clap(short = 'a', long)]
         local_addr: Option<SocketAddr>,
         /// External address of the node, to use when writing connection info.
         ///
@@ -76,14 +76,14 @@ pub enum NodeSubCommands {
         /// request was rejected because the other nodes were unable to reach your node. In this
         /// case, you can setup 'manual' port forwarding on your router, then use this option to set
         /// the public IP address of your router. For example, --public-addr 79.71.42.39:12000.
-        #[structopt(short = "p", long)]
+        #[clap(short = 'p', long)]
         public_addr: Option<SocketAddr>,
         /// Delete all data from a previous node running on the same PC
-        #[structopt(long = "clear-data")]
+        #[clap(long = "clear-data")]
         clear_data: bool,
         /// Set this flag if you're connecting to a network where all the nodes are running
         /// locally. This will launch the node and skip any port forwarding.
-        #[structopt(short = "l", long)]
+        #[clap(short = 'l', long)]
         local: bool,
         /// Use this flag to skip the automated, software-based port forwarding on the node binary.
         ///
@@ -91,38 +91,38 @@ pub enum NodeSubCommands {
         /// request was rejected because the other nodes were unable to reach your node. In this
         /// case, you can setup 'manual' port forwarding on your router, then use this option to set
         /// disable the software-based port forwarding in the node binary.
-        #[structopt(long)]
+        #[clap(long)]
         skip_auto_port_forwarding: bool,
     },
-    #[structopt(name = "run-baby-fleming")]
+    #[clap(name = "run-baby-fleming")]
     /// Run nodes to form a local single-section Safe network
     Run {
         /// Path of the directory where sn_node is located (default is ~/.safe/node/). The SN_NODE_PATH env var can also be used to set the path
-        #[structopt(long = "node-dir-path", env = "SN_NODE_PATH")]
+        #[clap(long = "node-dir-path", env = "SN_NODE_PATH")]
         node_dir_path: Option<PathBuf>,
         /// Interval in seconds between launching each of the nodes
-        #[structopt(short = "i", long, default_value = "1")]
+        #[clap(short = 'i', long, default_value = "1")]
         interval: u64,
         /// Number of nodes to be launched
-        #[structopt(long = "nodes", default_value = "11")]
+        #[clap(long = "nodes", default_value = "11")]
         num_of_nodes: u8,
         /// IP to be used to launch the local nodes.
-        #[structopt(long = "ip")]
+        #[clap(long = "ip")]
         ip: Option<String>,
     },
     /// Shutdown all running nodes processes
-    #[structopt(name = "killall")]
+    #[clap(name = "killall")]
     Killall {
         /// Path of the sn_node executable used to launch the processes with (default ~/.safe/node/sn_node). The SN_NODE_PATH env var can be also used to set this path
-        #[structopt(long = "node-path", env = "SN_NODE_PATH")]
+        #[clap(long = "node-path", env = "SN_NODE_PATH")]
         node_path: Option<PathBuf>,
     },
-    #[structopt(name = "update")]
+    #[clap(name = "update")]
     /// Update to latest sn_node released version
     Update {
-        #[structopt(long = "node-path")]
+        #[clap(long = "node-path")]
         /// Path of the sn_node executable to update (default ~/.safe/node/). The SN_NODE_PATH env var can be also used to set the path
-        #[structopt(long = "node-path", env = "SN_NODE_PATH")]
+        #[clap(long = "node-path", env = "SN_NODE_PATH")]
         node_path: Option<PathBuf>,
     },
 }
