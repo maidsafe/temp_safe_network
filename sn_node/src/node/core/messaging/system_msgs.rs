@@ -6,253 +6,153 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod agreement;
-mod anti_entropy;
-mod dkg;
-mod handover;
-mod join;
-mod left;
-mod membership;
-mod proposals;
-mod relocation;
-mod resource_proof;
-mod service_msgs;
-mod update_section;
-
-use crate::comm::Comm;
-use crate::dbs::Error as DbError;
-use crate::node::{
-    api::cmds::Cmd,
-    core::{DkgSessionInfo, Node, Proposal as CoreProposal, DATA_QUERY_LIMIT},
-    messages::WireMsgUtils,
-    Error, Event, MembershipEvent, Result, MIN_LEVEL_WHEN_FULL,
-};
-pub(crate) use proposals::handle_proposal;
-use sn_interface::{
-    messaging::{
-        data::{ServiceMsg, StorageLevel},
-        signature_aggregator::Error as AggregatorError,
-        system::{
-            JoinResponse, NodeCmd, NodeEvent, NodeMsgAuthorityUtils, NodeQuery,
-            Proposal as ProposalMsg, SystemMsg,
-        },
-        AuthorityProof, DstLocation, MsgId, MsgType, NodeMsgAuthority, SectionAuth, WireMsg,
+use crate::{
+    comm::Comm,
+    dbs::Error as DbError,
+    node::{
+        api::cmds::Cmd,
+        core::{DkgSessionInfo, Node, Proposal as CoreProposal},
+        messages::WireMsgUtils,
+        Error, Event, MembershipEvent, Result, MIN_LEVEL_WHEN_FULL,
     },
-    network_knowledge::NetworkKnowledge,
-    types::{log_markers::LogMarker, Keypair, Peer, PublicKey},
 };
-
 use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
-use itertools::Itertools;
+use sn_interface::{
+    messaging::{
+        data::StorageLevel,
+        signature_aggregator::Error as AggregatorError,
+        system::{
+            // SectionAuth is gonna cause issue
+            JoinResponse,
+            NodeCmd,
+            NodeEvent,
+            NodeMsgAuthorityUtils,
+            NodeQuery,
+            Proposal as ProposalMsg,
+            SectionAuth as SectionAuthAgreement,
+            SystemMsg,
+        },
+        AuthKind, AuthorityProof, DstLocation, MsgId, NodeMsgAuthority, SectionAuth, WireMsg,
+    },
+    network_knowledge::{NetworkKnowledge, NodeState},
+    types::{log_markers::LogMarker, Keypair, Peer, PublicKey},
+};
 use xor_name::XorName;
 
-// Message handling
 impl Node {
-    #[instrument(skip(self, original_bytes, comm))]
-    pub(crate) async fn handle_msg(
-        &mut self,
-        sender: Peer,
-        wire_msg: WireMsg,
-        original_bytes: Option<Bytes>,
-        comm: &Comm,
+    /// Send a direct (`SystemMsg`) message to a node in the specified section
+    pub(crate) async fn send_direct_msg(
+        &self,
+        recipient: Peer,
+        node_msg: SystemMsg,
+        section_pk: BlsPublicKey,
+    ) -> Result<Cmd> {
+        let section_name = recipient.name();
+        self.send_direct_msg_to_nodes(vec![recipient], node_msg, section_name, section_pk)
+            .await
+    }
+
+    /// Send a direct (`SystemMsg`) message to a set of nodes in the specified section
+    pub(crate) async fn send_direct_msg_to_nodes(
+        &self,
+        recipients: Vec<Peer>,
+        node_msg: SystemMsg,
+        section_name: XorName,
+        section_pk: BlsPublicKey,
+    ) -> Result<Cmd> {
+        trace!("{}", LogMarker::SendDirectToNodes);
+        let our_node = self.info();
+        let our_section_key = self.network_knowledge.section_key();
+
+        let wire_msg = WireMsg::single_src(
+            &our_node,
+            DstLocation::Section {
+                name: section_name,
+                section_pk,
+            },
+            node_msg,
+            our_section_key,
+        )?;
+
+        Ok(Cmd::SendMsg {
+            recipients,
+            wire_msg,
+        })
+    }
+
+    /// Send a `Relocate` message to the specified node
+    pub(crate) async fn send_relocate(
+        &self,
+        recipient: Peer,
+        node_state: SectionAuthAgreement<NodeState>,
+    ) -> Result<Cmd> {
+        let node_msg = SystemMsg::Relocate(node_state.into_authed_msg());
+        let section_pk = self.network_knowledge.section_key();
+        self.send_direct_msg(recipient, node_msg, section_pk).await
+    }
+
+    /// Send a direct (`SystemMsg`) message to all Elders in our section
+    pub(crate) async fn send_msg_to_our_elders(&self, node_msg: SystemMsg) -> Result<Cmd> {
+        let sap = self.network_knowledge.authority_provider();
+        let dst_section_pk = sap.section_key();
+        let section_name = sap.prefix().name();
+        let elders = sap.elders_vec();
+        self.send_direct_msg_to_nodes(elders, node_msg, section_name, dst_section_pk)
+            .await
+    }
+
+    // Send the message to all `recipients`. If one of the recipients is us, don't send it over the
+    // network but handle it directly (should only be used when accumulation is necessary)
+    pub(crate) async fn send_messages_to_all_nodes_or_directly_handle_for_accumulation(
+        &self,
+        recipients: Vec<Peer>,
+        mut wire_msg: WireMsg,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
+        let mut others = Vec::new();
+        let mut handle = false;
 
-        // Deserialize the payload of the incoming message
-        let msg_id = wire_msg.msg_id();
-        // payload needed for aggregation
-        let payload = wire_msg.payload.clone();
+        trace!("Send {:?} to {:?}", wire_msg, recipients);
 
-        let message_type = match wire_msg.into_msg() {
-            Ok(message_type) => message_type,
-            Err(error) => {
-                error!(
-                    "Failed to deserialize message payload ({:?}): {:?}",
-                    msg_id, error
-                );
-                return Ok(cmds);
-            }
-        };
-
-        match message_type {
-            MsgType::System {
-                msg_id,
-                msg_authority,
-                dst_location,
-                msg,
-            } => {
-                // Let's now verify the section key in the msg authority is trusted
-                // based on our current knowledge of the network and sections chains.
-                let mut known_keys: Vec<BlsPublicKey> = self
-                    .network_knowledge
-                    .section_chain()
-                    .await
-                    .keys()
-                    .copied()
-                    .collect();
-                known_keys.extend(self.network_knowledge.prefix_map().section_keys());
-                known_keys.push(*self.network_knowledge.genesis_key());
-
-                if !NetworkKnowledge::verify_node_msg_can_be_trusted(
-                    msg_authority.clone(),
-                    msg.clone(),
-                    &known_keys,
-                ) {
-                    warn!(
-                        "Untrusted message ({:?}) dropped from {:?}: {:?} ",
-                        msg_id, sender, msg
-                    );
-                    return Ok(cmds);
-                }
-
-                // Let's check for entropy before we proceed further
-                // Adult nodes don't need to carry out entropy checking,
-                // however the message shall always be handled.
-                if self.is_elder() {
-                    // For the case of receiving a join request not matching our prefix,
-                    // we just let the join request handler to deal with it later on.
-                    // We also skip AE check on Anti-Entropy messages
-                    //
-                    // TODO: consider changing the join and "join as relocated" flows to
-                    // make use of AntiEntropy retry/redirect responses.
-                    match msg {
-                        SystemMsg::AntiEntropyRetry { .. }
-                        | SystemMsg::AntiEntropyUpdate { .. }
-                        | SystemMsg::AntiEntropyRedirect { .. }
-                        | SystemMsg::JoinRequest(_)
-                        | SystemMsg::JoinAsRelocatedRequest(_) => {
-                            trace!(
-                                "Entropy check skipped for {:?}, handling message directly",
-                                msg_id
-                            );
-                        }
-                        _ => match dst_location.section_pk() {
-                            None => {}
-                            Some(dst_section_pk) => {
-                                let msg_bytes = original_bytes.unwrap_or(wire_msg.serialize()?);
-
-                                if let Some(ae_cmd) = self
-                                    .check_for_entropy(
-                                        // a cheap clone w/ Bytes
-                                        msg_bytes,
-                                        &msg_authority.src_location(),
-                                        &dst_section_pk,
-                                        dst_location.name(),
-                                        &sender,
-                                    )
-                                    .await?
-                                {
-                                    // we want to log issues with an elder who is out of sync here...
-                                    let knowledge = self.network_knowledge.elders();
-                                    let mut known_elders = knowledge.iter().map(|peer| peer.name());
-
-                                    if known_elders.contains(&sender.name()) {
-                                        // we track a dysfunction against our elder here
-                                        self.log_knowledge_issue(sender.name()).await?;
-                                    }
-
-                                    // short circuit and send those AE responses
-                                    cmds.push(ae_cmd);
-                                    return Ok(cmds);
-                                }
-
-                                trace!("Entropy check passed. Handling verified msg {:?}", msg_id);
-                            }
-                        },
+        let our_name = self.info().name();
+        for recipient in recipients.into_iter() {
+            if recipient.name() == our_name {
+                match wire_msg.auth_kind() {
+                    AuthKind::NodeBlsShare(_) => {
+                        // do nothing, continue we should be accumulating this
+                        handle = true;
                     }
+                    _ => return Err(Error::SendOrHandlingNormalMsg),
                 }
-
-                let handling_msg_cmds = self
-                    .handle_system_msg(
-                        sender,
-                        msg_id,
-                        msg_authority,
-                        msg,
-                        payload,
-                        known_keys,
-                        comm,
-                    )
-                    .await?;
-
-                cmds.extend(handling_msg_cmds);
-
-                Ok(cmds)
-            }
-            MsgType::Service {
-                msg_id,
-                msg,
-                dst_location,
-                auth,
-            } => {
-                let dst_name = match msg.dst_address() {
-                    Some(name) => name,
-                    None => {
-                        error!(
-                            "Service msg has been dropped since {:?} is not a valid msg to send from a client {}.",
-                            msg, sender.addr()
-                        );
-                        return Ok(vec![]);
-                    }
-                };
-
-                let src_location = wire_msg.auth_kind().src();
-
-                if self.is_not_elder() {
-                    trace!("Redirecting from adult to section elders");
-                    cmds.push(
-                        self.ae_redirect_to_our_elders(sender, &src_location, &wire_msg)
-                            .await?,
-                    );
-                    return Ok(cmds);
-                }
-
-                // First we check if it's query and we have too many on the go at the moment...
-                if let ServiceMsg::Query(_) = msg {
-                    // we have a query, check if we have too many on the go....
-                    let pending_query_length = self.pending_data_queries.len().await;
-
-                    if pending_query_length > DATA_QUERY_LIMIT {
-                        // TODO: check if query is pending for this already.. add to that if that makes sense.
-                        warn!("Pending queries length exceeded, dropping query {msg:?}");
-                        return Ok(vec![]);
-                    }
-                }
-
-                // Then we perform AE checks
-                let received_section_pk = match dst_location.section_pk() {
-                    Some(section_pk) => section_pk,
-                    None => {
-                        warn!("Dropping service message as there is no valid dst section_pk.");
-                        return Ok(cmds);
-                    }
-                };
-
-                let msg_bytes = original_bytes.unwrap_or(wire_msg.serialize()?);
-                if let Some(cmd) = self
-                    .check_for_entropy(
-                        // a cheap clone w/ Bytes
-                        msg_bytes,
-                        &src_location,
-                        &received_section_pk,
-                        dst_name,
-                        &sender,
-                    )
-                    .await?
-                {
-                    // short circuit and send those AE responses
-                    cmds.push(cmd);
-                    return Ok(cmds);
-                }
-
-                cmds.extend(
-                    self.handle_service_msg(msg_id, msg, dst_location, auth, sender)
-                        .await?,
-                );
-
-                Ok(cmds)
+            } else {
+                others.push(recipient);
             }
         }
+
+        if !others.is_empty() {
+            let dst_section_pk = self.section_key_by_name(&others[0].name()).await;
+            wire_msg.set_dst_section_pk(dst_section_pk);
+
+            trace!("{}", LogMarker::SendOrHandle);
+            cmds.push(Cmd::SendMsg {
+                recipients: others,
+                wire_msg: wire_msg.clone(),
+            });
+        }
+
+        if handle {
+            wire_msg.set_dst_section_pk(self.network_knowledge.section_key());
+            wire_msg.set_dst_xorname(our_name);
+
+            cmds.push(Cmd::HandleMsg {
+                sender: Peer::new(our_name, self.addr),
+                wire_msg,
+                original_bytes: None,
+            });
+        }
+
+        Ok(cmds)
     }
 
     // Handler for all system messages
@@ -543,7 +443,7 @@ impl Node {
                     ProposalMsg::JoinsAllowed(allowed) => CoreProposal::JoinsAllowed(allowed),
                 };
 
-                handle_proposal(
+                Node::handle_proposal(
                     msg_id,
                     core_proposal,
                     sig_share,
