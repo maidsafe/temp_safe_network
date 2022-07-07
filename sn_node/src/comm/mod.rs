@@ -22,10 +22,7 @@ use self::{
     peer_session::{PeerSession, SendWatcher},
 };
 
-use crate::node::{
-    core::RateLimits,
-    error::{Error, Result},
-};
+use crate::node::{Error, RateLimits, Result};
 use peer_session::SendStatus;
 
 use sn_dysfunction::DysfunctionDetection;
