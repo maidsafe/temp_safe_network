@@ -154,7 +154,7 @@ pub async fn wallet_commander(
                 )?)
             };
 
-            let name = safe
+            let (name, balance) = safe
                 .wallet_deposit(&wallet_url, name.as_deref(), &dbc, sk)
                 .await
                 .map_err(|e| match e {
@@ -167,10 +167,11 @@ pub async fn wallet_commander(
                     }
                     _ => e.into(),
                 })?;
+
             if OutputFmt::Pretty == output_fmt {
                 println!(
-                    "Spendable DBC deposited with name '{}' in wallet located at \"{}\"",
-                    name, wallet_url
+                    "Spendable DBC deposited ({} safecoins) with name '{}' in wallet located at \"{}\"",
+                    balance, name, wallet_url
                 );
             } else {
                 println!("{}", serialise_output(&(wallet_url, name), output_fmt));
