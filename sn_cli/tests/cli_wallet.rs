@@ -44,7 +44,7 @@ fn wallet_deposit_should_deposit_a_bearer_dbc() -> Result<()> {
     )?
     .assert()
     .stdout(format!(
-        "Spendable DBC deposited with name '{}' in wallet located at \"{}\"\n",
+        "Spendable DBC deposited (12.230000000 safecoins) with name '{}' in wallet located at \"{}\"\n",
         "my-first-dbc", wallet_xorurl
     ))
     .success();
@@ -75,7 +75,7 @@ fn wallet_deposit_should_deposit_a_dbc_from_a_file() -> Result<()> {
     )?
     .assert()
     .stdout(format!(
-        "Spendable DBC deposited with name '{}' in wallet located at \"{}\"\n",
+        "Spendable DBC deposited (12.230000000 safecoins) with name '{}' in wallet located at \"{}\"\n",
         "my-first-dbc", wallet_xorurl
     ))
     .success();
@@ -106,7 +106,7 @@ fn wallet_deposit_should_deposit_a_dbc_from_a_file_with_whitespace_at_the_end() 
     )?
     .assert()
     .stdout(format!(
-        "Spendable DBC deposited with name '{}' in wallet located at \"{}\"\n",
+        "Spendable DBC deposited (12.230000000 safecoins) with name '{}' in wallet located at \"{}\"\n",
         "my-first-dbc", wallet_xorurl
     ))
     .success();
@@ -229,7 +229,7 @@ fn wallet_deposit_should_deposit_an_owned_dbc_with_configured_secret_key() -> Re
     )?
     .assert()
     .stdout(format!(
-        "Spendable DBC deposited with name '{}' in wallet located at \"{}\"\n",
+        "Spendable DBC deposited (7.150000000 safecoins) with name '{}' in wallet located at \"{}\"\n",
         "reissued-dbc", wallet_xorurl
     ))
     .success();
@@ -287,7 +287,7 @@ fn wallet_deposit_should_deposit_an_owned_dbc_with_secret_key_arg() -> Result<()
     )?
     .assert()
     .stdout(format!(
-        "Spendable DBC deposited with name '{}' in wallet located at \"{}\"\n",
+        "Spendable DBC deposited (7.150000000 safecoins) with name '{}' in wallet located at \"{}\"\n",
         "reissued-dbc", wallet_xorurl
     ))
     .success();
