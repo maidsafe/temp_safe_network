@@ -1113,7 +1113,68 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
+## v0.68.1 (2022-07-07)
+
+### Chore
+
+ - <csr-id-77cef496695e8cac9ccefccaf99cf350fb479eb9/> now we only contact one adult at a time increase retry count
+   This should get us more contact with more elders in the same amount of time as previous.
+   Only returning faster if initial adult query returns
+ - <csr-id-da13669193d93b3a56fff4a956c9ac9830055a7a/> use latest sn_launch_tool release, sans StructOpt
+ - <csr-id-85ca7ce23414bf19e72236e32745b0fb6239664d/> replace StructOpt with Clap in sn_client
+ - <csr-id-46262268fc167c05963e5b7bd6261310496e2379/> `try!` macro is deprecated
+   No need for rustfmt to check/replace this, as the compiler will already
+   warn for this. Deprecated since 1.39.
+   
+   Removing the option seems to trigger a couple of formatting changes that
+   rustfmt did not seem to pick on before.
+ - <csr-id-8dccb7f1fc81385f9f5f25e6c354ad1d35759528/> clippy runs cargo check already
+ - <csr-id-2d0e23cdc7f94b0cc2d13ddf8203702cec4d3a07/> churn example tweaks
+
+### Bug Fixes
+
+ - <csr-id-1e3f865ae5e32520958bb071bc7fbffe8b79a033/> reduce client waiting time on receiving responses
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 12 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #1315 ([`67686f7`](https://github.com/maidsafe/safe_network/commit/67686f73f9e7b18bb6fbf1eadc3fd3a256285396))
+    - Merge #1313 ([`7fe7be3`](https://github.com/maidsafe/safe_network/commit/7fe7be336799dec811c5b17e6d753ebe31e625f1))
+    - Merge branch 'main' into cargo-husky-tweaks ([`6881855`](https://github.com/maidsafe/safe_network/commit/688185573bb71cc44a7103df17f3fbeea6740247))
+    - Merge #1309 ([`f9fa4f7`](https://github.com/maidsafe/safe_network/commit/f9fa4f7857d8161e8c036cca06006bf187a6c6c3))
+    - Merge branch 'main' into cargo-husky-tweaks ([`52dd02e`](https://github.com/maidsafe/safe_network/commit/52dd02e45ab4e160b0a26498919a79ce1aefb1bd))
+    - now we only contact one adult at a time increase retry count ([`77cef49`](https://github.com/maidsafe/safe_network/commit/77cef496695e8cac9ccefccaf99cf350fb479eb9))
+    - use latest sn_launch_tool release, sans StructOpt ([`da13669`](https://github.com/maidsafe/safe_network/commit/da13669193d93b3a56fff4a956c9ac9830055a7a))
+    - replace StructOpt with Clap in sn_client ([`85ca7ce`](https://github.com/maidsafe/safe_network/commit/85ca7ce23414bf19e72236e32745b0fb6239664d))
+    - `try!` macro is deprecated ([`4626226`](https://github.com/maidsafe/safe_network/commit/46262268fc167c05963e5b7bd6261310496e2379))
+    - clippy runs cargo check already ([`8dccb7f`](https://github.com/maidsafe/safe_network/commit/8dccb7f1fc81385f9f5f25e6c354ad1d35759528))
+    - churn example tweaks ([`2d0e23c`](https://github.com/maidsafe/safe_network/commit/2d0e23cdc7f94b0cc2d13ddf8203702cec4d3a07))
+    - reduce client waiting time on receiving responses ([`1e3f865`](https://github.com/maidsafe/safe_network/commit/1e3f865ae5e32520958bb071bc7fbffe8b79a033))
+</details>
+
 ## v0.68.0 (2022-07-04)
+
+<csr-id-9314a2db5dc1ae91bc4d80a65c1a8825492fc7c7/>
+<csr-id-d4850ff81d33751ebf9e3a7c7af438f160df6e44/>
+<csr-id-ddb7798a7b0c5e60960e123414277d58f3da27eb/>
+<csr-id-4e04a2b0acc79140bf1d0aefd82c0ad5b046a3cd/>
+<csr-id-6a2553a11b1404ad404e67df29bf3ec535d1b954/>
+<csr-id-5dbf50d92bf7e93acbb00e85f51910f32ac4a124/>
+<csr-id-849dfba283362d8fbdddd92be1078c3a963fb564/>
+<csr-id-91da4d4ac7aab039853b0651e5aafd9cdd31b9c4/>
 
 ### Chore
 
@@ -1135,6 +1196,10 @@ needed, as they keypair itself contains the Arcs we need.
    Results mostly from the single thread work of @joshuef in #1253 (and
    ongoing efforts).
 
+### Chore
+
+ - <csr-id-e4e2eb56611a328806c59ed8bc80ca2567206bbb/> sn_interface-0.8.0/sn_dysfunction-0.7.0/sn_client-0.68.0/sn_node-0.64.0/sn_api-0.66.0/sn_cli-0.59.0
+
 ### Refactor
 
  - <csr-id-6a2553a11b1404ad404e67df29bf3ec535d1b954/> remove NetworkInfo::GenesisKey variant
@@ -1146,14 +1211,13 @@ needed, as they keypair itself contains the Arcs we need.
 
  - <csr-id-5dad80d3f239f5844243fedb89f8d4baaee3b640/> have the nodes to attach valid Commitments to signed SpentProofShares
 
-
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 9 commits contributed to the release over the course of 5 calendar days.
+ - 10 commits contributed to the release over the course of 6 calendar days.
  - 6 days passed between releases.
- - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1163,6 +1227,7 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.8.0/sn_dysfunction-0.7.0/sn_client-0.68.0/sn_node-0.64.0/sn_api-0.66.0/sn_cli-0.59.0 ([`e4e2eb5`](https://github.com/maidsafe/safe_network/commit/e4e2eb56611a328806c59ed8bc80ca2567206bbb))
     - remove NetworkInfo::GenesisKey variant ([`6a2553a`](https://github.com/maidsafe/safe_network/commit/6a2553a11b1404ad404e67df29bf3ec535d1b954))
     - remove NodeConfig from sn_api::ipc, add sn_cli tests ([`5dbf50d`](https://github.com/maidsafe/safe_network/commit/5dbf50d92bf7e93acbb00e85f51910f32ac4a124))
     - update PrefixMap symlink if incorrect ([`849dfba`](https://github.com/maidsafe/safe_network/commit/849dfba283362d8fbdddd92be1078c3a963fb564))
@@ -1177,6 +1242,7 @@ needed, as they keypair itself contains the Arcs we need.
 ## v0.67.1 (2022-06-28)
 
 <csr-id-8c69306dc86a99a8be443ab8213253983540f1cf/>
+<csr-id-58890e5c919ada30f27d4e80c6b5e7291b99ed5c/>
 
 ### New Features
 
