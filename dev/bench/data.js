@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1657175183020,
+  "lastUpdate": 1657230750311,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -7787,6 +7787,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 542244842,
             "range": "± 3238309",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "c4d5dbf0d00c3c4d5ca4885add24627868bc825c",
+          "message": "Merge #1314\n\n1314: feat(cli): display balance of the DBC that has been successfully deposited into a wallet r=bochaco a=bochaco\n\nThis also changes the `sn_api::wallet_deposit` API to return the amount deposited.\n\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>",
+          "timestamp": "2022-07-07T20:17:24Z",
+          "tree_id": "002d9344aa85aa46cf20c8dda9945cad3188da98",
+          "url": "https://github.com/maidsafe/safe_network/commit/c4d5dbf0d00c3c4d5ca4885add24627868bc825c"
+        },
+        "date": 1657230748738,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 515757298,
+            "range": "± 16002984",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 552253317,
+            "range": "± 11233584",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 1259640347,
+            "range": "± 8049992774",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 292954823,
+            "range": "± 6448972",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 322681083,
+            "range": "± 2823864",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 555781502,
+            "range": "± 14992297",
             "unit": "ns/iter"
           }
         ]
