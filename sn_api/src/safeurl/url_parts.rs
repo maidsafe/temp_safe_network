@@ -144,7 +144,7 @@ impl UrlParts {
 
         // convert into top_name and sub_names
         let top_name = names_vec[names_vec.len() - 1].to_string();
-        let sub_names_vec = (&names_vec[0..names_vec.len() - 1]).to_vec();
+        let sub_names_vec = names_vec[0..names_vec.len() - 1].to_vec();
         let sub_names = sub_names_vec.join(".");
 
         // get raw path, without any normalization.

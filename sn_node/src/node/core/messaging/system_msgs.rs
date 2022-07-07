@@ -557,7 +557,7 @@ impl Node {
             }
             SystemMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
                 info!("ReplicateData MsgId: {:?}", msg_id);
-                return if self.is_elder() {
+                if self.is_elder() {
                     error!("Received unexpected message while Elder");
                     Ok(vec![])
                 } else {
@@ -600,7 +600,7 @@ impl Node {
                     }
 
                     Ok(cmds)
-                };
+                }
             }
             SystemMsg::NodeCmd(NodeCmd::SendAnyMissingRelevantData(known_data_addresses)) => {
                 info!(

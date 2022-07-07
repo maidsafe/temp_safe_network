@@ -88,7 +88,7 @@ pub async fn connect(safe: &mut Safe, config: &Config, timeout: Duration) -> Res
                 .await
                 .wrap_err("Failed to connect with read-only access")
         }
-        Err(err) => return Err(eyre!("Failed to connect: {}", err)),
+        Err(err) => Err(eyre!("Failed to connect: {}", err)),
     }
 }
 

@@ -23,7 +23,7 @@ use std::u32;
 
 /// IPC message.
 #[allow(clippy::large_enum_variant)]
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum IpcMsg {
     /// Request.
     Req(IpcReq),
