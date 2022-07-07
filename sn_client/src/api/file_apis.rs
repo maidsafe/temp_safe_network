@@ -620,6 +620,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "too heavy for CI"]
     async fn store_and_read_40mb() -> Result<()> {
         init_logger();
         let _outer_span = tracing::info_span!("store_and_read_40mb").entered();
