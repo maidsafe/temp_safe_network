@@ -657,9 +657,7 @@ impl Safe {
     pub(crate) async fn fetch_data(&self, safe_url: &SafeUrl, range: Range) -> Result<Bytes> {
         match safe_url.data_type() {
             DataType::File => self.get_bytes(safe_url.xorname(), range).await,
-            other => {
-                return Err(Error::ContentError(format!("{}", other)));
-            }
+            other => Err(Error::ContentError(format!("{}", other))),
         }
     }
 
@@ -968,12 +966,11 @@ async fn is_file_item_modified(safe: &Safe, local_filename: &Path, file_item: &F
     if FileMeta::filetype_is_file(&file_item[PREDICATE_TYPE]) {
         // Use a dry runner only for this next operation
         let dry_runner = Safe::dry_runner(Some(safe.xorurl_base));
-        let is_uploaded = match upload_file_to_net(&dry_runner, local_filename).await {
+
+        match upload_file_to_net(&dry_runner, local_filename).await {
             Ok(local_xorurl) => file_item[PREDICATE_LINK] != local_xorurl,
             Err(_) => false,
-        };
-
-        is_uploaded
+        }
     } else {
         // for now, we just return false if a symlink or directory.
         // In the future, should check if symlink has been modified.

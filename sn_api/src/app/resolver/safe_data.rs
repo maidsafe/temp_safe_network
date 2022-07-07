@@ -21,7 +21,7 @@ use std::collections::BTreeSet;
 /// `SafeData` contains the data types fetchable using the Safe Network resolver
 #[allow(clippy::large_enum_variant)]
 // FilesContainer is significantly larger than the other variants
-#[derive(Debug, PartialEq, Deserialize, Serialize, Clone)]
+#[derive(Debug, PartialEq, Eq, Deserialize, Serialize, Clone)]
 pub enum SafeData {
     SafeKey {
         xorurl: String,
