@@ -138,7 +138,7 @@ impl Node {
                 query: query.variant,
                 auth: auth.into_inner(),
                 origin: EndUser(origin.name()),
-                correlation_id: MsgId::from_xor_name(*address.name()),
+                correlation_id: msg_id,
             });
 
             self.send_node_msg_to_nodes(msg, targets).await
