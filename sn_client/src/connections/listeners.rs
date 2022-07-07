@@ -256,7 +256,16 @@ impl Session {
 
         let _handle = tokio::spawn(async move {
             match msg {
-                ServiceMsg::QueryResponse { response, .. } => {
+                ServiceMsg::QueryResponse {
+                    response,
+                    correlation_id,
+                } => {
+                    trace!(
+                        "ServiceMsg with id {:?} is QueryResponse regarding {:?} with response {:?}",
+                        msg_id,
+                        correlation_id,
+                        response,
+                    );
                     // Note that this doesn't remove the sender from here since multiple
                     // responses corresponding to the same msg ID might arrive.
                     // Once we are satisfied with the response this is channel is discarded in
@@ -265,8 +274,15 @@ impl Session {
                     if let Ok(op_id) = response.operation_id() {
                         if let Some(entry) = queries.get(&op_id) {
                             let all_senders = entry.value();
-                            for (_msg_id, sender) in all_senders {
-                                let res = sender.try_send(response.clone());
+                            // Only valid response shall get broadcast to all
+                            for (msg_id, sender) in all_senders {
+                                // TO FIX: change the correlation_id to be the origin msg_id
+                                //         currently it is actually the chunk_name
+                                let res = if response.is_success() || msg_id == &correlation_id {
+                                    sender.try_send(response.clone())
+                                } else {
+                                    continue;
+                                };
                                 if res.is_err() {
                                     trace!("Error relaying query response internally on a channel for {:?} op_id {:?}: {:?}. (It has likely been removed)", msg_id, op_id, res)
                                 }
