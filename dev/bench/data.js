@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1657148119675,
+  "lastUpdate": 1657152031547,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -7607,6 +7607,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 607147183,
             "range": "± 10364273",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "7fe7be336799dec811c5b17e6d753ebe31e625f1",
+          "message": "Merge #1313\n\n1313: feat(cmd): add parent id r=joshuef a=oetyng\n\nThis facilitates correlation in logging.\n\nCo-authored-by: oetyng <oetyng@gmail.com>\nCo-authored-by: joshuef <joshuef@gmail.com>",
+          "timestamp": "2022-07-06T22:24:56Z",
+          "tree_id": "7deaa7beffc843eea6531c89f8e01357428e7004",
+          "url": "https://github.com/maidsafe/safe_network/commit/7fe7be336799dec811c5b17e6d753ebe31e625f1"
+        },
+        "date": 1657152028360,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 521307315,
+            "range": "± 23895023",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 558035825,
+            "range": "± 16168818",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 2008696877,
+            "range": "± 4212627988",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 301263220,
+            "range": "± 7598050",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 351892912,
+            "range": "± 25136424",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 1039949475,
+            "range": "± 80129575",
             "unit": "ns/iter"
           }
         ]
