@@ -30,32 +30,42 @@ use std::{
 /// A struct for the job of controlling the flow
 /// of a [`Cmd`] in the system.
 ///
-/// An id is assigned to it, a priority by which it is
-/// ordered in the queue among other pending cmd jobs,
-/// and the time the job was instantiated.
-///
-/// todo: take parent id
+/// An id is assigned to it, its parent id (if any),
+/// a priority by which it is ordered in the queue
+/// among other pending cmd jobs, and the time the
+/// job was instantiated.
 #[derive(Debug, Clone)]
 pub struct CmdJob {
-    id: u64, // Consider use of subcmd id e.g. parent "963111461", child "963111461.0"
+    id: usize,
+    parent_id: Option<usize>,
     cmd: Cmd,
     priority: i32,
     created_at: SystemTime,
 }
 
 impl CmdJob {
-    pub(crate) fn new(id: u64, cmd: Cmd, created_at: SystemTime) -> Self {
+    pub(crate) fn new(
+        id: usize,
+        parent_id: Option<usize>,
+        cmd: Cmd,
+        created_at: SystemTime,
+    ) -> Self {
         let priority = cmd.priority();
         Self {
             id,
+            parent_id,
             cmd,
             priority,
             created_at,
         }
     }
 
-    pub(crate) fn id(&self) -> u64 {
+    pub(crate) fn id(&self) -> usize {
         self.id
+    }
+
+    pub(crate) fn parent_id(&self) -> Option<usize> {
+        self.parent_id
     }
 
     pub(crate) fn cmd(&self) -> &Cmd {
