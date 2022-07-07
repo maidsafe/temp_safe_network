@@ -269,7 +269,7 @@ pub enum NodeElderChange {
 }
 
 /// Bound name of elders and `section_key`, `section_prefix` info together.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Elders {
     /// The prefix of the section.
     pub prefix: Prefix,

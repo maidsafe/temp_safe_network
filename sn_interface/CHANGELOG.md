@@ -6,7 +6,55 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## v0.8.1 (2022-07-07)
+
+### Chore
+
+ - <csr-id-c79e2aac378b28b373fd7c18c4b9006348960071/> bit more low hanging clippy fruit
+ - <csr-id-46262268fc167c05963e5b7bd6261310496e2379/> `try!` macro is deprecated
+   No need for rustfmt to check/replace this, as the compiler will already
+   warn for this. Deprecated since 1.39.
+   
+   Removing the option seems to trigger a couple of formatting changes that
+   rustfmt did not seem to pick on before.
+ - <csr-id-8dccb7f1fc81385f9f5f25e6c354ad1d35759528/> clippy runs cargo check already
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 7 commits contributed to the release.
+ - 2 days passed between releases.
+ - 3 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #1315 ([`67686f7`](https://github.com/maidsafe/safe_network/commit/67686f73f9e7b18bb6fbf1eadc3fd3a256285396))
+    - Merge #1313 ([`7fe7be3`](https://github.com/maidsafe/safe_network/commit/7fe7be336799dec811c5b17e6d753ebe31e625f1))
+    - Merge branch 'main' into cargo-husky-tweaks ([`6881855`](https://github.com/maidsafe/safe_network/commit/688185573bb71cc44a7103df17f3fbeea6740247))
+    - bit more low hanging clippy fruit ([`c79e2aa`](https://github.com/maidsafe/safe_network/commit/c79e2aac378b28b373fd7c18c4b9006348960071))
+    - Merge branch 'main' into cargo-husky-tweaks ([`52dd02e`](https://github.com/maidsafe/safe_network/commit/52dd02e45ab4e160b0a26498919a79ce1aefb1bd))
+    - `try!` macro is deprecated ([`4626226`](https://github.com/maidsafe/safe_network/commit/46262268fc167c05963e5b7bd6261310496e2379))
+    - clippy runs cargo check already ([`8dccb7f`](https://github.com/maidsafe/safe_network/commit/8dccb7f1fc81385f9f5f25e6c354ad1d35759528))
+</details>
+
 ## v0.8.0 (2022-07-04)
+
+<csr-id-9314a2db5dc1ae91bc4d80a65c1a8825492fc7c7/>
+<csr-id-ddb7798a7b0c5e60960e123414277d58f3da27eb/>
+<csr-id-4e04a2b0acc79140bf1d0aefd82c0ad5b046a3cd/>
+<csr-id-6a2553a11b1404ad404e67df29bf3ec535d1b954/>
+<csr-id-2aae965ca2fdd4ff59034547b5ee8dcef0b7253e/>
+<csr-id-068327834c8d07ada6bf42cf78d6f7a117715466/>
+<csr-id-976e8c3d8c610d2a34c1bfa6678132a1bad234e8/>
+<csr-id-849dfba283362d8fbdddd92be1078c3a963fb564/>
+<csr-id-91da4d4ac7aab039853b0651e5aafd9cdd31b9c4/>
 
 ### Chore
 
@@ -27,6 +75,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    Results mostly from the single thread work of @joshuef in #1253 (and
    ongoing efforts).
 
+### Chore
+
+ - <csr-id-e4e2eb56611a328806c59ed8bc80ca2567206bbb/> sn_interface-0.8.0/sn_dysfunction-0.7.0/sn_client-0.68.0/sn_node-0.64.0/sn_api-0.66.0/sn_cli-0.59.0
+
 ### Refactor
 
  - <csr-id-6a2553a11b1404ad404e67df29bf3ec535d1b954/> remove NetworkInfo::GenesisKey variant
@@ -40,14 +92,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-5dad80d3f239f5844243fedb89f8d4baaee3b640/> have the nodes to attach valid Commitments to signed SpentProofShares
 
-
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 10 commits contributed to the release over the course of 5 calendar days.
+ - 11 commits contributed to the release over the course of 6 calendar days.
  - 6 days passed between releases.
- - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 11 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -57,6 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.8.0/sn_dysfunction-0.7.0/sn_client-0.68.0/sn_node-0.64.0/sn_api-0.66.0/sn_cli-0.59.0 ([`e4e2eb5`](https://github.com/maidsafe/safe_network/commit/e4e2eb56611a328806c59ed8bc80ca2567206bbb))
     - remove NetworkInfo::GenesisKey variant ([`6a2553a`](https://github.com/maidsafe/safe_network/commit/6a2553a11b1404ad404e67df29bf3ec535d1b954))
     - use hardlink instead of symlink ([`2aae965`](https://github.com/maidsafe/safe_network/commit/2aae965ca2fdd4ff59034547b5ee8dcef0b7253e))
     - sn_cli modify tests ([`0683278`](https://github.com/maidsafe/safe_network/commit/068327834c8d07ada6bf42cf78d6f7a117715466))
@@ -72,6 +124,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## v0.7.1 (2022-06-28)
 
 <csr-id-8c69306dc86a99a8be443ab8213253983540f1cf/>
+<csr-id-58890e5c919ada30f27d4e80c6b5e7291b99ed5c/>
 
 ### New Features
 

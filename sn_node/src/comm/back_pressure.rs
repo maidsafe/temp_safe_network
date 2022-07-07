@@ -37,8 +37,8 @@ impl BackPressure {
     /// Sent to nodes calling us, if the value has changed significantly.
     pub(crate) async fn tolerated_msgs_per_s(&self, sessions_count: usize) -> Option<f64> {
         let now = Instant::now();
-        let tolerated_msgs_per_s = self.try_get_new_value(sessions_count, now).await;
-        tolerated_msgs_per_s
+
+        self.try_get_new_value(sessions_count, now).await
     }
 
     async fn try_get_new_value(&self, sessions_count: usize, now: Instant) -> Option<f64> {
