@@ -34,7 +34,7 @@
 //!
 
 use sn_node::node::{
-    create_test_max_capacity_and_root_storage, Config, Event, EventReceiver, MembershipEvent,
+    cfg::create_test_max_capacity_and_root_storage, Config, Event, EventReceiver, MembershipEvent,
     MessagingEvent, NodeApi,
 };
 
