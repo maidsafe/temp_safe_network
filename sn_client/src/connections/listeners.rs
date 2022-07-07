@@ -275,10 +275,9 @@ impl Session {
                         if let Some(entry) = queries.get(&op_id) {
                             let all_senders = entry.value();
                             // Only valid response shall get broadcast to all
-                            for (msg_id, sender) in all_senders {
-                                // TO FIX: change the correlation_id to be the origin msg_id
-                                //         currently it is actually the chunk_name
-                                let res = if response.is_success() || msg_id == &correlation_id {
+                            for (ori_msg_id, sender) in all_senders {
+                                let res = if response.is_success() || ori_msg_id == &correlation_id
+                                {
                                     sender.try_send(response.clone())
                                 } else {
                                     continue;
