@@ -16,7 +16,8 @@ pub(crate) mod membership;
 
 // Node public API
 mod api;
-pub(crate) mod core;
+/// main functionality of the node
+pub mod core;
 mod dkg;
 pub(crate) mod error;
 mod logging;

@@ -494,7 +494,7 @@ impl Config {
         Ok(())
     }
 
-    pub async fn write_prefix_map(path: &PathBuf, prefix_map: &NetworkPrefixMap) -> Result<()> {
+    pub async fn write_prefix_map(path: &Path, prefix_map: &NetworkPrefixMap) -> Result<()> {
         let serialized = Self::serialise_prefix_map(prefix_map)?;
         fs::write(path, serialized).await.wrap_err_with(|| {
             format!("Unable to write NetworkPrefixMap to '{}'", path.display())
@@ -503,7 +503,7 @@ impl Config {
         Ok(())
     }
 
-    pub async fn retrieve_local_prefix_map(location: &PathBuf) -> Result<NetworkPrefixMap> {
+    pub async fn retrieve_local_prefix_map(location: &Path) -> Result<NetworkPrefixMap> {
         let bytes = fs::read(location)
             .await
             .wrap_err_with(|| format!("Unable to read NetworkPrefixMap from '{:?}'", location))?;

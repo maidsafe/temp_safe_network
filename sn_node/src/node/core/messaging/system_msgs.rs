@@ -620,6 +620,10 @@ impl Node {
                         origin,
                         correlation_id,
                     } => {
+                        debug!(
+                            "Handle NodeQuery with msg_id {:?} and correlation_id {:?}",
+                            msg_id, correlation_id,
+                        );
                         // There is no point in verifying a sig from a sender A or B here.
                         // Send back response to the sending elder
                         let sender_xorname = msg_authority.get_auth_xorname();
@@ -640,9 +644,10 @@ impl Node {
                 user,
             } => {
                 debug!(
-                    "{:?}: op_id {:?}, correlation_id: {correlation_id:?}, sender: {sender}",
+                    "{:?}: op_id {:?}, correlation_id: {correlation_id:?}, sender: {sender} origin msg_id: {:?}",
                     LogMarker::ChunkQueryResponseReceviedFromAdult,
-                    response.operation_id()?
+                    response.operation_id()?,
+                    msg_id
                 );
                 let sending_nodes_pk = match msg_authority {
                     NodeMsgAuthority::Node(auth) => PublicKey::from(auth.into_inner().node_ed_pk),
