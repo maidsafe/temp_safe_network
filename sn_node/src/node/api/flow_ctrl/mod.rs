@@ -259,13 +259,6 @@ impl FlowCtrl {
                             continue;
                         }
 
-                        // TO FIX: destination is incorrect here.
-                        let name = recipients[0].name();
-                        let dst = sn_interface::messaging::DstLocation::Node {
-                            name,
-                            section_pk: src_section_pk,
-                        };
-
                         let data_to_send = self
                             .node
                             .read()
@@ -273,27 +266,38 @@ impl FlowCtrl {
                             .data_storage
                             .get_from_local_store(&address)
                             .await?;
-
                         let system_msg =
                             SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
-                        let wire_msg =
-                            WireMsg::single_src(&our_info, dst, system_msg, src_section_pk)?;
 
-                        debug!(
-                            "{:?} Data {:?} to: {:?} w/ {:?} ",
-                            LogMarker::SendingMissingReplicatedData,
-                            address,
-                            recipients,
-                            wire_msg.msg_id()
-                        );
+                        for recipient in recipients {
+                            let name = recipient.name();
+                            let dst = sn_interface::messaging::DstLocation::Node {
+                                name,
+                                section_pk: src_section_pk,
+                            };
+                            let wire_msg = WireMsg::single_src(
+                                &our_info,
+                                dst,
+                                system_msg.clone(),
+                                src_section_pk,
+                            )?;
 
-                        let cmd = Cmd::SendMsg {
-                            wire_msg,
-                            recipients: recipients.clone(),
-                        };
+                            debug!(
+                                "{:?} Data {:?} to: {:?} w/ {:?} ",
+                                LogMarker::SendingMissingReplicatedData,
+                                address,
+                                recipient,
+                                wire_msg.msg_id()
+                            );
 
-                        if let Err(e) = self.cmd_ctrl.push(cmd).await {
-                            error!("Error in data replication loop: {:?}", e);
+                            let cmd = Cmd::SendMsg {
+                                wire_msg,
+                                recipients: vec![recipient],
+                            };
+
+                            if let Err(e) = self.cmd_ctrl.push(cmd).await {
+                                error!("Error in data replication loop: {:?}", e);
+                            }
                         }
                     }
                 } else {
