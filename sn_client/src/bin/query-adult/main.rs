@@ -4,6 +4,7 @@ use rand::{thread_rng, Rng};
 use self_encryption::MIN_ENCRYPTABLE_BYTES;
 use sn_client::{Client, ClientConfig, Error};
 use sn_interface::{
+    data_copy_count,
     messaging::{
         data::{DataQuery, DataQueryVariant, QueryResponse, ServiceMsg},
         WireMsg,
@@ -13,7 +14,9 @@ use sn_interface::{
 use std::{
     fs::File,
     io::{ErrorKind, Write},
+    time::Duration,
 };
+use tokio::time::timeout;
 use xor_name::XorName;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -28,6 +31,10 @@ struct Args {
     /// Upload the file to the network before querying
     #[clap(short, long)]
     upload: bool,
+
+    /// Query up to nth adult
+    #[clap(long, default_value_t = data_copy_count() - 1)]
+    up_to_adult: usize,
 }
 
 #[tokio::main]
@@ -62,14 +69,31 @@ async fn main() -> Result<()> {
 
     let mut error_occurred = false;
     for chunk in chunks {
-        for i in 0..3 {
-            if let Err(e) = query_chunk(&client, i, chunk.address().0).await {
+        println!(
+            "Querying adult 0-{} for Chunk({})",
+            args.up_to_adult,
+            chunk.address().0
+        );
+
+        for i in 0..=args.up_to_adult {
+            let query_fut = query_chunk(&client, i, chunk.address().0);
+            let res = match timeout(Duration::from_secs(10), query_fut).await {
+                Ok(res) => res,
+                Err(_) => {
+                    error_occurred = true;
+                    eprintln!(
+                        "Error for Chunk({}) at adult `{i}`: timed out!",
+                        chunk.address().0
+                    );
+                    continue;
+                }
+            };
+
+            if let Err(e) = res {
                 error_occurred = true;
                 eprintln!(
-                    "Error for Chunk({}) at adult `{}`: {:?}",
-                    chunk.address().0,
-                    i,
-                    e
+                    "Error for Chunk({}) at adult `{i}`: {e:?}",
+                    chunk.address().0
                 );
             }
         }
