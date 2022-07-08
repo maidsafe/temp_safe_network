@@ -5,12 +5,91 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.66.2 (2022-07-08)
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 1 commit contributed to the release.
+ - 0 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`6268fe7`](https://github.com/maidsafe/safe_network/commit/6268fe76e9dd81d291492b4611094273f8d1e223))
+</details>
+
+## v0.66.1 (2022-07-07)
+
+<csr-id-c79e2aac378b28b373fd7c18c4b9006348960071/>
+
+### Chore
+
+ - <csr-id-c79e2aac378b28b373fd7c18c4b9006348960071/> bit more low hanging clippy fruit
+
+### New Features (BREAKING)
+
+ - <csr-id-79a53b0d1df5a9377cfe7a9d70480ed1fa31bacc/> wallet_deposit API to also return the amount desposited
+
+### Chore
+
+ - <csr-id-2b00cec961561281f6b927e13e501342843f6a0f/> sn_interface-0.8.1/sn_dysfunction-0.7.1/sn_client-0.68.1/sn_node-0.64.1/sn_api-0.66.1/sn_cli-0.59.1
+
+### New Features
+
+ - <csr-id-57f635fbe80392574f7f122a9d157fbb6320c4cc/> generate the genesis DBC when launching first node and write it to disk
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 8 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 4 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.8.1/sn_dysfunction-0.7.1/sn_client-0.68.1/sn_node-0.64.1/sn_api-0.66.1/sn_cli-0.59.1 ([`2b00cec`](https://github.com/maidsafe/safe_network/commit/2b00cec961561281f6b927e13e501342843f6a0f))
+    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`7e2a25a`](https://github.com/maidsafe/safe_network/commit/7e2a25ae31ead0fae7824ca794b6c407695080cd))
+    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`7cf2eb6`](https://github.com/maidsafe/safe_network/commit/7cf2eb64e1176d2b23d63091f6f459d92bdccb57))
+    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`cd2f9aa`](https://github.com/maidsafe/safe_network/commit/cd2f9aa2f7001ae779273745f9ac78fc289525e3))
+    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`39bd5b4`](https://github.com/maidsafe/safe_network/commit/39bd5b471b6b3acb6ebe90489335c995b0aca82f))
+    - wallet_deposit API to also return the amount desposited ([`79a53b0`](https://github.com/maidsafe/safe_network/commit/79a53b0d1df5a9377cfe7a9d70480ed1fa31bacc))
+    - bit more low hanging clippy fruit ([`c79e2aa`](https://github.com/maidsafe/safe_network/commit/c79e2aac378b28b373fd7c18c4b9006348960071))
+    - generate the genesis DBC when launching first node and write it to disk ([`57f635f`](https://github.com/maidsafe/safe_network/commit/57f635fbe80392574f7f122a9d157fbb6320c4cc))
+</details>
+
 ## v0.66.0 (2022-07-04)
+
+<csr-id-9314a2db5dc1ae91bc4d80a65c1a8825492fc7c7/>
+<csr-id-ddb7798a7b0c5e60960e123414277d58f3da27eb/>
+<csr-id-2aae965ca2fdd4ff59034547b5ee8dcef0b7253e/>
+<csr-id-5dbf50d92bf7e93acbb00e85f51910f32ac4a124/>
+<csr-id-068327834c8d07ada6bf42cf78d6f7a117715466/>
+<csr-id-976e8c3d8c610d2a34c1bfa6678132a1bad234e8/>
+<csr-id-91da4d4ac7aab039853b0651e5aafd9cdd31b9c4/>
+<csr-id-e4e2eb56611a328806c59ed8bc80ca2567206bbb/>
 
 ### Chore
 
  - <csr-id-9314a2db5dc1ae91bc4d80a65c1a8825492fc7c7/> Docs - put symbols in backticks
  - <csr-id-ddb7798a7b0c5e60960e123414277d58f3da27eb/> remove let bindings for unit returns
+
+### Chore
+
+ - <csr-id-e4e2eb56611a328806c59ed8bc80ca2567206bbb/> sn_interface-0.8.0/sn_dysfunction-0.7.0/sn_client-0.68.0/sn_node-0.64.0/sn_api-0.66.0/sn_cli-0.59.0
 
 ### Refactor
 
@@ -24,14 +103,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-5dad80d3f239f5844243fedb89f8d4baaee3b640/> have the nodes to attach valid Commitments to signed SpentProofShares
 
-
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 8 commits contributed to the release over the course of 4 calendar days.
+ - 9 commits contributed to the release over the course of 4 calendar days.
  - 8 days passed between releases.
- - 8 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -41,6 +119,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.8.0/sn_dysfunction-0.7.0/sn_client-0.68.0/sn_node-0.64.0/sn_api-0.66.0/sn_cli-0.59.0 ([`e4e2eb5`](https://github.com/maidsafe/safe_network/commit/e4e2eb56611a328806c59ed8bc80ca2567206bbb))
     - use hardlink instead of symlink ([`2aae965`](https://github.com/maidsafe/safe_network/commit/2aae965ca2fdd4ff59034547b5ee8dcef0b7253e))
     - remove NodeConfig from sn_api::ipc, add sn_cli tests ([`5dbf50d`](https://github.com/maidsafe/safe_network/commit/5dbf50d92bf7e93acbb00e85f51910f32ac4a124))
     - sn_cli modify tests ([`0683278`](https://github.com/maidsafe/safe_network/commit/068327834c8d07ada6bf42cf78d6f7a117715466))
@@ -51,9 +130,125 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - have the nodes to attach valid Commitments to signed SpentProofShares ([`5dad80d`](https://github.com/maidsafe/safe_network/commit/5dad80d3f239f5844243fedb89f8d4baaee3b640))
 </details>
 
+## v0.65.0 (2022-06-26)
+
+<csr-id-243cfc48a7f4a9b60b5b7f1fdd609c02197aba5e/>
+<csr-id-3f3c39a14987910bb424df51f89d948333ca3e87/>
+<csr-id-5ea4c3d60bf84384ed37b5dde25ac4dc26147c24/>
+
+### Chore
+
+ - <csr-id-243cfc48a7f4a9b60b5b7f1fdd609c02197aba5e/> sn_interface-0.7.0/sn_dysfunction-0.6.0/sn_client-0.67.0/sn_node-0.63.0/sn_api-0.65.0/sn_cli-0.58.0
+ - <csr-id-3f3c39a14987910bb424df51f89d948333ca3e87/> changes based on review feedback
+   * Prefer `map_err` in various places rather than a full `match`.
+   * Change key serialization utility functions to static rather than instance.
+   * Change `dog` command to print non-support of `SafeKey` data type rather than panic.
+   * Remove unnecessary clone on `public_key_hex`.
+   * Remove unnecessary match in various tests.
+   * Ignore wallet CLI tests that deleted the credentials file. They are problematic when running in
+     parallel with other tests. We need better isolated testing mechanisms for these. Will address in a
+     separate PR.
+   * Use different deposit names in wallet tests where multiple DBCs are deposited.
+ - <csr-id-5ea4c3d60bf84384ed37b5dde25ac4dc26147c24/> changes based on review feedback
+   * Prefer `map_err` in various places rather than a full `match`.
+   * Change key serialization utility functions to static rather than instance.
+   * Change `dog` command to print non-support of `SafeKey` data type rather than panic.
+   * Remove unnecessary clone on `public_key_hex`.
+   * Remove unnecessary match in various tests.
+   * Ignore wallet CLI tests that deleted the credentials file. They are problematic when running in
+     parallel with other tests. We need better isolated testing mechanisms for these. Will address in a
+     separate PR.
+   * Use different deposit names in wallet tests where multiple DBCs are deposited.
+
+### New Features
+
+ - <csr-id-341306acd1e16290fe9a8ec676499feec8ef7639/> extend cli wallet deposit for owned dbcs
+   The CLI is now extended to support the deposit of owned DBCs.
+   
+   The `deposit` command will check if the supplied DBC is owned, and if it is, it will check to see if
+   the `--secret-key` argument is present and use that. If that argument isn't present, it will attempt
+   to use the secret key that's configured for use with the CLI, i.e., the `keys create --for-cli`
+   command.
+   
+   The `reissue` command was also extended to provide an `--owned` flag, which when used, will reissue
+   an owned DBC using the public key configured for use with the CLI. This argument is mutually
+   exclusive with the `--public-key` argument, which will reissue the DBC using a specified key.
+   
+   So we could offer the user a suggestion when a supplied secret key didn't match, this also involved
+   making a little extension to the API, to return a specific type of error. We will need to modify
+   `sn_dbc` to return a specific error type for this too, so we can avoid checking the string content
+   of the error message, but this will be covered on a separate PR.
+ - <csr-id-69079d698a539a6fe42e87ab1603bbb41ac91f50/> extend cli wallet deposit for owned dbcs
+   The CLI is now extended to support the deposit of owned DBCs.
+   
+   The `deposit` command will check if the supplied DBC is owned, and if it is, it will check to see if
+   the `--secret-key` argument is present and use that. If that argument isn't present, it will attempt
+   to use the secret key that's configured for use with the CLI, i.e., the `keys create --for-cli`
+   command.
+   
+   The `reissue` command was also extended to provide an `--owned` flag, which when used, will reissue
+   an owned DBC using the public key configured for use with the CLI. This argument is mutually
+   exclusive with the `--public-key` argument, which will reissue the DBC using a specified key.
+   
+   So we could offer the user a suggestion when a supplied secret key didn't match, this also involved
+   making a little extension to the API, to return a specific type of error. We will need to modify
+   `sn_dbc` to return a specific error type for this too, so we can avoid checking the string content
+   of the error message, but this will be covered on a separate PR.
+
+### New Features (BREAKING)
+
+ - <csr-id-5577695b5d3291c46cd475df8c0933a067b4cfc5/> serialize to bls keys in util functions
+   Utility functions were recently added to the API for serializing to the `Keypair` type. This was
+   changed to serialize directly to BLS to make it easier for the CLI to deal directly with BLS keys.
+   Soon we will be refactoring the `Keypair` type to have a different use case and things like
+   `sn_client` would be refactored to directly work with BLS keys. This is a little step in that
+   direction.
+   
+   There was a utility function added to `sn_interface` to create a `Keypair` from a hex-based BLS key
+   because we still need to use the `Keypair` at this point in time.
+ - <csr-id-3e757bb626d71c03608a625fa435a312b8fc0beb/> extend wallet_deposit for owned dbcs
+ - <csr-id-67006eb2e84b750a6b9b03d04aafdcfc85b38955/> serialize to bls keys in util functions
+   Utility functions were recently added to the API for serializing to the `Keypair` type. This was
+   changed to serialize directly to BLS to make it easier for the CLI to deal directly with BLS keys.
+   Soon we will be refactoring the `Keypair` type to have a different use case and things like
+   `sn_client` would be refactored to directly work with BLS keys. This is a little step in that
+   direction.
+   
+   There was a utility function added to `sn_interface` to create a `Keypair` from a hex-based BLS key
+   because we still need to use the `Keypair` at this point in time.
+ - <csr-id-23802f8e357831b0166307934ca19658d9107039/> extend wallet_deposit for owned dbcs
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 9 commits contributed to the release over the course of 1 calendar day.
+ - 5 days passed between releases.
+ - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.7.0/sn_dysfunction-0.6.0/sn_client-0.67.0/sn_node-0.63.0/sn_api-0.65.0/sn_cli-0.58.0 ([`243cfc4`](https://github.com/maidsafe/safe_network/commit/243cfc48a7f4a9b60b5b7f1fdd609c02197aba5e))
+    - changes based on review feedback ([`3f3c39a`](https://github.com/maidsafe/safe_network/commit/3f3c39a14987910bb424df51f89d948333ca3e87))
+    - extend cli wallet deposit for owned dbcs ([`341306a`](https://github.com/maidsafe/safe_network/commit/341306acd1e16290fe9a8ec676499feec8ef7639))
+    - serialize to bls keys in util functions ([`5577695`](https://github.com/maidsafe/safe_network/commit/5577695b5d3291c46cd475df8c0933a067b4cfc5))
+    - extend wallet_deposit for owned dbcs ([`3e757bb`](https://github.com/maidsafe/safe_network/commit/3e757bb626d71c03608a625fa435a312b8fc0beb))
+    - changes based on review feedback ([`5ea4c3d`](https://github.com/maidsafe/safe_network/commit/5ea4c3d60bf84384ed37b5dde25ac4dc26147c24))
+    - extend cli wallet deposit for owned dbcs ([`69079d6`](https://github.com/maidsafe/safe_network/commit/69079d698a539a6fe42e87ab1603bbb41ac91f50))
+    - serialize to bls keys in util functions ([`67006eb`](https://github.com/maidsafe/safe_network/commit/67006eb2e84b750a6b9b03d04aafdcfc85b38955))
+    - extend wallet_deposit for owned dbcs ([`23802f8`](https://github.com/maidsafe/safe_network/commit/23802f8e357831b0166307934ca19658d9107039))
+</details>
+
 ## v0.64.4 (2022-06-21)
 
 <csr-id-c038635cf88d32c52da89d11a8532e6c91c8bf38/>
+<csr-id-d526e0a32d3f09a788899d82db4fe6f13258568c/>
 
 ### Chore
 
@@ -218,119 +413,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - address some review comments ([`2429978`](https://github.com/maidsafe/safe_network/commit/24299786ba730e467c10946c8c152936b96148f8))
     - first version of Spentbook messaging, storage, and client API ([`dbda86b`](https://github.com/maidsafe/safe_network/commit/dbda86be03f912079776be514828ff5fd034830c))
     - Merge #1217 ([`2f26043`](https://github.com/maidsafe/safe_network/commit/2f2604325d533357bad7d917315cf4cba0b2d3c0))
-</details>
-
-## v0.65.0 (2022-06-26)
-
-### Chore
-
- - <csr-id-243cfc48a7f4a9b60b5b7f1fdd609c02197aba5e/> sn_interface-0.7.0/sn_dysfunction-0.6.0/sn_client-0.67.0/sn_node-0.63.0/sn_api-0.65.0/sn_cli-0.58.0
- - <csr-id-3f3c39a14987910bb424df51f89d948333ca3e87/> changes based on review feedback
-   * Prefer `map_err` in various places rather than a full `match`.
-   * Change key serialization utility functions to static rather than instance.
-   * Change `dog` command to print non-support of `SafeKey` data type rather than panic.
-   * Remove unnecessary clone on `public_key_hex`.
-   * Remove unnecessary match in various tests.
-   * Ignore wallet CLI tests that deleted the credentials file. They are problematic when running in
-     parallel with other tests. We need better isolated testing mechanisms for these. Will address in a
-     separate PR.
-   * Use different deposit names in wallet tests where multiple DBCs are deposited.
- - <csr-id-5ea4c3d60bf84384ed37b5dde25ac4dc26147c24/> changes based on review feedback
-   * Prefer `map_err` in various places rather than a full `match`.
-   * Change key serialization utility functions to static rather than instance.
-   * Change `dog` command to print non-support of `SafeKey` data type rather than panic.
-   * Remove unnecessary clone on `public_key_hex`.
-   * Remove unnecessary match in various tests.
-   * Ignore wallet CLI tests that deleted the credentials file. They are problematic when running in
-     parallel with other tests. We need better isolated testing mechanisms for these. Will address in a
-     separate PR.
-   * Use different deposit names in wallet tests where multiple DBCs are deposited.
-
-### New Features
-
- - <csr-id-341306acd1e16290fe9a8ec676499feec8ef7639/> extend cli wallet deposit for owned dbcs
-   The CLI is now extended to support the deposit of owned DBCs.
-   
-   The `deposit` command will check if the supplied DBC is owned, and if it is, it will check to see if
-   the `--secret-key` argument is present and use that. If that argument isn't present, it will attempt
-   to use the secret key that's configured for use with the CLI, i.e., the `keys create --for-cli`
-   command.
-   
-   The `reissue` command was also extended to provide an `--owned` flag, which when used, will reissue
-   an owned DBC using the public key configured for use with the CLI. This argument is mutually
-   exclusive with the `--public-key` argument, which will reissue the DBC using a specified key.
-   
-   So we could offer the user a suggestion when a supplied secret key didn't match, this also involved
-   making a little extension to the API, to return a specific type of error. We will need to modify
-   `sn_dbc` to return a specific error type for this too, so we can avoid checking the string content
-   of the error message, but this will be covered on a separate PR.
- - <csr-id-69079d698a539a6fe42e87ab1603bbb41ac91f50/> extend cli wallet deposit for owned dbcs
-   The CLI is now extended to support the deposit of owned DBCs.
-   
-   The `deposit` command will check if the supplied DBC is owned, and if it is, it will check to see if
-   the `--secret-key` argument is present and use that. If that argument isn't present, it will attempt
-   to use the secret key that's configured for use with the CLI, i.e., the `keys create --for-cli`
-   command.
-   
-   The `reissue` command was also extended to provide an `--owned` flag, which when used, will reissue
-   an owned DBC using the public key configured for use with the CLI. This argument is mutually
-   exclusive with the `--public-key` argument, which will reissue the DBC using a specified key.
-   
-   So we could offer the user a suggestion when a supplied secret key didn't match, this also involved
-   making a little extension to the API, to return a specific type of error. We will need to modify
-   `sn_dbc` to return a specific error type for this too, so we can avoid checking the string content
-   of the error message, but this will be covered on a separate PR.
-
-### New Features (BREAKING)
-
- - <csr-id-5577695b5d3291c46cd475df8c0933a067b4cfc5/> serialize to bls keys in util functions
-   Utility functions were recently added to the API for serializing to the `Keypair` type. This was
-   changed to serialize directly to BLS to make it easier for the CLI to deal directly with BLS keys.
-   Soon we will be refactoring the `Keypair` type to have a different use case and things like
-   `sn_client` would be refactored to directly work with BLS keys. This is a little step in that
-   direction.
-   
-   There was a utility function added to `sn_interface` to create a `Keypair` from a hex-based BLS key
-   because we still need to use the `Keypair` at this point in time.
- - <csr-id-3e757bb626d71c03608a625fa435a312b8fc0beb/> extend wallet_deposit for owned dbcs
-
- - <csr-id-67006eb2e84b750a6b9b03d04aafdcfc85b38955/> serialize to bls keys in util functions
-   Utility functions were recently added to the API for serializing to the `Keypair` type. This was
-   changed to serialize directly to BLS to make it easier for the CLI to deal directly with BLS keys.
-   Soon we will be refactoring the `Keypair` type to have a different use case and things like
-   `sn_client` would be refactored to directly work with BLS keys. This is a little step in that
-   direction.
-   
-   There was a utility function added to `sn_interface` to create a `Keypair` from a hex-based BLS key
-   because we still need to use the `Keypair` at this point in time.
- - <csr-id-23802f8e357831b0166307934ca19658d9107039/> extend wallet_deposit for owned dbcs
-
-
-### Commit Statistics
-
-<csr-read-only-do-not-edit/>
-
- - 9 commits contributed to the release over the course of 1 calendar day.
- - 5 days passed between releases.
- - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
- - 0 issues like '(#ID)' where seen in commit messages
-
-### Commit Details
-
-<csr-read-only-do-not-edit/>
-
-<details><summary>view details</summary>
-
- * **Uncategorized**
-    - sn_interface-0.7.0/sn_dysfunction-0.6.0/sn_client-0.67.0/sn_node-0.63.0/sn_api-0.65.0/sn_cli-0.58.0 ([`243cfc4`](https://github.com/maidsafe/safe_network/commit/243cfc48a7f4a9b60b5b7f1fdd609c02197aba5e))
-    - changes based on review feedback ([`3f3c39a`](https://github.com/maidsafe/safe_network/commit/3f3c39a14987910bb424df51f89d948333ca3e87))
-    - extend cli wallet deposit for owned dbcs ([`341306a`](https://github.com/maidsafe/safe_network/commit/341306acd1e16290fe9a8ec676499feec8ef7639))
-    - serialize to bls keys in util functions ([`5577695`](https://github.com/maidsafe/safe_network/commit/5577695b5d3291c46cd475df8c0933a067b4cfc5))
-    - extend wallet_deposit for owned dbcs ([`3e757bb`](https://github.com/maidsafe/safe_network/commit/3e757bb626d71c03608a625fa435a312b8fc0beb))
-    - changes based on review feedback ([`5ea4c3d`](https://github.com/maidsafe/safe_network/commit/5ea4c3d60bf84384ed37b5dde25ac4dc26147c24))
-    - extend cli wallet deposit for owned dbcs ([`69079d6`](https://github.com/maidsafe/safe_network/commit/69079d698a539a6fe42e87ab1603bbb41ac91f50))
-    - serialize to bls keys in util functions ([`67006eb`](https://github.com/maidsafe/safe_network/commit/67006eb2e84b750a6b9b03d04aafdcfc85b38955))
-    - extend wallet_deposit for owned dbcs ([`23802f8`](https://github.com/maidsafe/safe_network/commit/23802f8e357831b0166307934ca19658d9107039))
 </details>
 
 ## v0.64.0 (2022-06-05)

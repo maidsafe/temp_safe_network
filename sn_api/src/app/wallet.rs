@@ -42,14 +42,14 @@ impl Safe {
     /// A name can optionally be specified for the deposit. If it isn't, the hash of the DBC
     /// content will be used.
     ///
-    /// Returns the name that was set.
+    /// Returns the name that was set, along with the deposited amount.
     pub async fn wallet_deposit(
         &self,
         wallet_url: &str,
         spendable_name: Option<&str>,
         dbc: &Dbc,
         secret_key: Option<bls::SecretKey>,
-    ) -> Result<String> {
+    ) -> Result<(String, Token)> {
         // TODO: check the input DBCs were spent and all other sort of verifications,
         // perhaps all optional, and we may want a separate API to also do these verifications
         // for the user to perform them without depositing the DBC into a wallet.
@@ -79,6 +79,10 @@ impl Safe {
             ));
         };
 
+        let amount = dbc_to_deposit
+            .amount_secrets_bearer()
+            .map(|amount_secrets| Token::from_nano(amount_secrets.amount()))?;
+
         let safeurl = self.parse_and_resolve_url(wallet_url).await?;
 
         let spendable_name = match spendable_name {
@@ -90,11 +94,11 @@ impl Safe {
             .await?;
 
         debug!(
-            "A spendable DBC deposited into wallet at {}, with name: {}",
-            safeurl, spendable_name
+            "A spendable DBC deposited (amount: {}) into wallet at {}, with name: {}",
+            amount, safeurl, spendable_name
         );
 
-        Ok(spendable_name)
+        Ok((spendable_name, amount))
     }
 
     /// Fetch a wallet from a Url performing all type of URL resolution required.
@@ -443,8 +447,10 @@ mod tests {
         let wallet_xorurl = safe.wallet_create().await?;
 
         let dbc = new_dbc(DBC_WITH_12_230_000_000)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
+        let (_, amount) = safe
+            .wallet_deposit(&wallet_xorurl, None, &dbc, None)
             .await?;
+        assert_eq!(amount, Token::from_nano(12_230_000_000));
 
         let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
         assert_eq!(wallet_balances.len(), 1);
@@ -458,8 +464,11 @@ mod tests {
         let wallet_xorurl = safe.wallet_create().await?;
 
         let dbc = new_dbc(DBC_WITH_12_230_000_000)?;
-        safe.wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
+        let (name, amount) = safe
+            .wallet_deposit(&wallet_xorurl, Some("my-dbc"), &dbc, None)
             .await?;
+        assert_eq!(name, "my-dbc");
+        assert_eq!(amount, Token::from_nano(12_230_000_000));
 
         let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
         assert!(wallet_balances.contains_key("my-dbc"));
@@ -473,9 +482,11 @@ mod tests {
         let wallet_xorurl = safe.wallet_create().await?;
 
         let dbc = new_dbc(DBC_WITH_12_230_000_000)?;
-        let name = safe
+        let (name, amount) = safe
             .wallet_deposit(&wallet_xorurl, None, &dbc, None)
             .await?;
+        assert_eq!(amount, Token::from_nano(12_230_000_000));
+        assert_eq!(name, hex::encode(dbc.hash()));
 
         let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
         assert!(wallet_balances.contains_key(&name));
