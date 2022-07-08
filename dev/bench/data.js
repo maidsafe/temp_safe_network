@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1657261228882,
+  "lastUpdate": 1657287862253,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -7907,6 +7907,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 548876930,
             "range": "± 2353340",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "qi.ma@maidsafe.net",
+            "name": "qima",
+            "username": "maqi"
+          },
+          "committer": {
+            "email": "david.irvine@maidsafe.net",
+            "name": "David Irvine",
+            "username": "dirvine"
+          },
+          "distinct": true,
+          "id": "5cff2c5325a854f04788f9111439bca75b21c60f",
+          "message": "chore: ignore store_and_read_40mb as too heavy for CI",
+          "timestamp": "2022-07-08T14:16:20+01:00",
+          "tree_id": "eaa9b06a581871a36ca31a130abf413f750ef284",
+          "url": "https://github.com/maidsafe/safe_network/commit/5cff2c5325a854f04788f9111439bca75b21c60f"
+        },
+        "date": 1657287860776,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 508967451,
+            "range": "± 18764771",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 542483624,
+            "range": "± 13652789",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 799838901,
+            "range": "± 1435060556",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 284264795,
+            "range": "± 52000150",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 398381795,
+            "range": "± 17718616",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 1091115153,
+            "range": "± 27028561",
             "unit": "ns/iter"
           }
         ]
