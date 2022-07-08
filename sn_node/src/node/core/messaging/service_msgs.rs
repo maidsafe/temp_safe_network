@@ -309,31 +309,57 @@ impl Node {
         spent_proofs: &[SpentProof],
         spent_transactions: &[RingCtTransaction],
     ) -> Result<Option<SpentProofShare>> {
-        let sap = self.network_knowledge.authority_provider();
-        let current_section_key = sap.section_key();
-        let spentbook_pks = sap.public_key_set();
+        trace!(
+            "Processing DBC spend request for key image: {:?}",
+            key_image
+        );
 
-        // Obtain commitments from TX
+        // Verify the SpentProofs signatures are all valid
+        let mut spent_proofs_keys = BTreeSet::new();
+        for proof in spent_proofs.iter() {
+            if !proof
+                .spentbook_pub_key
+                .verify(&proof.spentbook_sig, proof.content.hash().as_ref())
+            {
+                debug!(
+                    "Dropping DBC spend request since a SpentProof signature is invalid: {:?}",
+                    proof.spentbook_pub_key
+                );
+                return Ok(None);
+            }
+            let _ = spent_proofs_keys.insert(proof.spentbook_pub_key);
+        }
+
+        // ...and verify the SpentProofs are signed by section keys known to us,
+        // unless the public key of the SpentProof is the genesis key
+        if spent_proofs_keys
+            .iter()
+            .any(|pk| !self.network_knowledge.verify_section_key_is_known(pk))
+        {
+            debug!("Dropping DBC spend request (key_image: {:?}) since a SpentProof is not signed by a section known to us", key_image);
+            return Ok(None);
+        }
+
+        // Obtain Commitments from the TX
         let mut public_commitments_info = Vec::<(KeyImage, Vec<Commitment>)>::new();
         for mlsag in tx.mlsags.iter() {
-            // TODO: verify the SpentProofs signatures are valid,
-            // and verify they are signed by known section keys.
-
-            // For each public key in ring, look up the matching OutputProof
-            // using the SpentProof's and spent TX's provided by the client.
-            let output_proofs: Vec<_> = mlsag
+            // For each public key in ring, look up the matching Commitment
+            // using the SpentProofs and spent TX set provided by the client.
+            let commitments: Vec<Commitment> = mlsag
                 .public_keys()
                 .iter()
-                .flat_map(|pk| {
+                .flat_map(|input_pk| {
                     spent_proofs.iter().flat_map(move |proof| {
-                        // make sure the spent proof:
-                        // 1- corresponds to any of the spent TX provided
-                        // 2- the TX output PK matches the ring PK
-                        spent_transactions.iter().filter_map(|tx| {
-                            if Hash::from(tx.hash()) == proof.transaction_hash() {
-                                tx.outputs
+                        // Make sure the spent proof corresponds to any of the spent TX provided,
+                        // and the TX output PK matches the ring PK
+                        spent_transactions.iter().filter_map(|spent_tx| {
+                            let tx_hash = Hash::from(spent_tx.hash());
+                            if tx_hash == proof.transaction_hash() {
+                                spent_tx
+                                    .outputs
                                     .iter()
-                                    .find(|output| output.public_key() == &pk.clone())
+                                    .find(|output| output.public_key() == &input_pk.clone())
+                                    .map(|output| output.commitment())
                             } else {
                                 None
                             }
@@ -342,24 +368,18 @@ impl Node {
                 })
                 .collect();
 
-            if output_proofs.len() != mlsag.public_keys().len() {
-                debug!("Dropping DBC spend request since the number of SpentProofs ({}) does not match the number of input public keys ({})",
-                        output_proofs.len(),
-                        mlsag.public_keys().len(),
+            if commitments.len() != mlsag.public_keys().len() {
+                debug!("Dropping DBC spend request since the number of SpentProofs ({}) does not match the number of input public keys ({:?})",
+                        commitments.len(),
+                        mlsag.public_keys(),
                     );
                 return Ok(None);
             }
 
-            // Collect Commitments from matched SpentProofs
-            let commitments: Vec<Commitment> = output_proofs
-                .iter()
-                .map(|proof| proof.commitment())
-                .collect();
-
             public_commitments_info.push((mlsag.key_image.into(), commitments));
         }
 
-        // Do not sign invalid tx.
+        // Do not sign invalid TX.
         let tx_public_commitments: Vec<Vec<Commitment>> = public_commitments_info
             .clone()
             .into_iter()
@@ -389,16 +409,17 @@ impl Node {
             public_commitments,
         };
 
+        let sap = self.network_knowledge.authority_provider();
+
         let (index, sig_share) = self
             .section_keys_provider
-            .sign_with(content.hash().as_ref(), &current_section_key)
+            .sign_with(content.hash().as_ref(), &sap.section_key())
             .await?;
-        let spentbook_sig_share = IndexedSignatureShare::new(index as u64, sig_share);
 
         Ok(Some(SpentProofShare {
             content,
-            spentbook_pks,
-            spentbook_sig_share,
+            spentbook_pks: sap.public_key_set(),
+            spentbook_sig_share: IndexedSignatureShare::new(index as u64, sig_share),
         }))
     }
 

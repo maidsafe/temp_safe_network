@@ -9,10 +9,14 @@
 use crate::{Client, ClientConfig};
 use bls::SecretKey;
 use eyre::{eyre, Result};
-use sn_dbc::Owner;
+use sn_dbc::{Dbc, Owner};
 use sn_interface::types::Keypair;
-use std::time::Duration;
+use std::{env, fs::read_to_string, path::PathBuf, time::Duration};
 use tempfile::tempdir;
+
+const TEST_ENV_GENESIS_DBC_PATH: &str = "TEST_ENV_GENESIS_DBC_PATH";
+const DEFAULT_TEST_GENESIS_DBC_PATH: &str =
+    ".safe/node/local-test-network/sn-node-genesis/genesis_dbc";
 
 /// Create a test client without providing any specific keypair, DBC owner, `bootstrap_config`, or
 /// timeout.
@@ -55,4 +59,35 @@ pub fn get_dbc_owner_from_secret_key_hex(secret_key_hex: &str) -> Result<Owner> 
     decoded_bytes.reverse(); // convert from big endian to little endian
     let sk: SecretKey = bincode::deserialize(&decoded_bytes).map_err(|e| eyre!(e))?;
     Ok(Owner::from(sk))
+}
+
+pub fn read_genesis_dbc_from_first_node() -> Result<Dbc> {
+    let path = match env::var(TEST_ENV_GENESIS_DBC_PATH) {
+        Ok(dir) => PathBuf::from(&dir),
+        Err(_) => {
+            let mut path = dirs_next::home_dir()
+                .ok_or_else(|| eyre!("Failed to obtain user's home path".to_string()))?;
+
+            path.push(DEFAULT_TEST_GENESIS_DBC_PATH);
+            path
+        }
+    };
+
+    let dbc_data = read_to_string(path.clone()).map_err(|err| {
+        eyre!(
+            "Failed to read genesis DBC file from '{}'.\
+            Please set TEST_ENV_GENESIS_DBC_PATH env var with the path to the genesis dbc file: {}",
+            path.display(),
+            err
+        )
+    })?;
+
+    Dbc::from_hex(dbc_data.trim()).map_err(|err| {
+        eyre!(
+            "The file read from '{}' does not appear to have genesis DBC data.\
+            Please set TEST_ENV_GENESIS_DBC_PATH env var with the path to the genesis dbc file: {}",
+            path.display(),
+            err
+        )
+    })
 }
