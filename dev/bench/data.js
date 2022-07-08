@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1657287862253,
+  "lastUpdate": 1657294112353,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -7967,6 +7967,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 1091115153,
             "range": "± 27028561",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "9c6914e2688f70a25ad5dfe74307572cb8e8fcc2",
+          "message": "Merge #1301\n\n1301: feat(node): perform signature verifications on input DBC SpentProof before signing new spent proof share r=bochaco a=bochaco\n\nThis is a follow up PR (6th PR) to PR https://github.com/maidsafe/safe_network/pull/1274, PR https://github.com/maidsafe/safe_network/pull/1235, PR https://github.com/maidsafe/safe_network/pull/1097, PR https://github.com/maidsafe/safe_network/pull/1105, and PR https://github.com/maidsafe/safe_network/pull/1143.\r\n\r\n- This implements `SpentProof`s signature verification by nodes before signing for a spent proof share, as well as checking that each `SpentProof` has been signed by a known section key (by checking the sections chains).\r\n- The input key for the genesis DBC TX is changed to be the same as the genesis key and owner of the genesis DBC. This makes the genesis spent-proof TX to be signed by the genesis key, and it allows nodes to realise when the genesis DBC is the one being spent when doing the `SpentProof` public key verification described above.\r\n- Adapt client_api spentbook test to read genesis DBC from first node in testnet, by default from `~/.safe/node/local-test-network/sn-node-genesis/genesis_dbc`, unless a path is provided on `TEST_ENV_GENESIS_DBC_PATH` env var.\r\n- We temporarily allow double spents in this sn_client test. Once we have the SpentBook implementation which prevents double spents, we'll need to adapt this sn_client test to verify there is no double spent of the genesis DBC.\n\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>",
+          "timestamp": "2022-07-08T14:00:21Z",
+          "tree_id": "30dcb65a6b5622f48ea399f4240a8d01f6c51666",
+          "url": "https://github.com/maidsafe/safe_network/commit/9c6914e2688f70a25ad5dfe74307572cb8e8fcc2"
+        },
+        "date": 1657294111326,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 513582979,
+            "range": "± 13842798",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 540335560,
+            "range": "± 29011079",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 813136159,
+            "range": "± 1352708466",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 279763839,
+            "range": "± 41979825",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 396938676,
+            "range": "± 18851096",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 1088885537,
+            "range": "± 27614829",
             "unit": "ns/iter"
           }
         ]
