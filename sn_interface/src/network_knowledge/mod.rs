@@ -506,6 +506,7 @@ impl NetworkKnowledge {
                 .collect();
 
             if self.merge_members(peers).await? {
+                there_was_an_update = true;
                 let prefix = self.prefix();
                 info!(
                     "Updated our section's members ({:?}): {:?}",

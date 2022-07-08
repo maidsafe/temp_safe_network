@@ -33,7 +33,7 @@ const MISSING_VOTE_INTERVAL: Duration = Duration::from_secs(15);
 const BACKPRESSURE_INTERVAL: Duration = Duration::from_secs(60);
 const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
 const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(120);
-const DATA_BATCH_INTERVAL: Duration = Duration::from_secs(1);
+const DATA_BATCH_INTERVAL: Duration = Duration::from_millis(50);
 const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(30);
 
 #[derive(Clone)]
@@ -209,12 +209,13 @@ impl FlowCtrl {
             let mut interval = tokio::time::interval(DATA_BATCH_INTERVAL);
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
+            use rand::seq::IteratorRandom;
+            let mut rng = rand::rngs::OsRng;
+
             loop {
                 trace!("data replication loop");
                 let _ = interval.tick().await;
 
-                use rand::seq::IteratorRandom;
-                let mut rng = rand::rngs::OsRng;
                 let mut this_batch_address = None;
 
                 let (src_section_pk, our_info, data_queued) = {
@@ -258,13 +259,6 @@ impl FlowCtrl {
                             continue;
                         }
 
-                        let name = recipients[0].name();
-
-                        let dst = sn_interface::messaging::DstLocation::Node {
-                            name,
-                            section_pk: src_section_pk,
-                        };
-
                         let data_to_send = self
                             .node
                             .read()
@@ -272,26 +266,38 @@ impl FlowCtrl {
                             .data_storage
                             .get_from_local_store(&address)
                             .await?;
-
                         let system_msg =
                             SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
-                        let wire_msg =
-                            WireMsg::single_src(&our_info, dst, system_msg, src_section_pk)?;
 
-                        debug!(
-                            "{:?} to: {:?} w/ {:?} ",
-                            LogMarker::SendingMissingReplicatedData,
-                            recipients,
-                            wire_msg.msg_id()
-                        );
+                        for recipient in recipients {
+                            let name = recipient.name();
+                            let dst = sn_interface::messaging::DstLocation::Node {
+                                name,
+                                section_pk: src_section_pk,
+                            };
+                            let wire_msg = WireMsg::single_src(
+                                &our_info,
+                                dst,
+                                system_msg.clone(),
+                                src_section_pk,
+                            )?;
 
-                        let cmd = Cmd::SendMsg {
-                            wire_msg,
-                            recipients: recipients.clone(),
-                        };
+                            debug!(
+                                "{:?} Data {:?} to: {:?} w/ {:?} ",
+                                LogMarker::SendingMissingReplicatedData,
+                                address,
+                                recipient,
+                                wire_msg.msg_id()
+                            );
 
-                        if let Err(e) = self.cmd_ctrl.push(cmd).await {
-                            error!("Error in data replication loop: {:?}", e);
+                            let cmd = Cmd::SendMsg {
+                                wire_msg,
+                                recipients: vec![recipient],
+                            };
+
+                            if let Err(e) = self.cmd_ctrl.push(cmd).await {
+                                error!("Error in data replication loop: {:?}", e);
+                            }
                         }
                     }
                 } else {
