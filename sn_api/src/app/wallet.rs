@@ -356,7 +356,6 @@ impl Safe {
 
         // Build the output DBCs
         // Spend all the input DBCs, collecting the spent proof shares for each of them
-        let client = self.get_safe_client()?;
 
         let spent_proofs: Vec<SpentProof> = input_dbcs
             .iter()
@@ -379,7 +378,6 @@ impl Safe {
                 )
                 .await?;
             let spent_proof_shares = client.spent_proof_shares(keyimage).await?;
-
             dbc_builder = dbc_builder
                 .add_spent_proof_shares(spent_proof_shares.into_iter())
                 .add_spent_transaction(tx);

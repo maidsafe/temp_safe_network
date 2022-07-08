@@ -12,6 +12,7 @@ mod test_client;
 #[cfg(test)]
 pub use test_client::{
     create_test_client, create_test_client_with, get_dbc_owner_from_secret_key_hex,
+    read_genesis_dbc_from_first_node,
 };
 
 #[cfg(test)]

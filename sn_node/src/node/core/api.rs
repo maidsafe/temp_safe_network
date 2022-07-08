@@ -25,8 +25,8 @@ use ed25519_dalek::Keypair;
 use secured_linked_list::SecuredLinkedList;
 use sn_dbc::{
     bls_ringct::{bls_bulletproofs::PedersenGens, group::Curve},
-    rng, Dbc, Hash, IndexedSignatureShare, MlsagMaterial, Output, Owner, OwnerOnce,
-    RevealedCommitment, SpentProofContent, SpentProofShare, TransactionBuilder, TrueInput,
+    rng, Dbc, Hash, IndexedSignatureShare, MlsagMaterial, Owner, OwnerOnce, RevealedCommitment,
+    SpentProofContent, SpentProofShare, TransactionBuilder, TrueInput,
 };
 use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf, sync::Arc};
 use xor_name::XorName;
@@ -46,10 +46,8 @@ impl Node {
             addr: our_addr,
         };
 
-        let genesis_sk = genesis_sk_set.secret_key();
-
         // Mint the genesis DBC to be owned by the provided genesis key
-        let genesis_dbc = gen_genesis_dbc(genesis_sk)?;
+        let genesis_dbc = gen_genesis_dbc(&genesis_sk_set)?;
 
         let (network_knowledge, section_key_share) =
             NetworkKnowledge::first_node(info.peer(), genesis_sk_set).await?;
@@ -199,14 +197,15 @@ impl Node {
 }
 
 // Helper to generate the (currently bearer) genesis DBC to be owned by the provided key.
-fn gen_genesis_dbc(output_sk: bls::SecretKey) -> Result<Dbc> {
-    let output_owner = Output::new(output_sk.public_key(), GENESIS_DBC_AMOUNT);
+fn gen_genesis_dbc(input_sk_set: &bls::SecretKeySet) -> Result<Dbc> {
+    // Use the same key as the input and output of Genesis Tx.
+    let output_sk = input_sk_set.secret_key();
+    let output_owner = OwnerOnce::from_owner_base(Owner::from(output_sk), &mut rng::thread_rng());
 
     let revealed_commitment =
         RevealedCommitment::from_value(GENESIS_DBC_AMOUNT, &mut rng::thread_rng());
 
-    // Make a secret key set (with threshold == 0) for the input of Genesis Tx.
-    let input_sk_set = bls::SecretKeySet::random(0, &mut rng::thread_rng());
+    // Use the same key as the input and output of Genesis Tx.
     let true_input = TrueInput::new(input_sk_set.secret_key(), revealed_commitment);
 
     // build our MlsagMaterial manually without randomness.
@@ -219,14 +218,9 @@ fn gen_genesis_dbc(output_sk: bls::SecretKey) -> Result<Dbc> {
         r: vec![(Default::default(), Default::default())],
     };
 
-    let output_owner_once = OwnerOnce {
-        owner_base: Owner::from(output_sk),
-        derivation_index: [1; 32],
-    };
-
     let mut dbc_builder = TransactionBuilder::default()
         .add_input(mlsag_material)
-        .add_output(output_owner, output_owner_once)
+        .add_output_by_amount(GENESIS_DBC_AMOUNT, output_owner)
         .build(&mut rng::thread_rng())
         .map_err(|err| {
             Error::GenesisDbcError(format!(
