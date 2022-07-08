@@ -4,26 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.59.1 (2022-07-07)
-
-### Chore
-
- - <csr-id-c79e2aac378b28b373fd7c18c4b9006348960071/> bit more low hanging clippy fruit
- - <csr-id-da13669193d93b3a56fff4a956c9ac9830055a7a/> use latest sn_launch_tool release, sans StructOpt
- - <csr-id-85ca7ce23414bf19e72236e32745b0fb6239664d/> replace StructOpt with Clap in sn_client
- - <csr-id-c5218c91f148e28d0e78c226bb2fd01c68f93344/> replace StructOpt with Clap in sn_cli
-
-### New Features
-
- - <csr-id-57f635fbe80392574f7f122a9d157fbb6320c4cc/> generate the genesis DBC when launching first node and write it to disk
+## v0.59.2 (2022-07-08)
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 6 commits contributed to the release over the course of 1 calendar day.
- - 2 days passed between releases.
- - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit contributed to the release.
+ - 0 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -33,8 +21,61 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`6268fe7`](https://github.com/maidsafe/safe_network/commit/6268fe76e9dd81d291492b4611094273f8d1e223))
+</details>
+
+## v0.59.1 (2022-07-07)
+
+<csr-id-c79e2aac378b28b373fd7c18c4b9006348960071/>
+<csr-id-da13669193d93b3a56fff4a956c9ac9830055a7a/>
+<csr-id-85ca7ce23414bf19e72236e32745b0fb6239664d/>
+<csr-id-c5218c91f148e28d0e78c226bb2fd01c68f93344/>
+
+### Chore
+
+ - <csr-id-c79e2aac378b28b373fd7c18c4b9006348960071/> bit more low hanging clippy fruit
+ - <csr-id-da13669193d93b3a56fff4a956c9ac9830055a7a/> use latest sn_launch_tool release, sans StructOpt
+ - <csr-id-85ca7ce23414bf19e72236e32745b0fb6239664d/> replace StructOpt with Clap in sn_client
+ - <csr-id-c5218c91f148e28d0e78c226bb2fd01c68f93344/> replace StructOpt with Clap in sn_cli
+
+### New Features (BREAKING)
+
+ - <csr-id-79a53b0d1df5a9377cfe7a9d70480ed1fa31bacc/> wallet_deposit API to also return the amount desposited
+
+### Chore
+
+ - <csr-id-2b00cec961561281f6b927e13e501342843f6a0f/> sn_interface-0.8.1/sn_dysfunction-0.7.1/sn_client-0.68.1/sn_node-0.64.1/sn_api-0.66.1/sn_cli-0.59.1
+
+### New Features
+
+ - <csr-id-57f635fbe80392574f7f122a9d157fbb6320c4cc/> generate the genesis DBC when launching first node and write it to disk
+ - <csr-id-510bdb4854bf2a04e187b60e2557ae7721aa9804/> display balance of the DBC that has been successfully deposited into a wallet
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 13 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 8 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.8.1/sn_dysfunction-0.7.1/sn_client-0.68.1/sn_node-0.64.1/sn_api-0.66.1/sn_cli-0.59.1 ([`2b00cec`](https://github.com/maidsafe/safe_network/commit/2b00cec961561281f6b927e13e501342843f6a0f))
+    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`7e2a25a`](https://github.com/maidsafe/safe_network/commit/7e2a25ae31ead0fae7824ca794b6c407695080cd))
+    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`7cf2eb6`](https://github.com/maidsafe/safe_network/commit/7cf2eb64e1176d2b23d63091f6f459d92bdccb57))
+    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`cd2f9aa`](https://github.com/maidsafe/safe_network/commit/cd2f9aa2f7001ae779273745f9ac78fc289525e3))
+    - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`39bd5b4`](https://github.com/maidsafe/safe_network/commit/39bd5b471b6b3acb6ebe90489335c995b0aca82f))
     - Merge #1309 ([`f9fa4f7`](https://github.com/maidsafe/safe_network/commit/f9fa4f7857d8161e8c036cca06006bf187a6c6c3))
+    - wallet_deposit API to also return the amount desposited ([`79a53b0`](https://github.com/maidsafe/safe_network/commit/79a53b0d1df5a9377cfe7a9d70480ed1fa31bacc))
     - bit more low hanging clippy fruit ([`c79e2aa`](https://github.com/maidsafe/safe_network/commit/c79e2aac378b28b373fd7c18c4b9006348960071))
+    - display balance of the DBC that has been successfully deposited into a wallet ([`510bdb4`](https://github.com/maidsafe/safe_network/commit/510bdb4854bf2a04e187b60e2557ae7721aa9804))
     - use latest sn_launch_tool release, sans StructOpt ([`da13669`](https://github.com/maidsafe/safe_network/commit/da13669193d93b3a56fff4a956c9ac9830055a7a))
     - replace StructOpt with Clap in sn_client ([`85ca7ce`](https://github.com/maidsafe/safe_network/commit/85ca7ce23414bf19e72236e32745b0fb6239664d))
     - replace StructOpt with Clap in sn_cli ([`c5218c9`](https://github.com/maidsafe/safe_network/commit/c5218c91f148e28d0e78c226bb2fd01c68f93344))
@@ -54,6 +95,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <csr-id-068327834c8d07ada6bf42cf78d6f7a117715466/>
 <csr-id-976e8c3d8c610d2a34c1bfa6678132a1bad234e8/>
 <csr-id-91da4d4ac7aab039853b0651e5aafd9cdd31b9c4/>
+<csr-id-e4e2eb56611a328806c59ed8bc80ca2567206bbb/>
 
 ### Chore
 
