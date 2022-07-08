@@ -136,7 +136,7 @@ impl ContentType {
 
     #[allow(missing_docs)]
     pub fn value(&self) -> Result<u16> {
-        match &*self {
+        match self {
             Self::Raw => Ok(0),
             Self::Wallet => Ok(1),
             Self::FilesContainer => Ok(2),
@@ -186,7 +186,7 @@ pub enum UrlType {
 impl UrlType {
     #[allow(missing_docs)]
     pub fn value(&self) -> Result<u16> {
-        match &*self {
+        match self {
             Self::XorUrl => Ok(0),
             Self::NrsUrl => Ok(1),
         }

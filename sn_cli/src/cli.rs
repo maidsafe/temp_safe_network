@@ -80,7 +80,7 @@ pub async fn run() -> Result<()> {
 
     debug!("Processing command: {:?}", args);
 
-    let result = match args.cmd {
+    match args.cmd {
         SubCommands::Config { cmd } => config_commander(cmd, &mut get_config().await?).await,
         SubCommands::Networks { cmd } => networks_commander(cmd, &mut get_config().await?).await,
         SubCommands::Update { no_confirm } => {
@@ -159,9 +159,7 @@ pub async fn run() -> Result<()> {
                 _ => Err(eyre!("Unknown safe subcommand")),
             }
         }
-    };
-
-    result
+    }
 }
 
 /// Gets the configuration, which is used by various parts of the application.

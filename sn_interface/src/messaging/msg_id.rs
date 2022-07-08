@@ -9,7 +9,6 @@
 use hex_fmt::HexFmt;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use xor_name::XorName;
 
 /// Constant byte length of `MsgId`.
 pub const MESSAGE_ID_LEN: usize = 32;
@@ -24,11 +23,6 @@ impl MsgId {
     /// Generates a new `MsgId` with random content.
     pub fn new() -> Self {
         Self(rand::random())
-    }
-
-    /// Convert an `XorName` into a `MsgId`
-    pub fn from_xor_name(xor_name: XorName) -> Self {
-        Self(xor_name.0)
     }
 
     fn fmt_bytes(bytes: &[u8; MESSAGE_ID_LEN], f: &mut fmt::Formatter) -> fmt::Result {

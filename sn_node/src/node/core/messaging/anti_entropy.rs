@@ -216,7 +216,7 @@ impl Node {
             sig: section_signed.clone(),
         };
 
-        let _updated = self
+        let updated = self
             .network_knowledge
             .update_knowledge_if_valid(
                 signed_sap.clone(),
@@ -229,7 +229,11 @@ impl Node {
 
         // always run this, only changes will trigger events
         let mut cmds = self.update_self_for_new_node_state(snapshot).await?;
-        cmds.extend(self.try_reorganize_data()?);
+
+        // Only trigger reorganize data when there is a membership change happens.
+        if updated {
+            cmds.extend(self.try_reorganize_data()?);
+        }
 
         Ok(cmds)
     }

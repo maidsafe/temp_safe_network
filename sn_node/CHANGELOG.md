@@ -5,7 +5,110 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.64.1 (2022-07-07)
+
+### Chore
+
+ - <csr-id-c79e2aac378b28b373fd7c18c4b9006348960071/> bit more low hanging clippy fruit
+ - <csr-id-d2c3f6e40156ff092e63640bee7c569017d5da95/> replace StructOpt with Clap in sn_node
+ - <csr-id-46262268fc167c05963e5b7bd6261310496e2379/> `try!` macro is deprecated
+   No need for rustfmt to check/replace this, as the compiler will already
+   warn for this. Deprecated since 1.39.
+   
+   Removing the option seems to trigger a couple of formatting changes that
+   rustfmt did not seem to pick on before.
+ - <csr-id-8dccb7f1fc81385f9f5f25e6c354ad1d35759528/> clippy runs cargo check already
+ - <csr-id-aa5dab0c10ccf4732e5ac43fa7d893d597c22f25/> prevent lock in data_replication loop
+ - <csr-id-262c10427e80a79edc5d9d5416fa51116ead284e/> remove DashMap from pending_data_to_replicate_to_peers
+ - <csr-id-b979a27793c8618610881ce8c8a71635f766556b/> remove unneeded async over data storage.keys()
+ - <csr-id-ed85c630919a03c8980d497becbcf7fe5deb9450/> log for data batch sending
+ - <csr-id-8927a7232b6fdd717a3c9a517da52a1757533e19/> increase join timeout
+ - <csr-id-6b574bd53f7e51839380b7be914dbab015726d1e/> Remove registerStorage cache
+ - <csr-id-2f6fff23a29cc4f04415a9a606fec88167551268/> remove dysfunction arc/rwlock
+ - <csr-id-dfcda427a51a88add7e935427722d9af7645ba37/> remove data storage arc/rwlock
+ - <csr-id-56a41f0ef175050e8e7c569e84ee6bdc2253f59a/> remove capacity arc/rwlock
+ - <csr-id-b3500b717ffbce34d80c067225ac6b368f142c03/> remove split barrier arc/rwlock
+ - <csr-id-49a03bcc2b51af262cc6931f7d5f006226076ca0/> remove ae_backoff_cache arc/rwlock
+ - <csr-id-6da8309b924357bbd8a1f576face89f8390ad8cf/> remove RwLock/Arc from LruCache
+ - <csr-id-bb68a98f5f29ecdd25d069aa57e5f49e57352445/> some read/write tweaks for node
+ - <csr-id-6cae68742e8b32105f87aeac463495b892d48397/> clippy and remove some unneccessary async
+ - <csr-id-dfeb7b0c8dfde25af6eac4374a2cf1691b321907/> add RwLock to Node inside dispatcher
+
+### New Features
+
+ - <csr-id-a2fd9b01638c2ec385656e01c4dddbc601cd5beb/> add parent id
+ - <csr-id-57f635fbe80392574f7f122a9d157fbb6320c4cc/> generate the genesis DBC when launching first node and write it to disk
+
+### Refactor
+
+ - <csr-id-92336b180c0b13290a3b83054545332867bc2d3f/> combine handling, sending sub-modules
+   Divide messaging in terms of components rather than handling, sending sub-modules
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 29 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 22 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - Merge #1315 ([`67686f7`](https://github.com/maidsafe/safe_network/commit/67686f73f9e7b18bb6fbf1eadc3fd3a256285396))
+    - Merge #1313 ([`7fe7be3`](https://github.com/maidsafe/safe_network/commit/7fe7be336799dec811c5b17e6d753ebe31e625f1))
+    - Merge branch 'main' into cargo-husky-tweaks ([`6881855`](https://github.com/maidsafe/safe_network/commit/688185573bb71cc44a7103df17f3fbeea6740247))
+    - Merge #1309 ([`f9fa4f7`](https://github.com/maidsafe/safe_network/commit/f9fa4f7857d8161e8c036cca06006bf187a6c6c3))
+    - bit more low hanging clippy fruit ([`c79e2aa`](https://github.com/maidsafe/safe_network/commit/c79e2aac378b28b373fd7c18c4b9006348960071))
+    - Merge branch 'main' into feat-cmd-parent-id ([`e10aaa2`](https://github.com/maidsafe/safe_network/commit/e10aaa2cf0404bfa10ef55b7c9dc7ae6fc0d28e5))
+    - Merge branch 'main' into cargo-husky-tweaks ([`52dd02e`](https://github.com/maidsafe/safe_network/commit/52dd02e45ab4e160b0a26498919a79ce1aefb1bd))
+    - Merge branch 'main' into refactor_messaging ([`349d432`](https://github.com/maidsafe/safe_network/commit/349d43295a44b529cbb138cf2fff9483b03fea07))
+    - combine handling, sending sub-modules ([`92336b1`](https://github.com/maidsafe/safe_network/commit/92336b180c0b13290a3b83054545332867bc2d3f))
+    - replace StructOpt with Clap in sn_node ([`d2c3f6e`](https://github.com/maidsafe/safe_network/commit/d2c3f6e40156ff092e63640bee7c569017d5da95))
+    - add parent id ([`a2fd9b0`](https://github.com/maidsafe/safe_network/commit/a2fd9b01638c2ec385656e01c4dddbc601cd5beb))
+    - `try!` macro is deprecated ([`4626226`](https://github.com/maidsafe/safe_network/commit/46262268fc167c05963e5b7bd6261310496e2379))
+    - clippy runs cargo check already ([`8dccb7f`](https://github.com/maidsafe/safe_network/commit/8dccb7f1fc81385f9f5f25e6c354ad1d35759528))
+    - prevent lock in data_replication loop ([`aa5dab0`](https://github.com/maidsafe/safe_network/commit/aa5dab0c10ccf4732e5ac43fa7d893d597c22f25))
+    - remove DashMap from pending_data_to_replicate_to_peers ([`262c104`](https://github.com/maidsafe/safe_network/commit/262c10427e80a79edc5d9d5416fa51116ead284e))
+    - remove unneeded async over data storage.keys() ([`b979a27`](https://github.com/maidsafe/safe_network/commit/b979a27793c8618610881ce8c8a71635f766556b))
+    - log for data batch sending ([`ed85c63`](https://github.com/maidsafe/safe_network/commit/ed85c630919a03c8980d497becbcf7fe5deb9450))
+    - increase join timeout ([`8927a72`](https://github.com/maidsafe/safe_network/commit/8927a7232b6fdd717a3c9a517da52a1757533e19))
+    - Remove registerStorage cache ([`6b574bd`](https://github.com/maidsafe/safe_network/commit/6b574bd53f7e51839380b7be914dbab015726d1e))
+    - remove dysfunction arc/rwlock ([`2f6fff2`](https://github.com/maidsafe/safe_network/commit/2f6fff23a29cc4f04415a9a606fec88167551268))
+    - remove data storage arc/rwlock ([`dfcda42`](https://github.com/maidsafe/safe_network/commit/dfcda427a51a88add7e935427722d9af7645ba37))
+    - remove capacity arc/rwlock ([`56a41f0`](https://github.com/maidsafe/safe_network/commit/56a41f0ef175050e8e7c569e84ee6bdc2253f59a))
+    - remove split barrier arc/rwlock ([`b3500b7`](https://github.com/maidsafe/safe_network/commit/b3500b717ffbce34d80c067225ac6b368f142c03))
+    - remove ae_backoff_cache arc/rwlock ([`49a03bc`](https://github.com/maidsafe/safe_network/commit/49a03bcc2b51af262cc6931f7d5f006226076ca0))
+    - remove RwLock/Arc from LruCache ([`6da8309`](https://github.com/maidsafe/safe_network/commit/6da8309b924357bbd8a1f576face89f8390ad8cf))
+    - some read/write tweaks for node ([`bb68a98`](https://github.com/maidsafe/safe_network/commit/bb68a98f5f29ecdd25d069aa57e5f49e57352445))
+    - clippy and remove some unneccessary async ([`6cae687`](https://github.com/maidsafe/safe_network/commit/6cae68742e8b32105f87aeac463495b892d48397))
+    - add RwLock to Node inside dispatcher ([`dfeb7b0`](https://github.com/maidsafe/safe_network/commit/dfeb7b0c8dfde25af6eac4374a2cf1691b321907))
+    - generate the genesis DBC when launching first node and write it to disk ([`57f635f`](https://github.com/maidsafe/safe_network/commit/57f635fbe80392574f7f122a9d157fbb6320c4cc))
+</details>
+
 ## v0.64.0 (2022-07-04)
+
+<csr-id-9314a2db5dc1ae91bc4d80a65c1a8825492fc7c7/>
+<csr-id-c09a983cf17fb41cd92c9f05b5605888f202af11/>
+<csr-id-ddb7798a7b0c5e60960e123414277d58f3da27eb/>
+<csr-id-2ab264744de8eeff8e26ff1423de32dadded688f/>
+<csr-id-ea46890a1706fc72787a8251b6d289a075e8ad2b/>
+<csr-id-871cd9e09bde31a7f99729fd1f7db1884e533037/>
+<csr-id-bb1cf29c2ff5d5a4ff315cab3d1affe0efd30290/>
+<csr-id-e03e5c87cdb46c74ba48ea3a2467f0193be7315b/>
+<csr-id-a348b52a40f23040adfec51e70d5d8652636d4f9/>
+<csr-id-c756918f09e742753b8686edf9472b15ec785abb/>
+<csr-id-3fc8df35510464e9003f6619cd4b98a929d6648a/>
+<csr-id-4e04a2b0acc79140bf1d0aefd82c0ad5b046a3cd/>
+<csr-id-976e8c3d8c610d2a34c1bfa6678132a1bad234e8/>
+<csr-id-849dfba283362d8fbdddd92be1078c3a963fb564/>
+<csr-id-91da4d4ac7aab039853b0651e5aafd9cdd31b9c4/>
+<csr-id-5f085f3765ab3156c74a4b7a7d7ab63a3bf6a670/>
 
 ### Chore
 
@@ -41,6 +144,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    Results mostly from the single thread work of @joshuef in #1253 (and
    ongoing efforts).
 
+### Chore
+
+ - <csr-id-e4e2eb56611a328806c59ed8bc80ca2567206bbb/> sn_interface-0.8.0/sn_dysfunction-0.7.0/sn_client-0.68.0/sn_node-0.64.0/sn_api-0.66.0/sn_cli-0.59.0
+
 ### New Features
 
  - <csr-id-26aa5b62742d09ad150db7565a4e7e694a9e2daa/> rewrite PeerSession to use a channel
@@ -72,14 +179,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - <csr-id-5dad80d3f239f5844243fedb89f8d4baaee3b640/> have the nodes to attach valid Commitments to signed SpentProofShares
 
-
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 23 commits contributed to the release over the course of 6 calendar days.
+ - 24 commits contributed to the release over the course of 6 calendar days.
  - 6 days passed between releases.
- - 23 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 24 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -89,6 +195,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.8.0/sn_dysfunction-0.7.0/sn_client-0.68.0/sn_node-0.64.0/sn_api-0.66.0/sn_cli-0.59.0 ([`e4e2eb5`](https://github.com/maidsafe/safe_network/commit/e4e2eb56611a328806c59ed8bc80ca2567206bbb))
     - sn_cli uses NetworkPrefixMap instead of node_conn_info.config ([`976e8c3`](https://github.com/maidsafe/safe_network/commit/976e8c3d8c610d2a34c1bfa6678132a1bad234e8))
     - update PrefixMap symlink if incorrect ([`849dfba`](https://github.com/maidsafe/safe_network/commit/849dfba283362d8fbdddd92be1078c3a963fb564))
     - remove node_connection_info.config from sn_node, sn_interface, sn_client ([`91da4d4`](https://github.com/maidsafe/safe_network/commit/91da4d4ac7aab039853b0651e5aafd9cdd31b9c4))
@@ -119,6 +226,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-b5b833a18b2b0ec9a5083036ccb4c068be3f1d7b/>
 <csr-id-8c69306dc86a99a8be443ab8213253983540f1cf/>
 <csr-id-eebbc30f5dd449b786115c37813a4554309875e0/>
+<csr-id-58890e5c919ada30f27d4e80c6b5e7291b99ed5c/>
 
 ### Chore
 
