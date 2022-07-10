@@ -39,8 +39,8 @@ impl Safe {
 
     /// Deposit a DBC in a wallet to make it a spendable balance.
     ///
-    /// A name can optionally be specified for the deposit. If it isn't, the hash of the DBC
-    /// content will be used.
+    /// A name can optionally be specified for the deposit. If it isn't,
+    /// part of the hash of the DBC content will be used.
     ///
     /// Returns the name that was set, along with the deposited amount.
     pub async fn wallet_deposit(
@@ -87,7 +87,7 @@ impl Safe {
 
         let spendable_name = match spendable_name {
             Some(name) => name.to_string(),
-            None => hex::encode(dbc.hash()),
+            None => format!("dbc-{}", &hex::encode(dbc_to_deposit.hash())[0..8]),
         };
 
         self.insert_dbc_into_wallet(&safeurl, &dbc_to_deposit, spendable_name.clone())
@@ -277,8 +277,12 @@ impl Safe {
             .await?;
 
         if let Some(change_dbc) = change_dbc {
-            self.insert_dbc_into_wallet(&safeurl, &change_dbc, "change-dbc".to_string())
-                .await?;
+            self.insert_dbc_into_wallet(
+                &safeurl,
+                &change_dbc,
+                format!("change-dbc-{}", &hex::encode(change_dbc.hash())[0..8]),
+            )
+            .await?;
         }
 
         // (virtually) remove input DBCs in the source wallet
@@ -484,7 +488,7 @@ mod tests {
             .wallet_deposit(&wallet_xorurl, None, &dbc, None)
             .await?;
         assert_eq!(amount, Token::from_nano(12_230_000_000));
-        assert_eq!(name, hex::encode(dbc.hash()));
+        assert_eq!(name, format!("dbc-{}", &hex::encode(dbc.hash())[0..8]));
 
         let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
         assert!(wallet_balances.contains_key(&name));
@@ -815,8 +819,9 @@ mod tests {
 
         assert_eq!(wallet_balances.len(), 1);
 
-        let (change_dbc_read, _) = wallet_balances
-            .get("change-dbc")
+        let (_, (change_dbc_read, _)) = wallet_balances
+            .iter()
+            .next()
             .ok_or_else(|| anyhow!("Couldn't read change DBC from fetched wallet"))?;
         let change = change_dbc_read
             .amount_secrets_bearer()
@@ -849,8 +854,9 @@ mod tests {
 
         assert_eq!(wallet_balances.len(), 1);
 
-        let (change_dbc_read, _) = wallet_balances
-            .get("change-dbc")
+        let (_, (change_dbc_read, _)) = wallet_balances
+            .iter()
+            .next()
             .ok_or_else(|| anyhow!("Couldn't read change DBC from fetched wallet"))?;
         let change = change_dbc_read
             .amount_secrets_bearer()
@@ -875,8 +881,9 @@ mod tests {
         let _ = safe.wallet_reissue(&wallet_xorurl, "1", None).await?;
         let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
 
-        let (change_dbc_read, _) = wallet_balances
-            .get("change-dbc")
+        let (_, (change_dbc_read, _)) = wallet_balances
+            .iter()
+            .next()
             .ok_or_else(|| anyhow!("Couldn't read change DBC from fetched wallet"))?;
         assert_eq!(*change_dbc_read.owner_base(), dbc_owner);
 
