@@ -4,14 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
-## v0.59.2 (2022-07-08)
+## v0.59.3 (2022-07-10)
+
+### Bug Fixes
+
+ - <csr-id-3c383ccf9ad0ed77080fb3e3ec459e5b02158505/> passing the churn test
+   This commit contains the work to passing the churn test.
+   There are mainly two fixes:
+   1, Only trigger data reorganization when there is membership update.
+      Previously, data reorganzation get undertaken whenever there is
+      incoming message. Which result in a looping of messaging among
+      nodes.
+   2, Only broadcast result when the QueryResponse is not an error.
+      Previously, this will cause the client thinking the whole query
+      is failed whenever an error response received.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
  - 1 commit contributed to the release.
- - 0 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -21,6 +34,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - passing the churn test ([`3c383cc`](https://github.com/maidsafe/safe_network/commit/3c383ccf9ad0ed77080fb3e3ec459e5b02158505))
+</details>
+
+## v0.59.2 (2022-07-08)
+
+### Chore
+
+ - <csr-id-b478314f331382229c9fb235dab0198f5203f509/> sn_api-0.66.2/sn_cli-0.59.2
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 2 commits contributed to the release.
+ - 1 commit where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_api-0.66.2/sn_cli-0.59.2 ([`b478314`](https://github.com/maidsafe/safe_network/commit/b478314f331382229c9fb235dab0198f5203f509))
     - Merge branch 'main' into feat-cli-wallet-show-deposited-amount ([`6268fe7`](https://github.com/maidsafe/safe_network/commit/6268fe76e9dd81d291492b4611094273f8d1e223))
 </details>
 
@@ -30,6 +68,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 <csr-id-da13669193d93b3a56fff4a956c9ac9830055a7a/>
 <csr-id-85ca7ce23414bf19e72236e32745b0fb6239664d/>
 <csr-id-c5218c91f148e28d0e78c226bb2fd01c68f93344/>
+<csr-id-2b00cec961561281f6b927e13e501342843f6a0f/>
 
 ### Chore
 

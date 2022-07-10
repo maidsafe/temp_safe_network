@@ -5,7 +5,82 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.64.2 (2022-07-10)
+
+### Chore
+
+ - <csr-id-f2ab97c053f173878ae8a355454818b38e7d72a9/> inline generic write_file function
+ - <csr-id-49e223e2c07695b4c63e253ba19ce43ec24d7112/> move more deps to clap-v3; rm some deps on rand
+ - <csr-id-5cff2c5325a854f04788f9111439bca75b21c60f/> ignore store_and_read_40mb as too heavy for CI
+
+### Bug Fixes
+
+ - <csr-id-64eb333d532694f46f1d0b9dd5109961b3551802/> for QueryResponse, set correlation_id to be the origin msg_id
+ - <csr-id-3c383ccf9ad0ed77080fb3e3ec459e5b02158505/> passing the churn test
+   This commit contains the work to passing the churn test.
+   There are mainly two fixes:
+   1, Only trigger data reorganization when there is membership update.
+      Previously, data reorganzation get undertaken whenever there is
+      incoming message. Which result in a looping of messaging among
+      nodes.
+   2, Only broadcast result when the QueryResponse is not an error.
+      Previously, this will cause the client thinking the whole query
+      is failed whenever an error response received.
+
+### Refactor
+
+ - <csr-id-dce3ba214354ad007900efce78273670cfb725d5/> move dkg util method definitions onto the DKG structs
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 10 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - inline generic write_file function ([`f2ab97c`](https://github.com/maidsafe/safe_network/commit/f2ab97c053f173878ae8a355454818b38e7d72a9))
+    - move dkg util method definitions onto the DKG structs ([`dce3ba2`](https://github.com/maidsafe/safe_network/commit/dce3ba214354ad007900efce78273670cfb725d5))
+    - move more deps to clap-v3; rm some deps on rand ([`49e223e`](https://github.com/maidsafe/safe_network/commit/49e223e2c07695b4c63e253ba19ce43ec24d7112))
+    - Merge branch 'main' into feat-dbc-spent-proof-validations ([`45418f2`](https://github.com/maidsafe/safe_network/commit/45418f2f9b5cc58f2a153bf40966beb2bf36a62a))
+    - ignore store_and_read_40mb as too heavy for CI ([`5cff2c5`](https://github.com/maidsafe/safe_network/commit/5cff2c5325a854f04788f9111439bca75b21c60f))
+    - for QueryResponse, set correlation_id to be the origin msg_id ([`64eb333`](https://github.com/maidsafe/safe_network/commit/64eb333d532694f46f1d0b9dd5109961b3551802))
+    - passing the churn test ([`3c383cc`](https://github.com/maidsafe/safe_network/commit/3c383ccf9ad0ed77080fb3e3ec459e5b02158505))
+    - Merge branch 'main' into feat-dbc-spent-proof-validations ([`94be181`](https://github.com/maidsafe/safe_network/commit/94be181789b0010f83ed5e89341f3f347575e37f))
+    - Merge branch 'main' into feat-dbc-spent-proof-validations ([`44411d5`](https://github.com/maidsafe/safe_network/commit/44411d511a496b13893670c8bc7d9f43f0ce9073))
+    - Merge branch 'main' into feat-dbc-spent-proof-validations ([`45309c4`](https://github.com/maidsafe/safe_network/commit/45309c4c0463dd9198a49537187417bf4bfdb847))
+</details>
+
 ## v0.64.1 (2022-07-07)
+
+<csr-id-c79e2aac378b28b373fd7c18c4b9006348960071/>
+<csr-id-d2c3f6e40156ff092e63640bee7c569017d5da95/>
+<csr-id-46262268fc167c05963e5b7bd6261310496e2379/>
+<csr-id-8dccb7f1fc81385f9f5f25e6c354ad1d35759528/>
+<csr-id-aa5dab0c10ccf4732e5ac43fa7d893d597c22f25/>
+<csr-id-262c10427e80a79edc5d9d5416fa51116ead284e/>
+<csr-id-b979a27793c8618610881ce8c8a71635f766556b/>
+<csr-id-ed85c630919a03c8980d497becbcf7fe5deb9450/>
+<csr-id-8927a7232b6fdd717a3c9a517da52a1757533e19/>
+<csr-id-6b574bd53f7e51839380b7be914dbab015726d1e/>
+<csr-id-2f6fff23a29cc4f04415a9a606fec88167551268/>
+<csr-id-dfcda427a51a88add7e935427722d9af7645ba37/>
+<csr-id-56a41f0ef175050e8e7c569e84ee6bdc2253f59a/>
+<csr-id-b3500b717ffbce34d80c067225ac6b368f142c03/>
+<csr-id-49a03bcc2b51af262cc6931f7d5f006226076ca0/>
+<csr-id-6da8309b924357bbd8a1f576face89f8390ad8cf/>
+<csr-id-bb68a98f5f29ecdd25d069aa57e5f49e57352445/>
+<csr-id-6cae68742e8b32105f87aeac463495b892d48397/>
+<csr-id-dfeb7b0c8dfde25af6eac4374a2cf1691b321907/>
+<csr-id-92336b180c0b13290a3b83054545332867bc2d3f/>
 
 ### Chore
 
@@ -34,10 +109,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - <csr-id-6cae68742e8b32105f87aeac463495b892d48397/> clippy and remove some unneccessary async
  - <csr-id-dfeb7b0c8dfde25af6eac4374a2cf1691b321907/> add RwLock to Node inside dispatcher
 
+### Chore
+
+ - <csr-id-2b00cec961561281f6b927e13e501342843f6a0f/> sn_interface-0.8.1/sn_dysfunction-0.7.1/sn_client-0.68.1/sn_node-0.64.1/sn_api-0.66.1/sn_cli-0.59.1
+
 ### New Features
 
  - <csr-id-a2fd9b01638c2ec385656e01c4dddbc601cd5beb/> add parent id
  - <csr-id-57f635fbe80392574f7f122a9d157fbb6320c4cc/> generate the genesis DBC when launching first node and write it to disk
+ - <csr-id-8313ed8d5b45b7f4ed3b36ada231e74c49c9f9e6/> perform signature verifications on input DBC SpentProof before signing new spent proof share
 
 ### Refactor
 
@@ -48,9 +128,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 <csr-read-only-do-not-edit/>
 
- - 29 commits contributed to the release over the course of 1 calendar day.
+ - 32 commits contributed to the release over the course of 1 calendar day.
  - 2 days passed between releases.
- - 22 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 24 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -60,9 +140,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.8.1/sn_dysfunction-0.7.1/sn_client-0.68.1/sn_node-0.64.1/sn_api-0.66.1/sn_cli-0.59.1 ([`2b00cec`](https://github.com/maidsafe/safe_network/commit/2b00cec961561281f6b927e13e501342843f6a0f))
     - Merge #1315 ([`67686f7`](https://github.com/maidsafe/safe_network/commit/67686f73f9e7b18bb6fbf1eadc3fd3a256285396))
+    - Merge branch 'main' into feat-dbc-spent-proof-validations ([`f83724c`](https://github.com/maidsafe/safe_network/commit/f83724cff1e63b35f1612fc82dffdefbeaab6cc1))
     - Merge #1313 ([`7fe7be3`](https://github.com/maidsafe/safe_network/commit/7fe7be336799dec811c5b17e6d753ebe31e625f1))
     - Merge branch 'main' into cargo-husky-tweaks ([`6881855`](https://github.com/maidsafe/safe_network/commit/688185573bb71cc44a7103df17f3fbeea6740247))
+    - perform signature verifications on input DBC SpentProof before signing new spent proof share ([`8313ed8`](https://github.com/maidsafe/safe_network/commit/8313ed8d5b45b7f4ed3b36ada231e74c49c9f9e6))
     - Merge #1309 ([`f9fa4f7`](https://github.com/maidsafe/safe_network/commit/f9fa4f7857d8161e8c036cca06006bf187a6c6c3))
     - bit more low hanging clippy fruit ([`c79e2aa`](https://github.com/maidsafe/safe_network/commit/c79e2aac378b28b373fd7c18c4b9006348960071))
     - Merge branch 'main' into feat-cmd-parent-id ([`e10aaa2`](https://github.com/maidsafe/safe_network/commit/e10aaa2cf0404bfa10ef55b7c9dc7ae6fc0d28e5))
@@ -109,6 +192,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-849dfba283362d8fbdddd92be1078c3a963fb564/>
 <csr-id-91da4d4ac7aab039853b0651e5aafd9cdd31b9c4/>
 <csr-id-5f085f3765ab3156c74a4b7a7d7ab63a3bf6a670/>
+<csr-id-e4e2eb56611a328806c59ed8bc80ca2567206bbb/>
 
 ### Chore
 
