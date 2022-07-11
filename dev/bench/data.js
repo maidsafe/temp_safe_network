@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1657542798261,
+  "lastUpdate": 1657554027348,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -8207,6 +8207,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 1085640117,
             "range": "± 22988748",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "09c2fb304c3a66902d81353153d5138f3e5a0a79",
+          "message": "Merge #1269\n\n1269: tests(relocate): unit tests for JoiningAsRelocated r=Yoga07 a=RolandSherwin\n\n\n\nCo-authored-by: RolandSherwin <RolandSherwin@protonmail.com>",
+          "timestamp": "2022-07-11T14:08:52Z",
+          "tree_id": "55894ac33c96378b0dbae093a36e360b76aeeba3",
+          "url": "https://github.com/maidsafe/safe_network/commit/09c2fb304c3a66902d81353153d5138f3e5a0a79"
+        },
+        "date": 1657554026541,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 527560116,
+            "range": "± 14141452",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 562110430,
+            "range": "± 12687706",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 949584621,
+            "range": "± 1258617929",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 306416753,
+            "range": "± 4068392",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 332568969,
+            "range": "± 3916141",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 1086263775,
+            "range": "± 223830414",
             "unit": "ns/iter"
           }
         ]
