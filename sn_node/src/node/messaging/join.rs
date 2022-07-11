@@ -21,7 +21,7 @@ use sn_interface::{
 use bls::PublicKey as BlsPublicKey;
 use std::vec;
 
-const FIRST_SECTION_MIN_ELDER_AGE: u8 = 90;
+const FIRST_SECTION_MIN_ELDER_AGE: u8 = 82;
 
 // Message handling
 impl Node {

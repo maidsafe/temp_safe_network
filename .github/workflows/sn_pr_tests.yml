@@ -226,7 +226,7 @@ jobs:
         run: ./target/release/testnet
         id: section-startup
         env:
-          RUST_LOG: "sn_node,sn_api,sn_dysfunction=trace"
+          RUST_LOG: "sn_node,sn_api,sn_consensus,sn_dysfunction=trace"
 
       - name: Print Network Log Stats at start
         shell: bash
@@ -349,7 +349,7 @@ jobs:
         shell: bash
         run: cargo run --release --example churn
         env:
-          RUST_LOG: "sn_node,sn_client,sn_dysfunction=trace"
+          RUST_LOG: "sn_node,sn_client,sn_consensus,sn_dysfunction=trace"
 
 
       - name: Print Network Stats after churn test
@@ -369,7 +369,7 @@ jobs:
         shell: bash
         run: cargo run --release --example network_split
         env:
-          RUST_LOG: "sn_node,sn_client=trace"
+          RUST_LOG: "sn_node,sn_client,sn_consensus=trace"
 
 
       - name: Print Network Log Stats at start
@@ -501,7 +501,7 @@ jobs:
         run: ./target/release/testnet
         id: section-startup
         env:
-          RUST_LOG: "sn_node,sn_dysfunction=trace"
+          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace"
 
       - name: Print Network Log Stats at start
         shell: bash
@@ -604,7 +604,7 @@ jobs:
         run: ./target/release/testnet
         id: section-startup
         env:
-          RUST_LOG: "sn_node,sn_api,sn_dysfunction=trace"
+          RUST_LOG: "sn_node,sn_api,sn_consensus,sn_dysfunction=trace"
 
       - name: Print Network Log Stats at start
         shell: bash
