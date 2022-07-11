@@ -50,7 +50,7 @@ pub const MIN_ADULT_AGE: u8 = 5;
 /// Defines the lower bound of this range.
 pub const FIRST_SECTION_MIN_AGE: u8 = MIN_ADULT_AGE + 1;
 /// Defines the higher bound of this range.
-pub const FIRST_SECTION_MAX_AGE: u8 = 100;
+pub const FIRST_SECTION_MAX_AGE: u8 = 98;
 
 const SN_ELDER_COUNT: &str = "SN_ELDER_COUNT";
 /// Number of elders per section.
