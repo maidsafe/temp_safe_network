@@ -71,15 +71,52 @@ impl Dispatcher {
 
                 Ok(cmds)
             }
-            Cmd::HandleMsg {
-                sender,
+            Cmd::ValidateMsg {
+                origin,
                 wire_msg,
                 original_bytes,
             } => {
                 let mut node = self.node.write().await;
 
-                node.handle_msg(sender, wire_msg, original_bytes, &self.comm)
+                node.validate_msg(origin, wire_msg, original_bytes).await
+            }
+            Cmd::HandleValidServiceMsg {
+                msg_id,
+                msg,
+                origin,
+                auth,
+            } => {
+                let mut node = self.node.write().await;
+
+                node.handle_valid_service_msg(msg_id, msg, auth, origin)
                     .await
+            }
+            Cmd::HandleValidSystemMsg {
+                origin,
+                msg_id,
+                msg,
+                msg_authority,
+                known_keys,
+                wire_msg_payload,
+            } => {
+                let mut node = self.node.write().await;
+
+                if let Some(msg_authority) = node
+                    .aggregate_system_msg(msg_id, msg_authority, wire_msg_payload)
+                    .await
+                {
+                    node.handle_valid_system_msg(
+                        msg_id,
+                        msg_authority,
+                        msg,
+                        origin,
+                        known_keys,
+                        &self.comm,
+                    )
+                    .await
+                } else {
+                    Ok(vec![])
+                }
             }
             Cmd::HandleDkgTimeout(token) => {
                 let node = self.node.read().await;

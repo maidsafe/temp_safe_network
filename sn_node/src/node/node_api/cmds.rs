@@ -11,8 +11,9 @@ use crate::node::{Proposal, XorName};
 use sn_consensus::Generation;
 use sn_interface::{
     messaging::{
+        data::ServiceMsg,
         system::{DkgFailureSigSet, KeyedSig, NodeState, SectionAuth, SystemMsg},
-        DstLocation, WireMsg,
+        AuthorityProof, DstLocation, MsgId, NodeMsgAuthority, ServiceAuth, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     types::{Peer, ReplicatedDataAddress},
@@ -93,14 +94,30 @@ impl CmdJob {
 pub(crate) enum Cmd {
     /// Cleanup node's PeerLinks, removing any unsused, unconnected peers
     CleanupPeerLinks,
-    /// Handle `message` from `sender`.
+    /// Validate `wire_msg` from `sender`.
     /// Holding the WireMsg that has been received from the network,
-    HandleMsg {
-        sender: Peer,
+    ValidateMsg {
+        origin: Peer,
         wire_msg: WireMsg,
         #[debug(skip)]
         // original bytes to avoid reserializing for entropy checks
-        original_bytes: Option<Bytes>,
+        original_bytes: Bytes,
+    },
+    HandleValidSystemMsg {
+        msg_id: MsgId,
+        msg: SystemMsg,
+        origin: Peer,
+        msg_authority: NodeMsgAuthority,
+        known_keys: Vec<bls::PublicKey>,
+        #[debug(skip)]
+        wire_msg_payload: Bytes,
+    },
+    HandleValidServiceMsg {
+        msg_id: MsgId,
+        msg: ServiceMsg,
+        origin: Peer,
+        /// Requester's authority over this message
+        auth: AuthorityProof<ServiceAuth>,
     },
     /// Handle a timeout previously scheduled with `ScheduleDkgTimeout`.
     HandleDkgTimeout(u64),
@@ -170,11 +187,11 @@ impl Cmd {
             HandleNewEldersAgreement { .. } => 10,
             HandleDkgOutcome { .. } => 10,
             HandleDkgFailure(_) => 10,
-            HandlePeerLost(_) => 10,
-            HandleNodeLeft(_) => 10,
-            ProposeOffline(_) => 10,
+            HandleDkgTimeout(_) => 10,
 
-            HandleDkgTimeout(_) => 9,
+            HandlePeerLost(_) => 9,
+            HandleNodeLeft(_) => 9,
+            ProposeOffline(_) => 9,
             HandleNewNodeOnline(_) => 9,
             EnqueueDataForReplication { .. } => 9,
 
@@ -182,14 +199,18 @@ impl Cmd {
             StartConnectivityTest(_) => 8,
             TestConnectivity(_) => 8,
 
+            Comm(_) => 7,
+
             // See [`MsgType`] for the priority constants and the range of possible values.
-            HandleMsg { wire_msg, .. } => wire_msg.priority(),
+            HandleValidSystemMsg { msg, .. } => msg.priority(),
+            HandleValidServiceMsg { msg, .. } => msg.priority(),
             SendMsg { wire_msg, .. } => wire_msg.priority(),
             SignOutgoingSystemMsg { msg, .. } => msg.priority(),
             SendMsgDeliveryGroup { wire_msg, .. } => wire_msg.priority(),
 
+            ValidateMsg { .. } => -9, // before it's validated, we cannot give it high prio, as it would be a spam vector
+
             CleanupPeerLinks => -10,
-            Comm(_) => 10,
         }
     }
 }
@@ -203,17 +224,23 @@ impl fmt::Display for Cmd {
             Cmd::HandleDkgTimeout(_) => write!(f, "HandleDkgTimeout"),
             Cmd::ScheduleDkgTimeout { .. } => write!(f, "ScheduleDkgTimeout"),
             #[cfg(not(feature = "test-utils"))]
-            Cmd::HandleMsg { wire_msg, .. } => {
-                write!(f, "HandleMsg {:?}", wire_msg.msg_id())
+            Cmd::ValidateMsg { wire_msg, .. } => {
+                write!(f, "ValidateMsg {:?}", wire_msg.msg_id())
             }
             #[cfg(feature = "test-utils")]
-            Cmd::HandleMsg { wire_msg, .. } => {
+            Cmd::ValidateMsg { wire_msg, .. } => {
                 write!(
                     f,
-                    "HandleMsg {:?} {:?}",
+                    "ValidateMsg {:?} {:?}",
                     wire_msg.msg_id(),
                     wire_msg.payload_debug
                 )
+            }
+            Cmd::HandleValidSystemMsg { msg_id, msg, .. } => {
+                write!(f, "HandleValidSystemMsg {:?}: {:?}", msg_id, msg)
+            }
+            Cmd::HandleValidServiceMsg { msg_id, msg, .. } => {
+                write!(f, "HandleValidServiceMsg {:?}: {:?}", msg_id, msg)
             }
             Cmd::HandlePeerLost(peer) => write!(f, "HandlePeerLost({:?})", peer.name()),
             Cmd::HandleAgreement { .. } => write!(f, "HandleAgreement"),

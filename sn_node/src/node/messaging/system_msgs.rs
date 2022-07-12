@@ -140,65 +140,61 @@ impl Node {
         if handle {
             wire_msg.set_dst_section_pk(self.network_knowledge.section_key());
             wire_msg.set_dst_xorname(our_name);
+            let original_bytes = wire_msg.serialize()?;
 
-            cmds.push(Cmd::HandleMsg {
-                sender: Peer::new(our_name, self.addr),
+            cmds.push(Cmd::ValidateMsg {
+                origin: Peer::new(our_name, self.addr),
                 wire_msg,
-                original_bytes: None,
+                original_bytes,
             });
         }
 
         Ok(cmds)
     }
 
-    // Handler for all system messages
+    /// Aggregation of system messages
+    /// Returns an updated NodeMsgAuthority if
+    /// msg was aggregated, or same as input if not
+    /// of type [`NodeMsgAuthority::BlsShare`], else [`None`].
     #[allow(clippy::too_many_arguments)]
-    pub(crate) async fn handle_system_msg(
+    pub(crate) async fn aggregate_system_msg(
         &mut self,
-        sender: Peer,
         msg_id: MsgId,
-        mut msg_authority: NodeMsgAuthority,
-        msg: SystemMsg,
+        msg_authority: NodeMsgAuthority,
         payload: Bytes,
-        known_keys: Vec<BlsPublicKey>,
-        comm: &Comm,
-    ) -> Result<Vec<Cmd>> {
-        trace!("{:?}", LogMarker::SystemMsgToBeHandled);
-
+    ) -> Option<NodeMsgAuthority> {
         // We assume to be aggregated if it contains a BLS Share sig as authority.
-        match self.aggregate_msg_and_stop(&mut msg_authority, payload) {
-            Ok(false) => {
-                self.handle_valid_msg(msg_id, msg_authority, msg, sender, known_keys, comm)
-                    .await
-            }
+        match self.aggregate_msg(msg_authority, payload) {
+            Ok(msg_authority) => msg_authority,
             Err(Error::InvalidSignatureShare) => {
                 warn!(
                     "Invalid signature on received system message, dropping the message: {:?}",
                     msg_id
                 );
-                Ok(vec![])
+                None
             }
-            Ok(true) => Ok(vec![]),
             Err(err) => {
-                trace!("handle_system_msg got error {:?}", err);
-                Ok(vec![])
+                trace!("aggregate_system_msg got error {:?}", err);
+                None
             }
         }
     }
 
     // Handler for data messages which have successfully
     // passed all signature checks and msg verifications
-    pub(crate) async fn handle_valid_msg(
+    pub(crate) async fn handle_valid_system_msg(
         &mut self,
         msg_id: MsgId,
         msg_authority: NodeMsgAuthority,
-        node_msg: SystemMsg,
+        msg: SystemMsg,
         sender: Peer,
         known_keys: Vec<BlsPublicKey>,
         comm: &Comm,
     ) -> Result<Vec<Cmd>> {
+        trace!("{:?}", LogMarker::SystemMsgToBeHandled);
+
         let src_name = msg_authority.name();
-        match node_msg {
+        match msg {
             SystemMsg::AntiEntropyUpdate {
                 section_auth,
                 section_signed,
@@ -372,7 +368,6 @@ impl Node {
                             trace!("{}", LogMarker::RelocateEnd);
                         } else {
                             warn!("Relocation:  self.relocate_state is not in Progress");
-                            return Ok(vec![]);
                         }
 
                         Ok(vec![])
@@ -744,33 +739,31 @@ impl Node {
         cmds
     }
 
-    // Convert the provided NodeMsgAuthority to be a `Section` message
-    // authority on successful accumulation. Also return 'true' if
-    // current message shall not be processed any further.
-    fn aggregate_msg_and_stop(
+    // Converts the provided NodeMsgAuthority to be a `Section` message
+    // authority on successful accumulation.
+    fn aggregate_msg(
         &mut self,
-        msg_authority: &mut NodeMsgAuthority,
+        msg_authority: NodeMsgAuthority,
         payload: Bytes,
-    ) -> Result<bool> {
+    ) -> Result<Option<NodeMsgAuthority>> {
         let bls_share_auth = if let NodeMsgAuthority::BlsShare(bls_share_auth) = msg_authority {
             bls_share_auth
         } else {
-            return Ok(false);
+            return Ok(Some(msg_authority));
         };
 
         match SectionAuth::try_authorize(
             &mut self.message_aggregator,
-            bls_share_auth.clone().into_inner(),
+            bls_share_auth.into_inner(),
             &payload,
         ) {
             Ok(section_auth) => {
                 info!("Successfully aggregated message");
-                *msg_authority = NodeMsgAuthority::Section(section_auth);
-                Ok(false)
+                Ok(Some(NodeMsgAuthority::Section(section_auth)))
             }
             Err(AggregatorError::NotEnoughShares) => {
                 info!("Not enough shares to aggregate received message");
-                Ok(true)
+                Ok(None)
             }
             Err(err) => {
                 error!("Error accumulating message at dst: {:?}", err);
