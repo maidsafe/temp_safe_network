@@ -211,14 +211,16 @@ impl Node {
         Ok(cmds)
     }
 
-    /// Handle `ServiceMsgs` received from `EndUser`
-    pub(crate) async fn handle_service_msg_received(
+    /// Handle incoming service msgs.
+    pub(crate) async fn handle_valid_service_msg(
         &mut self,
         msg_id: MsgId,
         msg: ServiceMsg,
         auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
     ) -> Result<Vec<Cmd>> {
+        trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
+
         // extract the data from the request
         let data = match msg {
             // These reads/writes are for adult nodes...
@@ -267,35 +269,10 @@ impl Node {
             });
             return self.send_cmd_error_response(error, origin, msg_id);
         }
+
         cmds.extend(self.send_cmd_ack(origin, msg_id)?);
+
         Ok(cmds)
-    }
-
-    /// Handle incoming data msgs.
-    pub(crate) async fn handle_service_msg(
-        &mut self,
-        msg_id: MsgId,
-        msg: ServiceMsg,
-        dst_location: DstLocation,
-        auth: AuthorityProof<ServiceAuth>,
-        user: Peer,
-    ) -> Result<Vec<Cmd>> {
-        trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
-        if let DstLocation::EndUser(_) = dst_location {
-            warn!(
-                "Service msg has been dropped as its destination location ({:?}) is invalid: {:?}",
-                dst_location, msg
-            );
-            return Ok(vec![]);
-        }
-
-        if self.is_not_elder() {
-            error!("Received unexpected message while Adult: {:?}", msg_id);
-            return Ok(vec![]);
-        }
-
-        self.handle_service_msg_received(msg_id, msg, auth, user)
-            .await
     }
 
     // Private helper to generate spent proof share

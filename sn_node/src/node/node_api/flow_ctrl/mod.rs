@@ -468,10 +468,10 @@ async fn handle_connection_events(ctrl: FlowCtrl, mut incoming_conns: mpsc::Rece
                     wire_msg
                 };
 
-                let cmd = Cmd::HandleMsg {
-                    sender,
+                let cmd = Cmd::ValidateMsg {
+                    origin: sender,
                     wire_msg,
-                    original_bytes: Some(original_bytes),
+                    original_bytes,
                 };
 
                 let _res = ctrl.cmd_ctrl.push(cmd).await;
