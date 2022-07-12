@@ -5,39 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.64.2 (2022-07-10)
+## v0.64.3 (2022-07-12)
 
-### Chore
+### Other
 
- - <csr-id-f2ab97c053f173878ae8a355454818b38e7d72a9/> inline generic write_file function
- - <csr-id-49e223e2c07695b4c63e253ba19ce43ec24d7112/> move more deps to clap-v3; rm some deps on rand
- - <csr-id-5cff2c5325a854f04788f9111439bca75b21c60f/> ignore store_and_read_40mb as too heavy for CI
-
-### Bug Fixes
-
- - <csr-id-64eb333d532694f46f1d0b9dd5109961b3551802/> for QueryResponse, set correlation_id to be the origin msg_id
- - <csr-id-3c383ccf9ad0ed77080fb3e3ec459e5b02158505/> passing the churn test
-   This commit contains the work to passing the churn test.
-   There are mainly two fixes:
-   1, Only trigger data reorganization when there is membership update.
-      Previously, data reorganzation get undertaken whenever there is
-      incoming message. Which result in a looping of messaging among
-      nodes.
-   2, Only broadcast result when the QueryResponse is not an error.
-      Previously, this will cause the client thinking the whole query
-      is failed whenever an error response received.
+ - <csr-id-0dcd4917c9a7bfbf6706f3b8a18e68d010c9b50d/> unit tests for JoiningAsRelocated
 
 ### Refactor
 
- - <csr-id-dce3ba214354ad007900efce78273670cfb725d5/> move dkg util method definitions onto the DKG structs
+ - <csr-id-5523e237464a76ef682ae2dbc183692502018682/> move core one level up
+   Move `node::core` to `node`.
+   Rename `api` module to `node_api`
+   Move `messages::mod` to `messages.rs`
+   Move `create_test_max_capacity_and_root_storage` from `node::mod` to `node::cfg::mod` where it is more appropriate.
 
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 10 commits contributed to the release over the course of 1 calendar day.
+ - 2 commits contributed to the release.
  - 1 day passed between releases.
- - 6 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 2 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -47,6 +35,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - unit tests for JoiningAsRelocated ([`0dcd491`](https://github.com/maidsafe/safe_network/commit/0dcd4917c9a7bfbf6706f3b8a18e68d010c9b50d))
+    - move core one level up ([`5523e23`](https://github.com/maidsafe/safe_network/commit/5523e237464a76ef682ae2dbc183692502018682))
+</details>
+
+## v0.64.2 (2022-07-10)
+
+<csr-id-f2ab97c053f173878ae8a355454818b38e7d72a9/>
+<csr-id-49e223e2c07695b4c63e253ba19ce43ec24d7112/>
+<csr-id-5cff2c5325a854f04788f9111439bca75b21c60f/>
+<csr-id-dce3ba214354ad007900efce78273670cfb725d5/>
+
+### Chore
+
+ - <csr-id-f2ab97c053f173878ae8a355454818b38e7d72a9/> inline generic write_file function
+ - <csr-id-49e223e2c07695b4c63e253ba19ce43ec24d7112/> move more deps to clap-v3; rm some deps on rand
+ - <csr-id-5cff2c5325a854f04788f9111439bca75b21c60f/> ignore store_and_read_40mb as too heavy for CI
+
+### Chore
+
+ - <csr-id-34bd9bd01a3f042c35e0432df2f0cfcebc32a8a8/> sn_interface-0.8.2/sn_client-0.68.2/sn_node-0.64.2/sn_api-0.66.3/sn_cli-0.59.3
+
+### Bug Fixes
+
+ - <csr-id-64eb333d532694f46f1d0b9dd5109961b3551802/> for QueryResponse, set correlation_id to be the origin msg_id
+ - <csr-id-3c383ccf9ad0ed77080fb3e3ec459e5b02158505/> passing the churn test
+   This commit contains the work to passing the churn test.
+   There are mainly two fixes:
+   1, Only trigger data reorganization when there is membership update.
+   Previously, data reorganzation get undertaken whenever there is
+   incoming message. Which result in a looping of messaging among
+   nodes.
+   2, Only broadcast result when the QueryResponse is not an error.
+   Previously, this will cause the client thinking the whole query
+   is failed whenever an error response received.
+
+### Refactor
+
+ - <csr-id-dce3ba214354ad007900efce78273670cfb725d5/> move dkg util method definitions onto the DKG structs
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 11 commits contributed to the release over the course of 2 calendar days.
+ - 2 days passed between releases.
+ - 7 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.8.2/sn_client-0.68.2/sn_node-0.64.2/sn_api-0.66.3/sn_cli-0.59.3 ([`34bd9bd`](https://github.com/maidsafe/safe_network/commit/34bd9bd01a3f042c35e0432df2f0cfcebc32a8a8))
     - inline generic write_file function ([`f2ab97c`](https://github.com/maidsafe/safe_network/commit/f2ab97c053f173878ae8a355454818b38e7d72a9))
     - move dkg util method definitions onto the DKG structs ([`dce3ba2`](https://github.com/maidsafe/safe_network/commit/dce3ba214354ad007900efce78273670cfb725d5))
     - move more deps to clap-v3; rm some deps on rand ([`49e223e`](https://github.com/maidsafe/safe_network/commit/49e223e2c07695b4c63e253ba19ce43ec24d7112))
@@ -81,6 +125,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <csr-id-6cae68742e8b32105f87aeac463495b892d48397/>
 <csr-id-dfeb7b0c8dfde25af6eac4374a2cf1691b321907/>
 <csr-id-92336b180c0b13290a3b83054545332867bc2d3f/>
+<csr-id-2b00cec961561281f6b927e13e501342843f6a0f/>
 
 ### Chore
 
