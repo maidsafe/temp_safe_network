@@ -12,26 +12,20 @@ use crate::{connections::CmdResponse, Error, Result};
 
 use sn_interface::{
     messaging::{
-        data::{CmdError, DataQuery, DataQueryVariant, QueryResponse},
+        data::{DataQuery, DataQueryVariant, QueryResponse},
         AuthKind, DstLocation, MsgId, ServiceAuth, WireMsg,
     },
-    network_knowledge::{prefix_map::NetworkPrefixMap, supermajority},
-    types::{Peer, PeerLinks, SendToOneError},
+    network_knowledge::supermajority,
+    types::{Peer, SendToOneError},
 };
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bytes::Bytes;
-use dashmap::DashMap;
 use futures::future::join_all;
-use qp2p::{Close, Config as QuicP2pConfig, ConnectionError, Endpoint, SendError};
+use qp2p::{Close, ConnectionError, SendError};
 use rand::{rngs::OsRng, seq::SliceRandom};
-use secured_linked_list::SecuredLinkedList;
-use std::{net::SocketAddr, sync::Arc, time::Duration};
-use tokio::{
-    sync::mpsc::{channel, Sender},
-    sync::RwLock,
-    task::JoinHandle,
-};
+use std::{sync::Arc, time::Duration};
+use tokio::{sync::mpsc::channel, sync::RwLock, task::JoinHandle};
 use tracing::{debug, error, trace, warn};
 use xor_name::XorName;
 
@@ -48,35 +42,6 @@ const INITIAL_WAIT: u64 = 1;
 const CLIENT_SEND_RETRIES: usize = 1;
 
 impl Session {
-    /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
-    #[instrument(skip(err_sender), level = "debug")]
-    pub(crate) fn new(
-        genesis_key: bls::PublicKey,
-        qp2p_config: QuicP2pConfig,
-        err_sender: Sender<CmdError>,
-        local_addr: SocketAddr,
-        cmd_ack_wait: Duration,
-        prefix_map: NetworkPrefixMap,
-    ) -> Result<Session> {
-        let endpoint = Endpoint::new_client(local_addr, qp2p_config)?;
-        let peer_links = PeerLinks::new(endpoint.clone());
-
-        let session = Session {
-            pending_queries: Arc::new(DashMap::default()),
-            incoming_err_sender: Arc::new(err_sender),
-            pending_cmds: Arc::new(DashMap::default()),
-            endpoint,
-            network: Arc::new(prefix_map),
-            genesis_key,
-            initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
-            cmd_ack_wait,
-            peer_links,
-            all_sections_chains: Arc::new(RwLock::new(SecuredLinkedList::new(genesis_key))),
-        };
-
-        Ok(session)
-    }
-
     #[instrument(skip(self, auth, payload), level = "debug", name = "session send cmd")]
     pub(crate) async fn send_cmd(
         &self,
@@ -670,12 +635,20 @@ pub(super) async fn send_msg(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sn_interface::network_knowledge::test_utils::{
-        gen_section_authority_provider, section_signed,
+    use sn_interface::{
+        messaging::data::CmdError,
+        network_knowledge::{
+            prefix_map::NetworkPrefixMap,
+            test_utils::{gen_section_authority_provider, section_signed},
+        },
     };
 
     use eyre::{eyre, Result};
-    use std::net::Ipv4Addr;
+    use qp2p::Config;
+    use std::{
+        net::{Ipv4Addr, SocketAddr},
+        time::Duration,
+    };
     use xor_name::Prefix;
 
     fn prefix(s: &str) -> Result<Prefix> {
@@ -705,7 +678,7 @@ mod tests {
 
         let session = Session::new(
             genesis_key,
-            QuicP2pConfig::default(),
+            Config::default(),
             err_sender,
             SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)),
             Duration::from_secs(10),

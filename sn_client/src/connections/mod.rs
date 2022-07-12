@@ -9,6 +9,7 @@
 mod listeners;
 mod messaging;
 
+use crate::Result;
 use sn_interface::{
     messaging::{
         data::{CmdError, OperationId, QueryResponse},
@@ -19,19 +20,16 @@ use sn_interface::{
 };
 
 use dashmap::DashMap;
-use qp2p::Endpoint;
+use qp2p::{Config as QuicP2pConfig, Endpoint};
 use secured_linked_list::SecuredLinkedList;
-use std::sync::Arc;
-use tokio::{
-    sync::{mpsc::Sender, RwLock},
-    time::Duration,
-};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
+use tokio::sync::{mpsc::Sender, RwLock};
 
 // Here we dont track the msg_id across the network, but just use it as a local identifier to remove the correct listener
 type PendingQueryResponses = Arc<DashMap<OperationId, Vec<(MsgId, QueryResponseSender)>>>;
 type QueryResponseSender = Sender<QueryResponse>;
 
-type CmdResponse = (std::net::SocketAddr, Option<CmdError>);
+type CmdResponse = (SocketAddr, Option<CmdError>);
 type PendingCmdAcks = Arc<DashMap<MsgId, Sender<CmdResponse>>>;
 
 #[derive(Debug)]
@@ -63,4 +61,35 @@ pub(super) struct Session {
     cmd_ack_wait: Duration,
     /// Links to nodes
     peer_links: PeerLinks,
+}
+
+impl Session {
+    /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
+    #[instrument(skip(err_sender), level = "debug")]
+    pub(crate) fn new(
+        genesis_key: bls::PublicKey,
+        qp2p_config: QuicP2pConfig,
+        err_sender: Sender<CmdError>,
+        local_addr: SocketAddr,
+        cmd_ack_wait: Duration,
+        prefix_map: NetworkPrefixMap,
+    ) -> Result<Session> {
+        let endpoint = Endpoint::new_client(local_addr, qp2p_config)?;
+        let peer_links = PeerLinks::new(endpoint.clone());
+
+        let session = Session {
+            pending_queries: Arc::new(DashMap::default()),
+            incoming_err_sender: Arc::new(err_sender),
+            pending_cmds: Arc::new(DashMap::default()),
+            endpoint,
+            network: Arc::new(prefix_map),
+            genesis_key,
+            initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
+            cmd_ack_wait,
+            peer_links,
+            all_sections_chains: Arc::new(RwLock::new(SecuredLinkedList::new(genesis_key))),
+        };
+
+        Ok(session)
+    }
 }
