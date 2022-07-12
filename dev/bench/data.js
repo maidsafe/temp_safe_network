@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1657633135866,
+  "lastUpdate": 1657647200777,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -8387,6 +8387,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 1086705710,
             "range": "± 28712416",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "ec1499d2a2ff0177b571f510c585ab71a2176cda",
+          "message": "Merge #1323\n\n1323: fix(sn_client): upon receiving an AE msg update client knowledge of network sections chains r=bochaco a=bochaco\n\n\n\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>",
+          "timestamp": "2022-07-12T16:16:05Z",
+          "tree_id": "c2fd72330433847694831b022053f3658bb960fa",
+          "url": "https://github.com/maidsafe/safe_network/commit/ec1499d2a2ff0177b571f510c585ab71a2176cda"
+        },
+        "date": 1657647199723,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 513560017,
+            "range": "± 12746698",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 541920271,
+            "range": "± 23369013",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 935259211,
+            "range": "± 972894715",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 282507463,
+            "range": "± 37846183",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 398162964,
+            "range": "± 17955712",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 1092122396,
+            "range": "± 34422983",
             "unit": "ns/iter"
           }
         ]
