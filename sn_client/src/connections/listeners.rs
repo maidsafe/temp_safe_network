@@ -395,9 +395,7 @@ impl Session {
         proof_chain: SecuredLinkedList,
         sender: Peer,
     ) {
-        // update our proof_chain based upon passed in knowledge
-        // self.network.verify_with_chain_and_update(sap.clone(), proof_chain)
-
+        // Update our network PrefixMap based upon passed in knowledge
         match session.network.verify_with_chain_and_update(
             SectionAuth {
                 value: sap.clone(),
@@ -435,7 +433,22 @@ impl Session {
                     sap.section_key(),
                     sender
                 );
+                return;
             }
+        }
+
+        // Since the proof chain is valid (we've verified that in above step when
+        // updating our PrefixMap), let's now update our knowledge of all sections chains
+        match session.all_sections_chains.write().await.join(proof_chain.clone()) {
+            Ok(()) => debug!(
+                "Anti-Entropy: updated our knowledge of network sections chains with proof chain {:?}",
+                proof_chain
+            ),
+            Err(e) =>
+            error!(
+                "Error updating our knowledge of all sections chains: {:?}",
+                e
+            )
         }
     }
 
