@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use clap::Parser;
+use eyre::{eyre, Result};
 use rand::{thread_rng, Rng};
 use self_encryption::MIN_ENCRYPTABLE_BYTES;
 use sn_client::{Client, ClientConfig, Error};
@@ -18,8 +19,6 @@ use std::{
 };
 use tokio::time::timeout;
 use xor_name::XorName;
-
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[derive(Parser, Debug)]
 #[clap(long_about = None)]
@@ -100,7 +99,7 @@ async fn main() -> Result<()> {
     }
 
     if error_occurred {
-        return Err("A chunk was not succesfully returned from an adult").map_err(|e| e.into());
+        return Err(eyre!("A chunk was not succesfully returned from an adult"));
     }
 
     Ok(())
