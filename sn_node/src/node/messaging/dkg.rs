@@ -25,7 +25,7 @@ use xor_name::XorName;
 
 impl Node {
     /// Send a `DkgStart` message to the provided set of candidates
-    pub(crate) async fn send_dkg_start(&self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
+    pub(crate) fn send_dkg_start(&self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
         // Send DKG start to all candidates
         let recipients = Vec::from_iter(session_id.elder_peers());
 
@@ -49,10 +49,9 @@ impl Node {
             node_msg,
             recipients,
         )
-        .await
     }
 
-    async fn send_msg_for_dst_accumulation(
+    fn send_msg_for_dst_accumulation(
         &self,
         src: XorName,
         dst: DstLocation,
@@ -64,7 +63,6 @@ impl Node {
         let key_share = self
             .section_keys_provider
             .key_share(&section_key)
-            .await
             .map_err(|err| {
                 trace!(
                     "Can't create message {:?} for accumulation at dst {:?}: {:?}",
@@ -254,8 +252,7 @@ impl Node {
         let generation = self.network_knowledge.chain_len();
 
         let dkg_session = if let Some(dkg_session) = self
-            .promote_and_demote_elders(&BTreeSet::new())
-            .await?
+            .promote_and_demote_elders(&BTreeSet::new())?
             .into_iter()
             .find(|session_id| failure_set.verify(session_id))
         {
@@ -274,10 +271,7 @@ impl Node {
                 failure_set.failed_participants,
                 generation, dkg_session
             );
-            cmds.extend(
-                self.cast_offline_proposals(&failure_set.failed_participants)
-                    .await?,
-            );
+            cmds.extend(self.cast_offline_proposals(&failure_set.failed_participants)?);
         }
 
         trace!(
@@ -285,10 +279,7 @@ impl Node {
             dkg_session, failure_set.failed_participants
         );
 
-        cmds.extend(
-            self.promote_and_demote_elders_except(&failure_set.failed_participants)
-                .await?,
-        );
+        cmds.extend(self.promote_and_demote_elders_except(&failure_set.failed_participants)?);
         Ok(cmds)
     }
 
@@ -307,7 +298,7 @@ impl Node {
 
         // Add our new keyshare to our cache, we will then use
         // it to sign any msg that needs section agreement.
-        self.section_keys_provider.insert(key_share.clone()).await;
+        self.section_keys_provider.insert(key_share.clone());
 
         let snapshot = self.state_snapshot();
 
@@ -325,7 +316,6 @@ impl Node {
             let proposal = Proposal::SectionInfo { sap, generation };
             let recipients: Vec<_> = self.network_knowledge.authority_provider().elders_vec();
             self.send_proposal_with(recipients, proposal, &key_share)
-                .await
         }
     }
 
@@ -335,7 +325,7 @@ impl Node {
     ) -> Result<Cmd> {
         // track those failed participants
         for name in &failure_set.failed_participants {
-            self.log_dkg_issue(*name).await?;
+            self.log_dkg_issue(*name)?;
         }
 
         let node_msg = SystemMsg::DkgFailureAgreement(failure_set);

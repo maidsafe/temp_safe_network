@@ -52,10 +52,7 @@ impl Node {
                 churn_id
             );
 
-            cmds.extend(
-                self.propose(Proposal::Offline(node_state.relocate(relocate_details)))
-                    .await?,
-            );
+            cmds.extend(self.propose(Proposal::Offline(node_state.relocate(relocate_details)))?);
         }
 
         Ok(cmds)
@@ -78,7 +75,6 @@ impl Node {
         );
 
         self.propose(Proposal::Offline(node_state.relocate(relocate_details)))
-            .await
     }
 
     pub(crate) async fn handle_relocate(

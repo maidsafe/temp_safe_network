@@ -215,7 +215,7 @@ mod core {
                 None
             };
 
-            let section_keys_provider = SectionKeysProvider::new(section_key_share.clone()).await;
+            let section_keys_provider = SectionKeysProvider::new(section_key_share.clone());
 
             let data_storage = DataStorage::new(&root_storage_dir, used_space.clone())?;
 
@@ -352,7 +352,7 @@ mod core {
         }
 
         /// Log a dkg issue (ie, an initialised but unfinished dkg round for a given participant)
-        pub(crate) async fn log_dkg_issue(&mut self, name: XorName) -> Result<()> {
+        pub(crate) fn log_dkg_issue(&mut self, name: XorName) -> Result<()> {
             trace!("Logging Dkg issue in dysfunction");
             self.dysfunction_tracking
                 .track_issue(name, IssueType::Dkg)
@@ -377,7 +377,7 @@ mod core {
         /// Generate a new section info(s) based on the current set of members,
         /// excluding any member matching a name in the provided `excluded_names` set.
         /// Returns a set of candidate `DkgSessionId`'s.
-        pub(crate) async fn promote_and_demote_elders(
+        pub(crate) fn promote_and_demote_elders(
             &mut self,
             excluded_names: &BTreeSet<XorName>,
         ) -> Result<Vec<DkgSessionId>> {
@@ -414,10 +414,10 @@ mod core {
 
                 // lets track ongoing DKG sessions
                 for candidate in zero_dkg_id.elders.keys() {
-                    self.log_dkg_issue(*candidate).await?;
+                    self.log_dkg_issue(*candidate)?;
                 }
                 for candidate in one_dkg_id.elders.keys() {
-                    self.log_dkg_issue(*candidate).await?;
+                    self.log_dkg_issue(*candidate)?;
                 }
 
                 return Ok(vec![zero_dkg_id, one_dkg_id]);
@@ -476,7 +476,7 @@ mod core {
                 };
                 // track init of DKG
                 for candidate in session_id.elders.keys() {
-                    self.log_dkg_issue(*candidate).await?;
+                    self.log_dkg_issue(*candidate)?;
                 }
 
                 vec![session_id]
@@ -485,11 +485,10 @@ mod core {
             Ok(res)
         }
 
-        async fn initialize_membership(&mut self, sap: SectionAuthorityProvider) -> Result<()> {
+        fn initialize_membership(&mut self, sap: SectionAuthorityProvider) -> Result<()> {
             let key = self
                 .section_keys_provider
-                .key_share(&self.network_knowledge.section_key())
-                .await?;
+                .key_share(&self.network_knowledge.section_key())?;
 
             self.membership = Some(Membership::from(
                 (key.index as u8, key.secret_key_share),
@@ -501,11 +500,10 @@ mod core {
             Ok(())
         }
 
-        async fn initialize_handover(&mut self) -> Result<()> {
+        fn initialize_handover(&mut self) -> Result<()> {
             let key = self
                 .section_keys_provider
-                .key_share(&self.network_knowledge.section_key())
-                .await?;
+                .key_share(&self.network_knowledge.section_key())?;
             let n_elders = self.network_knowledge.authority_provider().elder_count();
 
             // reset split barrier for
@@ -520,14 +518,14 @@ mod core {
             Ok(())
         }
 
-        async fn initialize_elder_state(&mut self) -> Result<()> {
+        fn initialize_elder_state(&mut self) -> Result<()> {
             let sap = self
                 .network_knowledge
                 .section_signed_authority_provider()
                 .value
                 .to_msg();
-            self.initialize_membership(sap).await?;
-            self.initialize_handover().await?;
+            self.initialize_membership(sap)?;
+            self.initialize_handover()?;
             Ok(())
         }
 
@@ -558,33 +556,26 @@ mod core {
                     let we_have_our_key_share_for_new_section_key = self
                         .section_keys_provider
                         .key_share(&new.section_key)
-                        .await
                         .is_ok();
 
                     if we_have_our_key_share_for_new_section_key {
                         // The section-key has changed, we are now able to function as an elder.
-                        self.initialize_elder_state().await?;
+                        self.initialize_elder_state()?;
 
-                        cmds.extend(
-                            self.promote_and_demote_elders_except(&BTreeSet::new())
-                                .await?,
-                        );
+                        cmds.extend(self.promote_and_demote_elders_except(&BTreeSet::new())?);
 
                         // NB TODO make sure this in only called once (after handover)
                         // and that it cannot interfere with the handover voting process as it resets the handover state completely
                         // NB TODO we should keep a copy of old handover states (since they contain valuable information like who is faulty)
-                        self.initialize_handover().await?;
+                        self.initialize_handover()?;
 
                         // Whenever there is an elders change, casting a round of joins_allowed
                         // proposals to sync.
-                        cmds.extend(
-                            self.propose(Proposal::JoinsAllowed(self.joins_allowed))
-                                .await?,
-                        );
+                        cmds.extend(self.propose(Proposal::JoinsAllowed(self.joins_allowed))?);
                     }
 
-                    self.print_network_stats().await;
-                    self.log_section_stats().await;
+                    self.print_network_stats();
+                    self.log_section_stats();
                 } else {
                     // if not elder
                     self.handover_voting = None;
@@ -612,7 +603,7 @@ mod core {
                     NodeElderChange::Promoted
                 } else if old.is_elder && !new.is_elder {
                     info!("{}", LogMarker::DemotedFromElder);
-                    self.section_keys_provider.wipe().await;
+                    self.section_keys_provider.wipe();
                     NodeElderChange::Demoted
                 } else {
                     NodeElderChange::None
@@ -635,8 +626,7 @@ mod core {
                             .iter()
                             .map(|peer| peer.name())
                             .collect(),
-                    )
-                    .await?;
+                    )?;
 
                     Event::Membership(MembershipEvent::SectionSplit {
                         elders,
@@ -691,14 +681,14 @@ mod core {
             }
         }
 
-        pub(crate) async fn print_network_stats(&self) {
+        pub(crate) fn print_network_stats(&self) {
             self.network_knowledge
                 .prefix_map()
                 .network_stats(&self.network_knowledge.authority_provider())
                 .print();
         }
 
-        pub(crate) async fn log_section_stats(&self) {
+        pub(crate) fn log_section_stats(&self) {
             if let Some(m) = self.membership.as_ref() {
                 let adults = self.network_knowledge.adults().len();
 

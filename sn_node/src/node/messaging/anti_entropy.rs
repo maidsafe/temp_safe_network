@@ -206,16 +206,13 @@ impl Node {
             sig: section_signed.clone(),
         };
 
-        let updated = self
-            .network_knowledge
-            .update_knowledge_if_valid(
-                signed_sap.clone(),
-                &proof_chain,
-                Some(members),
-                &our_name,
-                &self.section_keys_provider,
-            )
-            .await?;
+        let updated = self.network_knowledge.update_knowledge_if_valid(
+            signed_sap.clone(),
+            &proof_chain,
+            Some(members),
+            &our_name,
+            &self.section_keys_provider,
+        )?;
 
         // always run this, only changes will trigger events
         let mut cmds = self.update_self_for_new_node_state(snapshot).await?;
@@ -376,16 +373,13 @@ impl Node {
         let our_peer_info = self.info().peer();
 
         // Update our network knowledge
-        let there_was_an_update = self
-            .network_knowledge
-            .update_knowledge_if_valid(
-                signed_sap.clone(),
-                &proof_chain,
-                None,
-                &our_name,
-                &self.section_keys_provider,
-            )
-            .await?;
+        let there_was_an_update = self.network_knowledge.update_knowledge_if_valid(
+            signed_sap.clone(),
+            &proof_chain,
+            None,
+            &our_name,
+            &self.section_keys_provider,
+        )?;
 
         if there_was_an_update {
             self.write_prefix_map().await;
@@ -774,7 +768,7 @@ mod tests {
                         None,
                         &env.node.info().name(),
                         &env.node.section_keys_provider
-                    ).await?
+                    )?
             );
 
             // and it now shall give us an AE redirect msg
@@ -937,7 +931,7 @@ mod tests {
                 secret_key_share: secret_key_set.secret_key_share(0),
             };
 
-            node.section_keys_provider = SectionKeysProvider::new(Some(section_key_share)).await;
+            node.section_keys_provider = SectionKeysProvider::new(Some(section_key_share));
 
             // get our Node to now be in prefix(0)
             let _ = node.network_knowledge.update_knowledge_if_valid(

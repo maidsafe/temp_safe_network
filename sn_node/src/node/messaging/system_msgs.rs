@@ -446,7 +446,6 @@ impl Node {
                     &self.network_knowledge,
                     &mut self.proposal_aggregator,
                 )
-                .await
             }
             SystemMsg::DkgStart(session_id) => {
                 trace!("Handling msg: Dkg-Start {:?} from {}", session_id, sender);

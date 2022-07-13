@@ -365,7 +365,7 @@ impl NetworkKnowledge {
     /// with the provided proof chain.
     /// If the '`update_sap`' flag is set to 'true', the provided SAP and chain will be
     /// set as our current.
-    pub async fn update_knowledge_if_valid(
+    pub fn update_knowledge_if_valid(
         &mut self,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
         proof_chain: &SecuredLinkedList,
@@ -409,7 +409,6 @@ impl NetworkKnowledge {
                 if !we_are_an_adult || we_should_become_an_elder {
                     we_have_a_share_of_this_key = section_keys_provider
                         .key_share(&signed_sap.section_key())
-                        .await
                         .is_ok();
                 }
 
@@ -457,7 +456,7 @@ impl NetworkKnowledge {
                     self.section_peers.prune_members_archive(&section_chain);
 
                     // Switch to new SAP and chain.
-                    self.signed_sap = signed_sap.clone();
+                    self.signed_sap = signed_sap;
                     self.chain = section_chain;
                 }
             }
