@@ -19,7 +19,7 @@ use xor_name::XorName;
 
 /// Authority of a `NodeMsg`.
 /// Src of message and authority to send it. Authority is validated by the signature.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Eq, PartialEq, Debug, Clone)]
 pub enum NodeMsgAuthority {
     /// Authority of a single peer.
     Node(AuthorityProof<NodeAuth>),

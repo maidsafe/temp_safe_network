@@ -13,7 +13,7 @@ use sn_interface::{
     types::Cache,
 };
 use sn_node::node::{
-    create_test_max_capacity_and_root_storage, Config, Event as RoutingEvent, MembershipEvent,
+    cfg::create_test_max_capacity_and_root_storage, Config, Event as RoutingEvent, MembershipEvent,
     MessagingEvent, NodeApi, NodeElderChange,
 };
 

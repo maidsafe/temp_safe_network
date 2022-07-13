@@ -30,7 +30,7 @@ pub(crate) type PublicName = String;
 /// The map also has a subname version field that optionally specifies a subname at a particular
 /// version, since it's possible to have multiple entries for a given subname. If no version was
 /// requested when the map is retrieved, it will be set to `None`.
-#[derive(Debug, PartialEq, Default, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Eq, Default, Serialize, Deserialize, Clone)]
 pub struct NrsMap {
     pub map: BTreeMap<PublicName, SafeUrl>,
 }

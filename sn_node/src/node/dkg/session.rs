@@ -7,9 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    api::cmds::{next_timer_token, Cmd},
-    dkg::dkg_msgs_utils::{DkgFailureSigSetUtils, DkgFailureSigUtils},
     messages::WireMsgUtils,
+    node_api::cmds::{next_timer_token, Cmd},
     Result,
 };
 

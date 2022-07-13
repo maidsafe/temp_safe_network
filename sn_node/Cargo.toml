@@ -8,7 +8,7 @@ license = "GPL-3.0"
 name = "sn_node"
 readme = "README.md"
 repository = "https://github.com/maidsafe/safe_network"
-version = "0.64.0"
+version = "0.64.3"
 
 
 
@@ -40,7 +40,7 @@ bytes = { version = "1.0.1", features = ["serde"] }
 chrono = "0.4.19"
 color-eyre = "~0.6.0"
 console-subscriber = { version = "~0.1.0", optional = true }
-crdts = "7.0"
+crdts = { version = "7.1", default-features=false, features = ["merkle"] }
 custom_debug = "~0.5.0"
 dashmap = {version = "5.1.0", features = [ "serde" ]}
 dirs-next = "2.0.0"
@@ -60,14 +60,14 @@ qp2p = "~0.28.3"
 rand = "~0.8"
 rand-07 = { package = "rand", version = "~0.7.3" }
 rayon = "1.5.1"
-resource_proof = "1.0.38"
+resource_proof = "1.0.39"
 rmp-serde = "1.0.0"
 secured_linked_list = "~0.5.2"
 self_encryption = "~0.27.4"
 sn_consensus = "2.1.1"
 sn_dbc = { version = "6.0.0", features = ["serdes"] }
-sn_dysfunction = { path = "../sn_dysfunction", version = "^0.7.0" }
-sn_interface = { path = "../sn_interface", version = "^0.8.0" }
+sn_dysfunction = { path = "../sn_dysfunction", version = "^0.7.1" }
+sn_interface = { path = "../sn_interface", version = "^0.8.2" }
 serde = { version = "1.0.111", features = ["derive", "rc"] }
 serde_bytes = "~0.11.5"
 serde_json = "1.0.53"
@@ -109,12 +109,12 @@ rand_xorshift = "~0.2.0"
 tokio-util = { version = "~0.6.7", features = ["time"] }
 walkdir = "2"
 yansi = "~0.5.0"
-sn_interface = { path = "../sn_interface", version = "^0.8.0", features= ["test-utils", "proptest"] }
+sn_interface = { path = "../sn_interface", version = "^0.8.2", features= ["test-utils", "proptest"] }
 
 [dev-dependencies.cargo-husky]
 version = "1.5.0"
 default-features = false # Disable features which are enabled by default
-features = ["precommit-hook", "run-cargo-clippy", "run-cargo-fmt", "run-cargo-check"]
+features = ["precommit-hook", "run-cargo-clippy", "run-cargo-fmt"]
 
 [package.metadata.cargo-udeps.ignore]
 development = ["cargo-husky"]

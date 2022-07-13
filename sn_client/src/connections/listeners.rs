@@ -256,7 +256,16 @@ impl Session {
 
         let _handle = tokio::spawn(async move {
             match msg {
-                ServiceMsg::QueryResponse { response, .. } => {
+                ServiceMsg::QueryResponse {
+                    response,
+                    correlation_id,
+                } => {
+                    trace!(
+                        "ServiceMsg with id {:?} is QueryResponse regarding {:?} with response {:?}",
+                        msg_id,
+                        correlation_id,
+                        response,
+                    );
                     // Note that this doesn't remove the sender from here since multiple
                     // responses corresponding to the same msg ID might arrive.
                     // Once we are satisfied with the response this is channel is discarded in
@@ -265,8 +274,14 @@ impl Session {
                     if let Ok(op_id) = response.operation_id() {
                         if let Some(entry) = queries.get(&op_id) {
                             let all_senders = entry.value();
-                            for (_msg_id, sender) in all_senders {
-                                let res = sender.try_send(response.clone());
+                            // Only valid response shall get broadcast to all
+                            for (ori_msg_id, sender) in all_senders {
+                                let res = if response.is_success() || ori_msg_id == &correlation_id
+                                {
+                                    sender.try_send(response.clone())
+                                } else {
+                                    continue;
+                                };
                                 if res.is_err() {
                                     trace!("Error relaying query response internally on a channel for {:?} op_id {:?}: {:?}. (It has likely been removed)", msg_id, op_id, res)
                                 }
@@ -380,9 +395,7 @@ impl Session {
         proof_chain: SecuredLinkedList,
         sender: Peer,
     ) {
-        // update our proof_chain based upon passed in knowledge
-        // self.network.verify_with_chain_and_update(sap.clone(), proof_chain)
-
+        // Update our network PrefixMap based upon passed in knowledge
         match session.network.verify_with_chain_and_update(
             SectionAuth {
                 value: sap.clone(),
@@ -420,7 +433,22 @@ impl Session {
                     sap.section_key(),
                     sender
                 );
+                return;
             }
+        }
+
+        // Since the proof chain is valid (we've verified that in above step when
+        // updating our PrefixMap), let's now update our knowledge of all sections chains
+        match session.all_sections_chains.write().await.join(proof_chain.clone()) {
+            Ok(()) => debug!(
+                "Anti-Entropy: updated our knowledge of network sections chains with proof chain {:?}",
+                proof_chain
+            ),
+            Err(e) =>
+            error!(
+                "Error updating our knowledge of all sections chains: {:?}",
+                e
+            )
         }
     }
 

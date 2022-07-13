@@ -308,7 +308,7 @@ impl QueryResponse {
 
 /// Error type for an attempted conversion from a [`QueryResponse`] variant to an expected wrapped
 /// value.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 #[allow(clippy::large_enum_variant)]
 pub enum TryFromError {
     /// Wrong variant found in `QueryResponse`.

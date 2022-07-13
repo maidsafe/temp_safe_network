@@ -24,7 +24,7 @@ pub mod update;
 pub mod wallet;
 pub mod xorurl;
 
-#[derive(PartialEq, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum OutputFmt {
     Pretty,
     Json,

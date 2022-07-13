@@ -1113,7 +1113,138 @@ needed, as they keypair itself contains the Arcs we need.
     - Self authentication Example
     - Example to demonstrate Storage API
 
+## v0.68.2 (2022-07-10)
+
+### Chore
+
+ - <csr-id-19ddebad43aa53822cb7e781913ba34b848e2c89/> remove unused utilities
+ - <csr-id-49e223e2c07695b4c63e253ba19ce43ec24d7112/> move more deps to clap-v3; rm some deps on rand
+ - <csr-id-5cff2c5325a854f04788f9111439bca75b21c60f/> ignore store_and_read_40mb as too heavy for CI
+
+### Bug Fixes
+
+ - <csr-id-64eb333d532694f46f1d0b9dd5109961b3551802/> for QueryResponse, set correlation_id to be the origin msg_id
+ - <csr-id-3c383ccf9ad0ed77080fb3e3ec459e5b02158505/> passing the churn test
+   This commit contains the work to passing the churn test.
+   There are mainly two fixes:
+   1, Only trigger data reorganization when there is membership update.
+      Previously, data reorganzation get undertaken whenever there is
+      incoming message. Which result in a looping of messaging among
+      nodes.
+   2, Only broadcast result when the QueryResponse is not an error.
+      Previously, this will cause the client thinking the whole query
+      is failed whenever an error response received.
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 9 commits contributed to the release over the course of 1 calendar day.
+ - 1 day passed between releases.
+ - 5 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - remove unused utilities ([`19ddeba`](https://github.com/maidsafe/safe_network/commit/19ddebad43aa53822cb7e781913ba34b848e2c89))
+    - move more deps to clap-v3; rm some deps on rand ([`49e223e`](https://github.com/maidsafe/safe_network/commit/49e223e2c07695b4c63e253ba19ce43ec24d7112))
+    - Merge branch 'main' into feat-dbc-spent-proof-validations ([`45418f2`](https://github.com/maidsafe/safe_network/commit/45418f2f9b5cc58f2a153bf40966beb2bf36a62a))
+    - ignore store_and_read_40mb as too heavy for CI ([`5cff2c5`](https://github.com/maidsafe/safe_network/commit/5cff2c5325a854f04788f9111439bca75b21c60f))
+    - for QueryResponse, set correlation_id to be the origin msg_id ([`64eb333`](https://github.com/maidsafe/safe_network/commit/64eb333d532694f46f1d0b9dd5109961b3551802))
+    - passing the churn test ([`3c383cc`](https://github.com/maidsafe/safe_network/commit/3c383ccf9ad0ed77080fb3e3ec459e5b02158505))
+    - Merge branch 'main' into feat-dbc-spent-proof-validations ([`94be181`](https://github.com/maidsafe/safe_network/commit/94be181789b0010f83ed5e89341f3f347575e37f))
+    - Merge branch 'main' into feat-dbc-spent-proof-validations ([`44411d5`](https://github.com/maidsafe/safe_network/commit/44411d511a496b13893670c8bc7d9f43f0ce9073))
+    - Merge branch 'main' into feat-dbc-spent-proof-validations ([`45309c4`](https://github.com/maidsafe/safe_network/commit/45309c4c0463dd9198a49537187417bf4bfdb847))
+</details>
+
+## v0.68.1 (2022-07-07)
+
+<csr-id-77cef496695e8cac9ccefccaf99cf350fb479eb9/>
+<csr-id-da13669193d93b3a56fff4a956c9ac9830055a7a/>
+<csr-id-85ca7ce23414bf19e72236e32745b0fb6239664d/>
+<csr-id-46262268fc167c05963e5b7bd6261310496e2379/>
+<csr-id-8dccb7f1fc81385f9f5f25e6c354ad1d35759528/>
+<csr-id-2d0e23cdc7f94b0cc2d13ddf8203702cec4d3a07/>
+
+### Chore
+
+ - <csr-id-77cef496695e8cac9ccefccaf99cf350fb479eb9/> now we only contact one adult at a time increase retry count
+   This should get us more contact with more elders in the same amount of time as previous.
+   Only returning faster if initial adult query returns
+ - <csr-id-da13669193d93b3a56fff4a956c9ac9830055a7a/> use latest sn_launch_tool release, sans StructOpt
+ - <csr-id-85ca7ce23414bf19e72236e32745b0fb6239664d/> replace StructOpt with Clap in sn_client
+ - <csr-id-46262268fc167c05963e5b7bd6261310496e2379/> `try!` macro is deprecated
+   No need for rustfmt to check/replace this, as the compiler will already
+   warn for this. Deprecated since 1.39.
+   
+   Removing the option seems to trigger a couple of formatting changes that
+   rustfmt did not seem to pick on before.
+ - <csr-id-8dccb7f1fc81385f9f5f25e6c354ad1d35759528/> clippy runs cargo check already
+ - <csr-id-2d0e23cdc7f94b0cc2d13ddf8203702cec4d3a07/> churn example tweaks
+
+### Test
+
+ - <csr-id-90059dc4edf35fc7d53bc25b485be291a1de9807/> adapt client_api spentbook test to read genesis DBC from first node in testnet
+   We temporarily allow double spents in this test. Once we have the SpentBook implementation which prevents
+   double spents, we'll need to adapt this test to verify there is no double spent of the genesis DBC.
+
+### Chore
+
+ - <csr-id-2b00cec961561281f6b927e13e501342843f6a0f/> sn_interface-0.8.1/sn_dysfunction-0.7.1/sn_client-0.68.1/sn_node-0.64.1/sn_api-0.66.1/sn_cli-0.59.1
+
+### Bug Fixes
+
+ - <csr-id-1e3f865ae5e32520958bb071bc7fbffe8b79a033/> reduce client waiting time on receiving responses
+
+### Commit Statistics
+
+<csr-read-only-do-not-edit/>
+
+ - 15 commits contributed to the release over the course of 1 calendar day.
+ - 2 days passed between releases.
+ - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 0 issues like '(#ID)' where seen in commit messages
+
+### Commit Details
+
+<csr-read-only-do-not-edit/>
+
+<details><summary>view details</summary>
+
+ * **Uncategorized**
+    - sn_interface-0.8.1/sn_dysfunction-0.7.1/sn_client-0.68.1/sn_node-0.64.1/sn_api-0.66.1/sn_cli-0.59.1 ([`2b00cec`](https://github.com/maidsafe/safe_network/commit/2b00cec961561281f6b927e13e501342843f6a0f))
+    - Merge #1315 ([`67686f7`](https://github.com/maidsafe/safe_network/commit/67686f73f9e7b18bb6fbf1eadc3fd3a256285396))
+    - Merge branch 'main' into feat-dbc-spent-proof-validations ([`f83724c`](https://github.com/maidsafe/safe_network/commit/f83724cff1e63b35f1612fc82dffdefbeaab6cc1))
+    - Merge #1313 ([`7fe7be3`](https://github.com/maidsafe/safe_network/commit/7fe7be336799dec811c5b17e6d753ebe31e625f1))
+    - Merge branch 'main' into cargo-husky-tweaks ([`6881855`](https://github.com/maidsafe/safe_network/commit/688185573bb71cc44a7103df17f3fbeea6740247))
+    - adapt client_api spentbook test to read genesis DBC from first node in testnet ([`90059dc`](https://github.com/maidsafe/safe_network/commit/90059dc4edf35fc7d53bc25b485be291a1de9807))
+    - Merge #1309 ([`f9fa4f7`](https://github.com/maidsafe/safe_network/commit/f9fa4f7857d8161e8c036cca06006bf187a6c6c3))
+    - Merge branch 'main' into cargo-husky-tweaks ([`52dd02e`](https://github.com/maidsafe/safe_network/commit/52dd02e45ab4e160b0a26498919a79ce1aefb1bd))
+    - now we only contact one adult at a time increase retry count ([`77cef49`](https://github.com/maidsafe/safe_network/commit/77cef496695e8cac9ccefccaf99cf350fb479eb9))
+    - use latest sn_launch_tool release, sans StructOpt ([`da13669`](https://github.com/maidsafe/safe_network/commit/da13669193d93b3a56fff4a956c9ac9830055a7a))
+    - replace StructOpt with Clap in sn_client ([`85ca7ce`](https://github.com/maidsafe/safe_network/commit/85ca7ce23414bf19e72236e32745b0fb6239664d))
+    - `try!` macro is deprecated ([`4626226`](https://github.com/maidsafe/safe_network/commit/46262268fc167c05963e5b7bd6261310496e2379))
+    - clippy runs cargo check already ([`8dccb7f`](https://github.com/maidsafe/safe_network/commit/8dccb7f1fc81385f9f5f25e6c354ad1d35759528))
+    - churn example tweaks ([`2d0e23c`](https://github.com/maidsafe/safe_network/commit/2d0e23cdc7f94b0cc2d13ddf8203702cec4d3a07))
+    - reduce client waiting time on receiving responses ([`1e3f865`](https://github.com/maidsafe/safe_network/commit/1e3f865ae5e32520958bb071bc7fbffe8b79a033))
+</details>
+
 ## v0.68.0 (2022-07-04)
+
+<csr-id-9314a2db5dc1ae91bc4d80a65c1a8825492fc7c7/>
+<csr-id-d4850ff81d33751ebf9e3a7c7af438f160df6e44/>
+<csr-id-ddb7798a7b0c5e60960e123414277d58f3da27eb/>
+<csr-id-4e04a2b0acc79140bf1d0aefd82c0ad5b046a3cd/>
+<csr-id-6a2553a11b1404ad404e67df29bf3ec535d1b954/>
+<csr-id-5dbf50d92bf7e93acbb00e85f51910f32ac4a124/>
+<csr-id-849dfba283362d8fbdddd92be1078c3a963fb564/>
+<csr-id-91da4d4ac7aab039853b0651e5aafd9cdd31b9c4/>
+<csr-id-e4e2eb56611a328806c59ed8bc80ca2567206bbb/>
 
 ### Chore
 
@@ -1135,6 +1266,10 @@ needed, as they keypair itself contains the Arcs we need.
    Results mostly from the single thread work of @joshuef in #1253 (and
    ongoing efforts).
 
+### Chore
+
+ - <csr-id-e4e2eb56611a328806c59ed8bc80ca2567206bbb/> sn_interface-0.8.0/sn_dysfunction-0.7.0/sn_client-0.68.0/sn_node-0.64.0/sn_api-0.66.0/sn_cli-0.59.0
+
 ### Refactor
 
  - <csr-id-6a2553a11b1404ad404e67df29bf3ec535d1b954/> remove NetworkInfo::GenesisKey variant
@@ -1146,14 +1281,13 @@ needed, as they keypair itself contains the Arcs we need.
 
  - <csr-id-5dad80d3f239f5844243fedb89f8d4baaee3b640/> have the nodes to attach valid Commitments to signed SpentProofShares
 
-
 ### Commit Statistics
 
 <csr-read-only-do-not-edit/>
 
- - 9 commits contributed to the release over the course of 5 calendar days.
+ - 10 commits contributed to the release over the course of 6 calendar days.
  - 6 days passed between releases.
- - 9 commits where understood as [conventional](https://www.conventionalcommits.org).
+ - 10 commits where understood as [conventional](https://www.conventionalcommits.org).
  - 0 issues like '(#ID)' where seen in commit messages
 
 ### Commit Details
@@ -1163,6 +1297,7 @@ needed, as they keypair itself contains the Arcs we need.
 <details><summary>view details</summary>
 
  * **Uncategorized**
+    - sn_interface-0.8.0/sn_dysfunction-0.7.0/sn_client-0.68.0/sn_node-0.64.0/sn_api-0.66.0/sn_cli-0.59.0 ([`e4e2eb5`](https://github.com/maidsafe/safe_network/commit/e4e2eb56611a328806c59ed8bc80ca2567206bbb))
     - remove NetworkInfo::GenesisKey variant ([`6a2553a`](https://github.com/maidsafe/safe_network/commit/6a2553a11b1404ad404e67df29bf3ec535d1b954))
     - remove NodeConfig from sn_api::ipc, add sn_cli tests ([`5dbf50d`](https://github.com/maidsafe/safe_network/commit/5dbf50d92bf7e93acbb00e85f51910f32ac4a124))
     - update PrefixMap symlink if incorrect ([`849dfba`](https://github.com/maidsafe/safe_network/commit/849dfba283362d8fbdddd92be1078c3a963fb564))
@@ -1177,6 +1312,7 @@ needed, as they keypair itself contains the Arcs we need.
 ## v0.67.1 (2022-06-28)
 
 <csr-id-8c69306dc86a99a8be443ab8213253983540f1cf/>
+<csr-id-58890e5c919ada30f27d4e80c6b5e7291b99ed5c/>
 
 ### New Features
 

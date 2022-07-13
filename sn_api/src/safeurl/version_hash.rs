@@ -17,7 +17,7 @@ use std::{
 };
 use thiserror::Error;
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum VersionHashError {
     #[error("Decoding error")]
     DecodingError(#[from] multibase::Error),

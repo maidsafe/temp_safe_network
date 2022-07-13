@@ -10,7 +10,7 @@ use crate::common::auth_types::SafeAuthReqId;
 use serde::{Deserialize, Serialize};
 
 /// IPC request.
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum IpcReq {
     /// Application authorisation request, used to obtain keypair/s the application
     /// shall sign the network requests with.
@@ -21,7 +21,7 @@ pub enum IpcReq {
 }
 
 /// Represents an authorisation request.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct AuthReq {
     /// The authorisation request ID
     pub req_id: SafeAuthReqId,

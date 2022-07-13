@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
 /// Request to join a section as relocated from another section
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct JoinAsRelocatedRequest {
     /// The public key of the section to join.
     pub section_key: BlsPublicKey,
