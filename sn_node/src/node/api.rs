@@ -97,7 +97,7 @@ impl Node {
 
     /// Returns the current BLS public key set
     pub(crate) async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        Ok(self.key_share().await?.public_key_set)
+        Ok(self.key_share()?.public_key_set)
     }
 
     /// Returns the SAP of the section matching the name.
@@ -112,11 +112,10 @@ impl Node {
 
     /// Returns our key share in the current BLS group if this node is a member of one, or
     /// `Error::MissingSecretKeyShare` otherwise.
-    pub(crate) async fn key_share(&self) -> Result<SectionKeyShare> {
+    pub(crate) fn key_share(&self) -> Result<SectionKeyShare> {
         let section_key = self.network_knowledge.section_key();
         self.section_keys_provider
             .key_share(&section_key)
-            .await
             .map_err(Error::from)
     }
 
@@ -180,15 +179,15 @@ impl Node {
     // Generate a new section info based on the current set of members, but
     // excluding the ones in the provided list. And if the outcome list of candidates
     // differs from the current elders, trigger a DKG.
-    pub(crate) async fn promote_and_demote_elders_except(
+    pub(crate) fn promote_and_demote_elders_except(
         &mut self,
         excluded_names: &BTreeSet<XorName>,
     ) -> Result<Vec<Cmd>> {
         debug!("{}", LogMarker::TriggeringPromotionAndDemotion);
         let mut cmds = vec![];
         // TODO: move `promote_and_demote_elders` to Membership
-        for session_id in self.promote_and_demote_elders(excluded_names).await? {
-            cmds.extend(self.send_dkg_start(session_id).await?);
+        for session_id in self.promote_and_demote_elders(excluded_names)? {
+            cmds.extend(self.send_dkg_start(session_id)?);
         }
 
         Ok(cmds)

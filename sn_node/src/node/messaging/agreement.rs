@@ -132,7 +132,7 @@ impl Node {
         }))
         .await;
 
-        self.log_section_stats().await;
+        self.log_section_stats();
 
         // Do not disable node joins in first section.
         let our_prefix = self.network_knowledge.prefix();
@@ -153,9 +153,7 @@ impl Node {
                 .await?,
         );
 
-        let result = self
-            .promote_and_demote_elders_except(&BTreeSet::default())
-            .await?;
+        let result = self.promote_and_demote_elders_except(&BTreeSet::default())?;
 
         if result.is_empty() {
             // Send AE-Update to our section
@@ -166,7 +164,7 @@ impl Node {
 
         info!("cmds in queue for Accepting node {:?}", cmds);
 
-        self.print_network_stats().await;
+        self.print_network_stats();
 
         Ok(cmds)
     }
@@ -218,7 +216,7 @@ impl Node {
         //       elders excluded, this check here uses the empty set for the
         //       excluded_candidates which would prevent a dkg-retry from
         //       succeeding.
-        let dkg_sessions = self.promote_and_demote_elders(&BTreeSet::new()).await?;
+        let dkg_sessions = self.promote_and_demote_elders(&BTreeSet::new())?;
 
         let agreeing_elders = BTreeSet::from_iter(signed_section_auth.names());
         if dkg_sessions
@@ -302,17 +300,13 @@ impl Node {
                 err
             ),
             Ok(()) => {
-                match self
-                    .network_knowledge
-                    .update_knowledge_if_valid(
-                        signed_section_auth.clone(),
-                        &proof_chain,
-                        None,
-                        &our_name,
-                        &self.section_keys_provider,
-                    )
-                    .await
-                {
+                match self.network_knowledge.update_knowledge_if_valid(
+                    signed_section_auth.clone(),
+                    &proof_chain,
+                    None,
+                    &our_name,
+                    &self.section_keys_provider,
+                ) {
                     Err(err) => error!(
                         "Error updating our network knowledge for {:?}: {:?}",
                         prefix, err

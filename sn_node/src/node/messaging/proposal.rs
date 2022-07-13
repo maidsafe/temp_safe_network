@@ -21,13 +21,13 @@ use sn_interface::{
 
 impl Node {
     /// Send proposal to all our elders.
-    pub(crate) async fn propose(&mut self, proposal: Proposal) -> Result<Vec<Cmd>> {
+    pub(crate) fn propose(&mut self, proposal: Proposal) -> Result<Vec<Cmd>> {
         let elders = self.network_knowledge.authority_provider().elders_vec();
-        self.send_proposal(elders, proposal).await
+        self.send_proposal(elders, proposal)
     }
 
     /// Send `proposal` to `recipients`.
-    pub(crate) async fn send_proposal(
+    pub(crate) fn send_proposal(
         &mut self,
         recipients: Vec<Peer>,
         proposal: Proposal,
@@ -37,29 +37,22 @@ impl Node {
         let key_share = self
             .section_keys_provider
             .key_share(&section_key)
-            .await
             .map_err(|err| {
                 trace!("Can't propose {:?}: {:?}", proposal, err);
                 err
             })?;
 
         self.send_proposal_with(recipients, proposal, &key_share)
-            .await
     }
 
     /// Send `proposal` to `recipients` signing it with the provided key share.
-    pub(crate) async fn send_proposal_with(
+    pub(crate) fn send_proposal_with(
         &mut self,
         recipients: Vec<Peer>,
         proposal: Proposal,
         key_share: &SectionKeyShare,
     ) -> Result<Vec<Cmd>> {
-        trace!(
-            "Propose {:?}, key_share: {:?}, aggregators: {:?}",
-            proposal,
-            key_share,
-            recipients,
-        );
+        trace!("Propose {proposal:?}, key_share: {key_share:?}, aggregators: {recipients:?}");
 
         let sig_share = proposal.sign_with_key_share(
             key_share.public_key_set.clone(),
@@ -99,17 +92,14 @@ impl Node {
         // handle ourselves if we should
         for peer in recipients.clone() {
             if peer.name() == our_name {
-                cmds.extend(
-                    Node::handle_proposal(
-                        msg_id,
-                        proposal.clone(),
-                        sig_share.clone(),
-                        peer,
-                        &self.network_knowledge,
-                        &mut self.proposal_aggregator,
-                    )
-                    .await?,
-                )
+                cmds.extend(Node::handle_proposal(
+                    msg_id,
+                    proposal.clone(),
+                    sig_share.clone(),
+                    peer,
+                    &self.network_knowledge,
+                    &mut self.proposal_aggregator,
+                )?)
             }
         }
 
@@ -128,7 +118,7 @@ impl Node {
         Ok(cmds)
     }
 
-    pub(crate) async fn handle_proposal(
+    pub(crate) fn handle_proposal(
         msg_id: MsgId,
         proposal: Proposal,
         sig_share: SigShare,

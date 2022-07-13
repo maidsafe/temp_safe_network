@@ -413,8 +413,7 @@ impl Node {
 
         let (index, sig_share) = self
             .section_keys_provider
-            .sign_with(content.hash().as_ref(), &sap.section_key())
-            .await?;
+            .sign_with(content.hash().as_ref(), &sap.section_key())?;
 
         Ok(Some(SpentProofShare {
             content,
