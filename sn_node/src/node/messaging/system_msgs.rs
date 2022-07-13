@@ -445,7 +445,7 @@ impl Node {
                     sig_share,
                     sender,
                     &self.network_knowledge,
-                    &self.proposal_aggregator,
+                    &mut self.proposal_aggregator,
                 )
                 .await
             }
@@ -764,7 +764,7 @@ impl Node {
     // authority on successful accumulation. Also return 'true' if
     // current message shall not be processed any further.
     async fn aggregate_msg_and_stop(
-        &self,
+        &mut self,
         msg_authority: &mut NodeMsgAuthority,
         payload: Bytes,
     ) -> Result<bool> {
@@ -775,7 +775,7 @@ impl Node {
         };
 
         match SectionAuth::try_authorize(
-            self.message_aggregator.clone(),
+            &mut self.message_aggregator,
             bls_share_auth.clone().into_inner(),
             &payload,
         )

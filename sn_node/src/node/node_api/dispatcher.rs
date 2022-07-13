@@ -175,7 +175,7 @@ impl Dispatcher {
                 .into_iter()
                 .collect()),
             Cmd::ProposeOffline(names) => {
-                let node = self.node.read().await;
+                let mut node = self.node.write().await;
 
                 node.cast_offline_proposals(&names).await
             }
