@@ -120,17 +120,14 @@ impl Node {
                             Some(dst_section_pk) => {
                                 let msg_bytes = original_bytes.unwrap_or(wire_msg.serialize()?);
 
-                                if let Some(ae_cmd) = self
-                                    .check_for_entropy(
-                                        // a cheap clone w/ Bytes
-                                        msg_bytes,
-                                        &msg_authority.src_location(),
-                                        &dst_section_pk,
-                                        dst_location.name(),
-                                        &sender,
-                                    )
-                                    .await?
-                                {
+                                if let Some(ae_cmd) = self.check_for_entropy(
+                                    // a cheap clone w/ Bytes
+                                    msg_bytes,
+                                    &msg_authority.src_location(),
+                                    &dst_section_pk,
+                                    dst_location.name(),
+                                    &sender,
+                                )? {
                                     // we want to log issues with an elder who is out of sync here...
                                     let knowledge = self.network_knowledge.elders();
                                     let mut known_elders = knowledge.iter().map(|peer| peer.name());
@@ -217,17 +214,14 @@ impl Node {
                 };
 
                 let msg_bytes = original_bytes.unwrap_or(wire_msg.serialize()?);
-                if let Some(cmd) = self
-                    .check_for_entropy(
-                        // a cheap clone w/ Bytes
-                        msg_bytes,
-                        &src_location,
-                        &received_section_pk,
-                        dst_name,
-                        &sender,
-                    )
-                    .await?
-                {
+                if let Some(cmd) = self.check_for_entropy(
+                    // a cheap clone w/ Bytes
+                    msg_bytes,
+                    &src_location,
+                    &received_section_pk,
+                    dst_name,
+                    &sender,
+                )? {
                     // short circuit and send those AE responses
                     cmds.push(cmd);
                     return Ok(cmds);
