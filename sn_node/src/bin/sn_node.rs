@@ -86,7 +86,7 @@ fn create_runtime_and_node() -> Result<()> {
         .enable_all()
         .thread_name("sn_node")
         // 16mb here for windows stack size, which was being exceeded previously
-        .thread_stack_size(16 * 1024 * 1024)
+        .thread_stack_size(32 * 1024 * 1024)
         .build()?;
 
     let _res = rt.block_on(async move {
