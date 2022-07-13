@@ -21,14 +21,14 @@ use sn_interface::{
 
 impl Node {
     /// Send proposal to all our elders.
-    pub(crate) async fn propose(&self, proposal: Proposal) -> Result<Vec<Cmd>> {
+    pub(crate) async fn propose(&mut self, proposal: Proposal) -> Result<Vec<Cmd>> {
         let elders = self.network_knowledge.authority_provider().elders_vec();
         self.send_proposal(elders, proposal).await
     }
 
     /// Send `proposal` to `recipients`.
     pub(crate) async fn send_proposal(
-        &self,
+        &mut self,
         recipients: Vec<Peer>,
         proposal: Proposal,
     ) -> Result<Vec<Cmd>> {
@@ -49,7 +49,7 @@ impl Node {
 
     /// Send `proposal` to `recipients` signing it with the provided key share.
     pub(crate) async fn send_proposal_with(
-        &self,
+        &mut self,
         recipients: Vec<Peer>,
         proposal: Proposal,
         key_share: &SectionKeyShare,
@@ -106,7 +106,7 @@ impl Node {
                         sig_share.clone(),
                         peer,
                         &self.network_knowledge,
-                        &self.proposal_aggregator,
+                        &mut self.proposal_aggregator,
                     )
                     .await?,
                 )
@@ -134,7 +134,7 @@ impl Node {
         sig_share: SigShare,
         sender: Peer,
         network_knowledge: &NetworkKnowledge,
-        proposal_aggregator: &SignatureAggregator,
+        proposal_aggregator: &mut SignatureAggregator,
     ) -> Result<Vec<Cmd>> {
         let sig_share_pk = &sig_share.public_key_set.public_key();
 
@@ -192,10 +192,7 @@ impl Node {
                 sender, msg_id, error
             ),
             Ok(serialised_proposal) => {
-                match proposal_aggregator
-                    .add(&serialised_proposal, sig_share)
-                    .await
-                {
+                match proposal_aggregator.add(&serialised_proposal, sig_share) {
                     Ok(sig) => match proposal {
                         Proposal::NewElders(_) => {
                             cmds.push(Cmd::HandleNewEldersAgreement { proposal, sig })

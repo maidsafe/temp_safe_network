@@ -31,7 +31,7 @@ impl Node {
     }
 
     pub(crate) async fn cast_offline_proposals(
-        &self,
+        &mut self,
         names: &BTreeSet<XorName>,
     ) -> Result<Vec<Cmd>> {
         // Don't send the `Offline` proposal to the peer being lost as that send would fail,

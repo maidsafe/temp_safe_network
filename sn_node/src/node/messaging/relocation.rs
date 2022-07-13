@@ -26,7 +26,7 @@ use xor_name::XorName;
 // Relocation
 impl Node {
     pub(crate) async fn relocate_peers(
-        &self,
+        &mut self,
         churn_id: ChurnId,
         excluded: BTreeSet<XorName>,
     ) -> Result<Vec<Cmd>> {
@@ -62,7 +62,7 @@ impl Node {
     }
 
     pub(crate) async fn relocate_rejoining_peer(
-        &self,
+        &mut self,
         node_state: NodeState,
         age: u8,
     ) -> Result<Vec<Cmd>> {
