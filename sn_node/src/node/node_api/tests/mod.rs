@@ -77,7 +77,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
             let pk_set = sk_set.public_keys();
             let section_key = pk_set.public_key();
 
-            let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
+            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
 
@@ -165,7 +165,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
             let pk_set = sk_set.public_keys();
             let section_key = pk_set.public_key();
 
-            let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
+            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let comm = create_comm().await?;
@@ -255,7 +255,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
             let pk_set = sk_set.public_keys();
             let section_key = pk_set.public_key();
 
-            let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
+            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
             let node = nodes.remove(0);
             let relocated_node_old_name = node.name();
             let relocated_node_old_keypair = node.keypair.clone();
@@ -345,7 +345,7 @@ async fn handle_agreement_on_online() -> Result<()> {
 
             let (section_auth, mut nodes, sk_set) =
                 gen_section_authority_provider(prefix, elder_count());
-            let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
+            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let comm = create_comm().await?;
@@ -409,12 +409,10 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             for peer in section_auth.elders() {
                 let node_state = NodeState::joined(*peer, None);
                 let sig = prove(sk_set.secret_key(), &node_state)?;
-                let _updated = section
-                    .update_member(SectionAuth {
-                        value: node_state,
-                        sig,
-                    })
-                    .await;
+                let _updated = section.update_member(SectionAuth {
+                    value: node_state,
+                    sig,
+                });
                 if peer.age() == MIN_ADULT_AGE + 1 {
                     let _changed = expected_new_elders.insert(peer);
                 }
@@ -588,13 +586,13 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
             };
             let (section_auth, mut node_infos, sk_set) =
                 gen_section_authority_provider(prefix, elder_count());
-            let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
+            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
 
             // Make a left peer.
             let peer = create_peer(age);
             let node_state = NodeState::left(peer, None);
             let node_state = section_signed(sk_set.secret_key(), node_state)?;
-            let _updated = section.update_member(node_state).await;
+            let _updated = section.update_member(node_state);
 
             // Make a Node
             let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
@@ -666,13 +664,13 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
 
             let (section_auth, mut nodes, sk_set) = create_section_auth();
 
-            let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
+            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
 
             let existing_peer = create_peer(MIN_ADULT_AGE);
 
             let node_state = NodeState::joined(existing_peer, None);
             let node_state = section_signed(sk_set.secret_key(), node_state)?;
-            let _updated = section.update_member(node_state).await;
+            let _updated = section.update_member(node_state);
 
             let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
             let node = nodes.remove(0);
@@ -720,12 +718,12 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         .run_until(async move {
             let (section_auth, mut nodes, sk_set) = create_section_auth();
 
-            let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
+            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
 
             let existing_peer = create_peer(MIN_ADULT_AGE);
             let node_state = NodeState::joined(existing_peer, None);
             let node_state = section_signed(sk_set.secret_key(), node_state)?;
-            let _updated = section.update_member(node_state).await;
+            let _updated = section.update_member(node_state);
 
             // Pick the elder to remove.
             let auth_peers = section_auth.elders();
@@ -1013,7 +1011,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             RelocatedPeerRole::NonElder => recommended_section_size(),
         };
         let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, elder_count());
-        let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
+        let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
 
         let mut adults = section_size - elder_count();
         while adults > 0 {
@@ -1021,13 +1019,13 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             let non_elder_peer = create_peer(MIN_ADULT_AGE);
             let node_state = NodeState::joined(non_elder_peer, None);
             let node_state = section_signed(sk_set.secret_key(), node_state)?;
-            assert!(section.update_member(node_state).await);
+            assert!(section.update_member(node_state));
         }
 
         let non_elder_peer = create_peer(MIN_ADULT_AGE - 1);
         let node_state = NodeState::joined(non_elder_peer, None);
         let node_state = section_signed(sk_set.secret_key(), node_state)?;
-        assert!(section.update_member(node_state).await);
+        assert!(section.update_member(node_state));
         let node = nodes.remove(0);
         let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
         let comm = create_comm().await?;
@@ -1210,12 +1208,12 @@ async fn handle_elders_update() -> Result<()> {
             0,
         );
 
-        let (section0, section_key_share) = create_section(&sk_set0, &sap0).await?;
+        let (section0, section_key_share) = create_section(&sk_set0, &sap0)?;
 
         for peer in [&adult_peer, &promoted_peer] {
             let node_state = NodeState::joined(*peer, None);
             let node_state = section_signed(sk_set0.secret_key(), node_state)?;
-            assert!(section0.update_member(node_state).await);
+            assert!(section0.update_member(node_state));
         }
 
         let demoted_peer = other_elder_peers.remove(0);
@@ -1377,13 +1375,13 @@ async fn handle_demote_during_split() -> Result<()> {
                 sk_set_v0.public_keys(),
                 0,
             );
-            let (section, section_key_share) = create_section(&sk_set_v0, &section_auth_v0).await?;
+            let (section, section_key_share) = create_section(&sk_set_v0, &section_auth_v0)?;
 
             // all peers b are added
             for peer in peers_b.iter().chain(iter::once(&peer_c)).cloned() {
                 let node_state = NodeState::joined(peer, None);
                 let node_state = section_signed(sk_set_v0.secret_key(), node_state)?;
-                assert!(section.update_member(node_state).await);
+                assert!(section.update_member(node_state));
             }
 
             // we make a new full node from info, to see what it does
@@ -1534,7 +1532,7 @@ fn create_section_key_share(sk_set: &bls::SecretKeySet, index: usize) -> Section
     }
 }
 
-async fn create_section(
+fn create_section(
     sk_set: &SecretKeySet,
     section_auth: &SectionAuthorityProvider,
 ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
@@ -1547,7 +1545,7 @@ async fn create_section(
     for peer in section_auth.elders() {
         let node_state = NodeState::joined(*peer, None);
         let node_state = section_signed(sk_set.secret_key(), node_state)?;
-        let _updated = section.update_member(node_state).await;
+        let _updated = section.update_member(node_state);
     }
 
     let section_key_share = create_section_key_share(sk_set, 0);

@@ -165,13 +165,13 @@ mod tests {
     use rand::thread_rng;
     use std::thread::sleep;
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn smoke() -> Result<(), Error> {
+    #[test]
+    fn smoke() -> Result<(), Error> {
         let mut rng = thread_rng();
         let threshold = 3;
         let sk_set = bls::SecretKeySet::random(threshold, &mut rng);
 
-        let aggregator = SignatureAggregator::default();
+        let mut aggregator = SignatureAggregator::default();
         let payload = b"hello";
 
         // Not enough shares yet
@@ -201,13 +201,13 @@ mod tests {
         }
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn invalid_share() -> Result<(), Error> {
+    #[test]
+    fn invalid_share() -> Result<(), Error> {
         let mut rng = thread_rng();
         let threshold = 3;
         let sk_set = bls::SecretKeySet::random(threshold, &mut rng);
 
-        let aggregator = SignatureAggregator::default();
+        let mut aggregator = SignatureAggregator::default();
         let payload = b"good";
 
         // First insert less than threshold + 1 valid shares.
@@ -234,13 +234,13 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn expiration() {
+    #[test]
+    fn expiration() {
         let mut rng = thread_rng();
         let threshold = 3;
         let sk_set = bls::SecretKeySet::random(threshold, &mut rng);
 
-        let aggregator = SignatureAggregator::with_expiration(Duration::from_millis(500));
+        let mut aggregator = SignatureAggregator::with_expiration(Duration::from_millis(500));
         let payload = b"hello";
 
         for index in 0..threshold {
@@ -260,13 +260,13 @@ mod tests {
         }
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn repeated_voting() {
+    #[test]
+    fn repeated_voting() {
         let mut rng = thread_rng();
         let threshold = 3;
         let sk_set = bls::SecretKeySet::random(threshold, &mut rng);
 
-        let aggregator = SignatureAggregator::default();
+        let mut aggregator = SignatureAggregator::default();
 
         let payload = b"hello";
 
