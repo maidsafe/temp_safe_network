@@ -28,7 +28,7 @@ name = "churn"
 default = []
 chaos = []
 unstable-wiremsg-debuginfo = []
-test-utils = []
+test-utils = ["eyre"]
 # Needs to be built with RUSTFLAGS="--cfg tokio_unstable"
 tokio-console = ["console-subscriber"]
 
@@ -77,6 +77,7 @@ uluru = "3.0.0"
 url = "2.2.0"
 walkdir = "2"
 xor_name = "4.0.1"
+eyre = { version = "~0.6.5", optional = true }
 
 [dependencies.tokio]
 version = "1.17.0"
