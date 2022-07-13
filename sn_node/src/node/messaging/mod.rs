@@ -76,7 +76,6 @@ impl Node {
                 let mut known_keys: Vec<BlsPublicKey> = self
                     .network_knowledge
                     .section_chain()
-                    .await
                     .keys()
                     .copied()
                     .collect();

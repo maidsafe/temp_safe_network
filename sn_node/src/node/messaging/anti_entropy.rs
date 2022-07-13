@@ -28,7 +28,7 @@ use xor_name::{Prefix, XorName};
 
 impl Node {
     /// Send `AntiEntropyUpdate` message to all nodes in our own section.
-    pub(crate) async fn send_ae_update_to_our_section(&self) -> Vec<Cmd> {
+    pub(crate) fn send_ae_update_to_our_section(&self) -> Vec<Cmd> {
         let our_name = self.info().name();
         let nodes: Vec<_> = self
             .network_knowledge
@@ -44,22 +44,21 @@ impl Node {
         }
 
         // The previous PK which is likely what adults know
-        let previous_pk = *self.section_chain().await.prev_key();
+        let previous_pk = *self.section_chain().prev_key();
 
         let our_prefix = self.network_knowledge.prefix();
 
         self.send_ae_update_to_nodes(nodes, &our_prefix, previous_pk)
-            .await
     }
 
     /// Send `AntiEntropyUpdate` message to the specified nodes.
-    pub(crate) async fn send_ae_update_to_nodes(
+    pub(crate) fn send_ae_update_to_nodes(
         &self,
         recipients: Vec<Peer>,
         prefix: &Prefix,
         section_pk: BlsPublicKey,
     ) -> Vec<Cmd> {
-        let node_msg = match self.generate_ae_update_msg(section_pk).await {
+        let node_msg = match self.generate_ae_update_msg(section_pk) {
             Ok(node_msg) => node_msg,
             Err(err) => {
                 warn!("Failed to generate AE-Update msg to send: {:?}", err);
@@ -68,10 +67,12 @@ impl Node {
         };
 
         let our_section_key = self.network_knowledge.section_key();
-        match self
-            .send_direct_msg_to_nodes(recipients.clone(), node_msg, prefix.name(), our_section_key)
-            .await
-        {
+        match self.send_direct_msg_to_nodes(
+            recipients.clone(),
+            node_msg,
+            prefix.name(),
+            our_section_key,
+        ) {
             Ok(cmd) => vec![cmd],
             Err(err) => {
                 error!(
@@ -84,24 +85,21 @@ impl Node {
     }
 
     /// Send `MetadataExchange` packet to the specified nodes
-    pub(crate) async fn send_metadata_updates_to_nodes(
+    pub(crate) fn send_metadata_updates_to_nodes(
         &self,
         recipients: Vec<Peer>,
         prefix: &Prefix,
         section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
-        let metadata = self.get_metadata_of(prefix).await;
+        let metadata = self.get_metadata_of(prefix);
         let data_update_msg = SystemMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata });
 
-        match self
-            .send_direct_msg_to_nodes(
-                recipients.clone(),
-                data_update_msg,
-                prefix.name(),
-                section_pk,
-            )
-            .await
-        {
+        match self.send_direct_msg_to_nodes(
+            recipients.clone(),
+            data_update_msg,
+            prefix.name(),
+            section_pk,
+        ) {
             Ok(cmd) => Ok(vec![cmd]),
             Err(err) => {
                 error!(
@@ -115,7 +113,7 @@ impl Node {
 
     #[instrument(skip_all)]
     /// Send AntiEntropyUpdate message to the nodes in our sibling section.
-    pub(crate) async fn send_updates_to_sibling_section(
+    pub(crate) fn send_updates_to_sibling_section(
         &self,
         our_prev_state: &StateSnapshot,
     ) -> Result<Vec<Cmd>> {
@@ -142,23 +140,18 @@ impl Node {
             let previous_section_key = our_prev_state.section_key;
             let sibling_prefix = sibling_sap.prefix();
 
-            let mut cmds = self
-                .send_metadata_updates_to_nodes(
-                    promoted_sibling_elders.clone(),
-                    &sibling_prefix,
-                    previous_section_key,
-                )
-                .await?;
+            let mut cmds = self.send_metadata_updates_to_nodes(
+                promoted_sibling_elders.clone(),
+                &sibling_prefix,
+                previous_section_key,
+            )?;
 
             // Also send AE update to sibling section's new Elders
-            cmds.extend(
-                self.send_ae_update_to_nodes(
-                    promoted_sibling_elders,
-                    &sibling_prefix,
-                    previous_section_key,
-                )
-                .await,
-            );
+            cmds.extend(self.send_ae_update_to_nodes(
+                promoted_sibling_elders,
+                &sibling_prefix,
+                previous_section_key,
+            ));
 
             Ok(cmds)
         } else {
@@ -169,18 +162,17 @@ impl Node {
 
     // Private helper to generate AntiEntropyUpdate message to update
     // a peer abot our SAP, with proof_chain and members list.
-    async fn generate_ae_update_msg(&self, dst_section_key: BlsPublicKey) -> Result<SystemMsg> {
+    fn generate_ae_update_msg(&self, dst_section_key: BlsPublicKey) -> Result<SystemMsg> {
         let signed_sap = self.network_knowledge.section_signed_authority_provider();
 
         let proof_chain = if let Ok(chain) = self
             .network_knowledge
             .get_proof_chain_to_current(&dst_section_key)
-            .await
         {
             chain
         } else {
             // error getting chain from key, so let's send the whole chain from genesis
-            self.network_knowledge.section_chain().await
+            self.network_knowledge.section_chain()
         };
 
         let members = self
@@ -206,7 +198,7 @@ impl Node {
         proof_chain: SecuredLinkedList,
         members: SectionPeers,
     ) -> Result<Vec<Cmd>> {
-        let snapshot = self.state_snapshot().await;
+        let snapshot = self.state_snapshot();
 
         let our_name = self.info().name();
         let signed_sap = SectionAuth {
@@ -245,7 +237,7 @@ impl Node {
         sender: Peer,
     ) -> Result<Vec<Cmd>> {
         let dst_section_key = section_auth.section_key();
-        let snapshot = self.state_snapshot().await;
+        let snapshot = self.state_snapshot();
 
         let to_resend = self
             .update_network_knowledge(
@@ -276,10 +268,7 @@ impl Node {
                     result.extend(cmds);
                 }
 
-                result.push(
-                    self.send_direct_msg(sender, msg_to_resend, dst_section_key)
-                        .await?,
-                );
+                result.push(self.send_direct_msg(sender, msg_to_resend, dst_section_key)?);
 
                 Ok(result)
             }
@@ -339,9 +328,7 @@ impl Node {
 
                     self.create_or_wait_for_backoff(&elder).await;
 
-                    let cmd = self
-                        .send_direct_msg(elder, msg_to_redirect, dst_section_key)
-                        .await?;
+                    let cmd = self.send_direct_msg(elder, msg_to_redirect, dst_section_key)?;
 
                     Ok(vec![cmd])
                 }
@@ -545,7 +532,6 @@ impl Node {
         let ae_msg = match self
             .network_knowledge
             .get_proof_chain_to_current(dst_section_key)
-            .await
         {
             Ok(proof_chain) => {
                 info!("Anti-Entropy: sender's ({}) knowledge of our SAP is outdated, bounce msg for AE-Retry with up to date SAP info.", sender);
@@ -573,7 +559,7 @@ impl Node {
                     sender
                 );
 
-                let proof_chain = self.network_knowledge.section_chain().await;
+                let proof_chain = self.network_knowledge.section_chain();
 
                 let signed_sap = self.network_knowledge.section_signed_authority_provider();
 
@@ -613,7 +599,7 @@ impl Node {
         let ae_msg = SystemMsg::AntiEntropyRedirect {
             section_auth: signed_sap.value.to_msg(),
             section_signed: signed_sap.sig,
-            section_chain: self.network_knowledge.section_chain().await,
+            section_chain: self.network_knowledge.section_chain(),
             bounced_msg: original_wire_msg.serialize()?,
         };
 
@@ -907,17 +893,17 @@ mod tests {
                 .await?;
 
             let msg_type = assert_matches!(cmd, Some(Cmd::SendMsg { wire_msg, .. }) => {
-           wire_msg
-               .into_msg()
-               .context("failed to deserialised anti-entropy message")?
-       });
+                wire_msg
+                    .into_msg()
+                    .context("failed to deserialised anti-entropy message")?
+            });
 
             assert_matches!(msg_type, MsgType::System{ msg, .. } => {
-           assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
-               assert_eq!(*section_auth, env.node.network_knowledge().authority_provider().to_msg());
-               assert_eq!(*proof_chain, env.node.section_chain().await);
-           });
-       });
+                assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
+                    assert_eq!(*section_auth, env.node.network_knowledge().authority_provider().to_msg());
+                    assert_eq!(*proof_chain, env.node.section_chain());
+                });
+            });
             Result::<()>::Ok(())
         }).await
     }

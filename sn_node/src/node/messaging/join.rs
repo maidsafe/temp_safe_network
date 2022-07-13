@@ -70,10 +70,11 @@ impl Node {
 
             trace!("Sending {:?} to {}", node_msg, peer);
             trace!("{}", LogMarker::SendJoinRedirected);
-            return Ok(vec![
-                self.send_direct_msg(peer, node_msg, our_section_key)
-                    .await?,
-            ]);
+            return Ok(vec![self.send_direct_msg(
+                peer,
+                node_msg,
+                our_section_key,
+            )?]);
         }
 
         if !self.joins_allowed {
@@ -88,10 +89,11 @@ impl Node {
             trace!("{}", LogMarker::SendJoinsDisallowed);
 
             trace!("Sending {:?} to {}", node_msg, peer);
-            return Ok(vec![
-                self.send_direct_msg(peer, node_msg, our_section_key)
-                    .await?,
-            ]);
+            return Ok(vec![self.send_direct_msg(
+                peer,
+                node_msg,
+                our_section_key,
+            )?]);
         }
 
         let (is_age_invalid, expected_age) = self.verify_joining_node_age(&peer).await;
@@ -124,7 +126,7 @@ impl Node {
         }
 
         if !section_key_matches || is_age_invalid {
-            let proof_chain = self.network_knowledge.section_chain().await;
+            let proof_chain = self.network_knowledge.section_chain();
             let signed_sap = self.network_knowledge.section_signed_authority_provider();
 
             let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
@@ -135,10 +137,11 @@ impl Node {
             }));
 
             trace!("Sending {:?} to {}", node_msg, peer);
-            return Ok(vec![
-                self.send_direct_msg(peer, node_msg, our_section_key)
-                    .await?,
-            ]);
+            return Ok(vec![self.send_direct_msg(
+                peer,
+                node_msg,
+                our_section_key,
+            )?]);
         }
 
         // Do reachability check only for the initial join request
@@ -150,8 +153,7 @@ impl Node {
             trace!("{}", LogMarker::SendJoinRejected);
 
             trace!("Sending {:?} to {}", node_msg, peer);
-            self.send_direct_msg(peer, node_msg, our_section_key)
-                .await?
+            self.send_direct_msg(peer, node_msg, our_section_key)?
         } else {
             // It's reachable, let's then send the proof challenge
             self.send_resource_proof_challenge(peer).await?
@@ -220,10 +222,11 @@ impl Node {
             trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);
 
             trace!("Sending {node_msg:?} to {peer}");
-            return Ok(vec![
-                self.send_direct_msg(peer, node_msg, self.network_knowledge.section_key())
-                    .await?,
-            ]);
+            return Ok(vec![self.send_direct_msg(
+                peer,
+                node_msg,
+                self.network_knowledge.section_key(),
+            )?]);
         }
 
         let relocate_details = if let MembershipState::Relocated(ref details) =
@@ -261,10 +264,11 @@ impl Node {
             trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
 
             trace!("Sending {:?} to {}", node_msg, peer);
-            return Ok(vec![
-                self.send_direct_msg(peer, node_msg, self.network_knowledge.section_key())
-                    .await?,
-            ]);
+            return Ok(vec![self.send_direct_msg(
+                peer,
+                node_msg,
+                self.network_knowledge.section_key(),
+            )?]);
         };
 
         self.propose_membership_change(join_request.relocate_proof.value)

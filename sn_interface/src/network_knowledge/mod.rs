@@ -237,14 +237,11 @@ impl NetworkKnowledge {
     pub async fn relocated_to(&self, new_network_nowledge: Self) -> Result<()> {
         debug!("Node was relocated to {:?}", new_network_nowledge);
 
-        let chain_to_update_to = new_network_nowledge.section_chain().await;
-        *self.chain.borrow_mut() = chain_to_update_to;
+        *self.chain.borrow_mut() = new_network_nowledge.section_chain();
 
         *self.signed_sap.borrow_mut() = new_network_nowledge.signed_sap();
 
-        let _updated = self
-            .merge_members(new_network_nowledge.section_signed_members())
-            .await?;
+        let _updated = self.merge_members(new_network_nowledge.section_signed_members())?;
 
         Ok(())
     }
@@ -307,9 +304,7 @@ impl NetworkKnowledge {
                         // Remove any peer which doesn't belong to our new section's prefix
                         self.section_peers.retain(prefix);
                         // Prune list of archived members
-                        self.section_peers
-                            .prune_members_archive(&section_chain)
-                            .await;
+                        self.section_peers.prune_members_archive(&section_chain);
 
                         // Let's then update our current SAP and section chain
                         let our_prev_prefix = self.prefix();
@@ -398,7 +393,7 @@ impl NetworkKnowledge {
         match self.prefix_map.verify_with_chain_and_update(
             signed_sap.clone(),
             proof_chain,
-            &self.section_chain().await,
+            &self.section_chain(),
         ) {
             Ok(true) => {
                 there_was_an_update = true;
@@ -475,9 +470,7 @@ impl NetworkKnowledge {
                         .get_proof_chain(&self.genesis_key, &provided_sap.section_key())?;
 
                     // Prune list of archived members
-                    self.section_peers
-                        .prune_members_archive(&section_chain)
-                        .await;
+                    self.section_peers.prune_members_archive(&section_chain);
 
                     // Switch to new SAP and chain.
                     *self.signed_sap.borrow_mut() = signed_sap.clone();
@@ -505,7 +498,7 @@ impl NetworkKnowledge {
                 .map(|member| member.into_authed_state())
                 .collect();
 
-            if self.merge_members(peers).await? {
+            if self.merge_members(peers)? {
                 there_was_an_update = true;
                 let prefix = self.prefix();
                 info!(
@@ -561,7 +554,7 @@ impl NetworkKnowledge {
     }
 
     // Try to merge this `NetworkKnowledge` members with `peers`.
-    pub async fn merge_members(&self, peers: BTreeSet<SectionAuth<NodeState>>) -> Result<bool> {
+    pub fn merge_members(&self, peers: BTreeSet<SectionAuth<NodeState>>) -> Result<bool> {
         let mut there_was_an_update = false;
         let chain = self.chain.borrow().clone();
 
@@ -588,45 +581,36 @@ impl NetworkKnowledge {
     }
 
     /// Update the member. Returns whether it actually updated it.
-    pub async fn update_member(&self, node_state: SectionAuth<NodeState>) -> bool {
+    pub fn update_member(&self, node_state: SectionAuth<NodeState>) -> bool {
         let node_name = node_state.name();
         trace!(
-            "Updating section member state, name: {:?}, new state: {:?}",
-            node_name,
+            "Updating section member state, name: {node_name:?}, new state: {:?}",
             node_state.state()
         );
 
-        let the_chain = self.section_chain().await;
+        let the_chain = self.section_chain();
         // let's check the node state is properly signed by one of the keys in our chain
         if !node_state.verify(&the_chain) {
             error!(
-                "Can't update section member, name: {:?}, new state: {:?}",
-                node_name,
+                "Can't update section member, name: {node_name:?}, new state: {:?}",
                 node_state.state()
             );
             return false;
         }
 
         let updated = self.section_peers.update(node_state);
-        trace!(
-            "Section member state, name: {:?}, updated: {}",
-            node_name,
-            updated
-        );
+        trace!("Section member state, name: {node_name:?}, updated: {updated}");
 
         updated
     }
 
     /// Return a copy of our section chain
-    pub async fn section_chain(&self) -> SecuredLinkedList {
+    pub fn section_chain(&self) -> SecuredLinkedList {
         self.chain.borrow().clone()
     }
 
     /// Generate a proof chain from the provided key to our current section key
-    pub async fn get_proof_chain_to_current(
-        &self,
-        from_key: &BlsPublicKey,
-    ) -> Result<SecuredLinkedList> {
+    pub fn get_proof_chain_to_current(&self, from_key: &BlsPublicKey) -> Result<SecuredLinkedList> {
         let our_section_key = self.signed_sap.borrow().section_key();
         let proof_chain = self
             .chain

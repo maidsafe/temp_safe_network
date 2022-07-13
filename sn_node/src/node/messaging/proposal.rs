@@ -122,8 +122,7 @@ impl Node {
         cmds.extend(
             self.send_messages_to_all_nodes_or_directly_handle_for_accumulation(
                 recipients, wire_msg,
-            )
-            .await?,
+            )?,
         );
 
         Ok(cmds)

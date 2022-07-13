@@ -117,7 +117,7 @@ impl FlowCtrl {
 
                 // Send a probe message if we are an elder
                 if is_elder && !prefix.is_empty() {
-                    let probe = self.node.read().await.generate_probe_msg().await;
+                    let probe = self.node.read().await.generate_probe_msg();
 
                     match probe {
                         Ok(cmd) => {
@@ -146,7 +146,7 @@ impl FlowCtrl {
 
                 // Send a probe message to an elder
                 if !prefix.is_empty() {
-                    let probe = self.node.read().await.generate_section_probe_msg().await;
+                    let probe = self.node.read().await.generate_section_probe_msg();
                     match probe {
                         Ok(cmd) => {
                             info!("Sending section probe msg");

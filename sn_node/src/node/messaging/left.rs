@@ -34,7 +34,6 @@ impl Node {
         if !self
             .network_knowledge
             .update_member(signed_node_state.clone())
-            .await
         {
             info!(
                 "{}: {} at {}",
@@ -56,10 +55,7 @@ impl Node {
         // we then need to send the Relocate msg to the peer attaching the signed NodeState
         // containing the relocation details.
         if node_state.is_relocated() {
-            cmds.push(
-                self.send_relocate(*node_state.peer(), signed_node_state)
-                    .await?,
-            );
+            cmds.push(self.send_relocate(*node_state.peer(), signed_node_state)?);
         }
 
         let churn_id = ChurnId(signature.to_bytes().to_vec());
@@ -73,10 +69,7 @@ impl Node {
             let our_adults = self.network_knowledge.adults();
             let our_prefix = self.network_knowledge.prefix();
             let our_section_pk = self.network_knowledge.section_key();
-            cmds.extend(
-                self.send_ae_update_to_nodes(our_adults, &our_prefix, our_section_pk)
-                    .await,
-            );
+            cmds.extend(self.send_ae_update_to_nodes(our_adults, &our_prefix, our_section_pk));
         }
 
         cmds.extend(result);

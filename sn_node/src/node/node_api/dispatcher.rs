@@ -182,10 +182,9 @@ impl Dispatcher {
             Cmd::StartConnectivityTest(name) => {
                 let node = self.node.read().await;
 
-                Ok(vec![
-                    node.send_msg_to_our_elders(SystemMsg::StartConnectivityTest(name))
-                        .await?,
-                ])
+                Ok(vec![node.send_msg_to_our_elders(
+                    SystemMsg::StartConnectivityTest(name),
+                )?])
             }
             Cmd::TestConnectivity(name) => {
                 let node_state = self
