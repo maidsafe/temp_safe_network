@@ -24,8 +24,8 @@ use bytes::Bytes;
 use futures::future::join_all;
 use qp2p::{Close, ConnectionError, SendError};
 use rand::{rngs::OsRng, seq::SliceRandom};
-use std::{sync::Arc, time::Duration};
-use tokio::{sync::mpsc::channel, sync::RwLock, task::JoinHandle};
+use std::time::Duration;
+use tokio::{sync::mpsc::channel, task::JoinHandle};
 use tracing::{debug, error, trace, warn};
 use xor_name::XorName;
 
@@ -525,7 +525,7 @@ pub(super) async fn send_msg(
     // Send message to all Elders concurrently
     let mut tasks = Vec::default();
 
-    let successes = Arc::new(RwLock::new(0));
+    let mut successful_sends = 0usize;
 
     for peer in nodes.clone() {
         let session = session.clone();
@@ -599,7 +599,7 @@ pub(super) async fn send_msg(
                     );
                     last_error = Some(error);
                 }
-                Ok(_) => *successes.write().await += 1,
+                Ok(_) => successful_sends += 1,
             },
             Err(join_error) => {
                 warn!("Tokio join error as we send: {:?}", join_error)
@@ -607,7 +607,7 @@ pub(super) async fn send_msg(
         }
     }
 
-    let failures = nodes.len() - *successes.read().await;
+    let failures = nodes.len() - successful_sends;
 
     if failures > 0 {
         trace!(
@@ -620,7 +620,6 @@ pub(super) async fn send_msg(
         );
     }
 
-    let successful_sends = *successes.read().await;
     if failures > successful_sends {
         warn!("More errors when sending a message than successes");
         if let Some(error) = last_error {
