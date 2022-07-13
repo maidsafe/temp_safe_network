@@ -69,3 +69,4 @@ predicates = "2.0"
 proptest = "1.0.0"
 tokio = { version = "1.6.0", features = ["macros"] }
 tracing-subscriber = "~0.3.1"
+sn_client = { path = "../sn_client", version = "^0.68.2", features = ["test-utils"] }

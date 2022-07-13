@@ -6,14 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-#[cfg(test)]
-mod test_client;
+#[cfg(any(test, feature = "test-utils"))]
+/// Utility functions for testing clients
+pub mod test_client;
 
 #[cfg(test)]
 pub use test_client::{
     create_test_client, create_test_client_with, get_dbc_owner_from_secret_key_hex,
-    read_genesis_dbc_from_first_node,
 };
+
+#[cfg(any(test, feature = "test-utils"))]
+pub use test_client::read_genesis_dbc_from_first_node;
 
 #[cfg(test)]
 pub use sn_interface::init_logger;
