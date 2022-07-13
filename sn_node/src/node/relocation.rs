@@ -240,8 +240,7 @@ mod tests {
             let info = NodeState::joined(*peer, None);
             let info = section_signed(sk, info)?;
 
-            let res = futures::executor::block_on(network_knowledge.update_member(info));
-            assert!(res);
+            assert!(network_knowledge.update_member(info));
         }
 
         // Simulate a churn event whose signature has the given number of trailing zeros.

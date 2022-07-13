@@ -288,9 +288,7 @@ mod tests {
         let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
         let nodes_to_retain = adults[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
 
-        dysfunctional_detection
-            .retain_members_only(nodes_to_retain.clone())
-            .await;
+        dysfunctional_detection.retain_members_only(nodes_to_retain.clone());
 
         let current_nodes = dysfunctional_detection.current_nodes();
         assert_eq!(current_nodes.len(), 5);
@@ -326,9 +324,7 @@ mod tests {
 
         let nodes_to_retain = adults[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
 
-        dysfunctional_detection
-            .retain_members_only(nodes_to_retain.clone())
-            .await;
+        dysfunctional_detection.retain_members_only(nodes_to_retain);
 
         assert_eq!(dysfunctional_detection.communication_issues.len(), 1);
         assert_eq!(dysfunctional_detection.knowledge_issues.len(), 1);

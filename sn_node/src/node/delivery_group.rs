@@ -184,9 +184,9 @@ mod tests {
     use secured_linked_list::SecuredLinkedList;
     use xor_name::Prefix;
 
-    #[tokio::test]
-    async fn delivery_targets_elder_to_our_elder() -> Result<()> {
-        let (our_name, network_knowledge, _) = setup_elder().await?;
+    #[test]
+    fn delivery_targets_elder_to_our_elder() -> Result<()> {
+        let (our_name, network_knowledge, _) = setup_elder()?;
 
         let dst_name = *network_knowledge
             .authority_provider()
@@ -210,16 +210,16 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn delivery_targets_elder_to_our_adult() -> Result<()> {
-        let (our_name, network_knowledge, sk) = setup_elder().await?;
+    #[test]
+    fn delivery_targets_elder_to_our_adult() -> Result<()> {
+        let (our_name, network_knowledge, sk) = setup_elder()?;
 
         let name = ed25519::gen_name_with_age(MIN_ADULT_AGE);
         let dst_name = network_knowledge.prefix().substituted_in(name);
         let peer = Peer::new(dst_name, gen_addr());
         let node_state = NodeState::joined(peer, None);
         let node_state = section_signed(&sk, node_state)?;
-        assert!(network_knowledge.update_member(node_state).await);
+        assert!(network_knowledge.update_member(node_state));
 
         let section_pk = network_knowledge.authority_provider().section_key();
         let dst = DstLocation::Node {
@@ -235,9 +235,9 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn delivery_targets_elder_to_our_section() -> Result<()> {
-        let (our_name, network_knowledge, _) = setup_elder().await?;
+    #[test]
+    fn delivery_targets_elder_to_our_section() -> Result<()> {
+        let (our_name, network_knowledge, _) = setup_elder()?;
 
         let dst_name = network_knowledge
             .prefix()
@@ -263,9 +263,9 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn delivery_targets_elder_to_known_remote_peer() -> Result<()> {
-        let (our_name, network_knowledge, _) = setup_elder().await?;
+    #[test]
+    fn delivery_targets_elder_to_known_remote_peer() -> Result<()> {
+        let (our_name, network_knowledge, _) = setup_elder()?;
 
         let section_auth1 = network_knowledge
             .prefix_map()
@@ -287,9 +287,9 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn delivery_targets_elder_to_final_hop_unknown_remote_peer() -> Result<()> {
-        let (our_name, network_knowledge, _) = setup_elder().await?;
+    #[test]
+    fn delivery_targets_elder_to_final_hop_unknown_remote_peer() -> Result<()> {
+        let (our_name, network_knowledge, _) = setup_elder()?;
 
         let section_auth1 = network_knowledge
             .prefix_map()
@@ -316,10 +316,10 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[test]
     #[ignore = "Need to setup network so that we do not locate final dst, as to trigger correct outcome."]
-    async fn delivery_targets_elder_to_intermediary_hop_unknown_remote_peer() -> Result<()> {
-        let (our_name, network_knowledge, _) = setup_elder().await?;
+    fn delivery_targets_elder_to_intermediary_hop_unknown_remote_peer() -> Result<()> {
+        let (our_name, network_knowledge, _) = setup_elder()?;
 
         let elders_info1 = network_knowledge
             .prefix_map()
@@ -349,9 +349,9 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn delivery_targets_elder_final_hop_to_remote_section() -> Result<()> {
-        let (our_name, network_knowledge, _) = setup_elder().await?;
+    #[test]
+    fn delivery_targets_elder_final_hop_to_remote_section() -> Result<()> {
+        let (our_name, network_knowledge, _) = setup_elder()?;
 
         let section_auth1 = network_knowledge
             .prefix_map()
@@ -378,10 +378,10 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[test]
     #[ignore = "Need to setup network so that we do not locate final dst, as to trigger correct outcome."]
-    async fn delivery_targets_elder_intermediary_hop_to_remote_section() -> Result<()> {
-        let (our_name, network_knowledge, _) = setup_elder().await?;
+    fn delivery_targets_elder_intermediary_hop_to_remote_section() -> Result<()> {
+        let (our_name, network_knowledge, _) = setup_elder()?;
 
         let elders_info1 = network_knowledge
             .prefix_map()
@@ -413,8 +413,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn delivery_targets_adult_to_our_elder() -> Result<()> {
+    #[test]
+    fn delivery_targets_adult_to_our_elder() -> Result<()> {
         let (our_name, network_knowledge) = setup_adult()?;
 
         let dst_name = choose_elder_name(&network_knowledge.authority_provider())?;
@@ -435,8 +435,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn delivery_targets_adult_to_our_adult() -> Result<()> {
+    #[test]
+    fn delivery_targets_adult_to_our_adult() -> Result<()> {
         let (our_name, network_knowledge) = setup_adult()?;
 
         let dst_name = network_knowledge
@@ -459,8 +459,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn delivery_targets_adult_to_our_section() -> Result<()> {
+    #[test]
+    fn delivery_targets_adult_to_our_section() -> Result<()> {
         let (our_name, network_knowledge) = setup_adult()?;
 
         let dst_name = network_knowledge
@@ -483,8 +483,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn delivery_targets_adult_to_remote_peer() -> Result<()> {
+    #[test]
+    fn delivery_targets_adult_to_remote_peer() -> Result<()> {
         let (our_name, network_knowledge) = setup_adult()?;
 
         let dst_name = Prefix::default()
@@ -507,8 +507,8 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn delivery_targets_adult_to_remote_section() -> Result<()> {
+    #[test]
+    fn delivery_targets_adult_to_remote_section() -> Result<()> {
         let (our_name, network_knowledge) = setup_adult()?;
 
         let dst_name = Prefix::default()
@@ -531,7 +531,7 @@ mod tests {
         Ok(())
     }
 
-    async fn setup_elder() -> Result<(XorName, NetworkKnowledge, bls::SecretKey)> {
+    fn setup_elder() -> Result<(XorName, NetworkKnowledge, bls::SecretKey)> {
         let prefix0 = Prefix::default().pushed(false);
         let prefix1 = Prefix::default().pushed(true);
 
@@ -550,7 +550,7 @@ mod tests {
         for peer in elders0 {
             let node_state = NodeState::joined(peer, None);
             let node_state = section_signed(genesis_sk, node_state)?;
-            assert!(network_knowledge.update_member(node_state).await);
+            assert!(network_knowledge.update_member(node_state));
         }
 
         let (section_auth1, _, secret_key_set) =
@@ -576,7 +576,7 @@ mod tests {
             .verify_with_chain_and_update(
                 section_auth1,
                 &proof_chain,
-                &network_knowledge.section_chain().await
+                &network_knowledge.section_chain()
             )
             .is_ok(),);
 

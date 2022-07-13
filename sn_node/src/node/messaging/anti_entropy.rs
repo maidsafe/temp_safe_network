@@ -853,7 +853,7 @@ mod tests {
             assert_matches!(msg_type, MsgType::System{ msg, .. } => {
                 assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
                     assert_eq!(section_auth, &env.node.network_knowledge().authority_provider().to_msg());
-                    assert_eq!(proof_chain, &env.node.section_chain().await);
+                    assert_eq!(proof_chain, &env.node.section_chain());
                 });
             });
             Result::<()>::Ok(())
