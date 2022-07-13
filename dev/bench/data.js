@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1657720828947,
+  "lastUpdate": 1657737389282,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -8639,6 +8639,72 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 5302544,
             "range": "± 127133",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "gabrielviganotti@gmail.com",
+            "name": "bochaco",
+            "username": "bochaco"
+          },
+          "committer": {
+            "email": "gabrielviganotti@gmail.com",
+            "name": "bochaco",
+            "username": "bochaco"
+          },
+          "distinct": true,
+          "id": "f5af444b8ac37d2debfbe5e1d4dcdc48de963694",
+          "message": "refactor(api): removing hard-coded test DBC from sn_api Wallet unit tests",
+          "timestamp": "2022-07-13T14:57:41-03:00",
+          "tree_id": "7a51fdcf500587158b39b4fc0bad8501761cc2b2",
+          "url": "https://github.com/maidsafe/safe_network/commit/f5af444b8ac37d2debfbe5e1d4dcdc48de963694"
+        },
+        "date": 1657737387001,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 1222650641,
+            "range": "± 989806605",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 3363498858,
+            "range": "± 1390672615",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 3671691140,
+            "range": "± 1479226856",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 297064703,
+            "range": "± 5893456",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 318438828,
+            "range": "± 2985434",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 574478011,
+            "range": "± 5598393",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 4705621,
+            "range": "± 116428",
             "unit": "ns/iter"
           }
         ]
