@@ -140,7 +140,7 @@ pub struct NetworkKnowledge {
     /// Network genesis key
     genesis_key: BlsPublicKey,
     /// Current section chain of our own section, starting from genesis key
-    chain: Rc<RefCell<SecuredLinkedList>>,
+    chain: SecuredLinkedList,
     /// Signed Section Authority Provider
     signed_sap: Rc<RefCell<SectionAuth<SectionAuthorityProvider>>>,
     /// Members of our section
@@ -225,7 +225,7 @@ impl NetworkKnowledge {
 
         Ok(Self {
             genesis_key,
-            chain: Rc::new(RefCell::new(chain.clone())),
+            chain: chain.clone(),
             signed_sap: Rc::new(RefCell::new(signed_sap)),
             section_peers: SectionPeers::default(),
             prefix_map,
@@ -234,10 +234,10 @@ impl NetworkKnowledge {
     }
 
     /// update all section info for our new section
-    pub async fn relocated_to(&self, new_network_nowledge: Self) -> Result<()> {
+    pub fn relocated_to(&mut self, new_network_nowledge: Self) -> Result<()> {
         debug!("Node was relocated to {:?}", new_network_nowledge);
 
-        *self.chain.borrow_mut() = new_network_nowledge.section_chain();
+        self.chain = new_network_nowledge.section_chain();
 
         *self.signed_sap.borrow_mut() = new_network_nowledge.signed_sap();
 
@@ -247,7 +247,7 @@ impl NetworkKnowledge {
     }
 
     /// Creates `NetworkKnowledge` for the first node in the network
-    pub async fn first_node(
+    pub fn first_node(
         peer: Peer,
         genesis_sk_set: bls::SecretKeySet,
     ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
@@ -289,7 +289,7 @@ impl NetworkKnowledge {
     /// If we already have the signed SAP and section chain for the provided key and prefix
     /// we make them the current SAP and section chain, and if so, this returns 'true'.
     /// Note this function assumes we already have the key share for the provided section key.
-    pub async fn try_update_current_sap(&self, section_key: BlsPublicKey, prefix: &Prefix) -> bool {
+    pub fn try_update_current_sap(&mut self, section_key: BlsPublicKey, prefix: &Prefix) -> bool {
         // Let's try to find the signed SAP corresponding to the provided prefix and section key
         match self.prefix_map.get_signed(prefix) {
             Some(signed_sap) if signed_sap.value.section_key() == section_key => {
@@ -309,32 +309,20 @@ impl NetworkKnowledge {
                         // Let's then update our current SAP and section chain
                         let our_prev_prefix = self.prefix();
                         *self.signed_sap.borrow_mut() = signed_sap.clone();
-                        *self.chain.borrow_mut() = section_chain;
+                        self.chain = section_chain;
 
-                        info!(
-                            "Switched our section's SAP ({:?} to {:?}) with new one: {:?}",
-                            our_prev_prefix, prefix, signed_sap
-                        );
+                        info!("Switched our section's SAP ({our_prev_prefix:?} to {prefix:?}) with new one: {signed_sap:?}");
 
                         true
                     }
                     Err(err) => {
-                        trace!(
-                            "We couldn't find section chain for {:?} and section key {:?}: {:?}",
-                            prefix,
-                            section_key,
-                            err
-                        );
+                        trace!("We couldn't find section chain for {prefix:?} and section key {section_key:?}: {err:?}");
                         false
                     }
                 }
             }
             Some(_) | None => {
-                trace!(
-                    "We yet don't have the signed SAP for {:?} and section key {:?}",
-                    prefix,
-                    section_key
-                );
+                trace!("We yet don't have the signed SAP for {prefix:?} and section key {section_key:?}");
                 false
             }
         }
@@ -379,7 +367,7 @@ impl NetworkKnowledge {
     /// If the '`update_sap`' flag is set to 'true', the provided SAP and chain will be
     /// set as our current.
     pub async fn update_knowledge_if_valid(
-        &self,
+        &mut self,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
         proof_chain: &SecuredLinkedList,
         updated_members: Option<SectionPeersMsg>,
@@ -474,7 +462,7 @@ impl NetworkKnowledge {
 
                     // Switch to new SAP and chain.
                     *self.signed_sap.borrow_mut() = signed_sap.clone();
-                    *self.chain.borrow_mut() = section_chain;
+                    self.chain = section_chain;
                 }
             }
             Ok(false) => {
@@ -527,7 +515,7 @@ impl NetworkKnowledge {
 
     // Get SectionAuthorityProvider of a known section with the given prefix,
     // along with its section chain.
-    pub async fn get_closest_or_opposite_signed_sap(
+    pub fn get_closest_or_opposite_signed_sap(
         &self,
         name: &XorName,
     ) -> Option<(SectionAuth<SectionAuthorityProvider>, SecuredLinkedList)> {
@@ -556,7 +544,7 @@ impl NetworkKnowledge {
     // Try to merge this `NetworkKnowledge` members with `peers`.
     pub fn merge_members(&self, peers: BTreeSet<SectionAuth<NodeState>>) -> Result<bool> {
         let mut there_was_an_update = false;
-        let chain = self.chain.borrow().clone();
+        let chain = self.chain.clone();
 
         for node_state in peers.iter() {
             trace!(
@@ -606,16 +594,13 @@ impl NetworkKnowledge {
 
     /// Return a copy of our section chain
     pub fn section_chain(&self) -> SecuredLinkedList {
-        self.chain.borrow().clone()
+        self.chain.clone()
     }
 
     /// Generate a proof chain from the provided key to our current section key
     pub fn get_proof_chain_to_current(&self, from_key: &BlsPublicKey) -> Result<SecuredLinkedList> {
         let our_section_key = self.signed_sap.borrow().section_key();
-        let proof_chain = self
-            .chain
-            .borrow()
-            .get_proof_chain(from_key, &our_section_key)?;
+        let proof_chain = self.chain.get_proof_chain(from_key, &our_section_key)?;
 
         Ok(proof_chain)
     }
@@ -627,12 +612,12 @@ impl NetworkKnowledge {
 
     /// Return current section chain length
     pub fn chain_len(&self) -> u64 {
-        self.chain.borrow().main_branch_len() as u64
+        self.chain.main_branch_len() as u64
     }
 
     /// Return weather current section chain has the provided key
     pub fn has_chain_key(&self, key: &bls::PublicKey) -> bool {
-        self.chain.borrow().has_key(key)
+        self.chain.has_key(key)
     }
 
     /// Return a copy of current SAP

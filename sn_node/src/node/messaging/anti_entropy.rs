@@ -338,7 +338,7 @@ impl Node {
 
     // Try to update network knowledge and return the 'SystemMsg' that needs to be resent.
     async fn update_network_knowledge(
-        &self,
+        &mut self,
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
@@ -455,7 +455,7 @@ impl Node {
 
     // If entropy is found, determine the msg to send in order to
     // bring the sender's knowledge about us up to date.
-    pub(crate) async fn check_for_entropy(
+    pub(crate) fn check_for_entropy(
         &self,
         original_bytes: Bytes,
         src_location: &SrcLocation,
@@ -476,7 +476,6 @@ impl Node {
             match self
                 .network_knowledge
                 .get_closest_or_opposite_signed_sap(&dst_name)
-                .await
             {
                 Some((signed_sap, section_chain)) => {
                     info!("Found a better matching prefix {:?}", signed_sap.prefix());
