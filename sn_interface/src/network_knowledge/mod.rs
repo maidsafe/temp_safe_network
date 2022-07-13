@@ -142,7 +142,7 @@ pub struct NetworkKnowledge {
     /// Current section chain of our own section, starting from genesis key
     chain: SecuredLinkedList,
     /// Signed Section Authority Provider
-    signed_sap: Rc<RefCell<SectionAuth<SectionAuthorityProvider>>>,
+    signed_sap: SectionAuth<SectionAuthorityProvider>,
     /// Members of our section
     section_peers: SectionPeers,
     /// The network prefix map, i.e. a map from prefix to SAPs
@@ -226,7 +226,7 @@ impl NetworkKnowledge {
         Ok(Self {
             genesis_key,
             chain: chain.clone(),
-            signed_sap: Rc::new(RefCell::new(signed_sap)),
+            signed_sap,
             section_peers: SectionPeers::default(),
             prefix_map,
             all_sections_chains: Rc::new(RefCell::new(chain)),
@@ -239,7 +239,7 @@ impl NetworkKnowledge {
 
         self.chain = new_network_nowledge.section_chain();
 
-        *self.signed_sap.borrow_mut() = new_network_nowledge.signed_sap();
+        self.signed_sap = new_network_nowledge.signed_sap();
 
         let _updated = self.merge_members(new_network_nowledge.section_signed_members())?;
 
@@ -266,7 +266,7 @@ impl NetworkKnowledge {
             None,
         )?;
 
-        let sap = network_knowledge.signed_sap.borrow().clone();
+        let sap = network_knowledge.signed_sap.clone();
 
         for peer in sap.elders() {
             let node_state = NodeState::joined(*peer, None);
@@ -308,7 +308,7 @@ impl NetworkKnowledge {
 
                         // Let's then update our current SAP and section chain
                         let our_prev_prefix = self.prefix();
-                        *self.signed_sap.borrow_mut() = signed_sap.clone();
+                        self.signed_sap = signed_sap.clone();
                         self.chain = section_chain;
 
                         info!("Switched our section's SAP ({our_prev_prefix:?} to {prefix:?}) with new one: {signed_sap:?}");
@@ -461,7 +461,7 @@ impl NetworkKnowledge {
                     self.section_peers.prune_members_archive(&section_chain);
 
                     // Switch to new SAP and chain.
-                    *self.signed_sap.borrow_mut() = signed_sap.clone();
+                    self.signed_sap = signed_sap.clone();
                     self.chain = section_chain;
                 }
             }
@@ -510,7 +510,7 @@ impl NetworkKnowledge {
     }
     // Returns the signed sap
     pub fn signed_sap(&self) -> SectionAuth<SectionAuthorityProvider> {
-        self.signed_sap.borrow().clone()
+        self.signed_sap.clone()
     }
 
     // Get SectionAuthorityProvider of a known section with the given prefix,
@@ -599,7 +599,7 @@ impl NetworkKnowledge {
 
     /// Generate a proof chain from the provided key to our current section key
     pub fn get_proof_chain_to_current(&self, from_key: &BlsPublicKey) -> Result<SecuredLinkedList> {
-        let our_section_key = self.signed_sap.borrow().section_key();
+        let our_section_key = self.signed_sap.section_key();
         let proof_chain = self.chain.get_proof_chain(from_key, &our_section_key)?;
 
         Ok(proof_chain)
@@ -607,7 +607,7 @@ impl NetworkKnowledge {
 
     /// Return current section key
     pub fn section_key(&self) -> bls::PublicKey {
-        self.signed_sap.borrow().section_key()
+        self.signed_sap.section_key()
     }
 
     /// Return current section chain length
@@ -622,17 +622,17 @@ impl NetworkKnowledge {
 
     /// Return a copy of current SAP
     pub fn authority_provider(&self) -> SectionAuthorityProvider {
-        self.signed_sap.borrow().value.clone()
+        self.signed_sap.value.clone()
     }
 
     /// Return a copy of current SAP with corresponding section authority
     pub fn section_signed_authority_provider(&self) -> SectionAuth<SectionAuthorityProvider> {
-        self.signed_sap.borrow().clone()
+        self.signed_sap.clone()
     }
 
     /// Prefix of our section.
     pub fn prefix(&self) -> Prefix {
-        self.signed_sap.borrow().prefix()
+        self.signed_sap.prefix()
     }
 
     /// Returns the elders of our section
@@ -643,7 +643,7 @@ impl NetworkKnowledge {
     /// Return whether the name provided belongs to an Elder, by checking if
     /// it is one of the current section's SAP member,
     pub fn is_elder(&self, name: &XorName) -> bool {
-        self.signed_sap.borrow().contains_elder(name)
+        self.signed_sap.contains_elder(name)
     }
 
     /// Returns members that are joined.
