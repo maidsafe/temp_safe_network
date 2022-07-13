@@ -213,7 +213,6 @@ impl FlowCtrl {
             let mut rng = rand::rngs::OsRng;
 
             loop {
-                trace!("data replication loop");
                 let _ = interval.tick().await;
 
                 let mut this_batch_address = None;
@@ -300,8 +299,6 @@ impl FlowCtrl {
                             }
                         }
                     }
-                } else {
-                    trace!("no data to be sending");
                 }
             }
         });
