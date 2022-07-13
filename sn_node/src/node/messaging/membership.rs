@@ -36,9 +36,8 @@ impl Node {
                 }
             };
 
-            let cmds = self
-                .send_msg_to_our_elders(SystemMsg::MembershipVotes(vec![membership_vote]))
-                .await?;
+            let cmds =
+                self.send_msg_to_our_elders(SystemMsg::MembershipVotes(vec![membership_vote]))?;
             Ok(vec![cmds])
         } else {
             error!("Membership - Failed to propose membership change, no membership instance");
@@ -56,8 +55,7 @@ impl Node {
             if let Some(prev_vote) = membership.get_our_latest_vote() {
                 trace!("{}", LogMarker::ResendingLastMembershipVote);
                 let cmds = self
-                    .send_msg_to_our_elders(SystemMsg::MembershipVotes(vec![prev_vote.clone()]))
-                    .await?;
+                    .send_msg_to_our_elders(SystemMsg::MembershipVotes(vec![prev_vote.clone()]))?;
                 return Ok(vec![cmds]);
             }
         }
@@ -65,7 +63,7 @@ impl Node {
         Ok(vec![])
     }
 
-    pub(crate) async fn handle_membership_votes(
+    pub(crate) fn handle_membership_votes(
         &mut self,
         peer: Peer,
         signed_votes: Vec<SignedVote<NodeState>>,
@@ -96,9 +94,12 @@ impl Node {
                         let dst_section_pk = sap.section_key();
                         let section_name = prefix.name();
                         let msg = SystemMsg::MembershipAE(membership.generation());
-                        let cmd = self
-                            .send_direct_msg_to_nodes(vec![peer], msg, section_name, dst_section_pk)
-                            .await?;
+                        let cmd = self.send_direct_msg_to_nodes(
+                            vec![peer],
+                            msg,
+                            section_name,
+                            dst_section_pk,
+                        )?;
 
                         debug!("{:?}", LogMarker::MembershipSendingAeUpdateRequest);
                         cmds.push(cmd);
@@ -147,14 +148,14 @@ impl Node {
             };
 
             if let Some(vote_msg) = vote_broadcast {
-                cmds.push(self.send_msg_to_our_elders(vote_msg).await?);
+                cmds.push(self.send_msg_to_our_elders(vote_msg)?);
             }
         }
 
         Ok(cmds)
     }
 
-    pub(crate) async fn handle_membership_anti_entropy(
+    pub(crate) fn handle_membership_anti_entropy(
         &self,
         peer: Peer,
         gen: Generation,
@@ -169,14 +170,11 @@ impl Node {
         let cmds = if let Some(membership) = self.membership.as_ref() {
             match membership.anti_entropy(gen) {
                 Ok(catchup_votes) => {
-                    vec![
-                        self.send_direct_msg(
-                            peer,
-                            SystemMsg::MembershipVotes(catchup_votes),
-                            self.network_knowledge.section_key(),
-                        )
-                        .await?,
-                    ]
+                    vec![self.send_direct_msg(
+                        peer,
+                        SystemMsg::MembershipVotes(catchup_votes),
+                        self.network_knowledge.section_key(),
+                    )?]
                 }
                 Err(e) => {
                     error!("Membership - Error while processing anti-entropy {:?}", e);

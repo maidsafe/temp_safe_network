@@ -90,7 +90,6 @@ impl Node {
         );
 
         self.send_messages_to_all_nodes_or_directly_handle_for_accumulation(recipients, wire_msg)
-            .await
     }
 
     pub(crate) async fn handle_dkg_start(&mut self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
@@ -310,7 +309,7 @@ impl Node {
         // it to sign any msg that needs section agreement.
         self.section_keys_provider.insert(key_share.clone()).await;
 
-        let snapshot = self.state_snapshot().await;
+        let snapshot = self.state_snapshot();
 
         // If we are lagging, we may have been already approved as new Elder, and
         // an AE update provided us with this same SAP but already signed by previous Elders,
@@ -341,6 +340,6 @@ impl Node {
         }
 
         let node_msg = SystemMsg::DkgFailureAgreement(failure_set);
-        self.send_msg_to_our_elders(node_msg).await
+        self.send_msg_to_our_elders(node_msg)
     }
 }

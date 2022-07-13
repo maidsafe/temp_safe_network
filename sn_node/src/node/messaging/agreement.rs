@@ -34,12 +34,12 @@ impl Node {
                 .section_signed_authority_provider()
                 .into_authed_msg(),
             node_state: node_state.into_authed_msg(),
-            section_chain: self.network_knowledge.section_chain().await,
+            section_chain: self.network_knowledge.section_chain(),
         }));
 
         let dst_section_pk = self.network_knowledge.section_key();
         trace!("{}", LogMarker::SendNodeApproval);
-        match self.send_direct_msg(peer, node_msg, dst_section_pk).await {
+        match self.send_direct_msg(peer, node_msg, dst_section_pk) {
             Ok(cmd) => vec![cmd],
             Err(err) => {
                 error!("Failed to send join approval to node {}: {:?}", peer, err);
@@ -115,7 +115,7 @@ impl Node {
             sig,
         };
 
-        if !self.network_knowledge.update_member(new_info.clone()).await {
+        if !self.network_knowledge.update_member(new_info.clone()) {
             info!("ignore Online: {} at {}", new_info.name(), new_info.addr());
             return Ok(vec![]);
         }
@@ -159,7 +159,7 @@ impl Node {
 
         if result.is_empty() {
             // Send AE-Update to our section
-            cmds.extend(self.send_ae_update_to_our_section().await);
+            cmds.extend(self.send_ae_update_to_our_section());
         }
 
         cmds.extend(result);
@@ -278,8 +278,8 @@ impl Node {
         key_sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
         trace!("{}", LogMarker::HandlingNewEldersAgreement);
-        let snapshot = self.state_snapshot().await;
-        let old_chain = self.section_chain().await.clone();
+        let snapshot = self.state_snapshot();
+        let old_chain = self.section_chain().clone();
 
         let prefix = signed_section_auth.prefix();
         trace!("{}: for {:?}", LogMarker::NewSignedSap, prefix);

@@ -286,7 +286,7 @@ mod core {
         // Miscellaneous
         ////////////////////////////////////////////////////////////////////////////
 
-        pub(crate) async fn generate_probe_msg(&self) -> Result<Cmd> {
+        pub(crate) fn generate_probe_msg(&self) -> Result<Cmd> {
             // Generate a random address not belonging to our Prefix
             let mut dst = xor_name::rand::random();
 
@@ -309,10 +309,9 @@ mod core {
             );
 
             self.send_direct_msg_to_nodes(recipients, message, dst_name, section_key)
-                .await
         }
 
-        pub(crate) async fn generate_section_probe_msg(&self) -> Result<Cmd> {
+        pub(crate) fn generate_section_probe_msg(&self) -> Result<Cmd> {
             let our_section = self.network_knowledge.authority_provider();
 
             let message = SystemMsg::AntiEntropyProbe;
@@ -327,7 +326,6 @@ mod core {
             );
 
             self.send_direct_msg_to_nodes(recipients, message, dst_name, section_key)
-                .await
         }
 
         /// returns names that are relatively dysfunctional
@@ -367,7 +365,7 @@ mod core {
             self.dysfunction_tracking.dkg_ack_fulfilled(name);
         }
 
-        pub(crate) async fn state_snapshot(&self) -> StateSnapshot {
+        pub(crate) fn state_snapshot(&self) -> StateSnapshot {
             StateSnapshot {
                 is_elder: self.is_elder(),
                 section_key: self.network_knowledge.section_key(),
@@ -539,7 +537,7 @@ mod core {
             old: StateSnapshot,
         ) -> Result<Vec<Cmd>> {
             let mut cmds = vec![];
-            let new = self.state_snapshot().await;
+            let new = self.state_snapshot();
 
             if new.section_key != old.section_key {
                 if new.is_elder {
@@ -593,7 +591,7 @@ mod core {
                 }
 
                 if new.is_elder || old.is_elder {
-                    cmds.extend(self.send_ae_update_to_our_section().await);
+                    cmds.extend(self.send_ae_update_to_our_section());
                 }
 
                 let current: BTreeSet<_> = self.network_knowledge.authority_provider().names();
@@ -630,7 +628,7 @@ mod core {
                         info!("{}: {:?}", LogMarker::StillElderAfterSplit, new.prefix);
                     }
 
-                    cmds.extend(self.send_updates_to_sibling_section(&old).await?);
+                    cmds.extend(self.send_updates_to_sibling_section(&old)?);
                     self.liveness_retain_only(
                         self.network_knowledge
                             .adults()
@@ -645,14 +643,11 @@ mod core {
                         self_status_change,
                     })
                 } else {
-                    cmds.extend(
-                        self.send_metadata_updates_to_nodes(
-                            self.network_knowledge.authority_provider().elders_vec(),
-                            &self.network_knowledge.prefix(),
-                            new.section_key,
-                        )
-                        .await?,
-                    );
+                    cmds.extend(self.send_metadata_updates_to_nodes(
+                        self.network_knowledge.authority_provider().elders_vec(),
+                        &self.network_knowledge.prefix(),
+                        new.section_key,
+                    )?);
 
                     Event::Membership(MembershipEvent::EldersChanged {
                         elders,
@@ -670,8 +665,7 @@ mod core {
                             .collect(),
                         &self.network_knowledge.prefix(),
                         new.section_key,
-                    )
-                    .await?,
+                    )?,
                 );
 
                 self.send_event(event).await
@@ -680,7 +674,7 @@ mod core {
             Ok(cmds)
         }
 
-        pub(crate) async fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
+        pub(crate) fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
             if self.network_knowledge.prefix().matches(name) {
                 self.network_knowledge.section_key()
             } else if let Ok(sap) = self.network_knowledge.section_by_name(name) {
@@ -691,7 +685,7 @@ mod core {
                 // In case this assumption is not correct (because we already progressed more than one
                 // key since the split) then this key would be unknown to them and they would send
                 // us back their whole section chain. However, this situation should be rare.
-                *self.network_knowledge.section_chain().await.prev_key()
+                *self.network_knowledge.section_chain().prev_key()
             } else {
                 *self.network_knowledge.genesis_key()
             }

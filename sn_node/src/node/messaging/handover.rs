@@ -51,7 +51,7 @@ impl Node {
         // Deliver each SignedVote to all current Elders
         trace!("Broadcasting Vote msg: {:?}", signed_vote);
         let node_msg = SystemMsg::HandoverVotes(vec![signed_vote]);
-        match self.send_msg_to_our_elders(node_msg).await {
+        match self.send_msg_to_our_elders(node_msg) {
             Ok(cmd) => vec![cmd],
             Err(err) => {
                 error!("Failed to send SystemMsg::Handover message: {:?}", err);
@@ -362,9 +362,12 @@ impl Node {
                     let dst_section_pk = sap.section_key();
                     let section_name = self.network_knowledge.prefix().name();
                     let msg = SystemMsg::HandoverAE(gen);
-                    let cmd = self
-                        .send_direct_msg_to_nodes(vec![peer], msg, section_name, dst_section_pk)
-                        .await?;
+                    let cmd = self.send_direct_msg_to_nodes(
+                        vec![peer],
+                        msg,
+                        section_name,
+                        dst_section_pk,
+                    )?;
 
                     debug!("{:?}", LogMarker::HandoverSendingAeUpdateRequest);
                     cmds.push(cmd);
@@ -396,14 +399,11 @@ impl Node {
         let cmds = if let Some(handover) = self.handover_voting.as_ref() {
             match handover.anti_entropy(gen) {
                 Ok(catchup_votes) => {
-                    vec![
-                        self.send_direct_msg(
-                            peer,
-                            SystemMsg::HandoverVotes(catchup_votes),
-                            self.network_knowledge.section_key(),
-                        )
-                        .await?,
-                    ]
+                    vec![self.send_direct_msg(
+                        peer,
+                        SystemMsg::HandoverVotes(catchup_votes),
+                        self.network_knowledge.section_key(),
+                    )?]
                 }
                 Err(e) => {
                     error!("Handover - Error while processing anti-entropy {:?}", e);

@@ -304,7 +304,7 @@ impl NodeApi {
 
     /// Returns the Section Signed Chain
     pub async fn section_chain(&self) -> SecuredLinkedList {
-        self.node.read().await.section_chain().await
+        self.node.read().await.section_chain()
     }
 
     /// Returns the Section Chain's genesis key

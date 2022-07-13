@@ -206,7 +206,7 @@ impl DysfunctionDetection {
     /// Removes tracked nodes not present in `current_members`.
     ///
     /// Tracked issues related to nodes that were removed will also be removed.
-    pub async fn retain_members_only(&mut self, current_members: BTreeSet<XorName>) {
+    pub fn retain_members_only(&mut self, current_members: BTreeSet<XorName>) {
         let nodes = &mut self.adults;
         let nodes_being_removed = nodes
             .iter()

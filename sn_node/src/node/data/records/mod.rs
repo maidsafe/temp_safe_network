@@ -146,7 +146,7 @@ impl Node {
         }
     }
 
-    pub(crate) async fn get_metadata_of(&self, prefix: &Prefix) -> MetadataExchange {
+    pub(crate) fn get_metadata_of(&self, prefix: &Prefix) -> MetadataExchange {
         // Load tracked adult_levels
         let adult_levels = self.capacity.levels_matching(*prefix);
         MetadataExchange { adult_levels }
@@ -164,7 +164,7 @@ impl Node {
         self.capacity.retain_members_only(&members);
 
         // stop tracking liveness of absent holders
-        self.dysfunction_tracking.retain_members_only(members).await;
+        self.dysfunction_tracking.retain_members_only(members);
 
         Ok(())
     }
@@ -297,7 +297,7 @@ impl Node {
         for target in targets {
             debug!("Sending {:?} to {:?}", wire_msg, target);
             let mut wire_msg = wire_msg.clone();
-            let dst_section_pk = self.section_key_by_name(&target).await;
+            let dst_section_pk = self.section_key_by_name(&target);
             wire_msg.set_dst_section_pk(dst_section_pk);
             wire_msg.set_dst_xorname(target);
 
