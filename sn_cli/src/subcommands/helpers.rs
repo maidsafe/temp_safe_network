@@ -9,7 +9,7 @@
 use super::OutputFmt;
 use ansi_term::Style;
 use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Result};
-use comfy_table::Table;
+use comfy_table::{Cell, CellAlignment, Table};
 use num_traits::Float;
 use serde::ser::Serialize;
 use sn_api::{
@@ -153,7 +153,12 @@ pub fn gen_processed_files_table(
 // each of the contained spendable balances (DBCs), returning a Table ready to print out.
 pub async fn gen_wallet_table(safe: &Safe, multimap: &Multimap) -> Result<Table> {
     let mut table = Table::new();
-    table.add_row(&vec!["Spendable balance name", "Balance", "DBC Data"]);
+    table.add_row(&vec![
+        "Spendable balance name",
+        "Balance",
+        "Owner",
+        "DBC Data",
+    ]);
 
     for (_, (key, value)) in multimap.iter() {
         let xorurl_str = std::str::from_utf8(value)?;
@@ -168,18 +173,30 @@ pub async fn gen_wallet_table(safe: &Safe, multimap: &Multimap) -> Result<Table>
         };
 
         let balance = match dbc.amount_secrets_bearer() {
-            Ok(amount_secrets) => Token::from_nano(amount_secrets.amount()),
+            Ok(amount_secrets) => Token::from_nano(amount_secrets.amount()).to_string(),
             Err(err) => {
                 warn!("Ignoring amount from DBC found in wallet due to error in revealing secret amount: {:?}", err);
-                continue;
+                "unknown".to_string()
             }
         };
 
-        let spendable_name = std::str::from_utf8(key)?.to_string();
+        let spendable_name = std::str::from_utf8(key)?;
         let hex_dbc = dbc.to_hex()?;
         let hex_dbc = format!("{}...{}", &hex_dbc[..8], &hex_dbc[hex_dbc.len() - 8..]);
+        let hex_owner = dbc.owner_base().public_key().to_hex();
+        let owner = format!(
+            "{}...{}",
+            &hex_owner[..6],
+            &hex_owner[hex_owner.len() - 6..]
+        );
 
-        table.add_row(&vec![spendable_name, balance.to_string(), hex_dbc]);
+        let mut row = comfy_table::Row::new();
+        row.add_cell(spendable_name.into());
+        row.add_cell(Cell::new(balance).set_alignment(CellAlignment::Right));
+        row.add_cell(owner.into());
+        row.add_cell(hex_dbc.into());
+
+        table.add_row(row);
     }
 
     Ok(table)
