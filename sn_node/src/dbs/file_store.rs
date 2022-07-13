@@ -9,37 +9,38 @@
 use super::{Error, Result};
 
 use crate::UsedSpace;
-use sn_interface::types::{Chunk, ChunkAddress};
+use sn_interface::types::{Chunk, DataAddress};
 
 use bytes::Bytes;
+use sn_interface::messaging::data::DataCmd;
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt;
 use walkdir::WalkDir;
 use xor_name::{Prefix, XorName};
 
 const BIT_TREE_DEPTH: usize = 20;
-const CHUNK_DB_DIR: &str = "chunkdb";
+const FILE_DB_DIR: &str = "filedb";
 
 /// A disk store for chunks
 #[derive(Clone, Debug)]
-pub(crate) struct ChunkStore {
+pub(crate) struct FileStore {
     bit_tree_depth: usize,
-    chunk_store_path: PathBuf,
+    file_store_path: PathBuf,
     used_space: UsedSpace,
 }
 
-impl ChunkStore {
-    /// Creates a new `ChunkStore` at location `root/CHUNK_DB_DIR`
+impl FileStore {
+    /// Creates a new `FileStore` at location `root/CHUNK_DB_DIR`
     ///
-    /// If the location specified already contains a `ChunkStore`, it is simply used
+    /// If the location specified already contains a `FileStore`, it is simply used
     ///
     /// Used space of the dir is tracked
     pub(crate) fn new<P: AsRef<Path>>(root: P, used_space: UsedSpace) -> Result<Self> {
-        let chunk_store_path = root.as_ref().join(CHUNK_DB_DIR);
+        let chunk_store_path = root.as_ref().join(FILE_DB_DIR);
 
-        Ok(ChunkStore {
+        Ok(FileStore {
             bit_tree_depth: BIT_TREE_DEPTH,
-            chunk_store_path,
+            file_store_path: chunk_store_path,
             used_space,
         })
     }
@@ -50,7 +51,7 @@ impl ChunkStore {
     // Example:
     // - with a xorname with starting bits `010001110110....`
     // - and a bit_count of `6`
-    // returns the path `CHUNK_STORE_PATH/0/1/0/0/0/1`
+    // returns the path `FILE_STORE_PATH/0/1/0/0/0/1`
     // If the provided bit count is larger than `self.bit_tree_depth`, uses `self.bit_tree_depth`
     // to stay within the prefix tree path
     fn prefix_tree_path(&self, xorname: XorName, bit_count: usize) -> PathBuf {
@@ -61,12 +62,12 @@ impl ChunkStore {
             .map(|c| format!("{}", c))
             .collect();
 
-        let mut path = self.chunk_store_path.clone();
+        let mut path = self.file_store_path.clone();
         path.push(prefix_dir_path);
         path
     }
 
-    fn address_to_filepath(&self, addr: &ChunkAddress) -> Result<PathBuf> {
+    fn address_to_filepath(&self, addr: &DataAddress) -> Result<PathBuf> {
         let xorname = *addr.name();
         let filename = addr.encode_to_zbase32()?;
         let mut path = self.prefix_tree_path(xorname, self.bit_tree_depth);
@@ -74,13 +75,13 @@ impl ChunkStore {
         Ok(path)
     }
 
-    fn filepath_to_address(&self, path: &str) -> Result<ChunkAddress> {
+    fn filepath_to_address(&self, path: &str) -> Result<DataAddress> {
         let filename = Path::new(path)
             .file_name()
             .ok_or(Error::NoFilename)?
             .to_str()
             .ok_or(Error::InvalidFilename)?;
-        Ok(ChunkAddress::decode_from_zbase32(filename)?)
+        Ok(DataAddress::decode_from_zbase32(filename)?)
     }
 
     // ---------------------- api methods ----------------------
@@ -89,23 +90,27 @@ impl ChunkStore {
         self.used_space.can_add(size)
     }
 
-    pub(crate) async fn write_chunk(&self, data: &Chunk) -> Result<ChunkAddress> {
+    pub(crate) async fn write_data(&self, data: DataCmd) -> Result<DataAddress> {
         let addr = data.address();
-        let filepath = self.address_to_filepath(addr)?;
+        let filepath = self.address_to_filepath(&addr)?;
         if let Some(dirs) = filepath.parent() {
             tokio::fs::create_dir_all(dirs).await?;
         }
 
         let mut file = tokio::fs::File::create(filepath).await?;
-        file.write_all(data.value()).await?;
 
-        self.used_space.increase(data.value().len());
+        // TODO: Support Registers too
+        if let DataCmd::StoreChunk(chunk) = data {
+            file.write_all(chunk.value()).await?;
 
-        Ok(*addr)
+            self.used_space.increase(chunk.value().len());
+        }
+
+        Ok(addr)
     }
 
     #[allow(dead_code)]
-    pub(crate) async fn delete_chunk(&self, addr: &ChunkAddress) -> Result<()> {
+    pub(crate) async fn delete_data(&self, addr: &DataAddress) -> Result<()> {
         let filepath = self.address_to_filepath(addr)?;
         let meta = tokio::fs::metadata(filepath.clone()).await?;
         tokio::fs::remove_file(filepath).await?;
@@ -113,23 +118,23 @@ impl ChunkStore {
         Ok(())
     }
 
-    pub(crate) async fn read_chunk(&self, addr: &ChunkAddress) -> Result<Chunk> {
+    pub(crate) async fn read_data(&self, addr: &DataAddress) -> Result<Chunk> {
         let file_path = self.address_to_filepath(addr)?;
         let bytes = Bytes::from(tokio::fs::read(file_path).await?);
         let chunk = Chunk::new(bytes);
         Ok(chunk)
     }
 
-    pub(crate) fn chunk_file_exists(&self, addr: &ChunkAddress) -> Result<bool> {
+    pub(crate) fn data_file_exists(&self, addr: &DataAddress) -> Result<bool> {
         let filepath = self.address_to_filepath(addr)?;
         Ok(filepath.exists())
     }
 
     pub(crate) fn list_all_files(&self) -> Result<Vec<String>> {
-        list_files_in(&self.chunk_store_path)
+        list_files_in(&self.file_store_path)
     }
 
-    pub(crate) fn list_all_chunk_addresses(&self) -> Result<Vec<ChunkAddress>> {
+    pub(crate) fn list_all_data_addresses(&self) -> Result<Vec<DataAddress>> {
         let all_files = self.list_all_files()?;
         let all_addrs = all_files
             .iter()
@@ -166,7 +171,7 @@ fn list_files_in(path: &Path) -> Result<Vec<String>> {
         .filter_map(|e| match e {
             Ok(direntry) => Some(direntry),
             Err(err) => {
-                warn!("ChunkStore: failed to process file entry: {}", err);
+                warn!("FileStore: failed to process file entry: {}", err);
                 None
             }
         })
@@ -185,29 +190,26 @@ mod tests {
     use rayon::prelude::*;
     use tempfile::tempdir;
 
-    fn init_chunk_disk_store() -> ChunkStore {
+    fn init_file_store() -> FileStore {
         let root = tempdir().expect("Failed to create temporary directory for chunk disk store");
-        ChunkStore::new(root.path(), UsedSpace::new(usize::MAX))
+        FileStore::new(root.path(), UsedSpace::new(usize::MAX))
             .expect("Failed to create chunk disk store")
     }
 
     #[tokio::test]
     #[ignore]
     async fn test_write_read_chunk() {
-        let store = init_chunk_disk_store();
+        let store = init_file_store();
         // test that a range of different chunks return the written chunk
         for _ in 0..10 {
             let chunk = Chunk::new(random_bytes(100));
 
             let addr = store
-                .write_chunk(&chunk)
+                .write_data(DataCmd::StoreChunk(chunk.clone()))
                 .await
                 .expect("Failed to write chunk.");
 
-            let read_chunk = store
-                .read_chunk(&addr)
-                .await
-                .expect("Failed to read chunk.");
+            let read_chunk = store.read_data(&addr).await.expect("Failed to read chunk.");
 
             assert_eq!(chunk.value(), read_chunk.value());
         }
@@ -215,7 +217,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_write_read_async_multiple_chunks() {
-        let store = init_chunk_disk_store();
+        let store = init_file_store();
         let size = 100;
         let chunks: Vec<Chunk> = std::iter::repeat_with(|| Chunk::new(random_bytes(size)))
             .take(7)
@@ -225,20 +227,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_write_read_async_multiple_identical_chunks() {
-        let store = init_chunk_disk_store();
+        let store = init_file_store();
         let chunks: Vec<Chunk> = std::iter::repeat(Chunk::new(Bytes::from("test_concurrent")))
             .take(7)
             .collect();
         write_and_read_chunks(&chunks, store).await;
     }
 
-    async fn write_and_read_chunks(chunks: &[Chunk], store: ChunkStore) {
+    async fn write_and_read_chunks(chunks: &[Chunk], store: FileStore) {
         // write all chunks
-        let tasks = chunks.iter().map(|c| store.write_chunk(c));
+        let tasks = chunks
+            .iter()
+            .map(|c| store.write_data(DataCmd::StoreChunk(c.clone())));
         let results = join_all(tasks).await;
 
         // read all chunks
-        let tasks = results.iter().flatten().map(|addr| store.read_chunk(addr));
+        let tasks = results.iter().flatten().map(|addr| store.read_data(addr));
         let results = join_all(tasks).await;
         let read_chunks: Vec<&Chunk> = results.iter().flatten().collect();
 

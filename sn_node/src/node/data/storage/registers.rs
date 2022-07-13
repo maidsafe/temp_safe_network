@@ -85,6 +85,7 @@ impl RegisterStorage {
         self.drop_register_key(address.id()?)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn keys(&self) -> Result<Vec<RegisterAddress>> {
         type KeyResults = Vec<Result<XorName>>;
         let mut the_data = vec![];
