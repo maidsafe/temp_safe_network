@@ -167,14 +167,6 @@ impl Membership {
         self.gen
     }
 
-    pub(crate) fn voters_public_key_set(&self) -> &PublicKeySet {
-        &self.consensus.elders
-    }
-
-    pub(crate) fn most_recent_decision(&self) -> Option<&Decision<NodeState>> {
-        self.history.values().last().map(|(d, _)| d)
-    }
-
     #[cfg(test)]
     pub(crate) fn is_churn_in_progress(&self) -> bool {
         !self.consensus.votes.is_empty()
@@ -329,7 +321,7 @@ impl Membership {
         &mut self,
         signed_vote: SignedVote<NodeState>,
         prefix: &Prefix,
-    ) -> Result<VoteResponse<NodeState>> {
+    ) -> Result<(VoteResponse<NodeState>, Option<Decision<NodeState>>)> {
         self.validate_proposals(&signed_vote, prefix)?;
 
         let vote_gen = signed_vote.vote.gen;
@@ -343,7 +335,7 @@ impl Membership {
         );
         let vote_response = consensus.handle_signed_vote(signed_vote)?;
 
-        if let Some(decision) = consensus.decision.clone() {
+        let decision = if let Some(decision) = consensus.decision.clone() {
             if is_ongoing_consensus {
                 info!(
                     "Membership - decided {:?}",
@@ -360,17 +352,25 @@ impl Membership {
                 );
 
                 let decided_consensus = std::mem::replace(&mut self.consensus, next_consensus);
-                let _ = self.history.insert(vote_gen, (decision, decided_consensus));
-                self.gen = vote_gen
+                let _ = self
+                    .history
+                    .insert(vote_gen, (decision.clone(), decided_consensus));
+                self.gen = vote_gen;
+
+                Some(decision)
+            } else {
+                None
             }
         } else {
             // if this is our ongoing round, lets log the vote
             if is_ongoing_consensus && is_fresh_vote {
                 self.last_received_vote_time = Some(Instant::now());
             }
-        }
 
-        Ok(vote_response)
+            None
+        };
+
+        Ok((vote_response, decision))
     }
 
     fn sign_vote(&self, vote: Vote<NodeState>) -> Result<SignedVote<NodeState>> {
