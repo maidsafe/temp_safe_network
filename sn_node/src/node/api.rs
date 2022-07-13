@@ -82,8 +82,8 @@ impl Node {
         &self.network_knowledge
     }
 
-    pub(crate) async fn section_chain(&self) -> SecuredLinkedList {
-        self.network_knowledge.section_chain().await
+    pub(crate) fn section_chain(&self) -> SecuredLinkedList {
+        self.network_knowledge.section_chain()
     }
 
     /// Is this node an elder?
@@ -165,7 +165,7 @@ impl Node {
             wire_msg.src_section_pk(),
         );
 
-        let dst_pk = self.section_key_by_name(&target_name).await;
+        let dst_pk = self.section_key_by_name(&target_name);
         wire_msg.set_dst_section_pk(dst_pk);
 
         let cmd = Cmd::SendMsgDeliveryGroup {

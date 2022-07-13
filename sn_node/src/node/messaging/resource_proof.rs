@@ -57,6 +57,5 @@ impl Node {
 
         trace!("{}", LogMarker::SendResourceProofChallenge);
         self.send_direct_msg(peer, response, self.network_knowledge.section_key())
-            .await
     }
 }
