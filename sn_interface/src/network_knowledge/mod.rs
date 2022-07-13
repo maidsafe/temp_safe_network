@@ -39,7 +39,7 @@ use bls::PublicKey as BlsPublicKey;
 use section_peers::SectionPeers;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
-use std::{cell::RefCell, collections::BTreeSet, iter, net::SocketAddr, rc::Rc};
+use std::{collections::BTreeSet, iter, net::SocketAddr};
 use xor_name::{Prefix, XorName};
 
 /// The minimum age a node becomes an adult node.
@@ -148,7 +148,7 @@ pub struct NetworkKnowledge {
     /// The network prefix map, i.e. a map from prefix to SAPs
     prefix_map: NetworkPrefixMap,
     /// A DAG containing all section chains of the whole network that we are aware of
-    all_sections_chains: Rc<RefCell<SecuredLinkedList>>,
+    all_sections_chains: SecuredLinkedList,
 }
 
 impl NetworkKnowledge {
@@ -229,7 +229,7 @@ impl NetworkKnowledge {
             signed_sap,
             section_peers: SectionPeers::default(),
             prefix_map,
-            all_sections_chains: Rc::new(RefCell::new(chain)),
+            all_sections_chains: chain,
         })
     }
 
@@ -295,7 +295,6 @@ impl NetworkKnowledge {
             Some(signed_sap) if signed_sap.value.section_key() == section_key => {
                 let proof = self
                     .all_sections_chains
-                    .borrow()
                     .get_proof_chain(&self.genesis_key, &section_key);
                 // We have the signed SAP for the provided prefix and section key,
                 // we should be able to update our current SAP and section chain
@@ -330,7 +329,7 @@ impl NetworkKnowledge {
 
     /// Verify the given public key corresponds to any (current/old) section known to us
     pub fn verify_section_key_is_known(&self, section_key: &BlsPublicKey) -> bool {
-        self.all_sections_chains.borrow().has_key(section_key)
+        self.all_sections_chains.has_key(section_key)
     }
 
     /// Given a `NodeMsg` can we trust it (including verifying contents of an AE message)
@@ -392,9 +391,7 @@ impl NetworkKnowledge {
 
                 // Join the proof chain to our DAG since it's a new SAP
                 // thus it shall extend some branch/chain.
-                self.all_sections_chains
-                    .borrow_mut()
-                    .join(proof_chain.clone())?;
+                self.all_sections_chains.join(proof_chain.clone())?;
 
                 // and if we are... do we have the key share needed to perform elder duties
                 let mut we_have_a_share_of_this_key = false;
@@ -454,7 +451,6 @@ impl NetworkKnowledge {
 
                     let section_chain = self
                         .all_sections_chains
-                        .borrow()
                         .get_proof_chain(&self.genesis_key, &provided_sap.section_key())?;
 
                     // Prune list of archived members
@@ -526,7 +522,6 @@ impl NetworkKnowledge {
         if let Some(signed_sap) = closest_sap {
             if let Ok(proof_chain) = self
                 .all_sections_chains
-                .borrow()
                 .get_proof_chain(&self.genesis_key, &signed_sap.value.section_key())
             {
                 return Some((signed_sap, proof_chain));
