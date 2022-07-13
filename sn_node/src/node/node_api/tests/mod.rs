@@ -815,7 +815,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let comm = create_comm().await?;
-            let node = Node::new(
+            let mut node = Node::new(
                 comm.socket_addr(),
                 node.keypair.clone(),
                 network_knowledge,
@@ -873,8 +873,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             // Simulate DKG round finished succesfully by adding
             // the new section key share to our cache
             node.section_keys_provider
-                .insert(create_section_key_share(&sk_set2, 0))
-                .await;
+                .insert(create_section_key_share(&sk_set2, 0));
 
             let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
@@ -1245,7 +1244,7 @@ async fn handle_elders_update() -> Result<()> {
         let (event_sender, mut event_receiver) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
         let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
         let comm = create_comm().await?;
-        let node = Node::new(
+        let mut node = Node::new(
             comm.socket_addr(),
             info.keypair.clone(),
             section0.clone(),
@@ -1259,8 +1258,7 @@ async fn handle_elders_update() -> Result<()> {
         // Simulate DKG round finished succesfully by adding
         // the new section key share to our cache
         node.section_keys_provider
-            .insert(create_section_key_share(&sk_set1, 0))
-            .await;
+            .insert(create_section_key_share(&sk_set1, 0));
 
         let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
@@ -1388,7 +1386,7 @@ async fn handle_demote_during_split() -> Result<()> {
             let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let comm = create_comm().await?;
-            let node = Node::new(
+            let mut node = Node::new(
                 comm.socket_addr(),
                 info.keypair.clone(),
                 section,
@@ -1406,12 +1404,10 @@ async fn handle_demote_during_split() -> Result<()> {
             // key share to our cache (according to which split section we'll belong to).
             if prefix0.matches(&node_name) {
                 node.section_keys_provider
-                    .insert(create_section_key_share(&sk_set_v1_p0, 0))
-                    .await;
+                    .insert(create_section_key_share(&sk_set_v1_p0, 0));
             } else {
                 node.section_keys_provider
-                    .insert(create_section_key_share(&sk_set_v1_p1, 0))
-                    .await;
+                    .insert(create_section_key_share(&sk_set_v1_p1, 0));
             }
 
             let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);

@@ -177,7 +177,7 @@ impl Dispatcher {
             Cmd::ProposeOffline(names) => {
                 let mut node = self.node.write().await;
 
-                node.cast_offline_proposals(&names).await
+                node.cast_offline_proposals(&names)
             }
             Cmd::StartConnectivityTest(name) => {
                 let node = self.node.read().await;

@@ -70,17 +70,17 @@ impl Node {
         match candidates_sap {
             SapCandidate::ElderHandover(sap) => {
                 // NB TODO make sure this error has to be swallowed
-                self.propose_new_elders(sap).await.unwrap_or_else(|e| {
+                self.propose_new_elders(sap).unwrap_or_else(|e| {
                     error!("Failed to propose new elders: {}", e);
                     vec![]
                 })
             }
             SapCandidate::SectionSplit(sap1, sap2) => {
-                let mut prop1 = self.propose_new_elders(sap1).await.unwrap_or_else(|e| {
+                let mut prop1 = self.propose_new_elders(sap1).unwrap_or_else(|e| {
                     error!("Failed to propose new elders: {}", e);
                     vec![]
                 });
-                let mut prop2 = self.propose_new_elders(sap2).await.unwrap_or_else(|e| {
+                let mut prop2 = self.propose_new_elders(sap2).unwrap_or_else(|e| {
                     error!("Failed to propose new elders: {}", e);
                     vec![]
                 });
@@ -92,13 +92,13 @@ impl Node {
 
     /// Helper function to propose a `NewElders` list to sign from a SAP
     /// Send the `NewElders` proposal to all of the to-be-Elders so it's aggregated by them.
-    async fn propose_new_elders(
+    fn propose_new_elders(
         &mut self,
         sap: SectionAuth<SectionAuthorityProvider>,
     ) -> Result<Vec<Cmd>> {
         let proposal_recipients = sap.elders_vec();
         let proposal = Proposal::NewElders(sap);
-        self.send_proposal(proposal_recipients, proposal).await
+        self.send_proposal(proposal_recipients, proposal)
     }
 
     /// helper to handle a handover vote

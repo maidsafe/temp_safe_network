@@ -9,8 +9,6 @@
 use crate::network_knowledge::{Error, Result};
 use crate::types::log_markers::LogMarker;
 
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use uluru::LRUCache;
 
 const KEY_CACHE_SIZE: usize = 50;
@@ -32,33 +30,32 @@ pub struct SectionKeyShare {
 #[derive(Debug, Clone)]
 pub struct SectionKeysProvider {
     /// A cache for current and previous section BLS keys.
-    cache: Arc<RwLock<LRUCache<SectionKeyShare, KEY_CACHE_SIZE>>>,
+    cache: LRUCache<SectionKeyShare, KEY_CACHE_SIZE>,
 }
 
 impl SectionKeysProvider {
     /// Constructor.
-    pub async fn new(current: Option<SectionKeyShare>) -> Self {
-        let section_keys_provider = Self {
-            cache: Arc::new(RwLock::new(LRUCache::default())),
+    pub fn new(current: Option<SectionKeyShare>) -> Self {
+        let mut section_keys_provider = Self {
+            cache: LRUCache::default(),
         };
 
         if let Some(share) = current {
-            section_keys_provider.insert(share).await;
+            section_keys_provider.insert(share);
         }
         section_keys_provider
     }
 
     /// Resets the cache
-    pub async fn wipe(&self) {
-        self.cache.write().await.clear();
+    pub fn wipe(&mut self) {
+        self.cache.clear();
     }
 
     /// Returns the most recently added key.
-    pub async fn key_share(&self, public_key: &bls::PublicKey) -> Result<SectionKeyShare> {
+    pub fn key_share(&self, public_key: &bls::PublicKey) -> Result<SectionKeyShare> {
         match self
             .cache
-            .write()
-            .await
+            .iter()
             .find(|share| public_key == &share.public_key_set.public_key())
         {
             Some(key_share) => Ok(key_share.clone()),
@@ -68,34 +65,32 @@ impl SectionKeysProvider {
 
     /// Uses the secret key from cache, corresponding to
     /// the provided public key.
-    pub async fn sign_with(
+    pub fn sign_with(
         &self,
         data: &[u8],
         public_key: &bls::PublicKey,
     ) -> Result<(usize, bls::SignatureShare)> {
-        let key_share = self.key_share(public_key).await?;
+        let key_share = self.key_share(public_key)?;
 
         Ok((key_share.index, key_share.secret_key_share.sign(data)))
     }
 
     /// Returns true if no key share exists.
-    pub async fn is_empty(&self) -> bool {
-        self.cache.read().await.is_empty()
+    pub fn is_empty(&self) -> bool {
+        self.cache.is_empty()
     }
 
     /// Adds a new key to the cache, and removes the oldest
     /// key if cache size is exceeded.
-    pub async fn insert(&self, share: SectionKeyShare) {
+    pub fn insert(&mut self, share: SectionKeyShare) {
         let public_key = share.public_key_set.public_key();
-        if let Some(evicted) = self.cache.write().await.insert(share) {
+        if let Some(evicted) = self.cache.insert(share) {
             trace!("evicted old key share from cache: {:?}", evicted);
         }
-        let cache_len = self.cache.read().await.len();
+        let cache_len = self.cache.len();
         trace!(
-            "{} in cache (total {}): {:?}",
+            "{} in cache (total {cache_len}): {public_key:?}",
             LogMarker::NewKeyShareStored,
-            cache_len,
-            public_key
         );
     }
 }

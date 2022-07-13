@@ -30,10 +30,7 @@ impl Node {
         Ok(cmds)
     }
 
-    pub(crate) async fn cast_offline_proposals(
-        &mut self,
-        names: &BTreeSet<XorName>,
-    ) -> Result<Vec<Cmd>> {
+    pub(crate) fn cast_offline_proposals(&mut self, names: &BTreeSet<XorName>) -> Result<Vec<Cmd>> {
         // Don't send the `Offline` proposal to the peer being lost as that send would fail,
         // triggering a chain of further `Offline` proposals.
         let elders: Vec<_> = self
@@ -47,10 +44,7 @@ impl Node {
         for name in names.iter() {
             if let Some(info) = self.network_knowledge.get_section_member(name) {
                 let info = info.leave()?;
-                if let Ok(cmds) = self
-                    .send_proposal(elders.clone(), Proposal::Offline(info))
-                    .await
-                {
+                if let Ok(cmds) = self.send_proposal(elders.clone(), Proposal::Offline(info)) {
                     result.extend(cmds);
                 }
             }

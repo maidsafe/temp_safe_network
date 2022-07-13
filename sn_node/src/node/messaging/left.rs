@@ -61,9 +61,7 @@ impl Node {
         let churn_id = ChurnId(signature.to_bytes().to_vec());
         cmds.extend(self.relocate_peers(churn_id, BTreeSet::default()).await?);
 
-        let result = self
-            .promote_and_demote_elders_except(&BTreeSet::default())
-            .await?;
+        let result = self.promote_and_demote_elders_except(&BTreeSet::default())?;
         if result.is_empty() {
             // Send AE-Update to Adults of our section
             let our_adults = self.network_knowledge.adults();
@@ -80,8 +78,8 @@ impl Node {
                 .iter()
                 .map(|peer| peer.name())
                 .collect(),
-        )
-        .await?;
+        )?;
+
         self.joins_allowed = true;
 
         Ok(cmds)
