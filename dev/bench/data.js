@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1657647200777,
+  "lastUpdate": 1657704842302,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -8447,6 +8447,66 @@ window.BENCHMARK_DATA = {
             "name": "upload-sampling/upload 10mb",
             "value": 1092122396,
             "range": "± 34422983",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "d67971528697627245872f167de690029735c7d7",
+          "message": "Merge #1320\n\n1320: feat(cli): show the DBC owner in the wallet displayed by cat cmd r=joshuef a=bochaco\n\n- Display the owner of each DBC when `cat`-ing a wallet.\r\n- Align to the right the balance of each DBC when `cat`-ing a wallet.\r\n- Shorten the default name set to DBC when deposited in a wallet.\r\n- Make the name of the change DBC automatically deposited in the wallet unique.\r\n\r\nExample output:\r\n```\r\n$ safe cat safe://hyryynyw5jg6rw87x795yjqbaz1rc9e4w8yhqu8x45zksrb4f9h9g9ejf8yb6o \r\nSpendable balances of wallet at \"safe://hyryynyw5jg6rw87x795yjqbaz1rc9e4w8yhqu8x45zksrb4f9h9g9ejf8yb6o\":\r\n+------------------------+----------------------+-----------------+---------------------+\r\n| Spendable balance name | Balance              | Owner           | DBC Data            |\r\n|------------------------+----------------------+-----------------+---------------------|\r\n| dbc-6892553f           |          1.987000000 | 852b82...34600c | a17d3767...00000000 |\r\n|------------------------+----------------------+-----------------+---------------------|\r\n| dbc-75a447a3           |         50.123456789 | 81aa22...023193 | 40bbaf41...00000000 |\r\n|------------------------+----------------------+-----------------+---------------------|\r\n| change-dbc-dac2b72e    | 4524969502.025287444 | a63bbd...f24bd1 | 5caea6f4...00000000 |\r\n+------------------------+----------------------+-----------------+---------------------+\r\n```\n\nCo-authored-by: bochaco <gabrielviganotti@gmail.com>",
+          "timestamp": "2022-07-13T07:56:29Z",
+          "tree_id": "26b0eaf7b88ca8a6825caf5874649068285251e7",
+          "url": "https://github.com/maidsafe/safe_network/commit/d67971528697627245872f167de690029735c7d7"
+        },
+        "date": 1657704840805,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 518860700,
+            "range": "± 10917491",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 544632103,
+            "range": "± 16973660",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 1219635992,
+            "range": "± 2009057365",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 280521428,
+            "range": "± 4086059",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 314062240,
+            "range": "± 46767229",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 1089660528,
+            "range": "± 26898436",
             "unit": "ns/iter"
           }
         ]
