@@ -37,7 +37,7 @@ jobs:
           override: true
       - shell: bash
         run: make gha-build-${{ matrix.target }}
-      - uses: actions/upload-artifact@master
+      - uses: actions/upload-artifact@main
         with:
           name: safe_network-${{ matrix.target }}
           path: |

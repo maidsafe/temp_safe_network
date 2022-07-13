@@ -298,7 +298,7 @@ jobs:
         if: matrix.os != 'windows-latest'
 
       - name: Upload Node Logs
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@main
         with:
           name: sn_node_logs_e2e_${{matrix.os}}
           path: ~/.safe/node/local-test-network/**/*.log*
@@ -442,7 +442,7 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
       - name: Upload Node Logs
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@main
         with:
           name: sn_node_logs_e2e_split_self_hosted_ubuntu
           path: ~/.safe/node/local-test-network/**/*.log*
@@ -553,7 +553,7 @@ jobs:
         if: steps.section-startup.outcome == 'success'
 
       - name: Upload Node Logs
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@main
         with:
           name: sn_node_logs_api_${{matrix.os}}
           path: ~/.safe/node/local-test-network/**/*.log*
@@ -652,7 +652,7 @@ jobs:
         if: steps.section-startup.outcome == 'success'
 
       - name: Upload Node Logs
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@main
         with:
           name: sn_node_logs_cli_${{matrix.os}}
           path: ~/.safe/node/local-test-network/**/*.log*
@@ -670,7 +670,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Upload event file
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@main
         with:
           name: event-file
           path: ${{ github.event_path }}

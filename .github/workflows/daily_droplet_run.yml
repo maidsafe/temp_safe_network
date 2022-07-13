@@ -130,7 +130,7 @@ jobs:
           sudo apt install -y musl-tools
           rustup target add x86_64-unknown-linux-musl
           cargo build --release --target x86_64-unknown-linux-musl --bin sn_node
-      - uses: actions/upload-artifact@master
+      - uses: actions/upload-artifact@main
         with:
           name: sn_node-x86_64-unknown-linux-musl
           path: |
@@ -362,7 +362,7 @@ jobs:
           branch: main
           tags: true
       - name: Upload event file
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@main
         with:
           name: event-file
           path: ${{ github.event_path }}
@@ -386,7 +386,7 @@ jobs:
           aws-access-key-secret: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           action: 'destroy'
       - name: Upload event file
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@main
         with:
           name: event-file
           path: ${{ github.event_path }}
