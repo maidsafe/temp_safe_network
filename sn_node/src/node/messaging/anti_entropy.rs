@@ -665,16 +665,13 @@ mod tests {
                 let dst_name = our_prefix.substituted_in(xor_name::rand::random());
                 let dst_section_key = env.node.network_knowledge().section_key();
 
-                let cmd = env
-                    .node
-                    .check_for_entropy(
-                        msg.serialize()?,
-                        &src_location,
-                        &dst_section_key,
-                        dst_name,
-                        &sender,
-                    )
-                    .await?;
+                let cmd = env.node.check_for_entropy(
+                    msg.serialize()?,
+                    &src_location,
+                    &dst_section_key,
+                    dst_name,
+                    &sender,
+                )?;
 
                 assert!(cmd.is_none());
                 Result::<()>::Ok(())
@@ -734,9 +731,7 @@ mod tests {
 
         // Run the local task set.
         local.run_until(async move {
-
-
-            let env = Env::new().await?;
+            let mut env = Env::new().await?;
 
             let other_sk = bls::SecretKey::random();
             let other_pk = other_sk.public_key();
@@ -755,8 +750,7 @@ mod tests {
                     &dst_section_key,
                     dst_name,
                     &sender,
-                )
-                .await;
+                );
 
             let msg_type = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { wire_msg, .. })) => {
                 wire_msg
@@ -773,15 +767,14 @@ mod tests {
             // now let's insert the other SAP to make it aware of the other prefix
             assert!(
                 env.node
-                    .network_knowledge()
+                    .network_knowledge
                     .update_knowledge_if_valid(
                         env.other_sap.clone(),
                         &env.proof_chain,
                         None,
                         &env.node.info().name(),
                         &env.node.section_keys_provider
-                    )
-                    .await?
+                    ).await?
             );
 
             // and it now shall give us an AE redirect msg
@@ -794,8 +787,7 @@ mod tests {
                     &dst_section_key,
                     dst_name,
                     &sender,
-                )
-                .await;
+                );
 
             let msg_type = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { wire_msg, .. })) => {
                 wire_msg
@@ -840,8 +832,7 @@ mod tests {
                     dst_section_key,
                     dst_name,
                     &sender,
-                )
-                .await?;
+                )?;
 
             let msg_type = assert_matches!(cmd, Some(Cmd::SendMsg { wire_msg, .. }) => {
                 wire_msg
@@ -888,8 +879,7 @@ mod tests {
                     dst_section_key,
                     dst_name,
                     &sender,
-                )
-                .await?;
+                )?;
 
             let msg_type = assert_matches!(cmd, Some(Cmd::SendMsg { wire_msg, .. }) => {
                 wire_msg
@@ -950,16 +940,13 @@ mod tests {
             node.section_keys_provider = SectionKeysProvider::new(Some(section_key_share)).await;
 
             // get our Node to now be in prefix(0)
-            let _ = node
-                .network_knowledge()
-                .update_knowledge_if_valid(
-                    signed_sap.clone(),
-                    &chain,
-                    None,
-                    &info.name(),
-                    &node.section_keys_provider,
-                )
-                .await;
+            let _ = node.network_knowledge.update_knowledge_if_valid(
+                signed_sap.clone(),
+                &chain,
+                None,
+                &info.name(),
+                &node.section_keys_provider,
+            );
 
             // generate other SAP for prefix1
             let (other_sap, _, secret_key_set) =
