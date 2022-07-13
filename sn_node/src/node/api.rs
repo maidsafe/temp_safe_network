@@ -49,7 +49,7 @@ impl Node {
         let genesis_dbc = gen_genesis_dbc(&genesis_sk_set)?;
 
         let (network_knowledge, section_key_share) =
-            NetworkKnowledge::first_node(info.peer(), genesis_sk_set).await?;
+            NetworkKnowledge::first_node(info.peer(), genesis_sk_set)?;
 
         let node = Self::new(
             our_addr,
@@ -65,13 +65,13 @@ impl Node {
         Ok((node, genesis_dbc))
     }
 
-    pub(crate) async fn relocate(
+    pub(crate) fn relocate(
         &mut self,
         new_keypair: Arc<Keypair>,
         new_section: NetworkKnowledge,
     ) -> Result<()> {
         // we first try to relocate section info.
-        self.network_knowledge.relocated_to(new_section).await?;
+        self.network_knowledge.relocated_to(new_section)?;
 
         self.keypair = new_keypair;
 

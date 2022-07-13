@@ -317,7 +317,6 @@ impl Node {
         if self
             .network_knowledge
             .try_update_current_sap(key_share_pk, &sap.prefix())
-            .await
         {
             self.update_self_for_new_node_state(snapshot).await
         } else {
