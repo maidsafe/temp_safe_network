@@ -64,7 +64,7 @@ impl Node {
     /// for signature by the current elders
     #[instrument(skip(self), level = "trace")]
     pub(crate) async fn broadcast_handover_decision(
-        &self,
+        &mut self,
         candidates_sap: SapCandidate,
     ) -> Vec<Cmd> {
         match candidates_sap {
@@ -93,7 +93,7 @@ impl Node {
     /// Helper function to propose a `NewElders` list to sign from a SAP
     /// Send the `NewElders` proposal to all of the to-be-Elders so it's aggregated by them.
     async fn propose_new_elders(
-        &self,
+        &mut self,
         sap: SectionAuth<SectionAuthorityProvider>,
     ) -> Result<Vec<Cmd>> {
         let proposal_recipients = sap.elders_vec();

@@ -83,13 +83,11 @@ pub struct SectionAuth {
 impl SectionAuth {
     /// Try to construct verified section authority by aggregating a new share.
     pub async fn try_authorize(
-        aggregator: SignatureAggregator,
+        aggregator: &mut SignatureAggregator,
         share: BlsShareAuth,
         payload: impl AsRef<[u8]>,
     ) -> Result<AuthorityProof<Self>, AggregatorError> {
-        let sig = aggregator
-            .add(payload.as_ref(), share.sig_share.clone())
-            .await?;
+        let sig = aggregator.add(payload.as_ref(), share.sig_share.clone())?;
 
         if share.sig_share.public_key_set.public_key() != sig.public_key {
             return Err(AggregatorError::InvalidShare);
