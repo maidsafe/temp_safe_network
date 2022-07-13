@@ -360,8 +360,7 @@ impl Node {
                             //       As the sending of the JoinRequest as notification
                             //       may require the `node` to be switched to new already.
 
-                            self.relocate(new_keypair.clone(), new_network_knowledge)
-                                .await?;
+                            self.relocate(new_keypair.clone(), new_network_knowledge)?;
 
                             trace!(
                                 "Relocation: Sending aggregated JoinRequest to {:?}",
