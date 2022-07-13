@@ -30,14 +30,14 @@ pub struct SectionKeyShare {
 #[derive(Debug, Clone)]
 pub struct SectionKeysProvider {
     /// A cache for current and previous section BLS keys.
-    cache: LRUCache<SectionKeyShare, KEY_CACHE_SIZE>,
+    cache: Box<LRUCache<SectionKeyShare, KEY_CACHE_SIZE>>,
 }
 
 impl SectionKeysProvider {
     /// Constructor.
     pub fn new(current: Option<SectionKeyShare>) -> Self {
         let mut section_keys_provider = Self {
-            cache: LRUCache::default(),
+            cache: Box::new(LRUCache::default()),
         };
 
         if let Some(share) = current {
