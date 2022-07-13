@@ -6,16 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod chunk_store;
 mod encoding;
 mod errors;
 mod event_store;
+mod file_store;
 mod used_space;
 
-pub(crate) use chunk_store::ChunkStore;
 pub(crate) use encoding::{deserialise, serialise};
 pub(crate) use errors::{convert_to_error_msg, Error, Result};
 pub(crate) use event_store::EventStore;
+pub(crate) use file_store::FileStore;
 use std::path::Path;
 pub use used_space::UsedSpace;
 

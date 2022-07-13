@@ -16,7 +16,7 @@ mod xorurl_media_types;
 pub use errors::{Error, Result};
 pub use version_hash::VersionHash;
 
-use sn_interface::types::{DataAddress, RegisterAddress};
+use sn_interface::types::{ChunkAddress, DataAddress, RegisterAddress};
 
 use multibase::{decode as base_decode, encode as base_encode, Base};
 use serde::{Deserialize, Serialize};
@@ -492,7 +492,7 @@ impl SafeUrl {
 
         let address = match xorurl_bytes[3] {
             0 => DataAddress::SafeKey(xor_name),
-            1 => DataAddress::Bytes(xor_name),
+            1 => DataAddress::Bytes(ChunkAddress(xor_name)),
             2 => DataAddress::Register(RegisterAddress::new(xor_name, type_tag)),
             other => {
                 return Err(Error::InvalidXorUrl(format!(
@@ -530,7 +530,7 @@ impl SafeUrl {
 
     pub fn from_bytes(address: XorName, content_type: ContentType) -> Result<Self> {
         SafeUrl::new(
-            DataAddress::Bytes(address),
+            DataAddress::Bytes(ChunkAddress(address)),
             None,
             0,
             content_type,

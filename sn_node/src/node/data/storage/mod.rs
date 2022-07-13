@@ -26,6 +26,7 @@ use sn_interface::{
     },
 };
 
+use sn_interface::messaging::data::DataCmd;
 use std::path::Path;
 
 /// Operations on data.
@@ -59,7 +60,7 @@ impl DataStorage {
     ) -> Result<Option<StorageLevel>> {
         debug!("Replicating {data:?}");
         match data.clone() {
-            ReplicatedData::Chunk(chunk) => self.chunks.store(&chunk).await?,
+            ReplicatedData::Chunk(chunk) => self.chunks.store(DataCmd::StoreChunk(chunk)).await?,
             ReplicatedData::RegisterLog(data) => {
                 self.registers.update(RegisterStoreExport(vec![data]))?
             }
@@ -196,17 +197,14 @@ impl DataStorage {
 
     /// Retrieve all keys/ReplicatedDataAddresses of stored data
     pub fn keys(&self) -> Result<Vec<ReplicatedDataAddress>> {
-        let chunk_keys = self
-            .chunks
-            .keys()?
-            .into_iter()
-            .map(ReplicatedDataAddress::Chunk);
-        let reg_keys = self
-            .registers
-            .keys()?
-            .into_iter()
-            .map(ReplicatedDataAddress::Register);
-        Ok(reg_keys.chain(chunk_keys).collect())
+        let all_keys = self.chunks.keys()?;
+
+        let mut res = vec![];
+        for addr in all_keys {
+            res.push(addr.to_replicated_data_address()?)
+        }
+
+        Ok(res)
     }
 }
 

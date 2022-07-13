@@ -15,6 +15,7 @@ pub use register::RegisterAddress;
 pub use spentbook::SpentbookAddress;
 
 use super::{utils, Result};
+use crate::types::Error;
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -24,7 +25,7 @@ pub enum DataAddress {
     ///
     SafeKey(XorName),
     ///
-    Bytes(XorName),
+    Bytes(ChunkAddress),
     ///
     Register(RegisterAddress),
     ///
@@ -36,7 +37,7 @@ impl DataAddress {
     pub fn name(&self) -> &XorName {
         match self {
             Self::SafeKey(address) => address,
-            Self::Bytes(address) => address,
+            Self::Bytes(address) => address.name(),
             Self::Register(address) => address.name(),
             Self::Spentbook(address) => address.name(),
         }
@@ -59,7 +60,7 @@ impl DataAddress {
 
     ///
     pub fn bytes(name: XorName) -> DataAddress {
-        DataAddress::Bytes(name)
+        DataAddress::Bytes(ChunkAddress(name))
     }
 
     ///
@@ -70,6 +71,15 @@ impl DataAddress {
     ///
     pub fn spentbook(name: XorName) -> DataAddress {
         DataAddress::Spentbook(SpentbookAddress::new(name))
+    }
+
+    pub fn to_replicated_data_address(self) -> Result<ReplicatedDataAddress> {
+        match self {
+            Self::Bytes(addr) => Ok(ReplicatedDataAddress::Chunk(addr)),
+            Self::Register(addr) => Ok(ReplicatedDataAddress::Register(addr)),
+            Self::Spentbook(addr) => Ok(ReplicatedDataAddress::Spentbook(addr)),
+            _ => Err(Error::InvalidOperation),
+        }
     }
 }
 
@@ -91,15 +101,6 @@ impl ReplicatedDataAddress {
             Self::Chunk(address) => address.name(),
             Self::Register(address) => address.name(),
             Self::Spentbook(address) => address.name(),
-        }
-    }
-
-    ///
-    pub fn to_replicated_address(&self) -> ReplicatedDataAddress {
-        match self {
-            Self::Chunk(address) => ReplicatedDataAddress::Chunk(*address),
-            Self::Register(address) => ReplicatedDataAddress::Register(*address),
-            Self::Spentbook(address) => ReplicatedDataAddress::Spentbook(*address),
         }
     }
 }

@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{CmdError, Error, RegisterCmd, SpentbookCmd};
-use crate::types::Chunk;
+use crate::types::{Chunk, DataAddress};
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -49,6 +49,15 @@ impl DataCmd {
             Register(c) => c.error(error),
             #[cfg(feature = "spentbook")]
             Spentbook(c) => c.error(error),
+        }
+    }
+
+    /// Returns the DataAddress of the corresponding variant.
+    pub fn address(&self) -> DataAddress {
+        match self {
+            Self::StoreChunk(chunk) => DataAddress::Bytes(*chunk.address()),
+            Self::Register(register_cmd) => DataAddress::Register(register_cmd.dst_address()),
+            Self::Spentbook(spentbook_cmd) => DataAddress::Spentbook(spentbook_cmd.dst_address()),
         }
     }
 
