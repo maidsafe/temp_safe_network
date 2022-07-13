@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1657737389282,
+  "lastUpdate": 1657746563831,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -8705,6 +8705,72 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 4705621,
             "range": "± 116428",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bzeeman@live.nl",
+            "name": "Benno Zeeman",
+            "username": "b-zee"
+          },
+          "committer": {
+            "email": "davidrusu.me@gmail.com",
+            "name": "davidrusu",
+            "username": "davidrusu"
+          },
+          "distinct": true,
+          "id": "a378e7ba67ec18be708a2e1a9e08e63519da7451",
+          "message": "fix(client): Remove unused Arc(RwLock) structure",
+          "timestamp": "2022-07-13T16:34:54-04:00",
+          "tree_id": "121ae4ae213c3f1fbd14a666ecdd8e209bcc2df9",
+          "url": "https://github.com/maidsafe/safe_network/commit/a378e7ba67ec18be708a2e1a9e08e63519da7451"
+        },
+        "date": 1657746562003,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 514288046,
+            "range": "± 17466746",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 537652673,
+            "range": "± 22764863",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 1237487307,
+            "range": "± 28016565",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 395720221,
+            "range": "± 21478089",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 396190397,
+            "range": "± 18650649",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 1093560275,
+            "range": "± 21971811",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 4246323,
+            "range": "± 231502",
             "unit": "ns/iter"
           }
         ]
