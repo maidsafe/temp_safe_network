@@ -72,11 +72,7 @@ impl NetworkLogState {
     }
 
     /// assert new log marker counts
-    pub(crate) fn assert_count(
-        &mut self,
-        marker: LogMarker,
-        target_count: usize,
-    ) -> Result<()> {
+    pub(crate) fn assert_count(&mut self, marker: LogMarker, target_count: usize) -> Result<()> {
         let new_messages = self.get_additional_marker_count(marker.clone())?;
 
         if let Some(count) = new_messages {

@@ -185,9 +185,7 @@ impl Node {
 
                 if self.is_not_elder() {
                     trace!("Redirecting from adult to section elders");
-                    cmds.push(
-                        self.ae_redirect_to_our_elders(sender, &src_location, &wire_msg)?,
-                    );
+                    cmds.push(self.ae_redirect_to_our_elders(sender, &src_location, &wire_msg)?);
                     return Ok(cmds);
                 }
 

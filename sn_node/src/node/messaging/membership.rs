@@ -18,10 +18,7 @@ use std::{collections::BTreeSet, vec};
 
 // Message handling
 impl Node {
-    pub(crate) fn propose_membership_change(
-        &mut self,
-        node_state: NodeState,
-    ) -> Result<Vec<Cmd>> {
+    pub(crate) fn propose_membership_change(&mut self, node_state: NodeState) -> Result<Vec<Cmd>> {
         info!(
             "Proposing membership change: {} - {:?}",
             node_state.name, node_state.state
