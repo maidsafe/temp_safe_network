@@ -9,6 +9,7 @@
 use crate::node::{
     flow_ctrl::cmds::Cmd, relocation::ChurnId, Event, MembershipEvent, Node, Proposal, Result,
 };
+use bls::Signature;
 use sn_consensus::Decision;
 use sn_interface::{
     messaging::system::{
@@ -97,45 +98,7 @@ impl Node {
         );
 
         for (new_info, signature) in joining_nodes.iter().cloned() {
-            if let Some(old_info) = self
-                .network_knowledge
-                .is_either_member_or_archived(&new_info.name)
-            {
-                // We would approve and relocate it only if half its age is at least MIN_ADULT_AGE
-                let new_age = old_info.age() / 2;
-                if new_age >= MIN_ADULT_AGE {
-                    cmds.extend(self.relocate_rejoining_peer(old_info.value, new_age)?);
-
-                    continue;
-                }
-            }
-
-            let sig = KeyedSig {
-                public_key: self.network_knowledge.section_key(),
-                signature,
-            };
-
-            let new_info = SectionAuth {
-                value: new_info.into_state(),
-                sig,
-            };
-
-            if !self.network_knowledge.update_member(new_info.clone()) {
-                info!("ignore Online: {}", new_info.peer());
-                return Ok(vec![]);
-            }
-
-            self.add_new_adult_to_trackers(new_info.name());
-
-            info!("handle Online: {}", new_info.peer());
-
-            // still used for testing
-            self.send_event(Event::Membership(MembershipEvent::MemberJoined {
-                name: new_info.name(),
-                previous_name: new_info.previous_name(),
-                age: new_info.age(),
-            }))
-            .await;
+            cmds.extend(self.handle_joining_node(new_info, signature).await?);
         }
 
         self.log_section_stats();
@@ -170,6 +133,52 @@ impl Node {
         self.print_network_stats();
 
         Ok(cmds)
+    }
+
+    async fn handle_joining_node(
+        &mut self,
+        new_info: NodeStateMsg,
+        signature: Signature,
+    ) -> Result<Vec<Cmd>> {
+        if let Some(old_info) = self
+            .network_knowledge
+            .is_either_member_or_archived(&new_info.name)
+        {
+            // We would approve and relocate it only if half its age is at least MIN_ADULT_AGE
+            let new_age = old_info.age() / 2;
+            if new_age >= MIN_ADULT_AGE {
+                return self.relocate_rejoining_peer(old_info.value, new_age);
+            }
+        }
+
+        let sig = KeyedSig {
+            public_key: self.network_knowledge.section_key(),
+            signature,
+        };
+
+        let new_info = SectionAuth {
+            value: new_info.into_state(),
+            sig,
+        };
+
+        if !self.network_knowledge.update_member(new_info.clone()) {
+            info!("ignore Online: {}", new_info.peer());
+            return Ok(vec![]);
+        }
+
+        self.add_new_adult_to_trackers(new_info.name());
+
+        info!("handle Online: {}", new_info.peer());
+
+        // still used for testing
+        self.send_event(Event::Membership(MembershipEvent::MemberJoined {
+            name: new_info.name(),
+            previous_name: new_info.previous_name(),
+            age: new_info.age(),
+        }))
+        .await;
+
+        Ok(vec![])
     }
 
     #[instrument(skip(self))]
