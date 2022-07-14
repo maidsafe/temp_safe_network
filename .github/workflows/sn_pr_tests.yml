@@ -298,7 +298,7 @@ jobs:
         if: matrix.os != 'windows-latest'
 
       - name: Tar log files
-        run:
+        run: |
           killall -9 sn_node
           find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
         if: failure()
@@ -448,7 +448,7 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
       - name: Tar log files
-        run:
+        run: |
           killall -9 sn_node
           find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
         if: failure()
@@ -565,7 +565,7 @@ jobs:
         if: steps.section-startup.outcome == 'success'
 
       - name: Tar log files
-        run:
+        run: |
           killall -9 sn_node
           find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
         if: failure()
@@ -670,7 +670,7 @@ jobs:
         if: steps.section-startup.outcome == 'success'
 
       - name: Tar log files
-        run:
+        run: |
           killall -9 sn_node
           find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
         if: failure()
