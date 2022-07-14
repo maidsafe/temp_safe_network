@@ -168,7 +168,6 @@ impl Node {
         // We assume to be aggregated if it contains a BLS Share sig as authority.
         match self
             .aggregate_msg_and_stop(&mut msg_authority, payload)
-            .await
         {
             Ok(false) => {
                 self.handle_valid_msg(msg_id, msg_authority, msg, sender, known_keys, comm)
@@ -761,7 +760,7 @@ impl Node {
     // Convert the provided NodeMsgAuthority to be a `Section` message
     // authority on successful accumulation. Also return 'true' if
     // current message shall not be processed any further.
-    async fn aggregate_msg_and_stop(
+    fn aggregate_msg_and_stop(
         &mut self,
         msg_authority: &mut NodeMsgAuthority,
         payload: Bytes,
@@ -777,7 +776,6 @@ impl Node {
             bls_share_auth.clone().into_inner(),
             &payload,
         )
-        .await
         {
             Ok(section_auth) => {
                 info!("Successfully aggregated message");
