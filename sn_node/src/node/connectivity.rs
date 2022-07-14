@@ -11,7 +11,7 @@ use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;
 
 impl Node {
-    pub(crate) async fn handle_peer_lost(&mut self, addr: &SocketAddr) -> Result<Vec<Cmd>> {
+    pub(crate) fn handle_peer_lost(&mut self, addr: &SocketAddr) -> Result<Vec<Cmd>> {
         let name = if let Some(peer) = self.network_knowledge.find_member_by_addr(addr) {
             debug!("Lost known peer {}", peer);
             peer.name()
@@ -25,7 +25,7 @@ impl Node {
             return Ok(vec![]);
         }
 
-        self.log_comm_issue(name).await?;
+        self.log_comm_issue(name)?;
         let cmds = vec![Cmd::StartConnectivityTest(name)];
         Ok(cmds)
     }
