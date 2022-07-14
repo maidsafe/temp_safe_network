@@ -123,17 +123,17 @@ impl Node {
                         BTreeSet::from_iter(decision.proposals.keys())
                     );
                     let public_key = self.network_knowledge.section_key();
-                    for (value, signature) in decision.proposals {
+                    for (value, signature) in decision.proposals.clone() {
                         let sig = KeyedSig {
                             public_key,
                             signature,
                         };
                         if membership.is_leaving_section(&value, prefix) {
                             cmds.push(Cmd::HandleNodeLeft(SectionAuth { value, sig }));
-                        } else {
-                            cmds.push(Cmd::HandleNewNodeOnline(SectionAuth { value, sig }));
                         }
                     }
+
+                    cmds.push(Cmd::HandleNewNodeOnline(decision));
                 }
             } else {
                 error!(

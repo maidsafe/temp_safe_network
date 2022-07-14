@@ -18,6 +18,8 @@ use crate::node::{
     Result as RoutingResult, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
 };
 
+use bls::Signature;
+use sn_consensus::Decision;
 use sn_interface::{
     elder_count, init_logger,
     messaging::{
@@ -444,7 +446,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             let new_peer = create_peer(MIN_ADULT_AGE + 1);
             let node_state = NodeState::joined(new_peer, Some(xor_name::rand::random()));
 
-            let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
+            let membership_decision = section_decision(&sk_set, node_state.to_msg())?;
 
             // Force this node to join
             node.write()
@@ -454,7 +456,9 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 .unwrap()
                 .force_bootstrap(node_state.to_msg());
 
-            let cmds = run_and_collect_cmds(Cmd::HandleNewNodeOnline(auth), &dispatcher).await?;
+            let cmds =
+                run_and_collect_cmds(Cmd::HandleNewNodeOnline(membership_decision), &dispatcher)
+                    .await?;
 
             // Verify we sent a `DkgStart` message with the expected participants.
             let mut dkg_start_sent = false;
@@ -506,9 +510,10 @@ async fn handle_online_cmd(
     section_auth: &SectionAuthorityProvider,
 ) -> Result<HandleOnlineStatus> {
     let node_state = NodeState::joined(*peer, None);
-    let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
+    let membership_decision = section_decision(sk_set, node_state.to_msg())?;
 
-    let all_cmds = run_and_collect_cmds(Cmd::HandleNewNodeOnline(auth), dispatcher).await?;
+    let all_cmds =
+        run_and_collect_cmds(Cmd::HandleNewNodeOnline(membership_decision), dispatcher).await?;
 
     let mut status = HandleOnlineStatus {
         node_approval_sent: false,
@@ -1049,8 +1054,8 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             RelocatedPeerRole::NonElder => non_elder_peer,
         };
 
-        let auth = create_relocation_trigger(sk_set.secret_key(), relocated_peer.age())?;
-        let cmds = run_and_collect_cmds(Cmd::HandleNewNodeOnline(auth), &dispatcher).await?;
+        let membership_decision = create_relocation_trigger(&sk_set, relocated_peer.age())?;
+        let cmds = run_and_collect_cmds(Cmd::HandleNewNodeOnline(membership_decision), &dispatcher).await?;
 
         let mut offline_relocate_sent = false;
 
@@ -1559,15 +1564,21 @@ fn create_section(
 // NOTE: recommended to call this with low `age` (4 or 5), otherwise it might take very long time
 // to complete because it needs to generate a signature with the number of trailing zeroes equal to
 // (or greater that) `age`.
-fn create_relocation_trigger(sk: &bls::SecretKey, age: u8) -> Result<SectionAuth<NodeStateMsg>> {
+fn create_relocation_trigger(
+    sk_set: &bls::SecretKeySet,
+    age: u8,
+) -> Result<Decision<NodeStateMsg>> {
     loop {
         let node_state =
-            NodeState::joined(create_peer(MIN_ADULT_AGE), Some(xor_name::rand::random()));
-        let auth = section_signed(sk, node_state.to_msg())?;
+            NodeState::joined(create_peer(MIN_ADULT_AGE), Some(xor_name::rand::random())).to_msg();
+        let decision = section_decision(sk_set, node_state.clone())?;
 
-        let churn_id = ChurnId(auth.sig.signature.to_bytes().to_vec());
+        let sig: Signature = decision.proposals[&node_state].clone();
+
+        let churn_id = ChurnId(sig.to_bytes().to_vec());
+
         if relocation_check(age, &churn_id) && !relocation_check(age + 1, &churn_id) {
-            return Ok(auth);
+            return Ok(decision);
         }
     }
 }

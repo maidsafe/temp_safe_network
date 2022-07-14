@@ -11,6 +11,7 @@ use crate::comm::{Comm, DeliveryStatus, MsgEvent};
 
 use crate::node::{messages::WireMsgUtils, Error, Result};
 
+use sn_interface::messaging::system::MembershipState;
 use sn_interface::{
     messaging::{
         system::{
@@ -19,9 +20,7 @@ use sn_interface::{
         },
         AuthKind, DstLocation, MsgType, NodeAuth, WireMsg,
     },
-    network_knowledge::{
-        prefix_map::NetworkPrefixMap, NetworkKnowledge, NodeInfo, SectionAuthUtils, MIN_ADULT_AGE,
-    },
+    network_knowledge::{prefix_map::NetworkPrefixMap, NetworkKnowledge, NodeInfo, MIN_ADULT_AGE},
     types::{keys::ed25519, log_markers::LogMarker, Peer},
 };
 
@@ -191,19 +190,22 @@ impl<'a> Joiner<'a> {
                     section_auth,
                     genesis_key,
                     section_chain,
-                    node_state,
+                    decision,
                 } => {
                     info!("{}", LogMarker::ReceivedJoinApproval);
-                    if node_state.name != self.node.name() {
-                        trace!("Ignore NodeApproval not for us: {:?}", node_state);
+                    if let Err(e) = decision.validate(&section_auth.public_key_set) {
+                        error!("Dropping invalid join decision: {e:?}");
                         continue;
                     }
 
-                    if !node_state.verify(&section_chain) {
-                        error!(
-                            "Verification of node state in JoinResponse failed: {:?}",
-                            node_state
-                        );
+                    // Ensure this decision includes us as a joining node
+                    if decision
+                        .proposals
+                        .keys()
+                        .filter(|n| n.state == MembershipState::Joined)
+                        .all(|n| n.name != self.node.name())
+                    {
+                        trace!("Ignore join approval decision not for us: {decision:?}");
                         continue;
                     }
 
@@ -647,15 +649,15 @@ mod tests {
 
             // Send JoinResponse::Approval
             let section_auth = section_signed(sk, section_auth.clone())?;
-            let node_state = section_signed(sk, NodeState::joined(peer, None))?;
-            let proof_chain = SecuredLinkedList::new(section_key);
+            let decision = section_decision(&sk_set, NodeState::joined(peer, None).to_msg())?;
+            let section_chain = SecuredLinkedList::new(section_key);
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
                     genesis_key: section_key,
                     section_auth: section_auth.clone().into_authed_msg(),
-                    node_state: node_state.into_authed_msg(),
-                    section_chain: proof_chain,
+                    section_chain,
+                    decision,
                 })),
                 &bootstrap_node,
                 section_auth.section_key(),

@@ -8,6 +8,7 @@
 
 use crate::node::{Proposal, XorName};
 
+use sn_consensus::Decision;
 use sn_interface::{
     messaging::{
         data::ServiceMsg,
@@ -132,7 +133,7 @@ pub(crate) enum Cmd {
     /// Handle agreement on a proposal.
     HandleAgreement { proposal: Proposal, sig: KeyedSig },
     /// Handle a new Node joining agreement.
-    HandleNewNodeOnline(SectionAuth<NodeState>),
+    HandleNewNodeOnline(Decision<NodeState>),
     /// Handle a Node leaving agreement.
     HandleNodeLeft(SectionAuth<NodeState>),
     /// Handle agree on elders. This blocks node message processing until complete.
