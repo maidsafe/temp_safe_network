@@ -46,7 +46,7 @@ impl Node {
             );
 
             let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data]));
-            self.send_node_msg_to_nodes(msg, targets).await
+            self.send_node_msg_to_nodes(msg, targets)
         } else {
             Err(Error::InvalidState)
         }
@@ -139,7 +139,7 @@ impl Node {
                 correlation_id: msg_id,
             });
 
-            self.send_node_msg_to_nodes(msg, targets).await
+            self.send_node_msg_to_nodes(msg, targets)
         } else {
             // we don't do anything as we're still within data query timeout
             Ok(vec![])
@@ -275,7 +275,7 @@ impl Node {
     // Takes a message for specified targets, and builds internal send cmds
     // for sending to each of the targets.
     // Targets are XorName specified so must be within the section
-    async fn send_node_msg_to_nodes(
+    fn send_node_msg_to_nodes(
         &self,
         msg: SystemMsg,
         targets: BTreeSet<XorName>,
@@ -301,7 +301,7 @@ impl Node {
             wire_msg.set_dst_section_pk(dst_section_pk);
             wire_msg.set_dst_xorname(target);
 
-            cmds.extend(self.send_msg_to_nodes(wire_msg).await?);
+            cmds.extend(self.send_msg_to_nodes(wire_msg)?);
         }
 
         Ok(cmds)

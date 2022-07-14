@@ -96,12 +96,12 @@ impl Node {
     }
 
     /// Returns the current BLS public key set
-    pub(crate) async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
+    pub(crate) fn public_key_set(&self) -> Result<bls::PublicKeySet> {
         Ok(self.key_share()?.public_key_set)
     }
 
     /// Returns the SAP of the section matching the name.
-    pub(crate) async fn matching_section(
+    pub(crate) fn matching_section(
         &self,
         name: &XorName,
     ) -> Result<SectionAuthorityProvider> {
@@ -133,7 +133,7 @@ impl Node {
     }
 
     // Send message to peers on the network.
-    pub(crate) async fn send_msg_to_nodes(&self, mut wire_msg: WireMsg) -> Result<Option<Cmd>> {
+    pub(crate) fn send_msg_to_nodes(&self, mut wire_msg: WireMsg) -> Result<Option<Cmd>> {
         let dst_location = wire_msg.dst_location();
         let (targets, dg_size) = delivery_group::delivery_targets(
             dst_location,

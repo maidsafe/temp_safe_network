@@ -63,7 +63,7 @@ impl Node {
         if !our_prefix.matches(&peer.name()) {
             debug!("Redirecting JoinRequest from {peer} - name doesn't match our prefix {our_prefix:?}.");
 
-            let retry_sap = self.matching_section(&peer.name()).await?;
+            let retry_sap = self.matching_section(&peer.name())?;
 
             let node_msg =
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(retry_sap.to_msg())));
