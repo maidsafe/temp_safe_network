@@ -681,6 +681,11 @@ impl NetworkKnowledge {
         self.section_peers.is_either_member_or_archived(name)
     }
 
+    /// Get the peer of active node with the given connection info.
+    pub fn get_peer_by_conn_info(&self, addr: &SocketAddr) -> Option<Peer> {
+        self.section_peers.get_peer_by_conn_info(addr)
+    }
+
     /// Get info for the member with the given name.
     pub fn is_section_member(&self, name: &XorName) -> bool {
         self.section_peers.is_member(name)

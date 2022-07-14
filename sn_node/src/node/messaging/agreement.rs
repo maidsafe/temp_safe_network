@@ -103,6 +103,36 @@ impl Node {
             }
         }
 
+        // In case there is a node already having the same connection info,
+        // we need to:
+        //   1, if the existing node is valid, reject the incoming agreement.
+        //   2, if the existing node is invalid, accept the incoming agreement
+        //      AND propose an offline against the existing node.
+        //
+        // The existing node is valid when:
+        //   1, Its age is lower than the incoming node by more than 1.
+        //   2, Its age is higher than the incoming node by just 1.
+        if let Some(existing_peer) = self
+            .network_knowledge
+            .get_peer_by_conn_info(&new_info.addr())
+        {
+            let existing_age = existing_peer.age();
+            let incoming_age = new_info.age();
+            let is_existing_valid = if existing_age > incoming_age {
+                existing_age - 1 == incoming_age
+            } else {
+                existing_age + 1 < incoming_age
+            };
+
+            if is_existing_valid {
+                return Ok(cmds);
+            } else {
+                let mut list = BTreeSet::new();
+                let _ = list.insert(existing_peer.name());
+                cmds.push(Cmd::ProposeOffline(list));
+            }
+        }
+
         let new_info = SectionAuth {
             value: new_info,
             sig,

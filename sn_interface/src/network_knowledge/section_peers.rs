@@ -6,12 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::system::{MembershipState, SectionAuth};
-use crate::network_knowledge::NodeState;
+use crate::{
+    messaging::system::{MembershipState, SectionAuth},
+    network_knowledge::NodeState,
+    types::Peer,
+};
 
 use dashmap::{mapref::entry::Entry, DashMap};
 use secured_linked_list::SecuredLinkedList;
-use std::{collections::BTreeSet, sync::Arc};
+use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
 use xor_name::{Prefix, XorName};
 
 // Number of Elder churn events before a Left/Relocated member
@@ -62,6 +65,18 @@ impl SectionPeers {
         } else {
             self.archive.get(name).map(|state| state.value().clone())
         }
+    }
+
+    /// Get the peer of active node with the given connection info.
+    pub(super) fn get_peer_by_conn_info(&self, addr: &SocketAddr) -> Option<Peer> {
+        self.members.iter().find_map(|entry| {
+            let (_, state) = entry.pair();
+            if state.value.state() == MembershipState::Joined && &state.value.addr() == addr {
+                Some(*state.value.peer())
+            } else {
+                None
+            }
+        })
     }
 
     /// Update a member of our section.
