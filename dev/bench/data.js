@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1657796726939,
+  "lastUpdate": 1657805534725,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -8969,6 +8969,72 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 4080436,
             "range": "± 123591",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bzeeman@live.nl",
+            "name": "Benno Zeeman",
+            "username": "b-zee"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "db525193bed7662c5184810f18587abb0d22b26b",
+          "message": "fix(query-adult): use Eyre instead of boxed error",
+          "timestamp": "2022-07-14T14:56:56+02:00",
+          "tree_id": "83ead56f1a52862a0f6bbe24148527e4b6084e09",
+          "url": "https://github.com/maidsafe/safe_network/commit/db525193bed7662c5184810f18587abb0d22b26b"
+        },
+        "date": 1657805532492,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 510715556,
+            "range": "± 10414959",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 545312593,
+            "range": "± 13839568",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 1241303544,
+            "range": "± 64072878",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 398062303,
+            "range": "± 22679317",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 399112546,
+            "range": "± 15723989",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 1091419476,
+            "range": "± 40512106",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 4518485,
+            "range": "± 109886",
             "unit": "ns/iter"
           }
         ]
