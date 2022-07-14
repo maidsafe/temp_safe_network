@@ -63,7 +63,7 @@ impl Link {
         }
     }
 
-    pub(crate) async fn new_with(
+    pub(crate) fn new_with(
         peer: Peer,
         endpoint: Endpoint,
         listener: MsgListener,
@@ -79,7 +79,7 @@ impl Link {
         &self.peer
     }
 
-    pub(crate) async fn add(&mut self, conn: qp2p::Connection) {
+    pub(crate) fn add(&mut self, conn: qp2p::Connection) {
         self.insert(conn);
     }
 

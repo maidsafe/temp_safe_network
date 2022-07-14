@@ -67,7 +67,7 @@ impl Dispatcher {
                 let wire_msg = WireMsg::single_src(&node.info(), dst, msg, src_section_pk)?;
 
                 let mut cmds = vec![];
-                cmds.extend(node.send_msg_to_nodes(wire_msg).await?);
+                cmds.extend(node.send_msg_to_nodes(wire_msg)?);
 
                 Ok(cmds)
             }
