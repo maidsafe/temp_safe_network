@@ -88,7 +88,7 @@ impl JoiningAsRelocated {
     // - `Redirect`: repeat join request with the new set of addresses.
     // - `Approval`: returns the `Section` to use by this node, completing the relocation.
     // - `NodeNotReachable`: returns an error, completing the relocation attempt.
-    pub(crate) async fn handle_join_response(
+    pub(crate) fn handle_join_response(
         &mut self,
         join_response: JoinAsRelocatedResponse,
         sender: SocketAddr,
@@ -338,11 +338,11 @@ mod tests {
     async fn retry_and_redirect_should_update_the_node_with_latest_sap_of_the_destination_section(
     ) -> Result<()> {
         // destination section sends its updated SAP
-        relocate(Response::Retry).await?;
+        relocate(Response::Retry)?;
         // incorrect section sends the SAP of the correct section
-        relocate(Response::Redirect).await?;
+        relocate(Response::Redirect)?;
 
-        async fn relocate(response: Response) -> Result<()> {
+        fn relocate(response: Response) -> Result<()> {
             // from_sap
             let (mut from_sap, from_sk_set) = generate_sap();
             let node = NodeInfo::new(
@@ -378,9 +378,7 @@ mod tests {
                 .iter()
                 .next()
                 .ok_or_else(|| eyre!("Elder will be present"))?;
-            let handled = joining
-                .handle_join_response(response.clone(), *sender)
-                .await;
+            let handled = joining.handle_join_response(response.clone(), *sender);
 
             // updated with section's latest key
             assert_eq!(joining.dst_section_key, to_sk_set.secret_key().public_key());
@@ -403,7 +401,7 @@ mod tests {
             // The to_sap's elder list is exhausted after the first handle_join_response
             // Thus it should return None when new_recipients is empty and with outdated section key
             joining.dst_section_key = bls::SecretKey::random().public_key();
-            let handled = joining.handle_join_response(response, *sender).await;
+            let handled = joining.handle_join_response(response, *sender);
             if let Ok(Some(_)) = handled {
                 return Err(eyre!("Should return Ok(None)"));
             }
@@ -415,10 +413,10 @@ mod tests {
 
     #[tokio::test]
     async fn retry_and_redirect_should_return_none_on_latest_sap() -> Result<()> {
-        relocate(Response::Retry).await?;
-        relocate(Response::Redirect).await?;
+        relocate(Response::Retry)?;
+        relocate(Response::Redirect)?;
 
-        async fn relocate(response: Response) -> Result<()> {
+        fn relocate(response: Response) -> Result<()> {
             // from_sap
             let (mut from_sap, from_sk_set) = generate_sap();
             let node = NodeInfo::new(
@@ -453,9 +451,7 @@ mod tests {
                 .iter()
                 .next()
                 .ok_or_else(|| eyre!("Elder will be present"))?;
-            let handled = joining
-                .handle_join_response(response.clone(), *sender)
-                .await;
+            let handled = joining.handle_join_response(response, *sender);
 
             if let Ok(Some(_)) = handled {
                 return Err(eyre!("Should return Ok(None)"));

@@ -34,10 +34,10 @@ use xor_name::XorName;
 
 impl Node {
     // Locate ideal holders for this data, line up wiremsgs for those to instruct them to store the data
-    pub(crate) async fn replicate_data(&self, data: ReplicatedData) -> Result<Vec<Cmd>> {
+    pub(crate) fn replicate_data(&self, data: ReplicatedData) -> Result<Vec<Cmd>> {
         trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
         if self.is_elder() {
-            let targets = self.get_adults_who_should_store_data(data.name()).await;
+            let targets = self.get_adults_who_should_store_data(data.name());
 
             info!(
                 "Replicating data {:?} to holders {:?}",
@@ -68,9 +68,7 @@ impl Node {
             operation_id
         );
 
-        let targets = self
-            .get_adults_holding_data_including_full(address.name())
-            .await;
+        let targets = self.get_adults_holding_data_including_full(address.name());
 
         // Query only the nth adult
         let targets = BTreeSet::from_iter(
@@ -150,7 +148,7 @@ impl Node {
         MetadataExchange { adult_levels }
     }
 
-    pub(crate) async fn set_adult_levels(&mut self, adult_levels: MetadataExchange) {
+    pub(crate) fn set_adult_levels(&mut self, adult_levels: MetadataExchange) {
         let MetadataExchange { adult_levels } = adult_levels;
         self.capacity.set_adult_levels(adult_levels)
     }
@@ -191,14 +189,14 @@ impl Node {
         changed
     }
 
-    pub(crate) async fn full_adults(&self) -> BTreeSet<XorName> {
+    pub(crate) fn full_adults(&self) -> BTreeSet<XorName> {
         self.capacity.full_adults()
     }
 
     /// Construct list of adults that hold target data, including full nodes.
     /// List is sorted by distance from `target`.
-    async fn get_adults_holding_data_including_full(&self, target: &XorName) -> BTreeSet<XorName> {
-        let full_adults = self.full_adults().await;
+    fn get_adults_holding_data_including_full(&self, target: &XorName) -> BTreeSet<XorName> {
+        let full_adults = self.full_adults();
         let adults = self.network_knowledge().adults();
 
         let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
@@ -240,8 +238,8 @@ impl Node {
     }
 
     /// Used to fetch the list of holders for given name of data. Excludes full nodes
-    async fn get_adults_who_should_store_data(&self, target: XorName) -> BTreeSet<XorName> {
-        let full_adults = self.full_adults().await;
+    fn get_adults_who_should_store_data(&self, target: XorName) -> BTreeSet<XorName> {
+        let full_adults = self.full_adults();
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
         let adults = self.network_knowledge().adults();
 

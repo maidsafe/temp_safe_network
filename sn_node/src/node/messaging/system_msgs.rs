@@ -237,9 +237,8 @@ impl Node {
             SystemMsg::JoinAsRelocatedResponse(join_response) => {
                 trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
                 if let Some(ref mut joining_as_relocated) = self.relocate_state {
-                    if let Some(cmd) = joining_as_relocated
-                        .handle_join_response(*join_response, sender.addr())
-                        .await?
+                    if let Some(cmd) =
+                        joining_as_relocated.handle_join_response(*join_response, sender.addr())?
                     {
                         return Ok(vec![cmd]);
                     }
@@ -460,7 +459,7 @@ impl Node {
                         },
                     );
                 }
-                self.handle_dkg_start(session_id).await
+                self.handle_dkg_start(session_id)
             }
             SystemMsg::DkgMessage {
                 session_id,
@@ -472,7 +471,7 @@ impl Node {
                     message,
                     sender
                 );
-                self.handle_dkg_msg(session_id, message, sender).await
+                self.handle_dkg_msg(session_id, message, sender)
             }
             SystemMsg::DkgFailureObservation {
                 session_id,
@@ -495,10 +494,7 @@ impl Node {
                 message_history,
                 message,
                 session_id,
-            } => {
-                self.handle_dkg_retry(&session_id, message_history, message, sender)
-                    .await
-            }
+            } => self.handle_dkg_retry(&session_id, message_history, message, sender),
             SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {
                 let changed = self.set_storage_level(&node_id, level);
                 if changed && level.value() == MIN_LEVEL_WHEN_FULL {
@@ -509,7 +505,7 @@ impl Node {
             }
             SystemMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }) => {
                 info!("Processing received MetadataExchange packet: {:?}", msg_id);
-                self.set_adult_levels(metadata).await;
+                self.set_adult_levels(metadata);
                 Ok(vec![])
             }
             SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
@@ -531,7 +527,7 @@ impl Node {
                             self.joins_allowed = true;
                         }
                     }
-                    self.replicate_data(data).await
+                    self.replicate_data(data)
                 } else {
                     error!("Received unexpected message while Adult");
                     Ok(vec![])
@@ -717,11 +713,8 @@ impl Node {
                     },
                 );
                 trace!("DkgSessionInfo handling {:?}", session_id);
-                cmds.extend(self.handle_dkg_start(session_id.clone()).await?);
-                cmds.extend(
-                    self.handle_dkg_retry(&session_id, message_cache, message, sender)
-                        .await?,
-                );
+                cmds.extend(self.handle_dkg_start(session_id.clone())?);
+                cmds.extend(self.handle_dkg_retry(&session_id, message_cache, message, sender)?);
                 Ok(cmds)
             }
         }
