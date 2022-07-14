@@ -388,10 +388,10 @@ impl Node {
             }
             SystemMsg::DkgFailureAgreement(sig_set) => {
                 trace!("Handling msg: Dkg-FailureAgreement from {}", sender);
-                self.handle_dkg_failure_agreement(&src_name, &sig_set).await
+                self.handle_dkg_failure_agreement(&src_name, &sig_set)
             }
             SystemMsg::HandoverVotes(votes) => self.handle_handover_msg(sender, votes).await,
-            SystemMsg::HandoverAE(gen) => self.handle_handover_anti_entropy(sender, gen).await,
+            SystemMsg::HandoverAE(gen) => self.handle_handover_anti_entropy(sender, gen),
             SystemMsg::JoinRequest(join_request) => {
                 trace!("Handling msg: JoinRequest from {}", sender);
                 self.handle_join_request(sender, *join_request, comm).await
@@ -494,7 +494,6 @@ impl Node {
                     session_id,
                     self.network_knowledge.section_key(),
                 )
-                .await
             }
             SystemMsg::DkgRetry {
                 message_history,

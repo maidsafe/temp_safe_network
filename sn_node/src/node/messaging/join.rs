@@ -41,7 +41,7 @@ impl Node {
             }
 
             let node_state = NodeState::joined(peer.name(), peer.addr(), None);
-            return self.propose_membership_change(node_state).await;
+            return self.propose_membership_change(node_state);
         }
 
         let our_section_key = self.network_knowledge.section_key();
@@ -96,7 +96,7 @@ impl Node {
             )?]);
         }
 
-        let (is_age_invalid, expected_age) = self.verify_joining_node_age(&peer).await;
+        let (is_age_invalid, expected_age) = self.verify_joining_node_age(&peer);
 
         trace!(
             "our_prefix {:?} expected_age {:?} is_age_invalid {:?}",
@@ -162,7 +162,7 @@ impl Node {
         Ok(vec![cmd])
     }
 
-    pub(crate) async fn verify_joining_node_age(&self, peer: &Peer) -> (bool, u8) {
+    pub(crate) fn verify_joining_node_age(&self, peer: &Peer) -> (bool, u8) {
         // During the first section, nodes shall use ranged age to avoid too many nodes getting
         // relocated at the same time. After the first section splits, nodes shall only
         // start with an age of MIN_ADULT_AGE
@@ -272,6 +272,5 @@ impl Node {
         };
 
         self.propose_membership_change(join_request.relocate_proof.value)
-            .await
     }
 }

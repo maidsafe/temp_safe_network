@@ -161,7 +161,7 @@ impl Node {
             .await
     }
 
-    pub(crate) async fn handle_dkg_not_ready(
+    pub(crate) fn handle_dkg_not_ready(
         &self,
         sender: Peer,
         message: DkgMessage,
@@ -240,7 +240,7 @@ impl Node {
         }
     }
 
-    pub(crate) async fn handle_dkg_failure_agreement(
+    pub(crate) fn handle_dkg_failure_agreement(
         &mut self,
         sender: &XorName,
         failure_set: &DkgFailureSigSet,
@@ -319,7 +319,7 @@ impl Node {
         }
     }
 
-    pub(crate) async fn handle_dkg_failure(
+    pub(crate) fn handle_dkg_failure(
         &mut self,
         failure_set: DkgFailureSigSet,
     ) -> Result<Cmd> {
