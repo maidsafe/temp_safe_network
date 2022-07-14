@@ -47,7 +47,7 @@ impl Node {
         let genesis_dbc = gen_genesis_dbc(&genesis_sk_set)?;
 
         let (network_knowledge, section_key_share) =
-            NetworkKnowledge::first_node(info.peer(), genesis_sk_set)?;
+            NetworkKnowledge::first_node(info.peer(), genesis_sk_set).await?;
 
         let node = Self::new(
             our_addr,

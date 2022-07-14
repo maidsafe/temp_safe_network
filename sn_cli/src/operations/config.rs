@@ -13,7 +13,7 @@ use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Help, Report, Result};
 use comfy_table::Table;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
-use sn_api::{NetworkPrefixMap, Safe, DEFAULT_PREFIX_HARDLINK_NAME};
+use sn_api::{NetworkPrefixMap, NetworkPrefixMapSnapshot, Safe, DEFAULT_PREFIX_HARDLINK_NAME};
 use sn_dbc::Owner;
 use std::{
     collections::BTreeMap,
@@ -505,6 +505,7 @@ impl Config {
             .wrap_err_with(|| "Error creating temp file".to_string())?;
 
         let serialized = Self::serialise_prefix_map(prefix_map)
+            .await
             .wrap_err("Failed to serialise NetworkPrefixMap")?;
         temp_file
             .write_all(serialized.as_slice())
@@ -613,13 +614,14 @@ impl Config {
     }
 
     fn deserialise_prefix_map(bytes: &[u8]) -> Result<NetworkPrefixMap> {
-        let prefix_map: NetworkPrefixMap = rmp_serde::from_slice(bytes)
-            .wrap_err_with(|| "Failed to deserialize NetworkPrefixMap")?;
-        Ok(prefix_map)
+        let snapshot: NetworkPrefixMapSnapshot = rmp_serde::from_slice(bytes)
+            .wrap_err_with(|| "Failed to deserialize NetworkPrefixMapSnapshot")?;
+        Ok(snapshot.to_prefix_map())
     }
 
-    fn serialise_prefix_map(prefix_map: &NetworkPrefixMap) -> Result<Vec<u8>> {
-        rmp_serde::to_vec(prefix_map).wrap_err_with(|| "Failed to serialise NetworkPrefixMap")
+    async fn serialise_prefix_map(prefix_map: &NetworkPrefixMap) -> Result<Vec<u8>> {
+        let snapshot = prefix_map.snapshot().await;
+        rmp_serde::to_vec(&snapshot).wrap_err_with(|| "Failed to serialise NetworkPrefixMap")
     }
 }
 
@@ -804,10 +806,10 @@ mod constructor {
         let serialized_config = r#"
         {"networks":{
           "network_1":{
-            "Remote":["https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(18d6..75b6)", [184,214,172,51,65,61,252,4,71,229,78,204,8,19,192,4,170,83,90,9,253,250,25,156,82,158,200,114,57,127,135,80,126,9,25,215,77,88,137,2,204,210,25,168,63,109,108,190]]
+            "Remote":["https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(0699..31a2)", [134,153,176,17,8,146,92,141,244,153,46,24,65,181,135,178,186,81,108,10,203,11,239,242,1,94,117,120,16,175,164,116,198,71,92,27,196,151,99,26,255,8,181,241,53,118,97,108]]
           },
           "network_2":{
-            "Local": ["../resources/test_prefix_maps/PublicKey(0021..0e71)", [128,33,141,121,52,118,157,130,242,109,189,19,194,123,82,125,23,160,217,211,27,2,46,33,25,19,4,5,79,32,54,221,111,75,125,169,51,226,203,56,155,252,217,104,177,44,12,90]]
+            "Local": ["../resources/test_prefix_maps/PublicKey(0382..dadc)", [131,130,129,222,20,111,175,152,150,110,191,102,4,192,164,240,149,41,95,133,206,146,142,72,232,252,172,20,226,136,109,60,184,95,162,45,254,121,185,41,183,41,123,249,235,176,109,21]]
           }
         }}"#;
         let tmp_dir = assert_fs::TempDir::new()?;
@@ -823,7 +825,7 @@ mod constructor {
         if let NetworkInfo::Remote(_, genesis_key) = network_info {
             assert_eq!(
                 format!("{:?}", genesis_key),
-                String::from("Some(PublicKey(18d6..75b6))")
+                String::from("Some(PublicKey(0699..31a2))")
             );
         } else {
             return Err(eyre!(
@@ -839,7 +841,7 @@ mod constructor {
         if let NetworkInfo::Local(_, genesis_key) = network_info {
             assert_eq!(
                 format!("{:?}", genesis_key),
-                String::from("Some(PublicKey(0021..0e71))")
+                String::from("Some(PublicKey(0382..dadc))")
             );
         } else {
             return Err(eyre!(
@@ -944,16 +946,16 @@ mod sync_prefix_maps_and_settings {
         let serialized_config = r#"
         {"networks":{
           "network_1":{
-            "Remote":["https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(18d6..75b6)", null]
+            "Remote":["https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(0382..dadc)", null]
           },
           "network_2":{
-            "Remote":["https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(0138..d91e)", null]
+            "Remote":["https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(0699..31a2)", null]
           },
           "local_network_1":{
-            "Local": ["../resources/test_prefix_maps/PublicKey(0021..0e71)", [128,33,141,121,52,118,157,130,242,109,189,19,194,123,82,125,23,160,217,211,27,2,46,33,25,19,4,5,79,32,54,221,111,75,125,169,51,226,203,56,155,252,217,104,177,44,12,90]]
+            "Local": ["../resources/test_prefix_maps/PublicKey(0a3a..513d)", [128,33,141,121,52,118,157,130,242,109,189,19,194,123,82,125,23,160,217,211,27,2,46,33,25,19,4,5,79,32,54,221,111,75,125,169,51,226,203,56,155,252,217,104,177,44,12,90]]
           },
           "local_network_2":{
-            "Local": ["../resources/test_prefix_maps/PublicKey(035b..20fa)", null]
+            "Local": ["../resources/test_prefix_maps/PublicKey(134d..7bef)", null]
           }
         }}"#;
         let tmp_dir = assert_fs::TempDir::new()?;
@@ -991,10 +993,10 @@ mod sync_prefix_maps_and_settings {
         let serialized_config = r#"
         {"networks":{
         "network_1":{
-            "Remote":["https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(18d6..75b6)", null]
+            "Remote":["https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(0382..dadc)", null]
         },
         "network_2":{
-            "Local":["../resources/test_prefix_maps/PublicKey(0021..0e71)", null]
+            "Local":["../resources/test_prefix_maps/PublicKey(0699..31a2)", null]
         }
         }}"#;
         let tmp_dir = assert_fs::TempDir::new()?;
@@ -1029,11 +1031,11 @@ mod sync_prefix_maps_and_settings {
         let serialized_config = r#"
         {"networks":{
         "network_1":{
-             "Local":["../resources/test_prefix_maps/PublicKey(18d6..75b6)", null]
+             "Local":["../resources/test_prefix_maps/PublicKey(0382..dadc)", null]
         }}}"#;
         let tmp_dir = assert_fs::TempDir::new()?;
         let mut config = Config::create_config(&tmp_dir, Some(serialized_config)).await?;
-        let path = PathBuf::from("../resources/test_prefix_maps/PublicKey(0021..0e71)");
+        let path = PathBuf::from("../resources/test_prefix_maps/PublicKey(0699..31a2)");
 
         // will be ignored during sync since the network list is fetched from the config file
         config.settings.networks.insert(
@@ -1059,10 +1061,10 @@ mod sync_prefix_maps_and_settings {
         let serialized_config = r#"
         {"networks":{
           "network_1":{
-            "Local": ["../resources/test_prefix_maps/PublicKey(035b..20fa)", null]
+            "Local": ["../resources/test_prefix_maps/PublicKey(0382..dadc)", null]
           },
           "network_1_copy":{
-            "Local": ["../resources/test_prefix_maps/PublicKey(035b..20fa)", null]
+            "Local": ["../resources/test_prefix_maps/PublicKey(0699..31a2)", null]
           }
         }}"#;
         let tmp_dir = assert_fs::TempDir::new()?;
@@ -1120,11 +1122,11 @@ mod networks {
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let network_1 = NetworkInfo::Remote(
-            "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(0021..0e71)".to_string(),
+            "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(0382..dadc)".to_string(),
             None,
         );
         let network_2 = NetworkInfo::Local(
-            PathBuf::from("../resources/test_prefix_maps/PublicKey(18d6..75b6)"),
+            PathBuf::from("../resources/test_prefix_maps/PublicKey(0699..31a2)"),
             None,
         );
         config.add_network("network_1", network_1).await?;
@@ -1162,7 +1164,7 @@ mod networks {
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let network_1 = NetworkInfo::Local(
-            PathBuf::from("../resources/test_prefix_maps/PublicKey(18d6..75b6)"),
+            PathBuf::from("../resources/test_prefix_maps/PublicKey(0382..dadc)"),
             None,
         );
         config.add_network("network_1", network_1).await?;
@@ -1185,11 +1187,11 @@ mod networks {
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let network_1 = NetworkInfo::Local(
-            PathBuf::from("../resources/test_prefix_maps/PublicKey(0021..0e71)"),
+            PathBuf::from("../resources/test_prefix_maps/PublicKey(0382..dadc)"),
             None,
         );
         let network_2 = NetworkInfo::Local(
-            PathBuf::from("../resources/test_prefix_maps/PublicKey(18d6..75b6)"),
+            PathBuf::from("../resources/test_prefix_maps/PublicKey(0699..31a2)"),
             None,
         );
 
@@ -1208,7 +1210,7 @@ mod networks {
             assert_eq!(default.genesis_key(), gk);
             assert_eq!(
                 format!("{:?}", default.genesis_key()),
-                "PublicKey(0021..0e71)".to_string()
+                "PublicKey(0382..dadc)".to_string()
             );
         } else {
             return Err(eyre!("NetworkInfo should be Local"));
@@ -1226,7 +1228,7 @@ mod networks {
             assert_eq!(default.genesis_key(), gk);
             assert_eq!(
                 format!("{:?}", default.genesis_key()),
-                "PublicKey(18d6..75b6)".to_string()
+                "PublicKey(0699..31a2)".to_string()
             );
         } else {
             return Err(eyre!("NetworkInfo should be Local"));

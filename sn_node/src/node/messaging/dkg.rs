@@ -305,6 +305,7 @@ impl Node {
         if self
             .network_knowledge
             .try_update_current_sap(key_share_pk, &sap.prefix())
+            .await
         {
             self.update_on_elder_change(snapshot).await
         } else {

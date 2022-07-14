@@ -26,26 +26,32 @@ use bls::PublicKey as BlsPublicKey;
 use dashmap::{self, mapref::multiple::RefMulti, DashMap};
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
-use std::iter::{self, Iterator};
-use std::sync::Arc;
+use std::{
+    cmp::Ordering,
+    iter::{self, Iterator},
+    sync::Arc,
+};
+use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};
 
 /// Container for storing information about other sections in the network.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct NetworkPrefixMap {
-    /// Map of sections prefixes to their latest signed section authority providers.
-    sections: Arc<DashMap<Prefix, SectionAuth<SectionAuthorityProvider>>>,
     /// The network's genesis public key
     genesis_pk: BlsPublicKey,
+    /// Map of sections prefixes to their latest signed section authority providers.
+    sections: Arc<DashMap<Prefix, SectionAuth<SectionAuthorityProvider>>>,
+    /// A DAG containing all section chains of the whole network that we are aware of
+    pub section_dag: Arc<RwLock<SecuredLinkedList>>,
 }
 
 impl NetworkPrefixMap {
     /// Create an empty container
     pub fn new(genesis_pk: BlsPublicKey) -> Self {
         Self {
-            sections: Arc::new(DashMap::new()),
             genesis_pk,
+            sections: Arc::new(DashMap::new()),
+            section_dag: Arc::new(RwLock::new(SecuredLinkedList::new(genesis_pk))),
         }
     }
 
@@ -146,47 +152,13 @@ impl NetworkPrefixMap {
         self.sections.get(prefix).map(|entry| entry.value().clone())
     }
 
-    /// Update our knowledge of a remote section's SAP only
-    /// if it's verifiable with the provided proof chain and the
-    /// currently known SAP we are aware of for the Prefix.
-    pub fn update(
+    /// Update our knowledge on the remote section's SAP and our section DAG
+    /// if it's verifiable with the provided proof chain.
+    /// Returns true if an update was made
+    pub async fn update(
         &self,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
         proof_chain: &SecuredLinkedList,
-    ) -> Result<bool> {
-        let prefix = signed_sap.prefix();
-
-        trace!("Attempting to update prefixmap for {:?}", prefix);
-        let section_key = match self.section_by_prefix(&prefix) {
-            Ok(sap) => sap.section_key(),
-            Err(_) => {
-                trace!("No key found for prefix: {:?}", prefix);
-                self.genesis_pk
-            }
-        };
-
-        let res = self.verify_with_chain_and_update(
-            signed_sap,
-            proof_chain,
-            &SecuredLinkedList::new(section_key),
-        );
-
-        for section in self.sections.iter() {
-            let prefix = section.key();
-            trace!("Known prefix after update: {:?}", prefix);
-        }
-
-        res
-    }
-
-    /// Update our knowledge of a remote section's SAP only
-    /// if it's verifiable with the provided proof chain and section chain.
-    /// Returns true if an udpate was made
-    pub fn verify_with_chain_and_update(
-        &self,
-        signed_sap: SectionAuth<SectionAuthorityProvider>,
-        proof_chain: &SecuredLinkedList,
-        section_chain: &SecuredLinkedList,
     ) -> Result<bool> {
         // Check if SAP signature is valid
         if !signed_sap.self_verify() {
@@ -227,19 +199,16 @@ impl NetworkPrefixMap {
             };
         }
 
-        // We currently don't keep the complete chain of remote sections,
-        // **but** the SAPs of remote sections we keep were already verified by us
-        // as trusted before we store them in our local records.
-        // Thus, we just need to check our knowledge of the remote section's key
-        // is part of the proof chain received.
         match self.sections.get(incoming_prefix) {
             Some(entry) if entry.value() == &signed_sap => {
                 // It's the same SAP we are already aware of
+                trace!("roland: same sap");
                 return Ok(false);
             }
             Some(entry) => {
                 // We are then aware of the prefix, let's just verify the new SAP can
                 // be trusted based on the SAP we aware of and the proof chain provided.
+                trace!("roland: different sap {:?}", entry);
                 if !proof_chain.has_key(&entry.value().section_key()) {
                     // This case may happen when both the sender and receiver is about to using
                     // a new SAP. The AE-Update was sent before sender switching to use new SAP,
@@ -249,6 +218,7 @@ impl NetworkPrefixMap {
                     // As an outdated node will got updated via AE triggered by other messages,
                     // there is no need to bounce back here (assuming the sender is outdated) to
                     // avoid potential looping.
+                    trace!("roland: different sap, but does not have key");
                     return Err(Error::UntrustedProofChain(format!(
                         "provided proof_chain doesn't cover the SAP's key we currently know: {:?}",
                         entry.value().value
@@ -258,7 +228,9 @@ impl NetworkPrefixMap {
             None => {
                 // We are not aware of the prefix, let's then verify it can be
                 // trusted based on our own section chain and the provided proof chain.
-                if !proof_chain.check_trust(section_chain.keys()) {
+                trace!("roland: no sap");
+                if !proof_chain.check_trust(self.section_dag.read().await.keys()) {
+                    trace!("roland: no sap and cant be trusted");
                     return Err(Error::UntrustedProofChain(format!(
                         "none of the keys were found on our section chain: {:?}",
                         signed_sap.value
@@ -268,7 +240,7 @@ impl NetworkPrefixMap {
         }
 
         // Make sure the proof chain can be trusted,
-        // i.e. check each key is signed by its parent/predecesor key.
+        // i.e. check each key is signed by its parent/predecessor key.
         if !proof_chain.self_verify() {
             return Err(Error::UntrustedProofChain(format!(
                 "invalid proof chain: {:?}",
@@ -291,9 +263,21 @@ impl NetworkPrefixMap {
         // for the prefix since we've already checked that above.
         let changed = self.insert(signed_sap);
 
+        // update our section DAG
+        if changed
+            && self
+                .section_dag
+                .write()
+                .await
+                .join(proof_chain.clone())
+                .is_err()
+        {
+            warn!("Error joining the proof_chain with our section_dag");
+        }
+
         for section in self.sections.iter() {
             let prefix = section.key();
-            trace!("Known prefix: {:?}", prefix);
+            trace!("Known prefix after update: {:?}", prefix);
         }
 
         Ok(changed)
@@ -393,32 +377,13 @@ impl NetworkPrefixMap {
             }
         }
     }
-}
 
-impl<'de> Deserialize<'de> for NetworkPrefixMap {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        // This is easier than hand-writing an impl, not sure if there's a downside.
-        // Uses the same name in case it shows up in errors messages etc.
-        #[derive(Deserialize)]
-        struct NetworkPrefixMap {
-            sections: DashMap<Prefix, SectionAuth<crate::messaging::SectionAuthorityProvider>>,
-            genesis_pk: BlsPublicKey,
+    pub async fn snapshot(&self) -> NetworkPrefixMapSnapshot {
+        NetworkPrefixMapSnapshot {
+            genesis_pk: self.genesis_pk,
+            sections: (*self.sections).clone(),
+            section_dag: (*self.section_dag.read().await).clone(),
         }
-
-        let helper = NetworkPrefixMap::deserialize(deserializer)?;
-        let sections = helper
-            .sections
-            .into_iter()
-            .map(|(k, v)| (k, v.into_authed_state()))
-            .collect();
-
-        Ok(Self {
-            sections: Arc::new(sections),
-            genesis_pk: helper.genesis_pk,
-        })
     }
 }
 
@@ -441,6 +406,23 @@ impl PartialEq for NetworkPrefixMap {
 }
 
 impl Eq for NetworkPrefixMap {}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NetworkPrefixMapSnapshot {
+    genesis_pk: BlsPublicKey,
+    sections: DashMap<Prefix, SectionAuth<SectionAuthorityProvider>>,
+    section_dag: SecuredLinkedList,
+}
+
+impl NetworkPrefixMapSnapshot {
+    pub fn to_prefix_map(self) -> NetworkPrefixMap {
+        NetworkPrefixMap {
+            genesis_pk: self.genesis_pk,
+            sections: Arc::new(self.sections),
+            section_dag: Arc::new(RwLock::new(self.section_dag)),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -658,8 +640,8 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn closest() -> Result<()> {
+    #[tokio::test]
+    async fn closest() -> Result<()> {
         // Create map containing sections (00), (01) and (10)
         let (map, genesis_sk, genesis_pk) = new_network_prefix_map();
         let chain = SecuredLinkedList::new(genesis_pk);
@@ -672,14 +654,14 @@ mod tests {
         let pk01 = section_auth_01.section_key();
         let sig01 = bincode::serialize(&pk01).map(|bytes| genesis_sk.sign(&bytes))?;
         chain01.insert(&genesis_pk, pk01, sig01)?;
-        let _updated = map.verify_with_chain_and_update(section_auth_01, &chain01, &chain);
+        let _updated = map.update(section_auth_01, &chain01).await;
 
         let mut chain10 = chain.clone();
         let section_auth_10 = gen_section_auth(p10)?;
         let pk10 = section_auth_10.section_key();
         let sig10 = bincode::serialize(&pk10).map(|bytes| genesis_sk.sign(&bytes))?;
         chain10.insert(&genesis_pk, pk10, sig10)?;
-        let _updated = map.verify_with_chain_and_update(section_auth_10, &chain10, &chain);
+        let _updated = map.update(section_auth_10, &chain10).await;
 
         let n01 = p01.substituted_in(xor_name::rand::random());
         let n10 = p10.substituted_in(xor_name::rand::random());

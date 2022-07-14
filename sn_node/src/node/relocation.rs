@@ -134,6 +134,7 @@ mod tests {
     use rand::{rngs::SmallRng, Rng, SeedableRng};
     use secured_linked_list::SecuredLinkedList;
     use std::net::SocketAddr;
+    use tokio::runtime::Runtime;
     use xor_name::{Prefix, XOR_NAME_LEN};
 
     #[test]
@@ -161,6 +162,7 @@ mod tests {
     }
 
     fn proptest_actions_impl(peers: Vec<Peer>, signature_trailing_zeros: u8) -> Result<()> {
+        let runtime = Runtime::new()?;
         let sk_set = SecretKeySet::random();
         let sk = sk_set.secret_key();
         let genesis_pk = sk.public_key();
@@ -181,12 +183,12 @@ mod tests {
         );
         let section_auth = section_signed(sk, section_auth)?;
 
-        let network_knowledge = NetworkKnowledge::new(
+        let network_knowledge = runtime.block_on(NetworkKnowledge::new(
             genesis_pk,
             SecuredLinkedList::new(genesis_pk),
             section_auth,
             None,
-        )?;
+        ))?;
 
         for peer in &peers {
             let info = NodeState::joined(*peer, None);
