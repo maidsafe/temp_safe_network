@@ -298,9 +298,9 @@ jobs:
         if: matrix.os != 'windows-latest'
 
       - name: Tar log files
-        run: |
-          killall -9 sn_node
-          find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
+        shell: bash
+        continue-on-error: true
+        run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
         if: failure()
 
       - name: Upload Node Logs
@@ -448,9 +448,9 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
       - name: Tar log files
-        run: |
-          killall -9 sn_node
-          find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
+        shell: bash
+        continue-on-error: true
+        run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
         if: failure()
 
       - name: Upload Node Logs
@@ -565,9 +565,9 @@ jobs:
         if: steps.section-startup.outcome == 'success'
 
       - name: Tar log files
-        run: |
-          killall -9 sn_node
-          find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
+        shell: bash
+        continue-on-error: true
+        run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
         if: failure()
 
       - name: Upload Node Logs
@@ -670,9 +670,9 @@ jobs:
         if: steps.section-startup.outcome == 'success'
 
       - name: Tar log files
-        run: |
-          killall -9 sn_node
-          find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
+        shell: bash
+        continue-on-error: true
+        run: find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
         if: failure()
 
       - name: Upload Node Logs
