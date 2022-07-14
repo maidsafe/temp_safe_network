@@ -127,7 +127,7 @@ async fn main() -> Result<()> {
             let mut network = Network::new();
 
             // Create the genesis node
-            network.create_node(event_tx.clone(), true).await;
+            network.create_node(event_tx.clone(), true);
 
             let mut churn_events = schedule.events();
 
@@ -146,7 +146,7 @@ async fn main() -> Result<()> {
                     event = churn_events.next() => {
                         match event {
                             Some(ChurnEvent::Join) => {
-                                network.create_node(event_tx.clone(), false).await
+                                network.create_node(event_tx.clone(), false)
                             }
                             Some(ChurnEvent::Drop) => {
                                 network.remove_random_node()
@@ -221,7 +221,7 @@ impl Network {
     }
 
     // Create new node and let it join the network.
-    async fn create_node(&mut self, event_tx: Sender<Event>, first: bool) {
+    fn create_node(&mut self, event_tx: Sender<Event>, first: bool) {
         let id = self.new_node_id();
         let _prev = self.nodes.insert(id, Node::Joining);
         self.stats.join_attempts += 1;
