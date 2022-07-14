@@ -86,9 +86,7 @@ impl Node {
             let error = convert_to_error_msg(Error::NoAdults(self.network_knowledge().prefix()));
 
             debug!("No targets found for {msg_id:?}");
-            return self
-                .send_cmd_error_response(CmdError::Data(error), origin, msg_id)
-                .await;
+            return self.send_cmd_error_response(CmdError::Data(error), origin, msg_id);
         }
 
         let mut op_was_already_underway = false;
@@ -179,11 +177,7 @@ impl Node {
 
     /// Set storage level of a given node.
     /// Returns whether the level changed or not.
-    pub(crate) async fn set_storage_level(
-        &mut self,
-        node_id: &PublicKey,
-        level: StorageLevel,
-    ) -> bool {
+    pub(crate) fn set_storage_level(&mut self, node_id: &PublicKey, level: StorageLevel) -> bool {
         info!("Setting new storage level..");
         let changed = self
             .capacity

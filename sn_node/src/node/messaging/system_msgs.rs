@@ -500,7 +500,7 @@ impl Node {
                     .await
             }
             SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {
-                let changed = self.set_storage_level(&node_id, level).await;
+                let changed = self.set_storage_level(&node_id, level);
                 if changed && level.value() == MIN_LEVEL_WHEN_FULL {
                     // ..then we accept a new node in place of the full node
                     self.joins_allowed = true;
@@ -525,8 +525,7 @@ impl Node {
                 if self.is_elder() {
                     if full {
                         let changed = self
-                            .set_storage_level(&node_id, StorageLevel::from(StorageLevel::MAX)?)
-                            .await;
+                            .set_storage_level(&node_id, StorageLevel::from(StorageLevel::MAX)?);
                         if changed {
                             // ..then we accept a new node in place of the full node
                             self.joins_allowed = true;
@@ -560,7 +559,7 @@ impl Node {
                         {
                             Ok(level_report) => {
                                 info!("Storage level report: {:?}", level_report);
-                                cmds.extend(self.record_storage_level_if_any(level_report).await);
+                                cmds.extend(self.record_storage_level_if_any(level_report));
                             }
                             Err(DbError::NotEnoughSpace) => {
                                 // db full
@@ -728,7 +727,7 @@ impl Node {
         }
     }
 
-    async fn record_storage_level_if_any(&self, level: Option<StorageLevel>) -> Vec<Cmd> {
+    fn record_storage_level_if_any(&self, level: Option<StorageLevel>) -> Vec<Cmd> {
         let mut cmds = vec![];
         if let Some(level) = level {
             info!("Storage has now passed {} % used.", 10 * level.value());

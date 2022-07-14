@@ -17,7 +17,7 @@ use sn_interface::{
 use std::collections::BTreeSet;
 
 impl Node {
-    pub(crate) async fn handle_node_left(
+    pub(crate) fn handle_node_left(
         &mut self,
         node_state: NodeState,
         sig: KeyedSig,
@@ -59,7 +59,7 @@ impl Node {
         }
 
         let churn_id = ChurnId(signature.to_bytes().to_vec());
-        cmds.extend(self.relocate_peers(churn_id, BTreeSet::default()).await?);
+        cmds.extend(self.relocate_peers(churn_id, BTreeSet::default())?);
 
         let result = self.promote_and_demote_elders_except(&BTreeSet::default())?;
         if result.is_empty() {
