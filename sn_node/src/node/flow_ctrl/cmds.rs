@@ -133,7 +133,7 @@ pub(crate) enum Cmd {
     /// Handle agreement on a proposal.
     HandleAgreement { proposal: Proposal, sig: KeyedSig },
     /// Handle a new Node joining agreement.
-    HandleNewNodeOnline(Decision<NodeState>),
+    HandleJoinDecision(Decision<NodeState>),
     /// Handle a Node leaving agreement.
     HandleNodeLeft(SectionAuth<NodeState>),
     /// Handle agree on elders. This blocks node message processing until complete.
@@ -205,7 +205,7 @@ impl Cmd {
             HandlePeerLost(_) => 9,
             HandleNodeLeft(_) => 9,
             ProposeOffline(_) => 9,
-            HandleNewNodeOnline(_) => 9,
+            HandleJoinDecision(_) => 9,
             EnqueueDataForReplication { .. } => 9,
             CleanupPeerLinks => 9,
 
@@ -255,7 +255,7 @@ impl fmt::Display for Cmd {
             Cmd::HandlePeerLost(peer) => write!(f, "HandlePeerLost({:?})", peer.name()),
             Cmd::HandleAgreement { .. } => write!(f, "HandleAgreement"),
             Cmd::HandleNewEldersAgreement { .. } => write!(f, "HandleNewEldersAgreement"),
-            Cmd::HandleNewNodeOnline(_) => write!(f, "HandleNewNodeOnline"),
+            Cmd::HandleJoinDecision(_) => write!(f, "HandleJoinDecision"),
             Cmd::HandleNodeLeft(_) => write!(f, "HandleNodeLeft"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Cmd::HandleDkgFailure(_) => write!(f, "HandleDkgFailure"),
