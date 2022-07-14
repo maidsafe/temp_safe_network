@@ -167,10 +167,10 @@ impl Dispatcher {
 
                 node.handle_general_agreements(proposal, sig).await
             }
-            Cmd::HandleNewNodeOnline(decision) => {
+            Cmd::HandleJoinDecision(decision) => {
                 let mut node = self.node.write().await;
 
-                node.handle_online_agreement(decision).await
+                node.handle_join_decision(decision).await
             }
             Cmd::HandleNodeLeft(auth) => {
                 let mut node = self.node.write().await;
