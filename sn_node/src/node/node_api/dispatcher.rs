@@ -132,7 +132,7 @@ impl Dispatcher {
             Cmd::HandleDkgFailure(signeds) => {
                 let mut node = self.node.write().await;
 
-                node.handle_dkg_failure(signeds).await.map(|cmd| vec![cmd])
+                node.handle_dkg_failure(signeds).map(|cmd| vec![cmd])
             }
             Cmd::SendMsg {
                 recipients,

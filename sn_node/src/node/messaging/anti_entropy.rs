@@ -581,7 +581,7 @@ impl Node {
     }
 
     // Generate an AE redirect cmd for the given message
-    pub(crate) async fn ae_redirect_to_our_elders(
+    pub(crate) fn ae_redirect_to_our_elders(
         &self,
         sender: Peer,
         src_location: &SrcLocation,
