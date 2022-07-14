@@ -170,11 +170,11 @@ impl Node {
     }
 
     /// Adds the new adult to the Capacity and Liveness trackers.
-    pub(crate) async fn add_new_adult_to_trackers(&mut self, adult: XorName) {
+    pub(crate) fn add_new_adult_to_trackers(&mut self, adult: XorName) {
         info!("Adding new Adult: {adult} to trackers");
         self.capacity.add_new_adult(adult);
 
-        self.dysfunction_tracking.add_new_node(adult).await;
+        self.dysfunction_tracking.add_new_node(adult);
     }
 
     /// Set storage level of a given node.

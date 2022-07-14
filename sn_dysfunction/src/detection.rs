@@ -902,11 +902,11 @@ mod knowledge_tests {
 
         let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
 
-        let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let mut dysfunctional_detection = DysfunctionDetection::new(adults);
 
         // Add a new adults
         let new_adult = random_xorname();
-        dysfunctional_detection.add_new_node(new_adult).await;
+        dysfunctional_detection.add_new_node(new_adult);
 
         // Add just one knowledge issue...
         for _ in 0..1 {
