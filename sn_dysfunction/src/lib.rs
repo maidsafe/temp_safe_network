@@ -198,7 +198,7 @@ impl DysfunctionDetection {
     }
 
     /// Add a new node to the tracker and recompute closest nodes.
-    pub async fn add_new_node(&mut self, adult: XorName) {
+    pub fn add_new_node(&mut self, adult: XorName) {
         info!("Adding new adult:{adult} to DysfunctionDetection tracker");
         self.adults.push(adult);
     }
@@ -395,10 +395,10 @@ mod tests {
     #[tokio::test]
     async fn add_new_node_should_track_new_node() -> Result<()> {
         let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let mut dysfunctional_detection = DysfunctionDetection::new(adults);
 
         let new_adult = random_xorname();
-        dysfunctional_detection.add_new_node(new_adult).await;
+        dysfunctional_detection.add_new_node(new_adult);
 
         let current_nodes = dysfunctional_detection.current_nodes();
 
