@@ -101,10 +101,7 @@ impl Node {
     }
 
     /// Returns the SAP of the section matching the name.
-    pub(crate) fn matching_section(
-        &self,
-        name: &XorName,
-    ) -> Result<SectionAuthorityProvider> {
+    pub(crate) fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
         self.network_knowledge
             .section_by_name(name)
             .map_err(Error::from)

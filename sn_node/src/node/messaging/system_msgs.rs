@@ -166,9 +166,7 @@ impl Node {
         trace!("{:?}", LogMarker::SystemMsgToBeHandled);
 
         // We assume to be aggregated if it contains a BLS Share sig as authority.
-        match self
-            .aggregate_msg_and_stop(&mut msg_authority, payload)
-        {
+        match self.aggregate_msg_and_stop(&mut msg_authority, payload) {
             Ok(false) => {
                 self.handle_valid_msg(msg_id, msg_authority, msg, sender, known_keys, comm)
                     .await
@@ -487,14 +485,12 @@ impl Node {
             SystemMsg::DkgNotReady {
                 message,
                 session_id,
-            } => {
-                self.handle_dkg_not_ready(
-                    sender,
-                    message,
-                    session_id,
-                    self.network_knowledge.section_key(),
-                )
-            }
+            } => self.handle_dkg_not_ready(
+                sender,
+                message,
+                session_id,
+                self.network_knowledge.section_key(),
+            ),
             SystemMsg::DkgRetry {
                 message_history,
                 message,
@@ -774,8 +770,7 @@ impl Node {
             &mut self.message_aggregator,
             bls_share_auth.clone().into_inner(),
             &payload,
-        )
-        {
+        ) {
             Ok(section_auth) => {
                 info!("Successfully aggregated message");
                 *msg_authority = NodeMsgAuthority::Section(section_auth);

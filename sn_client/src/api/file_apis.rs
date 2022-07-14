@@ -564,8 +564,7 @@ mod tests {
         tokio::time::sleep(delay).await;
 
         // 3 elders were chosen by the client (should only be 3 as even if client chooses adults, AE should kick in prior to them attempting any of this)
-        the_logs
-            .assert_count(LogMarker::DataStoreReceivedAtElder, 3)?;
+        the_logs.assert_count(LogMarker::DataStoreReceivedAtElder, 3)?;
 
         // 4 adults * reqs from 3 elders storing the chunk
         the_logs.assert_count(LogMarker::StoringChunk, 12)?;

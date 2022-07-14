@@ -273,11 +273,7 @@ impl Node {
     /// Checks if the elder candidates in the SAP match the oldest elders in the corresponding
     /// membership generation this SAP was proposed at
     /// Also checks the SAP signature
-    fn check_sap_candidate(
-        &self,
-        sap_candidate: &SapCandidate,
-        gen: Generation,
-    ) -> Result<()> {
+    fn check_sap_candidate(&self, sap_candidate: &SapCandidate, gen: Generation) -> Result<()> {
         self.check_sap_candidate_prefix(sap_candidate)?;
         match sap_candidate {
             SapCandidate::ElderHandover(authed_sap) => {

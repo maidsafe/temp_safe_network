@@ -319,10 +319,7 @@ impl Node {
         }
     }
 
-    pub(crate) fn handle_dkg_failure(
-        &mut self,
-        failure_set: DkgFailureSigSet,
-    ) -> Result<Cmd> {
+    pub(crate) fn handle_dkg_failure(&mut self, failure_set: DkgFailureSigSet) -> Result<Cmd> {
         // track those failed participants
         for name in &failure_set.failed_participants {
             self.log_dkg_issue(*name)?;
