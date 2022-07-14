@@ -101,10 +101,7 @@ impl Node {
                 // having to send this `NodeApproval`.
                 cmds.extend(self.send_node_approval(old_info.clone()));
 
-                cmds.extend(
-                    self.relocate_rejoining_peer(old_info.value, new_age)
-                        .await?,
-                );
+                cmds.extend(self.relocate_rejoining_peer(old_info.value, new_age)?);
 
                 return Ok(cmds);
             }
@@ -148,10 +145,7 @@ impl Node {
         // first things first, inform the node it can join us
         cmds.extend(self.send_node_approval(new_info));
 
-        cmds.extend(
-            self.relocate_peers(churn_id, excluded_from_relocation)
-                .await?,
-        );
+        cmds.extend(self.relocate_peers(churn_id, excluded_from_relocation)?);
 
         let result = self.promote_and_demote_elders_except(&BTreeSet::default())?;
 

@@ -156,7 +156,7 @@ impl Node {
             self.send_direct_msg(peer, node_msg, our_section_key)?
         } else {
             // It's reachable, let's then send the proof challenge
-            self.send_resource_proof_challenge(peer).await?
+            self.send_resource_proof_challenge(peer)?
         };
 
         Ok(vec![cmd])

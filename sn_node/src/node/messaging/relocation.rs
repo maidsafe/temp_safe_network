@@ -25,7 +25,7 @@ use xor_name::XorName;
 
 // Relocation
 impl Node {
-    pub(crate) async fn relocate_peers(
+    pub(crate) fn relocate_peers(
         &mut self,
         churn_id: ChurnId,
         excluded: BTreeSet<XorName>,
@@ -58,7 +58,7 @@ impl Node {
         Ok(cmds)
     }
 
-    pub(crate) async fn relocate_rejoining_peer(
+    pub(crate) fn relocate_rejoining_peer(
         &mut self,
         node_state: NodeState,
         age: u8,

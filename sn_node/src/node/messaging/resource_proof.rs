@@ -44,7 +44,7 @@ impl Node {
             .validate_all(&response.nonce, &response.data, response.solution)
     }
 
-    pub(crate) async fn send_resource_proof_challenge(&self, peer: Peer) -> Result<Cmd> {
+    pub(crate) fn send_resource_proof_challenge(&self, peer: Peer) -> Result<Cmd> {
         let nonce: [u8; 32] = rand::random();
         let serialized =
             bincode::serialize(&(peer.name(), &nonce)).map_err(|_| Error::InvalidMessage)?;

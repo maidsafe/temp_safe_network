@@ -101,7 +101,6 @@ impl Dispatcher {
                 let mut node = self.node.write().await;
 
                 node.handle_node_left(auth.value.into_state(), auth.sig)
-                    .await
             }
             Cmd::HandleNewEldersAgreement { proposal, sig } => match proposal {
                 Proposal::NewElders(section_auth) => {

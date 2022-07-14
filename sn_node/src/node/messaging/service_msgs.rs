@@ -34,7 +34,7 @@ use xor_name::XorName;
 
 impl Node {
     /// Forms a `CmdError` msg to send back to the client
-    pub(crate) async fn send_cmd_error_response(
+    pub(crate) fn send_cmd_error_response(
         &self,
         error: CmdError,
         target: Peer,
@@ -44,19 +44,19 @@ impl Node {
             error,
             correlation_id: msg_id,
         };
-        self.send_cmd_response(target, the_error_msg).await
+        self.send_cmd_response(target, the_error_msg)
     }
 
     /// Forms a `CmdAck` msg to send back to the client
-    pub(crate) async fn send_cmd_ack(&self, target: Peer, msg_id: MsgId) -> Result<Vec<Cmd>> {
+    pub(crate) fn send_cmd_ack(&self, target: Peer, msg_id: MsgId) -> Result<Vec<Cmd>> {
         let the_ack_msg = ServiceMsg::CmdAck {
             correlation_id: msg_id,
         };
-        self.send_cmd_response(target, the_ack_msg).await
+        self.send_cmd_response(target, the_ack_msg)
     }
 
     /// Forms a cmd to send a cmd response error/ack to the client
-    async fn send_cmd_response(&self, target: Peer, msg: ServiceMsg) -> Result<Vec<Cmd>> {
+    fn send_cmd_response(&self, target: Peer, msg: ServiceMsg) -> Result<Vec<Cmd>> {
         let dst = DstLocation::EndUser(EndUser(target.name()));
 
         let (auth_kind, payload) = self.ed_sign_client_msg(&msg)?;
@@ -230,14 +230,11 @@ impl Node {
                 spent_transactions,
             })) => {
                 // Generate and sign spent proof share
-                if let Some(spent_proof_share) = self
-                    .gen_spent_proof_share(&key_image, &tx, &spent_proofs, &spent_transactions)
-                    .await?
+                if let Some(spent_proof_share) =
+                    self.gen_spent_proof_share(&key_image, &tx, &spent_proofs, &spent_transactions)?
                 {
                     // Store spent proof share to adults
-                    let reg_cmd = self
-                        .gen_register_cmd(&key_image, &spent_proof_share)
-                        .await?;
+                    let reg_cmd = self.gen_register_cmd(&key_image, &spent_proof_share)?;
                     ReplicatedData::SpentbookWrite(reg_cmd)
                 } else {
                     return Ok(vec![]);
@@ -268,9 +265,9 @@ impl Node {
                 expected: data_copy_count() as u8,
                 found: cmds.len() as u8,
             });
-            return self.send_cmd_error_response(error, origin, msg_id).await;
+            return self.send_cmd_error_response(error, origin, msg_id);
         }
-        cmds.extend(self.send_cmd_ack(origin, msg_id).await?);
+        cmds.extend(self.send_cmd_ack(origin, msg_id)?);
         Ok(cmds)
     }
 
@@ -302,7 +299,7 @@ impl Node {
     }
 
     // Private helper to generate spent proof share
-    async fn gen_spent_proof_share(
+    fn gen_spent_proof_share(
         &self,
         key_image: &KeyImage,
         tx: &RingCtTransaction,
@@ -424,7 +421,7 @@ impl Node {
 
     // Private helper to generate the RegisterCmd to write the SpentProofShare
     // as an entry in the Spentbook (Register).
-    async fn gen_register_cmd(
+    fn gen_register_cmd(
         &self,
         key_image: &KeyImage,
         spent_proof_share: &SpentProofShare,
