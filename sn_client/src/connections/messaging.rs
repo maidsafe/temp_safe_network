@@ -52,7 +52,7 @@ impl Session {
         let endpoint = self.endpoint.clone();
         // TODO: Consider other approach: Keep a session per section!
 
-        let (section_pk, elders) = self.get_cmd_elders(dst_address).await?;
+        let (section_pk, elders) = self.get_cmd_elders(dst_address)?;
 
         let msg_id = MsgId::new();
 
@@ -154,7 +154,7 @@ impl Session {
 
         let dst = query.variant.dst_name();
 
-        let (section_pk, elders) = self.get_query_elders(dst).await?;
+        let (section_pk, elders) = self.get_query_elders(dst)?;
         let elders_len = elders.len();
         let msg_id = MsgId::new();
 
@@ -432,7 +432,7 @@ impl Session {
         Ok(())
     }
 
-    async fn get_query_elders(&self, dst: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
+    fn get_query_elders(&self, dst: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
         // Get DataSection elders details. Resort to own section if DataSection is not available.
         let sap = self.network.closest_or_opposite(&dst, None);
         let (section_pk, mut elders) = if let Some(sap) = &sap {
@@ -460,7 +460,7 @@ impl Session {
         Ok((section_pk, elders))
     }
 
-    async fn get_cmd_elders(&self, dst_address: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
+    fn get_cmd_elders(&self, dst_address: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
         let a_close_sap = self.network.closest_or_opposite(&dst_address, None);
 
         // Get DataSection elders details.
@@ -685,7 +685,7 @@ mod tests {
         )?;
 
         let mut rng = rand::thread_rng();
-        let result = session.get_cmd_elders(XorName::random(&mut rng)).await?;
+        let result = session.get_cmd_elders(XorName::random(&mut rng))?;
         assert_eq!(result.0, secret_key_set.public_keys().public_key());
         assert_eq!(result.1.len(), elders_len);
 
