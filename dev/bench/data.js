@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1657805534725,
+  "lastUpdate": 1657810970611,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -9035,6 +9035,72 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 4518485,
             "range": "± 109886",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "joshuef@gmail.com",
+            "name": "Josh Wilson",
+            "username": "joshuef"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "a856d788131ef85414ee1f42a868abcbbfc0d2b6",
+          "message": "chore: use timestamp for log files\n\nThis means that once written a log file's name will not change.\nThis hould make debugging a live network easier (your log file is less likely to change while viewing), and also pulling logs from a network via rsync fafster (as the namess/content aren't changing all the time).",
+          "timestamp": "2022-07-14T16:27:39+02:00",
+          "tree_id": "b3663253480ddd079ce539cca7d6813f2622df0e",
+          "url": "https://github.com/maidsafe/safe_network/commit/a856d788131ef85414ee1f42a868abcbbfc0d2b6"
+        },
+        "date": 1657810968746,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 511098331,
+            "range": "± 10133451",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 540884664,
+            "range": "± 20268035",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 1229029722,
+            "range": "± 38391980",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 395797007,
+            "range": "± 26803768",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 395836868,
+            "range": "± 16217588",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 1088233218,
+            "range": "± 28232198",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 4013519,
+            "range": "± 109719",
             "unit": "ns/iter"
           }
         ]
