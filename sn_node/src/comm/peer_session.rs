@@ -159,7 +159,7 @@ impl PeerSessionWorker {
                     SessionStatus::Ok
                 }
                 SessionCmd::AddConnection(conn) => {
-                    self.link.add(conn).await;
+                    self.link.add(conn);
                     SessionStatus::Ok
                 }
                 SessionCmd::Terminate => SessionStatus::Terminating,

@@ -495,8 +495,7 @@ impl Comm {
                 self.our_endpoint.clone(),
                 self.msg_listener.clone(),
                 conn,
-            )
-            .await;
+            );
             let session = PeerSession::new(link);
             let _ = self.sessions.insert(*peer, session);
         }

@@ -329,14 +329,14 @@ mod core {
         }
 
         /// returns names that are relatively dysfunctional
-        pub(crate) async fn get_dysfunctional_node_names(&mut self) -> Result<BTreeSet<XorName>> {
+        pub(crate) fn get_dysfunctional_node_names(&mut self) -> Result<BTreeSet<XorName>> {
             self.dysfunction_tracking
                 .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)
                 .map_err(Error::from)
         }
 
         /// Log a communication problem
-        pub(crate) async fn log_comm_issue(&mut self, name: XorName) -> Result<()> {
+        pub(crate) fn log_comm_issue(&mut self, name: XorName) -> Result<()> {
             trace!("Logging comms issue in dysfunction");
             self.dysfunction_tracking
                 .track_issue(name, IssueType::Communication)
@@ -344,7 +344,7 @@ mod core {
         }
 
         /// Log a knowledge issue
-        pub(crate) async fn log_knowledge_issue(&mut self, name: XorName) -> Result<()> {
+        pub(crate) fn log_knowledge_issue(&mut self, name: XorName) -> Result<()> {
             trace!("Logging Knowledge issue in dysfunction");
             self.dysfunction_tracking
                 .track_issue(name, IssueType::Knowledge)
@@ -360,7 +360,7 @@ mod core {
         }
 
         /// Log a dkg session as responded to
-        pub(crate) async fn log_dkg_session(&mut self, name: &XorName) {
+        pub(crate) fn log_dkg_session(&mut self, name: &XorName) {
             trace!("Logging Dkg session as responded to in dysfunction");
             self.dysfunction_tracking.dkg_ack_fulfilled(name);
         }

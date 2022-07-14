@@ -334,7 +334,7 @@ impl NodeApi {
 
     /// Returns the info about the section matching the name.
     pub async fn matching_section(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
-        self.node.read().await.matching_section(name).await
+        self.node.read().await.matching_section(name)
     }
 
     /// Builds a `WireMsg` signed by this Node
@@ -361,7 +361,7 @@ impl NodeApi {
             wire_msg.msg_id()
         );
 
-        let cmds = self.node.read().await.send_msg_to_nodes(wire_msg).await?;
+        let cmds = self.node.read().await.send_msg_to_nodes(wire_msg)?;
 
         if let Some(cmd) = cmds {
             self.flow_ctrl.fire_and_forget(cmd).await?;
@@ -373,6 +373,6 @@ impl NodeApi {
     /// Returns the current BLS public key set if this node has one, or
     /// `Error::MissingSecretKeyShare` otherwise.
     pub async fn public_key_set(&self) -> Result<bls::PublicKeySet> {
-        self.node.read().await.public_key_set().await
+        self.node.read().await.public_key_set()
     }
 }

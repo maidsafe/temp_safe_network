@@ -548,7 +548,7 @@ mod tests {
             membership_gen: 0,
         };
 
-        let cmds = voter.start(&node, session_id, section_pk).await?;
+        let cmds = voter.start(&node, session_id, section_pk)?;
         assert_matches!(&cmds[..], &[Cmd::HandleDkgOutcome { .. }]);
 
         Ok(())
@@ -591,11 +591,9 @@ mod tests {
             .collect();
 
         for actor in actors.values_mut() {
-            let cmds = futures::executor::block_on(actor.voter.start(
-                &actor.node,
-                session_id.clone(),
-                section_pk,
-            ))?;
+            let cmds = actor
+                .voter
+                .start(&actor.node, session_id.clone(), section_pk)?;
 
             for cmd in cmds {
                 messages.extend(actor.handle(cmd, &session_id)?)
@@ -621,13 +619,13 @@ mod tests {
 
             let actor = actors.get_mut(&addr).context("Unknown message recipient")?;
 
-            let cmds = futures::executor::block_on(actor.voter.process_msg(
+            let cmds = actor.voter.process_msg(
                 actor.peer(),
                 &actor.node,
                 &session_id,
                 message,
                 section_pk,
-            ))?;
+            )?;
 
             for cmd in cmds {
                 messages.extend(actor.handle(cmd, &session_id)?)

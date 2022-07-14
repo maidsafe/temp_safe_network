@@ -104,7 +104,7 @@ impl fmt::Display for NetworkInfo {
 }
 
 impl NetworkInfo {
-    pub async fn matches(&self, genesis_key: &BlsPublicKey) -> bool {
+    pub fn matches(&self, genesis_key: &BlsPublicKey) -> bool {
         match self {
             Self::Local(_, genesis_key_opt) => match genesis_key_opt {
                 Some(gk) => gk == genesis_key,
@@ -181,7 +181,7 @@ impl Config {
         fs::create_dir_all(prefix_maps_dir.as_path()).await?;
         let mut dbc_owner_sk_path = pb.clone();
         dbc_owner_sk_path.push("credentials");
-        let dbc_owner = Config::get_dbc_owner(&dbc_owner_sk_path).await?;
+        let dbc_owner = Config::get_dbc_owner(&dbc_owner_sk_path)?;
 
         let config = Config {
             settings,
@@ -451,7 +451,7 @@ impl Config {
         for (network_name, net_info) in self.networks_iter() {
             let mut current = "";
             if let Ok(prefix_map) = &current_prefix_map {
-                if net_info.matches(&prefix_map.genesis_key()).await {
+                if net_info.matches(&prefix_map.genesis_key()) {
                     current = "*";
                 }
             }
@@ -543,7 +543,7 @@ impl Config {
     /// Private helpers
     ///
 
-    async fn get_dbc_owner(dbc_sk_path: &Path) -> Result<Option<Owner>> {
+    fn get_dbc_owner(dbc_sk_path: &Path) -> Result<Option<Owner>> {
         if dbc_sk_path.exists() {
             let sk = Safe::deserialize_bls_key(dbc_sk_path)?;
             return Ok(Some(Owner::from(sk)));

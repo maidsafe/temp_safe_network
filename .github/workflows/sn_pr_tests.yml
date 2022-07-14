@@ -297,11 +297,17 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: matrix.os != 'windows-latest'
 
+      - name: Tar log files
+        run:
+          killall -9 sn_node
+          find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
+        if: failure()
+
       - name: Upload Node Logs
         uses: actions/upload-artifact@main
         with:
           name: sn_node_logs_e2e_${{matrix.os}}
-          path: ~/.safe/node/local-test-network/**/*.log*
+          path: log_files.tar.gz
         if: failure()
         continue-on-error: true
 
@@ -441,11 +447,17 @@ jobs:
         continue-on-error: true
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
+      - name: Tar log files
+        run:
+          killall -9 sn_node
+          find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
+        if: failure()
+
       - name: Upload Node Logs
         uses: actions/upload-artifact@main
         with:
           name: sn_node_logs_e2e_split_self_hosted_ubuntu
-          path: ~/.safe/node/local-test-network/**/*.log*
+          path: log_files.tar.gz
         if: failure()
         continue-on-error: true
 
@@ -552,11 +564,17 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success'
 
+      - name: Tar log files
+        run:
+          killall -9 sn_node
+          find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
+        if: failure()
+
       - name: Upload Node Logs
         uses: actions/upload-artifact@main
         with:
           name: sn_node_logs_api_${{matrix.os}}
-          path: ~/.safe/node/local-test-network/**/*.log*
+          path: log_files.tar.gz
         if: failure()
         continue-on-error: true
 
@@ -651,11 +669,17 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: steps.section-startup.outcome == 'success'
 
+      - name: Tar log files
+        run:
+          killall -9 sn_node
+          find ~/.safe/node/local-test-network -iname '*.log*' | tar -zcvf log_files.tar.gz --files-from -
+        if: failure()
+
       - name: Upload Node Logs
         uses: actions/upload-artifact@main
         with:
           name: sn_node_logs_cli_${{matrix.os}}
-          path: ~/.safe/node/local-test-network/**/*.log*
+          path: log_files.tar.gz
         if: failure()
         continue-on-error: true
 

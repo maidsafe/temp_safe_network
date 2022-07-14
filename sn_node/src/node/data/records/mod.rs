@@ -34,10 +34,10 @@ use xor_name::XorName;
 
 impl Node {
     // Locate ideal holders for this data, line up wiremsgs for those to instruct them to store the data
-    pub(crate) async fn replicate_data(&self, data: ReplicatedData) -> Result<Vec<Cmd>> {
+    pub(crate) fn replicate_data(&self, data: ReplicatedData) -> Result<Vec<Cmd>> {
         trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
         if self.is_elder() {
-            let targets = self.get_adults_who_should_store_data(data.name()).await;
+            let targets = self.get_adults_who_should_store_data(data.name());
 
             info!(
                 "Replicating data {:?} to holders {:?}",
@@ -46,7 +46,7 @@ impl Node {
             );
 
             let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data]));
-            self.send_node_msg_to_nodes(msg, targets).await
+            self.send_node_msg_to_nodes(msg, targets)
         } else {
             Err(Error::InvalidState)
         }
@@ -68,9 +68,7 @@ impl Node {
             operation_id
         );
 
-        let targets = self
-            .get_adults_holding_data_including_full(address.name())
-            .await;
+        let targets = self.get_adults_holding_data_including_full(address.name());
 
         // Query only the nth adult
         let targets = BTreeSet::from_iter(
@@ -86,9 +84,7 @@ impl Node {
             let error = convert_to_error_msg(Error::NoAdults(self.network_knowledge().prefix()));
 
             debug!("No targets found for {msg_id:?}");
-            return self
-                .send_cmd_error_response(CmdError::Data(error), origin, msg_id)
-                .await;
+            return self.send_cmd_error_response(CmdError::Data(error), origin, msg_id);
         }
 
         let mut op_was_already_underway = false;
@@ -139,7 +135,7 @@ impl Node {
                 correlation_id: msg_id,
             });
 
-            self.send_node_msg_to_nodes(msg, targets).await
+            self.send_node_msg_to_nodes(msg, targets)
         } else {
             // we don't do anything as we're still within data query timeout
             Ok(vec![])
@@ -152,7 +148,7 @@ impl Node {
         MetadataExchange { adult_levels }
     }
 
-    pub(crate) async fn set_adult_levels(&mut self, adult_levels: MetadataExchange) {
+    pub(crate) fn set_adult_levels(&mut self, adult_levels: MetadataExchange) {
         let MetadataExchange { adult_levels } = adult_levels;
         self.capacity.set_adult_levels(adult_levels)
     }
@@ -170,20 +166,16 @@ impl Node {
     }
 
     /// Adds the new adult to the Capacity and Liveness trackers.
-    pub(crate) async fn add_new_adult_to_trackers(&mut self, adult: XorName) {
+    pub(crate) fn add_new_adult_to_trackers(&mut self, adult: XorName) {
         info!("Adding new Adult: {adult} to trackers");
         self.capacity.add_new_adult(adult);
 
-        self.dysfunction_tracking.add_new_node(adult).await;
+        self.dysfunction_tracking.add_new_node(adult);
     }
 
     /// Set storage level of a given node.
     /// Returns whether the level changed or not.
-    pub(crate) async fn set_storage_level(
-        &mut self,
-        node_id: &PublicKey,
-        level: StorageLevel,
-    ) -> bool {
+    pub(crate) fn set_storage_level(&mut self, node_id: &PublicKey, level: StorageLevel) -> bool {
         info!("Setting new storage level..");
         let changed = self
             .capacity
@@ -197,14 +189,14 @@ impl Node {
         changed
     }
 
-    pub(crate) async fn full_adults(&self) -> BTreeSet<XorName> {
+    pub(crate) fn full_adults(&self) -> BTreeSet<XorName> {
         self.capacity.full_adults()
     }
 
     /// Construct list of adults that hold target data, including full nodes.
     /// List is sorted by distance from `target`.
-    async fn get_adults_holding_data_including_full(&self, target: &XorName) -> BTreeSet<XorName> {
-        let full_adults = self.full_adults().await;
+    fn get_adults_holding_data_including_full(&self, target: &XorName) -> BTreeSet<XorName> {
+        let full_adults = self.full_adults();
         let adults = self.network_knowledge().adults();
 
         let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
@@ -246,8 +238,8 @@ impl Node {
     }
 
     /// Used to fetch the list of holders for given name of data. Excludes full nodes
-    async fn get_adults_who_should_store_data(&self, target: XorName) -> BTreeSet<XorName> {
-        let full_adults = self.full_adults().await;
+    fn get_adults_who_should_store_data(&self, target: XorName) -> BTreeSet<XorName> {
+        let full_adults = self.full_adults();
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
         let adults = self.network_knowledge().adults();
 
@@ -275,7 +267,7 @@ impl Node {
     // Takes a message for specified targets, and builds internal send cmds
     // for sending to each of the targets.
     // Targets are XorName specified so must be within the section
-    async fn send_node_msg_to_nodes(
+    fn send_node_msg_to_nodes(
         &self,
         msg: SystemMsg,
         targets: BTreeSet<XorName>,
@@ -301,7 +293,7 @@ impl Node {
             wire_msg.set_dst_section_pk(dst_section_pk);
             wire_msg.set_dst_xorname(target);
 
-            cmds.extend(self.send_msg_to_nodes(wire_msg).await?);
+            cmds.extend(self.send_msg_to_nodes(wire_msg)?);
         }
 
         Ok(cmds)

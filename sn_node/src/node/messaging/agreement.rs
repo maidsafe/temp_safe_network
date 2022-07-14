@@ -22,7 +22,7 @@ use std::{cmp, collections::BTreeSet};
 // Agreement
 impl Node {
     // Send `NodeApproval` to a joining node which makes it a section member
-    pub(crate) async fn send_node_approval(&self, node_state: SectionAuth<NodeState>) -> Vec<Cmd> {
+    pub(crate) fn send_node_approval(&self, node_state: SectionAuth<NodeState>) -> Vec<Cmd> {
         let peer = *node_state.peer();
         let prefix = self.network_knowledge.prefix();
         info!("Our section with {:?} has approved peer {}.", prefix, peer,);
@@ -56,7 +56,7 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         debug!("{:?} {:?}", LogMarker::ProposalAgreed, proposal);
         match proposal {
-            Proposal::Offline(node_state) => self.handle_offline_agreement(node_state, sig).await,
+            Proposal::Offline(node_state) => self.handle_offline_agreement(node_state, sig),
             Proposal::SectionInfo { sap, generation } => {
                 self.handle_section_info_agreement(sap, sig, generation)
                     .await
@@ -99,12 +99,9 @@ impl Node {
             if new_age >= MIN_ADULT_AGE {
                 // TODO: consider handling the relocation inside the bootstrap phase, to avoid
                 // having to send this `NodeApproval`.
-                cmds.extend(self.send_node_approval(old_info.clone()).await);
+                cmds.extend(self.send_node_approval(old_info.clone()));
 
-                cmds.extend(
-                    self.relocate_rejoining_peer(old_info.value, new_age)
-                        .await?,
-                );
+                cmds.extend(self.relocate_rejoining_peer(old_info.value, new_age)?);
 
                 return Ok(cmds);
             }
@@ -120,7 +117,7 @@ impl Node {
             return Ok(vec![]);
         }
 
-        self.add_new_adult_to_trackers(new_info.name()).await;
+        self.add_new_adult_to_trackers(new_info.name());
 
         info!("handle Online: {} at {}", new_info.name(), new_info.addr());
 
@@ -146,12 +143,9 @@ impl Node {
         let excluded_from_relocation = vec![new_info.name()].into_iter().collect();
 
         // first things first, inform the node it can join us
-        cmds.extend(self.send_node_approval(new_info).await);
+        cmds.extend(self.send_node_approval(new_info));
 
-        cmds.extend(
-            self.relocate_peers(churn_id, excluded_from_relocation)
-                .await?,
-        );
+        cmds.extend(self.relocate_peers(churn_id, excluded_from_relocation)?);
 
         let result = self.promote_and_demote_elders_except(&BTreeSet::default())?;
 
@@ -170,7 +164,7 @@ impl Node {
     }
 
     #[instrument(skip(self))]
-    async fn handle_offline_agreement(
+    fn handle_offline_agreement(
         &mut self,
         node_state: NodeState,
         sig: KeyedSig,
@@ -181,7 +175,7 @@ impl Node {
             node_state.addr()
         );
 
-        self.propose_membership_change(node_state.to_msg()).await
+        self.propose_membership_change(node_state.to_msg())
     }
 
     #[instrument(skip(self), level = "trace")]
@@ -235,8 +229,7 @@ impl Node {
                 signed_section_auth.prefix()
             );
             return self
-                .propose_handover_consensus(SapCandidate::ElderHandover(signed_section_auth))
-                .await;
+                .propose_handover_consensus(SapCandidate::ElderHandover(signed_section_auth));
         }
 
         // manage pending split SAP candidates
@@ -262,7 +255,6 @@ impl Node {
                 sap1.to_owned(),
                 sap2.to_owned(),
             ))
-            .await
         } else {
             debug!("Waiting for more split handover candidates");
             Ok(vec![])

@@ -67,7 +67,7 @@ impl Dispatcher {
                 let wire_msg = WireMsg::single_src(&node.info(), dst, msg, src_section_pk)?;
 
                 let mut cmds = vec![];
-                cmds.extend(node.send_msg_to_nodes(wire_msg).await?);
+                cmds.extend(node.send_msg_to_nodes(wire_msg)?);
 
                 Ok(cmds)
             }
@@ -101,7 +101,6 @@ impl Dispatcher {
                 let mut node = self.node.write().await;
 
                 node.handle_node_left(auth.value.into_state(), auth.sig)
-                    .await
             }
             Cmd::HandleNewEldersAgreement { proposal, sig } => match proposal {
                 Proposal::NewElders(section_auth) => {
@@ -117,7 +116,7 @@ impl Dispatcher {
             Cmd::HandlePeerLost(peer) => {
                 let mut node = self.node.write().await;
 
-                node.handle_peer_lost(&peer.addr()).await
+                node.handle_peer_lost(&peer.addr())
             }
             Cmd::HandleDkgOutcome {
                 section_auth,
@@ -132,7 +131,7 @@ impl Dispatcher {
             Cmd::HandleDkgFailure(signeds) => {
                 let mut node = self.node.write().await;
 
-                node.handle_dkg_failure(signeds).await.map(|cmd| vec![cmd])
+                node.handle_dkg_failure(signeds).map(|cmd| vec![cmd])
             }
             Cmd::SendMsg {
                 recipients,
@@ -198,7 +197,7 @@ impl Dispatcher {
                     if self.comm.is_reachable(&member_info.addr()).await.is_err() {
                         let mut node = self.node.write().await;
 
-                        node.log_comm_issue(member_info.name()).await?
+                        node.log_comm_issue(member_info.name())?
                     }
                 }
                 Ok(vec![])

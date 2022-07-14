@@ -166,10 +166,7 @@ impl Node {
         trace!("{:?}", LogMarker::SystemMsgToBeHandled);
 
         // We assume to be aggregated if it contains a BLS Share sig as authority.
-        match self
-            .aggregate_msg_and_stop(&mut msg_authority, payload)
-            .await
-        {
+        match self.aggregate_msg_and_stop(&mut msg_authority, payload) {
             Ok(false) => {
                 self.handle_valid_msg(msg_id, msg_authority, msg, sender, known_keys, comm)
                     .await
@@ -240,9 +237,8 @@ impl Node {
             SystemMsg::JoinAsRelocatedResponse(join_response) => {
                 trace!("Handling msg: JoinAsRelocatedResponse from {}", sender);
                 if let Some(ref mut joining_as_relocated) = self.relocate_state {
-                    if let Some(cmd) = joining_as_relocated
-                        .handle_join_response(*join_response, sender.addr())
-                        .await?
+                    if let Some(cmd) =
+                        joining_as_relocated.handle_join_response(*join_response, sender.addr())?
                     {
                         return Ok(vec![cmd]);
                     }
@@ -389,10 +385,10 @@ impl Node {
             }
             SystemMsg::DkgFailureAgreement(sig_set) => {
                 trace!("Handling msg: Dkg-FailureAgreement from {}", sender);
-                self.handle_dkg_failure_agreement(&src_name, &sig_set).await
+                self.handle_dkg_failure_agreement(&src_name, &sig_set)
             }
             SystemMsg::HandoverVotes(votes) => self.handle_handover_msg(sender, votes).await,
-            SystemMsg::HandoverAE(gen) => self.handle_handover_anti_entropy(sender, gen).await,
+            SystemMsg::HandoverAE(gen) => self.handle_handover_anti_entropy(sender, gen),
             SystemMsg::JoinRequest(join_request) => {
                 trace!("Handling msg: JoinRequest from {}", sender);
                 self.handle_join_request(sender, *join_request, comm).await
@@ -449,7 +445,7 @@ impl Node {
             }
             SystemMsg::DkgStart(session_id) => {
                 trace!("Handling msg: Dkg-Start {:?} from {}", session_id, sender);
-                self.log_dkg_session(&sender.name()).await;
+                self.log_dkg_session(&sender.name());
                 let our_name = self.info().name();
                 if !session_id.contains_elder(our_name) {
                     return Ok(vec![]);
@@ -463,7 +459,7 @@ impl Node {
                         },
                     );
                 }
-                self.handle_dkg_start(session_id).await
+                self.handle_dkg_start(session_id)
             }
             SystemMsg::DkgMessage {
                 session_id,
@@ -475,7 +471,7 @@ impl Node {
                     message,
                     sender
                 );
-                self.handle_dkg_msg(session_id, message, sender).await
+                self.handle_dkg_msg(session_id, message, sender)
             }
             SystemMsg::DkgFailureObservation {
                 session_id,
@@ -488,25 +484,19 @@ impl Node {
             SystemMsg::DkgNotReady {
                 message,
                 session_id,
-            } => {
-                self.handle_dkg_not_ready(
-                    sender,
-                    message,
-                    session_id,
-                    self.network_knowledge.section_key(),
-                )
-                .await
-            }
+            } => self.handle_dkg_not_ready(
+                sender,
+                message,
+                session_id,
+                self.network_knowledge.section_key(),
+            ),
             SystemMsg::DkgRetry {
                 message_history,
                 message,
                 session_id,
-            } => {
-                self.handle_dkg_retry(&session_id, message_history, message, sender)
-                    .await
-            }
+            } => self.handle_dkg_retry(&session_id, message_history, message, sender),
             SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel { node_id, level, .. }) => {
-                let changed = self.set_storage_level(&node_id, level).await;
+                let changed = self.set_storage_level(&node_id, level);
                 if changed && level.value() == MIN_LEVEL_WHEN_FULL {
                     // ..then we accept a new node in place of the full node
                     self.joins_allowed = true;
@@ -515,7 +505,7 @@ impl Node {
             }
             SystemMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }) => {
                 info!("Processing received MetadataExchange packet: {:?}", msg_id);
-                self.set_adult_levels(metadata).await;
+                self.set_adult_levels(metadata);
                 Ok(vec![])
             }
             SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
@@ -531,14 +521,13 @@ impl Node {
                 if self.is_elder() {
                     if full {
                         let changed = self
-                            .set_storage_level(&node_id, StorageLevel::from(StorageLevel::MAX)?)
-                            .await;
+                            .set_storage_level(&node_id, StorageLevel::from(StorageLevel::MAX)?);
                         if changed {
                             // ..then we accept a new node in place of the full node
                             self.joins_allowed = true;
                         }
                     }
-                    self.replicate_data(data).await
+                    self.replicate_data(data)
                 } else {
                     error!("Received unexpected message while Adult");
                     Ok(vec![])
@@ -566,7 +555,7 @@ impl Node {
                         {
                             Ok(level_report) => {
                                 info!("Storage level report: {:?}", level_report);
-                                cmds.extend(self.record_storage_level_if_any(level_report).await);
+                                cmds.extend(self.record_storage_level_if_any(level_report));
                             }
                             Err(DbError::NotEnoughSpace) => {
                                 // db full
@@ -724,17 +713,14 @@ impl Node {
                     },
                 );
                 trace!("DkgSessionInfo handling {:?}", session_id);
-                cmds.extend(self.handle_dkg_start(session_id.clone()).await?);
-                cmds.extend(
-                    self.handle_dkg_retry(&session_id, message_cache, message, sender)
-                        .await?,
-                );
+                cmds.extend(self.handle_dkg_start(session_id.clone())?);
+                cmds.extend(self.handle_dkg_retry(&session_id, message_cache, message, sender)?);
                 Ok(cmds)
             }
         }
     }
 
-    async fn record_storage_level_if_any(&self, level: Option<StorageLevel>) -> Vec<Cmd> {
+    fn record_storage_level_if_any(&self, level: Option<StorageLevel>) -> Vec<Cmd> {
         let mut cmds = vec![];
         if let Some(level) = level {
             info!("Storage has now passed {} % used.", 10 * level.value());
@@ -761,7 +747,7 @@ impl Node {
     // Convert the provided NodeMsgAuthority to be a `Section` message
     // authority on successful accumulation. Also return 'true' if
     // current message shall not be processed any further.
-    async fn aggregate_msg_and_stop(
+    fn aggregate_msg_and_stop(
         &mut self,
         msg_authority: &mut NodeMsgAuthority,
         payload: Bytes,
@@ -776,9 +762,7 @@ impl Node {
             &mut self.message_aggregator,
             bls_share_auth.clone().into_inner(),
             &payload,
-        )
-        .await
-        {
+        ) {
             Ok(section_auth) => {
                 info!("Successfully aggregated message");
                 *msg_authority = NodeMsgAuthority::Section(section_auth);

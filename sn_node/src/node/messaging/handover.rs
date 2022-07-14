@@ -24,7 +24,7 @@ use xor_name::{Prefix, XorName};
 
 impl Node {
     /// Make a handover consensus proposal vote for a sap candidate
-    pub(crate) async fn propose_handover_consensus(
+    pub(crate) fn propose_handover_consensus(
         &mut self,
         sap_candidates: SapCandidate,
     ) -> Result<Vec<Cmd>> {
@@ -34,7 +34,7 @@ impl Node {
                 let vote = vs.propose(sap_candidates)?;
                 self.handover_voting = Some(vs);
                 debug!("{}: {:?}", LogMarker::HandoverConsensusTrigger, &vote);
-                Ok(self.broadcast_handover_vote_msg(vote).await)
+                Ok(self.broadcast_handover_vote_msg(vote))
             }
             None => {
                 warn!("Failed to make handover consensus proposal because node is not an Elder");
@@ -44,7 +44,7 @@ impl Node {
     }
 
     /// Broadcast handover Vote message to Elders
-    pub(crate) async fn broadcast_handover_vote_msg(
+    pub(crate) fn broadcast_handover_vote_msg(
         &self,
         signed_vote: SignedVote<SapCandidate>,
     ) -> Vec<Cmd> {
@@ -115,7 +115,7 @@ impl Node {
                     ">>> Handover Vote msg successfully handled, broadcasting our vote: {:?}",
                     signed_vote
                 );
-                Ok(self.broadcast_handover_vote_msg(signed_vote).await)
+                Ok(self.broadcast_handover_vote_msg(signed_vote))
             }
             Ok(VoteResponse::WaitingForMoreVotes) => {
                 trace!(
@@ -162,7 +162,7 @@ impl Node {
         Ok(())
     }
 
-    async fn get_members_at_gen(&self, gen: Generation) -> Result<BTreeMap<XorName, NodeState>> {
+    fn get_members_at_gen(&self, gen: Generation) -> Result<BTreeMap<XorName, NodeState>> {
         if let Some(m) = self.membership.as_ref() {
             Ok(m.section_members(gen)?)
         } else {
@@ -171,17 +171,17 @@ impl Node {
         }
     }
 
-    async fn get_sap_for_prefix(&self, prefix: Prefix) -> Result<SectionAuthorityProvider> {
+    fn get_sap_for_prefix(&self, prefix: Prefix) -> Result<SectionAuthorityProvider> {
         self.network_knowledge
             .prefix_map()
             .get(&prefix)
             .ok_or(Error::FailedToGetSAPforPrefix(prefix))
     }
 
-    async fn check_elder_handover_candidates(&self, sap: &SectionAuthorityProvider) -> Result<()> {
+    fn check_elder_handover_candidates(&self, sap: &SectionAuthorityProvider) -> Result<()> {
         // in regular handover the previous SAP's prefix is the same
-        let previous_gen_sap = self.get_sap_for_prefix(sap.prefix()).await?;
-        let members = self.get_members_at_gen(sap.membership_gen()).await?;
+        let previous_gen_sap = self.get_sap_for_prefix(sap.prefix())?;
+        let members = self.get_members_at_gen(sap.membership_gen())?;
         let received_candidates: BTreeSet<&Peer> = sap.elders().collect();
 
         let expected_peers: BTreeSet<Peer> =
@@ -197,7 +197,7 @@ impl Node {
         Ok(())
     }
 
-    async fn check_section_split_candidates(
+    fn check_section_split_candidates(
         &self,
         sap1: &SectionAuthorityProvider,
         sap2: &SectionAuthorityProvider,
@@ -206,8 +206,8 @@ impl Node {
         // we use gen/prefix from sap1, both SAPs in a split have the same generation
         // and the same ancestor prefix
         let prev_prefix = sap1.prefix().popped();
-        let previous_gen_sap = self.get_sap_for_prefix(prev_prefix).await?;
-        let members = self.get_members_at_gen(sap1.membership_gen()).await?;
+        let previous_gen_sap = self.get_sap_for_prefix(prev_prefix)?;
+        let members = self.get_members_at_gen(sap1.membership_gen())?;
         let dummy_chain_len = 0;
         let dummy_gen = 0;
 
@@ -240,7 +240,7 @@ impl Node {
         }
     }
 
-    async fn check_sap_candidate_prefix(&self, sap_candidate: &SapCandidate) -> Result<()> {
+    fn check_sap_candidate_prefix(&self, sap_candidate: &SapCandidate) -> Result<()> {
         let section_prefix = self.network_knowledge.prefix();
         match sap_candidate {
             SapCandidate::ElderHandover(single_sap) => {
@@ -273,35 +273,28 @@ impl Node {
     /// Checks if the elder candidates in the SAP match the oldest elders in the corresponding
     /// membership generation this SAP was proposed at
     /// Also checks the SAP signature
-    async fn check_sap_candidate(
-        &self,
-        sap_candidate: &SapCandidate,
-        gen: Generation,
-    ) -> Result<()> {
-        self.check_sap_candidate_prefix(sap_candidate).await?;
+    fn check_sap_candidate(&self, sap_candidate: &SapCandidate, gen: Generation) -> Result<()> {
+        self.check_sap_candidate_prefix(sap_candidate)?;
         match sap_candidate {
             SapCandidate::ElderHandover(authed_sap) => {
                 self.check_sap_sig(authed_sap, gen)?;
                 self.check_elder_handover_candidates(&authed_sap.value)
-                    .await
             }
             SapCandidate::SectionSplit(authed_sap1, authed_sap2) => {
                 self.check_sap_sig(authed_sap1, gen)?;
                 self.check_sap_sig(authed_sap2, gen)?;
                 self.check_section_split_candidates(&authed_sap1.value, &authed_sap2.value)
-                    .await
             }
         }
     }
 
-    async fn check_signed_vote_saps(&self, signed_vote: &SignedVote<SapCandidate>) -> Result<()> {
+    fn check_signed_vote_saps(&self, signed_vote: &SignedVote<SapCandidate>) -> Result<()> {
         let sap_candidates = signed_vote.proposals();
         let gen = signed_vote.vote.gen;
-        let checks: Vec<_> = sap_candidates
-            .iter()
-            .map(|sap_can| self.check_sap_candidate(sap_can, gen))
-            .collect();
-        let _ = futures::future::try_join_all(checks).await?;
+
+        for sap_can in sap_candidates {
+            let _ = self.check_sap_candidate(&sap_can, gen);
+        }
         Ok(())
     }
 
@@ -310,7 +303,7 @@ impl Node {
         peer: Peer,
         signed_vote: SignedVote<SapCandidate>,
     ) -> Result<Vec<Cmd>> {
-        self.check_signed_vote_saps(&signed_vote).await?;
+        self.check_signed_vote_saps(&signed_vote)?;
 
         match &self.handover_voting {
             Some(handover_state) => {
@@ -384,7 +377,7 @@ impl Node {
         Ok(cmds)
     }
 
-    pub(crate) async fn handle_handover_anti_entropy(
+    pub(crate) fn handle_handover_anti_entropy(
         &self,
         peer: Peer,
         gen: Generation,
