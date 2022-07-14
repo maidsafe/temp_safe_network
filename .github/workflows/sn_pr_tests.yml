@@ -375,7 +375,7 @@ jobs:
         shell: bash
         run: cargo run --release --example network_split
         env:
-          RUST_LOG: "sn_node,sn_client,sn_consensus=trace"
+          RUST_LOG: "sn_node,sn_client,sn_consensus,sn_dysfunction=trace"
 
 
       - name: Print Network Log Stats at start
