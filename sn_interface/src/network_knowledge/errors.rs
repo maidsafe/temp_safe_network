@@ -46,4 +46,6 @@ pub enum Error {
     NotAMember,
     #[error("Request does not match the section prefix")]
     WrongSection,
+    #[error("Consensus({0:?})")]
+    Consensus(#[from] sn_consensus::Error),
 }
