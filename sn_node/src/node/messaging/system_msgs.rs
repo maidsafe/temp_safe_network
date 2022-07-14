@@ -448,7 +448,7 @@ impl Node {
             }
             SystemMsg::DkgStart(session_id) => {
                 trace!("Handling msg: Dkg-Start {:?} from {}", session_id, sender);
-                self.log_dkg_session(&sender.name()).await;
+                self.log_dkg_session(&sender.name());
                 let our_name = self.info().name();
                 if !session_id.contains_elder(our_name) {
                     return Ok(vec![]);

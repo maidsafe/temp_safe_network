@@ -117,7 +117,7 @@ impl Dispatcher {
             Cmd::HandlePeerLost(peer) => {
                 let mut node = self.node.write().await;
 
-                node.handle_peer_lost(&peer.addr()).await
+                node.handle_peer_lost(&peer.addr())
             }
             Cmd::HandleDkgOutcome {
                 section_auth,
@@ -198,7 +198,7 @@ impl Dispatcher {
                     if self.comm.is_reachable(&member_info.addr()).await.is_err() {
                         let mut node = self.node.write().await;
 
-                        node.log_comm_issue(member_info.name()).await?
+                        node.log_comm_issue(member_info.name())?
                     }
                 }
                 Ok(vec![])
