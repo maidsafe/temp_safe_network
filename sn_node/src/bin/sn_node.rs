@@ -37,7 +37,11 @@ use color_eyre::{Section, SectionExt};
 #[cfg(not(feature = "tokio-console"))]
 use eyre::Error;
 use eyre::{eyre, Context, ErrReport, Result};
-use file_rotate::{compression::Compression, suffix::AppendCount, ContentLimit, FileRotate};
+use file_rotate::{
+    compression::Compression,
+    suffix::{AppendTimestamp, FileLimit},
+    ContentLimit, FileRotate,
+};
 use self_update::{cargo_crate_version, Status};
 use std::{fmt::Debug, io, io::Write, path::Path, process::exit};
 use tokio::time::{sleep, Duration};
@@ -164,7 +168,7 @@ fn init_node_logging(config: Config) -> Result<Option<WorkerGuard>> {
         let file_appender = FileRotateAppender::make_rotate_appender(
             log_dir,
             "sn_node.log",
-            AppendCount::new(logs_retained),
+            AppendTimestamp::default(FileLimit::MaxFiles(logs_retained)),
             content_limit,
             Compression::OnRotate(config.logs_uncompressed),
         );
@@ -219,7 +223,7 @@ fn init_node_logging(config: Config) -> Result<Option<WorkerGuard>> {
 //
 // The above functionality is provided using crate file_rotation
 pub struct FileRotateAppender {
-    writer: FileRotate<AppendCount>,
+    writer: FileRotate<AppendTimestamp>,
 }
 
 impl FileRotateAppender {
@@ -230,7 +234,7 @@ impl FileRotateAppender {
         let path = Path::new(&log_directory).join(&log_filename_prefix);
         let writer = FileRotate::new(
             &Path::new(&path),
-            AppendCount::new(9),
+            AppendTimestamp::default(FileLimit::MaxFiles(9)),
             ContentLimit::Bytes(10 * 1024 * 1024),
             Compression::OnRotate(1),
         );
@@ -242,14 +246,14 @@ impl FileRotateAppender {
     pub fn make_rotate_appender(
         directory: impl AsRef<Path>,
         file_name_prefix: impl AsRef<Path>,
-        num_logs: AppendCount,
+        file_limit: AppendTimestamp,
         max_log_size: ContentLimit,
         compression: Compression,
     ) -> Self {
         let log_directory = directory.as_ref().to_str().unwrap();
         let log_filename_prefix = file_name_prefix.as_ref().to_str().unwrap();
         let path = Path::new(&log_directory).join(&log_filename_prefix);
-        let writer = FileRotate::new(&Path::new(&path), num_logs, max_log_size, compression);
+        let writer = FileRotate::new(&Path::new(&path), file_limit, max_log_size, compression);
 
         Self { writer }
     }
