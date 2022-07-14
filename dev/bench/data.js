@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1657790139140,
+  "lastUpdate": 1657790146127,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -8837,6 +8837,72 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 4287462,
             "range": "± 74950",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "davidrusu.me@gmail.com",
+            "name": "David Rusu",
+            "username": "davidrusu"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "4e44e373da9ee75b2563b39c26794299e607f48f",
+          "message": "fix(membership): only process each membership decision once",
+          "timestamp": "2022-07-14T10:39:59+02:00",
+          "tree_id": "27fd74b7e129f9a8fb301722a9f0d909e8bdfaea",
+          "url": "https://github.com/maidsafe/safe_network/commit/4e44e373da9ee75b2563b39c26794299e607f48f"
+        },
+        "date": 1657790145411,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 519290272,
+            "range": "± 9916786",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 543147424,
+            "range": "± 14256077",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 1231670874,
+            "range": "± 45169596",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 397387186,
+            "range": "± 21926255",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 398012574,
+            "range": "± 15372336",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 1092477492,
+            "range": "± 27005597",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 4331452,
+            "range": "± 148910",
             "unit": "ns/iter"
           }
         ]
