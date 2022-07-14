@@ -344,7 +344,7 @@ mod tests {
         tokio::time::sleep(delay).await;
 
         // All elders should have been written to
-        the_logs.assert_count(LogMarker::RegisterWrite, 7).await?;
+        the_logs.assert_count(LogMarker::RegisterWrite, 7)?;
 
         Ok(())
     }

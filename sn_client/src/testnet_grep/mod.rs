@@ -72,7 +72,7 @@ impl NetworkLogState {
     }
 
     /// assert new log marker counts
-    pub(crate) async fn assert_count(
+    pub(crate) fn assert_count(
         &mut self,
         marker: LogMarker,
         target_count: usize,
