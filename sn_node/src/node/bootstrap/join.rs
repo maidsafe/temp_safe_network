@@ -230,7 +230,8 @@ impl<'a> Joiner<'a> {
                         section_chain,
                         section_auth,
                         Some(self.prefix_map),
-                    )?;
+                    )
+                    .await?;
 
                     return Ok((self.node, network_knowledge));
                 }
@@ -269,7 +270,7 @@ impl<'a> Joiner<'a> {
                     };
 
                     // make sure we received a valid and trusted new SAP
-                    let is_new_sap = match self.prefix_map.update(signed_sap, &proof_chain) {
+                    let is_new_sap = match self.prefix_map.update(signed_sap, &proof_chain).await {
                         Ok(updated) => updated,
                         Err(err) => {
                             debug!(

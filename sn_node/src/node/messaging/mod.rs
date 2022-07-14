@@ -164,8 +164,9 @@ impl Node {
                 }
 
                 // Then we perform AE checks
-                if let Some(cmd) =
-                    self.check_for_entropy(original_bytes, &dst.section_key, dst_name, &origin)?
+                if let Some(cmd) = self
+                    .check_for_entropy(original_bytes, &dst.section_key, dst_name, &origin)
+                    .await?
                 {
                     // short circuit and send those AE responses
                     return Ok(vec![cmd]);
@@ -231,8 +232,9 @@ impl Node {
                 Ok(cmds)
             }
             _ => {
-                if let Some(ae_cmd) =
-                    self.check_for_entropy(msg_bytes, &dst.section_key, dst.name, origin)?
+                if let Some(ae_cmd) = self
+                    .check_for_entropy(msg_bytes, &dst.section_key, dst.name, origin)
+                    .await?
                 {
                     // we want to log issues with an elder who is out of sync here...
                     let knowledge = self.network_knowledge.elders();

@@ -159,13 +159,16 @@ impl Node {
             sig: section_signed.clone(),
         };
 
-        let updated = self.network_knowledge.update_knowledge_if_valid(
-            signed_sap.clone(),
-            &proof_chain,
-            Some(members),
-            &our_name,
-            &self.section_keys_provider,
-        )?;
+        let updated = self
+            .network_knowledge
+            .update_knowledge_if_valid(
+                signed_sap.clone(),
+                &proof_chain,
+                Some(members),
+                &our_name,
+                &self.section_keys_provider,
+            )
+            .await?;
 
         // always run this, only changes will trigger events
         let mut cmds = self.update_on_elder_change(snapshot).await?;
@@ -344,13 +347,16 @@ impl Node {
         let our_peer_info = self.info().peer();
 
         // Update our network knowledge
-        let there_was_an_update = self.network_knowledge.update_knowledge_if_valid(
-            signed_sap.clone(),
-            &proof_chain,
-            None,
-            &our_name,
-            &self.section_keys_provider,
-        )?;
+        let there_was_an_update = self
+            .network_knowledge
+            .update_knowledge_if_valid(
+                signed_sap.clone(),
+                &proof_chain,
+                None,
+                &our_name,
+                &self.section_keys_provider,
+            )
+            .await?;
 
         if there_was_an_update {
             self.write_prefix_map().await;
@@ -420,7 +426,7 @@ impl Node {
 
     // If entropy is found, determine the msg to send in order to
     // bring the sender's knowledge about us up to date.
-    pub(crate) fn check_for_entropy(
+    pub(crate) async fn check_for_entropy(
         &self,
         original_bytes: Bytes,
         dst_section_key: &BlsPublicKey,
@@ -440,6 +446,7 @@ impl Node {
             return match self
                 .network_knowledge
                 .get_closest_or_opposite_signed_sap(&dst_name)
+                .await
             {
                 Some((signed_sap, section_chain)) => {
                     info!("Found a better matching prefix {:?}", signed_sap.prefix());
@@ -609,12 +616,10 @@ mod tests {
                 let dst_name = our_prefix.substituted_in(xor_name::rand::random());
                 let dst_section_key = env.node.network_knowledge().section_key();
 
-                let cmd = env.node.check_for_entropy(
-                    msg.serialize()?,
-                    &dst_section_key,
-                    dst_name,
-                    &sender,
-                )?;
+                let cmd = env
+                    .node
+                    .check_for_entropy(msg.serialize()?, &dst_section_key, dst_name, &sender)
+                    .await?;
 
                 assert!(cmd.is_none());
                 Result::<()>::Ok(())
@@ -694,7 +699,7 @@ mod tests {
                     &dst_section_key,
                     dst_name,
                     &sender,
-                );
+                ).await;
 
             let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::System(msg), .. })) => {
                 msg
@@ -714,7 +719,7 @@ mod tests {
                         None,
                         &env.node.info().name(),
                         &env.node.section_keys_provider
-                    )?
+                    ).await?
             );
 
             // and it now shall give us an AE redirect msg
@@ -726,7 +731,7 @@ mod tests {
                     &dst_section_key,
                     dst_name,
                     &sender,
-                );
+                ).await;
 
             let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::System(msg), .. })) => {
                 msg
@@ -766,7 +771,7 @@ mod tests {
                     dst_section_key,
                     dst_name,
                     &sender,
-                )?;
+                ).await?;
 
             let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::System(msg), .. }) => {
                 msg
@@ -808,7 +813,7 @@ mod tests {
                     dst_section_key,
                     dst_name,
                     &sender,
-                )?;
+                ).await?;
 
             let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::System(msg), .. }) => {
                 msg
@@ -864,13 +869,16 @@ mod tests {
             node.section_keys_provider = SectionKeysProvider::new(Some(section_key_share));
 
             // get our Node to now be in prefix(0)
-            let _ = node.network_knowledge.update_knowledge_if_valid(
-                signed_sap.clone(),
-                &chain,
-                None,
-                &info.name(),
-                &node.section_keys_provider,
-            );
+            let _ = node
+                .network_knowledge
+                .update_knowledge_if_valid(
+                    signed_sap.clone(),
+                    &chain,
+                    None,
+                    &info.name(),
+                    &node.section_keys_provider,
+                )
+                .await;
 
             // generate other SAP for prefix1
             let (other_sap, _, secret_key_set) = random_sap(prefix1, elder_count());

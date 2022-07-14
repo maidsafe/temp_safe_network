@@ -155,7 +155,8 @@ impl Session {
                 // Let's now verify the section key in the msg authority is trusted
                 // based on our current knowledge of the network and sections chains.
                 let known_keys: Vec<BlsPublicKey> = session
-                    .all_sections_chains
+                    .network
+                    .section_dag
                     .read()
                     .await
                     .keys()
@@ -402,14 +403,17 @@ impl Session {
         sender: Peer,
     ) {
         // Update our network PrefixMap based upon passed in knowledge
-        match session.network.verify_with_chain_and_update(
-            SectionAuth {
-                value: sap.clone(),
-                sig: section_signed,
-            },
-            &proof_chain,
-            &*session.all_sections_chains.read().await,
-        ) {
+        match session
+            .network
+            .update(
+                SectionAuth {
+                    value: sap.clone(),
+                    sig: section_signed,
+                },
+                &proof_chain,
+            )
+            .await
+        {
             Ok(true) => {
                 debug!(
                     "Anti-Entropy: updated remote section SAP updated for {:?}",
@@ -431,7 +435,7 @@ impl Session {
             }
             Err(err) => {
                 warn!(
-                    "Anti-Entropy: failed to update remote section SAP w/ err: {:?}",
+                    "Anti-Entropy: failed to update remote section SAP and section DAG w/ err: {:?}",
                     err
                 );
                 warn!(
@@ -439,22 +443,7 @@ impl Session {
                     sap.section_key(),
                     sender
                 );
-                return;
             }
-        }
-
-        // Since the proof chain is valid (we've verified that in above step when
-        // updating our PrefixMap), let's now update our knowledge of all sections chains
-        match session.all_sections_chains.write().await.join(proof_chain.clone()) {
-            Ok(()) => debug!(
-                "Anti-Entropy: updated our knowledge of network sections chains with proof chain {:?}",
-                proof_chain
-            ),
-            Err(e) =>
-            error!(
-                "Error updating our knowledge of all sections chains: {:?}",
-                e
-            )
         }
     }
 

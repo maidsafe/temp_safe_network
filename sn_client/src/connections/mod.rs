@@ -21,7 +21,6 @@ use sn_interface::{
 
 use dashmap::DashMap;
 use qp2p::{Config as QuicP2pConfig, Endpoint};
-use secured_linked_list::SecuredLinkedList;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::sync::{mpsc::Sender, RwLock};
 
@@ -47,9 +46,7 @@ pub(super) struct Session {
     // Channels for sending CmdAck to upper layers
     pending_cmds: PendingCmdAcks,
     /// All elders we know about from AE messages
-    network: Arc<NetworkPrefixMap>,
-    /// A DAG containing all section chains of the whole network that we are aware of
-    pub(super) all_sections_chains: Arc<RwLock<SecuredLinkedList>>,
+    pub(super) network: NetworkPrefixMap,
     /// Initial network comms MsgId
     initial_connection_check_msg_id: Arc<RwLock<Option<MsgId>>>,
     /// Standard time to await potential AE messages:
@@ -75,11 +72,10 @@ impl Session {
             pending_queries: Arc::new(DashMap::default()),
             pending_cmds: Arc::new(DashMap::default()),
             endpoint,
-            network: Arc::new(prefix_map),
+            network: prefix_map,
             initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
             cmd_ack_wait,
             peer_links,
-            all_sections_chains: Arc::new(RwLock::new(SecuredLinkedList::new(genesis_key))),
         };
 
         Ok(session)

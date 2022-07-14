@@ -151,8 +151,6 @@ pub struct NetworkKnowledge {
     section_peers: SectionPeers,
     /// The network prefix map, i.e. a map from prefix to SAPs
     prefix_map: NetworkPrefixMap,
-    /// A DAG containing all section chains of the whole network that we are aware of
-    all_sections_chains: SecuredLinkedList,
 }
 
 impl NetworkKnowledge {
@@ -160,7 +158,7 @@ impl NetworkKnowledge {
     /// (`SAP`).
     ///
     /// Returns error if the `signed_sap` is not verifiable with the `chain`.
-    pub fn new(
+    pub async fn new(
         genesis_key: bls::PublicKey,
         chain: SecuredLinkedList,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
@@ -200,7 +198,7 @@ impl NetworkKnowledge {
         }
 
         // Make sure the section chain can be trusted, i.e. check that
-        // each key is signed by its parent/predecesor key.
+        // each key is signed by its parent/predecessor key.
         if !chain.self_verify() {
             return Err(Error::UntrustedProofChain(format!(
                 "invalid chain: {:?}",
@@ -223,7 +221,7 @@ impl NetworkKnowledge {
 
         // At this point we know the prefix map corresponds to the correct genesis key,
         // let's make sure the prefix map contains also our own prefix and SAP,
-        if let Err(err) = prefix_map.update(signed_sap.clone(), &chain) {
+        if let Err(err) = prefix_map.update(signed_sap.clone(), &chain).await {
             debug!("Failed to update NetworkPrefixMap with SAP {:?} and chain {:?} upon creating new NetworkKnowledge intance: {:?}", signed_sap, chain, err);
         }
 
@@ -233,7 +231,6 @@ impl NetworkKnowledge {
             signed_sap,
             section_peers: SectionPeers::default(),
             prefix_map,
-            all_sections_chains: chain,
         })
     }
 
@@ -251,7 +248,7 @@ impl NetworkKnowledge {
     }
 
     /// Creates `NetworkKnowledge` for the first node in the network
-    pub fn first_node(
+    pub async fn first_node(
         peer: Peer,
         genesis_sk_set: bls::SecretKeySet,
     ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
@@ -268,7 +265,8 @@ impl NetworkKnowledge {
             SecuredLinkedList::new(genesis_key),
             section_auth,
             None,
-        )?;
+        )
+        .await?;
 
         let sap = network_knowledge.signed_sap.clone();
 
@@ -293,12 +291,19 @@ impl NetworkKnowledge {
     /// If we already have the signed SAP and section chain for the provided key and prefix
     /// we make them the current SAP and section chain, and if so, this returns 'true'.
     /// Note this function assumes we already have the key share for the provided section key.
-    pub fn try_update_current_sap(&mut self, section_key: BlsPublicKey, prefix: &Prefix) -> bool {
+    pub async fn try_update_current_sap(
+        &mut self,
+        section_key: BlsPublicKey,
+        prefix: &Prefix,
+    ) -> bool {
         // Let's try to find the signed SAP corresponding to the provided prefix and section key
         match self.prefix_map.get_signed(prefix) {
             Some(signed_sap) if signed_sap.value.section_key() == section_key => {
                 let proof = self
-                    .all_sections_chains
+                    .prefix_map
+                    .section_dag
+                    .read()
+                    .await
                     .get_proof_chain(&self.genesis_key, &section_key);
                 // We have the signed SAP for the provided prefix and section key,
                 // we should be able to update our current SAP and section chain
@@ -332,8 +337,12 @@ impl NetworkKnowledge {
     }
 
     /// Verify the given public key corresponds to any (current/old) section known to us
-    pub fn verify_section_key_is_known(&self, section_key: &BlsPublicKey) -> bool {
-        self.all_sections_chains.has_key(section_key)
+    pub async fn verify_section_key_is_known(&self, section_key: &BlsPublicKey) -> bool {
+        self.prefix_map
+            .section_dag
+            .read()
+            .await
+            .has_key(section_key)
     }
 
     /// Given a `NodeMsg` can we trust it (including verifying contents of an AE message)
@@ -369,7 +378,7 @@ impl NetworkKnowledge {
     /// with the provided proof chain.
     /// If the '`update_sap`' flag is set to 'true', the provided SAP and chain will be
     /// set as our current.
-    pub fn update_knowledge_if_valid(
+    pub async fn update_knowledge_if_valid(
         &mut self,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
         proof_chain: &SecuredLinkedList,
@@ -381,21 +390,17 @@ impl NetworkKnowledge {
         let provided_sap = signed_sap.value.clone();
 
         // Update the network prefix map
-        match self.prefix_map.verify_with_chain_and_update(
-            signed_sap.clone(),
-            proof_chain,
-            &self.section_chain(),
-        ) {
+        match self
+            .prefix_map
+            .update(signed_sap.clone(), proof_chain)
+            .await
+        {
             Ok(true) => {
                 there_was_an_update = true;
                 debug!(
                     "Updated network prefix map with SAP for {:?}",
                     provided_sap.prefix()
                 );
-
-                // Join the proof chain to our DAG since it's a new SAP
-                // thus it shall extend some branch/chain.
-                self.all_sections_chains.join(proof_chain.clone())?;
 
                 // and if we are... do we have the key share needed to perform elder duties
                 let mut we_have_a_share_of_this_key = false;
@@ -453,7 +458,10 @@ impl NetworkKnowledge {
                     );
 
                     let section_chain = self
-                        .all_sections_chains
+                        .prefix_map
+                        .section_dag
+                        .read()
+                        .await
                         .get_proof_chain(&self.genesis_key, &provided_sap.section_key())?;
 
                     // Prune list of archived members
@@ -514,7 +522,7 @@ impl NetworkKnowledge {
 
     // Get SectionAuthorityProvider of a known section with the given prefix,
     // along with its section chain.
-    pub fn get_closest_or_opposite_signed_sap(
+    pub async fn get_closest_or_opposite_signed_sap(
         &self,
         name: &XorName,
     ) -> Option<(SectionAuth<SectionAuthorityProvider>, SecuredLinkedList)> {
@@ -524,7 +532,10 @@ impl NetworkKnowledge {
 
         if let Some(signed_sap) = closest_sap {
             if let Ok(proof_chain) = self
-                .all_sections_chains
+                .prefix_map
+                .section_dag
+                .read()
+                .await
                 .get_proof_chain(&self.genesis_key, &signed_sap.value.section_key())
             {
                 return Some((signed_sap, proof_chain));
