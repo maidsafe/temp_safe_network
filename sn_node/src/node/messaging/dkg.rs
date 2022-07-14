@@ -90,7 +90,7 @@ impl Node {
         self.send_messages_to_all_nodes_or_directly_handle_for_accumulation(recipients, wire_msg)
     }
 
-    pub(crate) async fn handle_dkg_start(&mut self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
+    pub(crate) fn handle_dkg_start(&mut self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
         let current_generation = self.network_knowledge.chain_len();
         if session_id.section_chain_len < current_generation {
             trace!("Skipping DkgStart for older generation: {:?}", &session_id);
@@ -122,18 +122,15 @@ impl Node {
         self.dkg_sessions.retain(|_, existing_session_info| {
             existing_session_info.session_id.section_chain_len >= session_id.section_chain_len
         });
-        let cmds = self
-            .dkg_voter
-            .start(
-                &self.info(),
-                session_id,
-                self.network_knowledge().section_key(),
-            )
-            .await?;
+        let cmds = self.dkg_voter.start(
+            &self.info(),
+            session_id,
+            self.network_knowledge().section_key(),
+        )?;
         Ok(cmds)
     }
 
-    pub(crate) async fn handle_dkg_msg(
+    pub(crate) fn handle_dkg_msg(
         &self,
         session_id: DkgSessionId,
         message: DkgMessage,
@@ -150,15 +147,13 @@ impl Node {
             return Err(Error::InvalidDkgPrefix);
         }
 
-        self.dkg_voter
-            .process_msg(
-                sender,
-                &self.info(),
-                &session_id,
-                message,
-                self.network_knowledge().section_key(),
-            )
-            .await
+        self.dkg_voter.process_msg(
+            sender,
+            &self.info(),
+            &session_id,
+            message,
+            self.network_knowledge().section_key(),
+        )
     }
 
     pub(crate) fn handle_dkg_not_ready(
@@ -190,7 +185,7 @@ impl Node {
         }])
     }
 
-    pub(crate) async fn handle_dkg_retry(
+    pub(crate) fn handle_dkg_retry(
         &self,
         session_id: &DkgSessionId,
         message_history: Vec<DkgMessage>,
@@ -206,22 +201,21 @@ impl Node {
             );
             return Ok(vec![]);
         }
-        let mut cmds = self
-            .dkg_voter
-            .handle_dkg_history(
-                &self.info(),
-                session_id,
-                message_history,
-                sender.name(),
-                section_key,
-            )
-            .await?;
+        let mut cmds = self.dkg_voter.handle_dkg_history(
+            &self.info(),
+            session_id,
+            message_history,
+            sender.name(),
+            section_key,
+        )?;
 
-        cmds.extend(
-            self.dkg_voter
-                .process_msg(sender, &self.info(), session_id, message, section_key)
-                .await?,
-        );
+        cmds.extend(self.dkg_voter.process_msg(
+            sender,
+            &self.info(),
+            session_id,
+            message,
+            section_key,
+        )?);
         Ok(cmds)
     }
 

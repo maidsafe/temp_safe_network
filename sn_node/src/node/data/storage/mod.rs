@@ -107,7 +107,7 @@ impl DataStorage {
     ) -> NodeQueryResponse {
         match query {
             DataQueryVariant::GetChunk(addr) => self.chunks.get(addr).await,
-            DataQueryVariant::Register(read) => self.registers.read(read, requester).await,
+            DataQueryVariant::Register(read) => self.registers.read(read, requester),
             DataQueryVariant::Spentbook(read) => {
                 // TODO: this is temporary till spentbook native data type is implemented,
                 // we read from the Register where we store the spentbook data
@@ -123,7 +123,6 @@ impl DataStorage {
                 match self
                     .registers
                     .read(&RegisterQuery::Get(reg_addr), requester)
-                    .await
                 {
                     NodeQueryResponse::GetRegister((Err(Error::DataNotFound(_)), _)) => {
                         NodeQueryResponse::SpentProofShares((Ok(Vec::new()), spentbook_op_id))
@@ -187,10 +186,10 @@ impl DataStorage {
     pub(crate) async fn remove(&mut self, address: &ReplicatedDataAddress) -> Result<()> {
         match address {
             ReplicatedDataAddress::Chunk(addr) => self.chunks.remove_chunk(addr).await,
-            ReplicatedDataAddress::Register(addr) => self.registers.remove_register(addr).await,
+            ReplicatedDataAddress::Register(addr) => self.registers.remove_register(addr),
             ReplicatedDataAddress::Spentbook(addr) => {
                 let reg_addr = RegisterAddress::new(*addr.name(), SPENTBOOK_TYPE_TAG);
-                self.registers.remove_register(&reg_addr).await
+                self.registers.remove_register(&reg_addr)
             }
         }
     }

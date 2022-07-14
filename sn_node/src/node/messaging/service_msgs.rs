@@ -256,7 +256,7 @@ impl Node {
         };
 
         // build the replication cmds
-        let mut cmds = self.replicate_data(data).await?;
+        let mut cmds = self.replicate_data(data)?;
         // make sure the expected replication factor is achieved
         if data_copy_count() > cmds.len() {
             error!("InsufficientAdults for storing data reliably");
