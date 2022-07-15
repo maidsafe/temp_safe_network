@@ -14,10 +14,9 @@ use crate::messaging::{
     ServiceAuth,
 };
 use bls::PublicKey as BlsPublicKey;
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use custom_debug::Debug;
 use serde::Serialize;
-use std::io::Write;
 use xor_name::XorName;
 
 /// In order to send a message over the wire, it needs to be serialized
@@ -96,24 +95,16 @@ impl WireMsg {
     pub fn serialize(&self) -> Result<Bytes> {
         // First we create a buffer with the capacity
         // needed to serialize the wire msg
-        // FIXME: don't multiplying the max size by a factor of 10 and calculate the correct size.
-        let max_length = 10 * (WireMsgHeader::max_size() as usize + self.payload.len());
-        let mut buffer = vec![0u8; max_length];
+        let max_length = WireMsgHeader::max_size() as usize + self.payload.len();
+        let buffer = BytesMut::with_capacity(max_length);
 
-        let (mut buf_at_payload, bytes_written) = self.header.write(&mut buffer)?;
+        let (mut buffer, _bytes_written) = self.header.write(buffer)?;
 
         // ...and finally we write the bytes of the serialized payload to the original buffer
-        buf_at_payload.write_all(&self.payload).map_err(|err| {
-            Error::Serialisation(format!(
-                "message payload (size {}) couldn't be serialized: {}",
-                self.payload.len(),
-                err
-            ))
-        })?;
+        buffer.extend_from_slice(&self.payload);
 
         // We can now return the buffer containing the written bytes
-        buffer.truncate(bytes_written as usize + self.payload.len());
-        Ok(Bytes::from(buffer))
+        Ok(buffer.freeze())
     }
 
     /// Deserialize the payload from this `WireMsg` returning a `MsgType` instance.
