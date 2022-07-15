@@ -261,7 +261,6 @@ jobs:
       - name: Download genesis DBC
         shell: bash
         run: |
-          mkdir -p ~/.safe/genesis_dbc
           curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-genesis-dbc \
             > ~/.safe/genesis_dbc
 
