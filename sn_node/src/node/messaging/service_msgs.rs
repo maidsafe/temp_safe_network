@@ -9,6 +9,7 @@
 use crate::node::{node_api::cmds::Cmd, Error, Node, Result};
 use bytes::Bytes;
 use ed25519_dalek::Signer;
+use itertools::Itertools;
 use rand::thread_rng;
 use sn_dbc::{
     Commitment, Hash, IndexedSignatureShare, KeyImage, RingCtTransaction, SpentProof,
@@ -208,14 +209,10 @@ impl Node {
         let dst = DstLocation::EndUser(EndUser(xor_name::XorName::random(&mut rng)));
         let wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst)?;
 
-        for peer in waiting_peers.iter() {
-            debug!("Responding with the first query response to {:?}", dst);
-
-            cmds.push(Cmd::SendMsg {
-                recipients: vec![*peer],
-                wire_msg: wire_msg.clone(),
-            });
-        }
+        cmds.push(Cmd::SendMsg {
+            recipients: waiting_peers.into_iter().collect_vec(),
+            wire_msg,
+        });
 
         Ok(cmds)
     }
