@@ -246,7 +246,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p ~/.safe/prefix_maps
-          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-prefix-map > ~/.safe/prefix_maps/default
+          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-prefix-map \
+            > ~/.safe/prefix_maps/default
 
       - uses: Swatinem/rust-cache@v1
         continue-on-error: true
@@ -256,6 +257,17 @@ jobs:
 
       - name: Build all sn_api tests
         run: cargo test --no-run -p sn_api --release --lib
+
+      - name: Download genesis DBC
+        shell: bash
+        run: |
+          mkdir -p ~/.safe/genesis_dbc
+          curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-genesis-dbc \
+            > ~/.safe/genesis_dbc
+
+      - name: Set TEST_ENV_GENESIS_DBC_PATH env
+        shell: bash
+        run: echo "TEST_ENV_GENESIS_DBC_PATH=~/.safe/genesis_dbc" >> $GITHUB_ENV
 
       - name: Run API tests
         uses: jacderida/cargo-nextest@main
