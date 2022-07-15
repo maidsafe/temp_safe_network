@@ -292,36 +292,22 @@ impl Session {
     pub(crate) async fn make_contact_with_nodes(
         &self,
         nodes: Vec<Peer>,
+        section_pk: bls::PublicKey,
         dst_address: XorName,
         auth: ServiceAuth,
         payload: Bytes,
     ) -> Result<(), Error> {
         let endpoint = self.endpoint.clone();
-        // Get DataSection elders details.
-        // TODO: we should be able to handle using an pre-existing prefixmap. This is here for when that's in place.
-        let (elders_or_adults, section_pk) =
-            if let Some(sap) = self.network.closest_or_opposite(&dst_address, None) {
-                let mut nodes: Vec<_> = sap.elders_vec();
-
-                nodes.shuffle(&mut OsRng);
-
-                (nodes, sap.section_key())
-            } else {
-                // Send message to our bootstrap peer with network's genesis PK.
-                (nodes, self.genesis_key)
-            };
-
         let msg_id = MsgId::new();
 
         debug!(
             "Making initial contact with nodes. Our PublicAddr: {:?}. Using {:?} to {} nodes: {:?}",
             endpoint.public_addr(),
             msg_id,
-            elders_or_adults.len(),
-            elders_or_adults
+            nodes.len(),
+            nodes
         );
 
-        // TODO: Don't use genesis key if we have a full section
         let dst_location = DstLocation::Section {
             name: dst_address,
             section_pk,
@@ -329,14 +315,7 @@ impl Session {
         let auth_kind = AuthKind::Service(auth);
         let wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst_location)?;
 
-        // When the client bootstrap using the nodes read from the config, the list is sorted
-        // by socket addresses. To improve the efficiency, the `elders_or_adults` shall be sorted
-        // by `age`, so that `elders` can be contacted first.
-        // Unfortunately, the bootstrap nodes were created using random names as the stored
-        // prefix_map file doesn't contains the `name` info associated with the socket address,
-        // which invalidates the sorting on age.
-
-        let initial_contacts = elders_or_adults
+        let initial_contacts = nodes
             .clone()
             .into_iter()
             .take(NODES_TO_CONTACT_PER_STARTUP_BATCH)
@@ -385,7 +364,7 @@ impl Session {
                 outgoing_msg_rounds += 1;
 
                 // if we'd run over known contacts, then we just go to the end
-                if start_pos > elders_or_adults.len() {
+                if start_pos > nodes.len() {
                     start_pos = last_start_pos;
                 }
 
@@ -394,16 +373,15 @@ impl Session {
                 let next_batch_end = start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH;
 
                 // if we'd run over known contacts, then we just go to the end
-                let next_contacts = if next_batch_end > elders_or_adults.len() {
+                let next_contacts = if next_batch_end > nodes.len() {
                     // but incase we _still_ dont know anything after this
-                    let next = elders_or_adults[start_pos..].to_vec();
+                    let next = nodes[start_pos..].to_vec();
                     // mark as tried all
                     tried_every_contact = true;
 
                     next
                 } else {
-                    elders_or_adults[start_pos..start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH]
-                        .to_vec()
+                    nodes[start_pos..start_pos + NODES_TO_CONTACT_PER_STARTUP_BATCH].to_vec()
                 };
 
                 trace!("Sending out another batch of initial contact msgs to new nodes");

@@ -167,11 +167,11 @@ impl Client {
         let (random_dst_addr, auth, serialised_cmd) = generate_probe_msg(&client, client_pk)?;
 
         // get bootstrap nodes
-        let bootstrap_nodes = {
+        let (bootstrap_nodes, section_pk) = {
             let sap = prefix_map
-                .closest_or_opposite(&xor_name::rand::random(), None)
+                .closest_or_opposite(&random_dst_addr, None)
                 .ok_or(Error::NoNetworkKnowledge)?;
-            sap.elders_vec()
+            (sap.elders_vec(), sap.section_key())
         };
         debug!(
             "Make contact with the bootstrap nodes: {:?}",
@@ -183,6 +183,7 @@ impl Client {
             .session
             .make_contact_with_nodes(
                 bootstrap_nodes.clone(),
+                section_pk,
                 random_dst_addr,
                 auth.clone(),
                 serialised_cmd,
@@ -210,6 +211,7 @@ impl Client {
                 .session
                 .make_contact_with_nodes(
                     bootstrap_nodes.clone(),
+                    section_pk,
                     random_dst_addr,
                     auth,
                     serialised_cmd,
