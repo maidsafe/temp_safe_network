@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1657820700013,
+  "lastUpdate": 1657909487834,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -9233,6 +9233,72 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 5400111,
             "range": "± 262697",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "chriso83@protonmail.com",
+            "name": "Chris O'Neil",
+            "username": "jacderida"
+          },
+          "committer": {
+            "email": "chris.oneil@gmail.com",
+            "name": "Chris O'Neil",
+            "username": "jacderida"
+          },
+          "distinct": true,
+          "id": "4521dafc707448b8887194bde4a923a1c23f790e",
+          "message": "fix: copy genesis dbc to correct location",
+          "timestamp": "2022-07-15T18:46:47+01:00",
+          "tree_id": "f0a00fd1589f6d9551218b9d9a3dd30660913b69",
+          "url": "https://github.com/maidsafe/safe_network/commit/4521dafc707448b8887194bde4a923a1c23f790e"
+        },
+        "date": 1657909486996,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 529459869,
+            "range": "± 7508491",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 556806848,
+            "range": "± 11999551",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 1208338817,
+            "range": "± 127107713",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 396169804,
+            "range": "± 31007061",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 394903126,
+            "range": "± 22162977",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 1090732460,
+            "range": "± 30462785",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 5287922,
+            "range": "± 90093",
             "unit": "ns/iter"
           }
         ]
