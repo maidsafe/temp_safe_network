@@ -23,7 +23,7 @@ jobs:
         id: toolchain
         with:
           profile: minimal
-          toolchain: nightly
+          toolchain: stable
           override: true
 
       - uses: Swatinem/rust-cache@v1
