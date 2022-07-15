@@ -53,8 +53,6 @@ pub(super) struct Session {
     network: Arc<NetworkPrefixMap>,
     /// A DAG containing all section chains of the whole network that we are aware of
     all_sections_chains: Arc<RwLock<SecuredLinkedList>>,
-    /// Network's genesis key
-    genesis_key: bls::PublicKey,
     /// Initial network comms MsgId
     initial_connection_check_msg_id: Arc<RwLock<Option<MsgId>>>,
     /// Standard time to await potential AE messages:
@@ -83,7 +81,6 @@ impl Session {
             pending_cmds: Arc::new(DashMap::default()),
             endpoint,
             network: Arc::new(prefix_map),
-            genesis_key,
             initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
             cmd_ack_wait,
             peer_links,
