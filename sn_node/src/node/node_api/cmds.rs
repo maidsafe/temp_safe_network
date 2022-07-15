@@ -166,6 +166,10 @@ impl Cmd {
     pub(crate) fn priority(&self) -> i32 {
         use Cmd::*;
         match self {
+            // whatever the msg, if we've gotten to a SendMsg command, it should be sent out ASAP. This should prevent
+            // msgs hanging around and clogging up the mem if there is a lot of high prio cmds to deal with.
+            // We can flush the msgs, and then treat the pending Cmds by their normal prioriry.
+            SendMsg { .. } => 20,
             HandleAgreement { .. } => 10,
             HandleNewEldersAgreement { .. } => 10,
             HandleDkgOutcome { .. } => 10,
@@ -184,7 +188,6 @@ impl Cmd {
 
             // See [`MsgType`] for the priority constants and the range of possible values.
             HandleMsg { wire_msg, .. } => wire_msg.priority(),
-            SendMsg { wire_msg, .. } => wire_msg.priority(),
             SignOutgoingSystemMsg { msg, .. } => msg.priority(),
             SendMsgDeliveryGroup { wire_msg, .. } => wire_msg.priority(),
 
