@@ -15,6 +15,7 @@ use crate::node::{
     MAX_WAITING_PEERS_PER_QUERY,
 };
 
+use itertools::Itertools;
 use sn_dysfunction::IssueType;
 use sn_interface::{
     data_copy_count,
@@ -25,10 +26,7 @@ use sn_interface::{
     },
     types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData},
 };
-
-use dashmap::DashSet;
-use itertools::Itertools;
-use std::{cmp::Ordering, collections::BTreeSet, sync::Arc};
+use std::{cmp::Ordering, collections::BTreeSet};
 use tracing::info;
 use xor_name::XorName;
 
@@ -88,16 +86,16 @@ impl Node {
         }
 
         let mut op_was_already_underway = false;
-        let waiting_peers = if let Some(peers) = self.pending_data_queries.get(&operation_id).await
-        {
-            op_was_already_underway = peers.insert(origin);
+        let waiting_peers =
+            if let Some(mut peers) = self.pending_data_queries.get(&operation_id).await {
+                op_was_already_underway = peers.insert(origin);
 
-            peers
-        } else {
-            let peers = DashSet::new();
-            let _false_as_fresh = peers.insert(origin);
-            Arc::new(peers)
-        };
+                peers
+            } else {
+                let mut peers = BTreeSet::new();
+                let _false_as_fresh = peers.insert(origin);
+                peers
+            };
 
         // drop if we exceed
         if waiting_peers.len() > MAX_WAITING_PEERS_PER_QUERY {

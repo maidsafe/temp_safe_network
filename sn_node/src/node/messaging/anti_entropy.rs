@@ -585,7 +585,7 @@ impl Node {
         &self,
         sender: Peer,
         src_location: &SrcLocation,
-        original_wire_msg: &WireMsg,
+        original_wire_msg: &Bytes,
     ) -> Result<Cmd> {
         let signed_sap = self.network_knowledge.section_signed_authority_provider();
 
@@ -593,7 +593,7 @@ impl Node {
             section_auth: signed_sap.value.to_msg(),
             section_signed: signed_sap.sig,
             section_chain: self.network_knowledge.section_chain(),
-            bounced_msg: original_wire_msg.serialize()?,
+            bounced_msg: original_wire_msg.clone(),
         };
 
         let wire_msg = WireMsg::single_src(

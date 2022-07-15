@@ -98,7 +98,6 @@ mod core {
     };
 
     use backoff::ExponentialBackoff;
-    use dashmap::DashSet;
     use ed25519_dalek::Keypair;
     use itertools::Itertools;
     use resource_proof::ResourceProof;
@@ -176,7 +175,7 @@ mod core {
         // Trackers
         pub(crate) capacity: Capacity,
         pub(crate) dysfunction_tracking: DysfunctionDetection,
-        pub(crate) pending_data_queries: Cache<OperationId, Arc<DashSet<Peer>>>,
+        pub(crate) pending_data_queries: Cache<OperationId, BTreeSet<Peer>>,
         // Caches
         pub(crate) ae_backoff_cache: AeBackoffCache,
     }
