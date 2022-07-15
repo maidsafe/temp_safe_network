@@ -198,6 +198,7 @@ impl Cmd {
             ProposeOffline(_) => 9,
             HandleNewNodeOnline(_) => 9,
             EnqueueDataForReplication { .. } => 9,
+            CleanupPeerLinks => 9,
 
             ScheduleDkgTimeout { .. } => 8,
             StartConnectivityTest(_) => 8,
@@ -214,7 +215,6 @@ impl Cmd {
 
             ValidateMsg { .. } => -9, // before it's validated, we cannot give it high prio, as it would be a spam vector
 
-            CleanupPeerLinks => -10,
         }
     }
 }
