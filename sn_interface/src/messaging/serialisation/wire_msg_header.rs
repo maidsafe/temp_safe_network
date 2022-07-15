@@ -11,10 +11,10 @@ use bincode::{
     config::{BigEndian, FixintEncoding, WithOtherEndian, WithOtherIntEncoding},
     Options,
 };
-use bytes::Bytes;
+use bytes::{BufMut, Bytes, BytesMut};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::{io::Write, mem::size_of};
+use std::mem::size_of;
 
 // Current version of the messaging protocol.
 // At this point this implementation supports only this version.
@@ -133,7 +133,8 @@ impl WireMsgHeader {
         Ok((header, payload_bytes))
     }
 
-    pub fn write<'a>(&self, mut buffer: &'a mut [u8]) -> Result<(&'a mut [u8], u16)> {
+    /// Write header metadata and msg envelope info into a provided buffer
+    pub fn write(&self, buffer: BytesMut) -> Result<(BytesMut, u16)> {
         // first serialise the msg envelope so we can figure out the total header size
         let msg_envelope_vec = rmp_serde::to_vec_named(&self.msg_envelope).map_err(|err| {
             Error::Serialisation(format!(
@@ -148,9 +149,10 @@ impl WireMsgHeader {
             version: self.version,
         };
 
+        let mut buffer_writer = buffer.writer();
         // Write the leading metadata
         BINCODE_OPTIONS
-            .serialize_into(&mut buffer, &meta)
+            .serialize_into(&mut buffer_writer, &meta)
             .map_err(|err| {
                 Error::Serialisation(format!(
                     "header metadata couldn't be serialized into the header: {}",
@@ -158,13 +160,9 @@ impl WireMsgHeader {
                 ))
             })?;
 
+        let mut buffer = buffer_writer.into_inner();
         // ...now write the message envelope
-        buffer.write_all(&msg_envelope_vec).map_err(|err| {
-            Error::Serialisation(format!(
-                "message envelope couldn't be serialized into the header: {}",
-                err
-            ))
-        })?;
+        buffer.extend_from_slice(&msg_envelope_vec);
 
         Ok((buffer, meta.header_len))
     }
