@@ -158,7 +158,8 @@ pub(crate) enum Cmd {
     /// Performs serialisation and signing for sending of NodeMsg.
     /// This cmd only send this to other nodes
     SignOutgoingSystemMsg { msg: SystemMsg, dst: DstLocation },
-    /// Send a message to `delivery_group_size` peers out of the given `recipients`.
+    /// Send a message to `delivery_group_size` peers out of the given `recipients`,
+    /// Keeps trying to send until `delivery_group_size` have been reached
     SendMsgDeliveryGroup {
         recipients: Vec<Peer>,
         delivery_group_size: usize,

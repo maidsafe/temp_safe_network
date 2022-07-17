@@ -73,7 +73,7 @@ impl Dispatcher {
                 let wire_msg = WireMsg::single_src(&node.info(), dst, msg, src_section_pk)?;
 
                 let mut cmds = vec![];
-                cmds.extend(node.send_msg_to_nodes(wire_msg)?);
+                cmds.extend(node.send_msg_on_to_nodes(wire_msg)?);
 
                 Ok(cmds)
             }
@@ -171,7 +171,10 @@ impl Dispatcher {
             Cmd::SendMsg {
                 recipients,
                 wire_msg,
-            } => self.send_msg(&recipients, recipients.len(), wire_msg).await,
+            } => {
+                self.send_msg_via_comms(&recipients, recipients.len(), wire_msg)
+                    .await
+            }
             Cmd::EnqueueDataForReplication {
                 // throttle_duration,
                 recipient,
@@ -200,7 +203,7 @@ impl Dispatcher {
                 delivery_group_size,
                 wire_msg,
             } => {
-                self.send_msg(&recipients, delivery_group_size, wire_msg)
+                self.send_msg_via_comms(&recipients, delivery_group_size, wire_msg)
                     .await
             }
             Cmd::ScheduleDkgTimeout { duration, token } => Ok(self
@@ -244,7 +247,7 @@ impl Dispatcher {
         }
     }
 
-    async fn send_msg(
+    async fn send_msg_via_comms(
         &self,
         recipients: &[Peer],
         delivery_group_size: usize,
