@@ -198,7 +198,7 @@ impl RegisterStorage {
     pub(crate) async fn write(&mut self, cmd: RegisterCmd) -> Result<()> {
         info!("Writing register cmd: {:?}", cmd);
 
-        // rough estimate ignoring the extra space used by sled
+        // rough estimate of the RegisterCmd
         let required_space = std::mem::size_of::<RegisterCmd>();
         if !self.file_db.can_add(required_space) {
             return Err(Error::NotEnoughSpace);

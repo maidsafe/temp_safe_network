@@ -49,28 +49,29 @@ fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
 
     let size_ranges = [100, 500, 1_000];
 
-    // TODO: re-enable when Sled has been removed
+    for size in size_ranges.iter() {
+        group.bench_with_input(
+            BenchmarkId::new("register_writes", size),
+            size,
+            |b, &size| {
+                let storage = get_new_data_store()
+                    .context("Could not create a temp data store")
+                    .unwrap();
 
-    // for size in size_ranges.iter() {
-    //     group.bench_with_input(
-    //         BenchmarkId::new("register_writes", size),
-    //         size,
-    //         |b, &size| {
-    //             let storage = get_new_data_store()
-    //                 .context("Could not create a temp data store")
-    //                 .unwrap();
+                println!("finished {size} writes");
 
-    //             println!("finished {size} writes");
-
-    //             b.to_async(&runtime).iter(|| async {
-    //                 for _ in 0..size {
-    //                     let random_data = create_random_register_replicated_data();
-    //                     let _ = storage.clone().store(&random_data, pk, keypair.clone()).await;
-    //                 }
-    //             })
-    //         },
-    //     );
-    // }
+                b.to_async(&runtime).iter(|| async {
+                    for _ in 0..size {
+                        let random_data = create_random_register_replicated_data();
+                        let _ = storage
+                            .clone()
+                            .store(&random_data, pk, keypair.clone())
+                            .await;
+                    }
+                })
+            },
+        );
+    }
 
     for size in size_ranges.iter() {
         group.bench_with_input(BenchmarkId::new("chunk writes", size), size, |b, &size| {
@@ -108,45 +109,43 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
 
     let size_ranges = [100, 500, 1_000];
 
-    // TODO: re-enable when Sled has been removed
+    for size in size_ranges.iter() {
+        group.bench_with_input(BenchmarkId::new("register_keys", size), size, |b, &size| {
+            let storage = get_new_data_store()
+                .context("Could not create a temp data store")
+                .unwrap();
 
-    // for size in size_ranges.iter() {
-    //     group.bench_with_input(BenchmarkId::new("register_keys", size), size, |b, &size| {
-    //         let storage = get_new_data_store()
-    //             .context("Could not create a temp data store")
-    //             .unwrap();
+            println!("starting writes");
+            for _ in 0..size {
+                let random_data = create_random_register_replicated_data();
 
-    //         println!("starting writes");
-    //         for _ in 0..size {
-    //             let random_data = create_random_register_replicated_data();
+                if runtime
+                    .block_on(storage.clone().store(&random_data, pk, keypair.clone()))
+                    .context("could not store register")
+                    .is_err()
+                {
+                    panic!("Error storing register");
+                }
+            }
 
-    //             if runtime
-    //                 .block_on(storage.clone().store(&random_data, pk, keypair.clone()))
-    //                 .context("could not store register")
-    //                 .is_err()
-    //             {
-    //                 panic!("Error storing register");
-    //             }
-    //         }
+            println!("finished {size} writes");
 
-    //         println!("finished {size} writes");
+            b.to_async(&runtime).iter(|| async {
+                match storage.keys() {
+                    Ok(_) => {
+                        let random_filename: String = thread_rng()
+                            .sample_iter(&Alphanumeric)
+                            .take(7)
+                            .map(char::from)
+                            .collect();
 
-    //         b.to_async(&runtime).iter(|| async {
-    //             match storage.keys() {
-    //                 Ok(_) => {
-    //                     let random_filename: String = thread_rng()
-    //                         .sample_iter(&Alphanumeric)
-    //                         .take(7)
-    //                         .map(char::from)
-    //                         .collect();
-
-    //                     println!("progress? reading reg {:?}", random_filename)
-    //                 }
-    //                 Err(error) => println!("Reading store register keys failed with {:?}", error),
-    //             }
-    //         })
-    //     });
-    // }
+                        println!("progress? reading reg {:?}", random_filename)
+                    }
+                    Err(error) => println!("Reading store register keys failed with {:?}", error),
+                }
+            })
+        });
+    }
 
     for size in size_ranges.iter() {
         group.bench_with_input(BenchmarkId::new("chunk keys", size), size, |b, &size| {
