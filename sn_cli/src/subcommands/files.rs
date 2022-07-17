@@ -76,12 +76,7 @@ impl FileTreeNode {
 
     // find's a (mutable) child node matching `name`
     fn find_child(&mut self, name: &str) -> Option<&mut FileTreeNode> {
-        for c in self.sub.iter_mut() {
-            if c.name == name {
-                return Some(c);
-            }
-        }
-        None
+        self.sub.iter_mut().find(|c| c.name == name)
     }
 
     // adds a child node

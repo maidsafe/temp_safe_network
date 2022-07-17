@@ -9,11 +9,13 @@
 use super::{Error, Result};
 use serde::{Deserialize, Serialize};
 
+#[allow(dead_code)]
 /// Wrapper for raw `bincode::serialise`.
 pub(crate) fn serialise<T: Serialize>(data: &T) -> Result<Vec<u8>> {
     bincode::serialize(data).map_err(|err| Error::Serialize(err.as_ref().to_string()))
 }
 
+#[allow(dead_code)]
 /// Wrapper for `bincode::deserialize`.
 pub(crate) fn deserialise<'a, T>(bytes: &'a [u8]) -> Result<T>
 where

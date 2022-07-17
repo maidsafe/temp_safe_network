@@ -23,6 +23,8 @@ use std::{
 };
 use tracing::info;
 
+const CHUNKS_DB_NAME: &str = "chunks";
+
 /// Operations on data chunks.
 #[derive(Clone, Debug)]
 pub(crate) struct ChunkStorage {
@@ -32,7 +34,7 @@ pub(crate) struct ChunkStorage {
 impl ChunkStorage {
     pub(crate) fn new(path: &Path, used_space: UsedSpace) -> Result<Self> {
         Ok(Self {
-            db: FileStore::new(path, used_space)?,
+            db: FileStore::new(path.join(CHUNKS_DB_NAME), used_space)?,
         })
     }
 

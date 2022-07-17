@@ -7,9 +7,10 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Error, Result};
+use std::collections::btree_map::BTreeMap;
 
 use crate::UsedSpace;
-use sn_interface::types::{Chunk, DataAddress};
+use sn_interface::types::{Chunk, DataAddress, RegisterAddress, RegisterCmd};
 
 use bytes::Bytes;
 use sn_interface::messaging::data::DataCmd;
@@ -68,7 +69,11 @@ impl FileStore {
     }
 
     fn address_to_filepath(&self, addr: &DataAddress) -> Result<PathBuf> {
-        let xorname = *addr.name();
+        let xorname = if let DataAddress::Register(reg_addr) = addr {
+            reg_addr.id()?
+        } else {
+            *addr.name()
+        };
         let filename = addr.encode_to_zbase32()?;
         let mut path = self.prefix_tree_path(xorname, self.bit_tree_depth);
         path.push(filename);
@@ -99,7 +104,7 @@ impl FileStore {
 
         let mut file = tokio::fs::File::create(filepath).await?;
 
-        // TODO: Support Registers too
+        // Only chunk go through here
         if let DataCmd::StoreChunk(chunk) = data {
             file.write_all(chunk.value()).await?;
 
@@ -162,6 +167,55 @@ impl FileStore {
     pub(crate) fn list_files_with_prefix(&self, prefix: Prefix) -> Result<Vec<String>> {
         let prefix_path = self.prefix_tree_path(prefix.name(), prefix.bit_count());
         list_files_in(prefix_path.as_path())
+    }
+
+    /// Opens the log of RegisterCmds for a given register address. Creates a new log if no data is found
+    pub(crate) async fn open_log(
+        &self,
+        addr: &RegisterAddress,
+    ) -> Result<(BTreeMap<String, RegisterCmd>, PathBuf)> {
+        let path = self.address_to_filepath(&DataAddress::Register(*addr))?;
+
+        let map = if self.data_file_exists(&DataAddress::Register(*addr))? {
+            trace!("Register log exists {:?}", path);
+            let serialized_data = tokio::fs::read(&path)
+                .await
+                .map_err(|e| Error::Serialize(e.to_string()))?;
+            let map: BTreeMap<String, RegisterCmd> =
+                sn_interface::types::utils::deserialise(&serialized_data)?;
+            map
+        } else {
+            trace!(
+                "Register log does not exists, creating a new one {:?}",
+                path
+            );
+            BTreeMap::new()
+        };
+
+        Ok((map, path))
+    }
+
+    pub(crate) async fn write_to_log(
+        &self,
+        log: BTreeMap<String, RegisterCmd>,
+        path: &PathBuf,
+    ) -> Result<()> {
+        let serialized_data = sn_interface::types::utils::serialise(&log)?;
+
+        trace!("Writing to register log at {:?}", path);
+
+        if let Some(dirs) = path.parent() {
+            tokio::fs::create_dir_all(dirs).await?;
+        }
+
+        let mut file = tokio::fs::File::create(path).await?;
+
+        file.write_all(&serialized_data).await?;
+
+        self.used_space.increase(std::mem::size_of::<RegisterCmd>());
+
+        trace!("Log writing successful");
+        Ok(())
     }
 }
 

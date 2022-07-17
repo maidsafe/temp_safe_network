@@ -62,23 +62,30 @@ impl DataStorage {
         match data.clone() {
             ReplicatedData::Chunk(chunk) => self.chunks.store(DataCmd::StoreChunk(chunk)).await?,
             ReplicatedData::RegisterLog(data) => {
-                self.registers.update(RegisterStoreExport(vec![data]))?
+                info!("Updating register: {:?}", data.address);
+                self.registers
+                    .update(RegisterStoreExport(vec![data]))
+                    .await?
             }
-            ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd)?,
+            ReplicatedData::RegisterWrite(cmd) => self.registers.write(cmd).await?,
             ReplicatedData::SpentbookWrite(cmd) => {
                 // FIMXE: this is temporay logic to create a spentbook to make sure it exists.
                 // Spentbooks shall always exist, and the section nodes shall create them by default.
-                self.registers.create_spentbook_register(
-                    &cmd.dst_address(),
-                    pk_for_spent_book,
-                    keypair_for_spent_book,
-                )?;
+                self.registers
+                    .create_spentbook_register(
+                        &cmd.dst_address(),
+                        pk_for_spent_book,
+                        keypair_for_spent_book,
+                    )
+                    .await?;
 
                 // We now write the cmd received
-                self.registers.write(cmd)?
+                self.registers.write(cmd).await?
             }
             ReplicatedData::SpentbookLog(data) => {
-                self.registers.update(RegisterStoreExport(vec![data]))?
+                self.registers
+                    .update(RegisterStoreExport(vec![data]))
+                    .await?
             }
         };
 
@@ -108,7 +115,7 @@ impl DataStorage {
     ) -> NodeQueryResponse {
         match query {
             DataQueryVariant::GetChunk(addr) => self.chunks.get(addr).await,
-            DataQueryVariant::Register(read) => self.registers.read(read, requester),
+            DataQueryVariant::Register(read) => self.registers.read(read, requester).await,
             DataQueryVariant::Spentbook(read) => {
                 // TODO: this is temporary till spentbook native data type is implemented,
                 // we read from the Register where we store the spentbook data
@@ -124,6 +131,7 @@ impl DataStorage {
                 match self
                     .registers
                     .read(&RegisterQuery::Get(reg_addr), requester)
+                    .await
                 {
                     NodeQueryResponse::GetRegister((Err(Error::DataNotFound(_)), _)) => {
                         NodeQueryResponse::SpentProofShares((Ok(Vec::new()), spentbook_op_id))
@@ -173,11 +181,13 @@ impl DataStorage {
             ReplicatedDataAddress::Register(addr) => self
                 .registers
                 .get_register_replica(addr)
+                .await
                 .map(ReplicatedData::RegisterLog),
             ReplicatedDataAddress::Spentbook(addr) => {
                 let reg_addr = RegisterAddress::new(*addr.name(), SPENTBOOK_TYPE_TAG);
                 self.registers
                     .get_register_replica(&reg_addr)
+                    .await
                     .map(ReplicatedData::SpentbookLog)
             }
         }
@@ -187,24 +197,30 @@ impl DataStorage {
     pub(crate) async fn remove(&mut self, address: &ReplicatedDataAddress) -> Result<()> {
         match address {
             ReplicatedDataAddress::Chunk(addr) => self.chunks.remove_chunk(addr).await,
-            ReplicatedDataAddress::Register(addr) => self.registers.remove_register(addr),
+            ReplicatedDataAddress::Register(addr) => self.registers.remove_register(addr).await,
             ReplicatedDataAddress::Spentbook(addr) => {
                 let reg_addr = RegisterAddress::new(*addr.name(), SPENTBOOK_TYPE_TAG);
-                self.registers.remove_register(&reg_addr)
+                self.registers.remove_register(&reg_addr).await
             }
         }
     }
 
     /// Retrieve all keys/ReplicatedDataAddresses of stored data
     pub fn keys(&self) -> Result<Vec<ReplicatedDataAddress>> {
-        let all_keys = self.chunks.keys()?;
+        let mut all_addrs = vec![];
 
-        let mut res = vec![];
-        for addr in all_keys {
-            res.push(addr.to_replicated_data_address()?)
+        // TODO: Parallelize this below loops
+        let chunk_keys = self.chunks.keys()?;
+        for addr in chunk_keys {
+            all_addrs.push(addr.to_replicated_data_address()?)
         }
 
-        Ok(res)
+        let reg_keys = self.registers.keys()?;
+        for addr in reg_keys {
+            all_addrs.push(addr.to_replicated_data_address()?)
+        }
+
+        Ok(all_addrs)
     }
 }
 
