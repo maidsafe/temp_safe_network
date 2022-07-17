@@ -111,7 +111,7 @@ impl Node {
             for target in &targets {
                 trace!("adding pending req for {target:?} in dysfunction tracking");
                 self.dysfunction_tracking.track_issue(
-                    *target,
+                    target.name(),
                     IssueType::PendingRequestOperation(Some(operation_id)),
                 )?;
             }
@@ -193,16 +193,15 @@ impl Node {
 
     /// Construct list of adults that hold target data, including full nodes.
     /// List is sorted by distance from `target`.
-    fn get_adults_holding_data_including_full(&self, target: &XorName) -> BTreeSet<XorName> {
+    fn get_adults_holding_data_including_full(&self, target: &XorName) -> BTreeSet<Peer> {
         let full_adults = self.full_adults();
         let adults = self.network_knowledge().adults();
 
-        let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
-
-        let mut candidates = adults_names
+        let mut candidates = adults
+            .clone()
             .into_iter()
-            .sorted_by(|lhs, rhs| target.cmp_distance(lhs, rhs))
-            .filter(|peer| !full_adults.contains(peer))
+            .sorted_by(|lhs, rhs| target.cmp_distance(&lhs.name(), &rhs.name()))
+            .filter(|peer| !full_adults.contains(&peer.name()))
             .take(data_copy_count())
             .collect::<BTreeSet<_>>();
 
@@ -215,12 +214,13 @@ impl Node {
 
         // Full adults that are close to the chunk, shall still be considered as candidates
         // to allow chunks stored to non-full adults can be queried when nodes become full.
-        let close_full_adults = if let Some(closest_empty) = candidates.iter().next() {
+        let candidates_clone = candidates.clone();
+        let close_full_adults = if let Some(closest_empty) = candidates_clone.iter().next() {
             full_adults
                 .iter()
                 .filter_map(|name| {
-                    if target.cmp_distance(name, closest_empty) == Ordering::Less {
-                        Some(*name)
+                    if target.cmp_distance(name, &closest_empty.name()) == Ordering::Less {
+                        Some(closest_empty)
                     } else {
                         None
                     }
@@ -228,7 +228,14 @@ impl Node {
                 .collect::<BTreeSet<_>>()
         } else {
             // In case there is no empty candidates, query all full_adults
-            full_adults
+            // full_adults
+
+            adults
+                .iter()
+                // .sorted_by(|lhs, rhs| target.cmp_distance(&lhs.name(), &rhs.name()))
+                .filter(|peer| !full_adults.contains(&peer.name()))
+                // .take(data_copy_count())
+                .collect::<BTreeSet<_>>()
         };
 
         candidates.extend(close_full_adults);
@@ -236,19 +243,17 @@ impl Node {
     }
 
     /// Used to fetch the list of holders for given name of data. Excludes full nodes
-    fn get_adults_who_should_store_data(&self, target: XorName) -> BTreeSet<XorName> {
+    fn get_adults_who_should_store_data(&self, target: XorName) -> BTreeSet<Peer> {
         let full_adults = self.full_adults();
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
         let adults = self.network_knowledge().adults();
 
         trace!("Total adults known about: {:?}", adults.len());
 
-        let adults_names = adults.iter().map(|p2p_node| p2p_node.name());
-
-        let candidates = adults_names
+        let candidates = adults
             .into_iter()
-            .sorted_by(|lhs, rhs| target.cmp_distance(lhs, rhs))
-            .filter(|peer| !full_adults.contains(peer))
+            .sorted_by(|lhs, rhs| target.cmp_distance(&lhs.name(), &rhs.name()))
+            .filter(|peer| !full_adults.contains(&peer.name()))
             .take(data_copy_count())
             .collect::<BTreeSet<_>>();
 
@@ -265,11 +270,7 @@ impl Node {
     // Takes a message for specified targets, and builds internal send cmds
     // for sending to each of the targets.
     // Targets are XorName specified so must be within the section
-    fn send_node_msg_to_nodes(
-        &self,
-        msg: SystemMsg,
-        targets: BTreeSet<XorName>,
-    ) -> Result<Vec<Cmd>> {
+    fn send_node_msg_to_nodes(&self, msg: SystemMsg, targets: BTreeSet<Peer>) -> Result<Vec<Cmd>> {
         // we create a dummy/random dst location,
         // we will set it correctly for each msg and target
         let section_pk = self.network_knowledge().section_key();
@@ -285,13 +286,16 @@ impl Node {
         let mut cmds = vec![];
 
         for target in targets {
-            debug!("Sending {:?} to {:?}", wire_msg, target);
+            debug!("Queueing Send of {:?} to {:?}", wire_msg, target);
             let mut wire_msg = wire_msg.clone();
-            let dst_section_pk = self.section_key_by_name(&target);
+            let dst_section_pk = self.section_key_by_name(&target.name());
             wire_msg.set_dst_section_pk(dst_section_pk);
-            wire_msg.set_dst_xorname(target);
+            wire_msg.set_dst_xorname(target.name());
 
-            cmds.extend(self.send_msg_to_nodes(wire_msg)?);
+            cmds.push(Cmd::SendMsg {
+                recipients: vec![target],
+                wire_msg,
+            });
         }
 
         Ok(cmds)

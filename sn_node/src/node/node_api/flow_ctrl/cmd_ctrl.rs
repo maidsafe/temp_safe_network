@@ -14,10 +14,10 @@ use crate::node::{
     },
     CmdProcessEvent, Error, Event, RateLimits, Result,
 };
-use sn_interface::types::Peer;
 use custom_debug::Debug;
 use priority_queue::PriorityQueue;
 use sn_interface::messaging::WireMsg;
+use sn_interface::types::Peer;
 use std::time::SystemTime;
 use std::{
     sync::{
@@ -143,7 +143,9 @@ impl CmdCtrl {
                 debug!("recips len: {:?}", new_cmd_recipients.len());
 
                 let mut all_recipients = new_cmd_recipients.clone();
-                let (msg_match, exact_same_existing_cmd_id) = self.check_if_matching_send_msg_exists(new_cmd_recipients, new_cmd_msg).await;
+                let (msg_match, exact_same_existing_cmd_id) = self
+                    .check_if_matching_send_msg_exists(new_cmd_recipients, new_cmd_msg)
+                    .await;
                 if msg_match {
                     debug!("!!!!!!!!!!!!!!!!!!!!!job existssss");
                     // dropping msg and exiting out early as we have the same exact cmd already waiting to be parsed
@@ -159,9 +161,9 @@ impl CmdCtrl {
                     for (enqueued_job, _prio) in q.iter_mut() {
                         let queued_cmd = enqueued_job.job.cmd();
                         if let Cmd::SendMsg {
-                                wire_msg,
-                                recipients
-                            } = queued_cmd
+                            wire_msg,
+                            recipients,
+                        } = queued_cmd
                         {
                             // if we've the same msg and different recipients, we should merge
                             if wire_msg == new_cmd_msg {
@@ -199,12 +201,18 @@ impl CmdCtrl {
             Cmd::SendMsgDeliveryGroup {
                 recipients: new_cmd_recipients,
                 wire_msg: new_cmd_msg,
-                delivery_group_size: new_cmd_delivery_group_size
+                delivery_group_size: new_cmd_delivery_group_size,
             } => {
                 debug!("group recips len: {:?}", new_cmd_recipients.len());
 
                 let mut all_recipients = new_cmd_recipients.clone();
-                let (msg_match, exact_same_existing_cmd_id) = self.check_if_matching_send_group_msg_exists(new_cmd_recipients, new_cmd_msg, *new_cmd_delivery_group_size).await;
+                let (msg_match, exact_same_existing_cmd_id) = self
+                    .check_if_matching_send_group_msg_exists(
+                        new_cmd_recipients,
+                        new_cmd_msg,
+                        *new_cmd_delivery_group_size,
+                    )
+                    .await;
                 if msg_match {
                     debug!("!!!!!!!!!!!!!!!!!!!!!job existssss");
                     // dropping msg and exiting out early as we have the same exact cmd already waiting to be parsed
@@ -220,9 +228,9 @@ impl CmdCtrl {
                     for (enqueued_job, _prio) in q.iter_mut() {
                         let queued_cmd = enqueued_job.job.cmd();
                         if let Cmd::SendMsg {
-                                wire_msg,
-                                recipients
-                            } = queued_cmd
+                            wire_msg,
+                            recipients,
+                        } = queued_cmd
                         {
                             // if we've the same msg and different recipients, we should merge
                             if wire_msg == new_cmd_msg {
@@ -246,7 +254,7 @@ impl CmdCtrl {
                                 let new_cmd = Cmd::SendMsgDeliveryGroup {
                                     recipients: all_recipients,
                                     wire_msg: wire_msg.clone(),
-                                    delivery_group_size: *new_cmd_delivery_group_size
+                                    delivery_group_size: *new_cmd_delivery_group_size,
                                 };
                                 enqueued_job.job.update_cmd(new_cmd);
                                 debug!("cmd updated");
@@ -259,8 +267,6 @@ impl CmdCtrl {
                 None
             }
 
-
-
             _ => None,
         }
     }
@@ -270,12 +276,20 @@ impl CmdCtrl {
     /// duplicate Cmd.
     ///
     /// Ie, returns (msg matches, recipients are the same)
-    async fn check_if_matching_send_msg_exists(&self, cmd_recipients: &Vec<Peer>, cmd_wire_msg: &WireMsg) -> (bool, Option<usize>) {
+    async fn check_if_matching_send_msg_exists(
+        &self,
+        cmd_recipients: &Vec<Peer>,
+        cmd_wire_msg: &WireMsg,
+    ) -> (bool, Option<usize>) {
         let q = self.cmd_queue.read().await;
 
         for (enqueued_job, _prio) in q.iter() {
             let queued_cmd = enqueued_job.job.cmd();
-            if let Cmd::SendMsg { recipients, wire_msg } = queued_cmd {
+            if let Cmd::SendMsg {
+                recipients,
+                wire_msg,
+            } = queued_cmd
+            {
                 // if we have the same wire msg, it's a match
                 let msg_match = wire_msg == cmd_wire_msg;
                 let existing_cmd_id = enqueued_job.job.id();
@@ -283,49 +297,50 @@ impl CmdCtrl {
                 if msg_match {
                     if recipients == cmd_recipients {
                         // we know the Cmd and it matches completely so we drop it
-                        return( msg_match, Some(existing_cmd_id))
+                        return (msg_match, Some(existing_cmd_id));
+                    } else {
+                        return (msg_match, None);
                     }
-                    else {
-
-                        return( msg_match, None)
-                    }
-
                 }
-
             }
         }
 
         (false, None)
     }
 
-
     /// checks for a matching SendMsgDeliveryGroup, returns (true,..) if one exists and (.., Some(CmdId)) if recipients match too
     /// That way we can exit early with never taking a write lock on the cmd struct, and log that we've dropped this
     /// duplicate Cmd.
     ///
     /// Ie, returns (msg matches, recipients are the same)
-    async fn check_if_matching_send_group_msg_exists(&self, cmd_recipients: &Vec<Peer>, cmd_wire_msg: &WireMsg, group_size: usize) -> (bool, Option<usize>) {
+    async fn check_if_matching_send_group_msg_exists(
+        &self,
+        cmd_recipients: &Vec<Peer>,
+        cmd_wire_msg: &WireMsg,
+        group_size: usize,
+    ) -> (bool, Option<usize>) {
         let q = self.cmd_queue.read().await;
 
         for (enqueued_job, _prio) in q.iter() {
             let queued_cmd = enqueued_job.job.cmd();
-            if let Cmd::SendMsgDeliveryGroup { recipients, delivery_group_size, wire_msg } = queued_cmd {
+            if let Cmd::SendMsgDeliveryGroup {
+                recipients,
+                delivery_group_size,
+                wire_msg,
+            } = queued_cmd
+            {
                 // if we have the same wire msg, it's a match
                 let msg_match = wire_msg == cmd_wire_msg;
                 let existing_cmd_id = enqueued_job.job.id();
 
-                if msg_match && &group_size == delivery_group_size{
+                if msg_match && &group_size == delivery_group_size {
                     if recipients == cmd_recipients {
                         // we know the Cmd and it matches completely so we drop it
-                        return( msg_match, Some(existing_cmd_id))
+                        return (msg_match, Some(existing_cmd_id));
+                    } else {
+                        return (msg_match, None);
                     }
-                    else {
-
-                        return( msg_match, None)
-                    }
-
                 }
-
             }
         }
 

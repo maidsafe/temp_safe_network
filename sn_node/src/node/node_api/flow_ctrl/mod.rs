@@ -99,7 +99,7 @@ impl FlowCtrl {
             }
         } else {
             /// Cmd was merged into an existing Cmd, so no watcher returned
-            return Ok(());
+            Ok(())
         }
     }
 

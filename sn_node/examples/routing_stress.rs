@@ -455,7 +455,7 @@ impl Network {
 
         let wire_msg = node.sign_single_src_msg(node_msg, dst_location).await?;
 
-        match node.send_msg_to_nodes(wire_msg).await {
+        match node.send_msg_to_nodesxxx(wire_msg).await {
             Ok(()) => Ok(true),
             Err(error) => {
                 Err(error).context(format!("failed to send probe by {}", node.name().await))
