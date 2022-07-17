@@ -62,38 +62,3 @@ impl RegOpStore {
         Ok(())
     }
 }
-
-// #[cfg(test)]
-// mod test {
-//     use super::EventStore;
-//     use crate::node::{Error, Result};
-//     use sn_interface::types::Token;
-//
-//     use std::path::Path;
-//     use tempfile::tempdir;
-//     use xor_name::XorName;
-//
-//     #[tokio::test]
-//     async fn history() -> Result<()> {
-//         let id: XorName = xor_name::rand::random();
-//         let tmp_dir = tempdir()?;
-//         let db_dir = tmp_dir.path().join(Path::new(&"Token"));
-//         let db = sled::open(db_dir).map_err(|error| {
-//             trace!("Sled Error: {:?}", error);
-//             Error::Sled(error)
-//         })?;
-//         let store = EventStore::new(&id, db)?;
-//
-//         store.append(Token::from_nano(10))?;
-//
-//         let events = store.get_all()?;
-//         assert_eq!(events.len(), 1);
-//
-//         match events.get(0) {
-//             Some(token) => assert_eq!(token.as_nano(), 10),
-//             None => unreachable!(),
-//         }
-//
-//         Ok(())
-//     }
-// }

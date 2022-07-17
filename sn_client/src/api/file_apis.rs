@@ -569,7 +569,7 @@ mod tests {
         // 4 adults * reqs from 3 elders storing the chunk
         the_logs.assert_count(LogMarker::StoringChunk, 12)?;
 
-        // Here we can see that each write thinks it's new, so there's 12... but we let Sled handle this later.
+        // Here we can see that each write thinks it's new, so there's 12... but we let our data storage module handle this later.
         // 4 adults storing the chunk * 3 messages, so we'll still see this due to the rapid/ concurrent nature here...
         the_logs.assert_count(LogMarker::StoredNewChunk, 12)?;
 

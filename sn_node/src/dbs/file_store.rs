@@ -14,7 +14,9 @@ use sn_interface::types::{Chunk, DataAddress, RegisterAddress, RegisterCmd};
 
 use bytes::Bytes;
 use sn_interface::messaging::data::DataCmd;
+use sn_interface::types::utils::{deserialise, serialise};
 use std::path::{Path, PathBuf};
+use tokio::fs::{create_dir_all, metadata, read, remove_file, File};
 use tokio::io::AsyncWriteExt;
 use walkdir::WalkDir;
 use xor_name::{Prefix, XorName};
@@ -99,10 +101,10 @@ impl FileStore {
         let addr = data.address();
         let filepath = self.address_to_filepath(&addr)?;
         if let Some(dirs) = filepath.parent() {
-            tokio::fs::create_dir_all(dirs).await?;
+            create_dir_all(dirs).await?;
         }
 
-        let mut file = tokio::fs::File::create(filepath).await?;
+        let mut file = File::create(filepath).await?;
 
         // Only chunk go through here
         if let DataCmd::StoreChunk(chunk) = data {
@@ -117,15 +119,15 @@ impl FileStore {
     #[allow(dead_code)]
     pub(crate) async fn delete_data(&self, addr: &DataAddress) -> Result<()> {
         let filepath = self.address_to_filepath(addr)?;
-        let meta = tokio::fs::metadata(filepath.clone()).await?;
-        tokio::fs::remove_file(filepath).await?;
+        let meta = metadata(filepath.clone()).await?;
+        remove_file(filepath).await?;
         self.used_space.decrease(meta.len() as usize);
         Ok(())
     }
 
     pub(crate) async fn read_data(&self, addr: &DataAddress) -> Result<Chunk> {
         let file_path = self.address_to_filepath(addr)?;
-        let bytes = Bytes::from(tokio::fs::read(file_path).await?);
+        let bytes = Bytes::from(read(file_path).await?);
         let chunk = Chunk::new(bytes);
         Ok(chunk)
     }
@@ -178,11 +180,10 @@ impl FileStore {
 
         let map = if self.data_file_exists(&DataAddress::Register(*addr))? {
             trace!("Register log exists {:?}", path);
-            let serialized_data = tokio::fs::read(&path)
+            let serialized_data = read(&path)
                 .await
                 .map_err(|e| Error::Serialize(e.to_string()))?;
-            let map: BTreeMap<String, RegisterCmd> =
-                sn_interface::types::utils::deserialise(&serialized_data)?;
+            let map: BTreeMap<String, RegisterCmd> = deserialise(&serialized_data)?;
             map
         } else {
             trace!(
@@ -200,15 +201,15 @@ impl FileStore {
         log: BTreeMap<String, RegisterCmd>,
         path: &PathBuf,
     ) -> Result<()> {
-        let serialized_data = sn_interface::types::utils::serialise(&log)?;
+        let serialized_data = serialise(&log)?;
 
         trace!("Writing to register log at {:?}", path);
 
         if let Some(dirs) = path.parent() {
-            tokio::fs::create_dir_all(dirs).await?;
+            create_dir_all(dirs).await?;
         }
 
-        let mut file = tokio::fs::File::create(path).await?;
+        let mut file = File::create(path).await?;
 
         file.write_all(&serialized_data).await?;
 
