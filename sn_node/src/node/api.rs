@@ -130,7 +130,7 @@ impl Node {
     }
 
     // Send message to peers on the network.
-    pub(crate) fn send_msg_to_nodes(&self, mut wire_msg: WireMsg) -> Result<Option<Cmd>> {
+    pub(crate) fn send_msg_on_to_nodes(&self, mut wire_msg: WireMsg) -> Result<Option<Cmd>> {
         let dst_location = wire_msg.dst_location();
         let (targets, dg_size) = delivery_group::delivery_targets(
             dst_location,
