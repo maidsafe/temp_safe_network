@@ -86,12 +86,6 @@ pub enum Error {
     ///Operation Id could not be generated
     #[error("Operation Id could not be generated")]
     NoOperationId,
-    /// Sled error.
-    #[error("Sled error:: {0}")]
-    Sled(#[from] sled::Error),
-    /// There were Error(s) while batching for Sled operations.
-    #[error("Errors found when batching for Sled")]
-    SledBatching,
     /// Invalid filename
     #[error("Invalid chunk filename")]
     InvalidFilename,

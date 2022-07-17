@@ -39,7 +39,7 @@ use xor_name::XorName;
 /// List of peers of a section
 pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
 
-#[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant)]
 /// Message sent over the among nodes
 pub enum SystemMsg {

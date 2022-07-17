@@ -155,9 +155,6 @@ pub enum Error {
     /// Invalid node authority for a query response.
     #[error("Invalid node authority received for a QueryResponse message")]
     InvalidQueryResponseAuthority,
-    /// Sled error.
-    #[error("Sled error:: {0}")]
-    Sled(#[from] sled::Error),
     /// DysfunctionDetection error.
     #[error("DysfunctionDetection error:: {0}")]
     DysfunctionDetection(#[from] sn_dysfunction::Error),

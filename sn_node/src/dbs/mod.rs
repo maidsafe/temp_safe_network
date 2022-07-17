@@ -12,14 +12,11 @@ mod event_store;
 mod file_store;
 mod used_space;
 
-pub(crate) use encoding::{deserialise, serialise};
 pub(crate) use errors::{convert_to_error_msg, Error, Result};
-pub(crate) use event_store::EventStore;
+pub(crate) use event_store::RegOpStore;
 pub(crate) use file_store::FileStore;
 use std::path::Path;
 pub use used_space::UsedSpace;
-
-pub(crate) const SLED_FLUSH_TIME_MS: Option<u64> = Some(5000);
 
 pub(crate) trait Subdir {
     fn subdir() -> &'static Path;
