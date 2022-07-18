@@ -9,7 +9,6 @@
 use crate::node::{
     node_api::cmds::Cmd, relocation::ChurnId, Event, MembershipEvent, Node, Proposal, Result,
 };
-use sn_consensus::Generation;
 use sn_interface::{
     messaging::system::{JoinResponse, KeyedSig, MembershipState, SectionAuth, SystemMsg},
     network_knowledge::{
@@ -57,10 +56,7 @@ impl Node {
         debug!("{:?} {:?}", LogMarker::ProposalAgreed, proposal);
         match proposal {
             Proposal::Offline(node_state) => self.handle_offline_agreement(node_state, sig),
-            Proposal::SectionInfo { sap, generation } => {
-                self.handle_section_info_agreement(sap, sig, generation)
-                    .await
-            }
+            Proposal::SectionInfo(sap) => self.handle_section_info_agreement(sap, sig).await,
             Proposal::NewElders(_) => {
                 error!("Elders agreement should be handled in a separate blocking fashion");
                 Ok(vec![])
@@ -183,7 +179,6 @@ impl Node {
         &mut self,
         section_auth: SectionAuthorityProvider,
         sig: KeyedSig,
-        generation: Generation,
     ) -> Result<Vec<Cmd>> {
         // check if section matches our prefix
         let equal_prefix = section_auth.prefix() == self.network_knowledge.prefix();
@@ -240,7 +235,6 @@ impl Node {
                 &self.network_knowledge.prefix(),
                 signed_section_auth.clone(),
                 sig.clone(),
-                generation,
             )
             .await;
 

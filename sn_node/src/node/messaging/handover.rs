@@ -139,16 +139,8 @@ impl Node {
 
     /// Verifies the SAP signature and checks that the signature's public key matches the
     /// signature of the SAP, because SAP candidates are signed by the candidate section key
-    fn check_sap_sig(
-        &self,
-        sap: &SectionAuth<SectionAuthorityProvider>,
-        gen: Generation,
-    ) -> Result<()> {
-        let sap_bytes = Proposal::SectionInfo {
-            sap: sap.value.clone(),
-            generation: gen,
-        }
-        .as_signable_bytes()?;
+    fn check_sap_sig(&self, sap: &SectionAuth<SectionAuthorityProvider>) -> Result<()> {
+        let sap_bytes = Proposal::SectionInfo(sap.value.clone()).as_signable_bytes()?;
         if !sap.sig.verify(&sap_bytes) {
             return Err(Error::InvalidSignature);
         }
@@ -273,16 +265,16 @@ impl Node {
     /// Checks if the elder candidates in the SAP match the oldest elders in the corresponding
     /// membership generation this SAP was proposed at
     /// Also checks the SAP signature
-    fn check_sap_candidate(&self, sap_candidate: &SapCandidate, gen: Generation) -> Result<()> {
+    fn check_sap_candidate(&self, sap_candidate: &SapCandidate) -> Result<()> {
         self.check_sap_candidate_prefix(sap_candidate)?;
         match sap_candidate {
             SapCandidate::ElderHandover(authed_sap) => {
-                self.check_sap_sig(authed_sap, gen)?;
+                self.check_sap_sig(authed_sap)?;
                 self.check_elder_handover_candidates(&authed_sap.value)
             }
             SapCandidate::SectionSplit(authed_sap1, authed_sap2) => {
-                self.check_sap_sig(authed_sap1, gen)?;
-                self.check_sap_sig(authed_sap2, gen)?;
+                self.check_sap_sig(authed_sap1)?;
+                self.check_sap_sig(authed_sap2)?;
                 self.check_section_split_candidates(&authed_sap1.value, &authed_sap2.value)
             }
         }
@@ -290,10 +282,8 @@ impl Node {
 
     fn check_signed_vote_saps(&self, signed_vote: &SignedVote<SapCandidate>) -> Result<()> {
         let sap_candidates = signed_vote.proposals();
-        let gen = signed_vote.vote.gen;
-
         for sap_can in sap_candidates {
-            let _ = self.check_sap_candidate(&sap_can, gen);
+            let _ = self.check_sap_candidate(&sap_can);
         }
         Ok(())
     }

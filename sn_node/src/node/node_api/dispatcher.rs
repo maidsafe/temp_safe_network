@@ -158,12 +158,10 @@ impl Dispatcher {
             Cmd::HandleDkgOutcome {
                 section_auth,
                 outcome,
-                generation,
             } => {
                 let mut node = self.node.write().await;
 
-                node.handle_dkg_outcome(section_auth, outcome, generation)
-                    .await
+                node.handle_dkg_outcome(section_auth, outcome).await
             }
             Cmd::HandleDkgFailure(signeds) => {
                 let mut node = self.node.write().await;

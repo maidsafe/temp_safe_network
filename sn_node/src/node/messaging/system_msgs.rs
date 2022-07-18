@@ -421,10 +421,7 @@ impl Node {
                     ProposalMsg::Offline(node_state) => {
                         CoreProposal::Offline(node_state.into_state())
                     }
-                    ProposalMsg::SectionInfo { sap, generation } => CoreProposal::SectionInfo {
-                        sap: sap.into_state(),
-                        generation,
-                    },
+                    ProposalMsg::SectionInfo(sap) => CoreProposal::SectionInfo(sap.into_state()),
                     ProposalMsg::NewElders(sap) => CoreProposal::NewElders(sap.into_authed_state()),
                     ProposalMsg::JoinsAllowed(allowed) => CoreProposal::JoinsAllowed(allowed),
                 };

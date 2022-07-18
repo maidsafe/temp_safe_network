@@ -8,7 +8,6 @@
 
 use crate::node::{Proposal, XorName};
 
-use sn_consensus::Generation;
 use sn_interface::{
     messaging::{
         data::ServiceMsg,
@@ -139,7 +138,6 @@ pub(crate) enum Cmd {
     HandleDkgOutcome {
         section_auth: SectionAuthorityProvider,
         outcome: SectionKeyShare,
-        generation: Generation,
     },
     /// Handle a DKG failure that was observed by a majority of the DKG participants.
     HandleDkgFailure(DkgFailureSigSet),
