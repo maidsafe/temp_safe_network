@@ -9,6 +9,8 @@
 use crate::node::{node_api::cmds::Cmd, Error, Node, Result};
 use bytes::Bytes;
 use ed25519_dalek::Signer;
+use itertools::Itertools;
+use rand::thread_rng;
 use sn_dbc::{
     Commitment, Hash, IndexedSignatureShare, KeyImage, RingCtTransaction, SpentProof,
     SpentProofContent, SpentProofShare,
@@ -155,6 +157,11 @@ impl Node {
             return Ok(cmds);
         };
 
+        if waiting_peers.is_empty() {
+            // nothing to do
+            return Ok(cmds);
+        }
+
         let query_response = response.convert();
 
         let pending_removed = self
@@ -196,17 +203,16 @@ impl Node {
         };
         let (auth_kind, payload) = self.ed_sign_client_msg(&msg)?;
 
-        for peer in waiting_peers.iter() {
-            let dst = DstLocation::EndUser(EndUser(peer.name()));
-            let wire_msg = WireMsg::new_msg(msg_id, payload.clone(), auth_kind.clone(), dst)?;
+        // set a random xorname first. We set it specifically per peer thereafter
+        // This is overwritten in comm.send_to_client
+        let mut rng = thread_rng();
+        let dst = DstLocation::EndUser(EndUser(xor_name::XorName::random(&mut rng)));
+        let wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst)?;
 
-            debug!("Responding with the first query response to {:?}", dst);
-
-            cmds.push(Cmd::SendMsg {
-                recipients: vec![*peer],
-                wire_msg,
-            });
-        }
+        cmds.push(Cmd::SendMsg {
+            recipients: waiting_peers.into_iter().collect_vec(),
+            wire_msg,
+        });
 
         Ok(cmds)
     }

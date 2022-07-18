@@ -134,10 +134,11 @@ impl Node {
 
                 if self.is_not_elder() {
                     trace!("Redirecting from adult to section elders");
+
                     return Ok(vec![self.ae_redirect_to_our_elders(
                         origin,
                         &src_location,
-                        &wire_msg,
+                        &original_bytes,
                     )?]);
                 }
 
