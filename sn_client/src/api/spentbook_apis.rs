@@ -16,6 +16,7 @@ use sn_interface::{
     types::SpentbookAddress,
 };
 
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
 impl Client {
@@ -29,14 +30,14 @@ impl Client {
         &self,
         key_image: KeyImage,
         tx: RingCtTransaction,
-        spent_proofs: Vec<SpentProof>,
-        spent_transactions: Vec<RingCtTransaction>,
+        spent_proofs: BTreeSet<SpentProof>,
+        spent_transactions: BTreeSet<RingCtTransaction>,
     ) -> Result<(), Error> {
         let cmd = SpentbookCmd::Spend {
             key_image,
             tx,
-            spent_proofs,
-            spent_transactions,
+            spent_proofs: spent_proofs.into_iter().collect::<Vec<_>>(),
+            spent_transactions: spent_transactions.into_iter().collect::<Vec<_>>(),
         };
         self.send_cmd(DataCmd::Spentbook(cmd)).await
     }
