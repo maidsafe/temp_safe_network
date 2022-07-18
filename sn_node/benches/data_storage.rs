@@ -47,7 +47,7 @@ fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
     let runtime = Runtime::new().unwrap();
     pub const NONSENSE_CHUNK_SIZE: usize = 1024; // data size should not be important for keys() tests
 
-    let size_ranges = [100, 500, 1_000];
+    let size_ranges = [100, 1_000, 4_000];
 
     for size in size_ranges.iter() {
         group.bench_with_input(
@@ -107,7 +107,7 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
     let runtime = Runtime::new().unwrap();
     pub const NONSENSE_CHUNK_SIZE: usize = 1024; // data size should not be important for keys() tests
 
-    let size_ranges = [100, 500, 1_000];
+    let size_ranges = [100, 1_000, 4_000];
 
     for size in size_ranges.iter() {
         group.bench_with_input(BenchmarkId::new("register_keys", size), size, |b, &size| {
