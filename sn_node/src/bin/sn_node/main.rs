@@ -46,8 +46,6 @@ mod log;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
-    #[cfg(feature = "tokio-console")]
-    console_subscriber::init();
 
     // first, let's grab the config. We do this outwith of the node, so we can init logging
     // with the config, and so it can persists across node restarts
@@ -58,7 +56,7 @@ fn main() -> Result<()> {
 
     trace!("Initial node config: {config:?}");
 
-    let _guard = log::init_node_logging(config).map_err(Error::from)?;
+    let _guard = log::init_node_logging(&config).map_err(Error::from)?;
 
     loop {
         create_runtime_and_node()?;
@@ -109,7 +107,6 @@ fn create_runtime_and_node() -> Result<()> {
     debug!("Node runtime should be shutdown now");
     Ok(())
 }
-
 
 async fn run_node(config: Config) -> Result<()> {
     if let Some(c) = &config.completions() {

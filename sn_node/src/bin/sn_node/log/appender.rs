@@ -3,8 +3,13 @@ use file_rotate::{
     suffix::{AppendTimestamp, FileLimit},
     ContentLimit, FileRotate,
 };
-use tracing_appender::non_blocking::{WorkerGuard, NonBlocking};
-use std::{fmt::Debug, io, io::Write, path::{Path, PathBuf}};
+use std::{
+    fmt::Debug,
+    io,
+    io::Write,
+    path::{Path, PathBuf},
+};
+use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
 
 pub fn file_rotater(
     dir: &PathBuf,
