@@ -57,21 +57,6 @@ pub struct FileRotateAppender {
 }
 
 impl FileRotateAppender {
-    /// Create default `FileRotateAppender`
-    pub fn new(directory: impl AsRef<Path>, file_name_prefix: impl AsRef<Path>) -> Self {
-        let log_directory = directory.as_ref().to_str().unwrap();
-        let log_filename_prefix = file_name_prefix.as_ref().to_str().unwrap();
-        let path = Path::new(&log_directory).join(&log_filename_prefix);
-        let writer = FileRotate::new(
-            &Path::new(&path),
-            AppendTimestamp::default(FileLimit::MaxFiles(9)),
-            ContentLimit::Bytes(10 * 1024 * 1024),
-            Compression::OnRotate(1),
-        );
-
-        Self { writer }
-    }
-
     /// Create `FileRotateAppender` using parameters
     pub fn make_rotate_appender(
         directory: impl AsRef<Path>,

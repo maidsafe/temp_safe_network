@@ -32,7 +32,6 @@ use sn_node::node::{Config, Error as NodeError, Event, MembershipEvent, NodeApi}
 use clap::{CommandFactory, Parser};
 use clap_complete::{generate, Shell};
 use color_eyre::{Section, SectionExt};
-#[cfg(not(feature = "tokio-console"))]
 use eyre::Error;
 use eyre::{eyre, Context, ErrReport, Result};
 use self_update::{cargo_crate_version, Status};
@@ -59,7 +58,6 @@ fn main() -> Result<()> {
 
     trace!("Initial node config: {config:?}");
 
-    #[cfg(not(feature = "tokio-console"))]
     let _guard = log::init_node_logging(config).map_err(Error::from)?;
 
     loop {

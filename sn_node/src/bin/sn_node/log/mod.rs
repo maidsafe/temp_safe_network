@@ -4,27 +4,21 @@ use sn_interface::LogFormatter;
 use sn_node::node::Config;
 
 use eyre::{Context, Result};
-
 use tracing::Level;
-#[cfg(not(feature = "tokio-console"))]
 use tracing_appender::non_blocking::WorkerGuard;
-
-#[cfg(not(feature = "tokio-console"))]
 use tracing_subscriber::filter::EnvFilter;
+use tracing_subscriber::prelude::*;
 
-#[cfg(not(feature = "tokio-console"))]
 const MODULE_NAME: &str = "sn_node";
 
 /// Inits node logging, returning the global node guard if required.
 /// This guard should be held for the life of the program.
 ///
 /// Logging should be instantiated only once.
-#[cfg(not(feature = "tokio-console"))]
 pub fn init_node_logging(config: Config) -> Result<Option<WorkerGuard>> {
-    let env_filter = env_filter(config.verbose())?;
-    let mut guard: Option<WorkerGuard> = None;
+    let mut layers = vec![env_filter(config.verbose())?.boxed()];
 
-    guard = if let Some(log_dir) = config.log_dir() {
+    let guard: Option<WorkerGuard> = if let Some(log_dir) = config.log_dir() {
         println!("Starting logging to directory: {:?}", log_dir);
 
         let (non_blocking, guard) = appender::file_rotater(
@@ -35,33 +29,34 @@ pub fn init_node_logging(config: Config) -> Result<Option<WorkerGuard>> {
             config.logs_uncompressed,
         );
 
-        let builder = tracing_subscriber::fmt()
-            // eg : RUST_LOG=my_crate=info,my_crate::my_mod=debug,[my_span]=trace
-            .with_env_filter(env_filter)
+        let fmt_layer = tracing_subscriber::fmt::layer()
             .with_thread_names(true)
             .with_ansi(false)
             .with_writer(non_blocking);
 
         if config.json_logs {
-            builder.json().init();
+            layers.push(fmt_layer.json().boxed());
         } else {
-            builder.event_format(LogFormatter::default()).init();
+            layers.push(fmt_layer.event_format(LogFormatter::default()).boxed());
         }
 
         Some(guard)
     } else {
         println!("Starting logging to stdout");
 
-        tracing_subscriber::fmt()
+        let fmt_layer = tracing_subscriber::fmt::layer()
             .with_thread_names(true)
             .with_ansi(false)
-            .with_env_filter(env_filter)
             .with_target(false)
-            .event_format(LogFormatter::default())
-            .init();
+            .event_format(LogFormatter::default());
+        layers.push(fmt_layer.boxed());
 
         None
     };
+
+    tracing_subscriber::registry()
+        .with(layers)
+        .init();
 
     Ok(guard)
 }
