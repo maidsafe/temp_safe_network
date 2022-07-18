@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1657913892097,
+  "lastUpdate": 1658134767075,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -9365,6 +9365,72 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 4146347,
             "range": "± 73557",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "joshuef@gmail.com",
+            "name": "Josh Wilson",
+            "username": "joshuef"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "2f38be726cf493c89d452b6faa50ab8284048798",
+          "message": "chore(dsyfunction): relax knowledge penalty.\n\nWe've seen some CI nodes being booted due to knowledge issues, so relaxing\nthis should help there'",
+          "timestamp": "2022-07-18T10:15:31+02:00",
+          "tree_id": "20fdd682653685c3b49d64ab128975d7979d40e1",
+          "url": "https://github.com/maidsafe/safe_network/commit/2f38be726cf493c89d452b6faa50ab8284048798"
+        },
+        "date": 1658134765506,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 656821366,
+            "range": "± 11693181",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 688157870,
+            "range": "± 19156207",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 928044411,
+            "range": "± 115701739",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 373870326,
+            "range": "± 44038829",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 397204666,
+            "range": "± 11598021",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 1090242615,
+            "range": "± 20872002",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 4092580,
+            "range": "± 72631",
             "unit": "ns/iter"
           }
         ]
