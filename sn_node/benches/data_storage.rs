@@ -42,7 +42,7 @@ fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
     let pk = PublicKey::Bls(bls::SecretKey::random().public_key());
     let keypair = Keypair::new_ed25519();
 
-    let mut group = c.benchmark_group("read-sampling");
+    let mut group = c.benchmark_group("write-sampling");
 
     let runtime = Runtime::new().unwrap();
     pub const NONSENSE_CHUNK_SIZE: usize = 1024; // data size should not be important for keys() tests
@@ -57,8 +57,6 @@ fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
                 let storage = get_new_data_store()
                     .context("Could not create a temp data store")
                     .unwrap();
-
-                println!("finished {size} writes");
 
                 b.to_async(&runtime).iter(|| async {
                     for _ in 0..size {
@@ -81,7 +79,6 @@ fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
 
             b.to_async(&runtime).iter(|| async {
                 for _ in 0..size {
-                    // println!("writing d:{i}");
                     let file = sn_interface::types::utils::random_bytes(NONSENSE_CHUNK_SIZE);
                     let random_data = ReplicatedData::Chunk(Chunk::new(file));
                     storage
@@ -90,7 +87,6 @@ fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
                         .await
                         .expect("failed to write chunk {i}");
                 }
-                println!("finished {size} writes");
             })
         });
     }
@@ -115,7 +111,6 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
                 .context("Could not create a temp data store")
                 .unwrap();
 
-            println!("starting writes");
             for _ in 0..size {
                 let random_data = create_random_register_replicated_data();
 
@@ -128,20 +123,10 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
                 }
             }
 
-            println!("finished {size} writes");
-
             b.to_async(&runtime).iter(|| async {
                 match storage.keys() {
-                    Ok(_) => {
-                        let random_filename: String = thread_rng()
-                            .sample_iter(&Alphanumeric)
-                            .take(7)
-                            .map(char::from)
-                            .collect();
-
-                        println!("progress? reading reg {:?}", random_filename)
-                    }
-                    Err(error) => println!("Reading store register keys failed with {:?}", error),
+                    Ok(_) => {}
+                    Err(error) => panic!("Reading store register keys failed with {:?}", error),
                 }
             })
         });
@@ -153,7 +138,6 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
                 .context("Could not create a temp data store")
                 .unwrap();
 
-            println!("starting writes");
             for _ in 0..size {
                 let file = sn_interface::types::utils::random_bytes(NONSENSE_CHUNK_SIZE);
                 let random_data = ReplicatedData::Chunk(Chunk::new(file));
@@ -165,20 +149,11 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
                     panic!("Error storing chunk");
                 };
             }
-            println!("finished {size} writes");
 
             b.to_async(&runtime).iter(|| async {
                 match &storage.keys() {
-                    Ok(_keys) => {
-                        let random_filename: String = thread_rng()
-                            .sample_iter(&Alphanumeric)
-                            .take(7)
-                            .map(char::from)
-                            .collect();
-
-                        println!("progress? {:?}", random_filename)
-                    }
-                    Err(error) => println!("Reading store chunk keys failed with {:?}", error),
+                    Ok(_keys) => {}
+                    Err(error) => panic!("Reading store chunk keys failed with {:?}", error),
                 }
             })
         });
