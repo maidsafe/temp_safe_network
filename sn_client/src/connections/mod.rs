@@ -52,7 +52,7 @@ pub(super) struct Session {
     /// All elders we know about from AE messages
     network: Arc<NetworkPrefixMap>,
     /// A DAG containing all section chains of the whole network that we are aware of
-    all_sections_chains: Arc<RwLock<SecuredLinkedList>>,
+    pub(super) all_sections_chains: Arc<RwLock<SecuredLinkedList>>,
     /// Initial network comms MsgId
     initial_connection_check_msg_id: Arc<RwLock<Option<MsgId>>>,
     /// Standard time to await potential AE messages:
