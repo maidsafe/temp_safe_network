@@ -26,7 +26,7 @@ use tracing_subscriber::{fmt, EnvFilter};
 const TEST_AUTH_CREDENTIALS: &str = "TEST_AUTH_CREDENTIALS";
 
 // Number of DBCs to reissue from genesis DBC so there is enough
-// for each individual test to use a different ones.
+// for each individual test to use a different one
 const NUM_OF_DBCS_TO_REISSUE: usize = 40;
 
 // Range of values to pick the random balances each of

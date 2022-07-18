@@ -15,8 +15,10 @@ use crate::{
 };
 use bytes::Bytes;
 use log::{debug, warn};
+use sn_client::Client;
 use sn_dbc::{
-    rng, AmountSecrets, Hash, Owner, OwnerOnce, RingCtTransaction, SpentProof, TransactionBuilder,
+    rng, AmountSecrets, Hash, Owner, OwnerOnce, PublicKey, RingCtTransaction, Signature,
+    SpentProof, TransactionBuilder,
 };
 use sn_interface::types::Token;
 use std::collections::{BTreeMap, BTreeSet};
@@ -27,6 +29,36 @@ pub const WALLET_TYPE_TAG: u64 = 1_000;
 /// Set of spendable DBCs mapped to their friendly name as defined/chosen by the user when
 /// depositing DBCs into a wallet.
 pub type WalletSpendableDbcs = BTreeMap<String, (Dbc, EntryHash)>;
+
+// Verifier required by sn_dbc API to check a SpentProof
+// is validly signed by known sections keys.
+struct SpentProofKeyVerifier<'a> {
+    client: &'a Client,
+}
+
+impl sn_dbc::SpentProofKeyVerifier for SpentProofKeyVerifier<'_> {
+    type Error = crate::Error;
+
+    // Called by sn_dbc API when it needs to verify a SpentProof is valid
+    fn verify(&self, proof_hash: &Hash, key: &PublicKey, signature: &Signature) -> Result<()> {
+        if !key.verify(signature, proof_hash) {
+            Err(Error::DbcVerificationFailed(format!(
+                "Failed to verify SpentProof signature with key: {}",
+                key.to_hex()
+            )))
+        } else if !futures::executor::block_on(self.client.is_known_section_key(key)) {
+            // FIXME: there is a WIP task to change the way sn_client keeps track of sections DAG,
+            // that will allow us to remove the futures block on sn_client::is_known_section_key.
+
+            Err(Error::DbcVerificationFailed(format!(
+                "SpentProof key is an unknown section key: {}",
+                key.to_hex()
+            )))
+        } else {
+            Ok(())
+        }
+    }
+}
 
 impl Safe {
     /// Create an empty wallet and return its XOR-URL.
@@ -54,10 +86,6 @@ impl Safe {
         dbc: &Dbc,
         secret_key: Option<bls::SecretKey>,
     ) -> Result<(String, Token)> {
-        // TODO: check the input DBCs were spent and all other sort of verifications,
-        // perhaps all optional, and we may want a separate API to also do these verifications
-        // for the user to perform them without depositing the DBC into a wallet.
-
         let dbc_to_deposit = if dbc.is_bearer() {
             if secret_key.is_some() {
                 return Err(Error::DbcDepositError(
@@ -83,17 +111,29 @@ impl Safe {
             ));
         };
 
-        let amount = dbc_to_deposit
-            .amount_secrets_bearer()
-            .map(|amount_secrets| Token::from_nano(amount_secrets.amount()))?;
+        // TODO: check the DBC was not spent already. Perhaps we want a separate API to do these
+        // verifications for the user to perform them without depositing the DBC into a wallet.
 
-        let safeurl = self.parse_and_resolve_url(wallet_url).await?;
+        // Verify that the DBC to deposit is valid. This verifies there is a matching transaction
+        // provided for each SpentProof, although this does not check if the DBC has been spent.
+        let proof_key_verifier = SpentProofKeyVerifier {
+            client: self.get_safe_client()?,
+        };
+        dbc_to_deposit.verify(
+            &dbc_to_deposit.owner_base().secret_key()?,
+            &proof_key_verifier,
+        )?;
 
         let spendable_name = match spendable_name {
             Some(name) => name.to_string(),
             None => format!("dbc-{}", &hex::encode(dbc_to_deposit.hash())[0..8]),
         };
 
+        let amount = dbc_to_deposit
+            .amount_secrets_bearer()
+            .map(|amount_secrets| Token::from_nano(amount_secrets.amount()))?;
+
+        let safeurl = self.parse_and_resolve_url(wallet_url).await?;
         self.insert_dbc_into_wallet(&safeurl, &dbc_to_deposit, spendable_name.clone())
             .await?;
 
@@ -383,13 +423,12 @@ impl Safe {
 
         // Build the output DBCs
         // Spend all the input DBCs, collecting the spent proof shares for each of them
-
-        let spent_proofs: Vec<SpentProof> = input_dbcs
+        let spent_proofs: BTreeSet<SpentProof> = input_dbcs
             .iter()
             .flat_map(|dbc| dbc.spent_proofs.clone())
             .collect();
 
-        let spent_transactions: Vec<RingCtTransaction> = input_dbcs
+        let spent_transactions: BTreeSet<RingCtTransaction> = input_dbcs
             .iter()
             .flat_map(|dbc| dbc.spent_transactions.clone())
             .collect();
@@ -404,6 +443,7 @@ impl Safe {
                     spent_transactions.clone(),
                 )
                 .await?;
+
             let spent_proof_shares = client.spent_proof_shares(keyimage).await?;
 
             // TODO: we temporarilly filter the spent proof shares which correspond to the TX we
@@ -418,9 +458,12 @@ impl Safe {
                 .add_spent_transaction(tx);
         }
 
-        // TODO: Perform the verification of the transaction and spentproofs for input DBCs,
+        // Perform verifications of input TX and spentproofs,
         // as well as building the output DBCs.
-        let dbcs = dbc_builder.build_without_verifying()?;
+        let proof_key_verifier = SpentProofKeyVerifier {
+            client: self.get_safe_client()?,
+        };
+        let dbcs = dbc_builder.build(&proof_key_verifier)?;
 
         Ok((dbcs, change_owneronce))
     }

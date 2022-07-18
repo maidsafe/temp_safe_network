@@ -131,6 +131,9 @@ pub enum Error {
     /// DbcReissueError
     #[error("DbcReissueError: {0}")]
     DbcReissueError(String),
+    /// Verification of DBC validly signed by a known section failed
+    #[error("DBC validity verification failed: {0}")]
+    DbcVerificationFailed(String),
     /// DbcDepositError
     #[error("DbcDepositError: {0}")]
     DbcDepositError(String),
