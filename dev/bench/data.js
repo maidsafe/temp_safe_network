@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1658134767075,
+  "lastUpdate": 1658134822035,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -9431,6 +9431,72 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 4092580,
             "range": "± 72631",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "oetyng@gmail.com",
+            "name": "oetyng",
+            "username": "oetyng"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "38d25d6df71e3bb71e8efda50a4bf64345f69f81",
+          "message": "fix(tests): update for the split of HandleCmd\nAlso removes order requirement of resulting cmds in one test,\nas the order is not a system requirement.",
+          "timestamp": "2022-07-18T10:15:17+02:00",
+          "tree_id": "594098bc2bcf62cf18c0510eaed1b0af1f1df2c9",
+          "url": "https://github.com/maidsafe/safe_network/commit/38d25d6df71e3bb71e8efda50a4bf64345f69f81"
+        },
+        "date": 1658134821253,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 660048398,
+            "range": "± 13226729",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 670291890,
+            "range": "± 20929031",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 942837913,
+            "range": "± 9673798",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 391812507,
+            "range": "± 40106940",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 398077489,
+            "range": "± 10133315",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 1089533782,
+            "range": "± 28098858",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 4152377,
+            "range": "± 168383",
             "unit": "ns/iter"
           }
         ]
