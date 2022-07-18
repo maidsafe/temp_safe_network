@@ -3,7 +3,46 @@ use file_rotate::{
     suffix::{AppendTimestamp, FileLimit},
     ContentLimit, FileRotate,
 };
-use std::{fmt::Debug, io, io::Write, path::Path};
+use tracing_appender::non_blocking::{WorkerGuard, NonBlocking};
+use std::{fmt::Debug, io, io::Write, path::{Path, PathBuf}};
+
+pub fn file_rotater(
+    dir: &PathBuf,
+    max_size: usize,
+    max_lines: usize,
+    files_to_retain: usize,
+    uncompressed_files: usize,
+) -> (NonBlocking, WorkerGuard) {
+    let mut content_limit = ContentLimit::BytesSurpassed(max_size);
+    if max_lines > 0 {
+        content_limit = ContentLimit::Lines(max_lines);
+    }
+
+    // FileRotate crate changed `0 means for all` to `0 means only original`
+    // Here set the retained value to be same as uncompressed in case of 0.
+    let logs_retained = if files_to_retain == 0 {
+        uncompressed_files
+    } else {
+        files_to_retain
+    };
+    let file_appender = FileRotateAppender::make_rotate_appender(
+        dir,
+        "sn_node.log",
+        AppendTimestamp::default(FileLimit::MaxFiles(logs_retained)),
+        content_limit,
+        Compression::OnRotate(uncompressed_files),
+    );
+
+    // configure how tracing non-blocking works: https://tracing.rs/tracing_appender/non_blocking/struct.nonblockingbuilder#method.default
+    let non_blocking_builder = tracing_appender::non_blocking::NonBlockingBuilder::default();
+
+    non_blocking_builder
+        // lose lines and keep perf, or exert backpressure?
+        .lossy(false)
+        // optionally change buffered lines limit
+        // .buffered_lines_limit(buffered_lines_limit)
+        .finish(file_appender)
+}
 
 /// `FileRotateAppender` is a `tracing_appender` with extra logrotate features:
 ///  - most recent logfile name re-used to support following (e.g. 'tail -f=logfile')
