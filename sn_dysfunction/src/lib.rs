@@ -76,6 +76,10 @@ pub struct DysfunctionDetection {
     /// operation ID.
     pub unfulfilled_ops: BTreeMap<NodeIdentifier, Vec<OperationId>>,
     adults: Vec<XorName>,
+    /// Holding the nodes that detected as shall be voted off immediatelly.
+    /// So far, there is only one situation: node's name changed during bootstrap,
+    ///   i.e. different node names but with the same connection_info
+    nodes_really_bad: BTreeSet<XorName>,
 }
 
 impl DysfunctionDetection {
@@ -87,6 +91,7 @@ impl DysfunctionDetection {
             knowledge_issues: BTreeMap::new(),
             unfulfilled_ops: BTreeMap::new(),
             adults,
+            nodes_really_bad: BTreeSet::new(),
         }
     }
 
@@ -118,6 +123,9 @@ impl DysfunctionDetection {
                 })?;
                 trace!("New issue has associated operation ID: {op_id:#?}");
                 queue.push(op_id);
+            }
+            IssueType::ReallyBad => {
+                let _ = self.nodes_really_bad.insert(node_id);
             }
         }
         Ok(())

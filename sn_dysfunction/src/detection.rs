@@ -35,6 +35,10 @@ pub enum IssueType {
     Knowledge,
     /// Represents a pending request operation issue to be tracked by Dysfunction Detection.
     PendingRequestOperation(Option<OperationId>),
+    /// Repreents the issue shall cause the node to be voted off immediatelly.
+    /// So far, there is only one situation: node's name changed during bootstrap,
+    ///   i.e. different node names but with the same connection_info
+    ReallyBad,
 }
 
 #[derive(Debug)]
@@ -159,6 +163,14 @@ impl DysfunctionDetection {
                 };
                 count
             }
+            IssueType::ReallyBad => {
+                if self.nodes_really_bad.contains(node) {
+                    // May need to be further tweaked.
+                    200
+                } else {
+                    1
+                }
+            }
         }
     }
 
@@ -255,7 +267,7 @@ impl DysfunctionDetection {
     ) -> Result<BTreeSet<XorName>> {
         self.cleanup_time_sensistive_checks()?;
 
-        let mut dysfunctional_nodes = BTreeSet::new();
+        let mut dysfunctional_nodes = std::mem::take(&mut self.nodes_really_bad);
 
         let final_scores = self.get_weighted_scores();
 
@@ -283,6 +295,7 @@ mod tests {
 
     use eyre::bail;
     use proptest::prelude::*;
+    use std::collections::{BTreeMap, BTreeSet};
     use tokio::runtime::Runtime;
     use xor_name::{rand::random as random_xorname, XorName};
 
@@ -299,6 +312,13 @@ mod tests {
                 NodeQualityScored::Bad(r) => r,
             }
         }
+    }
+
+    fn generate_really_bad_issues() -> impl Strategy<Value = IssueType> {
+        // higher numbers here are more frequent
+        prop_oneof![
+        20 => Just(IssueType::ReallyBad),
+        ]
     }
 
     /// In a standard network startup (as of 24/06/22)
@@ -372,6 +392,18 @@ mod tests {
                 issue_name_for_direction,
                 0.0..1.0f32,
             ),
+            min..max + 1,
+        )
+    }
+
+    /// Generate really bad issue only
+    fn generate_reallybad_issues(
+        min: usize,
+        max: usize,
+    ) -> impl Strategy<Value = Vec<(IssueType, XorName)>> {
+        let issue_name_for_direction = generate_xorname();
+        prop::collection::vec(
+            (generate_really_bad_issues(), issue_name_for_direction),
             min..max + 1,
         )
     }
@@ -488,6 +520,7 @@ mod tests {
                     IssueType::PendingRequestOperation(_) => {
                         assert_eq!(score_results.op_scores.len(), adult_count);
                     },
+                    IssueType::ReallyBad => {},
                 }
             })
         }
@@ -519,6 +552,7 @@ mod tests {
                     IssueType::PendingRequestOperation(_) => {
                         score_results.op_scores
                     },
+                    IssueType::ReallyBad => BTreeMap::new(),
                 };
                 let expected_score = if issue_count > 1 {
                     issue_count - 1
@@ -626,6 +660,49 @@ mod tests {
 
                     Ok(())
                 });
+        }
+
+        #[test]
+        /// Currently just confirming the ReallyBad issue will triger the target to be reported
+        /// as over severity immediately.
+        fn pt_detect_really_bad_nodes(
+            _elders_in_dkg in 2..7usize,
+            nodes in generate_nodes_and_quality(3,30), issues in generate_reallybad_issues(100,500))
+            {
+                init_test_logger();
+                let _outer_span = tracing::info_span!("pt_really_bad").entered();
+
+                let _res = Runtime::new().unwrap().block_on(async {
+                // add dysf to our all_nodes
+                let all_node_names = nodes.clone().iter().map(|(name, _)| *name).collect::<Vec<XorName>>();
+
+                let mut dysfunctional_detection = DysfunctionDetection::new(all_node_names);
+                let mut expected_really_bad_nodes = BTreeSet::new();
+
+                // Now we loop through each issue/msg
+                for (issue, issue_location) in issues {
+                    if let IssueType::ReallyBad = issue {
+                        let _ = expected_really_bad_nodes.insert(issue_location);
+                        let _ = dysfunctional_detection.track_issue(issue_location, issue.clone());
+                    }
+                }
+                // now we can see what we have...
+                let dysfunctional_nodes_found = match dysfunctional_detection
+                    .get_nodes_beyond_severity( DysfunctionSeverity::Dysfunctional) {
+                        Ok(nodes) => nodes,
+                        Err(error) => bail!("Failed getting dysfunctional nodes from DysfunctionDetector: {error}")
+                    };
+
+                info!("======================");
+                info!("dysf found len {:?}:, expected {:}?", dysfunctional_nodes_found.len(), expected_really_bad_nodes.len());
+                info!("======================");
+
+                // over a long enough time span, we should catch those bad nodes...
+                // So long as dysfunction isn't returning _more_ than the bad node count, this can pass
+                assert_eq!(expected_really_bad_nodes, dysfunctional_nodes_found);
+
+                Ok(())
+            });
         }
 
 
@@ -750,6 +827,7 @@ mod tests {
                     IssueType::PendingRequestOperation(_) => {
                         score_results.op_scores
                     },
+                    IssueType::ReallyBad => BTreeMap::new(),
                 };
                 for adult in adults.iter() {
                     assert_eq!(*scores.get(adult).unwrap(), 1.0);
