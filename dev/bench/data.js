@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1658134822035,
+  "lastUpdate": 1658138093864,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -9497,6 +9497,72 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 4152377,
             "range": "± 168383",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "f664d797b56e7cbf03893c98d6c27d9c6d882be4",
+          "message": "Merge #1324 #1345 #1346\n\n1324: feat(msgs): validate w low prio before handling r=joshuef a=oetyng\n\nDeserializes and validates at lower prio, to cut off an overload attack angle.\r\nAfter validity of msg has been established, the msg is dealt with according to its type prio.\n\n1345: Chore refactor send msg cmd r=joshuef a=joshuef\n\ntweaks to reduce SendMsg cmd load.\r\n\r\nas https://github.com/maidsafe/safe_network/pull/1342 but without the change to the Sendmsg priority\n\n1346: chore(dsyfunction): relax knowledge penalty. r=Yoga07 a=joshuef\n\nWe've seen some CI nodes being booted due to knowledge issues, so relaxing\r\nthis should help there'\r\n\r\n<!--\r\nThanks for contributing to the project! We recommend you check out our \"Guide to contributing\" page if you haven't already: https://github.com/maidsafe/QA/blob/master/CONTRIBUTING.md\r\n\r\nWrite your comment below this line: -->\r\n\n\nCo-authored-by: oetyng <oetyng@gmail.com>\nCo-authored-by: Josh Wilson <joshuef@gmail.com>",
+          "timestamp": "2022-07-18T08:32:13Z",
+          "tree_id": "2a828f22d662daa3d405e4efed03b496797069b7",
+          "url": "https://github.com/maidsafe/safe_network/commit/f664d797b56e7cbf03893c98d6c27d9c6d882be4"
+        },
+        "date": 1658138092249,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 630070197,
+            "range": "± 44154038",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 685094344,
+            "range": "± 22088645",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 941480883,
+            "range": "± 64570005",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 395276651,
+            "range": "± 38705383",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 394877977,
+            "range": "± 20567884",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 1088208683,
+            "range": "± 34767689",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 4089119,
+            "range": "± 50040",
             "unit": "ns/iter"
           }
         ]
