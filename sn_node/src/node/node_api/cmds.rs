@@ -130,7 +130,10 @@ pub(crate) enum Cmd {
     /// Handle a Node leaving agreement.
     HandleNodeLeft(SectionAuth<NodeState>),
     /// Handle agree on elders. This blocks node message processing until complete.
-    HandleNewEldersAgreement { proposal: Proposal, sig: KeyedSig },
+    HandleNewEldersAgreement {
+        new_elders: SectionAuth<SectionAuthorityProvider>,
+        sig: KeyedSig,
+    },
     /// Handle the outcome of a DKG session where we are one of the participants (that is, one of
     /// the proposed new elders).
     HandleDkgOutcome {

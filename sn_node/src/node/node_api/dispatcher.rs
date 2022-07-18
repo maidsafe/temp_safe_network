@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{messages::WireMsgUtils, node_api::Cmd, Node, Proposal, Result};
+use crate::node::{messages::WireMsgUtils, node_api::Cmd, Node, Result};
 
 use crate::comm::{Comm, DeliveryStatus};
 use sn_interface::{
@@ -139,17 +139,11 @@ impl Dispatcher {
 
                 node.handle_node_left(auth.value.into_state(), auth.sig)
             }
-            Cmd::HandleNewEldersAgreement { proposal, sig } => match proposal {
-                Proposal::NewElders(section_auth) => {
-                    let mut node = self.node.write().await;
+            Cmd::HandleNewEldersAgreement { new_elders, sig } => {
+                let mut node = self.node.write().await;
 
-                    node.handle_new_elders_agreement(section_auth, sig).await
-                }
-                _ => {
-                    error!("Other agreement messages should be handled in `HandleAgreement`, which is non-blocking ");
-                    Ok(vec![])
-                }
-            },
+                node.handle_new_elders_agreement(new_elders, sig).await
+            }
             Cmd::HandlePeerLost(peer) => {
                 let mut node = self.node.write().await;
 
