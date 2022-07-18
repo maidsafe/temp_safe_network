@@ -37,8 +37,8 @@ impl SplitBarrier {
         our_prefix: &Prefix,
         section_auth: SectionAuth<SectionAuthorityProvider>,
         keyed_sig: KeyedSig,
-        generation: Generation,
     ) -> Vec<Entry> {
+        let generation = (*section_auth).membership_gen();
         debug!("Processing split barrier for gen: {generation}");
         if !section_auth.prefix().is_extension_of(our_prefix) {
             // Not a split, no need to cache.

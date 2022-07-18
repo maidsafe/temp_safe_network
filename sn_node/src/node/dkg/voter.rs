@@ -90,7 +90,6 @@ impl DkgVoter {
                     index: participant_index,
                     secret_key_share: secret_key_set.secret_key_share(0u64),
                 },
-                generation: 0,
             }]);
         }
 

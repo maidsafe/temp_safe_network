@@ -371,12 +371,9 @@ impl Session {
             secret_key_share: outcome.secret_key_share,
         };
 
-        let generation = self.session_id.membership_gen;
-
         Ok(vec![Cmd::HandleDkgOutcome {
             section_auth,
             outcome,
-            generation,
         }])
     }
 

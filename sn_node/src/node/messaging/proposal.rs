@@ -129,7 +129,7 @@ impl Node {
         let sig_share_pk = &sig_share.public_key_set.public_key();
 
         // Any other proposal than SectionInfo needs to be signed by a known section key.
-        if let Proposal::SectionInfo { sap, .. } = &proposal {
+        if let Proposal::SectionInfo(sap) = &proposal {
             let section_auth = sap;
             // TODO: do we want to drop older generations too?
 
