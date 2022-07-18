@@ -40,10 +40,10 @@ use eyre::{eyre, Context, ErrReport, Result};
 use file_rotate::{
     compression::Compression,
     suffix::{AppendTimestamp, FileLimit},
-    ContentLimit, FileRotate,
+    ContentLimit,
 };
 use self_update::{cargo_crate_version, Status};
-use std::{fmt::Debug, io, io::Write, path::Path, process::exit};
+use std::{io::Write, process::exit};
 use tokio::time::{sleep, Duration};
 use tracing::{self, debug, error, info, trace, warn};
 
@@ -57,6 +57,8 @@ use tracing_subscriber::filter::EnvFilter;
 const MODULE_NAME: &str = "sn_node";
 const JOIN_TIMEOUT_SEC: u64 = 30;
 const BOOTSTRAP_RETRY_TIME_SEC: u64 = 5;
+
+mod log;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
@@ -165,7 +167,7 @@ fn init_node_logging(config: Config) -> Result<Option<WorkerGuard>> {
         } else {
             config.logs_retained
         };
-        let file_appender = FileRotateAppender::make_rotate_appender(
+        let file_appender = log::FileRotateAppender::make_rotate_appender(
             log_dir,
             "sn_node.log",
             AppendTimestamp::default(FileLimit::MaxFiles(logs_retained)),
@@ -214,68 +216,7 @@ fn init_node_logging(config: Config) -> Result<Option<WorkerGuard>> {
     Ok(_optional_guard)
 }
 
-/// `FileRotateAppender` is a `tracing_appender` with extra logrotate features:
-///  - most recent logfile name re-used to support following (e.g. 'tail -f=logfile')
-///  - numbered rotation (logfile.1, logfile.2 etc)
-///  - limit logfile by size, lines or time
-///  - limit maximum number of logfiles
-///  - optional compression of rotated logfiles
-//
-// The above functionality is provided using crate file_rotation
-pub struct FileRotateAppender {
-    writer: FileRotate<AppendTimestamp>,
-}
 
-impl FileRotateAppender {
-    /// Create default `FileRotateAppender`
-    pub fn new(directory: impl AsRef<Path>, file_name_prefix: impl AsRef<Path>) -> Self {
-        let log_directory = directory.as_ref().to_str().unwrap();
-        let log_filename_prefix = file_name_prefix.as_ref().to_str().unwrap();
-        let path = Path::new(&log_directory).join(&log_filename_prefix);
-        let writer = FileRotate::new(
-            &Path::new(&path),
-            AppendTimestamp::default(FileLimit::MaxFiles(9)),
-            ContentLimit::Bytes(10 * 1024 * 1024),
-            Compression::OnRotate(1),
-        );
-
-        Self { writer }
-    }
-
-    /// Create `FileRotateAppender` using parameters
-    pub fn make_rotate_appender(
-        directory: impl AsRef<Path>,
-        file_name_prefix: impl AsRef<Path>,
-        file_limit: AppendTimestamp,
-        max_log_size: ContentLimit,
-        compression: Compression,
-    ) -> Self {
-        let log_directory = directory.as_ref().to_str().unwrap();
-        let log_filename_prefix = file_name_prefix.as_ref().to_str().unwrap();
-        let path = Path::new(&log_directory).join(&log_filename_prefix);
-        let writer = FileRotate::new(&Path::new(&path), file_limit, max_log_size, compression);
-
-        Self { writer }
-    }
-}
-
-impl Write for FileRotateAppender {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.writer.write(buf)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.writer.flush()
-    }
-}
-
-use std::fmt;
-
-impl Debug for FileRotateAppender {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("FileRotateAppender").finish()
-    }
-}
 
 async fn run_node(config: Config) -> Result<()> {
     if let Some(c) = &config.completions() {
