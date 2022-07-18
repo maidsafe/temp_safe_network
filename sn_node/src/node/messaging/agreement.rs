@@ -9,6 +9,7 @@
 use crate::node::{
     node_api::cmds::Cmd, relocation::ChurnId, Event, MembershipEvent, Node, Proposal, Result,
 };
+use sn_dysfunction::IssueType;
 use sn_interface::{
     messaging::system::{JoinResponse, KeyedSig, MembershipState, SectionAuth, SystemMsg},
     network_knowledge::{
@@ -124,12 +125,14 @@ impl Node {
                 existing_age + 1 < incoming_age
             };
 
+            // When the existing node is valid, just ignore the incoming agreement.
+            // Otherwise, track the existing node as really bad in the dysfunction.
             if is_existing_valid {
                 return Ok(cmds);
             } else {
-                let mut list = BTreeSet::new();
-                let _ = list.insert(existing_peer.name());
-                cmds.push(Cmd::ProposeOffline(list));
+                let _ = self
+                    .dysfunction_tracking
+                    .track_issue(existing_peer.name(), IssueType::ReallyBad);
             }
         }
 
