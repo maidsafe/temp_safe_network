@@ -26,6 +26,39 @@ pub fn init_node_logging(config: &Config) -> Result<Option<WorkerGuard>> {
         layers.push(console_layer.boxed());
     }
 
+    #[cfg(feature = "otlp")]
+    {
+        use opentelemetry::sdk::Resource;
+        use opentelemetry::KeyValue;
+        use opentelemetry_otlp::WithExportConfig;
+
+        let tracer = opentelemetry_otlp::new_pipeline()
+            .tracing()
+            .with_exporter(
+                opentelemetry_otlp::new_exporter()
+                    .tonic()
+                    // Derive endpoints etc. from environment variables like `OTEL_EXPORTER_OTLP_ENDPOINT`
+                    .with_env(),
+            )
+            .with_trace_config(
+                opentelemetry::sdk::trace::config().with_resource(Resource::new(vec![
+                    KeyValue::new(
+                        opentelemetry_semantic_conventions::resource::SERVICE_NAME,
+                        current_crate_str(),
+                    ),
+                    KeyValue::new(
+                        opentelemetry_semantic_conventions::resource::SERVICE_INSTANCE_ID,
+                        std::process::id().to_string(),
+                    ),
+                ])),
+            )
+            .install_batch(opentelemetry::runtime::Tokio)?;
+
+        let otlp_layer = tracing_opentelemetry::layer().with_tracer(tracer);
+
+        layers.push(otlp_layer.boxed());
+    }
+
     let mut guard: Option<WorkerGuard> = None;
     if let Some(log_dir) = config.log_dir() {
         println!("Starting logging to directory: {:?}", log_dir);

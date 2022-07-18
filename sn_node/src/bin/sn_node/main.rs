@@ -32,12 +32,11 @@ use sn_node::node::{Config, Error as NodeError, Event, MembershipEvent, NodeApi}
 use clap::{CommandFactory, Parser};
 use clap_complete::{generate, Shell};
 use color_eyre::{Section, SectionExt};
-use eyre::Error;
 use eyre::{eyre, Context, ErrReport, Result};
 use self_update::{cargo_crate_version, Status};
 use std::{io::Write, process::exit};
 use tokio::time::{sleep, Duration};
-use tracing::{self, debug, error, info, trace, warn};
+use tracing::{self, error, info, trace, warn};
 
 const JOIN_TIMEOUT_SEC: u64 = 30;
 const BOOTSTRAP_RETRY_TIME_SEC: u64 = 5;
@@ -47,28 +46,7 @@ mod log;
 fn main() -> Result<()> {
     color_eyre::install()?;
 
-    // first, let's grab the config. We do this outwith of the node, so we can init logging
-    // with the config, and so it can persists across node restarts
-    let config_rt = tokio::runtime::Runtime::new()?;
-    let config = config_rt.block_on(Config::new())?;
-    // shut down this runtime, we do not need it anymore
-    config_rt.shutdown_timeout(Duration::from_secs(1));
-
-    trace!("Initial node config: {config:?}");
-
-    let _guard = log::init_node_logging(&config).map_err(Error::from)?;
-
-    loop {
-        create_runtime_and_node()?;
-    }
-}
-
-/// Create a tokio runtime per `run_node` instance.
-///
-fn create_runtime_and_node() -> Result<()> {
-    info!("Node runtime started");
-
-    // start a new runtime for a node.
+    // Create a new runtime for a node
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .thread_name("sn_node")
@@ -76,39 +54,43 @@ fn create_runtime_and_node() -> Result<()> {
         .thread_stack_size(16 * 1024 * 1024)
         .build()?;
 
-    let _res = rt.block_on(async move {
-        // pull config again in case it has been updated meanwhile
-        let config = Config::new().await?;
+    rt.block_on(async {
+        let mut config = Config::new().await?;
+        let _guard = log::init_node_logging(&config)?;
+        trace!("Initial node config: {config:?}");
 
-        let local = tokio::task::LocalSet::new();
+        loop {
+            info!("Node runtime started");
+            create_runtime_and_node(&config).await?;
 
-        local
-            .run_until(async move {
-                // we want logging to persist
-                // loops ready to catch any ChurnJoinMiss
-                match run_node(config).await {
-                    Ok(_) => {
-                        info!("Node has finished running, no runtime errors were reported");
-                    }
-                    Err(error) => {
-                        warn!("Node instance finished with an error: {error:?}");
-                    }
-                };
-            })
-            .await;
+            // pull config again in case it has been updated meanwhile
+            config = Config::new().await?;
+        }
+    })
+}
 
-        Result::<(), NodeError>::Ok(())
-    });
+/// Create a tokio runtime per `run_node` instance.
+async fn create_runtime_and_node(config: &Config) -> Result<()> {
+    let local = tokio::task::LocalSet::new();
 
-    info!("Shutting down node runtime");
+    local
+        .run_until(async move {
+            // loops ready to catch any ChurnJoinMiss
+            match run_node(config).await {
+                Ok(_) => {
+                    info!("Node has finished running, no runtime errors were reported");
+                }
+                Err(error) => {
+                    warn!("Node instance finished with an error: {error:?}");
+                }
+            };
+        })
+        .await;
 
-    // doesn't really matter the outcome here.
-    rt.shutdown_timeout(Duration::from_secs(2));
-    debug!("Node runtime should be shutdown now");
     Ok(())
 }
 
-async fn run_node(config: Config) -> Result<()> {
+async fn run_node(config: &Config) -> Result<()> {
     if let Some(c) = &config.completions() {
         let shell = c.parse().map_err(|err: String| eyre!(err))?;
         let buf = gen_completions_for_shell(shell, Config::command()).map_err(|err| eyre!(err))?;
@@ -148,7 +130,7 @@ async fn run_node(config: Config) -> Result<()> {
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
 
     let (_node, mut event_stream) = loop {
-        match NodeApi::new(&config, join_timeout).await {
+        match NodeApi::new(config, join_timeout).await {
             Ok(result) => break result,
             Err(NodeError::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
                 return Err(error).suggestion(
