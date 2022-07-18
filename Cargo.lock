@@ -1937,7 +1937,6 @@ name = "log_cmds_inspector"
 version = "0.1.0"
 dependencies = [
  "clap 3.2.11",
- "console-subscriber",
  "eyre",
  "grep",
  "sn_interface",
@@ -3334,7 +3333,6 @@ dependencies = [
  "bytes",
  "cargo-husky",
  "clap 3.2.11",
- "console-subscriber",
  "crdts",
  "criterion",
  "custom_debug",
@@ -3459,7 +3457,6 @@ dependencies = [
  "blsttc",
  "bytes",
  "cargo-husky",
- "console-subscriber",
  "crdts",
  "custom_debug",
  "dashmap",
@@ -3757,7 +3754,6 @@ version = "0.1.0"
 dependencies = [
  "clap 3.2.11",
  "color-eyre",
- "console-subscriber",
  "dirs-next 2.0.0",
  "eyre",
  "sn_launch_tool",
