@@ -8,24 +8,45 @@
 
 use crate::{Safe, SafeUrl};
 
-use sn_dbc::Owner;
-use sn_interface::types::Keypair;
+use sn_client::utils::test_utils::read_genesis_dbc_from_first_node;
+use sn_dbc::{rng, Dbc, Owner, OwnerOnce};
+use sn_interface::types::{Keypair, Token};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
+use async_once::AsyncOnce;
 use bls::SecretKey;
+use lazy_static::lazy_static;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::{collections::HashMap, env::var, ops::Index, sync::Once};
+use tokio::sync::Mutex;
 use tracing_subscriber::{fmt, EnvFilter};
 
 // Environment variable which can be set with the auth credentials
 // to be used for all sn_api tests
 const TEST_AUTH_CREDENTIALS: &str = "TEST_AUTH_CREDENTIALS";
 
-static INIT: Once = Once::new();
+// Number of DBCs to reissue from genesis DBC so there is enough
+// for each individual test to use a different ones.
+const NUM_OF_DBCS_TO_REISSUE: usize = 40;
+
+// Range of values to pick the random balances each of
+// the NUM_OF_DBCS_TO_REISSUE reissued DBCs will own
+const REISSUED_DBC_MIN_BALANCE: u64 = 5_000_000_000;
+const REISSUED_DBC_MAX_BALANCE: u64 = 100_000_000_000;
+
+// Load the genesis DBC.
+lazy_static! {
+    pub static ref GENESIS_DBC: Dbc = match read_genesis_dbc_from_first_node() {
+        Ok(dbc) => dbc,
+        Err(err) => panic!("Failed to read genesis DBC for tests: {:?}", err),
+    };
+}
 
 // Initialise logger for tests, this is run only once, even if called multiple times.
 fn init_logger() {
-    INIT.call_once(|| {
+    static INIT_LOGGER: Once = Once::new();
+
+    INIT_LOGGER.call_once(|| {
         fmt()
             // NOTE: comment out this line for more compact (but less readable) log output.
             // .pretty()
@@ -34,6 +55,73 @@ fn init_logger() {
             .with_target(false)
             .init()
     });
+}
+
+// Return the next unused DBC along with the balance it owns
+pub async fn get_next_bearer_dbc() -> Result<(Dbc, Token)> {
+    lazy_static! {
+        static ref NEXT_DBC_INDEX: Mutex<usize> = Mutex::new(0);
+        static ref REISSUED_DBCS: AsyncOnce<Vec<(Dbc, Token)>> =
+            AsyncOnce::new(async { reissue_bearer_dbcs().await.unwrap_or_default() });
+    }
+
+    let mut index = NEXT_DBC_INDEX.lock().await;
+    let next_dbc = REISSUED_DBCS
+        .get()
+        .await
+        .get(*index)
+        .ok_or_else(|| anyhow!("No more unused DBCs available, already used: {}", index))?
+        .clone();
+
+    *index += 1;
+
+    Ok(next_dbc)
+}
+
+// Build a set of bearer DBCs with random amounts, by reissuing them from testnet genesis DBC.
+async fn reissue_bearer_dbcs() -> Result<Vec<(Dbc, Token)>> {
+    let total_balance = match GENESIS_DBC.amount_secrets_bearer() {
+        Ok(amount_secrets) => amount_secrets.amount(),
+        Err(err) => bail!("Failed to obtain genesis DBC balance: {:?}", err),
+    };
+
+    let mut rng = rand::thread_rng();
+    let amounts: Vec<u64> = (0..NUM_OF_DBCS_TO_REISSUE)
+        .map(|_| rng.gen_range(REISSUED_DBC_MIN_BALANCE..REISSUED_DBC_MAX_BALANCE))
+        .collect();
+
+    let total_output_amount: u64 = amounts.iter().sum();
+    let change_amount = Token::from_nano(total_balance - total_output_amount);
+
+    let output_amounts: Vec<(Token, OwnerOnce)> = amounts
+        .into_iter()
+        .map(|amount| {
+            let owner = Owner::from_random_secret_key(&mut rng::thread_rng());
+            let output_owner = OwnerOnce::from_owner_base(owner, &mut rng::thread_rng());
+            (Token::from_nano(amount), output_owner)
+        })
+        .collect();
+
+    let safe = new_safe_instance().await?;
+    let (output_dbcs, _) = safe
+        .reissue_dbcs(vec![GENESIS_DBC.clone()], output_amounts, change_amount)
+        .await?;
+
+    Ok(output_dbcs
+        .into_iter()
+        .map(|(dbc, _, amount_secrets)| {
+            let amount = Token::from_nano(amount_secrets.amount());
+            (dbc, amount)
+        })
+        .collect())
+}
+
+// Instantiate a Safe instance, and also obtain an unspent/unused DBC
+pub async fn new_safe_instance_with_dbc() -> Result<(Safe, Dbc, Token)> {
+    let (dbc, balance) = get_next_bearer_dbc().await?;
+    let safe = new_safe_instance().await?;
+
+    Ok((safe, dbc, balance))
 }
 
 pub struct TestDataFilesContainer {

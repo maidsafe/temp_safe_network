@@ -250,6 +250,16 @@ impl Client {
     pub fn dbc_owner(&self) -> Owner {
         self.dbc_owner.clone()
     }
+
+    /// Check if the provided public key is a known section key
+    /// based on our current knowledge of the network and sections chains.
+    pub async fn is_known_section_key(&self, section_key: &sn_dbc::PublicKey) -> bool {
+        self.session
+            .all_sections_chains
+            .read()
+            .await
+            .has_key(section_key)
+    }
 }
 
 #[cfg(test)]

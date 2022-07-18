@@ -18,8 +18,8 @@ use log::{debug, info};
 use std::collections::{BTreeMap, BTreeSet};
 use std::str;
 
-// Type tag to use for the NrsMapContainer stored on Register
-pub(crate) const NRS_MAP_TYPE_TAG: u64 = 1_500;
+/// Type tag to use for the NrsMapContainer stored on Register
+pub const NRS_MAP_TYPE_TAG: u64 = 1_500;
 
 impl Safe {
     /// # Creates a `nrs_map_container` for a chosen top name
