@@ -184,8 +184,8 @@ impl Node {
             Ok(serialised_proposal) => {
                 match proposal_aggregator.add(&serialised_proposal, sig_share) {
                     Ok(sig) => match proposal {
-                        Proposal::NewElders(_) => {
-                            cmds.push(Cmd::HandleNewEldersAgreement { proposal, sig })
+                        Proposal::NewElders(new_elders) => {
+                            cmds.push(Cmd::HandleNewEldersAgreement { new_elders, sig })
                         }
                         _ => cmds.push(Cmd::HandleAgreement { proposal, sig }),
                     },

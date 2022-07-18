@@ -1238,7 +1238,7 @@ async fn handle_elders_update() -> Result<()> {
         let elder_names1: BTreeSet<_> = sap1.names();
 
         let signed_sap1 = section_signed(sk_set1.secret_key(), sap1)?;
-        let proposal = Proposal::NewElders(signed_sap1);
+        let proposal = Proposal::NewElders(signed_sap1.clone());
         let signature = sk_set0.secret_key().sign(&proposal.as_signable_bytes()?);
         let sig = KeyedSig {
             signature,
@@ -1266,7 +1266,7 @@ async fn handle_elders_update() -> Result<()> {
 
         let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
-        let cmds = run_and_collect_cmds(Cmd::HandleNewEldersAgreement { proposal, sig }, &dispatcher).await?;
+        let cmds = run_and_collect_cmds(Cmd::HandleNewEldersAgreement { new_elders: signed_sap1, sig }, &dispatcher).await?;
 
         let mut update_actual_recipients = HashSet::new();
 
@@ -1415,16 +1415,20 @@ async fn handle_demote_during_split() -> Result<()> {
             let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
             // Create agreement on `OurElder` for both sub-sections
-            let create_our_elders_cmd = |signed_sap| -> Result<_> {
-                let proposal = Proposal::NewElders(signed_sap);
-                let signature = sk_set_v0.secret_key().sign(&proposal.as_signable_bytes()?);
-                let sig = KeyedSig {
-                    signature,
-                    public_key: sk_set_v0.public_keys().public_key(),
-                };
+            let create_our_elders_cmd =
+                |signed_sap: SectionAuth<SectionAuthorityProvider>| -> Result<_> {
+                    let proposal = Proposal::NewElders(signed_sap.clone());
+                    let signature = sk_set_v0.secret_key().sign(&proposal.as_signable_bytes()?);
+                    let sig = KeyedSig {
+                        signature,
+                        public_key: sk_set_v0.public_keys().public_key(),
+                    };
 
-                Ok(Cmd::HandleNewEldersAgreement { proposal, sig })
-            };
+                    Ok(Cmd::HandleNewEldersAgreement {
+                        new_elders: signed_sap,
+                        sig,
+                    })
+                };
 
             // Handle agreement on `NewElders` for prefix-0.
             let section_auth = SectionAuthorityProvider::new(
