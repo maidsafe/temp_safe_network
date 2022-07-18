@@ -111,9 +111,10 @@ impl FlowCtrl {
 
             loop {
                 let _instant = interval.tick().await;
-                let node = &self.node.read().await;
+                let node = self.node.read().await;
                 let is_elder = node.is_elder();
                 let prefix = node.network_knowledge().prefix();
+                drop(node);
 
                 // Send a probe message if we are an elder
                 if is_elder && !prefix.is_empty() {
@@ -381,6 +382,7 @@ impl FlowCtrl {
 
                 let members = node.network_knowledge().section_members();
                 let section_pk = node.network_knowledge().section_key();
+                drop(node);
 
                 if let Some(load_report) =
                     self.cmd_ctrl.dispatcher.comm().tolerated_msgs_per_s().await
