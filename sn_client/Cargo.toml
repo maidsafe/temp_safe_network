@@ -33,6 +33,7 @@ default = []
 chaos = []
 unstable-wiremsg-debuginfo = []
 test-utils = ["eyre"]
+traceroute = ["sn_interface/traceroute"]
 # Dependencies only when building binary (`query-adult`)
 build-bin = ["clap", "eyre"]
 

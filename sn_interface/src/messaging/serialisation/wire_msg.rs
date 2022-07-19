@@ -19,6 +19,11 @@ use custom_debug::Debug;
 use serde::Serialize;
 use xor_name::XorName;
 
+#[cfg(feature = "traceroute")]
+use crate::types::PublicKey;
+#[cfg(feature = "traceroute")]
+use serde::Deserialize;
+
 /// In order to send a message over the wire, it needs to be serialized
 /// along with a header (`WireMsgHeader`) which contains the information needed
 /// by the recipient to properly deserialize it.
@@ -36,6 +41,15 @@ pub struct WireMsg {
     // well as its serialization.
     #[cfg(feature = "test-utils")]
     pub payload_debug: Option<std::sync::Arc<dyn std::fmt::Debug + Send + Sync>>,
+}
+
+#[cfg(feature = "traceroute")]
+/// PublicKey of the entity that created/handled it's associated WireMsg
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum Entity {
+    Elder(PublicKey),
+    Adult(PublicKey),
+    Client(PublicKey),
 }
 
 impl PartialEq for WireMsg {
@@ -68,7 +82,13 @@ impl WireMsg {
         dst_location: DstLocation,
     ) -> Result<Self> {
         Ok(Self {
-            header: WireMsgHeader::new(msg_id, auth_kind, dst_location),
+            header: WireMsgHeader::new(
+                msg_id,
+                auth_kind,
+                dst_location,
+                #[cfg(feature = "traceroute")]
+                vec![],
+            ),
             payload,
             #[cfg(feature = "test-utils")]
             payload_debug: None,
@@ -253,6 +273,17 @@ impl WireMsg {
     ) -> Self {
         self.payload_debug = Some(std::sync::Arc::new(payload_debug));
         self
+    }
+}
+
+#[cfg(feature = "traceroute")]
+impl WireMsg {
+    pub fn add_trace(&mut self, traceroute: &mut Vec<Entity>) {
+        self.header.msg_envelope.traceroute.append(traceroute)
+    }
+
+    pub fn show_trace(&self) -> Vec<Entity> {
+        self.header.msg_envelope.traceroute.clone()
     }
 }
 

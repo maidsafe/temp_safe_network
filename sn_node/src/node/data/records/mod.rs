@@ -17,6 +17,8 @@ use crate::node::{
 
 use itertools::Itertools;
 use sn_dysfunction::IssueType;
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Entity;
 use sn_interface::{
     data_copy_count,
     messaging::{
@@ -32,7 +34,11 @@ use xor_name::XorName;
 
 impl Node {
     // Locate ideal holders for this data, line up wiremsgs for those to instruct them to store the data
-    pub(crate) fn replicate_data(&self, data: ReplicatedData) -> Result<Vec<Cmd>> {
+    pub(crate) fn replicate_data(
+        &self,
+        data: ReplicatedData,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+    ) -> Result<Vec<Cmd>> {
         trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
         if self.is_elder() {
             let targets = self.get_adults_who_should_store_data(data.name());
@@ -44,7 +50,12 @@ impl Node {
             );
 
             let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data]));
-            self.send_node_msg_to_nodes(msg, targets)
+            self.send_node_msg_to_nodes(
+                msg,
+                targets,
+                #[cfg(feature = "traceroute")]
+                &mut traceroute.clone(),
+            )
         } else {
             Err(Error::InvalidState)
         }
@@ -56,6 +67,7 @@ impl Node {
         msg_id: MsgId,
         auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
         let address = query.variant.address();
         let operation_id = query.variant.operation_id()?;
@@ -133,7 +145,12 @@ impl Node {
                 correlation_id: msg_id,
             });
 
-            self.send_node_msg_to_nodes(msg, targets)
+            self.send_node_msg_to_nodes(
+                msg,
+                targets,
+                #[cfg(feature = "traceroute")]
+                &mut traceroute.clone(),
+            )
         } else {
             // we don't do anything as we're still within data query timeout
             Ok(vec![])
@@ -273,7 +290,12 @@ impl Node {
     // Takes a message for specified targets, and builds internal send cmds
     // for sending to each of the targets.
     // Targets are XorName specified so must be within the section
-    fn send_node_msg_to_nodes(&self, msg: SystemMsg, targets: BTreeSet<Peer>) -> Result<Vec<Cmd>> {
+    fn send_node_msg_to_nodes(
+        &self,
+        msg: SystemMsg,
+        targets: BTreeSet<Peer>,
+        #[cfg(feature = "traceroute")] traceroute: &mut Vec<Entity>,
+    ) -> Result<Vec<Cmd>> {
         // we create a dummy/random dst location,
         // we will set it correctly for each msg and target
         let section_pk = self.network_knowledge().section_key();
@@ -284,7 +306,15 @@ impl Node {
         };
 
         // separate this into form_wire_msg based on agg
-        let wire_msg = WireMsg::single_src(&self.info(), dummy_dst_location, msg, section_pk)?;
+        let mut wire_msg = WireMsg::single_src(&self.info(), dummy_dst_location, msg, section_pk)?;
+
+        #[cfg(feature = "traceroute")]
+        {
+            traceroute.push(Entity::Elder(PublicKey::Ed25519(
+                self.info().keypair.public.clone(),
+            )));
+            wire_msg.add_trace(traceroute);
+        }
 
         let mut cmds = vec![];
 

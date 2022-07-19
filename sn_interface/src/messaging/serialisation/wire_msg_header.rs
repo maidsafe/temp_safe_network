@@ -16,6 +16,9 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::mem::size_of;
 
+#[cfg(feature = "traceroute")]
+use crate::messaging::Entity;
+
 // Current version of the messaging protocol.
 // At this point this implementation supports only this version.
 const MESSAGING_PROTO_VERSION: u16 = 1u16;
@@ -40,6 +43,8 @@ pub struct MsgEnvelope {
     pub msg_id: MsgId,
     pub auth_kind: AuthKind,
     pub dst_location: DstLocation,
+    #[cfg(feature = "traceroute")]
+    pub traceroute: Vec<Entity>,
 }
 
 // The first two fields in the header. This is not part of the public interface.
@@ -73,7 +78,12 @@ lazy_static! {
 
 impl WireMsgHeader {
     // Instantiate a WireMsgHeader as per current supported version.
-    pub fn new(msg_id: MsgId, auth_kind: AuthKind, dst_location: DstLocation) -> Self {
+    pub fn new(
+        msg_id: MsgId,
+        auth_kind: AuthKind,
+        dst_location: DstLocation,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+    ) -> Self {
         Self {
             //header_size: Self::max_size(),
             version: MESSAGING_PROTO_VERSION,
@@ -81,6 +91,8 @@ impl WireMsgHeader {
                 msg_id,
                 auth_kind,
                 dst_location,
+                #[cfg(feature = "traceroute")]
+                traceroute,
             },
         }
     }

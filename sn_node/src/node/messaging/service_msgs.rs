@@ -34,6 +34,9 @@ use sn_interface::{
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Entity;
+
 impl Node {
     /// Forms a `CmdError` msg to send back to the client
     pub(crate) fn send_cmd_error_response(
@@ -94,6 +97,7 @@ impl Node {
         auth: ServiceAuth,
         user: EndUser,
         requesting_elder: XorName,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
 
@@ -116,7 +120,12 @@ impl Node {
             section_pk,
         };
 
-        cmds.push(Cmd::SignOutgoingSystemMsg { msg, dst });
+        cmds.push(Cmd::SignOutgoingSystemMsg {
+            msg,
+            dst,
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        });
 
         Ok(cmds)
     }
@@ -130,6 +139,7 @@ impl Node {
         response: NodeQueryResponse,
         user: EndUser,
         sending_node_pk: PublicKey,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
         let msg_id = MsgId::new();
         let mut cmds = vec![];
@@ -207,7 +217,16 @@ impl Node {
         // This is overwritten in comm.send_to_client
         let mut rng = thread_rng();
         let dst = DstLocation::EndUser(EndUser(xor_name::XorName::random(&mut rng)));
-        let wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst)?;
+        let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst)?;
+
+        #[cfg(feature = "traceroute")]
+        {
+            let mut trace = traceroute.clone();
+            trace.push(Entity::Elder(PublicKey::Ed25519(
+                self.info().keypair.public.clone(),
+            )));
+            wire_msg.add_trace(&mut trace);
+        }
 
         cmds.push(Cmd::SendMsg {
             recipients: waiting_peers.into_iter().collect_vec(),
@@ -224,6 +243,7 @@ impl Node {
         msg: ServiceMsg,
         auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
         trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
 
@@ -251,7 +271,14 @@ impl Node {
             ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => ReplicatedData::Chunk(chunk),
             ServiceMsg::Query(query) => {
                 return self
-                    .read_data_from_adults(query, msg_id, auth, origin)
+                    .read_data_from_adults(
+                        query,
+                        msg_id,
+                        auth,
+                        origin,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
                     .await;
             }
             _ => {
@@ -264,7 +291,11 @@ impl Node {
         };
 
         // build the replication cmds
-        let mut cmds = self.replicate_data(data)?;
+        let mut cmds = self.replicate_data(
+            data,
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        )?;
         // make sure the expected replication factor is achieved
         if data_copy_count() > cmds.len() {
             error!("InsufficientAdults for storing data reliably");

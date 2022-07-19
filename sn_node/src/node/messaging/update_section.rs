@@ -123,6 +123,8 @@ impl Node {
                     NodeCmd::SendAnyMissingRelevantData(data_i_have.clone()).clone(),
                 ),
                 dst: DstLocation::Node { name, section_pk },
+                #[cfg(feature = "traceroute")]
+                traceroute: vec![],
             })
         }
 

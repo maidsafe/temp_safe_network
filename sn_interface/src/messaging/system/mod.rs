@@ -34,6 +34,7 @@ use bytes::Bytes;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
+use std::fmt::{Display, Formatter};
 use xor_name::XorName;
 
 /// List of peers of a section
@@ -259,6 +260,46 @@ impl SystemMsg {
             | SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData { .. })
             | SystemMsg::NodeQuery(_)
             | SystemMsg::NodeQueryResponse { .. } => NODE_DATA_MSG_PRIORITY,
+        }
+    }
+}
+
+impl Display for SystemMsg {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SystemMsg::AntiEntropyRetry{ .. } => write!(f, "SystemMsg::AntiEntropyRetry"),
+            SystemMsg::AntiEntropyRedirect{ .. } => write!(f, "SystemMsg::AntiEntropyRedirect"),
+            SystemMsg::AntiEntropyUpdate{ .. } => write!(f, "SystemMsg::AntiEntropyUpdate"),
+            SystemMsg::AntiEntropyProbe{ .. } => write!(f, "SystemMsg::AntiEntropyProbe"),
+            SystemMsg::Relocate{ .. } => write!(f, "SystemMsg::Relocate"),
+            SystemMsg::MembershipVotes{ .. } => write!(f, "SystemMsg::MembershipVotes"),
+            SystemMsg::MembershipAE{ .. } => write!(f, "SystemMsg::MembershipAE"),
+            SystemMsg::JoinRequest{ .. } => write!(f, "SystemMsg::JoinRequest"),
+            SystemMsg::JoinResponse{ .. } => write!(f, "SystemMsg::JoinResponse"),
+            SystemMsg::JoinAsRelocatedRequest{ .. } => write!(f, "SystemMsg::JoinAsRelocatedRequest"),
+            SystemMsg::JoinAsRelocatedResponse{ .. } => write!(f, "SystemMsg::JoinAsRelocatedResponse"),
+            SystemMsg::DkgStart{ .. } => write!(f, "SystemMsg::DkgStart"),
+            SystemMsg::DkgSessionUnknown{ .. } => write!(f, "SystemMsg::DkgSessionUnknown"),
+            SystemMsg::DkgSessionInfo{ .. } => write!(f, "SystemMsg::DkgSessionInfo"),
+            SystemMsg::DkgMessage{ .. } => write!(f, "SystemMsg::DkgMessage"),
+            SystemMsg::DkgNotReady{ .. } => write!(f, "SystemMsg::DkgNotReady"),
+            SystemMsg::DkgRetry{ .. } => write!(f, "SystemMsg::DkgRetry"),
+            SystemMsg::DkgFailureObservation{ .. } => write!(f, "SystemMsg::DkgFailureObservation"),
+            SystemMsg::DkgFailureAgreement{ .. } => write!(f, "SystemMsg::DkgFailureAgreement"),
+            SystemMsg::HandoverVotes{ .. } => write!(f, "SystemMsg::HandoverVotes"),
+            SystemMsg::HandoverAE{ .. } => write!(f, "SystemMsg::HandoverAE"),
+            SystemMsg::Propose{ .. } => write!(f, "SystemMsg::Propose"),
+            SystemMsg::StartConnectivityTest{ .. } => write!(f, "SystemMsg::StartConnectivityTest"),
+            SystemMsg::NodeEvent{ .. } => write!(f, "SystemMsg::NodeEvent"),
+            SystemMsg::NodeMsgError{ .. } => write!(f, "SystemMsg::NodeMsgError"),
+            #[cfg(any(feature = "chunks", feature = "registers"))]
+            SystemMsg::NodeCmd{ .. } => write!(f, "SystemMsg::NodeCmd"),
+            #[cfg(any(feature = "chunks", feature = "registers"))]
+            SystemMsg::NodeQuery{ .. } => write!(f, "SystemMsg::NodeQuery"),
+            #[cfg(any(feature = "chunks", feature = "registers"))]
+            SystemMsg::NodeQueryResponse{ .. } => write!(f, "SystemMsg::NodeQueryResponse"),
+            #[cfg(feature = "back-pressure")]
+            SystemMsg::BackPressure{ .. } => write!(f, "SystemMsg::BackPressure"),
         }
     }
 }

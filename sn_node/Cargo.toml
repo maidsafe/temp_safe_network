@@ -27,6 +27,7 @@ default = []
 chaos = []
 back-pressure = ["sn_interface/back-pressure"]
 unstable-wiremsg-debuginfo = []
+traceroute = ["sn_interface/traceroute"]
 # Needs to be built with RUSTFLAGS="--cfg tokio_unstable"
 tokio-console = ["console-subscriber"]
 otlp = [ "opentelemetry", "opentelemetry-otlp", "opentelemetry-semantic-conventions", "tracing-opentelemetry" ]

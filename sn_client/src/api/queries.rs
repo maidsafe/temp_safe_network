@@ -128,6 +128,14 @@ impl Client {
             signature,
         };
 
-        self.session.send_query(query, auth, serialised_query).await
+        self.session
+            .send_query(
+                query,
+                auth,
+                serialised_query,
+                #[cfg(feature = "traceroute")]
+                self.public_key(),
+            )
+            .await
     }
 }
