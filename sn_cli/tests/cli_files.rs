@@ -12,11 +12,10 @@ use color_eyre::{eyre::eyre, Report, Result};
 use predicates::prelude::*;
 use sn_api::{SafeUrl, VersionHash};
 use sn_cmd_test_utilities::util::{
-    get_directory_file_count, get_directory_len, get_file_len, get_random_nrs_string,
-    mk_emptyfolder, parse_files_container_output, parse_files_put_or_sync_output,
-    parse_files_tree_output, parse_nrs_register_output, safe_cmd, safe_cmd_stderr, safe_cmd_stdout,
-    safeurl_from, test_symlinks_are_valid, upload_path, upload_test_symlinks_folder,
-    upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
+    get_directory_file_count, get_directory_len, get_file_len, get_random_string, mk_emptyfolder,
+    parse_files_container_output, parse_files_put_or_sync_output, parse_files_tree_output,
+    parse_nrs_register_output, safe_cmd, safe_cmd_stderr, safe_cmd_stdout, test_symlinks_are_valid,
+    upload_path, upload_test_symlinks_folder, upload_testfolder_trailing_slash, CLI, SAFE_PROTOCOL,
 };
 use std::{path::Path, process::Command, str::FromStr};
 
@@ -110,7 +109,7 @@ fn calling_safe_files_put_recursive_and_set_dst_path() -> Result<()> {
     let files_container_xor =
         &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace('"', "");
 
-    let mut safeurl = safeurl_from(files_container_xor)?;
+    let mut safeurl = SafeUrl::from_url(files_container_xor)?;
     safeurl.set_path("/aha/test.md");
     let file_cat = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
     let contents = std::fs::read_to_string(format!("{}/test.md", TEST_FOLDER))?;
@@ -175,13 +174,13 @@ fn calling_safe_files_put_recursive_with_slash() -> Result<()> {
     let files_container_xor =
         &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace('"', "");
 
-    let mut safeurl = safeurl_from(files_container_xor)?;
+    let mut safeurl = SafeUrl::from_url(files_container_xor)?;
     safeurl.set_path("/test.md");
     let file_cat = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
     let contents = std::fs::read_to_string(format!("{}/test.md", TEST_FOLDER))?;
     assert_eq!(file_cat, contents);
 
-    let mut safeurl = safeurl_from(files_container_xor)?;
+    let mut safeurl = SafeUrl::from_url(files_container_xor)?;
     safeurl.set_path("/subfolder/subexists.md");
     let subfile_cat = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
     let contents = std::fs::read_to_string(format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER))?;
@@ -203,13 +202,13 @@ fn calling_safe_files_put_recursive_without_slash() -> Result<()> {
     let files_container_xor =
         &files_container_xor_line[PRETTY_FILES_CREATION_RESPONSE.len()..].replace('"', "");
 
-    let mut safeurl = safeurl_from(files_container_xor)?;
+    let mut safeurl = SafeUrl::from_url(files_container_xor)?;
     safeurl.set_path("/testdata/test.md");
     let file_cat = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
     let contents = std::fs::read_to_string(format!("{}/test.md", TEST_FOLDER))?;
     assert_eq!(file_cat, contents);
 
-    let mut safeurl = safeurl_from(files_container_xor)?;
+    let mut safeurl = SafeUrl::from_url(files_container_xor)?;
     safeurl.set_path("/testdata/subfolder/subexists.md");
     let subfile_cat = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
     let contents = std::fs::read_to_string(format!("{}/subexists.md", TEST_FOLDER_SUBFOLDER))?;
@@ -269,7 +268,7 @@ fn calling_safe_files_sync() -> Result<()> {
 fn calling_safe_files_sync_dry_run() -> Result<()> {
     let content = safe_cmd_stdout(["files", "put", TEST_FOLDER, "--json"], Some(0))?;
     let (container_xorurl, _) = parse_files_put_or_sync_output(&content)?;
-    let mut target = safeurl_from(&container_xorurl)?;
+    let mut target = SafeUrl::from_url(&container_xorurl)?;
     target.set_content_version(None);
 
     let random_content: String = (0..10).map(|_| rand::random::<char>()).collect();
@@ -311,7 +310,7 @@ fn calling_safe_files_removed_sync() -> Result<()> {
     assert_eq!(processed_files.len(), EXPECT_TESTDATA_PUT_CNT);
 
     // let's first try with --dry-run and they should not be removed
-    let mut safeurl = safeurl_from(&files_container_xor)?;
+    let mut safeurl = SafeUrl::from_url(&files_container_xor)?;
     safeurl.set_content_version(None);
     let files_container_no_version = safeurl.to_string();
     let sync_cmd_output_dry_run = safe_cmd_stdout(
@@ -473,7 +472,7 @@ fn calling_files_sync_and_fetch_with_nrsurl_and_nrs_update() -> Result<()> {
         get_directory_file_count(&tmp_data_dir)?
     );
 
-    let nrsurl = get_random_nrs_string();
+    let nrsurl = get_random_string();
     let output = safe_cmd_stdout(
         [
             "nrs",
@@ -540,7 +539,7 @@ fn calling_files_sync_and_fetch_without_nrs_update() -> Result<()> {
     let orig_directory_file_count = get_directory_file_count(&tmp_data_dir)?;
     assert_eq!(processed_files.len(), orig_directory_file_count);
 
-    let nrsurl = get_random_nrs_string();
+    let nrsurl = get_random_string();
     safe_cmd(
         [
             "nrs",
@@ -595,7 +594,7 @@ fn calling_files_sync_and_fetch_without_nrs_url_with_safe_prefix() -> Result<()>
     let orig_directory_file_count = get_directory_file_count(&tmp_data_dir)?;
     assert_eq!(processed_files.len(), orig_directory_file_count);
 
-    let site_name = get_random_nrs_string();
+    let site_name = get_random_string();
     let nrsurl = format!("safe://{}", site_name);
     safe_cmd(
         [
@@ -650,7 +649,7 @@ fn calling_safe_files_add() -> Result<()> {
     let (files_container_xor, _processed_files) =
         parse_files_put_or_sync_output(&files_container_output)?;
 
-    let mut safeurl = safeurl_from(&files_container_xor)?;
+    let mut safeurl = SafeUrl::from_url(&files_container_xor)?;
     safeurl.set_content_version(None);
     safe_cmd(
         [
@@ -676,7 +675,7 @@ fn calling_safe_files_add_dry_run() -> Result<(), Report> {
         Some(0),
     )?;
     let (files_container_xor, _) = parse_files_put_or_sync_output(&files_container_output)?;
-    let mut safeurl = safeurl_from(&files_container_xor)?;
+    let mut safeurl = SafeUrl::from_url(&files_container_xor)?;
     safeurl.set_content_version(None);
     safe_cmd(
         [
@@ -707,7 +706,7 @@ fn calling_safe_files_add_a_url() -> Result<()> {
     let (files_container_xor, processed_files) =
         parse_files_put_or_sync_output(&files_container_output)?;
 
-    let mut safeurl = safeurl_from(&files_container_xor)?;
+    let mut safeurl = SafeUrl::from_url(&files_container_xor)?;
     safeurl.set_content_version(None);
     safeurl.set_path("/new_test.md");
     let link = processed_files[Path::new(TEST_FILE)]
@@ -732,7 +731,7 @@ fn calling_files_ls() -> Result<()> {
     let (files_container_xor, processed_files) =
         parse_files_put_or_sync_output(&files_container_output)?;
 
-    let mut safeurl = safeurl_from(&files_container_xor)?;
+    let mut safeurl = SafeUrl::from_url(&files_container_xor)?;
     safeurl.set_content_version(None);
     let container_xorurl_no_version = safeurl.to_string();
 
@@ -812,7 +811,7 @@ fn calling_files_ls() -> Result<()> {
 #[test]
 fn calling_files_ls_with_invalid_path() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_trailing_slash()?;
-    let mut safeurl = safeurl_from(&files_container_xor).map_err(|e| eyre!(e.to_string()))?;
+    let mut safeurl = SafeUrl::from_url(&files_container_xor).map_err(|e| eyre!(e.to_string()))?;
 
     // set invalid path
     safeurl.set_path("subfold");
@@ -833,7 +832,7 @@ fn calling_files_ls_with_invalid_path() -> Result<()> {
 fn calling_files_ls_on_single_file() -> Result<()> {
     let (files_container_xor, _processed_files) = upload_testfolder_trailing_slash()?;
 
-    let mut safeurl = safeurl_from(&files_container_xor).map_err(|e| eyre!(e.to_string()))?;
+    let mut safeurl = SafeUrl::from_url(&files_container_xor).map_err(|e| eyre!(e.to_string()))?;
     safeurl.set_path("/subfolder/subexists.md");
     let single_file_url = safeurl.to_string();
 
@@ -862,7 +861,7 @@ fn calling_files_ls_on_nrs_with_path() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_dir, with_trailing_slash)?;
 
-    let nrsurl = get_random_nrs_string();
+    let nrsurl = get_random_string();
     safe_cmd(
         [
             "nrs",
@@ -946,7 +945,7 @@ fn calling_files_tree() -> Result<()> {
     let (files_container_xor, _processed_files) =
         upload_testfolder_trailing_slash().map_err(|e| eyre!(e.to_string()))?;
 
-    let mut safeurl = safeurl_from(&files_container_xor)?;
+    let mut safeurl = SafeUrl::from_url(&files_container_xor)?;
     safeurl.set_content_version(None);
     let container_xorurl_no_version = safeurl.to_string();
 

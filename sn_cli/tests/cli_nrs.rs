@@ -11,7 +11,7 @@ use assert_fs::prelude::*;
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
 use sn_api::SafeUrl;
-use sn_cmd_test_utilities::util::{get_random_nrs_string, safe_cmd, upload_path};
+use sn_cmd_test_utilities::util::{get_random_string, safe_cmd, upload_path};
 
 ///
 /// `nrs register` subcommand
@@ -24,7 +24,7 @@ use sn_cmd_test_utilities::util::{get_random_nrs_string, safe_cmd, upload_path};
 
 #[test]
 fn nrs_register_should_register_a_topname() -> Result<()> {
-    let topname = get_random_nrs_string();
+    let topname = get_random_string();
     safe_cmd(["nrs", "register", &topname], Some(0))?
         .assert()
         .stdout(predicate::str::contains(format!(
@@ -44,7 +44,7 @@ fn nrs_register_should_register_a_topname_with_a_versioned_content_link() -> Res
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
-    let topname = get_random_nrs_string();
+    let topname = get_random_string();
     safe_cmd(
         ["nrs", "register", &topname, "--link", &url.to_string()],
         Some(0),
@@ -80,7 +80,7 @@ fn nrs_register_should_register_a_topname_with_an_immutable_content_link() -> Re
     let url = SafeUrl::from_url(test_md_file_link)?;
     println!("processed_files = {:?}", processed_files);
 
-    let topname = get_random_nrs_string();
+    let topname = get_random_string();
     safe_cmd(
         ["nrs", "register", &topname, "--link", &url.to_string()],
         Some(0),
@@ -99,7 +99,7 @@ fn nrs_register_should_register_a_topname_with_an_immutable_content_link() -> Re
 
 #[test]
 fn nrs_register_should_return_an_error_if_a_subname_is_specified() -> Result<()> {
-    let name = format!("a.{}", get_random_nrs_string());
+    let name = format!("a.{}", get_random_string());
     safe_cmd(["nrs", "register", &name], Some(1))?
         .assert()
         .stderr(predicate::str::contains(
@@ -128,7 +128,7 @@ fn nrs_register_should_return_an_error_if_link_to_versioned_content_has_no_versi
     url.set_path("test.md");
     url.set_content_version(None);
 
-    let topname = get_random_nrs_string();
+    let topname = get_random_string();
     safe_cmd(
         ["nrs", "register", &topname, "--link", &url.to_string()],
         Some(1),
@@ -148,7 +148,7 @@ fn nrs_register_should_return_an_error_if_link_to_versioned_content_has_no_versi
 
 #[test]
 fn nrs_register_should_return_an_error_if_the_topname_already_exists() -> Result<()> {
-    let topname = get_random_nrs_string();
+    let topname = get_random_string();
     safe_cmd(["nrs", "register", &topname], Some(0))?;
     safe_cmd(["nrs", "register", &topname], Some(1))?
         .assert()
@@ -177,7 +177,7 @@ fn nrs_add_should_add_a_subname_to_versioned_content() -> Result<()> {
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
-    let test_name = get_random_nrs_string();
+    let test_name = get_random_string();
     let public_name = format!("test.{}", &test_name);
     safe_cmd(["nrs", "register", &test_name], Some(0))?;
     safe_cmd(
@@ -210,7 +210,7 @@ fn nrs_add_should_add_a_subname_to_immutable_content() -> Result<()> {
         .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?;
     let url = SafeUrl::from_url(test_md_file_link)?;
 
-    let test_name = get_random_nrs_string();
+    let test_name = get_random_string();
     let public_name = format!("test.{}", &test_name);
     safe_cmd(["nrs", "register", &test_name], Some(0))?;
     safe_cmd(
@@ -235,7 +235,7 @@ fn nrs_add_should_add_a_subname_and_set_it_as_the_default_for_the_topname() -> R
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
-    let topname = get_random_nrs_string();
+    let topname = get_random_string();
     let public_name = format!("test.{}", &topname);
     safe_cmd(["nrs", "register", &topname], Some(0))?;
     safe_cmd(
@@ -278,7 +278,7 @@ fn nrs_add_should_add_a_subname_and_a_new_topname() -> Result<()> {
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
-    let test_name = get_random_nrs_string();
+    let test_name = get_random_string();
     let public_name = format!("test.{}", &test_name);
     safe_cmd(
         [
@@ -309,7 +309,7 @@ fn nrs_add_should_add_a_subname_and_behave_idempotently_for_existing_topname() -
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
-    let test_name = get_random_nrs_string();
+    let test_name = get_random_string();
     let public_name = format!("test.{}", &test_name);
     safe_cmd(["nrs", "register", &test_name], Some(0))?;
     safe_cmd(
@@ -343,7 +343,7 @@ fn nrs_add_should_update_an_existing_subname() -> Result<()> {
     let mut another_md_url = SafeUrl::from_url(&files_container_xor)?;
     another_md_url.set_path("another.md");
 
-    let test_name = get_random_nrs_string();
+    let test_name = get_random_string();
     let public_name = format!("test.{}", &test_name);
     safe_cmd(
         [
@@ -386,7 +386,7 @@ fn nrs_add_should_return_an_error_if_link_to_versioned_content_has_no_version() 
     url.set_path("test.md");
     url.set_content_version(None);
 
-    let topname = get_random_nrs_string();
+    let topname = get_random_string();
     let public_name = format!("test.{}", &topname);
     safe_cmd(["nrs", "register", &topname], Some(0))?;
     safe_cmd(
@@ -418,7 +418,7 @@ fn nrs_add_with_register_top_name_should_return_an_error_if_link_to_versioned_co
     url.set_path("test.md");
     url.set_content_version(None);
 
-    let topname = get_random_nrs_string();
+    let topname = get_random_string();
     let public_name = format!("test.{}", &topname);
     safe_cmd(["nrs", "register", &topname], Some(0))?;
     safe_cmd(
@@ -457,7 +457,7 @@ fn nrs_add_with_default_should_return_an_error_if_link_to_versioned_content_has_
     url.set_path("test.md");
     url.set_content_version(None);
 
-    let topname = get_random_nrs_string();
+    let topname = get_random_string();
     let public_name = format!("test.{}", &topname);
     safe_cmd(["nrs", "register", &topname], Some(0))?;
     safe_cmd(
@@ -496,7 +496,7 @@ fn nrs_remove_should_remove_a_subname() -> Result<()> {
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
-    let test_name = get_random_nrs_string();
+    let test_name = get_random_string();
     let public_name = format!("test.{}", &test_name);
     safe_cmd(
         [
@@ -520,7 +520,7 @@ fn nrs_remove_should_remove_a_subname() -> Result<()> {
 
 #[test]
 fn nrs_remove_should_return_an_error_for_a_non_existent_topname() -> Result<()> {
-    let topname = get_random_nrs_string();
+    let topname = get_random_string();
     let public_name = format!("test.{}", &topname);
     safe_cmd(["nrs", "remove", &public_name], Some(1))?
         .assert()

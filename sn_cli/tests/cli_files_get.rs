@@ -12,8 +12,8 @@ use predicates::prelude::*;
 use sn_api::SafeUrl;
 use sn_cmd_test_utilities::util::{
     can_write_symlinks, create_absolute_symlinks_directory, create_nrs_link, create_symlink,
-    digest_file, get_random_nrs_string, safe_cmd, safe_cmd_at, safe_cmd_stdout, safeurl_from,
-    str_to_sha3_256, sum_tree, test_symlinks_are_valid, upload_path, TEST_FOLDER,
+    digest_file, get_random_string, safe_cmd, safe_cmd_at, safe_cmd_stdout, str_to_sha3_256,
+    sum_tree, test_symlinks_are_valid, upload_path, TEST_FOLDER,
 };
 use std::{
     path::{Path, PathBuf},
@@ -544,7 +544,7 @@ fn files_get_src_is_nrs_recursive_and_dst_not_existing() -> Result<()> {
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path(container_folder_name);
 
-    let tmp_data_nrs = get_random_nrs_string();
+    let tmp_data_nrs = get_random_string();
     let tmp_data_nrs_url = create_nrs_link(&tmp_data_nrs, &url.to_string())?;
     let version = tmp_data_nrs_url
         .content_version()
@@ -1086,7 +1086,7 @@ fn files_get_src_is_dir_and_dst_exists_as_file() -> Result<()> {
     child.copy_from("../resources/testdata", &["**"])?;
     let (files_container_xor, _processed_files, _) = upload_path(&child, with_trailing_slash)?;
 
-    let url = safeurl_from(&files_container_xor)?;
+    let url = SafeUrl::from_url(&files_container_xor)?;
     let src = format!(
         "{}://{}/{}?v=0",
         url.scheme(),
@@ -1862,7 +1862,7 @@ fn files_get_symlinks_after_sync() -> Result<()> {
     let (files_container_xor, _processed_files, _) =
         upload_path(&tmp_data_path, with_trailing_slash)?;
 
-    let mut safeurl = safeurl_from(&files_container_xor)?;
+    let mut safeurl = SafeUrl::from_url(&files_container_xor)?;
     safeurl.set_content_version(None);
 
     let new_symlink_path = Path::new(tmp_data_path.path()).join("newlink");

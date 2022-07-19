@@ -61,8 +61,12 @@ fn init_logger() {
 pub async fn get_next_bearer_dbc() -> Result<(Dbc, Token)> {
     lazy_static! {
         static ref NEXT_DBC_INDEX: Mutex<usize> = Mutex::new(0);
-        static ref REISSUED_DBCS: AsyncOnce<Vec<(Dbc, Token)>> =
-            AsyncOnce::new(async { reissue_bearer_dbcs().await.unwrap_or_default() });
+        static ref REISSUED_DBCS: AsyncOnce<Vec<(Dbc, Token)>> = AsyncOnce::new(async {
+            match reissue_bearer_dbcs().await {
+                Ok(dbcs) => dbcs,
+                Err(err) => panic!("Failed to reissue DBCs from genesis DBC: {:?}", err),
+            }
+        });
     }
 
     let mut index = NEXT_DBC_INDEX.lock().await;
