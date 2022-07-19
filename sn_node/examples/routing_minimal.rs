@@ -34,8 +34,8 @@
 //!
 
 use sn_node::node::{
-    cfg::create_test_max_capacity_and_root_storage, Config, Event, EventReceiver, MembershipEvent,
-    MessagingEvent, NodeApi,
+    cfg::create_test_max_capacity_and_root_storage, new_test_api, Config, Event, EventReceiver,
+    MembershipEvent, MessagingEvent, NodeTestApi as NodeApi,
 };
 
 use clap::Parser;
@@ -171,7 +171,7 @@ async fn start_node(
 
     let join_timeout = Duration::from_secs(3 * 60);
 
-    let (node, event_receiver) = NodeApi::new(&config, join_timeout)
+    let (node, event_receiver) = new_test_api(&config, join_timeout)
         .await
         .expect("Failed to instantiate a Node");
 

@@ -25,6 +25,8 @@ mod messages;
 mod messaging;
 mod monitoring;
 mod node_api;
+mod node_starter;
+mod node_test_api;
 mod proposal;
 mod relocation;
 mod split_barrier;
@@ -49,8 +51,9 @@ pub use self::{
     node_api::{
         event::{Event, MembershipEvent, MessagingEvent, NodeElderChange},
         event_channel::EventReceiver,
-        NodeApi,
     },
+    node_starter::{new_test_api, start_node},
+    node_test_api::NodeTestApi,
 };
 
 pub(crate) use self::monitoring::RateLimits;

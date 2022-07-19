@@ -29,7 +29,7 @@
 
 #[cfg(not(feature = "tokio-console"))]
 use sn_interface::LogFormatter;
-use sn_node::node::{Config, Error as NodeError, Event, MembershipEvent, NodeApi};
+use sn_node::node::{start_node, Config, Error as NodeError, Event, MembershipEvent};
 
 use clap::{CommandFactory, Parser};
 use clap_complete::{generate, Shell};
@@ -316,8 +316,8 @@ async fn run_node(config: Config) -> Result<()> {
     let join_timeout = Duration::from_secs(JOIN_TIMEOUT_SEC);
     let bootstrap_retry_duration = Duration::from_secs(BOOTSTRAP_RETRY_TIME_SEC);
 
-    let (_node, mut event_stream) = loop {
-        match NodeApi::new(&config, join_timeout).await {
+    let (_ref, mut event_stream) = loop {
+        match start_node(&config, join_timeout).await {
             Ok(result) => break result,
             Err(NodeError::CannotConnectEndpoint(qp2p::EndpointError::Upnp(error))) => {
                 return Err(error).suggestion(
@@ -377,10 +377,9 @@ async fn run_node(config: Config) -> Result<()> {
         let mut rng = rand::thread_rng();
         let x: f64 = rng.gen_range(0.0..1.0);
 
-        let is_elder = _node.is_elder().await;
         if !config.is_first() && x > 0.6 {
             println!(
-                "\n =========== [Chaos] (PID: {our_pid}): Startup chaos crash w/ x of: {}. Was elder?: {is_elder} ============== \n",
+                "\n =========== [Chaos] (PID: {our_pid}): Startup chaos crash w/ x of: {}. ============== \n",
                 x
             );
 
