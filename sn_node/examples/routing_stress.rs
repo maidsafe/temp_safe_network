@@ -13,8 +13,8 @@ use sn_interface::{
     types::Cache,
 };
 use sn_node::node::{
-    cfg::create_test_max_capacity_and_root_storage, Config, Event as RoutingEvent, MembershipEvent,
-    MessagingEvent, NodeApi, NodeElderChange,
+    cfg::create_test_max_capacity_and_root_storage, new_test_api, Config, Event as RoutingEvent,
+    MembershipEvent, MessagingEvent, NodeElderChange, NodeTestApi as NodeApi,
 };
 
 use bls::PublicKey;
@@ -621,7 +621,7 @@ async fn add_node(id: u64, mut config: Config, event_sender: Sender<Event>) -> R
     config.root_dir = Some(root_dir);
     let join_timeout = Duration::from_secs(3 * 60);
 
-    let (node, mut event_receiver) = match NodeApi::new(&config, join_timeout).await {
+    let (node, mut event_receiver) = match new_test_api(&config, join_timeout).await {
         Ok(output) => output,
         Err(error) => {
             let _res = event_sender

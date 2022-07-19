@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{messages::WireMsgUtils, node_api::Cmd, Node, Result};
+use crate::node::{messages::WireMsgUtils, Cmd, Node, Result};
 
 use crate::comm::{Comm, DeliveryStatus};
 use sn_interface::{
@@ -25,7 +25,7 @@ pub(crate) struct Dispatcher {
 }
 
 impl Dispatcher {
-    pub(super) fn new(node: Arc<RwLock<Node>>, comm: Comm) -> Self {
+    pub(crate) fn new(node: Arc<RwLock<Node>>, comm: Comm) -> Self {
         let (cancel_timer_tx, cancel_timer_rx) = watch::channel(false);
         let dkg_timeout = Arc::new(DkgTimeout {
             cancel_timer_tx,
