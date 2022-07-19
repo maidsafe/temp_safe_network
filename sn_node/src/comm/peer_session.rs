@@ -27,7 +27,7 @@ use tokio::{sync::mpsc, time::Instant};
 // TODO: temporarily disable priority while we transition to channels
 // type Priority = i32;
 
-const MAX_SENDJOB_RETRIES: usize = 10;
+const MAX_SENDJOB_RETRIES: usize = 1;
 const DEFAULT_DESIRED_RATE: f64 = 10.0; // 10 msgs / s
 
 #[derive(Debug)]
