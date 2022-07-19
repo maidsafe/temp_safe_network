@@ -30,8 +30,8 @@ mod auth;
 mod consts;
 mod helpers;
 
-#[cfg(test)]
-mod test_helpers;
+#[cfg(any(test, feature = "test-utils"))]
+pub mod test_helpers;
 
 use super::{common, constants, Error, Result};
 

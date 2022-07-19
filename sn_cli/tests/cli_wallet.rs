@@ -7,13 +7,25 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use assert_cmd::prelude::*;
-use assert_fs::prelude::*;
+use assert_fs::{
+    fixture::{ChildPath, TempDir},
+    prelude::*,
+};
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
+use sn_api::{test_helpers::get_next_bearer_dbc, Token};
 use sn_cmd_test_utilities::util::{
-    parse_keys_create_output, parse_wallet_create_output, safe_cmd, safe_cmd_stdout,
-    DBC_WITH_12_230_000_000,
+    get_random_string, parse_keys_create_output, parse_wallet_create_output, safe_cmd,
+    safe_cmd_stdout,
 };
+
+async fn get_bearer_dbc_on_file(tmp_data_dir: &TempDir) -> Result<(ChildPath, Token)> {
+    let dbc_file_path = tmp_data_dir.child(get_random_string());
+    let (dbc, balance) = get_next_bearer_dbc().await.map_err(|err| eyre!(err))?;
+    dbc_file_path.write_str(&dbc.to_hex()?)?;
+
+    Ok((dbc_file_path, balance))
+}
 
 #[test]
 fn wallet_create_should_create_a_wallet() -> Result<()> {
@@ -25,10 +37,13 @@ fn wallet_create_should_create_a_wallet() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn wallet_deposit_should_deposit_a_bearer_dbc() -> Result<()> {
+#[tokio::test]
+async fn wallet_deposit_should_deposit_a_bearer_dbc() -> Result<()> {
     let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let (dbc_file_path, balance) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
         [
@@ -37,26 +52,25 @@ fn wallet_deposit_should_deposit_a_bearer_dbc() -> Result<()> {
             "--name",
             "my-first-dbc",
             "--dbc",
-            DBC_WITH_12_230_000_000,
+            &dbc_file_path.path().display().to_string(),
             &wallet_xorurl,
         ],
         Some(0),
     )?
     .assert()
     .stdout(format!(
-        "Spendable DBC deposited (12.230000000 safecoins) with name '{}' in wallet located at \"{}\"\n",
-        "my-first-dbc", wallet_xorurl
+        "Spendable DBC deposited ({} safecoins) with name 'my-first-dbc' in wallet located at \"{}\"\n",
+        balance, wallet_xorurl
     ))
     .success();
 
     Ok(())
 }
 
-#[test]
-fn wallet_deposit_should_deposit_a_dbc_from_a_file() -> Result<()> {
+#[tokio::test]
+async fn wallet_deposit_should_deposit_a_dbc_from_a_file() -> Result<()> {
     let tmp_data_dir = assert_fs::TempDir::new()?;
-    let dbc_data_file = tmp_data_dir.child("dbc_with_12_300_000_000");
-    dbc_data_file.write_str(DBC_WITH_12_230_000_000)?;
+    let (dbc_file_path, balance) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
@@ -68,26 +82,28 @@ fn wallet_deposit_should_deposit_a_dbc_from_a_file() -> Result<()> {
             "--name",
             "my-first-dbc",
             "--dbc",
-            &dbc_data_file.path().display().to_string(),
+            &dbc_file_path.display().to_string(),
             &wallet_xorurl,
         ],
         Some(0),
     )?
     .assert()
     .stdout(format!(
-        "Spendable DBC deposited (12.230000000 safecoins) with name '{}' in wallet located at \"{}\"\n",
-        "my-first-dbc", wallet_xorurl
+        "Spendable DBC deposited ({} safecoins) with name 'my-first-dbc' in wallet located at \"{}\"\n",
+        balance, wallet_xorurl
     ))
     .success();
 
     Ok(())
 }
 
-#[test]
-fn wallet_deposit_should_deposit_a_dbc_from_a_file_with_whitespace_at_the_end() -> Result<()> {
+#[tokio::test]
+async fn wallet_deposit_should_deposit_a_dbc_from_a_file_with_whitespace_at_the_end() -> Result<()>
+{
     let tmp_data_dir = assert_fs::TempDir::new()?;
-    let dbc_data_file = tmp_data_dir.child("dbc_with_12_300_000_000");
-    dbc_data_file.write_str(&format!("{}  \n", DBC_WITH_12_230_000_000))?;
+    let dbc_file_path = tmp_data_dir.child(get_random_string());
+    let (dbc, balance) = get_next_bearer_dbc().await.map_err(|err| eyre!(err))?;
+    dbc_file_path.write_str(&format!("{}  \n", dbc.to_hex()?))?;
 
     let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
@@ -99,15 +115,15 @@ fn wallet_deposit_should_deposit_a_dbc_from_a_file_with_whitespace_at_the_end() 
             "--name",
             "my-first-dbc",
             "--dbc",
-            &dbc_data_file.path().display().to_string(),
+            &dbc_file_path.path().display().to_string(),
             &wallet_xorurl,
         ],
         Some(0),
     )?
     .assert()
     .stdout(format!(
-        "Spendable DBC deposited (12.230000000 safecoins) with name '{}' in wallet located at \"{}\"\n",
-        "my-first-dbc", wallet_xorurl
+        "Spendable DBC deposited ({} safecoins) with name 'my-first-dbc' in wallet located at \"{}\"\n",
+        balance, wallet_xorurl
     ))
     .success();
 
@@ -117,8 +133,8 @@ fn wallet_deposit_should_deposit_a_dbc_from_a_file_with_whitespace_at_the_end() 
 #[test]
 fn wallet_deposit_should_fail_with_suggestion_when_file_does_not_contain_dbc_data() -> Result<()> {
     let tmp_data_dir = assert_fs::TempDir::new()?;
-    let dbc_data_file = tmp_data_dir.child("dbc_with_12_300_000_000");
-    dbc_data_file.write_str("this file does not have dbc data")?;
+    let dbc_file_path = tmp_data_dir.child("dbc_with_12_300_000_000");
+    dbc_file_path.write_str("this file does not have dbc data")?;
 
     let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
@@ -130,7 +146,7 @@ fn wallet_deposit_should_fail_with_suggestion_when_file_does_not_contain_dbc_dat
             "--name",
             "my-first-dbc",
             "--dbc",
-            &dbc_data_file.path().display().to_string(),
+            &dbc_file_path.path().display().to_string(),
             &wallet_xorurl,
         ],
         Some(1),
@@ -181,12 +197,14 @@ fn wallet_deposit_should_fail_with_suggestion_when_path_is_directory() -> Result
 /// Therefore, this test requires the generation of those credentials in advance. We should
 /// probably refactor the CLI test suite so that each test case that requires credentials creates
 /// its own new keypair, but we don't have that infrastructure available at the moment.
-#[test]
-fn wallet_deposit_should_deposit_an_owned_dbc_with_configured_secret_key() -> Result<()> {
+#[tokio::test]
+async fn wallet_deposit_should_deposit_an_owned_dbc_with_configured_secret_key() -> Result<()> {
     let keys_show_output = safe_cmd_stdout(["keys", "show", "--json"], Some(0))?;
     let (pk_hex, _) = parse_keys_create_output(&keys_show_output)?;
     let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let (dbc_file_path, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
         [
@@ -195,7 +213,7 @@ fn wallet_deposit_should_deposit_an_owned_dbc_with_configured_secret_key() -> Re
             "--name",
             "my-first-dbc",
             "--dbc",
-            DBC_WITH_12_230_000_000,
+            &dbc_file_path.display().to_string(),
             &wallet_xorurl,
         ],
         Some(0),
@@ -205,7 +223,7 @@ fn wallet_deposit_should_deposit_an_owned_dbc_with_configured_secret_key() -> Re
         [
             "wallet",
             "reissue",
-            "7.15",
+            "3.15",
             "--from",
             &wallet_xorurl,
             "--public-key",
@@ -229,20 +247,22 @@ fn wallet_deposit_should_deposit_an_owned_dbc_with_configured_secret_key() -> Re
     )?
     .assert()
     .stdout(format!(
-        "Spendable DBC deposited (7.150000000 safecoins) with name '{}' in wallet located at \"{}\"\n",
-        "reissued-dbc", wallet_xorurl
+        "Spendable DBC deposited (3.150000000 safecoins) with name 'reissued-dbc' in wallet located at \"{}\"\n",
+         wallet_xorurl
     ))
     .success();
     Ok(())
 }
 
-#[test]
-fn wallet_deposit_should_deposit_an_owned_dbc_with_secret_key_arg() -> Result<()> {
+#[tokio::test]
+async fn wallet_deposit_should_deposit_an_owned_dbc_with_secret_key_arg() -> Result<()> {
     let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
-    let pk_hex = "8664d6e363117516a6816ad62a0960fdef274c784934e208a7134594888e2454\
-                  f3ed300ba87c1783c79cb671edcf4d95";
-    let sk_hex = "20d58316dc97d533a798dafa08ac46811219e532ee8ba419e9be2ebe7a1e1f24";
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let (dbc_file_path, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+
+    let sk = bls::SecretKey::random();
+    let pk = sk.public_key();
 
     safe_cmd(
         [
@@ -251,7 +271,7 @@ fn wallet_deposit_should_deposit_an_owned_dbc_with_secret_key_arg() -> Result<()
             "--name",
             "my-first-dbc",
             "--dbc",
-            DBC_WITH_12_230_000_000,
+            &dbc_file_path.display().to_string(),
             &wallet_xorurl,
         ],
         Some(0),
@@ -265,7 +285,7 @@ fn wallet_deposit_should_deposit_an_owned_dbc_with_secret_key_arg() -> Result<()
             "--from",
             &wallet_xorurl,
             "--public-key",
-            pk_hex,
+            &pk.to_hex(),
             "--json",
         ],
         Some(0),
@@ -280,15 +300,15 @@ fn wallet_deposit_should_deposit_an_owned_dbc_with_secret_key_arg() -> Result<()
             "--dbc",
             &reissue_output,
             "--secret-key",
-            sk_hex,
+            &sk.to_hex(),
             &wallet_xorurl,
         ],
         Some(0),
     )?
     .assert()
     .stdout(format!(
-        "Spendable DBC deposited (7.150000000 safecoins) with name '{}' in wallet located at \"{}\"\n",
-        "reissued-dbc", wallet_xorurl
+        "Spendable DBC deposited (7.150000000 safecoins) with name 'reissued-dbc' in wallet located at \"{}\"\n",
+         wallet_xorurl
     ))
     .success();
     Ok(())
@@ -302,13 +322,15 @@ fn wallet_deposit_should_deposit_an_owned_dbc_with_secret_key_arg() -> Result<()
 /// credentials, so at the end of this test, we will generate a new set. The best solution would
 /// probably be for each test case that requires credentials to generate its own keypair, but at
 /// the moment we don't have that infrastructure.
-#[test]
+#[tokio::test]
 #[ignore = "this test is problematic when running in parallel"]
-fn wallet_deposit_owned_dbc_with_no_secret_key_or_credentials_should_fail_with_suggestion(
+async fn wallet_deposit_owned_dbc_with_no_secret_key_or_credentials_should_fail_with_suggestion(
 ) -> Result<()> {
     let pk_hex = bls::SecretKey::random().public_key().to_hex();
     let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let (dbc_file_path, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
         [
@@ -317,7 +339,7 @@ fn wallet_deposit_owned_dbc_with_no_secret_key_or_credentials_should_fail_with_s
             "--name",
             "my-first-dbc",
             "--dbc",
-            DBC_WITH_12_230_000_000,
+            &dbc_file_path.display().to_string(),
             &wallet_xorurl,
         ],
         Some(0),
@@ -327,7 +349,7 @@ fn wallet_deposit_owned_dbc_with_no_secret_key_or_credentials_should_fail_with_s
         [
             "wallet",
             "reissue",
-            "7.15",
+            "0.15",
             "--from",
             &wallet_xorurl,
             "--public-key",
@@ -372,14 +394,16 @@ fn wallet_deposit_owned_dbc_with_no_secret_key_or_credentials_should_fail_with_s
     Ok(())
 }
 
-#[test]
-fn wallet_deposit_owned_dbc_with_secret_key_that_does_not_match_should_fail_with_suggestion(
+#[tokio::test]
+async fn wallet_deposit_owned_dbc_with_secret_key_that_does_not_match_should_fail_with_suggestion(
 ) -> Result<()> {
     let sk = bls::SecretKey::random();
     let sk2 = bls::SecretKey::random();
     let pk_hex = sk.public_key().to_hex();
     let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let (dbc_file_path, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
         [
@@ -388,7 +412,7 @@ fn wallet_deposit_owned_dbc_with_secret_key_that_does_not_match_should_fail_with
             "--name",
             "my-first-dbc",
             "--dbc",
-            DBC_WITH_12_230_000_000,
+            &dbc_file_path.display().to_string(),
             &wallet_xorurl,
         ],
         Some(0),
@@ -398,7 +422,7 @@ fn wallet_deposit_owned_dbc_with_secret_key_that_does_not_match_should_fail_with
         [
             "wallet",
             "reissue",
-            "7.15",
+            "0.15",
             "--from",
             &wallet_xorurl,
             "--public-key",
@@ -434,10 +458,12 @@ fn wallet_deposit_owned_dbc_with_secret_key_that_does_not_match_should_fail_with
     Ok(())
 }
 
-#[test]
-fn wallet_balance_should_report_the_balance_of_a_wallet() -> Result<()> {
+#[tokio::test]
+async fn wallet_balance_should_report_the_balance_of_a_wallet() -> Result<()> {
     let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let (dbc_file_path, balance) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
         [
@@ -446,7 +472,7 @@ fn wallet_balance_should_report_the_balance_of_a_wallet() -> Result<()> {
             "--name",
             "my-first-dbc",
             "--dbc",
-            DBC_WITH_12_230_000_000,
+            &dbc_file_path.display().to_string(),
             &wallet_xorurl,
         ],
         Some(0),
@@ -455,18 +481,20 @@ fn wallet_balance_should_report_the_balance_of_a_wallet() -> Result<()> {
     safe_cmd(["wallet", "balance", &wallet_xorurl], Some(0))?
         .assert()
         .stdout(format!(
-            "Wallet at \"{}\" has a total balance of 12.230000000 safecoins\n",
-            wallet_xorurl
+            "Wallet at \"{}\" has a total balance of {} safecoins\n",
+            wallet_xorurl, balance
         ))
         .success();
 
     Ok(())
 }
 
-#[test]
-fn wallet_reissue_should_reissue_a_bearer_dbc_from_a_deposited_dbc() -> Result<()> {
+#[tokio::test]
+async fn wallet_reissue_should_reissue_a_bearer_dbc_from_a_deposited_dbc() -> Result<()> {
     let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let (dbc_file_path, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
         [
@@ -475,19 +503,19 @@ fn wallet_reissue_should_reissue_a_bearer_dbc_from_a_deposited_dbc() -> Result<(
             "--name",
             "my-first-dbc",
             "--dbc",
-            DBC_WITH_12_230_000_000,
+            &dbc_file_path.display().to_string(),
             &wallet_xorurl,
         ],
         Some(0),
     )?;
 
     safe_cmd(
-        ["wallet", "reissue", "7.15", "--from", &wallet_xorurl],
+        ["wallet", "reissue", "1.15", "--from", &wallet_xorurl],
         Some(0),
     )?
     .assert()
     .stdout(predicate::str::contains(
-        "Reissued DBC with 7.15 safecoins.",
+        "Reissued DBC with 1.15 safecoins.",
     ))
     .stdout(predicate::str::contains(
         "This is a bearer DBC that can be spent by anyone.",
@@ -497,11 +525,14 @@ fn wallet_reissue_should_reissue_a_bearer_dbc_from_a_deposited_dbc() -> Result<(
     Ok(())
 }
 
-#[test]
-fn wallet_reissue_should_reissue_an_owned_dbc_from_a_deposited_dbc() -> Result<()> {
+#[tokio::test]
+async fn wallet_reissue_should_reissue_an_owned_dbc_from_a_deposited_dbc() -> Result<()> {
     let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
-    let pk_hex = "84da738d24dbf226bdcf4a9e27ac8a9f1beaa7c527f46774fb645b8d88850c0dab2159c2d646c35c53cf2fa940a9d6f3";
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let (dbc_file_path, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+
+    let pk_hex = bls::SecretKey::random().public_key().to_hex();
 
     safe_cmd(
         [
@@ -510,7 +541,7 @@ fn wallet_reissue_should_reissue_an_owned_dbc_from_a_deposited_dbc() -> Result<(
             "--name",
             "my-first-dbc",
             "--dbc",
-            DBC_WITH_12_230_000_000,
+            &dbc_file_path.display().to_string(),
             &wallet_xorurl,
         ],
         Some(0),
@@ -520,17 +551,17 @@ fn wallet_reissue_should_reissue_an_owned_dbc_from_a_deposited_dbc() -> Result<(
         [
             "wallet",
             "reissue",
-            "7.15",
+            "2.15",
             "--from",
             &wallet_xorurl,
             "--public-key",
-            pk_hex,
+            &pk_hex,
         ],
         Some(0),
     )?
     .assert()
     .stdout(predicate::str::contains(
-        "Reissued DBC with 7.15 safecoins.",
+        "Reissued DBC with 2.15 safecoins.",
     ))
     .stdout(predicate::str::contains(format!(
         "This DBC is owned by public key {}",
@@ -541,12 +572,14 @@ fn wallet_reissue_should_reissue_an_owned_dbc_from_a_deposited_dbc() -> Result<(
     Ok(())
 }
 
-#[test]
-fn wallet_reissue_with_owned_arg_should_reissue_with_configured_public_key() -> Result<()> {
+#[tokio::test]
+async fn wallet_reissue_with_owned_arg_should_reissue_with_configured_public_key() -> Result<()> {
     let keys_show_output = safe_cmd_stdout(["keys", "show", "--json"], Some(0))?;
     let (pk_hex, _) = parse_keys_create_output(&keys_show_output)?;
     let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let (dbc_file_path, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
         [
@@ -555,7 +588,7 @@ fn wallet_reissue_with_owned_arg_should_reissue_with_configured_public_key() -> 
             "--name",
             "my-first-dbc",
             "--dbc",
-            DBC_WITH_12_230_000_000,
+            &dbc_file_path.display().to_string(),
             &wallet_xorurl,
         ],
         Some(0),
@@ -565,7 +598,7 @@ fn wallet_reissue_with_owned_arg_should_reissue_with_configured_public_key() -> 
         [
             "wallet",
             "reissue",
-            "7.15",
+            "0.15",
             "--from",
             &wallet_xorurl,
             "--owned",
@@ -574,7 +607,7 @@ fn wallet_reissue_with_owned_arg_should_reissue_with_configured_public_key() -> 
     )?
     .assert()
     .stdout(predicate::str::contains(
-        "Reissued DBC with 7.15 safecoins.",
+        "Reissued DBC with 0.15 safecoins.",
     ))
     .stdout(predicate::str::contains(format!(
         "This DBC is owned by public key {}",
@@ -594,11 +627,14 @@ fn wallet_reissue_with_owned_arg_should_reissue_with_configured_public_key() -> 
 /// credentials, so at the end of this test, we will generate a new set. The best solution would
 /// probably be for each test case that requires credentials to generate its own keypair, but at
 /// the moment we don't have that infrastructure.
-#[test]
+#[tokio::test]
 #[ignore = "this test is problematic when running in parallel"]
-fn wallet_reissue_with_owned_arg_should_fail_if_credentials_are_not_configured() -> Result<()> {
+async fn wallet_reissue_with_owned_arg_should_fail_if_credentials_are_not_configured() -> Result<()>
+{
     let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let (dbc_file_path, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
         [
@@ -607,7 +643,7 @@ fn wallet_reissue_with_owned_arg_should_fail_if_credentials_are_not_configured()
             "--name",
             "my-first-dbc",
             "--dbc",
-            DBC_WITH_12_230_000_000,
+            &dbc_file_path.display().to_string(),
             &wallet_xorurl,
         ],
         Some(0),
@@ -624,7 +660,7 @@ fn wallet_reissue_with_owned_arg_should_fail_if_credentials_are_not_configured()
         [
             "wallet",
             "reissue",
-            "7.15",
+            "0.15",
             "--from",
             &wallet_xorurl,
             "--owned",
@@ -644,10 +680,13 @@ fn wallet_reissue_with_owned_arg_should_fail_if_credentials_are_not_configured()
     Ok(())
 }
 
-#[test]
-fn wallet_reissue_with_owned_and_public_key_args_should_fail_with_suggestion() -> Result<()> {
+#[tokio::test]
+async fn wallet_reissue_with_owned_and_public_key_args_should_fail_with_suggestion() -> Result<()> {
     let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let (dbc_file_path, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+
     let sk = bls::SecretKey::random();
 
     safe_cmd(
@@ -657,7 +696,7 @@ fn wallet_reissue_with_owned_and_public_key_args_should_fail_with_suggestion() -
             "--name",
             "my-first-dbc",
             "--dbc",
-            DBC_WITH_12_230_000_000,
+            &dbc_file_path.display().to_string(),
             &wallet_xorurl,
         ],
         Some(0),
@@ -667,7 +706,7 @@ fn wallet_reissue_with_owned_and_public_key_args_should_fail_with_suggestion() -
         [
             "wallet",
             "reissue",
-            "7.15",
+            "1.15",
             "--from",
             &wallet_xorurl,
             "--owned",

@@ -12,7 +12,7 @@ use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
 use sn_api::resolver::{SafeData, SafeUrl};
 use sn_cmd_test_utilities::util::{
-    get_random_nrs_string, parse_files_put_or_sync_output, parse_wallet_create_output, safe_cmd,
+    get_random_string, parse_files_put_or_sync_output, parse_wallet_create_output, safe_cmd,
     safe_cmd_stdout, upload_path,
 };
 use std::path::PathBuf;
@@ -24,7 +24,7 @@ fn calling_safe_dog_files_container_nrsurl() -> Result<()> {
     let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
     let (container_xorurl, _) = parse_files_put_or_sync_output(&content)?;
 
-    let nrsurl = get_random_nrs_string();
+    let nrsurl = get_random_string();
     safe_cmd(
         ["nrs", "register", &nrsurl, "-l", &container_xorurl],
         Some(0),
@@ -48,7 +48,7 @@ fn calling_safe_dog_files_container_nrsurl_with_safe_prefix() -> Result<()> {
     let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
     let (container_xorurl, _) = parse_files_put_or_sync_output(&content)?;
 
-    let site_name = get_random_nrs_string();
+    let site_name = get_random_string();
     let nrsurl = format!("safe://{}", site_name);
     safe_cmd(
         ["nrs", "register", &site_name, "-l", &container_xorurl],
@@ -73,7 +73,7 @@ fn calling_safe_dog_files_container_nrsurl_jsoncompact() -> Result<()> {
     let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--output=jsoncompact"], Some(0))?;
     let (container_xorurl, _) = parse_files_put_or_sync_output(&content)?;
 
-    let nrsurl = get_random_nrs_string();
+    let nrsurl = get_random_string();
     safe_cmd(
         ["nrs", "register", &nrsurl, "-l", &container_xorurl],
         Some(0),
@@ -97,7 +97,7 @@ fn calling_safe_dog_files_container_nrsurl_yaml() -> Result<()> {
     let content = safe_cmd_stdout(["files", "put", TEST_FILE, "--json"], Some(0))?;
     let (container_xorurl, _) = parse_files_put_or_sync_output(&content)?;
 
-    let nrsurl = get_random_nrs_string();
+    let nrsurl = get_random_string();
     let _ = safe_cmd_stdout(
         ["nrs", "register", &nrsurl, "-l", &container_xorurl],
         Some(0),
@@ -151,7 +151,7 @@ fn calling_safe_dog_with_nrs_map_container_link() -> Result<()> {
         .link()
         .ok_or_else(|| eyre!("should have link"))?;
 
-    let site_name = get_random_nrs_string();
+    let site_name = get_random_string();
     let container_xorurl = SafeUrl::from_url(&format!("safe://{}", site_name))?.to_xorurl_string();
     safe_cmd(
         [

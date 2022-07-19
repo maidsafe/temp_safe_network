@@ -10,12 +10,14 @@ use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
-use sn_api::resolver::{ContentType, DataType, SafeUrl};
+use sn_api::{
+    resolver::{ContentType, DataType, SafeUrl},
+    test_helpers::get_next_bearer_dbc,
+};
 use sn_cmd_test_utilities::util::{
-    get_random_nrs_string, parse_files_container_output, parse_files_put_or_sync_output,
+    get_random_string, parse_files_container_output, parse_files_put_or_sync_output,
     parse_nrs_register_output, parse_wallet_create_output, safe_cmd, safe_cmd_stderr,
-    safe_cmd_stdout, safeurl_from, test_symlinks_are_valid, upload_path,
-    upload_test_symlinks_folder, CLI, DBC_WITH_12_230_000_000,
+    safe_cmd_stdout, test_symlinks_are_valid, upload_path, upload_test_symlinks_folder, CLI,
 };
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -47,7 +49,7 @@ fn calling_safe_cat_using_spot_file() -> Result<()> {
     .stdout(predicate::str::contains(TEST_FILE_CONTENT))
     .success();
 
-    let safeurl = safeurl_from(
+    let safeurl = SafeUrl::from_url(
         processed_files[Path::new("../resources/testdata/test.md")]
             .link()
             .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
@@ -87,7 +89,7 @@ fn calling_safe_cat_using_large_file() -> Result<()> {
     .stdout(predicate::str::contains(content))
     .success();
 
-    let safeurl = safeurl_from(
+    let safeurl = SafeUrl::from_url(
         processed_files[Path::new("../resources/testdata/large_markdown_file.md")]
             .link()
             .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
@@ -156,7 +158,7 @@ fn calling_safe_cat_hexdump() -> Result<()> {
     .stdout(predicate::str::contains(TEST_FILE_HEXDUMP_CONTENT))
     .success();
 
-    let safeurl = safeurl_from(
+    let safeurl = SafeUrl::from_url(
         processed_files[Path::new(TEST_FILE)]
             .link()
             .ok_or_else(|| eyre!("Missing xorurl link of uploaded test file"))?,
@@ -205,7 +207,7 @@ fn calling_safe_cat_nrsurl_with_version() -> Result<()> {
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
-    let public_name = format!("test.{}", get_random_nrs_string());
+    let public_name = format!("test.{}", get_random_string());
     let output = safe_cmd_stdout(
         [
             "nrs",
@@ -241,7 +243,7 @@ fn calling_safe_cat_nrsurl_without_safe_prefix() -> Result<()> {
     let mut url = SafeUrl::from_url(&files_container_xor)?;
     url.set_path("test.md");
 
-    let public_name = format!("test.{}", get_random_nrs_string());
+    let public_name = format!("test.{}", get_random_string());
     safe_cmd(
         [
             "nrs",
@@ -279,7 +281,7 @@ fn calling_safe_cat_nrsurl_with_immutable_content() -> Result<()> {
         .ok_or_else(|| eyre!("Could not retrieve URL from processed file change"))?;
     let url = SafeUrl::from_url(file_url)?;
 
-    let public_name = format!("test.{}", get_random_nrs_string());
+    let public_name = format!("test.{}", get_random_string());
     safe_cmd_stdout(
         [
             "nrs",
@@ -301,10 +303,16 @@ fn calling_safe_cat_nrsurl_with_immutable_content() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn calling_safe_cat_wallet() -> Result<()> {
+#[tokio::test]
+async fn calling_safe_cat_wallet() -> Result<()> {
     let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let dbc_file_path = tmp_data_dir.child(get_random_string());
+    let (dbc, balance) = get_next_bearer_dbc().await.map_err(|err| eyre!(err))?;
+    let dbc_hex_string = dbc.to_hex()?;
+    dbc_file_path.write_str(&dbc_hex_string)?;
 
     safe_cmd(
         [
@@ -313,7 +321,7 @@ fn calling_safe_cat_wallet() -> Result<()> {
             "--name",
             "my-first-dbc",
             "--dbc",
-            DBC_WITH_12_230_000_000,
+            &dbc_file_path.display().to_string(),
             &wallet_xorurl,
         ],
         Some(0),
@@ -326,11 +334,11 @@ fn calling_safe_cat_wallet() -> Result<()> {
             wallet_xorurl
         )))
         .stdout(predicate::str::contains("my-first-dbc"))
-        .stdout(predicate::str::contains("12.230000000"))
+        .stdout(predicate::str::contains(balance.to_string()))
         .stdout(predicate::str::contains(format!(
             "{}...{}",
-            &DBC_WITH_12_230_000_000[..8],
-            &DBC_WITH_12_230_000_000[DBC_WITH_12_230_000_000.len() - 8..]
+            &dbc_hex_string[..8],
+            &dbc_hex_string[dbc_hex_string.len() - 8..]
         )));
 
     Ok(())
@@ -355,7 +363,7 @@ fn calling_cat_symlinks_resolve_dir_and_file() -> Result<()> {
     }
 
     let (url, ..) = upload_test_symlinks_folder(true)?;
-    let mut safeurl = safeurl_from(&url)?;
+    let mut safeurl = SafeUrl::from_url(&url)?;
     safeurl.set_path("/dir_link_link/parent_dir/dir_link/sibling_dir_file.md");
 
     let output = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
@@ -377,7 +385,7 @@ fn calling_cat_symlinks_resolve_infinite_loop() -> Result<()> {
     }
 
     let (url, ..) = upload_test_symlinks_folder(true)?;
-    let mut safeurl = safeurl_from(&url)?;
+    let mut safeurl = SafeUrl::from_url(&url)?;
 
     safeurl.set_path("/sub/infinite_loop");
     let output = safe_cmd_stderr(["cat", &safeurl.to_string()], Some(1))?;
@@ -419,7 +427,7 @@ fn calling_cat_symlinks_resolve_parent_dir() -> Result<()> {
     }
 
     let (url, ..) = upload_test_symlinks_folder(true)?;
-    let mut safeurl = safeurl_from(&url)?;
+    let mut safeurl = SafeUrl::from_url(&url)?;
 
     safeurl.set_path("/dir_link_deep/../readme.md");
     let output = safe_cmd_stdout(["cat", &safeurl.to_string()], Some(0))?;
@@ -441,7 +449,7 @@ fn calling_cat_symlinks_resolve_dir_outside() -> Result<()> {
     }
 
     let (url, ..) = upload_test_symlinks_folder(true)?;
-    let mut safeurl = safeurl_from(&url)?;
+    let mut safeurl = SafeUrl::from_url(&url)?;
 
     safeurl.set_path("/dir_outside");
     let output = safe_cmd_stderr(["cat", &safeurl.to_string()], Some(1))?;
@@ -470,7 +478,7 @@ fn calling_safe_cat_nrs_map_container() -> Result<()> {
         .link()
         .ok_or_else(|| eyre!("should have link"))?;
 
-    let site_name = get_random_nrs_string();
+    let site_name = get_random_string();
     let container_xorurl = SafeUrl::from_url(&format!("safe://{}", site_name))?.to_xorurl_string();
     safe_cmd(
         [

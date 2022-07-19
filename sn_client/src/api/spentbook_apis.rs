@@ -103,15 +103,14 @@ mod tests {
         let (key_image, tx) = &dbc_builder.inputs()[0];
         assert_eq!(&genesis_key_image, key_image);
 
-        let spent_proofs = genesis_dbc.spent_proofs.into_iter().collect::<Vec<_>>();
-        let spent_transactions = genesis_dbc
-            .spent_transactions
-            .into_iter()
-            .collect::<Vec<_>>();
-
         // Spend the key_image.
         client
-            .spend_dbc(*key_image, tx.clone(), spent_proofs, spent_transactions)
+            .spend_dbc(
+                *key_image,
+                tx.clone(),
+                genesis_dbc.spent_proofs,
+                genesis_dbc.spent_transactions,
+            )
             .await?;
 
         // Get spent proof shares for the key_image

@@ -13,7 +13,7 @@ use assert_cmd::prelude::*;
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
 use sn_api::SafeUrl;
-use sn_cmd_test_utilities::util::{parse_xorurl_output, safeurl_from, CLI, SAFE_PROTOCOL};
+use sn_cmd_test_utilities::util::{parse_xorurl_output, CLI, SAFE_PROTOCOL};
 use std::process::Command;
 
 const TEST_FILE: &str = "../resources/testdata/test.md";
@@ -51,7 +51,7 @@ fn calling_safe_xorurl_decode() -> Result<()> {
 
     let xorurls = parse_xorurl_output(&content)?;
     let file_xorurl = &xorurls[0].1;
-    let safeurl = safeurl_from(file_xorurl)?;
+    let safeurl = SafeUrl::from_url(file_xorurl)?;
 
     let xorurl_decoded = cmd!(
         env!("CARGO_BIN_EXE_safe"),
