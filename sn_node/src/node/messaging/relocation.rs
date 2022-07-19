@@ -8,7 +8,7 @@
 
 use crate::node::{
     bootstrap::JoiningAsRelocated,
-    node_api::cmds::Cmd,
+    flow_ctrl::cmds::Cmd,
     relocation::{find_nodes_to_relocate, ChurnId, RelocateDetailsUtils},
     Event, MembershipEvent, Node, Proposal, Result,
 };

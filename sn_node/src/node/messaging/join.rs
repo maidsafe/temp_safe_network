@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::comm::Comm;
-use crate::node::{node_api::cmds::Cmd, relocation::RelocateDetailsUtils, Node, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, relocation::RelocateDetailsUtils, Node, Result};
 use sn_interface::{
     elder_count,
     messaging::system::{

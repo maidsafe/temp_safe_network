@@ -20,7 +20,7 @@ mod service_msgs;
 mod system_msgs;
 mod update_section;
 
-use crate::node::{node_api::cmds::Cmd, Node, Result, DATA_QUERY_LIMIT};
+use crate::node::{flow_ctrl::cmds::Cmd, Node, Result, DATA_QUERY_LIMIT};
 
 use sn_interface::{
     messaging::{

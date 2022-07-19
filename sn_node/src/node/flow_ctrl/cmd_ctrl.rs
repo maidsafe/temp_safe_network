@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    node_api::{
+    flow_ctrl::{
         cmds::{Cmd, CmdJob},
         dispatcher::Dispatcher,
         event_channel::EventSender,

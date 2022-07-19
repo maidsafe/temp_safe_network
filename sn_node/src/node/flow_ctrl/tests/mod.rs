@@ -12,8 +12,8 @@ use crate::comm::{Comm, MsgEvent};
 use crate::dbs::UsedSpace;
 use crate::node::{
     cfg::create_test_max_capacity_and_root_storage,
+    flow_ctrl::{dispatcher::Dispatcher, event_channel},
     messages::WireMsgUtils,
-    node_api::{dispatcher::Dispatcher, event_channel},
     relocation_check, ChurnId, Cmd, Error, Event, MembershipEvent, Node, Proposal, RateLimits,
     Result as RoutingResult, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
 };

@@ -9,7 +9,7 @@
 use crate::{
     node::{
         delivery_group,
-        node_api::{cmds::Cmd, event_channel::EventSender},
+        flow_ctrl::{cmds::Cmd, event_channel::EventSender},
         Error, Event, Node, Result, GENESIS_DBC_AMOUNT,
     },
     UsedSpace,
