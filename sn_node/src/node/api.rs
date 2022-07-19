@@ -132,7 +132,7 @@ impl Node {
     // Send message to peers on the network.
     pub(crate) fn send_msg_on_to_nodes(&self, mut wire_msg: WireMsg) -> Result<Option<Cmd>> {
         let dst_location = wire_msg.dst_location();
-        let (targets, dg_size) = delivery_group::delivery_targets(
+        let (targets, _dg_size) = delivery_group::delivery_targets(
             dst_location,
             &self.info().name(),
             &self.network_knowledge,
@@ -154,9 +154,8 @@ impl Node {
         }
 
         trace!(
-            "relay {:?} to first {:?} of {:?} (Section PK: {:?})",
+            "relay {:?} to {:?} (Section PK: {:?})",
             wire_msg,
-            dg_size,
             targets,
             wire_msg.src_section_pk(),
         );
@@ -164,9 +163,8 @@ impl Node {
         let dst_pk = self.section_key_by_name(&target_name);
         wire_msg.set_dst_section_pk(dst_pk);
 
-        let cmd = Cmd::SendMsgDeliveryGroup {
+        let cmd = Cmd::SendMsg {
             recipients: targets.into_iter().collect(),
-            delivery_group_size: dg_size,
             wire_msg,
         };
 
