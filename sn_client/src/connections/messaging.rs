@@ -29,6 +29,12 @@ use tokio::{sync::mpsc::channel, task::JoinHandle};
 use tracing::{debug, error, trace, warn};
 use xor_name::XorName;
 
+#[cfg(feature = "traceroute")]
+use sn_interface::types::PublicKey;
+
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Entity;
+
 // Number of Elders subset to send queries to
 pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 
@@ -143,6 +149,7 @@ impl Session {
         query: DataQuery,
         auth: ServiceAuth,
         payload: Bytes,
+        #[cfg(feature = "traceroute")] client_pk: PublicKey,
     ) -> Result<QueryResult> {
         let endpoint = self.endpoint.clone();
 
@@ -189,7 +196,10 @@ impl Session {
             section_pk,
         };
         let auth_kind = AuthKind::Service(auth);
-        let wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst_location)?;
+        let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst_location)?;
+
+        #[cfg(feature = "traceroute")]
+        wire_msg.add_trace(&mut vec![Entity::Client(client_pk)]);
 
         send_msg_in_bg(self.clone(), elders, wire_msg, msg_id)?;
 

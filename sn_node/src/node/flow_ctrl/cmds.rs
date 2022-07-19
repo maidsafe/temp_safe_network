@@ -27,6 +27,9 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Entity;
+
 /// A struct for the job of controlling the flow
 /// of a [`Cmd`] in the system.
 ///
@@ -110,6 +113,8 @@ pub(crate) enum Cmd {
         known_keys: Vec<bls::PublicKey>,
         #[debug(skip)]
         wire_msg_payload: Bytes,
+        #[cfg(feature = "traceroute")]
+        traceroute: Vec<Entity>,
     },
     HandleValidServiceMsg {
         msg_id: MsgId,
@@ -117,6 +122,8 @@ pub(crate) enum Cmd {
         origin: Peer,
         /// Requester's authority over this message
         auth: AuthorityProof<ServiceAuth>,
+        #[cfg(feature = "traceroute")]
+        traceroute: Vec<Entity>,
     },
     /// Handle a timeout previously scheduled with `ScheduleDkgTimeout`.
     HandleDkgTimeout(u64),
@@ -157,7 +164,12 @@ pub(crate) enum Cmd {
     },
     /// Performs serialisation and signing for sending of NodeMsg.
     /// This cmd only send this to other nodes
-    SignOutgoingSystemMsg { msg: SystemMsg, dst: DstLocation },
+    SignOutgoingSystemMsg {
+        msg: SystemMsg,
+        dst: DstLocation,
+        #[cfg(feature = "traceroute")]
+        traceroute: Vec<Entity>,
+    },
     /// Schedule a timeout after the given duration. When the timeout expires, a `HandleDkgTimeout`
     /// cmd is raised. The token is used to identify the timeout.
     ScheduleDkgTimeout { duration: Duration, token: u64 },

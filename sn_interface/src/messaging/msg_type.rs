@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use std::fmt::{Display, Formatter};
 use super::{
     data::ServiceMsg, system::SystemMsg, AuthorityProof, DstLocation, MsgId, NodeMsgAuthority,
     ServiceAuth,
@@ -71,6 +72,15 @@ impl MsgType {
             // client <-> node service comms
             #[cfg(any(feature = "chunks", feature = "registers"))]
             MsgType::Service { msg, .. } => msg.priority(),
+        }
+    }
+}
+
+impl Display for MsgType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MsgType::System { msg, .. } => write!(f, "MsgType::System({})", msg),
+            MsgType::Service { msg, .. } => write!(f, "MsgType::Service({})", msg),
         }
     }
 }

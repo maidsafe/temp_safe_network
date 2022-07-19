@@ -17,6 +17,11 @@ use sn_interface::{
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::{sync::watch, sync::RwLock, time};
 
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Entity;
+#[cfg(feature = "traceroute")]
+use sn_interface::types::PublicKey;
+
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
     node: Arc<RwLock<Node>>,
@@ -66,11 +71,24 @@ impl Dispatcher {
                     .await?;
                 Ok(vec![])
             }
-            Cmd::SignOutgoingSystemMsg { msg, dst } => {
+            Cmd::SignOutgoingSystemMsg {
+                msg,
+                dst,
+                #[cfg(feature = "traceroute")]
+                mut traceroute,
+            } => {
                 let node = self.node.read().await;
 
                 let src_section_pk = node.network_knowledge().section_key();
-                let wire_msg = WireMsg::single_src(&node.info(), dst, msg, src_section_pk)?;
+                let mut wire_msg = WireMsg::single_src(&node.info(), dst, msg, src_section_pk)?;
+
+                #[cfg(feature = "traceroute")]
+                {
+                    traceroute.push(Entity::Adult(PublicKey::Ed25519(
+                        self.node.read().await.info().keypair.public,
+                    )));
+                    wire_msg.add_trace(&mut traceroute);
+                }
 
                 let mut cmds = vec![];
                 cmds.extend(node.send_msg_on_to_nodes(wire_msg)?);
@@ -91,11 +109,20 @@ impl Dispatcher {
                 msg,
                 origin,
                 auth,
+                #[cfg(feature = "traceroute")]
+                traceroute,
             } => {
                 let mut node = self.node.write().await;
 
-                node.handle_valid_service_msg(msg_id, msg, auth, origin)
-                    .await
+                node.handle_valid_service_msg(
+                    msg_id,
+                    msg,
+                    auth,
+                    origin,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
+                )
+                .await
             }
             Cmd::HandleValidSystemMsg {
                 origin,
@@ -104,6 +131,8 @@ impl Dispatcher {
                 msg_authority,
                 known_keys,
                 wire_msg_payload,
+                #[cfg(feature = "traceroute")]
+                traceroute,
             } => {
                 let mut node = self.node.write().await;
 
@@ -118,6 +147,8 @@ impl Dispatcher {
                         origin,
                         known_keys,
                         &self.comm,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
                     )
                     .await
                 } else {

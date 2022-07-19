@@ -96,6 +96,9 @@ impl Node {
                     return Ok(vec![ae_cmd]);
                 }
 
+                #[cfg(feature = "traceroute")]
+                let traceroute = wire_msg.show_trace();
+
                 Ok(vec![Cmd::HandleValidSystemMsg {
                     origin,
                     msg_id,
@@ -103,6 +106,8 @@ impl Node {
                     msg_authority,
                     known_keys,
                     wire_msg_payload,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
                 }])
             }
             MsgType::Service {
@@ -179,6 +184,8 @@ impl Node {
                     msg,
                     origin,
                     auth,
+                    #[cfg(feature = "traceroute")]
+                    traceroute: wire_msg.show_trace(),
                 }])
             }
         }

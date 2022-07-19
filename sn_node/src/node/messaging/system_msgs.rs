@@ -38,6 +38,9 @@ use sn_interface::{
 };
 use xor_name::XorName;
 
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Entity;
+
 impl Node {
     /// Send a direct (`SystemMsg`) message to a node in the specified section
     pub(crate) fn send_direct_msg(
@@ -190,6 +193,7 @@ impl Node {
         sender: Peer,
         known_keys: Vec<BlsPublicKey>,
         comm: &Comm,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
         trace!("{:?}", LogMarker::SystemMsgToBeHandled);
 
@@ -519,7 +523,11 @@ impl Node {
                             self.joins_allowed = true;
                         }
                     }
-                    self.replicate_data(data)
+                    self.replicate_data(
+                        data,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
                 } else {
                     error!("Received unexpected message while Adult");
                     Ok(vec![])
@@ -547,7 +555,14 @@ impl Node {
                         {
                             Ok(level_report) => {
                                 info!("Storage level report: {:?}", level_report);
-                                cmds.extend(self.record_storage_level_if_any(level_report));
+                                cmds.extend(self.record_storage_level_if_any(
+                                    level_report,
+                                    #[cfg(feature = "traceroute")]
+                                    traceroute.clone(),
+                                ));
+
+                                #[cfg(feature = "traceroute")]
+                                info!("End of message flow. Trace: {:?}", traceroute);
                             }
                             Err(DbError::NotEnoughSpace) => {
                                 // db full
@@ -603,6 +618,8 @@ impl Node {
                             auth,
                             origin,
                             sender_xorname,
+                            #[cfg(feature = "traceroute")]
+                            traceroute,
                         )
                         .await
                     }
@@ -629,6 +646,8 @@ impl Node {
                     response,
                     user,
                     sending_nodes_pk,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
                 )
                 .await
             }
@@ -712,7 +731,11 @@ impl Node {
         }
     }
 
-    fn record_storage_level_if_any(&self, level: Option<StorageLevel>) -> Vec<Cmd> {
+    fn record_storage_level_if_any(
+        &self,
+        level: Option<StorageLevel>,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+    ) -> Vec<Cmd> {
         let mut cmds = vec![];
         if let Some(level) = level {
             info!("Storage has now passed {} % used.", 10 * level.value());
@@ -731,7 +754,12 @@ impl Node {
                 section_pk: self.network_knowledge.section_key(),
             };
 
-            cmds.push(Cmd::SignOutgoingSystemMsg { msg, dst });
+            cmds.push(Cmd::SignOutgoingSystemMsg {
+                msg,
+                dst,
+                #[cfg(feature = "traceroute")]
+                traceroute,
+            });
         }
         cmds
     }

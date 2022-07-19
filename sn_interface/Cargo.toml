@@ -16,6 +16,7 @@ back-pressure = []
 chunks = []
 registers = []
 spentbook = []
+traceroute = []
 test-utils=["proptest"]
 
 [dependencies]

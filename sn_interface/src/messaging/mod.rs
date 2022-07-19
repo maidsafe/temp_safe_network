@@ -52,3 +52,6 @@ pub use self::{
     sap::SectionAuthorityProvider,
     serialisation::{NodeMsgAuthority, WireMsg},
 };
+
+#[cfg(feature = "traceroute")]
+pub use self::serialisation::Entity;
