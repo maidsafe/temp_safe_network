@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{messages::WireMsgUtils, node_api::flow_ctrl::FlowCtrl, Node, Peer, Result};
+use crate::node::{flow_ctrl::FlowCtrl, messages::WireMsgUtils, Node, Peer, Result};
 
 use sn_interface::{
     messaging::{system::SystemMsg, DstLocation, WireMsg},

@@ -9,15 +9,15 @@
 use crate::comm::Comm;
 use crate::node::{
     cfg::keypair_storage::{get_reward_pk, store_network_keypair, store_new_reward_keypair},
-    join_network,
-    logging::{log_ctx::LogCtx, run_system_logger},
-    node_api::{
+    flow_ctrl::{
         dispatcher::Dispatcher,
         event::{Elders, Event, MembershipEvent, NodeElderChange},
         event_channel,
         event_channel::EventReceiver,
-        flow_ctrl::{CmdCtrl, FlowCtrl},
+        CmdCtrl, FlowCtrl,
     },
+    join_network,
+    logging::{log_ctx::LogCtx, run_system_logger},
     Config, Error, Node, RateLimits, Result,
 };
 use crate::UsedSpace;

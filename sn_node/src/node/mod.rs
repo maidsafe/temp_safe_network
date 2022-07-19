@@ -18,13 +18,13 @@ mod data;
 mod delivery_group;
 mod dkg;
 pub(crate) mod error;
+mod flow_ctrl;
 mod handover;
 mod logging;
 mod membership;
 mod messages;
 mod messaging;
 mod monitoring;
-mod node_api;
 mod node_starter;
 mod node_test_api;
 mod proposal;
@@ -38,7 +38,7 @@ use self::{
         MAX_WAITING_PEERS_PER_QUERY, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
     },
     data::MIN_LEVEL_WHEN_FULL,
-    node_api::{
+    flow_ctrl::{
         cmds::Cmd,
         event::{CmdProcessEvent, Elders},
     },
@@ -48,7 +48,7 @@ pub use self::{
     cfg::config_handler::Config,
     data::DataStorage,
     error::{Error, Result},
-    node_api::{
+    flow_ctrl::{
         event::{Event, MembershipEvent, MessagingEvent, NodeElderChange},
         event_channel::EventReceiver,
     },
@@ -74,9 +74,9 @@ mod core {
             bootstrap::JoiningAsRelocated,
             data::Capacity,
             dkg::DkgVoter,
+            flow_ctrl::{cmds::Cmd, event_channel::EventSender},
             handover::Handover,
             membership::{elder_candidates, try_split_dkg, Membership},
-            node_api::{cmds::Cmd, event_channel::EventSender},
             split_barrier::SplitBarrier,
             DataStorage, Elders, Error, Event, MembershipEvent, NodeElderChange, Prefix, Proposal,
             Result, XorName,

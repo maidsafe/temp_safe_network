@@ -8,7 +8,7 @@
 
 use super::UsedRecipientSaps;
 
-use crate::node::{messages::WireMsgUtils, node_api::cmds::Cmd, Error, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, messages::WireMsgUtils, Error, Result};
 
 use sn_interface::{
     messaging::{

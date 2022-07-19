@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    messages::WireMsgUtils, node_api::cmds::Cmd, Error, Event, MembershipEvent, Node, Result,
+    flow_ctrl::cmds::Cmd, messages::WireMsgUtils, Error, Event, MembershipEvent, Node, Result,
     StateSnapshot,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -618,7 +618,7 @@ mod tests {
 
     use crate::node::{
         cfg::create_test_max_capacity_and_root_storage,
-        node_api::{event_channel, tests::create_comm},
+        flow_ctrl::{event_channel, tests::create_comm},
         MIN_ADULT_AGE,
     };
     use crate::UsedSpace;

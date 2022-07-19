@@ -6,11 +6,18 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-mod cmd_ctrl;
+pub(crate) mod cmd_ctrl;
+pub(crate) mod cmds;
+pub(super) mod dispatcher;
+pub(super) mod event;
+pub(super) mod event_channel;
+#[cfg(test)]
+pub(crate) mod tests;
 
 pub(crate) use self::cmd_ctrl::CmdCtrl;
+
 use crate::comm::MsgEvent;
-use crate::node::{messages::WireMsgUtils, node_api::cmds::Cmd, Error, Node, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, messages::WireMsgUtils, Error, Node, Result};
 
 use sn_interface::{
     messaging::{

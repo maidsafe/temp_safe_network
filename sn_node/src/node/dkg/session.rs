@@ -7,8 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
+    flow_ctrl::cmds::{next_timer_token, Cmd},
     messages::WireMsgUtils,
-    node_api::cmds::{next_timer_token, Cmd},
     Result,
 };
 

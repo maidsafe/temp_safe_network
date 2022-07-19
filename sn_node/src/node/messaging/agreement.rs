@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    node_api::cmds::Cmd, relocation::ChurnId, Event, MembershipEvent, Node, Proposal, Result,
+    flow_ctrl::cmds::Cmd, relocation::ChurnId, Event, MembershipEvent, Node, Proposal, Result,
 };
 use sn_interface::{
     messaging::system::{JoinResponse, KeyedSig, MembershipState, SectionAuth, SystemMsg},

@@ -10,8 +10,8 @@ use crate::{
     comm::Comm,
     dbs::Error as DbError,
     node::{
-        messages::WireMsgUtils, node_api::cmds::Cmd, DkgSessionInfo, Error, Event, MembershipEvent,
-        Node, Proposal as CoreProposal, Result, MIN_LEVEL_WHEN_FULL,
+        flow_ctrl::cmds::Cmd, messages::WireMsgUtils, DkgSessionInfo, Error, Event,
+        MembershipEvent, Node, Proposal as CoreProposal, Result, MIN_LEVEL_WHEN_FULL,
     },
 };
 use bls::PublicKey as BlsPublicKey;

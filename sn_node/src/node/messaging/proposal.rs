@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    dkg::SigShare, messages::WireMsgUtils, node_api::cmds::Cmd, Node, Proposal, Result,
+    dkg::SigShare, flow_ctrl::cmds::Cmd, messages::WireMsgUtils, Node, Proposal, Result,
 };
 use sn_interface::{
     messaging::{

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{node_api::cmds::Cmd, relocation::ChurnId, Node, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, relocation::ChurnId, Node, Result};
 
 use sn_interface::{
     messaging::system::{KeyedSig, SectionAuth},
