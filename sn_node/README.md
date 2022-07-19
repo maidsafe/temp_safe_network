@@ -6,15 +6,18 @@ The Safe Network Node Implementation.
 
 ### OpenTelemetry Protocol (OTLP)
 
+OTLP allows for inspecting and visualizing log spans.
+
 By specifying the `otlp` feature for the `sn_node` binary, logs will be sent to an OTLP endpoint. This endpoint can be configured by environment variables. (See [opentelemetry.io/docs/...](https://opentelemetry.io/docs/reference/specification/protocol/exporter/) for more information.)
 
 ```sh
-export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4317"
-export RUST_LOG=sn_node=trace
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4317" # Already the default
+export RUST_LOG=sn_node=info # This filters the output for stdout/files, not OTLP
+export RUST_LOG_OTLP=sn_node=trace # This filters what is sent to OTLP endpoint 
 cargo run --release --bin sn_node --features otlp -- --first --skip-auto-port-forwarding --local-addr=127.0.0.1:0
 ```
 
-Before running the node, an OTLP endpoint should be available. An example of an OTLP-supporting endpoint is Jaeger, which can be launched with Docker like this:
+Before running the node, an OTLP endpoint should be available. An example of an OTLP-supporting endpoint is Jaeger, which can be launched with Docker like this (see [documentation](https://www.jaegertracing.io/docs/1.36/getting-started/#all-in-one)):
 ```
 docker run --name jaeger \
   -e COLLECTOR_OTLP_ENABLED=true \

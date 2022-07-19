@@ -4,30 +4,15 @@ use sn_interface::LogFormatter;
 use sn_node::node::Config;
 
 use eyre::Result;
-use tracing::Level;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::filter::{EnvFilter, Targets};
-use tracing_subscriber::layer::Layer;
-use tracing_subscriber::prelude::*;
+use tracing_subscriber::fmt::Layer;
+use tracing_subscriber::layer::Filter;
+use tracing_subscriber::{prelude::*, Registry};
 
-/// Inits node logging, returning the global node guard if required.
-/// This guard should be held for the life of the program.
-///
-/// Logging should be instantiated only once.
-pub fn init_node_logging(config: &Config) -> Result<Option<WorkerGuard>> {
-    let mut layers = vec![];
-    let fmt_layer = tracing_subscriber::fmt::layer()
-        .with_thread_names(true)
-        .with_ansi(false);
-
-    #[cfg(feature = "tokio-console")]
-    {
-        let console_layer = console_subscriber::spawn();
-        layers.push(console_layer.boxed());
-    }
-
-    #[cfg(feature = "otlp")]
-    {
+#[cfg(feature = "otlp")]
+macro_rules! otlp_layer {
+    () => {{
         use opentelemetry::sdk::Resource;
         use opentelemetry::KeyValue;
         use opentelemetry_otlp::WithExportConfig;
@@ -52,55 +37,82 @@ pub fn init_node_logging(config: &Config) -> Result<Option<WorkerGuard>> {
                     ),
                 ])),
             )
-            .install_batch(opentelemetry::runtime::Tokio)?;
+            .install_batch(opentelemetry::runtime::Tokio);
 
-        let otlp_layer = tracing_opentelemetry::layer().with_tracer(tracer);
-
-        layers.push(otlp_layer.boxed());
-    }
-
-    let mut guard: Option<WorkerGuard> = None;
-    if let Some(log_dir) = config.log_dir() {
-        println!("Starting logging to directory: {:?}", log_dir);
-
-        let (non_blocking, worker_guard) = appender::file_rotater(
-            log_dir,
-            config.logs_max_bytes,
-            config.logs_max_lines,
-            config.logs_retained,
-            config.logs_uncompressed,
-        );
-        guard = Some(worker_guard);
-
-        let fmt_layer = fmt_layer.with_writer(non_blocking);
-
-        if config.json_logs {
-            layers.push(fmt_layer.json().boxed());
-        } else {
-            layers.push(fmt_layer.event_format(LogFormatter::default()).boxed());
+        match tracer {
+            Ok(t) => Ok(tracing_opentelemetry::layer().with_tracer(t).with_filter(EnvFilter::from_env("RUST_LOG_OTLP"))),
+            Err(e) => Err(e),
         }
-    } else {
-        println!("Starting logging to stdout");
+    }};
+}
 
-        let fmt_layer = fmt_layer
-            .with_target(false)
-            .event_format(LogFormatter::default());
-        layers.push(fmt_layer.boxed());
-    };
+macro_rules! fmt_layer {
+    ($config:expr) => {{
+        // Filter by log level either from `RUST_LOG` or default to crate only.
+        let target_filter: Box<dyn Filter<Registry> + Send + Sync> =
+            if let Ok(f) = EnvFilter::try_from_default_env() {
+                Box::new(f)
+            } else {
+                Box::new(Targets::new().with_target(current_crate_str(), $config.verbose()))
+            };
+        let mut guard: Option<WorkerGuard> = None;
+        let fmt_layer: Layer<Registry> = tracing_subscriber::fmt::layer()
+            .with_thread_names(true)
+            .with_ansi(false);
 
-    // Create filter to log only from certain modules. Either from `RUST_LOG` or a default level for current crate.
-    let target_filter = if let Ok(f) = EnvFilter::try_from_default_env() {
-        f.boxed()
-    } else {
-        Targets::new()
-            .with_target(current_crate_str(), Level::INFO)
-            .boxed()
-    };
+        let fmt_layer = if let Some(log_dir) = $config.log_dir() {
+            println!("Starting logging to directory: {:?}", log_dir);
 
-    tracing_subscriber::registry()
-        .with(layers)
-        .with(target_filter)
-        .init();
+            let (non_blocking, worker_guard) = appender::file_rotater(
+                log_dir,
+                $config.logs_max_bytes,
+                $config.logs_max_lines,
+                $config.logs_retained,
+                $config.logs_uncompressed,
+            );
+            guard = Some(worker_guard);
+
+            let fmt_layer = fmt_layer.with_writer(non_blocking);
+
+            if $config.json_logs {
+                fmt_layer.json().with_filter(target_filter).boxed()
+            } else {
+                fmt_layer
+                    .event_format(LogFormatter::default())
+                    .with_filter(target_filter)
+                    .boxed()
+            }
+        } else {
+            println!("Starting logging to stdout");
+
+            fmt_layer
+                .with_target(false)
+                .event_format(LogFormatter::default())
+                .with_filter(target_filter)
+                .boxed()
+        };
+
+        (fmt_layer, guard)
+    }};
+}
+
+/// Inits node logging, returning the global node guard if required.
+/// This guard should be held for the life of the program.
+///
+/// Logging should be instantiated only once.
+pub fn init_node_logging(config: &Config) -> Result<Option<WorkerGuard>> {
+    let reg = tracing_subscriber::registry();
+
+    let (fmt, guard) = fmt_layer!(config);
+    let reg = reg.with(fmt);
+
+    #[cfg(feature = "tokio-console")]
+    let reg = reg.with(console_subscriber::spawn());
+
+    #[cfg(feature = "otlp")]
+    let reg = reg.with(otlp_layer!()?);
+
+    reg.init();
 
     Ok(guard)
 }
