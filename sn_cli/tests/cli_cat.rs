@@ -10,14 +10,12 @@ use assert_cmd::prelude::*;
 use assert_fs::prelude::*;
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
-use sn_api::{
-    resolver::{ContentType, DataType, SafeUrl},
-    test_helpers::get_next_bearer_dbc,
-};
+use sn_api::resolver::{ContentType, DataType, SafeUrl};
 use sn_cmd_test_utilities::util::{
-    get_random_string, parse_files_container_output, parse_files_put_or_sync_output,
-    parse_nrs_register_output, parse_wallet_create_output, safe_cmd, safe_cmd_stderr,
-    safe_cmd_stdout, test_symlinks_are_valid, upload_path, upload_test_symlinks_folder, CLI,
+    get_bearer_dbc_on_file, get_random_string, parse_files_container_output,
+    parse_files_put_or_sync_output, parse_nrs_register_output, parse_wallet_create_output,
+    safe_cmd, safe_cmd_stderr, safe_cmd_stdout, test_symlinks_are_valid, upload_path,
+    upload_test_symlinks_folder, CLI,
 };
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -309,8 +307,8 @@ async fn calling_safe_cat_wallet() -> Result<()> {
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
 
     let tmp_data_dir = assert_fs::TempDir::new()?;
-    let dbc_file_path = tmp_data_dir.child(get_random_string());
-    let (dbc, balance) = get_next_bearer_dbc().await.map_err(|err| eyre!(err))?;
+    let (dbc_file_path, dbc, balance) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+
     let dbc_hex_string = dbc.to_hex()?;
     dbc_file_path.write_str(&dbc_hex_string)?;
 
@@ -327,6 +325,14 @@ async fn calling_safe_cat_wallet() -> Result<()> {
         Some(0),
     )?;
 
+    // The CLI shows DBC hex string in a shortened way, keeping the
+    // first and last 8 bytes of the DBC content.
+    let shortened_dbc_str = format!(
+        "{}...{}",
+        &dbc_hex_string[..8],
+        &dbc_hex_string[dbc_hex_string.len() - 8..]
+    );
+
     safe_cmd(["cat", &wallet_xorurl], Some(0))?
         .assert()
         .stdout(predicate::str::contains(format!(
@@ -335,11 +341,7 @@ async fn calling_safe_cat_wallet() -> Result<()> {
         )))
         .stdout(predicate::str::contains("my-first-dbc"))
         .stdout(predicate::str::contains(balance.to_string()))
-        .stdout(predicate::str::contains(format!(
-            "{}...{}",
-            &dbc_hex_string[..8],
-            &dbc_hex_string[dbc_hex_string.len() - 8..]
-        )));
+        .stdout(predicate::str::contains(shortened_dbc_str));
 
     Ok(())
 }

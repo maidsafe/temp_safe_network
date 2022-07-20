@@ -10,6 +10,7 @@ edition = "2021"
 
 [dependencies]
 assert_cmd = "2.0"
+assert_fs = "1.0"
 color-eyre = "~0.6"
 ctor = "~0.1"
 dirs-next = "2.0.0"

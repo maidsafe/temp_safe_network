@@ -3366,6 +3366,7 @@ name = "sn_cmd_test_utilities"
 version = "1.1.0"
 dependencies = [
  "assert_cmd",
+ "assert_fs",
  "color-eyre",
  "ctor",
  "dirs-next 2.0.0",
