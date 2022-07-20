@@ -132,7 +132,7 @@ impl Node {
             } else {
                 let _ = self
                     .dysfunction_tracking
-                    .track_issue(existing_peer.name(), IssueType::ReallyBad);
+                    .track_issue(existing_peer.name(), IssueType::DuplicateSocketAddr);
             }
         }
 

@@ -6,10 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::net::SocketAddr;
-
 use secured_linked_list::error::Error as SecuredLinkedListError;
 use thiserror::Error;
+
+use super::NodeState;
 
 /// The type returned by the `sn_routing` message handling methods.
 pub type Result<T, E = Error> = std::result::Result<T, E>;
@@ -45,9 +45,9 @@ pub enum Error {
     )]
     ExistingMemberConflict,
     #[error(
-        "A JoinResponse was received after a node at this address ({0}) already joined the network. It has been ignored."
+        "A JoinResponse was received after a node with this address is already a member ({0:?}). It has been ignored."
     )]
-    ExistingSocketAddrConflict(SocketAddr),
+    ExistingSocketAddrConflict(NodeState),
     #[error("The node in question is not a member of the section")]
     NotAMember,
     #[error("Request does not match the section prefix")]

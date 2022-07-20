@@ -6,11 +6,17 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::cmds::Cmd, membership, Node, Result};
+use crate::node::{
+    flow_ctrl::cmds::Cmd,
+    membership::{self, Error},
+    Node, Result,
+};
 
 use sn_consensus::{Generation, SignedVote, VoteResponse};
+use sn_dysfunction::IssueType;
 use sn_interface::{
     messaging::system::{KeyedSig, NodeState, SectionAuth, SystemMsg},
+    network_knowledge::Error as NetworkKnowledgeError,
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -29,6 +35,15 @@ impl Node {
                 Ok(vote) => vote,
                 Err(e) => {
                     warn!("Membership - failed to propose change: {e:?}");
+                    if let Error::NetworkKnowledge(
+                        NetworkKnowledgeError::ExistingSocketAddrConflict(node),
+                    ) = e
+                    {
+                        // log this in dysfunction
+                        warn!("Duplicate SocketAddr detected in two nodes. Both have to go");
+                        self.dysfunction_tracking
+                            .track_issue(node.name(), IssueType::DuplicateSocketAddr)?;
+                    }
                     return Ok(vec![]);
                 }
             };

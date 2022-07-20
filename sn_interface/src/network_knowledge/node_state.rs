@@ -92,7 +92,7 @@ impl NodeState {
                     .find(|n| n.peer().addr() == self.peer().addr())
                 {
                     info!("Rejecting join since we have an existing node with this address: {existing_node:?}");
-                    Err(Error::ExistingSocketAddrConflict(existing_node.addr()))
+                    Err(Error::ExistingSocketAddrConflict(existing_node.clone()))
                 } else {
                     Ok(())
                 }

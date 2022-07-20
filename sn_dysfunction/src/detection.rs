@@ -35,10 +35,11 @@ pub enum IssueType {
     Knowledge,
     /// Represents a pending request operation issue to be tracked by Dysfunction Detection.
     PendingRequestOperation(Option<OperationId>),
-    /// Repreents the issue shall cause the node to be voted off immediatelly.
+    /// Two or more nodes share a socketAddr. This should not be possible and one node must be
+    /// a zombie node (receives the msgs, but doesnt respond... so no Comm type issues will be raised)
     /// So far, there is only one situation: node's name changed during bootstrap,
-    ///   i.e. different node names but with the same connection_info
-    ReallyBad,
+    /// i.e. different node names but with the same connection_info
+    DuplicateSocketAddr,
 }
 
 #[derive(Debug)]
@@ -163,12 +164,12 @@ impl DysfunctionDetection {
                 };
                 count
             }
-            IssueType::ReallyBad => {
-                if self.nodes_really_bad.contains(node) {
+            IssueType::DuplicateSocketAddr => {
+                if self.duplicate_sockets.contains(node) {
                     // May need to be further tweaked.
-                    200
-                } else {
                     1
+                } else {
+                    0
                 }
             }
         }
@@ -267,7 +268,8 @@ impl DysfunctionDetection {
     ) -> Result<BTreeSet<XorName>> {
         self.cleanup_time_sensistive_checks()?;
 
-        let mut dysfunctional_nodes = std::mem::take(&mut self.nodes_really_bad);
+        // Take as a basis the duplicate socket nodes, as we'll need to vote them off.
+        let mut dysfunctional_nodes = std::mem::take(&mut self.duplicate_sockets);
 
         let final_scores = self.get_weighted_scores();
 
@@ -317,7 +319,7 @@ mod tests {
     fn generate_really_bad_issues() -> impl Strategy<Value = IssueType> {
         // higher numbers here are more frequent
         prop_oneof![
-        20 => Just(IssueType::ReallyBad),
+        20 => Just(IssueType::DuplicateSocketAddr),
         ]
     }
 
@@ -520,7 +522,7 @@ mod tests {
                     IssueType::PendingRequestOperation(_) => {
                         assert_eq!(score_results.op_scores.len(), adult_count);
                     },
-                    IssueType::ReallyBad => {},
+                    IssueType::DuplicateSocketAddr => {},
                 }
             })
         }
@@ -552,7 +554,7 @@ mod tests {
                     IssueType::PendingRequestOperation(_) => {
                         score_results.op_scores
                     },
-                    IssueType::ReallyBad => BTreeMap::new(),
+                    IssueType::DuplicateSocketAddr => BTreeMap::new(),
                 };
                 let expected_score = if issue_count > 1 {
                     issue_count - 1
@@ -681,7 +683,7 @@ mod tests {
 
                 // Now we loop through each issue/msg
                 for (issue, issue_location) in issues {
-                    if let IssueType::ReallyBad = issue {
+                    if let IssueType::DuplicateSocketAddr = issue {
                         let _ = expected_really_bad_nodes.insert(issue_location);
                         let _ = dysfunctional_detection.track_issue(issue_location, issue.clone());
                     }
@@ -827,7 +829,7 @@ mod tests {
                     IssueType::PendingRequestOperation(_) => {
                         score_results.op_scores
                     },
-                    IssueType::ReallyBad => BTreeMap::new(),
+                    IssueType::DuplicateSocketAddr => BTreeMap::new(),
                 };
                 for adult in adults.iter() {
                     assert_eq!(*scores.get(adult).unwrap(), 1.0);
