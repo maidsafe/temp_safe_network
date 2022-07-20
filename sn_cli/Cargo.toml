@@ -83,7 +83,7 @@ sn_api = { path = "../sn_api", version = "^0.66.3", features = ["app", "test-uti
 path = "../sn_cmd_test_utilities"
 
 [[bench]]
-name = "put"
+name = "files"
 harness = false
 
 [[bench]]

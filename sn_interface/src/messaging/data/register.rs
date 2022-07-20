@@ -40,7 +40,7 @@ pub enum RegisterQuery {
     ///
     /// This should eventually lead to a [`GetRegisterEntry`] response.
     ///
-    /// [`GetEntry`]: QueryResponse::GetRegisterEntry
+    /// [`GetRegisterEntry`]: QueryResponse::GetRegisterEntry
     GetEntry {
         /// Register address.
         address: RegisterAddress,

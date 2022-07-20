@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use sn_dbc::{KeyImage, RingCtTransaction, SpentProof};
 use xor_name::XorName;
 
-/// [`Spentbook`] read operations.
+/// Spentbook read operations.
 #[allow(clippy::large_enum_variant)]
 #[derive(Hash, Eq, PartialEq, PartialOrd, Clone, Serialize, Deserialize, Debug)]
 pub enum SpentbookQuery {
@@ -24,7 +24,7 @@ pub enum SpentbookQuery {
     SpentProofShares(SpentbookAddress),
 }
 
-/// A [`Spentbook`] cmd.
+/// A Spentbook cmd.
 #[allow(clippy::large_enum_variant)]
 #[derive(Eq, PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub enum SpentbookCmd {

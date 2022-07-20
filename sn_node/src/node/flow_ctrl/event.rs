@@ -19,7 +19,7 @@ use ed25519_dalek::Keypair;
 use std::{collections::BTreeSet, sync::Arc, time::SystemTime};
 use xor_name::{Prefix, XorName};
 
-/// Node-internal events raised by a [`Node`] via its event sender.
+/// Node-internal events raised via its event sender.
 ///
 /// These have previously connected to separate (legacy) layers of the
 /// code base (routing and node), which today has been refactored away.

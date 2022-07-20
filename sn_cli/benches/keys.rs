@@ -6,10 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use assert_cmd::Command;
 use criterion::Criterion;
-use duct::cmd;
-use sn_cmd_test_utilities::util::get_bin_location;
-use std::time::Duration;
+use std::{env, time::Duration};
 
 // sample size is _NOT_ the number of times the command is run...
 // https://bheisler.github.io/criterion.rs/book/analysis.html#measurement
@@ -30,9 +29,11 @@ fn bench_cli_keys(c: &mut Criterion) {
     c.bench_function("generating keys", |b| {
         b.iter(|| {
             //  use the safe command, so for bench it has to be installed
-            cmd!(get_bin_location().unwrap(), "keys", "create")
-                .read()
-                .unwrap()
+            let mut cmd = Command::cargo_bin("safe").unwrap();
+            cmd.args(["keys", "create"])
+                .current_dir(env::current_dir().unwrap())
+                .assert()
+                .code(0);
         })
     });
 }

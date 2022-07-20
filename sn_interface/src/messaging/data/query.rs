@@ -36,7 +36,8 @@ pub enum DataQueryVariant {
     /// Retrieve a [`Chunk`] at the given address.
     ///
     /// This should eventually lead to a [`GetChunk`] response.
-    /// [`Chunk`]: crate::types::Chunk
+    ///
+    /// [`Chunk`]:  crate::types::Chunk
     /// [`GetChunk`]: QueryResponse::GetChunk
     GetChunk(ChunkAddress),
     #[cfg(feature = "registers")]
@@ -45,9 +46,7 @@ pub enum DataQueryVariant {
     /// [`Register`]: crate::types::register::Register
     Register(RegisterQuery),
     #[cfg(feature = "spentbook")]
-    /// [`Spentbook`] read operation.
-    ///
-    /// [`Spentbook`]: crate::types::spentbook::Spentbook
+    /// Spentbook read operation.
     Spentbook(SpentbookQuery),
 }
 
