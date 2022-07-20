@@ -41,7 +41,7 @@ pub enum Error {
     #[error(
         "A JoinResponse was reeived after we've already joined the network. It has been ignored."
     )]
-    AlreadyJoinedTheNetwork,
+    ExistingMemberConflict,
     #[error("The node in question is not a member of the section")]
     NotAMember,
     #[error("Request does not match the section prefix")]
