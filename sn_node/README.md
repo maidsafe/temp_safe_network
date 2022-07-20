@@ -1,9 +1,33 @@
-# safe_network
+# sn_node
 
-The Safe Network Core. API message definitions, routing and nodes, client core api.
+The Safe Network Node Implementation.
 
-| [![](https://img.shields.io/crates/v/sn_client)](https://crates.io/crates/sn_client) | [![Documentation](https://docs.rs/sn_client/badge.svg)](https://docs.rs/sn_client) |
-|:----------:|:----------:|
+## Building
+
+### OpenTelemetry Protocol (OTLP)
+
+OTLP allows for inspecting and visualizing log spans.
+
+By specifying the `otlp` feature for the `sn_node` binary, logs will be sent to an OTLP endpoint. This endpoint can be configured by environment variables. (See [opentelemetry.io/docs/...](https://opentelemetry.io/docs/reference/specification/protocol/exporter/) for more information.)
+
+```sh
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4317" # Already the default
+export RUST_LOG=sn_node=info # This filters the output for stdout/files, not OTLP
+export RUST_LOG_OTLP=sn_node=trace # This filters what is sent to OTLP endpoint 
+cargo run --release --bin sn_node --features otlp -- --first --skip-auto-port-forwarding --local-addr=127.0.0.1:0
+```
+
+Before running the node, an OTLP endpoint should be available. An example of an OTLP-supporting endpoint is Jaeger, which can be launched with Docker like this (see [documentation](https://www.jaegertracing.io/docs/1.36/getting-started/#all-in-one)):
+```
+docker run --name jaeger \
+  -e COLLECTOR_OTLP_ENABLED=true \
+  -p 16686:16686 \
+  -p 4317:4317 \
+  -p 4318:4318 \
+  jaegertracing/all-in-one:1.36
+```
+
+In the web interface of Jaeger (http://localhost:16686) one can filter several things, e.g. the tag `service.instance.id=<PID>`, where PID is the process ID of the node. The service name is `sn_node`.
 
 ## License
 
