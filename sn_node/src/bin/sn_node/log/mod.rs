@@ -10,6 +10,42 @@ use tracing_subscriber::fmt::Layer;
 use tracing_subscriber::layer::Filter;
 use tracing_subscriber::{prelude::*, Registry};
 
+#[cfg(feature = "otlp")]
+macro_rules! otlp_layer {
+    () => {{
+        use opentelemetry::sdk::Resource;
+        use opentelemetry::KeyValue;
+        use opentelemetry_otlp::WithExportConfig;
+
+        let tracer = opentelemetry_otlp::new_pipeline()
+            .tracing()
+            .with_exporter(
+                opentelemetry_otlp::new_exporter()
+                    .tonic()
+                    // Derive endpoints etc. from environment variables like `OTEL_EXPORTER_OTLP_ENDPOINT`
+                    .with_env(),
+            )
+            .with_trace_config(
+                opentelemetry::sdk::trace::config().with_resource(Resource::new(vec![
+                    KeyValue::new(
+                        opentelemetry_semantic_conventions::resource::SERVICE_NAME,
+                        current_crate_str(),
+                    ),
+                    KeyValue::new(
+                        opentelemetry_semantic_conventions::resource::SERVICE_INSTANCE_ID,
+                        std::process::id().to_string(),
+                    ),
+                ])),
+            )
+            .install_batch(opentelemetry::runtime::Tokio);
+
+        match tracer {
+            Ok(t) => Ok(tracing_opentelemetry::layer().with_tracer(t).with_filter(EnvFilter::from_env("RUST_LOG_OTLP"))),
+            Err(e) => Err(e),
+        }
+    }};
+}
+
 macro_rules! fmt_layer {
     ($config:expr) => {{
         // Filter by log level either from `RUST_LOG` or default to crate only.
@@ -72,6 +108,9 @@ pub fn init_node_logging(config: &Config) -> Result<Option<WorkerGuard>> {
 
     #[cfg(feature = "tokio-console")]
     let reg = reg.with(console_subscriber::spawn());
+
+    #[cfg(feature = "otlp")]
+    let reg = reg.with(otlp_layer!()?);
 
     reg.init();
 
