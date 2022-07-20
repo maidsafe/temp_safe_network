@@ -58,7 +58,7 @@ fn main() -> Result<()> {
 
     trace!("Initial node config: {config:?}");
 
-    let _guard = log::init_node_logging(config).map_err(Error::from)?;
+    let _guard = log::init_node_logging(&config).map_err(Error::from)?;
 
     loop {
         create_runtime_and_node()?;
@@ -109,7 +109,6 @@ fn create_runtime_and_node() -> Result<()> {
     debug!("Node runtime should be shutdown now");
     Ok(())
 }
-
 
 async fn run_node(config: Config) -> Result<()> {
     if let Some(c) = &config.completions() {
