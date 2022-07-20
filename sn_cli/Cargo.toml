@@ -83,7 +83,7 @@ futures = "0.3.21"
 path = "../sn_cmd_test_utilities"
 
 [[bench]]
-name = "put"
+name = "files"
 harness = false
 
 [[bench]]
