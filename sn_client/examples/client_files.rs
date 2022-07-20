@@ -16,7 +16,7 @@ use tokio::time::sleep;
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
-    let config = ClientConfig::new(None, None, None, None, None, None).await;
+    let config = ClientConfig::new(None, None, None, None, None).await;
     let client = Client::new(config, None, None).await?;
 
     let pk = client.public_key();
