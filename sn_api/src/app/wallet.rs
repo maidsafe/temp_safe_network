@@ -30,8 +30,8 @@ pub const WALLET_TYPE_TAG: u64 = 1_000;
 /// depositing DBCs into a wallet.
 pub type WalletSpendableDbcs = BTreeMap<String, (Dbc, EntryHash)>;
 
-// Verifier required by sn_dbc API to check a SpentProof
-// is validly signed by known sections keys.
+/// Verifier required by sn_dbc API to check a SpentProof
+/// is validly signed by known sections keys.
 struct SpentProofKeyVerifier<'a> {
     client: &'a Client,
 }
@@ -477,7 +477,7 @@ mod tests {
         new_safe_instance_with_dbc, new_safe_instance_with_dbc_owner, GENESIS_DBC,
     };
     use anyhow::{anyhow, Result};
-    use sn_dbc::Owner;
+    use sn_dbc::{Error as DbcError, Owner};
 
     #[tokio::test]
     async fn test_wallet_create() -> Result<()> {
@@ -1055,5 +1055,74 @@ mod tests {
         assert_eq!(balance, Token::from_nano(250_000_000));
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wallet_deposit_dbc_verification_fails() -> Result<()> {
+        let (safe, mut dbc, _) = new_safe_instance_with_dbc().await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+
+        // let's corrupt the pub key of the SpentProofs
+        let random_pk = bls::SecretKey::random().public_key();
+        dbc.spent_proofs = dbc
+            .spent_proofs
+            .into_iter()
+            .map(|mut proof| {
+                proof.spentbook_pub_key = random_pk;
+                proof
+            })
+            .collect();
+
+        match safe
+            .wallet_deposit(&wallet_xorurl, Some("deposited-dbc"), &dbc, None)
+            .await
+        {
+            Err(Error::DbcError(DbcError::InvalidSpentProofSignature(_, msg))) => {
+                assert_eq!(msg, format!(
+                    "DBC validity verification failed: Failed to verify SpentProof signature with key: {}",
+                    random_pk.to_hex()
+                ));
+                Ok(())
+            }
+            Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
+            Ok(_) => Err(anyhow!("Wallet deposit succeeded unexpectedly".to_string())),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_wallet_reissue_dbc_verification_fails() -> Result<()> {
+        let (safe, mut dbc, _) = new_safe_instance_with_dbc().await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+
+        // let's corrupt the pub key of the SpentProofs
+        let random_pk = bls::SecretKey::random().public_key();
+        dbc.spent_proofs = dbc
+            .spent_proofs
+            .into_iter()
+            .map(|mut proof| {
+                proof.spentbook_pub_key = random_pk;
+                proof
+            })
+            .collect();
+
+        // We insert a corrupted DBC (which contains invalid spent proofs) directly in the wallet,
+        // thus Elders won't sign the new spent proof shares when trying to reissue from it
+        safe.insert_dbc_into_wallet(
+            &SafeUrl::from_url(&wallet_xorurl)?,
+            &dbc,
+            "corrupted_dbc".to_string(),
+        )
+        .await?;
+
+        // It shall detect no spent proofs for this TX, thus fail to reissue
+        match safe.wallet_reissue(&wallet_xorurl, "0.1", None).await {
+            Err(Error::DbcError(DbcError::SpentProofInputLenMismatch { current, expected })) => {
+                assert_eq!(current, 0);
+                assert_eq!(expected, 1);
+                Ok(())
+            }
+            Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
+            Ok(_) => Err(anyhow!("Wallet deposit succeeded unexpectedly".to_string())),
+        }
     }
 }

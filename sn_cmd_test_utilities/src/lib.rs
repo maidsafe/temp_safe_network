@@ -9,12 +9,23 @@
 #[allow(dead_code)]
 pub mod util {
     use assert_cmd::Command;
+    use assert_fs::{
+        fixture::{ChildPath, TempDir},
+        prelude::*,
+    };
     use color_eyre::{eyre::eyre, eyre::WrapErr, Help, Result};
     use multibase::{encode, Base};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
-    use sn_api::{files::ProcessedFiles, resolver::SafeData, SafeUrl};
-    use std::path::{Path, PathBuf};
-    use std::{collections::BTreeMap, env, fs, process};
+    use sn_api::{
+        files::ProcessedFiles, resolver::SafeData, test_helpers::get_next_bearer_dbc, wallet::Dbc,
+        SafeUrl, Token,
+    };
+    use std::{
+        collections::BTreeMap,
+        env, fs,
+        path::{Path, PathBuf},
+        process,
+    };
     use tiny_keccak::{Hasher, Sha3};
     use walkdir::WalkDir;
 
@@ -30,6 +41,14 @@ pub mod util {
     #[ctor::ctor]
     fn init() {
         let _ = color_eyre::install();
+    }
+
+    pub async fn get_bearer_dbc_on_file(tmp_data_dir: &TempDir) -> Result<(ChildPath, Dbc, Token)> {
+        let dbc_file_path = tmp_data_dir.child(get_random_string());
+        let (dbc, balance) = get_next_bearer_dbc().await.map_err(|err| eyre!(err))?;
+        dbc_file_path.write_str(&dbc.to_hex()?)?;
+
+        Ok((dbc_file_path, dbc, balance))
     }
 
     pub fn get_sn_node_latest_released_version() -> Result<String> {

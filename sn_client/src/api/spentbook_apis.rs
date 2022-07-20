@@ -70,7 +70,7 @@ mod tests {
         create_test_client_with, init_logger, read_genesis_dbc_from_first_node,
     };
     use eyre::Result;
-    use sn_dbc::{rng, OwnerOnce, TransactionBuilder};
+    use sn_dbc::{rng, Hash, OwnerOnce, TransactionBuilder};
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_spentbook_spend_dbc() -> Result<()> {
@@ -81,12 +81,6 @@ mod tests {
         let client = create_test_client_with(None, Some(dbc_owner.clone()), None).await?;
 
         let genesis_key_image = genesis_dbc.key_image_bearer()?;
-
-        // Obtain the number of current spent shares for this key_image, note this test
-        // could have been more than once thus the genesis DBC could have been spent already.
-        // TODO: in this test we allow double spents for now, once we have our Spentbook
-        // to prevent double spents we'll need to adapt this test.
-        let previously_spent_shares = client.spent_proof_shares(genesis_key_image).await?;
 
         let output_owner = OwnerOnce::from_owner_base(dbc_owner, &mut rng::thread_rng());
         let dbc_builder = TransactionBuilder::default()
@@ -113,15 +107,20 @@ mod tests {
             )
             .await?;
 
-        // Get spent proof shares for the key_image
+        // Get spent proof shares for the key_image.
         let spent_proof_shares = client.spent_proof_shares(*key_image).await?;
 
-        // We should have 'spent_proof_shares' client API to contact at least
-        // a supermajority of Elders for writing and reading Spentbooks, this is why
-        // should obtain a supermajority of spent proof shares.
-        // Note we just check we received more spent proof shares than there already were
-        // in the spent book before, since we are temporarily allowing double spents in this test.
-        assert!(spent_proof_shares.len() >= 5 + previously_spent_shares.len());
+        // Note note this test could have been run more than once thus the genesis DBC
+        // could have been spent a few times already, so we filter
+        // the SpentProofShares that belong to the TX we just spent in this run.
+        // TODO: once we have our Spentbook which prevents double spents
+        // we shouldnt't need this filtering.
+        let valid_spent_proof_shares = spent_proof_shares
+            .iter()
+            .filter(|proof| proof.content.transaction_hash == Hash::from(tx.hash()))
+            .count();
+        assert!(valid_spent_proof_shares >= 5);
+        assert!(valid_spent_proof_shares <= 7);
 
         Ok(())
     }

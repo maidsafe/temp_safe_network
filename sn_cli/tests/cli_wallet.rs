@@ -7,25 +7,14 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use assert_cmd::prelude::*;
-use assert_fs::{
-    fixture::{ChildPath, TempDir},
-    prelude::*,
-};
+use assert_fs::prelude::*;
 use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
-use sn_api::{test_helpers::get_next_bearer_dbc, Token};
+use sn_api::test_helpers::get_next_bearer_dbc;
 use sn_cmd_test_utilities::util::{
-    get_random_string, parse_keys_create_output, parse_wallet_create_output, safe_cmd,
-    safe_cmd_stdout,
+    get_bearer_dbc_on_file, get_random_string, parse_keys_create_output,
+    parse_wallet_create_output, safe_cmd, safe_cmd_stdout,
 };
-
-async fn get_bearer_dbc_on_file(tmp_data_dir: &TempDir) -> Result<(ChildPath, Token)> {
-    let dbc_file_path = tmp_data_dir.child(get_random_string());
-    let (dbc, balance) = get_next_bearer_dbc().await.map_err(|err| eyre!(err))?;
-    dbc_file_path.write_str(&dbc.to_hex()?)?;
-
-    Ok((dbc_file_path, balance))
-}
 
 #[test]
 fn wallet_create_should_create_a_wallet() -> Result<()> {
@@ -43,7 +32,7 @@ async fn wallet_deposit_should_deposit_a_bearer_dbc() -> Result<()> {
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
 
     let tmp_data_dir = assert_fs::TempDir::new()?;
-    let (dbc_file_path, balance) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+    let (dbc_file_path, _, balance) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
         [
@@ -70,7 +59,7 @@ async fn wallet_deposit_should_deposit_a_bearer_dbc() -> Result<()> {
 #[tokio::test]
 async fn wallet_deposit_should_deposit_a_dbc_from_a_file() -> Result<()> {
     let tmp_data_dir = assert_fs::TempDir::new()?;
-    let (dbc_file_path, balance) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+    let (dbc_file_path, _, balance) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
@@ -204,7 +193,7 @@ async fn wallet_deposit_should_deposit_an_owned_dbc_with_configured_secret_key()
     let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
-    let (dbc_file_path, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+    let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
         [
@@ -259,7 +248,7 @@ async fn wallet_deposit_should_deposit_an_owned_dbc_with_secret_key_arg() -> Res
     let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
-    let (dbc_file_path, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+    let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     let sk = bls::SecretKey::random();
     let pk = sk.public_key();
@@ -330,7 +319,7 @@ async fn wallet_deposit_owned_dbc_with_no_secret_key_or_credentials_should_fail_
     let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
-    let (dbc_file_path, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+    let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
         [
@@ -403,7 +392,7 @@ async fn wallet_deposit_owned_dbc_with_secret_key_that_does_not_match_should_fai
     let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
-    let (dbc_file_path, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+    let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
         [
@@ -463,7 +452,7 @@ async fn wallet_balance_should_report_the_balance_of_a_wallet() -> Result<()> {
     let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
-    let (dbc_file_path, balance) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+    let (dbc_file_path, _, balance) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
         [
@@ -494,7 +483,7 @@ async fn wallet_reissue_should_reissue_a_bearer_dbc_from_a_deposited_dbc() -> Re
     let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
-    let (dbc_file_path, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+    let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
         [
@@ -530,7 +519,7 @@ async fn wallet_reissue_should_reissue_an_owned_dbc_from_a_deposited_dbc() -> Re
     let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&json_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
-    let (dbc_file_path, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+    let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     let pk_hex = bls::SecretKey::random().public_key().to_hex();
 
@@ -579,7 +568,7 @@ async fn wallet_reissue_with_owned_arg_should_reissue_with_configured_public_key
     let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
-    let (dbc_file_path, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+    let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
         [
@@ -634,7 +623,7 @@ async fn wallet_reissue_with_owned_arg_should_fail_if_credentials_are_not_config
     let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
-    let (dbc_file_path, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+    let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     safe_cmd(
         [
@@ -685,7 +674,7 @@ async fn wallet_reissue_with_owned_and_public_key_args_should_fail_with_suggesti
     let wallet_create_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
     let wallet_xorurl = parse_wallet_create_output(&wallet_create_output)?;
     let tmp_data_dir = assert_fs::TempDir::new()?;
-    let (dbc_file_path, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+    let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
 
     let sk = bls::SecretKey::random();
 

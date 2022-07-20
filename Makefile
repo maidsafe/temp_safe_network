@@ -16,8 +16,7 @@ gha-build-x86_64-unknown-linux-musl:
 	sudo apt update -y && sudo apt install -y musl-tools
 	rustup target add x86_64-unknown-linux-musl
 	cargo build --release --target x86_64-unknown-linux-musl --bin sn_node
-	cargo build --release --target x86_64-unknown-linux-musl \
-		--no-default-features --bin safe
+	cargo build --release --target x86_64-unknown-linux-musl --bin safe
 	find target/x86_64-unknown-linux-musl/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 	rm -f artifacts/.cargo-lock
 
@@ -35,8 +34,7 @@ arm-unknown-linux-musleabi:
 	mkdir artifacts
 	cargo install cross
 	cross build --release --target arm-unknown-linux-musleabi --bin sn_node
-	cross build --release --target arm-unknown-linux-musleabi --bin safe \
-		--no-default-features
+	cross build --release --target arm-unknown-linux-musleabi --bin safe
 	find target/arm-unknown-linux-musleabi/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 .ONESHELL:
@@ -49,8 +47,7 @@ armv7-unknown-linux-musleabihf:
 	mkdir artifacts
 	cargo install cross
 	cross build --release --target armv7-unknown-linux-musleabihf --bin sn_node
-	cross build --release --target armv7-unknown-linux-musleabihf --bin safe \
-		--no-default-features
+	cross build --release --target armv7-unknown-linux-musleabihf --bin safe
 	find target/armv7-unknown-linux-musleabihf/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 .ONESHELL:
@@ -63,15 +60,14 @@ aarch64-unknown-linux-musl:
 	mkdir artifacts
 	cargo install cross
 	cross build --release --target aarch64-unknown-linux-musl --bin sn_node
-	cross build --release --target aarch64-unknown-linux-musl --bin safe \
-		--no-default-features
+	cross build --release --target aarch64-unknown-linux-musl --bin safe
 	find target/aarch64-unknown-linux-musl/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 release-build:
 	rm -rf artifacts
 	mkdir artifacts
 	cargo build --release --bin sn_node
-	cargo build --release --no-default-features --bin safe
+	cargo build --release --bin safe
 	find target/release -maxdepth 1 -type f -exec cp '{}' artifacts \;
 
 .ONESHELL:
