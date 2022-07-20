@@ -398,8 +398,11 @@ impl Membership {
             .consensus_at_gen(signed_vote.vote.gen)
             .map_err(|_| Error::RequestAntiEntropy)?;
 
-        let members =
-            BTreeSet::from_iter(self.section_members(signed_vote.vote.gen - 1)?.into_keys());
+        let members = BTreeMap::from_iter(
+            self.section_members(signed_vote.vote.gen - 1)?
+                .into_iter()
+                .map(|(name, node)| (name, node.into_state())),
+        );
 
         for proposal in signed_vote.proposals() {
             proposal.into_state().validate(prefix, &members)?;
