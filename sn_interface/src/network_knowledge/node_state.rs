@@ -12,7 +12,7 @@ use crate::messaging::system::{
 use crate::network_knowledge::{section_has_room_for_node, Error, Result};
 use crate::types::Peer;
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::net::SocketAddr;
 use xor_name::{Prefix, XorName};
 
@@ -68,7 +68,7 @@ impl NodeState {
         }
     }
 
-    pub fn validate(&self, prefix: &Prefix, members: &BTreeSet<XorName>) -> Result<()> {
+    pub fn validate(&self, prefix: &Prefix, members: &BTreeMap<XorName, Self>) -> Result<()> {
         let name = self.name();
         info!("Validating node state for {name}");
 
@@ -81,18 +81,24 @@ impl NodeState {
 
         match self.state {
             MembershipState::Joined | MembershipState::Relocated(_) => {
-                if members.contains(&name) {
+                if members.contains_key(&name) {
                     info!("Rejecting join from existing member {name}");
-                    Err(Error::AlreadyJoinedTheNetwork)
-                } else if !section_has_room_for_node(name, prefix, members.iter().copied()) {
+                    Err(Error::ExistingMemberConflict)
+                } else if !section_has_room_for_node(name, prefix, members.keys().copied()) {
                     info!("Rejecting join since we are at capacity");
                     Err(Error::TryJoinLater)
+                } else if let Some(existing_node) = members
+                    .values()
+                    .find(|n| n.peer().addr() == self.peer().addr())
+                {
+                    info!("Rejecting join since we have an existing node with this address: {existing_node:?}");
+                    Err(Error::ExistingMemberConflict)
                 } else {
                     Ok(())
                 }
             }
             MembershipState::Left => {
-                if !members.contains(&name) {
+                if !members.contains_key(&name) {
                     info!("Rejecting leave from non-existing member");
                     Err(Error::NotAMember)
                 } else {
