@@ -117,8 +117,8 @@ pub struct AuthorityProof<T>(pub T);
 impl<T: VerifyAuthority> AuthorityProof<T> {
     /// Verify the authority of `inner`.
     ///
-    /// This is the only way to construct an instance of [`Authority`] from a `T`. Since it's
-    /// implemented to call [`VerifyAuthority::verify_authority`] an instance of `AuthorityProof<T>` is
+    /// This is the only way to construct an instance of [`AuthorityProof`] from a `T`. Since it's
+    /// implemented to call [`VerifyAuthority::verify_authority`] an instance of [`AuthorityProof<T>`] is
     /// guaranteed to be valid with respect to that trait's impl.
     pub fn verify(inner: T, payload: impl AsRef<[u8]>) -> Result<Self> {
         inner.verify_authority(payload).map(Self)
@@ -140,7 +140,7 @@ impl<T> core::ops::Deref for AuthorityProof<T> {
 
 /// Verify authority.
 ///
-/// This trait drives the verification logic used by [`Authority`].
+/// This trait drives the verification logic used by [`AuthorityProof`].
 ///
 /// **Note:** this trait is 'sealed', and as such cannot be implemented outside of this crate.
 pub trait VerifyAuthority: Sized + sealed::Sealed {

@@ -103,7 +103,7 @@ impl Link {
     /// responsible for correlating any anticipated responses from incoming streams.
     ///
     /// The priority will be `0` and retry behaviour will be determined by the
-    /// [`Config`](crate::Config) that was used to construct the [`Endpoint`] this connection
+    /// [`RetryConfig`] that was used to construct the [`Endpoint`] this connection
     /// belongs to. See [`send_with`](Self::send_with) if you want to send a message with specific
     /// configuration.
     #[allow(unused)]

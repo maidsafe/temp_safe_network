@@ -53,7 +53,7 @@ impl SignatureAggregator {
     /// Note: returned `Error::NotEnoughShares` does not indicate a failure. It simply means more
     /// shares still need to be added for that particular payload. This error could be safely
     /// ignored (it might still be useful perhaps for debugging). The other error variants, however,
-    /// indicate failures and should be treated a such. See [Error] for more info.
+    /// indicate failures and should be treated a such. See [`enum@Error`] for more info.
     pub fn add(&mut self, payload: &[u8], sig_share: SigShare) -> Result<KeyedSig, Error> {
         self.remove_expired();
 

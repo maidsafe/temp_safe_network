@@ -31,9 +31,7 @@ pub enum DataCmd {
     /// [`Register`]: crate::types::register::Register
     Register(RegisterCmd),
     #[cfg(feature = "spentbook")]
-    /// [`Spentbook`] write operation.
-    ///
-    /// [`Spentbook`]: crate::types::spentbook::Spentbook
+    /// Spentbook write operation.
     Spentbook(SpentbookCmd),
 }
 

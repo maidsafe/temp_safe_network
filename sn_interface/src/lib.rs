@@ -8,11 +8,11 @@
 
 //! SAFE network data types.
 
-/// Standardised messaging interface
+// Standardised messaging interface
 pub mod messaging;
-/// Knowledge of the safe network
+// Knowledge of the safe network
 pub mod network_knowledge;
-/// Types on the safe network
+// Types on the safe network
 pub mod types;
 
 #[macro_use]

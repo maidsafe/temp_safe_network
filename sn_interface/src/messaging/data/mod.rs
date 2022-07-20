@@ -96,6 +96,8 @@ pub struct ServiceError {
 /// Network service messages exchanged between clients
 /// and nodes in order for the clients to use the network services.
 /// NB: These are not used for node-to-node comms (see [`SystemMsg`] for those).
+///
+/// [`SystemMsg`]: crate::messaging::system::SystemMsg
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub enum ServiceMsg {
@@ -182,7 +184,9 @@ pub enum QueryResponse {
     //
     // ===== Chunk =====
     //
-    /// Response to [`ChunkRead::Get`].
+    /// Response to [`GetChunk`]
+    ///
+    /// [`GetChunk`]: crate::messaging::data::DataQueryVariant::GetChunk
     GetChunk(Result<Chunk>),
     //
     // ===== Register Data =====
