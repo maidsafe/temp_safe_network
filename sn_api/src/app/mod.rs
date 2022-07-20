@@ -97,7 +97,6 @@ impl Safe {
 
         let config = ClientConfig::new(
             None,
-            None,
             config_path.as_deref(),
             timeout.or(Some(DEFAULT_OPERATION_TIMEOUT)),
             timeout.or(Some(DEFAULT_OPERATION_TIMEOUT)),

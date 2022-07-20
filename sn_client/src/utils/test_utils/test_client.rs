@@ -12,7 +12,6 @@ use eyre::{eyre, Result};
 use sn_dbc::{Dbc, Owner};
 use sn_interface::types::Keypair;
 use std::{env, fs::read_to_string, path::PathBuf, time::Duration};
-use tempfile::tempdir;
 
 const TEST_ENV_GENESIS_DBC_PATH: &str = "TEST_ENV_GENESIS_DBC_PATH";
 const DEFAULT_TEST_GENESIS_DBC_PATH: &str =
@@ -31,20 +30,11 @@ pub async fn create_test_client_with(
     dbc_owner: Option<Owner>,
     timeout: Option<u64>,
 ) -> Result<Client> {
-    let root_dir = tempdir().map_err(|e| eyre::eyre!(e.to_string()))?;
     let timeout = timeout.map(Duration::from_secs);
     // use standard wait
     let cmd_ack_wait = None;
 
-    let config = ClientConfig::new(
-        Some(root_dir.path()),
-        None,
-        None,
-        timeout,
-        timeout,
-        cmd_ack_wait,
-    )
-    .await;
+    let config = ClientConfig::new(None, None, timeout, timeout, cmd_ack_wait).await;
     let client = Client::new(config, optional_keypair.clone(), dbc_owner.clone()).await?;
 
     Ok(client)

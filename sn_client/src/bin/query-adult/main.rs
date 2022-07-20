@@ -173,9 +173,7 @@ fn self_encryptable_file() -> Bytes {
 
 /// Construct Client from configuration files in default location
 async fn client() -> Result<Client> {
-    let root_dir = tempfile::tempdir()?;
-
-    let config = ClientConfig::new(Some(root_dir.path()), None, None, None, None, None).await;
+    let config = ClientConfig::new(None, None, None, None, None).await;
 
     Ok(Client::new(config, None, None).await?)
 }

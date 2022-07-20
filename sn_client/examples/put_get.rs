@@ -57,7 +57,7 @@ pub async fn run_chunk_soak() -> Result<()> {
 
     let files_to_put = files_count();
 
-    let config = ClientConfig::new(None, None, None, None, None, None).await;
+    let config = ClientConfig::new(None, None, None, None, None).await;
     let client = Client::new(config.clone(), None, None).await?;
 
     let mut put_tasks = vec![];
@@ -132,7 +132,7 @@ pub async fn run_chunk_soak() -> Result<()> {
 
 #[allow(dead_code)]
 async fn upload_data_using_fresh_client(iteration: usize) -> Result<(XorName, [u8; 32])> {
-    let config = ClientConfig::new(None, None, None, None, None, None).await;
+    let config = ClientConfig::new(None, None, None, None, None).await;
     let client = Client::new(config, None, None).await?;
 
     upload_data_using_client(client, iteration).await

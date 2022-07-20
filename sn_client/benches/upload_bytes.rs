@@ -66,7 +66,7 @@ fn grows_vec_to_bytes(seed: &[u8], length: usize) -> Bytes {
 }
 
 async fn create_client() -> Result<Client, Error> {
-    let config = ClientConfig::new(None, None, None, None, None, None).await;
+    let config = ClientConfig::new(None, None, None, None, None).await;
     let client = Client::new(config, None, None).await?;
 
     Ok(client)

@@ -170,7 +170,7 @@ pub async fn run_split() -> Result<()> {
     let interval_duration = Duration::from_millis(interval_as_int * ADDITIONAL_NODES_TO_SPLIT / 10);
     sleep(interval_duration).await;
 
-    let config = ClientConfig::new(None, None, None, None, None, None).await;
+    let config = ClientConfig::new(None, None, None, None, None).await;
     let client = Client::new(config, None, None).await?;
 
     for (address, hash) in all_data_put {
@@ -202,7 +202,7 @@ pub async fn run_split() -> Result<()> {
 }
 
 async fn upload_data() -> Result<(XorName, [u8; 32])> {
-    let config = ClientConfig::new(None, None, None, None, None, None).await;
+    let config = ClientConfig::new(None, None, None, None, None).await;
     let client = Client::new(config, None, None).await?;
 
     let bytes = random_bytes(1024 * 1024 * 10);

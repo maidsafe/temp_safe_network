@@ -11,13 +11,10 @@ use qp2p::Config as QuicP2pConfig;
 use serde::{Deserialize, Serialize};
 use std::{
     net::{Ipv4Addr, SocketAddr},
-    path::{Path, PathBuf},
+    path::Path,
     time::Duration,
 };
-use tokio::{
-    fs::File,
-    io::{self, AsyncReadExt},
-};
+use tokio::{fs::File, io::AsyncReadExt};
 use tracing::{debug, warn};
 
 const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::UNSPECIFIED, 0);
@@ -28,7 +25,6 @@ pub const DEFAULT_OPERATION_TIMEOUT: Duration = Duration::from_secs(120);
 /// Larger PUT operations may need larger ae wait time
 pub const DEFAULT_ACK_WAIT: Duration = Duration::from_secs(10);
 
-const DEFAULT_ROOT_DIR_NAME: &str = "root_dir";
 const SN_QUERY_TIMEOUT: &str = "SN_QUERY_TIMEOUT";
 const SN_CMD_TIMEOUT: &str = "SN_CMD_TIMEOUT";
 const SN_AE_WAIT: &str = "SN_AE_WAIT";
@@ -38,8 +34,6 @@ const SN_AE_WAIT: &str = "SN_AE_WAIT";
 pub struct ClientConfig {
     /// The local address to bind to.
     pub local_addr: SocketAddr,
-    /// Path to local storage.
-    pub root_dir: PathBuf,
     /// QuicP2p options.
     pub qp2p: QuicP2pConfig,
     /// The amount of time to wait for responses to queries before giving up and returning an error.
@@ -62,16 +56,12 @@ impl ClientConfig {
     ///
     /// If `query_timeout` is not specified, [`DEFAULT_OPERATION_TIMEOUT`] will be used.
     pub async fn new(
-        root_dir: Option<&Path>,
         local_addr: Option<SocketAddr>,
         config_file_path: Option<&Path>,
         query_timeout: Option<Duration>,
         cmd_timeout: Option<Duration>,
         cmd_ack_wait: Option<Duration>,
     ) -> Self {
-        let root_dir = root_dir
-            .map(|p| p.to_path_buf())
-            .unwrap_or_else(default_dir);
         // If a config file path was provided we try to read it,
         // otherwise we use default qp2p config.
         let qp2p = match &config_file_path {
@@ -143,7 +133,6 @@ impl ClientConfig {
         );
         Self {
             local_addr: local_addr.unwrap_or_else(|| SocketAddr::from(DEFAULT_LOCAL_ADDR)),
-            root_dir: root_dir.clone(),
             qp2p,
             query_timeout,
             cmd_timeout,
@@ -167,25 +156,6 @@ async fn read_config_file(filepath: &Path) -> Result<QuicP2pConfig, Error> {
         );
         err.into()
     })
-}
-
-/// Root directory for dbs and cached state. If not set, it defaults to
-/// `DEFAULT_ROOT_DIR_NAME` within the project's data directory (see `Config::root_dir` for the
-/// directories on each platform).
-fn default_dir() -> PathBuf {
-    project_dirs()
-        .unwrap_or_default()
-        .join(DEFAULT_ROOT_DIR_NAME)
-}
-
-fn project_dirs() -> Result<PathBuf> {
-    let mut home_dir = dirs_next::home_dir()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Home directory not found"))?;
-
-    home_dir.push(".safe");
-    home_dir.push("client");
-
-    Ok(home_dir)
 }
 
 #[cfg(test)]
@@ -220,15 +190,7 @@ mod tests {
 
         // In the absence of a config file, the config handler
         // should initialize bootstrap_cache_dir only
-        let config = ClientConfig::new(
-            Some(&root_dir),
-            None,
-            Some(&config_filepath),
-            None,
-            None,
-            None,
-        )
-        .await;
+        let config = ClientConfig::new(None, Some(&config_filepath), None, None, None).await;
         // convert to string for assert
         let mut str_path = root_dir
             .to_str()
@@ -265,7 +227,6 @@ mod tests {
 
         let expected_config = ClientConfig {
             local_addr: (Ipv4Addr::UNSPECIFIED, 0).into(),
-            root_dir: root_dir.clone(),
             qp2p: QuicP2pConfig {
                 ..Default::default()
             },
@@ -280,11 +241,11 @@ mod tests {
         let mut file = File::create(&config_filepath)?;
 
         let config_on_disk =
-            ClientConfig::new(None, None, Some(&config_filepath), None, None, None).await;
+            ClientConfig::new(None, Some(&config_filepath), None, None, None).await;
         serde_json::to_writer_pretty(&mut file, &config_on_disk)?;
         file.sync_all()?;
 
-        let read_cfg = ClientConfig::new(None, None, None, None, None, None).await;
+        let read_cfg = ClientConfig::new(None, None, None, None, None).await;
         assert_eq!(serialize(&config_on_disk)?, serialize(&read_cfg)?);
 
         Ok(())
