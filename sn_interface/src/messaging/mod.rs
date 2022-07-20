@@ -12,11 +12,9 @@
 //!
 //! - This module contains types that are common across the messaging API.
 //! - The [`serialisation`] module defines the wire format and message (de)serialization API.
-//! - The [`data`] module defines the data messages that clients and nodes send, and their
-//!   possible responses.
-//! - The [`node`] module defines the messages that nodes can exchange on the network.
-//! - The [`section_info`] module defines the queries and responses for section information – these
-//!   may be sent by both clients and nodes.
+//! - The [`data`] module defines the data messages that clients and nodes send, and their possible responses.
+//! - The [`signature_aggregator`] module defines the BLS signature aggregator.
+//! - The [`system`] module defines Operational Messages that can be exchanged on the network.
 
 /// Data messages that clients and nodes can send.
 pub mod data;

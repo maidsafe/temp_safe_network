@@ -86,34 +86,36 @@ pub enum NodeQueryResponse {
     // ===== Chunk =====
     //
     #[cfg(feature = "chunks")]
-    /// Response to [`ChunkRead::Get`].
+    /// Response to [`GetChunk`]
+    ///
+    /// [`GetChunk`]: crate::messaging::data::DataQueryVariant::GetChunk
     GetChunk(Result<Chunk>),
     //
     // ===== Register Data =====
     //
     #[cfg(feature = "registers")]
-    /// Response to [`RegisterQuery::Get`].
+    /// Response to [`crate::messaging::data::RegisterQuery::Get`].
     GetRegister((Result<Register>, OperationId)),
     #[cfg(feature = "registers")]
-    /// Response to [`RegisterQuery::GetOwner`].
+    /// Response to [`crate::messaging::data::RegisterQuery::GetOwner`].
     GetRegisterOwner((Result<User>, OperationId)),
     #[cfg(feature = "registers")]
-    /// Response to [`RegisterQuery::GetEntry`].
+    /// Response to [`crate::messaging::data::RegisterQuery::GetEntry`].
     GetRegisterEntry((Result<Entry>, OperationId)),
     #[cfg(feature = "registers")]
-    /// Response to [`RegisterQuery::GetPolicy`].
+    /// Response to [`crate::messaging::data::RegisterQuery::GetPolicy`].
     GetRegisterPolicy((Result<Policy>, OperationId)),
     #[cfg(feature = "registers")]
-    /// Response to [`RegisterQuery::Read`].
+    /// Response to [`crate::messaging::data::RegisterQuery::Read`].
     ReadRegister((Result<BTreeSet<(EntryHash, Entry)>>, OperationId)),
     #[cfg(feature = "registers")]
-    /// Response to [`RegisterQuery::GetUserPermissions`].
+    /// Response to [`crate::messaging::data::RegisterQuery::GetUserPermissions`].
     GetRegisterUserPermissions((Result<Permissions>, OperationId)),
     //
     // ===== Spentbook Data =====
     //
     #[cfg(feature = "spentbook")]
-    /// Response to [`SpentbookQuery::SpentProofShares`].
+    /// Response to [`crate::messaging::data::SpentbookQuery::SpentProofShares`].
     SpentProofShares((Result<Vec<SpentProofShare>>, OperationId)),
     //
     // ===== Other =====

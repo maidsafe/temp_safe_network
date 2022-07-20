@@ -17,7 +17,7 @@ pub(crate) fn new(channel_size: usize) -> (EventSender, EventReceiver) {
     )
 }
 
-/// Sender for [`Node`] events
+/// Sender for [`crate::node::Node`] events
 #[derive(Clone)]
 pub(crate) struct EventSender {
     event_sender: mpsc::Sender<Event>,
@@ -33,7 +33,7 @@ impl EventSender {
     }
 }
 
-/// Receiver of [`Node`] events
+/// Receiver of events
 #[allow(missing_debug_implementations)]
 pub struct EventReceiver {
     event_receiver: mpsc::Receiver<Event>,
