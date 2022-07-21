@@ -13,9 +13,9 @@ use super::{
 use crate::operations::config::Config;
 use bls::{PublicKey, SecretKey};
 use clap::Subcommand;
-use color_eyre::{eyre::eyre, Help, Result};
-use sn_api::{Error, Safe};
-use sn_dbc::Dbc;
+use color_eyre::{eyre::eyre, eyre::Error, Help, Result};
+use sn_api::{Error as ApiError, Safe};
+use sn_dbc::{Dbc, Error as DbcError};
 use std::path::Path;
 
 #[derive(Subcommand, Debug)]
@@ -48,6 +48,10 @@ pub enum WalletSubCommands {
         /// Use this argument to specify a secret key for an owned DBC. It should be a hex-encoded
         /// BLS key.
         secret_key_hex: Option<String>,
+        /// When this flag is set, the DBC will be deposited into the wallet without
+        /// trying to verify the DBC hasn't been already spent.
+        #[clap(long = "force")]
+        force: bool,
     },
     #[clap(name = "reissue")]
     /// Reissue a DBC from a wallet to a SafeKey.
@@ -111,6 +115,7 @@ pub async fn wallet_commander(
             name,
             dbc,
             secret_key_hex,
+            force,
         } => {
             let dbc = if let Some(dbc) = dbc {
                 let path = Path::new(&dbc);
@@ -134,15 +139,19 @@ pub async fn wallet_commander(
                 Dbc::from_hex(dbc_hex.trim())?
             };
 
-            let sk = if dbc.is_bearer() {
-                None
+            let (sk, key_image) = if dbc.is_bearer() {
+                (None, dbc.key_image_bearer()?)
             } else if let Some(sk_hex) = secret_key_hex {
                 // This is an owned DBC and its secret key has been supplied
-                Some(SecretKey::from_hex(&sk_hex)?)
+                let sk = SecretKey::from_hex(&sk_hex)?;
+                let key_image = dbc
+                    .key_image(&sk)
+                    .map_err(|e| map_invalid_sk_error(e.into()))?;
+                (Some(sk), key_image)
             } else {
                 // This is an owned DBC but its secret key was not provided,
                 // thus attempt to use the key configured for use with the CLI.
-                Some(read_key_from_configured_credentials(
+                let sk = read_key_from_configured_credentials(
                     config,
                     "This is an owned DBC. To deposit, it requires a secret key. \
                          A secret key was not supplied and there were no credentials \
@@ -151,22 +160,31 @@ pub async fn wallet_commander(
                     "Please run the command again using the --secret-key \
                          argument to specify the key."
                         .to_string(),
-                )?)
+                )?;
+                let key_image = dbc
+                    .key_image(&sk)
+                    .map_err(|e| map_invalid_sk_error(e.into()))?;
+                (Some(sk), key_image)
             };
+
+            if force {
+                println!(
+                    "\nWARNING: --force flag set, hence skipping verification to check if \
+                supplied DBC has been already spent.\n"
+                );
+            } else if safe.is_dbc_spent(key_image).await? {
+                return Err(
+                    eyre!("The supplied DBC has been already spent on the network.").suggestion(
+                        "Please run the command again with the --force flag if you still \
+                            wish to deposit it into the wallet.",
+                    ),
+                );
+            }
 
             let (name, balance) = safe
                 .wallet_deposit(&wallet_url, name.as_deref(), &dbc, sk)
                 .await
-                .map_err(|e| match e {
-                    Error::DbcDepositInvalidSecretKey => {
-                        eyre!("The supplied secret key did not match the public key for this DBC.")
-                            .suggestion(
-                                "Please run the command again with the correct key for the \
-                                --secret-key argument.",
-                            )
-                    }
-                    _ => e.into(),
-                })?;
+                .map_err(map_invalid_sk_error)?;
 
             if OutputFmt::Pretty == output_fmt {
                 println!(
@@ -249,4 +267,16 @@ fn read_key_from_configured_credentials(
     }
     let sk_hex = std::fs::read_to_string(credentials_path)?;
     Ok(SecretKey::from_hex(&sk_hex)?)
+}
+
+fn map_invalid_sk_error(api_error: ApiError) -> Error {
+    match api_error {
+        ApiError::DbcError(DbcError::SecretKeyDoesNotMatchPublicKey)
+        | ApiError::DbcDepositInvalidSecretKey => {
+            eyre!("The supplied secret key did not match the public key for this DBC.").suggestion(
+                "Please run the command again with the correct key for the --secret-key argument.",
+            )
+        }
+        _ => api_error.into(),
+    }
 }

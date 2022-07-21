@@ -17,7 +17,13 @@ pub mod util {
     use multibase::{encode, Base};
     use rand::{distributions::Alphanumeric, thread_rng, Rng};
     use sn_api::{
-        files::ProcessedFiles, resolver::SafeData, test_helpers::get_next_bearer_dbc, wallet::Dbc,
+        files::ProcessedFiles,
+        resolver::SafeData,
+        test_helpers::get_next_bearer_dbc,
+        wallet::{
+            dbc::{blsttc::SecretKey, Owner},
+            Dbc,
+        },
         SafeUrl, Token,
     };
     use std::{
@@ -49,6 +55,19 @@ pub mod util {
         dbc_file_path.write_str(&dbc.to_hex()?)?;
 
         Ok((dbc_file_path, dbc, balance))
+    }
+
+    pub async fn get_owned_dbc_on_file(
+        tmp_data_dir: &TempDir,
+    ) -> Result<(ChildPath, SecretKey, Token)> {
+        let dbc_file_path = tmp_data_dir.child(get_random_string());
+        let (mut dbc, balance) = get_next_bearer_dbc().await.map_err(|err| eyre!(err))?;
+
+        let owner_base = dbc.owner_base().clone();
+        dbc.content.owner_base = Owner::PublicKey(owner_base.public_key());
+        dbc_file_path.write_str(&dbc.to_hex()?)?;
+
+        Ok((dbc_file_path, owner_base.secret_key()?, balance))
     }
 
     pub fn get_sn_node_latest_released_version() -> Result<String> {
