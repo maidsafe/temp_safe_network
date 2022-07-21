@@ -75,18 +75,18 @@ pub struct DysfunctionDetection {
     /// The unfulfilled pending request operation issues logged against a node, along with an
     /// operation ID.
     pub unfulfilled_ops: BTreeMap<NodeIdentifier, Vec<(OperationId, Instant)>>,
-    adults: Vec<XorName>,
+    nodes: Vec<XorName>,
 }
 
 impl DysfunctionDetection {
     /// Set up a new Dysfunctional Node Tracker.
-    pub fn new(adults: Vec<NodeIdentifier>) -> Self {
+    pub fn new(nodes: Vec<NodeIdentifier>) -> Self {
         Self {
             communication_issues: BTreeMap::new(),
             dkg_issues: BTreeMap::new(),
             knowledge_issues: BTreeMap::new(),
             unfulfilled_ops: BTreeMap::new(),
-            adults,
+            nodes,
         }
     }
 
@@ -185,8 +185,8 @@ impl DysfunctionDetection {
     /// values.
     ///
     /// If there are no unfulfilled operations tracked, an empty list will be returned.
-    pub fn get_unfulfilled_ops(&self, adult: XorName) -> Vec<OperationId> {
-        if let Some(val) = self.unfulfilled_ops.get(&adult) {
+    pub fn get_unfulfilled_ops(&self, node: XorName) -> Vec<OperationId> {
+        if let Some(val) = self.unfulfilled_ops.get(&node) {
             return val.to_vec().iter().map(|(op_id, _)| *op_id).collect();
         }
         Vec::new()
@@ -194,20 +194,20 @@ impl DysfunctionDetection {
 
     /// List all current tracked nodes
     pub fn current_nodes(&self) -> Vec<XorName> {
-        self.adults.to_vec()
+        self.nodes.to_vec()
     }
 
     /// Add a new node to the tracker and recompute closest nodes.
-    pub fn add_new_node(&mut self, adult: XorName) {
-        info!("Adding new adult:{adult} to DysfunctionDetection tracker");
-        self.adults.push(adult);
+    pub fn add_new_node(&mut self, node: XorName) {
+        info!("Adding new node:{node} to DysfunctionDetection tracker");
+        self.nodes.push(node);
     }
 
     /// Removes tracked nodes not present in `current_members`.
     ///
     /// Tracked issues related to nodes that were removed will also be removed.
     pub fn retain_members_only(&mut self, current_members: BTreeSet<XorName>) {
-        let nodes = &mut self.adults;
+        let nodes = &mut self.nodes;
         let nodes_being_removed = nodes
             .iter()
             .filter(|x| !current_members.contains(x))
@@ -283,10 +283,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn retain_members_should_remove_other_adults() -> Result<()> {
-        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
-        let nodes_to_retain = adults[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
+    async fn retain_members_should_remove_other_nodes() -> Result<()> {
+        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
+        let nodes_to_retain = nodes[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
 
         dysfunctional_detection.retain_members_only(nodes_to_retain.clone());
 
@@ -301,28 +301,28 @@ mod tests {
 
     #[tokio::test]
     async fn retain_members_should_remove_issues_relating_to_nodes_not_retained() -> Result<()> {
-        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
 
         // Track some issues for nodes that are going to be removed.
-        for adult in adults.iter().take(3) {
-            let _ = dysfunctional_detection.track_issue(*adult, IssueType::Communication);
-            let _ = dysfunctional_detection.track_issue(*adult, IssueType::Knowledge);
+        for node in nodes.iter().take(3) {
+            let _ = dysfunctional_detection.track_issue(*node, IssueType::Communication);
+            let _ = dysfunctional_detection.track_issue(*node, IssueType::Knowledge);
             let _ = dysfunctional_detection.track_issue(
-                *adult,
+                *node,
                 IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
             );
         }
 
         // Track some issues for nodes that will be retained.
-        let _ = dysfunctional_detection.track_issue(adults[5], IssueType::Communication);
-        let _ = dysfunctional_detection.track_issue(adults[6], IssueType::Knowledge);
+        let _ = dysfunctional_detection.track_issue(nodes[5], IssueType::Communication);
+        let _ = dysfunctional_detection.track_issue(nodes[6], IssueType::Knowledge);
         let _ = dysfunctional_detection.track_issue(
-            adults[7],
+            nodes[7],
             IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
         );
 
-        let nodes_to_retain = adults[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
+        let nodes_to_retain = nodes[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
 
         dysfunctional_detection.retain_members_only(nodes_to_retain);
 
@@ -335,10 +335,10 @@ mod tests {
 
     #[tokio::test]
     async fn track_issue_should_add_a_comm_issue() -> Result<()> {
-        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
 
-        dysfunctional_detection.track_issue(adults[0], IssueType::Communication)?;
+        dysfunctional_detection.track_issue(nodes[0], IssueType::Communication)?;
 
         assert_eq!(dysfunctional_detection.communication_issues.len(), 1);
         assert_eq!(dysfunctional_detection.knowledge_issues.len(), 0);
@@ -348,10 +348,10 @@ mod tests {
 
     #[tokio::test]
     async fn track_issue_should_add_a_knowledge_issue() -> Result<()> {
-        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
 
-        dysfunctional_detection.track_issue(adults[0], IssueType::Knowledge)?;
+        dysfunctional_detection.track_issue(nodes[0], IssueType::Knowledge)?;
 
         assert_eq!(dysfunctional_detection.knowledge_issues.len(), 1);
         assert_eq!(dysfunctional_detection.communication_issues.len(), 0);
@@ -361,11 +361,11 @@ mod tests {
 
     #[tokio::test]
     async fn track_issue_should_add_a_pending_op_issue() -> Result<()> {
-        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
 
         dysfunctional_detection.track_issue(
-            adults[0],
+            nodes[0],
             IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
         )?;
 
@@ -378,11 +378,11 @@ mod tests {
     #[tokio::test]
     async fn track_issue_should_return_error_when_adding_pending_op_issue_without_op_id(
     ) -> Result<()> {
-        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
 
-        let result = dysfunctional_detection
-            .track_issue(adults[0], IssueType::PendingRequestOperation(None));
+        let result =
+            dysfunctional_detection.track_issue(nodes[0], IssueType::PendingRequestOperation(None));
 
         assert!(result.is_err());
         assert_eq!(
@@ -394,8 +394,8 @@ mod tests {
 
     #[tokio::test]
     async fn add_new_node_should_track_new_node() -> Result<()> {
-        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(adults);
+        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let mut dysfunctional_detection = DysfunctionDetection::new(nodes);
 
         let new_adult = random_xorname();
         dysfunctional_detection.add_new_node(new_adult);
@@ -408,23 +408,23 @@ mod tests {
 
     #[tokio::test]
     async fn get_unfulfilled_ops_should_return_op_ids() -> Result<()> {
-        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
 
         dysfunctional_detection.track_issue(
-            adults[0],
+            nodes[0],
             IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
         )?;
         dysfunctional_detection.track_issue(
-            adults[0],
+            nodes[0],
             IssueType::PendingRequestOperation(Some(OperationId([2; 32]))),
         )?;
         dysfunctional_detection.track_issue(
-            adults[0],
+            nodes[0],
             IssueType::PendingRequestOperation(Some(OperationId([3; 32]))),
         )?;
 
-        let op_ids = dysfunctional_detection.get_unfulfilled_ops(adults[0]);
+        let op_ids = dysfunctional_detection.get_unfulfilled_ops(nodes[0]);
 
         assert_eq!(3, op_ids.len());
         Ok(())
@@ -432,23 +432,23 @@ mod tests {
 
     #[tokio::test]
     async fn get_unfulfilled_ops_should_return_empty_list_for_node_with_no_ops() -> Result<()> {
-        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
 
         dysfunctional_detection.track_issue(
-            adults[0],
+            nodes[0],
             IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
         )?;
         dysfunctional_detection.track_issue(
-            adults[0],
+            nodes[0],
             IssueType::PendingRequestOperation(Some(OperationId([2; 32]))),
         )?;
         dysfunctional_detection.track_issue(
-            adults[0],
+            nodes[0],
             IssueType::PendingRequestOperation(Some(OperationId([3; 32]))),
         )?;
 
-        let op_ids = dysfunctional_detection.get_unfulfilled_ops(adults[1]);
+        let op_ids = dysfunctional_detection.get_unfulfilled_ops(nodes[1]);
 
         assert_eq!(0, op_ids.len());
         Ok(())
@@ -456,27 +456,27 @@ mod tests {
 
     #[tokio::test]
     async fn request_operation_fulfilled_should_remove_pending_op() -> Result<()> {
-        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
         let op_id = OperationId([2; 32]);
 
         dysfunctional_detection.track_issue(
-            adults[0],
+            nodes[0],
             IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
         )?;
         dysfunctional_detection.track_issue(
-            adults[0],
+            nodes[0],
             IssueType::PendingRequestOperation(Some(OperationId([2; 32]))),
         )?;
         dysfunctional_detection.track_issue(
-            adults[0],
+            nodes[0],
             IssueType::PendingRequestOperation(Some(OperationId([3; 32]))),
         )?;
 
-        let has_removed = dysfunctional_detection.request_operation_fulfilled(&adults[0], op_id);
+        let has_removed = dysfunctional_detection.request_operation_fulfilled(&nodes[0], op_id);
 
         assert!(has_removed);
-        let op_ids = dysfunctional_detection.get_unfulfilled_ops(adults[0]);
+        let op_ids = dysfunctional_detection.get_unfulfilled_ops(nodes[0]);
         assert_eq!(2, op_ids.len());
         assert_eq!(OperationId([1; 32]), op_ids[0]);
         assert_eq!(OperationId([3; 32]), op_ids[1]);
@@ -485,24 +485,24 @@ mod tests {
 
     #[tokio::test]
     async fn request_operation_fulfilled_should_return_false_for_node_with_no_ops() -> Result<()> {
-        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
         let op_id = OperationId([2; 32]);
 
         dysfunctional_detection.track_issue(
-            adults[0],
+            nodes[0],
             IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
         )?;
         dysfunctional_detection.track_issue(
-            adults[0],
+            nodes[0],
             IssueType::PendingRequestOperation(Some(OperationId([2; 32]))),
         )?;
         dysfunctional_detection.track_issue(
-            adults[0],
+            nodes[0],
             IssueType::PendingRequestOperation(Some(OperationId([3; 32]))),
         )?;
 
-        let has_removed = dysfunctional_detection.request_operation_fulfilled(&adults[1], op_id);
+        let has_removed = dysfunctional_detection.request_operation_fulfilled(&nodes[1], op_id);
 
         assert!(!has_removed);
         Ok(())
@@ -511,27 +511,27 @@ mod tests {
     #[tokio::test]
     async fn request_operation_fulfilled_should_return_false_when_op_id_not_tracked() -> Result<()>
     {
-        let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
+        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
         let op_id = OperationId([4; 32]);
 
         dysfunctional_detection.track_issue(
-            adults[0],
+            nodes[0],
             IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
         )?;
         dysfunctional_detection.track_issue(
-            adults[0],
+            nodes[0],
             IssueType::PendingRequestOperation(Some(OperationId([2; 32]))),
         )?;
         dysfunctional_detection.track_issue(
-            adults[0],
+            nodes[0],
             IssueType::PendingRequestOperation(Some(OperationId([3; 32]))),
         )?;
 
-        let has_removed = dysfunctional_detection.request_operation_fulfilled(&adults[1], op_id);
+        let has_removed = dysfunctional_detection.request_operation_fulfilled(&nodes[1], op_id);
 
         assert!(!has_removed);
-        let op_ids = dysfunctional_detection.get_unfulfilled_ops(adults[0]);
+        let op_ids = dysfunctional_detection.get_unfulfilled_ops(nodes[0]);
         assert_eq!(3, op_ids.len());
         Ok(())
     }
