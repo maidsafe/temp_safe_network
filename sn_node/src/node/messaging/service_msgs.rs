@@ -182,9 +182,9 @@ impl Node {
 
         let node_id = XorName::from(sending_node_pk);
 
-        let querys_peers = self.pending_data_queries.remove(&op_id).await;
+        let querys_peers = self.pending_data_queries.remove(&op_id);
         // Clear expired queries from the cache.
-        self.pending_data_queries.remove_expired().await;
+        self.pending_data_queries.remove_expired();
 
         // First check for waiting peers. If no one is waiting, we drop the response
         let waiting_peers = if let Some(peers) = querys_peers {
@@ -226,10 +226,7 @@ impl Node {
             // if no more responses come in this query should eventually time out
             // TODO: What happens if we keep getting queries / client for some data that's always not found?
             // We need to handle that
-            let _prev = self
-                .pending_data_queries
-                .set(op_id, waiting_peers.clone(), None)
-                .await;
+            let _prev = self.pending_data_queries.set(op_id, waiting_peers, None);
             trace!(
                 "Node {:?}, reported data not found {:?}",
                 sending_node_pk,
@@ -254,7 +251,7 @@ impl Node {
 
         #[cfg(feature = "traceroute")]
         {
-            let mut trace = traceroute.clone();
+            let mut trace = traceroute;
             trace.push(Entity::Elder(PublicKey::Ed25519(
                 self.info().keypair.public,
             )));
