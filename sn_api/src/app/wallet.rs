@@ -17,8 +17,9 @@ use bytes::Bytes;
 use log::{debug, warn};
 use sn_client::Client;
 use sn_dbc::{
-    rng, AmountSecrets, Hash, Owner, OwnerOnce, PublicKey, RingCtTransaction, Signature,
-    SpentProof, TransactionBuilder,
+    rng, AmountSecrets, Error as DbcError, Hash, IndexedSignatureShare, KeyImage, Owner, OwnerOnce,
+    PublicKey, RingCtTransaction, Signature, SpentProof, SpentProofContent, SpentProofShare,
+    TransactionBuilder,
 };
 use sn_interface::types::Token;
 use std::collections::{BTreeMap, BTreeSet};
@@ -77,6 +78,8 @@ impl Safe {
     ///
     /// A name can optionally be specified for the deposit. If it isn't,
     /// part of the hash of the DBC content will be used.
+    /// Note this won't perform a verification on the network to check if the the DBC has
+    /// been already spent, the user can call to `is_dbc_spent` API for that purpose beforehand.
     ///
     /// Returns the name that was set, along with the deposited amount.
     pub async fn wallet_deposit(
@@ -95,13 +98,11 @@ impl Safe {
             dbc.clone()
         } else if let Some(sk) = secret_key {
             let mut owned_dbc = dbc.clone();
-            owned_dbc.to_bearer(&sk).map_err(|e| {
-                if e.to_string()
-                    .contains("supplied secret key does not match the public key")
-                {
+            owned_dbc.to_bearer(&sk).map_err(|err| {
+                if let DbcError::DbcBearerConversionFailed(_) = err {
                     Error::DbcDepositInvalidSecretKey
                 } else {
-                    Error::DbcDepositError(e.to_string())
+                    Error::DbcDepositError(err.to_string())
                 }
             })?;
             owned_dbc
@@ -110,9 +111,6 @@ impl Safe {
                 "A secret key must be provided to deposit an owned DBC".to_string(),
             ));
         };
-
-        // TODO: check the DBC was not spent already. Perhaps we want a separate API to do these
-        // verifications for the user to perform them without depositing the DBC into a wallet.
 
         // Verify that the DBC to deposit is valid. This verifies there is a matching transaction
         // provided for each SpentProof, although this does not check if the DBC has been spent.
@@ -143,6 +141,70 @@ impl Safe {
         );
 
         Ok((spendable_name, amount))
+    }
+
+    /// Verify if the provided DBC's key_image has been already spent on the network.
+    pub async fn is_dbc_spent(&self, key_image: KeyImage) -> Result<bool> {
+        let client = self.get_safe_client()?;
+        let spent_proof_shares = client.spent_proof_shares(key_image).await?;
+
+        // We obtain a set of unique spent transactions hash the shares belong to
+        let spent_transactions: BTreeSet<(Hash, PublicKey)> = spent_proof_shares
+            .iter()
+            .map(|share| {
+                (
+                    share.content.transaction_hash,
+                    share.spentbook_pks().public_key(),
+                )
+            })
+            .collect();
+
+        let proof_key_verifier = SpentProofKeyVerifier {
+            client: self.get_safe_client()?,
+        };
+
+        // Among all different proof shares that could have been signed for different
+        // transactions, let's try to find one set of shares which can actually
+        // be aggregated onto a valid proof signature for the provided DBC's key_image,
+        // and which is signed by a known section key.
+        let is_spent = spent_transactions
+            .iter()
+            .any(|(tx_hash, signing_section_key)| {
+                let shares_for_current_tx: Vec<&SpentProofShare> = spent_proof_shares
+                    .iter()
+                    .filter(|share| &share.content.transaction_hash == tx_hash)
+                    .collect();
+
+                match shares_for_current_tx.get(0) {
+                    None => false,
+                    Some(share) => {
+                        if let Ok(section_signature) = share.spentbook_pks.combine_signatures(
+                            shares_for_current_tx
+                                .iter()
+                                .map(|share| SpentProofShare::spentbook_sig_share(share))
+                                .map(IndexedSignatureShare::threshold_crypto),
+                        ) {
+                            let spent_proof = SpentProof {
+                                content: SpentProofContent {
+                                    key_image,
+                                    transaction_hash: *tx_hash,
+                                    public_commitments: share.public_commitments().clone(),
+                                },
+                                spentbook_pub_key: *signing_section_key,
+                                spentbook_sig: section_signature,
+                            };
+
+                            spent_proof
+                                .verify(share.content.transaction_hash, &proof_key_verifier)
+                                .is_ok()
+                        } else {
+                            false
+                        }
+                    }
+                }
+            });
+
+        Ok(is_spent)
     }
 
     /// Fetch a wallet from a Url performing all type of URL resolution required.
@@ -1124,5 +1186,27 @@ mod tests {
             Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
             Ok(_) => Err(anyhow!("Wallet deposit succeeded unexpectedly".to_string())),
         }
+    }
+
+    #[tokio::test]
+    async fn test_wallet_is_dbc_spent() -> Result<()> {
+        let safe = new_safe_instance().await?;
+
+        // the api shall confirm the genesis DBC's key_image has been spent
+        let is_genesis_spent = safe.is_dbc_spent(GENESIS_DBC.key_image_bearer()?).await?;
+        assert!(is_genesis_spent);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wallet_dbc_is_unspent() -> Result<()> {
+        let (safe, unspent_dbc, _) = new_safe_instance_with_dbc().await?;
+
+        // confirm the DBC's key_image has not been spent yet
+        let is_unspent_dbc_spent = safe.is_dbc_spent(unspent_dbc.key_image_bearer()?).await?;
+        assert!(!is_unspent_dbc_spent);
+
+        Ok(())
     }
 }

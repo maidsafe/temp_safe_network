@@ -12,7 +12,7 @@ use color_eyre::{eyre::eyre, Result};
 use predicates::prelude::*;
 use sn_api::test_helpers::get_next_bearer_dbc;
 use sn_cmd_test_utilities::util::{
-    get_bearer_dbc_on_file, get_random_string, parse_keys_create_output,
+    get_bearer_dbc_on_file, get_owned_dbc_on_file, get_random_string, parse_keys_create_output,
     parse_wallet_create_output, safe_cmd, safe_cmd_stdout,
 };
 
@@ -712,6 +712,216 @@ async fn wallet_reissue_with_owned_and_public_key_args_should_fail_with_suggesti
         "Please run the command again and use one or the other, but not both, of these arguments.",
     ))
     .failure();
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn wallet_deposit_should_fail_since_bearer_dbc_is_spent() -> Result<()> {
+    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--dbc",
+            &dbc_file_path.display().to_string(),
+            &wallet_xorurl,
+        ],
+        Some(0),
+    )?;
+
+    safe_cmd_stdout(
+        ["wallet", "reissue", "0.5", "--from", &wallet_xorurl],
+        Some(0),
+    )?;
+
+    // trying to deposit the already spent DBC shall fail
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--dbc",
+            &dbc_file_path.display().to_string(),
+            &wallet_xorurl,
+        ],
+        Some(1),
+    )?
+    .assert()
+    .stderr(predicate::str::contains(
+        "The supplied DBC has been already spent on the network.",
+    ))
+    .stderr(predicate::str::contains(
+        "Please run the command again with the --force flag if you still \
+            wish to deposit it into the wallet.",
+    ))
+    .failure();
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn wallet_deposit_should_fail_since_owned_dbc_is_spent() -> Result<()> {
+    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let (dbc_file_path, sk, _) = get_owned_dbc_on_file(&tmp_data_dir).await?;
+    let sk_hex = sk.to_hex();
+
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--dbc",
+            &dbc_file_path.display().to_string(),
+            "--secret-key",
+            &sk_hex,
+            &wallet_xorurl,
+        ],
+        Some(0),
+    )?;
+
+    safe_cmd_stdout(
+        ["wallet", "reissue", "0.555", "--from", &wallet_xorurl],
+        Some(0),
+    )?;
+
+    // trying to deposit again the already spent DBC shall fail
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--dbc",
+            &dbc_file_path.display().to_string(),
+            "--secret-key",
+            &sk_hex,
+            &wallet_xorurl,
+        ],
+        Some(1),
+    )?
+    .assert()
+    .stderr(predicate::str::contains(
+        "The supplied DBC has been already spent on the network.",
+    ))
+    .stderr(predicate::str::contains(
+        "Please run the command again with the --force flag if you still \
+            wish to deposit it into the wallet.",
+    ))
+    .failure();
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn wallet_deposit_spent_bearer_dbc_force() -> Result<()> {
+    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let (dbc_file_path, _, balance) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--dbc",
+            &dbc_file_path.display().to_string(),
+            &wallet_xorurl,
+        ],
+        Some(0),
+    )?;
+
+    safe_cmd_stdout(
+        ["wallet", "reissue", "0.5", "--from", &wallet_xorurl],
+        Some(0),
+    )?;
+
+    // force to deposit the already spent DBC
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--name",
+            "spent-bearer-dbc",
+            "--dbc",
+            &dbc_file_path.display().to_string(),
+            &wallet_xorurl,
+            "--force"
+        ],
+        Some(0),
+    )?
+    .assert()
+    .stdout(predicate::str::contains(
+        "WARNING: --force flag set, hence skipping verification to check if \
+        supplied DBC has been already spent."
+    ))
+    .stdout(predicate::str::contains(
+        format!(
+            "Spendable DBC deposited ({} safecoins) with name 'spent-bearer-dbc' in wallet located at \"{}\"\n",
+            balance, wallet_xorurl
+        )
+    ))
+    .success();
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn wallet_deposit_spent_owned_dbc_force() -> Result<()> {
+    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let (dbc_file_path, sk, balance) = get_owned_dbc_on_file(&tmp_data_dir).await?;
+    let sk_hex = sk.to_hex();
+
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--dbc",
+            &dbc_file_path.display().to_string(),
+            "--secret-key",
+            &sk_hex,
+            &wallet_xorurl,
+        ],
+        Some(0),
+    )?;
+
+    safe_cmd_stdout(
+        ["wallet", "reissue", "0.666", "--from", &wallet_xorurl],
+        Some(0),
+    )?;
+
+    // force to deposit the already spent DBC
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--name",
+            "spent-owned-dbc",
+            "--dbc",
+            &dbc_file_path.display().to_string(),
+            "--secret-key",
+            &sk_hex,
+            &wallet_xorurl,
+            "--force"
+        ],
+        Some(0),
+    )?
+    .assert()
+    .stdout(predicate::str::contains(
+        "WARNING: --force flag set, hence skipping verification to check if \
+        supplied DBC has been already spent."
+    ))
+    .stdout(predicate::str::contains(
+        format!(
+            "Spendable DBC deposited ({} safecoins) with name 'spent-owned-dbc' in wallet located at \"{}\"\n",
+            balance, wallet_xorurl
+        )
+    ))
+    .success();
 
     Ok(())
 }
