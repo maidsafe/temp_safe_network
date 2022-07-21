@@ -216,7 +216,7 @@ impl Client {
     pub async fn is_known_section_key(&self, section_key: &sn_dbc::PublicKey) -> bool {
         self.session
             .network
-            .section_dag
+            .get_sections_dag()
             .read()
             .await
             .has_key(section_key)

@@ -141,8 +141,12 @@ pub fn section_has_room_for_node(
 /// Container for storing information about the network, including our own section.
 #[derive(Clone, Debug)]
 pub struct NetworkKnowledge {
+    // TODO: get genesis_key from NetworkPrefixMap::sections_dag once RwLock has been removed;
+    // else have to make a lot of fns as async
     /// Network genesis key
     genesis_key: BlsPublicKey,
+    // TODO: get current section chain from NetworkPrefixMap::sections_dag once RwLock has been
+    // removed; else have to make a lot of fns as async
     /// Current section chain of our own section, starting from genesis key
     chain: SecuredLinkedList,
     /// Signed Section Authority Provider
@@ -301,7 +305,7 @@ impl NetworkKnowledge {
             Some(signed_sap) if signed_sap.value.section_key() == section_key => {
                 let proof = self
                     .prefix_map
-                    .section_dag
+                    .get_sections_dag()
                     .read()
                     .await
                     .get_proof_chain(&self.genesis_key, &section_key);
@@ -339,7 +343,7 @@ impl NetworkKnowledge {
     /// Verify the given public key corresponds to any (current/old) section known to us
     pub async fn verify_section_key_is_known(&self, section_key: &BlsPublicKey) -> bool {
         self.prefix_map
-            .section_dag
+            .get_sections_dag()
             .read()
             .await
             .has_key(section_key)
@@ -459,7 +463,7 @@ impl NetworkKnowledge {
 
                     let section_chain = self
                         .prefix_map
-                        .section_dag
+                        .get_sections_dag()
                         .read()
                         .await
                         .get_proof_chain(&self.genesis_key, &provided_sap.section_key())?;
@@ -533,7 +537,7 @@ impl NetworkKnowledge {
         if let Some(signed_sap) = closest_sap {
             if let Ok(proof_chain) = self
                 .prefix_map
-                .section_dag
+                .get_sections_dag()
                 .read()
                 .await
                 .get_proof_chain(&self.genesis_key, &signed_sap.value.section_key())
