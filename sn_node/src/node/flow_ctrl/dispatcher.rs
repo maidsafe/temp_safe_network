@@ -53,17 +53,8 @@ impl Dispatcher {
     pub(crate) async fn process_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
         match cmd {
             Cmd::CleanupPeerLinks => {
-                // Scoping access to the RwLock
-                let (elders, dysfunction_tracking) = {
-                    let node = self.node.read().await;
-                    (
-                        node.network_knowledge.elders(),
-                        node.dysfunction_tracking.clone(),
-                    )
-                };
-                self.comm
-                    .cleanup_peers(elders, dysfunction_tracking)
-                    .await?;
+                let members = { self.node.read().await.network_knowledge.section_members() };
+                self.comm.cleanup_peers(members).await?;
                 Ok(vec![])
             }
             Cmd::SignOutgoingSystemMsg { msg, dst } => {
