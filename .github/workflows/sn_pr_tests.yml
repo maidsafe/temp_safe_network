@@ -254,7 +254,7 @@ jobs:
           release: true
           test-threads: 2
           retries: 0
-        timeout-minutes: 25
+        timeout-minutes: 50
 
       - name: Run AE tests
         uses: maidsafe/cargo-nextest@main
