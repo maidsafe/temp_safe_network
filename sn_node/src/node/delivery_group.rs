@@ -173,7 +173,7 @@ mod tests {
     use sn_interface::{
         network_knowledge::{
             test_utils::section_signed,
-            test_utils::{gen_addr, gen_section_authority_provider},
+            test_utils::{gen_addr, random_sap},
             NodeState, SectionAuthorityProvider, MIN_ADULT_AGE,
         },
         types::keys::ed25519,
@@ -535,8 +535,7 @@ mod tests {
         let prefix0 = Prefix::default().pushed(false);
         let prefix1 = Prefix::default().pushed(true);
 
-        let (section_auth0, _, secret_key_set) =
-            gen_section_authority_provider(prefix0, elder_count());
+        let (section_auth0, _, secret_key_set) = random_sap(prefix0, elder_count());
         let genesis_sk = secret_key_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
 
@@ -553,8 +552,7 @@ mod tests {
             assert!(network_knowledge.update_member(node_state));
         }
 
-        let (section_auth1, _, secret_key_set) =
-            gen_section_authority_provider(prefix1, elder_count());
+        let (section_auth1, _, secret_key_set) = random_sap(prefix1, elder_count());
         let sk1 = secret_key_set.secret_key();
         let pk1 = sk1.public_key();
 
@@ -588,8 +586,7 @@ mod tests {
     fn setup_adult() -> Result<(XorName, NetworkKnowledge)> {
         let prefix0 = Prefix::default().pushed(false);
 
-        let (section_auth, _, secret_key_set) =
-            gen_section_authority_provider(prefix0, elder_count());
+        let (section_auth, _, secret_key_set) = random_sap(prefix0, elder_count());
         let genesis_sk = secret_key_set.secret_key();
         let genesis_pk = genesis_sk.public_key();
         let section_auth = section_signed(genesis_sk, section_auth)?;

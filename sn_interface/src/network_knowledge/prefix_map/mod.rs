@@ -446,7 +446,7 @@ impl Eq for NetworkPrefixMap {}
 mod tests {
     use super::*;
     // sn_interface::network_knowledge::test_utils::gen_section_authority_provider
-    use crate::network_knowledge::test_utils::{gen_section_authority_provider, section_signed};
+    use crate::network_knowledge::test_utils::{random_sap, section_signed};
     use eyre::{eyre, Context, Result};
 
     #[test]
@@ -700,7 +700,7 @@ mod tests {
     }
 
     fn gen_section_auth(prefix: Prefix) -> Result<SectionAuth<SectionAuthorityProvider>> {
-        let (section_auth, _, secret_key_set) = gen_section_authority_provider(prefix, 5);
+        let (section_auth, _, secret_key_set) = random_sap(prefix, 5);
         section_signed(secret_key_set.secret_key(), section_auth)
             .context(format!("Failed to generate SAP for prefix {:?}", prefix))
     }

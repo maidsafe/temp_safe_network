@@ -317,7 +317,7 @@ pub mod test_utils {
     }
 
     // Generate random `SectionAuthorityProvider` for testing purposes.
-    pub fn gen_section_authority_provider(
+    pub fn random_sap(
         prefix: Prefix,
         count: usize,
     ) -> (SectionAuthorityProvider, Vec<NodeInfo>, SecretKeySet) {
