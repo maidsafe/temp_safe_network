@@ -20,6 +20,8 @@ static OP_WEIGHTING: f32 = 1.0;
 static KNOWLEDGE_WEIGHTING: f32 = 3.0;
 static DKG_WEIGHTING: f32 = 5.0;
 
+static DIFF_THRESHOLD: f32 = 1.0;
+
 /// Z-score value above which a node is dysfunctional
 static DYSFUNCTIONAL_DEVIATION: f32 = 2.0;
 
@@ -182,8 +184,6 @@ impl DysfunctionDetection {
         let mut scores_only = vec![];
         // now we loop to get the scores per xorname, so we can then avg etc
         for (name, score) in ops_scores {
-            debug!("Ops sore: {name}, {score}");
-
             let ops_score = score * OP_WEIGHTING;
 
             let node_conn_score = *conn_scores.get(&name).unwrap_or(&1.0);
@@ -195,10 +195,12 @@ impl DysfunctionDetection {
             let node_knowledge_score = *knowledge_scores.get(&name).unwrap_or(&1.0);
             let node_knowledge_score = node_knowledge_score * KNOWLEDGE_WEIGHTING;
 
-            debug!("Conns score: {name}, {node_conn_score}");
-            debug!("Knowledge score: {name}, {node_knowledge_score}");
-            debug!("Dkg score: {name}, {node_dkg_score}");
             let final_score = ops_score + node_conn_score + node_knowledge_score + node_dkg_score;
+            debug!(
+                "Node {name} has a final score of {final_score} |
+                (Conns score({node_conn_score}), Dkg score({node_dkg_score}), |
+                Knowledge score({node_knowledge_score}), Ops score({score}))"
+            );
 
             scores_only.push(final_score);
             let _prev = pre_z_scores.insert(name, final_score);
@@ -217,8 +219,13 @@ impl DysfunctionDetection {
             let zscore = match (mean, std_dev) {
                 (Some(mean), Some(std_deviation)) => {
                     let diff = score - mean;
+                    let threshold = if (mean / 2.0) > DIFF_THRESHOLD {
+                        mean / 2.0
+                    } else {
+                        DIFF_THRESHOLD
+                    };
 
-                    if diff < 1.0 {
+                    if diff < threshold {
                         // small or negative diff mean nodes are doing well
                         None
                     } else {
