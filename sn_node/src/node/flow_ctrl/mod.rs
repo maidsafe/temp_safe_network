@@ -15,16 +15,18 @@ pub(super) mod event_channel;
 pub(crate) mod tests;
 
 pub(crate) use self::cmd_ctrl::CmdCtrl;
-
 use crate::comm::MsgEvent;
 use crate::node::{flow_ctrl::cmds::Cmd, messages::WireMsgUtils, Error, Node, Result};
-
+use ed25519_dalek::Signer;
 use sn_interface::{
     messaging::{
+        data::{DataQuery, DataQueryVariant, ServiceMsg},
         system::{NodeCmd, SystemMsg},
-        WireMsg,
+        AuthorityProof, MsgId, ServiceAuth, WireMsg,
     },
     types::log_markers::LogMarker,
+    types::ChunkAddress,
+    types::{PublicKey, Signature},
 };
 
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
@@ -42,6 +44,9 @@ const SECTION_PROBE_INTERVAL: Duration = Duration::from_secs(300);
 const LINK_CLEANUP_INTERVAL: Duration = Duration::from_secs(120);
 const DATA_BATCH_INTERVAL: Duration = Duration::from_millis(50);
 const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(5);
+// 30 adult nodes checked per minute., so each node should be queried 10x in 10 mins
+// Which should hopefully trigger dysfunction if we're not getting responses back
+const HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
 
 #[derive(Clone)]
 pub(crate) struct FlowCtrl {
@@ -56,6 +61,7 @@ impl FlowCtrl {
 
         ctrl.clone().start_connection_listening(incoming_conns);
         ctrl.clone().start_network_probing();
+        ctrl.clone().start_running_health_checks();
         ctrl.clone().start_checking_for_missed_votes();
         ctrl.clone().start_section_probing();
         ctrl.clone().start_data_replication();
@@ -108,6 +114,57 @@ impl FlowCtrl {
     fn start_connection_listening(self, incoming_conns: mpsc::Receiver<MsgEvent>) {
         // Start listening to incoming connections.
         let _handle = task::spawn_local(handle_connection_events(self, incoming_conns));
+    }
+
+    fn start_running_health_checks(self) {
+        info!("Starting to check the section's health");
+        let _handle: JoinHandle<Result<()>> = tokio::task::spawn_local(async move {
+            let mut interval = tokio::time::interval(HEALTH_CHECK_INTERVAL);
+            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+            loop {
+                let _instant = interval.tick().await;
+                let mut node = self.node.write().await;
+                // random chunk addr will be sent to relevant nodes in the section.
+                let chunk_addr = xor_name::rand::random();
+                // lets make sure it's relevant to our section, to avoid any
+                // potential discards
+                let our_prefix = node.network_knowledge.prefix();
+
+                let chunk_addr = our_prefix.substituted_in(chunk_addr);
+
+                let msg = ServiceMsg::Query(DataQuery {
+                    variant: DataQueryVariant::GetChunk(ChunkAddress(chunk_addr)),
+                    adult_index: 0,
+                });
+
+                let keypair = node.keypair.clone();
+                let payload = WireMsg::serialize_msg_payload(&msg)?;
+                let signature = keypair.sign(&payload);
+
+                let auth = ServiceAuth {
+                    public_key: PublicKey::Ed25519(keypair.public),
+                    signature: Signature::Ed25519(signature),
+                };
+
+                let proofed_auth = AuthorityProof::verify(auth, payload)?;
+                let msg_id = MsgId::new();
+                let our_info = node.info();
+                let origin = our_info.peer();
+
+                // generate the cmds, and ensure we go through dysfunction tracking
+                let cmds = node
+                    .handle_valid_service_msg(msg_id, msg, proofed_auth, origin)
+                    .await?;
+
+                for cmd in cmds {
+                    info!("Sending healthcheck chunk query {:?}", msg_id);
+                    if let Err(e) = self.cmd_ctrl.push(cmd).await {
+                        error!("Error sending a health check msg to the network: {:?}", e);
+                    }
+                }
+            }
+        });
     }
 
     fn start_network_probing(self) {
