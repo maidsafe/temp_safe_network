@@ -752,34 +752,30 @@ struct ProbeTracker {
     sections: BTreeMap<Prefix, Cache<XorName, ProbeState>>,
 }
 
-use futures::executor::block_on as block;
-
 impl ProbeTracker {
     async fn send(&mut self, src: Prefix, dst: XorName, current_public_key: PublicKey) {
         let cache = self
             .sections
             .entry(src)
             .or_insert_with(|| Cache::with_expiry_duration(PROBE_WINDOW));
-        if cache.get(&dst).await.is_none() {
-            cache
-                .set(dst, ProbeState::Pending(current_public_key), None)
-                .await;
+        if cache.get(&dst).is_none() {
+            cache.set(dst, ProbeState::Pending(current_public_key), None);
         }
     }
 
     async fn receive(&mut self, dst: &XorName, received_public_key: &PublicKey) {
-        let result = &self
+        let result = self
             .sections
-            .iter()
-            .find_map(|(prefix, cache)| block(cache.get(dst)).map(|pk| (prefix, pk, cache)));
+            .iter_mut()
+            .find_map(|(prefix, cache)| cache.get(dst).map(|pk| (prefix, pk, cache)));
         let (_prefix, probe_state, cache) = match result {
             None => return,
             Some(state) => state,
         };
 
         if let ProbeState::Pending(pk) = probe_state {
-            if received_public_key == pk {
-                cache.set(*dst, ProbeState::Success, None).await;
+            if received_public_key == &pk {
+                cache.set(*dst, ProbeState::Success, None);
             }
         }
     }
@@ -787,12 +783,12 @@ impl ProbeTracker {
     // Returns iterator that yields the numbers of (delivered, sent) probe messages for each section.
     fn status(&self) -> impl Iterator<Item = (&Prefix, usize, usize)> {
         self.sections.iter().map(|(prefix, section)| {
-            let success = block(section.count(|(_, state)| match state.object {
+            let success = section.count(|(_, state)| match state.object {
                 ProbeState::Success => true,
                 ProbeState::Pending(_) => false,
-            }));
+            });
 
-            (prefix, success, block(section.len()))
+            (prefix, success, section.len())
         })
     }
 
@@ -800,7 +796,7 @@ impl ProbeTracker {
         let remove: Vec<_> = self
             .sections
             .iter()
-            .filter(|(_, section)| block(section.is_empty()))
+            .filter(|(_, section)| section.is_empty())
             .map(|(prefix, _)| *prefix)
             .collect();
 

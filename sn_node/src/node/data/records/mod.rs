@@ -67,7 +67,7 @@ impl Node {
         msg_id: MsgId,
         auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
-        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] mut traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
         let address = query.variant.address();
         let operation_id = query.variant.operation_id()?;
@@ -104,16 +104,15 @@ impl Node {
         }
 
         let mut op_was_already_underway = false;
-        let waiting_peers =
-            if let Some(mut peers) = self.pending_data_queries.get(&operation_id).await {
-                op_was_already_underway = peers.insert(origin);
+        let waiting_peers = if let Some(mut peers) = self.pending_data_queries.get(&operation_id) {
+            op_was_already_underway = peers.insert(origin);
 
-                peers
-            } else {
-                let mut peers = BTreeSet::new();
-                let _false_as_fresh = peers.insert(origin);
-                peers
-            };
+            peers
+        } else {
+            let mut peers = BTreeSet::new();
+            let _false_as_fresh = peers.insert(origin);
+            peers
+        };
 
         // drop if we exceed
         if waiting_peers.len() > MAX_WAITING_PEERS_PER_QUERY {
@@ -141,8 +140,7 @@ impl Node {
 
             let _prior_value = self
                 .pending_data_queries
-                .set(operation_id, waiting_peers, None)
-                .await;
+                .set(operation_id, waiting_peers, None);
 
             let msg = SystemMsg::NodeQuery(NodeQuery::Data {
                 query: query.variant,
@@ -155,7 +153,7 @@ impl Node {
                 msg,
                 targets,
                 #[cfg(feature = "traceroute")]
-                &mut traceroute.clone(),
+                &mut traceroute,
             )
         } else {
             // we don't do anything as we're still within data query timeout
