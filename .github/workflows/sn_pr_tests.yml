@@ -111,6 +111,12 @@ jobs:
         if: steps.sn_changes.outputs.src == 'true'
         run: cargo clippy --all-targets --all-features
 
+      - name: Check documentation
+        if: steps.sn_changes.outputs.src == 'true'
+        # Deny certain `rustdoc` lints that are unwanted.
+        # See https://doc.rust-lang.org/rustdoc/lints.html for lints that are 'warning' by default.
+        run: RUSTDOCFLAGS="--deny=warnings" cargo doc --no-deps
+
   unit:
     if: "!startsWith(github.event.pull_request.title, 'Automated version bump')"
     name: Unit Tests
