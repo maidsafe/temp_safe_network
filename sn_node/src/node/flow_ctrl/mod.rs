@@ -340,35 +340,33 @@ impl FlowCtrl {
                         let system_msg =
                             SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
 
-                        for recipient in recipients {
-                            let name = recipient.name();
-                            let dst = sn_interface::messaging::DstLocation::Node {
-                                name,
-                                section_pk: src_section_pk,
-                            };
-                            let wire_msg = WireMsg::single_src(
-                                &our_info,
-                                dst,
-                                system_msg.clone(),
-                                src_section_pk,
-                            )?;
+                        let name = recipients[0].name();
+                        let dst = sn_interface::messaging::DstLocation::Node {
+                            name,
+                            section_pk: src_section_pk,
+                        };
+                        let wire_msg = WireMsg::single_src(
+                            &our_info,
+                            dst,
+                            system_msg.clone(),
+                            src_section_pk,
+                        )?;
 
-                            debug!(
-                                "{:?} Data {:?} to: {:?} w/ {:?} ",
-                                LogMarker::SendingMissingReplicatedData,
-                                address,
-                                recipient,
-                                wire_msg.msg_id()
-                            );
+                        debug!(
+                            "{:?} Data {:?} to: {:?} w/ {:?} ",
+                            LogMarker::SendingMissingReplicatedData,
+                            address,
+                            recipients,
+                            wire_msg.msg_id()
+                        );
 
-                            let cmd = Cmd::SendMsg {
-                                wire_msg,
-                                recipients: vec![recipient],
-                            };
+                        let cmd = Cmd::SendMsg {
+                            wire_msg,
+                            recipients,
+                        };
 
-                            if let Err(e) = self.cmd_ctrl.push(cmd).await {
-                                error!("Error in data replication loop: {:?}", e);
-                            }
+                        if let Err(e) = self.cmd_ctrl.push(cmd).await {
+                            error!("Error in data replication loop: {:?}", e);
                         }
                     }
                 }
