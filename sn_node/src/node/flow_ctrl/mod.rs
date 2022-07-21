@@ -154,7 +154,14 @@ impl FlowCtrl {
 
                 // generate the cmds, and ensure we go through dysfunction tracking
                 let cmds = node
-                    .handle_valid_service_msg(msg_id, msg, proofed_auth, origin)
+                    .handle_valid_service_msg(
+                        msg_id,
+                        msg,
+                        proofed_auth,
+                        origin,
+                        #[cfg(feature = "traceroute")]
+                        vec![],
+                    )
                     .await?;
 
                 for cmd in cmds {
