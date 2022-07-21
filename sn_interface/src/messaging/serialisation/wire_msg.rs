@@ -44,7 +44,7 @@ pub struct WireMsg {
 }
 
 #[cfg(feature = "traceroute")]
-/// PublicKey of the entity that created/handled it's associated WireMsg
+/// PublicKey of the entity that created/handled its associated WireMsg
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Entity {
     Elder(PublicKey),
