@@ -131,7 +131,7 @@ fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
                 b.to_async(&runtime).iter(|| async {
                     for _ in 0..**size {
                         let random_data =
-                            ReplicatedData::Chunk(Chunk::new(grows_vec_to_bytes(&seed)));
+                            ReplicatedData::Chunk(Chunk::new(grows_vec_to_bytes(seed)));
                         storage
                             .clone()
                             .store(&random_data, pk, keypair.clone())

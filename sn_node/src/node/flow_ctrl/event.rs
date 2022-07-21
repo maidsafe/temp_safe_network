@@ -206,9 +206,10 @@ impl std::fmt::Display for CmdProcessEvent {
                 let time: DateTime<Utc> = (*time).into();
                 write!(
                     f,
-                    "{}: Started id: {}, prio: {}, queued for {} ms. Cmd: {}",
+                    "{}: Started id: {}, parent: {:?} prio: {}, queued for {} ms. Cmd: {}",
                     time.to_rfc3339(),
                     job.id(),
+                    job.parent_id(),
                     job.priority(),
                     queued_for,
                     cmd,
