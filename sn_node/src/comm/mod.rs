@@ -682,44 +682,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn successful_send_to_subset() -> Result<()> {
-        // Construct a local task set that can run `!Send` futures.
-        let local = tokio::task::LocalSet::new();
-
-        // Run the local task set.
-        local
-            .run_until(async move {
-                let (tx, _rx) = mpsc::channel(1);
-                let comm = Comm::first_node(local_addr(), Config::default(), RateLimits::new(), tx)
-                    .await?;
-
-                let (peer0, mut rx0) = new_peer().await?;
-                let (peer1, mut rx1) = new_peer().await?;
-
-                let original_message = new_test_msg()?;
-                let status = comm.send(&[peer0, peer1], original_message.clone()).await?;
-
-                assert_matches!(status, DeliveryStatus::AllRecipients);
-
-                if let Some(bytes) = rx0.recv().await {
-                    // the dst location name is updated per sender, so
-                    // we need to update that here before we check
-                    let mut check_msg = original_message.clone();
-                    check_msg.set_dst_xorname(peer0.name());
-
-                    assert_eq!(WireMsg::from(bytes)?, check_msg);
-                }
-
-                assert!(time::timeout(TIMEOUT, rx1.recv())
-                    .await
-                    .unwrap_or_default()
-                    .is_none());
-                Result::<()>::Ok(())
-            })
-            .await
-    }
-
-    #[tokio::test]
     async fn failed_send() -> Result<()> {
         // Construct a local task set that can run `!Send` futures.
         let local = tokio::task::LocalSet::new();
@@ -778,7 +740,7 @@ mod tests {
 
                 let message = new_test_msg()?;
                 let status = comm.send(&[invalid_peer, peer], message.clone()).await?;
-                assert_matches!(status, DeliveryStatus::DeliveredToAll(failed_recipients) => {
+                assert_matches!(status, DeliveryStatus::FailedToDeliverAll(failed_recipients) => {
                     assert_eq!(&failed_recipients, &[invalid_peer])
                 });
 
