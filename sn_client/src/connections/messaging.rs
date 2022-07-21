@@ -642,7 +642,7 @@ mod tests {
         messaging::data::CmdError,
         network_knowledge::{
             prefix_map::NetworkPrefixMap,
-            test_utils::{gen_section_authority_provider, section_signed},
+            test_utils::{random_sap, section_signed},
         },
     };
 
@@ -674,7 +674,7 @@ mod tests {
         let (err_sender, _err_receiver) = channel::<CmdError>(10);
 
         let prefix = prefix("0")?;
-        let (section_auth, _, secret_key_set) = gen_section_authority_provider(prefix, elders_len);
+        let (section_auth, _, secret_key_set) = random_sap(prefix, elders_len);
         let sap0 = section_signed(secret_key_set.secret_key(), section_auth)?;
         let (prefix_map, _genesis_sk, genesis_key) = new_network_prefix_map();
         assert!(prefix_map.insert_without_chain(sap0));

@@ -72,8 +72,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     local
         .run_until(async move {
             let prefix1 = Prefix::default().pushed(true);
-            let (section_auth, mut nodes, sk_set) =
-                gen_section_authority_provider(prefix1, elder_count());
+            let (section_auth, mut nodes, sk_set) = random_sap(prefix1, elder_count());
 
             let pk_set = sk_set.public_keys();
             let section_key = pk_set.public_key();
@@ -156,8 +155,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
     local
         .run_until(async move {
             let prefix1 = Prefix::default().pushed(true);
-            let (section_auth, mut nodes, sk_set) =
-                gen_section_authority_provider(prefix1, elder_count());
+            let (section_auth, mut nodes, sk_set) = random_sap(prefix1, elder_count());
 
             let pk_set = sk_set.public_keys();
             let section_key = pk_set.public_key();
@@ -349,7 +347,7 @@ async fn handle_agreement_on_online() -> Result<()> {
             let prefix = Prefix::default();
 
             let (section_auth, mut nodes, sk_set) =
-                gen_section_authority_provider(prefix, elder_count());
+                random_sap(prefix, elder_count());
             let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
@@ -588,9 +586,8 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
                 NetworkPhase::Startup => Prefix::default(),
                 NetworkPhase::Regular => "0".parse().unwrap(),
             };
-            let (section_auth, mut node_infos, sk_set) =
-                gen_section_authority_provider(prefix, elder_count());
-            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
+            let (sap, mut node_infos, sk_set) = random_sap(prefix, elder_count());
+            let (section, section_key_share) = create_section(&sk_set, &sap)?;
 
             // Make a left peer.
             let peer = create_peer(age);
@@ -616,7 +613,7 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
             let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
             // Simulate peer with the same name is rejoin and verify resulted behaviours.
-            let status = handle_online_cmd(&peer, &sk_set, &dispatcher, &section_auth).await?;
+            let status = handle_online_cmd(&peer, &sk_set, &dispatcher, &sap).await?;
 
             // A rejoin node with low age will be rejected.
             if age / 2 < MIN_ADULT_AGE {
@@ -1018,7 +1015,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             RelocatedPeerRole::Elder => elder_count(),
             RelocatedPeerRole::NonElder => recommended_section_size(),
         };
-        let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, elder_count());
+        let (section_auth, mut nodes, sk_set) = random_sap(prefix, elder_count());
         let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
 
         let mut adults = section_size - elder_count();
@@ -1525,8 +1522,7 @@ pub(crate) async fn create_comm() -> Result<Comm> {
 
 // Generate random SectionAuthorityProvider and the corresponding Nodes.
 fn create_section_auth() -> (SectionAuthorityProvider, Vec<NodeInfo>, SecretKeySet) {
-    let (section_auth, elders, secret_key_set) =
-        gen_section_authority_provider(Prefix::default(), elder_count());
+    let (section_auth, elders, secret_key_set) = random_sap(Prefix::default(), elder_count());
     (section_auth, elders, secret_key_set)
 }
 
