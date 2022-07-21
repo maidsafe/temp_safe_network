@@ -156,7 +156,7 @@ impl Session {
                 // based on our current knowledge of the network and sections chains.
                 let known_keys: Vec<BlsPublicKey> = session
                     .network
-                    .section_dag
+                    .get_sections_dag()
                     .read()
                     .await
                     .keys()

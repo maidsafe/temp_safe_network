@@ -37,12 +37,15 @@ use xor_name::{Prefix, XorName};
 /// Container for storing information about other sections in the network.
 #[derive(Debug, Clone)]
 pub struct NetworkPrefixMap {
+    //TODO: get genesis_key from sections_dag once RwLock has been removed; else have to make
+    // a lot of fns as async
     /// The network's genesis public key
     genesis_pk: BlsPublicKey,
     /// Map of sections prefixes to their latest signed section authority providers.
     sections: Arc<DashMap<Prefix, SectionAuth<SectionAuthorityProvider>>>,
+    // TODO: remove RwLock
     /// A DAG containing all section chains of the whole network that we are aware of
-    pub section_dag: Arc<RwLock<SecuredLinkedList>>,
+    sections_dag: Arc<RwLock<SecuredLinkedList>>,
 }
 
 impl NetworkPrefixMap {
@@ -51,13 +54,17 @@ impl NetworkPrefixMap {
         Self {
             genesis_pk,
             sections: Arc::new(DashMap::new()),
-            section_dag: Arc::new(RwLock::new(SecuredLinkedList::new(genesis_pk))),
+            sections_dag: Arc::new(RwLock::new(SecuredLinkedList::new(genesis_pk))),
         }
     }
 
     /// Returns the genesis key of the Network
     pub fn genesis_key(&self) -> BlsPublicKey {
         self.genesis_pk
+    }
+
+    pub fn get_sections_dag(&self) -> &RwLock<SecuredLinkedList> {
+        &*self.sections_dag
     }
 
     /// Inserts new entry into the map. Replaces previous entry at the same prefix.
@@ -152,7 +159,7 @@ impl NetworkPrefixMap {
         self.sections.get(prefix).map(|entry| entry.value().clone())
     }
 
-    /// Update our knowledge on the remote section's SAP and our section DAG
+    /// Update our knowledge on the remote section's SAP and our sections DAG
     /// if it's verifiable with the provided proof chain.
     /// Returns true if an update was made
     pub async fn update(
@@ -202,13 +209,11 @@ impl NetworkPrefixMap {
         match self.sections.get(incoming_prefix) {
             Some(entry) if entry.value() == &signed_sap => {
                 // It's the same SAP we are already aware of
-                trace!("roland: same sap");
                 return Ok(false);
             }
             Some(entry) => {
                 // We are then aware of the prefix, let's just verify the new SAP can
                 // be trusted based on the SAP we aware of and the proof chain provided.
-                trace!("roland: different sap {:?}", entry);
                 if !proof_chain.has_key(&entry.value().section_key()) {
                     // This case may happen when both the sender and receiver is about to using
                     // a new SAP. The AE-Update was sent before sender switching to use new SAP,
@@ -218,7 +223,6 @@ impl NetworkPrefixMap {
                     // As an outdated node will got updated via AE triggered by other messages,
                     // there is no need to bounce back here (assuming the sender is outdated) to
                     // avoid potential looping.
-                    trace!("roland: different sap, but does not have key");
                     return Err(Error::UntrustedProofChain(format!(
                         "provided proof_chain doesn't cover the SAP's key we currently know: {:?}",
                         entry.value().value
@@ -228,9 +232,7 @@ impl NetworkPrefixMap {
             None => {
                 // We are not aware of the prefix, let's then verify it can be
                 // trusted based on our own section chain and the provided proof chain.
-                trace!("roland: no sap");
-                if !proof_chain.check_trust(self.section_dag.read().await.keys()) {
-                    trace!("roland: no sap and cant be trusted");
+                if !proof_chain.check_trust(self.sections_dag.read().await.keys()) {
                     return Err(Error::UntrustedProofChain(format!(
                         "none of the keys were found on our section chain: {:?}",
                         signed_sap.value
@@ -263,17 +265,10 @@ impl NetworkPrefixMap {
         // for the prefix since we've already checked that above.
         let changed = self.insert(signed_sap);
 
-        // update our section DAG
-        if changed
-            && self
-                .section_dag
-                .write()
-                .await
-                .join(proof_chain.clone())
-                .is_err()
-        {
-            warn!("Error joining the proof_chain with our section_dag");
-        }
+        // update our sections DAG with the proof chain. Cannot be an error since in cases where we
+        // have outdated SAP (aware of prefix)/ not aware of the prefix, we have the proof_chains's
+        // root/child key in our sections_dag
+        let _res = self.sections_dag.write().await.join(proof_chain.clone());
 
         for section in self.sections.iter() {
             let prefix = section.key();
@@ -382,7 +377,7 @@ impl NetworkPrefixMap {
         NetworkPrefixMapSnapshot {
             genesis_pk: self.genesis_pk,
             sections: (*self.sections).clone(),
-            section_dag: (*self.section_dag.read().await).clone(),
+            sections_dag: (*self.sections_dag.read().await).clone(),
         }
     }
 }
@@ -411,7 +406,7 @@ impl Eq for NetworkPrefixMap {}
 pub struct NetworkPrefixMapSnapshot {
     genesis_pk: BlsPublicKey,
     sections: DashMap<Prefix, SectionAuth<SectionAuthorityProvider>>,
-    section_dag: SecuredLinkedList,
+    sections_dag: SecuredLinkedList,
 }
 
 impl NetworkPrefixMapSnapshot {
@@ -419,7 +414,7 @@ impl NetworkPrefixMapSnapshot {
         NetworkPrefixMap {
             genesis_pk: self.genesis_pk,
             sections: Arc::new(self.sections),
-            section_dag: Arc::new(RwLock::new(self.section_dag)),
+            sections_dag: Arc::new(RwLock::new(self.sections_dag)),
         }
     }
 }
