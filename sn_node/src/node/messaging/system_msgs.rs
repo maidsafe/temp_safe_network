@@ -185,6 +185,7 @@ impl Node {
 
     // Handler for data messages which have successfully
     // passed all signature checks and msg verifications
+    #[allow(clippy::too_many_arguments)]
     pub(crate) async fn handle_valid_system_msg(
         &mut self,
         msg_id: MsgId,

@@ -6,11 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::fmt::{Display, Formatter};
 use super::{
     data::ServiceMsg, system::SystemMsg, AuthorityProof, DstLocation, MsgId, NodeMsgAuthority,
     ServiceAuth,
 };
+use std::fmt::{Display, Formatter};
 
 // highest priority, since we must sort out membership first of all
 pub(crate) const DKG_MSG_PRIORITY: i32 = 8;

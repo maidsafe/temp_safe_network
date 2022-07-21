@@ -80,6 +80,8 @@ impl Dispatcher {
                 let node = self.node.read().await;
 
                 let src_section_pk = node.network_knowledge().section_key();
+
+                #[allow(unused_mut)]
                 let mut wire_msg = WireMsg::single_src(&node.info(), dst, msg, src_section_pk)?;
 
                 #[cfg(feature = "traceroute")]

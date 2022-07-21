@@ -217,13 +217,15 @@ impl Node {
         // This is overwritten in comm.send_to_client
         let mut rng = thread_rng();
         let dst = DstLocation::EndUser(EndUser(xor_name::XorName::random(&mut rng)));
+
+        #[allow(unused_mut)]
         let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst)?;
 
         #[cfg(feature = "traceroute")]
         {
             let mut trace = traceroute.clone();
             trace.push(Entity::Elder(PublicKey::Ed25519(
-                self.info().keypair.public.clone(),
+                self.info().keypair.public,
             )));
             wire_msg.add_trace(&mut trace);
         }

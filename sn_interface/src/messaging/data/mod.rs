@@ -170,10 +170,14 @@ impl Display for ServiceMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             ServiceMsg::Cmd(cmd) => write!(f, "ServiceMsg::Cmd({:?})", cmd),
-            ServiceMsg::CmdAck{ correlation_id } => write!(f, "ServiceMsg::CmdAck({:?})", correlation_id),
-            ServiceMsg::CmdError{ error, .. } => write!(f, "ServiceMsg::CmdError({:?})", error),
+            ServiceMsg::CmdAck { correlation_id } => {
+                write!(f, "ServiceMsg::CmdAck({:?})", correlation_id)
+            }
+            ServiceMsg::CmdError { error, .. } => write!(f, "ServiceMsg::CmdError({:?})", error),
             ServiceMsg::Query(query) => write!(f, "ServiceMsg::Query({:?})", query),
-            ServiceMsg::QueryResponse{ response, .. } => write!(f, "ServiceMsg::QueryResponse({:?})", response),
+            ServiceMsg::QueryResponse { response, .. } => {
+                write!(f, "ServiceMsg::QueryResponse({:?})", response)
+            }
             ServiceMsg::ServiceError(error) => write!(f, "ServiceMsg::ServiceError({:?})", error),
         }
     }
