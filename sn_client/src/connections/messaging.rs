@@ -196,6 +196,8 @@ impl Session {
             section_pk,
         };
         let auth_kind = AuthKind::Service(auth);
+
+        #[allow(unused_mut)]
         let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst_location)?;
 
         #[cfg(feature = "traceroute")]

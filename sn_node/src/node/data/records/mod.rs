@@ -37,7 +37,7 @@ impl Node {
     pub(crate) fn replicate_data(
         &self,
         data: ReplicatedData,
-        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] mut traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
         trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
         if self.is_elder() {
@@ -54,7 +54,7 @@ impl Node {
                 msg,
                 targets,
                 #[cfg(feature = "traceroute")]
-                &mut traceroute.clone(),
+                &mut traceroute,
             )
         } else {
             Err(Error::InvalidState)
@@ -306,12 +306,13 @@ impl Node {
         };
 
         // separate this into form_wire_msg based on agg
+        #[allow(unused_mut)]
         let mut wire_msg = WireMsg::single_src(&self.info(), dummy_dst_location, msg, section_pk)?;
 
         #[cfg(feature = "traceroute")]
         {
             traceroute.push(Entity::Elder(PublicKey::Ed25519(
-                self.info().keypair.public.clone(),
+                self.info().keypair.public,
             )));
             wire_msg.add_trace(traceroute);
         }
