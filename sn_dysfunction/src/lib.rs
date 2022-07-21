@@ -74,7 +74,7 @@ pub struct DysfunctionDetection {
     pub knowledge_issues: TimedTracker,
     /// The unfulfilled pending request operation issues logged against a node, along with an
     /// operation ID.
-    pub unfulfilled_ops: BTreeMap<NodeIdentifier, Vec<OperationId>>,
+    pub unfulfilled_ops: BTreeMap<NodeIdentifier, Vec<(OperationId, Instant)>>,
     adults: Vec<XorName>,
 }
 
@@ -117,7 +117,7 @@ impl DysfunctionDetection {
                     )
                 })?;
                 trace!("New issue has associated operation ID: {op_id:#?}");
-                queue.push(op_id);
+                queue.push((op_id, Instant::now()));
             }
         }
         Ok(())
@@ -138,8 +138,8 @@ impl DysfunctionDetection {
 
         if let Some(v) = self.unfulfilled_ops.get_mut(node_id) {
             // only remove the first instance from the vec
-            v.retain(|x| {
-                if has_removed || x != &operation_id {
+            v.retain(|(op_id, _)| {
+                if has_removed || op_id != &operation_id {
                     true
                 } else {
                     has_removed = true;
@@ -187,7 +187,7 @@ impl DysfunctionDetection {
     /// If there are no unfulfilled operations tracked, an empty list will be returned.
     pub fn get_unfulfilled_ops(&self, adult: XorName) -> Vec<OperationId> {
         if let Some(val) = self.unfulfilled_ops.get(&adult) {
-            return val.to_vec();
+            return val.to_vec().iter().map(|(op_id, _)| *op_id).collect();
         }
         Vec::new()
     }

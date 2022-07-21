@@ -13,6 +13,7 @@ use xor_name::XorName;
 
 use std::time::Duration;
 static RECENT_ISSUE_DURATION: Duration = Duration::from_secs(60 * 10); // 10 minutes
+static OUTDATED_PENDING_REQUEST_DURATION: Duration = Duration::from_secs(10);
 
 static CONN_WEIGHTING: f32 = 2.0;
 static OP_WEIGHTING: f32 = 1.0;
@@ -153,7 +154,13 @@ impl DysfunctionDetection {
             }
             IssueType::PendingRequestOperation(_) => {
                 let count = if let Some(issues) = self.unfulfilled_ops.get(node) {
-                    issues.len()
+                    // To avoid the case that the check get carried out just after
+                    // burst of messages get inserted, only those issues has sat a
+                    // while will be considered as outdated.
+                    issues
+                        .iter()
+                        .filter(|(_, time)| time.elapsed() > OUTDATED_PENDING_REQUEST_DURATION)
+                        .count()
                 } else {
                     1
                 };
@@ -499,9 +506,13 @@ mod tests {
             Runtime::new().unwrap().block_on(async {
                 let adults = (0..adult_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
                 let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+                let mut pending_operation_count = 0;
                 for _ in 0..issue_count {
                     let _ = dysfunctional_detection.track_issue(
                         adults[0], issue_type.clone());
+                    if let IssueType::PendingRequestOperation(_) = issue_type {
+                        pending_operation_count += 1;
+                    }
                 }
 
                 let score_results = dysfunctional_detection
@@ -520,8 +531,8 @@ mod tests {
                         score_results.op_scores
                     },
                 };
-                let expected_score = if issue_count > 1 {
-                    issue_count - 1
+                let expected_score = if (issue_count - pending_operation_count) > 1 {
+                    issue_count - pending_operation_count - 1
                 } else {
                     1
                 };
@@ -761,6 +772,8 @@ mod tests {
 
 #[cfg(test)]
 mod ops_tests {
+    use super::*;
+
     use crate::{error::Result, DysfunctionDetection, DysfunctionSeverity, IssueType, OperationId};
     use rand::Rng;
     use xor_name::{rand::random as random_xorname, XorName};
@@ -775,15 +788,16 @@ mod ops_tests {
     }
 
     #[tokio::test]
-    async fn op_dysfunction_no_variance_is_okay() -> Result<()> {
+    async fn op_dysfunction() -> Result<()> {
         let adults = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
         let mut dysfunctional_detection = DysfunctionDetection::new(adults.clone());
+        let mut pending_operations = Vec::new();
         for adult in &adults {
             for _ in 0..NORMAL_OPERATIONS_ISSUES {
-                let _ = dysfunctional_detection.track_issue(
-                    *adult,
-                    IssueType::PendingRequestOperation(get_random_operation_id()),
-                );
+                let op_id = get_random_operation_id();
+                pending_operations.push((adult, op_id.unwrap()));
+                let _ = dysfunctional_detection
+                    .track_issue(*adult, IssueType::PendingRequestOperation(op_id));
             }
         }
 
@@ -798,6 +812,42 @@ mod ops_tests {
                 .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)?
                 .len(),
             0
+        );
+
+        // We now wait for a while for the pending operations
+        // to become outdated and counted towards issue score.
+        tokio::time::sleep(OUTDATED_PENDING_REQUEST_DURATION).await;
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        assert_eq!(
+            dysfunctional_detection
+                .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)?
+                .len(),
+            0
+        );
+        assert_eq!(
+            dysfunctional_detection
+                .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)?
+                .len(),
+            0
+        );
+
+        // We now fulfill all operations except those for the adults[0]
+        // to create a deviation
+        for i in NORMAL_OPERATIONS_ISSUES..pending_operations.len() {
+            assert!(dysfunctional_detection
+                .request_operation_fulfilled(pending_operations[i].0, pending_operations[i].1));
+        }
+        assert_eq!(
+            dysfunctional_detection
+                .get_nodes_beyond_severity(DysfunctionSeverity::Dysfunctional)?
+                .len(),
+            1
+        );
+        assert_eq!(
+            dysfunctional_detection
+                .get_nodes_beyond_severity(DysfunctionSeverity::Suspicious)?
+                .len(),
+            1
         );
 
         Ok(())
