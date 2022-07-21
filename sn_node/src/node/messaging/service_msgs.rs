@@ -44,28 +44,59 @@ impl Node {
         error: CmdError,
         target: Peer,
         msg_id: MsgId,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
         let the_error_msg = ServiceMsg::CmdError {
             error,
             correlation_id: msg_id,
         };
-        self.send_cmd_response(target, the_error_msg)
+        self.send_cmd_response(
+            target,
+            the_error_msg,
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        )
     }
 
     /// Forms a `CmdAck` msg to send back to the client
-    pub(crate) fn send_cmd_ack(&self, target: Peer, msg_id: MsgId) -> Result<Vec<Cmd>> {
+    pub(crate) fn send_cmd_ack(
+        &self,
+        target: Peer,
+        msg_id: MsgId,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+    ) -> Result<Vec<Cmd>> {
         let the_ack_msg = ServiceMsg::CmdAck {
             correlation_id: msg_id,
         };
-        self.send_cmd_response(target, the_ack_msg)
+        self.send_cmd_response(
+            target,
+            the_ack_msg,
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        )
     }
 
     /// Forms a cmd to send a cmd response error/ack to the client
-    fn send_cmd_response(&self, target: Peer, msg: ServiceMsg) -> Result<Vec<Cmd>> {
+    fn send_cmd_response(
+        &self,
+        target: Peer,
+        msg: ServiceMsg,
+        #[cfg(feature = "traceroute")] mut traceroute: Vec<Entity>,
+    ) -> Result<Vec<Cmd>> {
         let dst = DstLocation::EndUser(EndUser(target.name()));
 
         let (auth_kind, payload) = self.ed_sign_client_msg(&msg)?;
-        let wire_msg = WireMsg::new_msg(MsgId::new(), payload, auth_kind, dst)?;
+
+        #[allow(unused_mut)]
+        let mut wire_msg = WireMsg::new_msg(MsgId::new(), payload, auth_kind, dst)?;
+
+        #[cfg(feature = "traceroute")]
+        {
+            traceroute.push(Entity::Elder(PublicKey::Ed25519(
+                self.info().keypair.public,
+            )));
+            wire_msg.add_trace(&mut traceroute);
+        }
 
         let cmd = Cmd::SendMsg {
             recipients: vec![target],
@@ -296,7 +327,7 @@ impl Node {
         let mut cmds = self.replicate_data(
             data,
             #[cfg(feature = "traceroute")]
-            traceroute,
+            traceroute.clone(),
         )?;
         // make sure the expected replication factor is achieved
         if data_copy_count() > cmds.len() {
@@ -306,10 +337,21 @@ impl Node {
                 expected: data_copy_count() as u8,
                 found: cmds.len() as u8,
             });
-            return self.send_cmd_error_response(error, origin, msg_id);
+            return self.send_cmd_error_response(
+                error,
+                origin,
+                msg_id,
+                #[cfg(feature = "traceroute")]
+                traceroute,
+            );
         }
 
-        cmds.extend(self.send_cmd_ack(origin, msg_id)?);
+        cmds.extend(self.send_cmd_ack(
+            origin,
+            msg_id,
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        )?);
 
         Ok(cmds)
     }

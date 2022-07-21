@@ -94,7 +94,13 @@ impl Node {
             let error = convert_to_error_msg(Error::NoAdults(self.network_knowledge().prefix()));
 
             debug!("No targets found for {msg_id:?}");
-            return self.send_cmd_error_response(CmdError::Data(error), origin, msg_id);
+            return self.send_cmd_error_response(
+                CmdError::Data(error),
+                origin,
+                msg_id,
+                #[cfg(feature = "traceroute")]
+                traceroute,
+            );
         }
 
         let mut op_was_already_underway = false;

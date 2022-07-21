@@ -48,12 +48,17 @@ const INITIAL_WAIT: u64 = 1;
 const CLIENT_SEND_RETRIES: usize = 1;
 
 impl Session {
-    #[instrument(skip(self, auth, payload), level = "debug", name = "session send cmd")]
+    #[instrument(
+        skip(self, auth, payload, client_pk),
+        level = "debug",
+        name = "session send cmd"
+    )]
     pub(crate) async fn send_cmd(
         &self,
         dst_address: XorName,
         auth: ServiceAuth,
         payload: Bytes,
+        #[cfg(feature = "traceroute")] client_pk: PublicKey,
     ) -> Result<()> {
         let endpoint = self.endpoint.clone();
         // TODO: Consider other approach: Keep a session per section!
@@ -75,7 +80,12 @@ impl Session {
         };
 
         let auth_kind = AuthKind::Service(auth);
-        let wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst_location)?;
+
+        #[allow(unused_mut)]
+        let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst_location)?;
+
+        #[cfg(feature = "traceroute")]
+        wire_msg.add_trace(&mut vec![Entity::Client(client_pk)]);
 
         // The insertion of channel will be executed AFTER the completion of the `send_message`.
         let (sender, mut receiver) = channel::<CmdResponse>(elders_len);
@@ -142,7 +152,11 @@ impl Session {
         Ok(())
     }
 
-    #[instrument(skip_all, level = "debug")]
+    #[instrument(
+        skip(self, auth, payload, client_pk),
+        level = "debug",
+        name = "session send query"
+    )]
     /// Send a `ServiceMsg` to the network awaiting for the response.
     pub(crate) async fn send_query(
         &self,

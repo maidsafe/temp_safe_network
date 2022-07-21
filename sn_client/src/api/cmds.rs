@@ -115,7 +115,13 @@ impl Client {
         };
 
         self.session
-            .send_cmd(dst_address, auth, serialised_cmd)
+            .send_cmd(
+                dst_address,
+                auth,
+                serialised_cmd,
+                #[cfg(feature = "traceroute")]
+                self.public_key(),
+            )
             .await
     }
 
