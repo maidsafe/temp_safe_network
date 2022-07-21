@@ -93,7 +93,7 @@ async fn main() -> Result<()> {
     // got resoved within the new version of Rust.
     #[cfg(not(target_os = "windows"))]
     // For Windows guys, rember to use
-    // `cargo build --release --features=test-utils --bins`
+    // `cargo build --release --bins`
     // before executing the testnet.exe.
     {
         let cmd_args = Cmd::from_args();
@@ -104,6 +104,13 @@ async fn main() -> Result<()> {
             println!("*** Building testnet with CHAOS enabled. Watch out. ***");
             build_args.push("--features");
             build_args.push("chaos");
+        }
+
+        // Keep features consistent to avoid recompiling when possible
+        if cfg!(feature = "traceroute") {
+            println!("*** Building testnet with TRACEROUTE enabled. Watch out for traces. ***");
+            build_args.push("--features");
+            build_args.push("traceroute");
         }
 
         if cfg!(feature = "unstable-wiremsg-debuginfo") {
