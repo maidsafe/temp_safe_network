@@ -86,9 +86,11 @@ jobs:
         with:
           filters: |
             src:
-              - 'sn_node/src/**'
               - 'sn_api/src/**'
               - 'sn_cli/src/**'
+              - 'sn_client/src/**'
+              - 'sn_interface/src/**'
+              - 'sn_node/src/**'
 
       - uses: actions-rs/toolchain@v1
         if: steps.sn_changes.outputs.src == 'true'
