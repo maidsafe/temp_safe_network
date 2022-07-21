@@ -468,6 +468,8 @@ impl Node {
                     message,
                     sender
                 );
+                // We could receive a DkgStart BEFORE starts tracking it in dysfunction
+                self.log_dkg_session(&sender.name());
                 self.handle_dkg_msg(session_id, message, sender)
             }
             SystemMsg::DkgFailureObservation {

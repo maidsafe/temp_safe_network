@@ -414,12 +414,17 @@ mod core {
                 );
                 info!("Splitting {:?} {:?}", zero_dkg_id, one_dkg_id);
 
-                // lets track ongoing DKG sessions
-                for candidate in zero_dkg_id.elders.keys() {
-                    self.log_dkg_issue(*candidate)?;
-                }
-                for candidate in one_dkg_id.elders.keys() {
-                    self.log_dkg_issue(*candidate)?;
+                // Lets track ongoing DKG sessions.
+                // However we won't receive DKG messages from the other after-split section.
+                // So, shall only track the side that we are in as well.
+                if zero_dkg_id.elders.contains_key(&self.info().name()) {
+                    for candidate in zero_dkg_id.elders.keys() {
+                        self.log_dkg_issue(*candidate)?;
+                    }
+                } else if one_dkg_id.elders.contains_key(&self.info().name()) {
+                    for candidate in one_dkg_id.elders.keys() {
+                        self.log_dkg_issue(*candidate)?;
+                    }
                 }
 
                 return Ok(vec![zero_dkg_id, one_dkg_id]);
