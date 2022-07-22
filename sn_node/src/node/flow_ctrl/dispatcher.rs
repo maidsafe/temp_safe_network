@@ -10,7 +10,7 @@ use crate::node::{messages::WireMsgUtils, Cmd, Node, Result};
 
 use crate::comm::{Comm, DeliveryStatus};
 use sn_interface::{
-    messaging::{system::SystemMsg, AuthKind, WireMsg},
+    messaging::{system::SystemMsg, DstLocation, WireMsg},
     types::Peer,
 };
 
@@ -261,11 +261,8 @@ impl Dispatcher {
     }
 
     async fn send_msg_via_comms(&self, recipients: &[Peer], wire_msg: WireMsg) -> Result<Vec<Cmd>> {
-        let cmds = match wire_msg.auth_kind() {
-            AuthKind::Node(_) | AuthKind::NodeBlsShare(_) => {
-                self.deliver_msgs(recipients, wire_msg).await?
-            }
-            AuthKind::Service(_) => {
+        let cmds = match wire_msg.dst_location() {
+            DstLocation::EndUser(_) => {
                 for peer in recipients {
                     if let Err(err) = self.comm.send_to_client(peer, wire_msg.clone()).await {
                         error!(
@@ -276,6 +273,7 @@ impl Dispatcher {
                 }
                 vec![]
             }
+            _ => self.deliver_msgs(recipients, wire_msg).await?,
         };
 
         Ok(cmds)
