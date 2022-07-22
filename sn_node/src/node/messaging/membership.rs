@@ -16,7 +16,6 @@ use sn_interface::{
     messaging::system::{
         JoinResponse, KeyedSig, MembershipState, NodeState, SectionAuth, SystemMsg,
     },
-    network_knowledge::MIN_ADULT_AGE,
     types::{log_markers::LogMarker, Peer},
 };
 
@@ -251,17 +250,6 @@ impl Node {
         new_info: NodeState,
         signature: Signature,
     ) -> Result<Vec<Cmd>> {
-        if let Some(old_info) = self
-            .network_knowledge
-            .is_either_member_or_archived(&new_info.name)
-        {
-            // We would approve and relocate it only if half its age is at least MIN_ADULT_AGE
-            let new_age = old_info.age() / 2;
-            if new_age >= MIN_ADULT_AGE {
-                return self.relocate_rejoining_peer(old_info.value, new_age);
-            }
-        }
-
         let sig = KeyedSig {
             public_key: self.network_knowledge.section_key(),
             signature,

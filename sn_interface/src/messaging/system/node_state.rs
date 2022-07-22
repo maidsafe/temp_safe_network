@@ -7,11 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use bls::PublicKey as BlsPublicKey;
+use ed25519_dalek::{Signature, Verifier};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use xor_name::{XorName, XOR_NAME_LEN};
 
-use crate::types::Peer;
+use crate::{network_knowledge::NetworkKnowledge, types::Peer};
 
 /// Information about a member of our section.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
@@ -71,4 +72,38 @@ pub struct RelocateDetails {
     pub dst_section_key: BlsPublicKey,
     /// The age the node will have post-relocation.
     pub age: u8,
+}
+
+impl RelocateDetails {
+    /// Constructs RelocateDetails given current network knowledge
+    pub fn with_age(
+        network_knowledge: &NetworkKnowledge,
+        peer: &Peer,
+        dst: XorName,
+        age: u8,
+    ) -> RelocateDetails {
+        let genesis_key = *network_knowledge.genesis_key();
+
+        let dst_section_key = network_knowledge
+            .section_by_name(&dst)
+            .map_or_else(|_| genesis_key, |section_auth| section_auth.section_key());
+
+        RelocateDetails {
+            previous_name: peer.name(),
+            dst,
+            dst_section_key,
+            age,
+        }
+    }
+
+    pub fn verify_identity(&self, new_name: &XorName, new_name_sig: &Signature) -> bool {
+        let pub_key = if let Ok(pub_key) = crate::types::keys::ed25519::pub_key(&self.previous_name)
+        {
+            pub_key
+        } else {
+            return false;
+        };
+
+        pub_key.verify(&new_name.0, new_name_sig).is_ok()
+    }
 }

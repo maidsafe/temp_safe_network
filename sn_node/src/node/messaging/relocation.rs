@@ -9,14 +9,13 @@
 use crate::node::{
     bootstrap::JoiningAsRelocated,
     flow_ctrl::cmds::Cmd,
-    relocation::{find_nodes_to_relocate, ChurnId, RelocateDetailsUtils},
+    relocation::{find_nodes_to_relocate, ChurnId},
     Event, MembershipEvent, Node, Proposal, Result,
 };
 
 use sn_interface::{
     elder_count,
-    messaging::system::{MembershipState, NodeState as NodeStateMsg, RelocateDetails, SectionAuth},
-    network_knowledge::NodeState,
+    messaging::system::{MembershipState, NodeState as NodeStateMsg, SectionAuth},
     types::log_markers::LogMarker,
 };
 
@@ -56,25 +55,6 @@ impl Node {
         }
 
         Ok(cmds)
-    }
-
-    pub(crate) fn relocate_rejoining_peer(
-        &mut self,
-        node_state: NodeState,
-        age: u8,
-    ) -> Result<Vec<Cmd>> {
-        let peer = node_state.peer();
-        let relocate_details =
-            RelocateDetails::with_age(&self.network_knowledge, peer, peer.name(), age);
-
-        trace!(
-            "Relocating {:?} to {} with age {} due to rejoin",
-            peer,
-            relocate_details.dst,
-            relocate_details.age
-        );
-
-        self.propose(Proposal::Offline(node_state.relocate(relocate_details)))
     }
 
     pub(crate) async fn handle_relocate(

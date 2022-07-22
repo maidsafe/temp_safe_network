@@ -12,10 +12,7 @@ use sn_interface::{
     elder_count,
     messaging::system::RelocateDetails,
     network_knowledge::{recommended_section_size, NetworkKnowledge, NodeState},
-    types::{keys::ed25519, Peer},
 };
-
-use ed25519_dalek::{Signature, Verifier};
 use std::{
     cmp::min,
     collections::BTreeSet,
@@ -92,51 +89,6 @@ pub(super) fn find_nodes_to_relocate(
         .collect()
 }
 
-/// Details of a relocation: which node to relocate, where to relocate it to
-/// and what age it should get once relocated.
-pub(super) trait RelocateDetailsUtils {
-    fn with_age(
-        network_knowledge: &NetworkKnowledge,
-        peer: &Peer,
-        dst: XorName,
-        age: u8,
-    ) -> RelocateDetails;
-
-    fn verify_identity(&self, new_name: &XorName, new_name_sig: &Signature) -> bool;
-}
-
-impl RelocateDetailsUtils for RelocateDetails {
-    fn with_age(
-        network_knowledge: &NetworkKnowledge,
-        peer: &Peer,
-        dst: XorName,
-        age: u8,
-    ) -> RelocateDetails {
-        let genesis_key = *network_knowledge.genesis_key();
-
-        let dst_section_key = network_knowledge
-            .section_by_name(&dst)
-            .map_or_else(|_| genesis_key, |section_auth| section_auth.section_key());
-
-        RelocateDetails {
-            previous_name: peer.name(),
-            dst,
-            dst_section_key,
-            age,
-        }
-    }
-
-    fn verify_identity(&self, new_name: &XorName, new_name_sig: &Signature) -> bool {
-        let pub_key = if let Ok(pub_key) = ed25519::pub_key(&self.previous_name) {
-            pub_key
-        } else {
-            return false;
-        };
-
-        pub_key.verify(&new_name.0, new_name_sig).is_ok()
-    }
-}
-
 // Relocation check - returns whether a member with the given age is a candidate for relocation on
 // a churn event with the given churn id.
 pub(crate) fn check(age: u8, churn_id: &ChurnId) -> bool {
@@ -173,7 +125,7 @@ mod tests {
     use sn_interface::{
         elder_count,
         network_knowledge::{test_utils::section_signed, SectionAuthorityProvider, MIN_ADULT_AGE},
-        types::SecretKeySet,
+        types::{Peer, SecretKeySet},
     };
 
     use eyre::Result;

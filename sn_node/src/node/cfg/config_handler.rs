@@ -135,12 +135,6 @@ impl Config {
     /// Returns a new `Config` instance.  Tries to read from the default node config file location,
     /// and overrides values with any equivalent cmd line args.
     pub async fn new() -> Result<Self, Error> {
-        // FIXME: Re-enable when we have rejoins working
-        // let mut config = match Self::read_from_file() {
-        //     Ok(Some(config)) => config,
-        //     Ok(None) | Err(_) => Default::default(),
-        // };
-
         let mut config = Config::default();
 
         let cmd_line_args = Config::parse();
