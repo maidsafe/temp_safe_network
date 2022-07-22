@@ -331,11 +331,7 @@ impl RegisterStorage {
 
     /// --- Reading ---
 
-    pub(crate) async fn read(
-        &mut self,
-        read: &RegisterQuery,
-        requester: User,
-    ) -> NodeQueryResponse {
+    pub(crate) async fn read(&self, read: &RegisterQuery, requester: User) -> NodeQueryResponse {
         trace!("Reading register {:?}", read.dst_address());
         let operation_id = match read.operation_id() {
             Ok(id) => id,
@@ -363,7 +359,7 @@ impl RegisterStorage {
 
     /// Get `Register` from the store and check permissions.
     async fn get_register(
-        &mut self,
+        &self,
         address: &RegisterAddress,
         action: Action,
         requester: User,
@@ -386,7 +382,7 @@ impl RegisterStorage {
 
     /// Get entire Register.
     async fn get(
-        &mut self,
+        &self,
         address: RegisterAddress,
         requester: User,
         operation_id: OperationId,
@@ -403,7 +399,7 @@ impl RegisterStorage {
     }
 
     async fn read_register(
-        &mut self,
+        &self,
         address: RegisterAddress,
         requester: User,
         operation_id: OperationId,
@@ -417,7 +413,7 @@ impl RegisterStorage {
     }
 
     async fn get_owner(
-        &mut self,
+        &self,
         address: RegisterAddress,
         requester: User,
         operation_id: OperationId,
@@ -431,7 +427,7 @@ impl RegisterStorage {
     }
 
     async fn get_entry(
-        &mut self,
+        &self,
         address: RegisterAddress,
         hash: EntryHash,
         requester: User,
@@ -450,7 +446,7 @@ impl RegisterStorage {
     }
 
     async fn get_user_permissions(
-        &mut self,
+        &self,
         address: RegisterAddress,
         user: User,
         requester: User,
@@ -469,7 +465,7 @@ impl RegisterStorage {
     }
 
     async fn get_policy(
-        &mut self,
+        &self,
         address: RegisterAddress,
         requester_pk: User,
         operation_id: OperationId,

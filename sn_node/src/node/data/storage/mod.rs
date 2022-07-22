@@ -109,7 +109,7 @@ impl DataStorage {
 
     // Query the local store and return NodeQueryResponse
     pub(crate) async fn query(
-        &mut self,
+        &self,
         query: &DataQueryVariant,
         requester: User,
     ) -> NodeQueryResponse {
