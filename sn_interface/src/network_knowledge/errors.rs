@@ -48,4 +48,7 @@ pub enum Error {
     WrongSection,
     #[error("Consensus({0:?})")]
     Consensus(#[from] sn_consensus::Error),
+
+    #[error("An archived node attempted to rejoin the section")]
+    ArchivedNodeRejoined,
 }

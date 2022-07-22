@@ -590,12 +590,6 @@ async fn handle_join_request_of_rejoined_node(phase: NetworkPhase, age: u8) -> R
             let (sap, mut node_infos, sk_set) = random_sap(prefix, elder_count());
             let (section, section_key_share) = create_section(&sk_set, &sap)?;
 
-            // Make a left peer.
-            let peer = create_peer(age);
-            let node_state = NodeState::left(peer, None);
-            let node_state = section_signed(sk_set.secret_key(), node_state)?;
-            let _updated = section.update_member(node_state);
-
             // Make a Node
             let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
             let info = node_infos.remove(0);
@@ -613,7 +607,18 @@ async fn handle_join_request_of_rejoined_node(phase: NetworkPhase, age: u8) -> R
             .await?;
             let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
-            // Simulate peer with the same name is rejoin and verify resulted behaviours.
+            // Make a left peer.
+            let peer = create_peer_in_prefix(&prefix, age);
+            dispatcher
+                .node()
+                .write()
+                .await
+                .membership
+                .as_mut()
+                .unwrap()
+                .force_bootstrap(NodeState::left(peer, None).to_msg());
+
+            // Simulate a peer with the same name rejoins
             let node_state = NodeState::joined(peer, None).to_msg();
             let join_cmds = dispatcher
                 .node()
