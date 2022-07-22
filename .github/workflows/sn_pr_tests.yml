@@ -146,7 +146,7 @@ jobs:
 
       - name: Build all test targets
        # all = all crates in workspace, lib/bins targets, with these features...
-        run: cargo test --no-run --release -p sn_interface -p sn_dysfunction -p sn_node
+        run: cargo test --no-run --release -p sn_interface -p sn_dysfunction -p sn_node -p sn_cli
 
       - name: Run sn_interface tests
         timeout-minutes: 25
@@ -250,6 +250,10 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: matrix.os != 'windows-latest'
 
+      - name: Build all tests before running
+        run: cd sn_client && cargo test --no-run --release -p sn_client
+        timeout-minutes: 50
+
       - name: Run client tests
         uses: maidsafe/cargo-nextest@main
         with:
@@ -260,7 +264,7 @@ jobs:
           release: true
           test-threads: 2
           retries: 0
-        timeout-minutes: 50
+        timeout-minutes: 25
 
       - name: Run AE tests
         uses: maidsafe/cargo-nextest@main
@@ -404,6 +408,10 @@ jobs:
         shell: bash
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
 
+      - name: Build all tests before running
+        run: cd sn_client && cargo test --no-run --release -p sn_client
+        timeout-minutes: 50
+
       - name: Run sn_client tests
         uses: maidsafe/cargo-nextest@main
         with:
@@ -537,6 +545,10 @@ jobs:
         run: ./target/release/log_cmds_inspector $HOME/.safe/node/local-test-network
         if: matrix.os != 'windows-latest'
 
+      - name: Build all tests before running
+        run: cd sn_api && cargo test --no-run --release -p sn_api
+        timeout-minutes: 50
+
       - name: Run API tests
         uses: maidsafe/cargo-nextest@main
         with:
@@ -643,6 +655,10 @@ jobs:
 
       - name: Generate keys for test run
         run: cargo run --package sn_cli --release -- keys create --for-cli
+
+      - name: Build all tests before running
+        run: cd sn_cli && cargo test --no-run --release -p sn_cli
+        timeout-minutes: 50
 
       - name: Run CLI tests
         uses: maidsafe/cargo-nextest@main
