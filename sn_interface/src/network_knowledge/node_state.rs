@@ -170,10 +170,7 @@ impl NodeState {
 
     pub fn leave(self) -> Result<Self, Error> {
         // Do not allow switching to `Left` when already relocated,
-        // to avoid rejoining with the same name.
-        if let MembershipState::Relocated(_) = self.state {
-            return Err(Error::InvalidState);
-        }
+        assert_eq!(self.state, MembershipState::Joined);
 
         Ok(Self {
             state: MembershipState::Left,
