@@ -570,12 +570,8 @@ struct HandleOnlineStatus {
     relocate_details: Option<RelocateDetails>,
 }
 
-enum NetworkPhase {
-    Startup,
-    Regular,
-}
-
-async fn handle_join_request_of_rejoined_node(phase: NetworkPhase, age: u8) -> Result<()> {
+#[tokio::test]
+async fn handle_join_request_of_rejoined_node() -> Result<()> {
     // Construct a local task set that can run `!Send` futures.
     let local = tokio::task::LocalSet::new();
 
@@ -583,10 +579,7 @@ async fn handle_join_request_of_rejoined_node(phase: NetworkPhase, age: u8) -> R
     local
         .run_until(async move {
             init_logger();
-            let prefix = match phase {
-                NetworkPhase::Startup => Prefix::default(),
-                NetworkPhase::Regular => "0".parse().unwrap(),
-            };
+            let prefix = Prefix::default();
             let (sap, mut node_infos, sk_set) = random_sap(prefix, elder_count());
             let (section, section_key_share) = create_section(&sk_set, &sap)?;
 
@@ -608,7 +601,7 @@ async fn handle_join_request_of_rejoined_node(phase: NetworkPhase, age: u8) -> R
             let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
             // Make a left peer.
-            let peer = create_peer_in_prefix(&prefix, age);
+            let peer = create_peer_in_prefix(&prefix, MIN_ADULT_AGE);
             dispatcher
                 .node()
                 .write()
@@ -618,7 +611,7 @@ async fn handle_join_request_of_rejoined_node(phase: NetworkPhase, age: u8) -> R
                 .unwrap()
                 .force_bootstrap(NodeState::left(peer, None).to_msg());
 
-            // Simulate a peer with the same name rejoins
+            // Simulate the same peer rejoining
             let node_state = NodeState::joined(peer, None).to_msg();
             let join_cmds = dispatcher
                 .node()
@@ -627,57 +620,19 @@ async fn handle_join_request_of_rejoined_node(phase: NetworkPhase, age: u8) -> R
                 .propose_membership_change(node_state.clone())
                 .unwrap();
 
-            // A rejoin node with low age will be rejected.
-            if age / 2 < MIN_ADULT_AGE {
-                assert!(join_cmds.is_empty()); // no commands signals this membership proposal was dropped.
-                return Ok(());
-            }
-
-            let mut voted_for_join = false;
-            for cmd in join_cmds {
-                let wire_msg = match cmd {
-                    Cmd::SendMsg { wire_msg, .. } => wire_msg,
-                    _ => continue,
-                };
-
-                let votes = match wire_msg.into_msg() {
-                    Ok(MsgType::System {
-                        msg: SystemMsg::MembershipVotes(votes),
-                        ..
-                    }) => votes,
-                    _ => continue,
-                };
-
-                voted_for_join = votes
-                    .into_iter()
-                    .all(|v| v.proposals().contains(&node_state));
-            }
-
-            assert!(voted_for_join);
-
-            Result::<()>::Ok(())
+            // A rejoining node with always be rejected
+            assert!(join_cmds.is_empty()); // no commands signals this membership proposal was dropped.
+            assert!(!dispatcher
+                .node()
+                .read()
+                .await
+                .membership
+                .as_ref()
+                .unwrap()
+                .is_churn_in_progress());
+            Ok(())
         })
         .await
-}
-
-#[tokio::test]
-async fn handle_join_request_of_rejoined_node_with_high_age_in_startup() -> Result<()> {
-    handle_join_request_of_rejoined_node(NetworkPhase::Startup, 16).await
-}
-
-#[tokio::test]
-async fn handle_join_request_of_rejoined_node_with_high_age_after_startup() -> Result<()> {
-    handle_join_request_of_rejoined_node(NetworkPhase::Regular, 16).await
-}
-
-#[tokio::test]
-async fn handle_join_request_of_rejoined_node_with_low_age_in_startup() -> Result<()> {
-    handle_join_request_of_rejoined_node(NetworkPhase::Startup, 8).await
-}
-
-#[tokio::test]
-async fn handle_join_request_of_rejoined_node_with_low_age_after_startup() -> Result<()> {
-    handle_join_request_of_rejoined_node(NetworkPhase::Regular, 8).await
 }
 
 #[tokio::test]
