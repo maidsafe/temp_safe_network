@@ -223,9 +223,43 @@ impl Membership {
         self.section_members(self.gen).unwrap_or_default()
     }
 
+    pub(crate) fn archived_members(&self) -> BTreeSet<XorName> {
+        let mut members = BTreeSet::from_iter(
+            self.bootstrap_members
+                .iter()
+                .filter(|n| {
+                    matches!(
+                        n.state,
+                        MembershipState::Left | MembershipState::Relocated(..)
+                    )
+                })
+                .map(|n| n.name),
+        );
+
+        for (decision, _) in self.history.values() {
+            for (node_state, _sig) in decision.proposals.iter() {
+                match node_state.state {
+                    MembershipState::Joined => {
+                        continue;
+                    }
+                    MembershipState::Left | MembershipState::Relocated(_) => {
+                        let _ = members.insert(node_state.name);
+                    }
+                }
+            }
+        }
+
+        members
+    }
+
     pub(crate) fn section_members(&self, gen: Generation) -> Result<BTreeMap<XorName, NodeState>> {
-        let mut members =
-            BTreeMap::from_iter(self.bootstrap_members.iter().cloned().map(|n| (n.name, n)));
+        let mut members = BTreeMap::from_iter(
+            self.bootstrap_members
+                .iter()
+                .cloned()
+                .filter(|n| matches!(n.state, MembershipState::Joined))
+                .map(|n| (n.name, n)),
+        );
 
         if gen == 0 {
             return Ok(members);
@@ -404,8 +438,12 @@ impl Membership {
                 .map(|(name, node)| (name, node.into_state())),
         );
 
+        let archived_members = self.archived_members();
+
         for proposal in signed_vote.proposals() {
-            proposal.into_state().validate(prefix, &members)?;
+            proposal
+                .into_state()
+                .validate(prefix, &members, &archived_members)?;
         }
 
         Ok(())
