@@ -29,7 +29,7 @@ name = "query-adult"
 required-features = ["build-bin"]
 
 [features]
-default = []
+default = ["traceroute"]
 chaos = []
 unstable-wiremsg-debuginfo = []
 test-utils = ["eyre"]
