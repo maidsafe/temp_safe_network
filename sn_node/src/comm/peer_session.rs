@@ -61,6 +61,10 @@ impl PeerSession {
         }
     }
 
+    pub(crate) fn is_connected(&self) -> bool {
+        !self.channel.is_closed()
+    }
+
     // this must be restricted somehow, we can't allow an unbounded inflow
     // of connections from a peer...
     pub(crate) async fn add(&self, conn: qp2p::Connection) {
