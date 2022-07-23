@@ -18,6 +18,8 @@ use crate::node::{
     Result as RoutingResult, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
 };
 
+use bls::Signature;
+use sn_consensus::Decision;
 use sn_interface::{
     elder_count, init_logger,
     messaging::{
@@ -70,8 +72,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
     local
         .run_until(async move {
             let prefix1 = Prefix::default().pushed(true);
-            let (section_auth, mut nodes, sk_set) =
-                gen_section_authority_provider(prefix1, elder_count());
+            let (section_auth, mut nodes, sk_set) = random_sap(prefix1, elder_count());
 
             let pk_set = sk_set.public_keys();
             let section_key = pk_set.public_key();
@@ -154,8 +155,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
     local
         .run_until(async move {
             let prefix1 = Prefix::default().pushed(true);
-            let (section_auth, mut nodes, sk_set) =
-                gen_section_authority_provider(prefix1, elder_count());
+            let (section_auth, mut nodes, sk_set) = random_sap(prefix1, elder_count());
 
             let pk_set = sk_set.public_keys();
             let section_key = pk_set.public_key();
@@ -347,7 +347,7 @@ async fn handle_agreement_on_online() -> Result<()> {
             let prefix = Prefix::default();
 
             let (section_auth, mut nodes, sk_set) =
-                gen_section_authority_provider(prefix, elder_count());
+                random_sap(prefix, elder_count());
             let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
@@ -444,7 +444,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             let new_peer = create_peer(MIN_ADULT_AGE + 1);
             let node_state = NodeState::joined(new_peer, Some(xor_name::rand::random()));
 
-            let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
+            let membership_decision = section_decision(&sk_set, node_state.to_msg())?;
 
             // Force this node to join
             node.write()
@@ -454,7 +454,9 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 .unwrap()
                 .force_bootstrap(node_state.to_msg());
 
-            let cmds = run_and_collect_cmds(Cmd::HandleNewNodeOnline(auth), &dispatcher).await?;
+            let cmds =
+                run_and_collect_cmds(Cmd::HandleJoinDecision(membership_decision), &dispatcher)
+                    .await?;
 
             // Verify we sent a `DkgStart` message with the expected participants.
             let mut dkg_start_sent = false;
@@ -506,9 +508,10 @@ async fn handle_online_cmd(
     section_auth: &SectionAuthorityProvider,
 ) -> Result<HandleOnlineStatus> {
     let node_state = NodeState::joined(*peer, None);
-    let auth = section_signed(sk_set.secret_key(), node_state.to_msg())?;
+    let membership_decision = section_decision(sk_set, node_state.to_msg())?;
 
-    let all_cmds = run_and_collect_cmds(Cmd::HandleNewNodeOnline(auth), dispatcher).await?;
+    let all_cmds =
+        run_and_collect_cmds(Cmd::HandleJoinDecision(membership_decision), dispatcher).await?;
 
     let mut status = HandleOnlineStatus {
         node_approval_sent: false,
@@ -567,31 +570,18 @@ struct HandleOnlineStatus {
     relocate_details: Option<RelocateDetails>,
 }
 
-enum NetworkPhase {
-    Startup,
-    Regular,
-}
-
-async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u8) -> Result<()> {
+#[tokio::test]
+async fn handle_join_request_of_rejoined_node() -> Result<()> {
     // Construct a local task set that can run `!Send` futures.
     let local = tokio::task::LocalSet::new();
 
     // Run the local task set.
     local
         .run_until(async move {
-            let prefix = match phase {
-                NetworkPhase::Startup => Prefix::default(),
-                NetworkPhase::Regular => "0".parse().unwrap(),
-            };
-            let (section_auth, mut node_infos, sk_set) =
-                gen_section_authority_provider(prefix, elder_count());
-            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
-
-            // Make a left peer.
-            let peer = create_peer(age);
-            let node_state = NodeState::left(peer, None);
-            let node_state = section_signed(sk_set.secret_key(), node_state)?;
-            let _updated = section.update_member(node_state);
+            init_logger();
+            let prefix = Prefix::default();
+            let (sap, mut node_infos, sk_set) = random_sap(prefix, elder_count());
+            let (section, section_key_share) = create_section(&sk_set, &sap)?;
 
             // Make a Node
             let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
@@ -610,44 +600,39 @@ async fn handle_agreement_on_online_of_rejoined_node(phase: NetworkPhase, age: u
             .await?;
             let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
-            // Simulate peer with the same name is rejoin and verify resulted behaviours.
-            let status = handle_online_cmd(&peer, &sk_set, &dispatcher, &section_auth).await?;
+            // Make a left peer.
+            let peer = create_peer_in_prefix(&prefix, MIN_ADULT_AGE);
+            dispatcher
+                .node()
+                .write()
+                .await
+                .membership
+                .as_mut()
+                .unwrap()
+                .force_bootstrap(NodeState::left(peer, None).to_msg());
 
-            // A rejoin node with low age will be rejected.
-            if age / 2 < MIN_ADULT_AGE {
-                assert!(!status.node_approval_sent);
-                assert!(status.relocate_details.is_none());
-                return Ok(());
-            }
+            // Simulate the same peer rejoining
+            let node_state = NodeState::joined(peer, None).to_msg();
+            let join_cmds = dispatcher
+                .node()
+                .write()
+                .await
+                .propose_membership_change(node_state.clone())
+                .unwrap();
 
-            assert!(status.node_approval_sent);
-            assert_matches!(status.relocate_details, Some(details) => {
-                assert_eq!(details.dst, peer.name());
-                assert_eq!(details.age, (age / 2).max(MIN_ADULT_AGE));
-            });
-            Result::<()>::Ok(())
+            // A rejoining node will always be rejected
+            assert!(join_cmds.is_empty()); // no commands signals this membership proposal was dropped.
+            assert!(!dispatcher
+                .node()
+                .read()
+                .await
+                .membership
+                .as_ref()
+                .unwrap()
+                .is_churn_in_progress());
+            Ok(())
         })
         .await
-}
-
-#[tokio::test]
-async fn handle_agreement_on_online_of_rejoined_node_with_high_age_in_startup() -> Result<()> {
-    handle_agreement_on_online_of_rejoined_node(NetworkPhase::Startup, 16).await
-}
-
-#[tokio::test]
-async fn handle_agreement_on_online_of_rejoined_node_with_high_age_after_startup() -> Result<()> {
-    handle_agreement_on_online_of_rejoined_node(NetworkPhase::Regular, 16).await
-}
-
-#[tokio::test]
-async fn handle_agreement_on_online_of_rejoined_node_with_low_age_in_startup() -> Result<()> {
-    handle_agreement_on_online_of_rejoined_node(NetworkPhase::Startup, 8).await
-}
-
-#[tokio::test]
-async fn handle_agreement_on_online_of_rejoined_node_with_low_age_after_startup() -> Result<()> {
-    handle_agreement_on_online_of_rejoined_node(NetworkPhase::Regular, 8).await
 }
 
 #[tokio::test]
@@ -1013,7 +998,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             RelocatedPeerRole::Elder => elder_count(),
             RelocatedPeerRole::NonElder => recommended_section_size(),
         };
-        let (section_auth, mut nodes, sk_set) = gen_section_authority_provider(prefix, elder_count());
+        let (section_auth, mut nodes, sk_set) = random_sap(prefix, elder_count());
         let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
 
         let mut adults = section_size - elder_count();
@@ -1049,8 +1034,8 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
             RelocatedPeerRole::NonElder => non_elder_peer,
         };
 
-        let auth = create_relocation_trigger(sk_set.secret_key(), relocated_peer.age())?;
-        let cmds = run_and_collect_cmds(Cmd::HandleNewNodeOnline(auth), &dispatcher).await?;
+        let membership_decision = create_relocation_trigger(&sk_set, relocated_peer.age())?;
+        let cmds = run_and_collect_cmds(Cmd::HandleJoinDecision(membership_decision), &dispatcher).await?;
 
         let mut offline_relocate_sent = false;
 
@@ -1520,8 +1505,7 @@ pub(crate) async fn create_comm() -> Result<Comm> {
 
 // Generate random SectionAuthorityProvider and the corresponding Nodes.
 fn create_section_auth() -> (SectionAuthorityProvider, Vec<NodeInfo>, SecretKeySet) {
-    let (section_auth, elders, secret_key_set) =
-        gen_section_authority_provider(Prefix::default(), elder_count());
+    let (section_auth, elders, secret_key_set) = random_sap(Prefix::default(), elder_count());
     (section_auth, elders, secret_key_set)
 }
 
@@ -1559,15 +1543,21 @@ fn create_section(
 // NOTE: recommended to call this with low `age` (4 or 5), otherwise it might take very long time
 // to complete because it needs to generate a signature with the number of trailing zeroes equal to
 // (or greater that) `age`.
-fn create_relocation_trigger(sk: &bls::SecretKey, age: u8) -> Result<SectionAuth<NodeStateMsg>> {
+fn create_relocation_trigger(
+    sk_set: &bls::SecretKeySet,
+    age: u8,
+) -> Result<Decision<NodeStateMsg>> {
     loop {
         let node_state =
-            NodeState::joined(create_peer(MIN_ADULT_AGE), Some(xor_name::rand::random()));
-        let auth = section_signed(sk, node_state.to_msg())?;
+            NodeState::joined(create_peer(MIN_ADULT_AGE), Some(xor_name::rand::random())).to_msg();
+        let decision = section_decision(sk_set, node_state.clone())?;
 
-        let churn_id = ChurnId(auth.sig.signature.to_bytes().to_vec());
+        let sig: Signature = decision.proposals[&node_state].clone();
+
+        let churn_id = ChurnId(sig.to_bytes().to_vec());
+
         if relocation_check(age, &churn_id) && !relocation_check(age + 1, &churn_id) {
-            return Ok(auth);
+            return Ok(decision);
         }
     }
 }

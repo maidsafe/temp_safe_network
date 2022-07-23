@@ -273,6 +273,7 @@ pub mod test_utils {
     use crate::network_knowledge::{NodeInfo, MIN_ADULT_AGE};
     use crate::types::SecretKeySet;
     use itertools::Itertools;
+    use sn_consensus::{Ballot, Consensus, Decision, Proposition, Vote, VoteResponse};
     // use ed25519::ed25519;
     use std::{cell::Cell, net::SocketAddr};
     use xor_name::Prefix;
@@ -316,7 +317,7 @@ pub mod test_utils {
     }
 
     // Generate random `SectionAuthorityProvider` for testing purposes.
-    pub fn gen_section_authority_provider(
+    pub fn random_sap(
         prefix: Prefix,
         count: usize,
     ) -> (SectionAuthorityProvider, Vec<NodeInfo>, SecretKeySet) {
@@ -337,6 +338,42 @@ pub mod test_utils {
             public_key: secret_key.public_key(),
             signature: secret_key.sign(&bytes),
         })
+    }
+
+    pub fn section_decision<P: Proposition>(
+        secret_key_set: &bls::SecretKeySet,
+        proposal: P,
+    ) -> Result<Decision<P>> {
+        let n = secret_key_set.threshold() + 1;
+        let mut nodes = Vec::from_iter((1..=n).into_iter().map(|idx| {
+            let secret = (idx as u8, secret_key_set.secret_key_share(idx));
+            Consensus::from(secret, secret_key_set.public_keys(), n)
+        }));
+
+        let first_vote = nodes[0].sign_vote(Vote {
+            gen: 0,
+            ballot: Ballot::Propose(proposal),
+            faults: Default::default(),
+        })?;
+
+        let mut votes = vec![nodes[0].cast_vote(first_vote)?];
+
+        while let Some(vote) = votes.pop() {
+            for node in nodes.iter_mut() {
+                match node.handle_signed_vote(vote.clone())? {
+                    VoteResponse::WaitingForMoreVotes => (),
+                    VoteResponse::Broadcast(vote) => votes.push(vote),
+                }
+            }
+        }
+
+        // All nodes have agreed to the same proposal
+        assert_eq!(
+            BTreeSet::from_iter(nodes.iter().map(|n| n.decision.clone().unwrap().proposals)).len(),
+            1
+        );
+
+        Ok(nodes[0].decision.clone().unwrap())
     }
 
     // Wrap the given payload in `SectionAuth`

@@ -12,6 +12,7 @@ use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::Signature;
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
+use sn_consensus::Decision;
 use std::{collections::VecDeque, net::SocketAddr};
 
 /// Request to join a section
@@ -76,10 +77,10 @@ pub enum JoinResponse {
         genesis_key: BlsPublicKey,
         /// SectionAuthorityProvider Signed by (current section)
         section_auth: SectionAuth<SectionAuthorityProvider>,
-        /// Current node's state
-        node_state: SectionAuth<NodeState>,
         /// Full verifiable section chain
         section_chain: SecuredLinkedList,
+        /// Current node's state
+        decision: Decision<NodeState>,
     },
     /// Join was rejected
     Rejected(JoinRejectionReason),

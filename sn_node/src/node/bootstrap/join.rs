@@ -11,6 +11,7 @@ use crate::comm::{Comm, DeliveryStatus, MsgEvent};
 
 use crate::node::{messages::WireMsgUtils, Error, Result};
 
+use sn_interface::messaging::system::MembershipState;
 use sn_interface::{
     messaging::{
         system::{
@@ -19,9 +20,7 @@ use sn_interface::{
         },
         AuthKind, DstLocation, MsgType, NodeAuth, WireMsg,
     },
-    network_knowledge::{
-        prefix_map::NetworkPrefixMap, NetworkKnowledge, NodeInfo, SectionAuthUtils, MIN_ADULT_AGE,
-    },
+    network_knowledge::{prefix_map::NetworkPrefixMap, NetworkKnowledge, NodeInfo, MIN_ADULT_AGE},
     types::{keys::ed25519, log_markers::LogMarker, Peer},
 };
 
@@ -191,19 +190,22 @@ impl<'a> Joiner<'a> {
                     section_auth,
                     genesis_key,
                     section_chain,
-                    node_state,
+                    decision,
                 } => {
                     info!("{}", LogMarker::ReceivedJoinApproval);
-                    if node_state.name != self.node.name() {
-                        trace!("Ignore NodeApproval not for us: {:?}", node_state);
+                    if let Err(e) = decision.validate(&section_auth.public_key_set) {
+                        error!("Dropping invalid join decision: {e:?}");
                         continue;
                     }
 
-                    if !node_state.verify(&section_chain) {
-                        error!(
-                            "Verification of node state in JoinResponse failed: {:?}",
-                            node_state
-                        );
+                    // Ensure this decision includes us as a joining node
+                    if decision
+                        .proposals
+                        .keys()
+                        .filter(|n| n.state == MembershipState::Joined)
+                        .all(|n| n.name != self.node.name())
+                    {
+                        trace!("Ignore join approval decision not for us: {decision:?}");
                         continue;
                     }
 
@@ -564,8 +566,7 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
-        let (section_auth, mut nodes, sk_set) =
-            gen_section_authority_provider(Prefix::default(), elder_count());
+        let (section_auth, mut nodes, sk_set) = random_sap(Prefix::default(), elder_count());
         let bootstrap_node = nodes.remove(0);
         let bootstrap_addr = bootstrap_node.addr;
         let sk = sk_set.secret_key();
@@ -647,15 +648,15 @@ mod tests {
 
             // Send JoinResponse::Approval
             let section_auth = section_signed(sk, section_auth.clone())?;
-            let node_state = section_signed(sk, NodeState::joined(peer, None))?;
-            let proof_chain = SecuredLinkedList::new(section_key);
+            let decision = section_decision(&sk_set, NodeState::joined(peer, None).to_msg())?;
+            let section_chain = SecuredLinkedList::new(section_key);
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
                     genesis_key: section_key,
                     section_auth: section_auth.clone().into_authed_msg(),
-                    node_state: node_state.into_authed_msg(),
-                    section_chain: proof_chain,
+                    section_chain,
+                    decision,
                 })),
                 &bootstrap_node,
                 section_auth.section_key(),
@@ -680,8 +681,7 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
-        let (_, mut nodes, sk_set) =
-            gen_section_authority_provider(Prefix::default(), elder_count());
+        let (_, mut nodes, sk_set) = random_sap(Prefix::default(), elder_count());
         let bootstrap_node = nodes.remove(0);
         let genesis_key = sk_set.secret_key().public_key();
 
@@ -720,8 +720,7 @@ mod tests {
                 .map(|_| (xor_name::rand::random(), gen_addr()))
                 .collect();
 
-            let (new_section_auth, _, new_sk_set) =
-                gen_section_authority_provider(Prefix::default(), elder_count());
+            let (new_section_auth, _, new_sk_set) = random_sap(Prefix::default(), elder_count());
             let new_pk_set = new_sk_set.public_keys();
 
             send_response(
@@ -786,8 +785,7 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
-        let (_, mut nodes, sk_set) =
-            gen_section_authority_provider(Prefix::default(), elder_count());
+        let (_, mut nodes, sk_set) = random_sap(Prefix::default(), elder_count());
         let bootstrap_node = nodes.remove(0);
 
         let node = NodeInfo::new(
@@ -812,8 +810,7 @@ mod tests {
             assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, .. }) =>
             assert_matches!(msg, SystemMsg::JoinRequest{..}));
 
-            let (new_section_auth, _, new_sk_set) =
-                gen_section_authority_provider(Prefix::default(), elder_count());
+            let (new_section_auth, _, new_sk_set) = random_sap(Prefix::default(), elder_count());
             let new_pk_set = new_sk_set.public_keys();
 
             send_response(
@@ -878,8 +875,7 @@ mod tests {
         let (send_tx, mut send_rx) = mpsc::channel(1);
         let (recv_tx, mut recv_rx) = mpsc::channel(1);
 
-        let (section_auth, mut nodes, sk_set) =
-            gen_section_authority_provider(Prefix::default(), elder_count());
+        let (section_auth, mut nodes, sk_set) = random_sap(Prefix::default(), elder_count());
         let bootstrap_node = nodes.remove(0);
 
         let node = NodeInfo::new(
@@ -957,7 +953,7 @@ mod tests {
             }
         };
 
-        let (section_auth, _, sk_set) = gen_section_authority_provider(good_prefix, elder_count());
+        let (section_auth, _, sk_set) = random_sap(good_prefix, elder_count());
         let section_key = sk_set.public_keys().public_key();
 
         let state = Joiner::new(
@@ -994,9 +990,7 @@ mod tests {
             send_response(
                 &recv_tx,
                 SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
-                    section_auth: gen_section_authority_provider(bad_prefix, elder_count())
-                        .0
-                        .to_msg(),
+                    section_auth: random_sap(bad_prefix, elder_count()).0.to_msg(),
                     section_signed: signed_sap.sig.clone(),
                     proof_chain: section_chain.clone(),
                     expected_age: MIN_ADULT_AGE,

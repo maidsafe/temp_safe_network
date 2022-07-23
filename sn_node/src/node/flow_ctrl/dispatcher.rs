@@ -58,8 +58,17 @@ impl Dispatcher {
     pub(crate) async fn process_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
         match cmd {
             Cmd::CleanupPeerLinks => {
-                let members = { self.node.read().await.network_knowledge.section_members() };
-                self.comm.cleanup_peers(members).await?;
+                // Scoping access to the RwLock
+                let (elders, dysfunction_tracking) = {
+                    let node = self.node.read().await;
+                    (
+                        node.network_knowledge.elders(),
+                        node.dysfunction_tracking.clone(),
+                    )
+                };
+                self.comm
+                    .cleanup_peers(elders, dysfunction_tracking)
+                    .await?;
                 Ok(vec![])
             }
             Cmd::SignOutgoingSystemMsg {
@@ -158,11 +167,10 @@ impl Dispatcher {
 
                 node.handle_general_agreements(proposal, sig).await
             }
-            Cmd::HandleNewNodeOnline(auth) => {
+            Cmd::HandleJoinDecision(decision) => {
                 let mut node = self.node.write().await;
 
-                node.handle_online_agreement(auth.value.into_state(), auth.sig)
-                    .await
+                node.handle_join_decision(decision).await
             }
             Cmd::HandleNodeLeft(auth) => {
                 let mut node = self.node.write().await;

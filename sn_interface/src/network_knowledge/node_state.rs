@@ -12,7 +12,7 @@ use crate::messaging::system::{
 use crate::network_knowledge::{section_has_room_for_node, Error, Result};
 use crate::types::Peer;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::net::SocketAddr;
 use xor_name::{Prefix, XorName};
 
@@ -68,7 +68,12 @@ impl NodeState {
         }
     }
 
-    pub fn validate(&self, prefix: &Prefix, members: &BTreeMap<XorName, Self>) -> Result<()> {
+    pub fn validate(
+        &self,
+        prefix: &Prefix,
+        members: &BTreeMap<XorName, Self>,
+        archived: &BTreeSet<XorName>,
+    ) -> Result<()> {
         let name = self.name();
         info!("Validating node state for {name}");
 
@@ -93,6 +98,8 @@ impl NodeState {
                 {
                     info!("Rejecting join since we have an existing node with this address: {existing_node:?}");
                     Err(Error::ExistingMemberConflict)
+                } else if archived.contains(&name) {
+                    Err(Error::ArchivedNodeRejoined)
                 } else {
                     Ok(())
                 }
@@ -163,10 +170,7 @@ impl NodeState {
 
     pub fn leave(self) -> Result<Self, Error> {
         // Do not allow switching to `Left` when already relocated,
-        // to avoid rejoining with the same name.
-        if let MembershipState::Relocated(_) = self.state {
-            return Err(Error::InvalidState);
-        }
+        assert_eq!(self.state, MembershipState::Joined);
 
         Ok(Self {
             state: MembershipState::Left,

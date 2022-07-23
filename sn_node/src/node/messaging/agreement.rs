@@ -6,47 +6,16 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{
-    flow_ctrl::cmds::Cmd, relocation::ChurnId, Event, MembershipEvent, Node, Proposal, Result,
-};
+use crate::node::{flow_ctrl::cmds::Cmd, Node, Proposal, Result};
 use sn_interface::{
-    messaging::system::{JoinResponse, KeyedSig, MembershipState, SectionAuth, SystemMsg},
-    network_knowledge::{
-        NodeState, SapCandidate, SectionAuthUtils, SectionAuthorityProvider, MIN_ADULT_AGE,
-    },
+    messaging::system::{KeyedSig, SectionAuth},
+    network_knowledge::{NodeState, SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
     types::log_markers::LogMarker,
 };
-use std::{cmp, collections::BTreeSet};
+use std::collections::BTreeSet;
 
 // Agreement
 impl Node {
-    // Send `NodeApproval` to a joining node which makes it a section member
-    pub(crate) fn send_node_approval(&self, node_state: SectionAuth<NodeState>) -> Vec<Cmd> {
-        let peer = *node_state.peer();
-        let prefix = self.network_knowledge.prefix();
-        info!("Our section with {:?} has approved peer {}.", prefix, peer,);
-
-        let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
-            genesis_key: *self.network_knowledge.genesis_key(),
-            section_auth: self
-                .network_knowledge
-                .section_signed_authority_provider()
-                .into_authed_msg(),
-            node_state: node_state.into_authed_msg(),
-            section_chain: self.network_knowledge.section_chain(),
-        }));
-
-        let dst_section_pk = self.network_knowledge.section_key();
-        trace!("{}", LogMarker::SendNodeApproval);
-        match self.send_direct_msg(peer, node_msg, dst_section_pk) {
-            Ok(cmd) => vec![cmd],
-            Err(err) => {
-                error!("Failed to send join approval to node {}: {:?}", peer, err);
-                vec![]
-            }
-        }
-    }
-
     #[instrument(skip(self), level = "trace")]
     pub(crate) async fn handle_general_agreements(
         &mut self,
@@ -68,97 +37,6 @@ impl Node {
         }
     }
 
-    pub(crate) async fn handle_online_agreement(
-        &mut self,
-        new_info: NodeState,
-        sig: KeyedSig,
-    ) -> Result<Vec<Cmd>> {
-        debug!("{}", LogMarker::AgreementOfOnline);
-        let mut cmds = vec![];
-        if let Some(old_info) = self
-            .network_knowledge
-            .is_either_member_or_archived(&new_info.name())
-        {
-            // This node is rejoin with same name.
-            if old_info.state() != MembershipState::Left {
-                debug!(
-                    "Ignoring Online node {} , Already a member (or has been) - {:?} not Left.",
-                    new_info.name(),
-                    old_info.state(),
-                );
-
-                return Ok(cmds);
-            }
-
-            // We would approve and relocate it only if half its age is at least MIN_ADULT_AGE
-            let new_age = cmp::max(MIN_ADULT_AGE - 1, old_info.age() / 2);
-            if new_age >= MIN_ADULT_AGE {
-                // TODO: consider handling the relocation inside the bootstrap phase, to avoid
-                // having to send this `NodeApproval`.
-                cmds.extend(self.send_node_approval(old_info.clone()));
-
-                cmds.extend(self.relocate_rejoining_peer(old_info.value, new_age)?);
-
-                return Ok(cmds);
-            }
-        }
-
-        let new_info = SectionAuth {
-            value: new_info,
-            sig,
-        };
-
-        if !self.network_knowledge.update_member(new_info.clone()) {
-            info!("ignore Online: {} at {}", new_info.name(), new_info.addr());
-            return Ok(vec![]);
-        }
-
-        self.add_new_adult_to_trackers(new_info.name());
-
-        info!("handle Online: {} at {}", new_info.name(), new_info.addr());
-
-        // still used for testing
-        self.send_event(Event::Membership(MembershipEvent::MemberJoined {
-            name: new_info.name(),
-            previous_name: new_info.previous_name(),
-            age: new_info.age(),
-        }))
-        .await;
-
-        self.log_section_stats();
-
-        // Do not disable node joins in first section.
-        let our_prefix = self.network_knowledge.prefix();
-        if !our_prefix.is_empty() {
-            // ..otherwise, switch off joins_allowed on a node joining.
-            // TODO: fix racing issues here? https://github.com/maidsafe/safe_network/issues/890
-            self.joins_allowed = false;
-        }
-
-        let churn_id = ChurnId(new_info.sig.signature.to_bytes().to_vec());
-        let excluded_from_relocation = vec![new_info.name()].into_iter().collect();
-
-        // first things first, inform the node it can join us
-        cmds.extend(self.send_node_approval(new_info));
-
-        cmds.extend(self.relocate_peers(churn_id, excluded_from_relocation)?);
-
-        let result = self.promote_and_demote_elders_except(&BTreeSet::default())?;
-
-        if result.is_empty() {
-            // Send AE-Update to our section
-            cmds.extend(self.send_ae_update_to_our_section());
-        }
-
-        cmds.extend(result);
-
-        info!("cmds in queue for Accepting node {:?}", cmds);
-
-        self.print_network_stats();
-
-        Ok(cmds)
-    }
-
     #[instrument(skip(self))]
     fn handle_offline_agreement(
         &mut self,
@@ -166,9 +44,8 @@ impl Node {
         sig: KeyedSig,
     ) -> Result<Vec<Cmd>> {
         info!(
-            "Agreement - proposing membership change with node offline: {} at {}",
-            node_state.name(),
-            node_state.addr()
+            "Agreement - proposing membership change with node offline: {}",
+            node_state.peer()
         );
 
         self.propose_membership_change(node_state.to_msg())
