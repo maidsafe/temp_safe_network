@@ -620,7 +620,7 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
                 .propose_membership_change(node_state.clone())
                 .unwrap();
 
-            // A rejoining node with always be rejected
+            // A rejoining node will always be rejected
             assert!(join_cmds.is_empty()); // no commands signals this membership proposal was dropped.
             assert!(!dispatcher
                 .node()
