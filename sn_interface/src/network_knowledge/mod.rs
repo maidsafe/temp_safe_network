@@ -614,6 +614,14 @@ impl NetworkKnowledge {
         self.chain.has_key(key)
     }
 
+    /// Return weather current section chain has the provided key
+    pub fn known_keys(&self) -> Vec<bls::PublicKey> {
+        let mut known_keys: Vec<_> = self.section_chain().keys().copied().collect();
+        known_keys.extend(self.prefix_map().section_keys());
+        known_keys.push(*self.genesis_key());
+        known_keys
+    }
+
     /// Return a copy of current SAP
     pub fn authority_provider(&self) -> SectionAuthorityProvider {
         self.signed_sap.value.clone()

@@ -32,7 +32,6 @@ use sn_interface::{
     types::Peer,
 };
 
-use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
 
@@ -69,16 +68,13 @@ impl Node {
                 msg,
             } => {
                 // Verify that the section key in the msg authority is trusted
-                let known_keys =
-                    if let Some(known_keys) = self.verify_section_key(&msg_authority, &msg).await {
-                        known_keys
-                    } else {
-                        warn!(
-                            "Untrusted message ({:?}) dropped from {:?}: {:?} ",
-                            msg_id, origin, msg
-                        );
-                        return Ok(vec![]);
-                    };
+                if !self.verify_section_key(&msg_authority, &msg).await {
+                    warn!(
+                        "Untrusted message ({:?}) dropped from {:?}: {:?} ",
+                        msg_id, origin, msg
+                    );
+                    return Ok(vec![]);
+                };
 
                 // Check for entropy before we proceed further
                 if let Some(ae_cmd) = self
@@ -104,7 +100,6 @@ impl Node {
                     msg_id,
                     msg,
                     msg_authority,
-                    known_keys,
                     wire_msg_payload,
                     #[cfg(feature = "traceroute")]
                     traceroute,
@@ -198,25 +193,13 @@ impl Node {
         &mut self,
         msg_authority: &NodeMsgAuthority,
         msg: &SystemMsg,
-    ) -> Option<Vec<BlsPublicKey>> {
-        let mut known_keys: Vec<BlsPublicKey> = self
-            .network_knowledge
-            .section_chain()
-            .keys()
-            .copied()
-            .collect();
-        known_keys.extend(self.network_knowledge.prefix_map().section_keys());
-        known_keys.push(*self.network_knowledge.genesis_key());
-
-        if NetworkKnowledge::verify_node_msg_can_be_trusted(
+    ) -> bool {
+        let known_keys = self.network_knowledge.known_keys();
+        NetworkKnowledge::verify_node_msg_can_be_trusted(
             msg_authority.clone(),
             msg.clone(),
             &known_keys,
-        ) {
-            Some(known_keys)
-        } else {
-            None
-        }
+        )
     }
 
     /// Check if the origin needs to be updated on network structure/members.

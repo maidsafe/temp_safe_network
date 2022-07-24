@@ -131,7 +131,6 @@ impl Dispatcher {
                 msg_id,
                 msg,
                 msg_authority,
-                known_keys,
                 wire_msg_payload,
                 #[cfg(feature = "traceroute")]
                 traceroute,
@@ -147,7 +146,6 @@ impl Dispatcher {
                         msg_authority,
                         msg,
                         origin,
-                        known_keys,
                         &self.comm,
                         #[cfg(feature = "traceroute")]
                         traceroute,

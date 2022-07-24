@@ -192,7 +192,6 @@ impl Node {
         msg_authority: NodeMsgAuthority,
         msg: SystemMsg,
         sender: Peer,
-        known_keys: Vec<BlsPublicKey>,
         comm: &Comm,
         #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
@@ -401,7 +400,7 @@ impl Node {
                     return Ok(vec![]);
                 }
 
-                self.handle_join_as_relocated_request(sender, *join_request, known_keys, comm)
+                self.handle_join_as_relocated_request(sender, *join_request, comm)
                     .await
             }
             SystemMsg::MembershipVotes(votes) => {
