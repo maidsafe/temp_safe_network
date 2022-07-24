@@ -130,7 +130,7 @@ impl Node {
                     }
                 };
 
-                let src_location = wire_msg.auth_kind().src();
+                let src_location = wire_msg.auth().src();
 
                 if self.is_not_elder() {
                     trace!("Redirecting from adult to section elders");
