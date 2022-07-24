@@ -111,7 +111,6 @@ pub(crate) enum Cmd {
         msg: SystemMsg,
         origin: Peer,
         msg_authority: NodeMsgAuthority,
-        known_keys: Vec<bls::PublicKey>,
         #[debug(skip)]
         wire_msg_payload: Bytes,
         #[cfg(feature = "traceroute")]

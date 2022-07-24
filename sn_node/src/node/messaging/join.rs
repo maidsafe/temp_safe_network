@@ -18,7 +18,6 @@ use sn_interface::{
     types::{log_markers::LogMarker, Peer},
 };
 
-use bls::PublicKey as BlsPublicKey;
 use std::vec;
 
 const FIRST_SECTION_MIN_ELDER_AGE: u8 = 82;
@@ -201,7 +200,6 @@ impl Node {
         &mut self,
         peer: Peer,
         join_request: JoinAsRelocatedRequest,
-        known_keys: Vec<BlsPublicKey>,
         comm: &Comm,
     ) -> Result<Vec<Cmd>> {
         debug!("Received JoinAsRelocatedRequest {join_request:?} from {peer}",);
@@ -237,6 +235,7 @@ impl Node {
                 debug!("Ignoring JoinAsRelocatedRequest from {peer} - invalid sig.");
                 return Ok(vec![]);
             }
+            let known_keys = self.network_knowledge.known_keys();
             if !known_keys.contains(&join_request.relocate_proof.sig.public_key) {
                 debug!("Ignoring JoinAsRelocatedRequest from {peer} - untrusted src.");
                 return Ok(vec![]);
