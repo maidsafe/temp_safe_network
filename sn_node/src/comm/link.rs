@@ -28,6 +28,7 @@ type ConnId = usize;
 // unforseen bursts, but at the same time puts a sane cap on the max
 // number continuously held for an - obviously malfunctioning - peer (i.e. edge case).
 const CAPACITY: usize = 255;
+// How long before quiet connections are cleaned up.
 const UNUSED_TTL: Duration = Duration::from_secs(120);
 
 /// A link to a peer in our network.
