@@ -78,7 +78,6 @@ impl Dispatcher {
                 mut traceroute,
             } => {
                 let node = self.node.read().await;
-
                 let src_section_pk = node.network_knowledge().section_key();
 
                 #[allow(unused_mut)]

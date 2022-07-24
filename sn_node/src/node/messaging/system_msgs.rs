@@ -390,7 +390,14 @@ impl Node {
             SystemMsg::HandoverAE(gen) => self.handle_handover_anti_entropy(sender, gen),
             SystemMsg::JoinRequest(join_request) => {
                 trace!("Handling msg: JoinRequest from {}", sender);
-                self.handle_join_request(sender, *join_request, comm).await
+
+                // First do reachability check (we can't respond to the node if it fails).
+                if comm.is_reachable(&sender.addr()).await.is_err() {
+                    debug!("Ignoring JoinRequest from {sender} - not reachable.");
+                    return Ok(vec![]);
+                };
+
+                self.handle_join_request(sender, *join_request).await
             }
             SystemMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
@@ -400,7 +407,13 @@ impl Node {
                     return Ok(vec![]);
                 }
 
-                self.handle_join_as_relocated_request(sender, *join_request, comm)
+                // First do reachability check (we can't respond to the node if it fails).
+                if comm.is_reachable(&sender.addr()).await.is_err() {
+                    debug!("Ignoring JoinAsRelocatedRequest from {sender} - not reachable.");
+                    return Ok(vec![]);
+                };
+
+                self.handle_join_as_relocated_request(sender, *join_request)
                     .await
             }
             SystemMsg::MembershipVotes(votes) => {

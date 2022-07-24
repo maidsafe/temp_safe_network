@@ -6,8 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::comm::Comm;
 use crate::node::{flow_ctrl::cmds::Cmd, Node, Result};
+
 use sn_interface::{
     elder_count,
     messaging::system::{
@@ -28,7 +28,6 @@ impl Node {
         &mut self,
         peer: Peer,
         join_request: JoinRequest,
-        comm: &Comm,
     ) -> Result<Vec<Cmd>> {
         debug!("Received {:?} from {}", join_request, peer);
 
@@ -143,22 +142,7 @@ impl Node {
             )?]);
         }
 
-        // Do reachability check only for the initial join request
-        let cmd = if comm.is_reachable(&peer.addr()).await.is_err() {
-            let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
-                JoinRejectionReason::NodeNotReachable(peer.addr()),
-            )));
-
-            trace!("{}", LogMarker::SendJoinRejected);
-
-            trace!("Sending {:?} to {}", node_msg, peer);
-            self.send_direct_msg(peer, node_msg, our_section_key)?
-        } else {
-            // It's reachable, let's then send the proof challenge
-            self.send_resource_proof_challenge(peer)?
-        };
-
-        Ok(vec![cmd])
+        Ok(vec![self.send_resource_proof_challenge(peer)?])
     }
 
     pub(crate) fn verify_joining_node_age(&self, peer: &Peer) -> (bool, u8) {
@@ -200,7 +184,6 @@ impl Node {
         &mut self,
         peer: Peer,
         join_request: JoinAsRelocatedRequest,
-        comm: &Comm,
     ) -> Result<Vec<Cmd>> {
         debug!("Received JoinAsRelocatedRequest {join_request:?} from {peer}",);
 
@@ -254,21 +237,6 @@ impl Node {
             debug!("Ignoring JoinAsRelocatedRequest from {peer} - invalid node name signature.");
             return Ok(vec![]);
         }
-
-        // Finally do reachability check
-        if comm.is_reachable(&peer.addr()).await.is_err() {
-            let node_msg = SystemMsg::JoinAsRelocatedResponse(Box::new(
-                JoinAsRelocatedResponse::NodeNotReachable(peer.addr()),
-            ));
-            trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
-
-            trace!("Sending {:?} to {}", node_msg, peer);
-            return Ok(vec![self.send_direct_msg(
-                peer,
-                node_msg,
-                self.network_knowledge.section_key(),
-            )?]);
-        };
 
         self.propose_membership_change(join_request.relocate_proof.value)
     }
