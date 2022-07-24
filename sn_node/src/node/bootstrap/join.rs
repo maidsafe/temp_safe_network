@@ -472,7 +472,7 @@ impl<'a> Joiner<'a> {
             let (join_response, sender) = match event {
                 MsgEvent::Received {
                     sender, wire_msg, ..
-                } => match wire_msg.auth_kind() {
+                } => match wire_msg.auth() {
                     AuthKind::Service(_) => continue,
                     AuthKind::NodeBlsShare(_) => {
                         trace!(

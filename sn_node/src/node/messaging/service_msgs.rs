@@ -85,10 +85,10 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         let dst = DstLocation::EndUser(EndUser(target.name()));
 
-        let (auth_kind, payload) = self.ed_sign_client_msg(&msg)?;
+        let (auth, payload) = self.ed_sign_client_msg(&msg)?;
 
         #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::new_msg(MsgId::new(), payload, auth_kind, dst)?;
+        let mut wire_msg = WireMsg::new_msg(MsgId::new(), payload, auth, dst)?;
 
         #[cfg(feature = "traceroute")]
         {
@@ -242,7 +242,7 @@ impl Node {
             response: query_response,
             correlation_id,
         };
-        let (auth_kind, payload) = self.ed_sign_client_msg(&msg)?;
+        let (auth, payload) = self.ed_sign_client_msg(&msg)?;
 
         // set a random xorname first. We set it specifically per peer thereafter
         // This is overwritten in comm.send_to_client
@@ -250,7 +250,7 @@ impl Node {
         let dst = DstLocation::EndUser(EndUser(xor_name::XorName::random(&mut rng)));
 
         #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst)?;
+        let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst)?;
 
         #[cfg(feature = "traceroute")]
         {

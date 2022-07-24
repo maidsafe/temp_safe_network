@@ -79,10 +79,10 @@ impl Session {
             section_pk,
         };
 
-        let auth_kind = AuthKind::Service(auth);
+        let auth = AuthKind::Service(auth);
 
         #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst_location)?;
+        let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst_location)?;
 
         #[cfg(feature = "traceroute")]
         wire_msg.add_trace(&mut vec![Entity::Client(client_pk)]);
@@ -209,10 +209,10 @@ impl Session {
             name: dst,
             section_pk,
         };
-        let auth_kind = AuthKind::Service(auth);
+        let auth = AuthKind::Service(auth);
 
         #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst_location)?;
+        let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst_location)?;
 
         #[cfg(feature = "traceroute")]
         wire_msg.add_trace(&mut vec![Entity::Client(client_pk)]);
@@ -338,8 +338,8 @@ impl Session {
             name: dst_address,
             section_pk,
         };
-        let auth_kind = AuthKind::Service(auth);
-        let wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst_location)?;
+        let auth = AuthKind::Service(auth);
+        let wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst_location)?;
 
         let initial_contacts = nodes
             .clone()

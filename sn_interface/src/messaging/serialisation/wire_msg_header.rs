@@ -41,7 +41,7 @@ pub struct WireMsgHeader {
 #[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct MsgEnvelope {
     pub msg_id: MsgId,
-    pub auth_kind: AuthKind,
+    pub auth: AuthKind,
     pub dst_location: DstLocation,
     #[cfg(feature = "traceroute")]
     pub traceroute: Vec<Entity>,
@@ -80,7 +80,7 @@ impl WireMsgHeader {
     // Instantiate a WireMsgHeader as per current supported version.
     pub fn new(
         msg_id: MsgId,
-        auth_kind: AuthKind,
+        auth: AuthKind,
         dst_location: DstLocation,
         #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Self {
@@ -89,7 +89,7 @@ impl WireMsgHeader {
             version: MESSAGING_PROTO_VERSION,
             msg_envelope: MsgEnvelope {
                 msg_id,
-                auth_kind,
+                auth,
                 dst_location,
                 #[cfg(feature = "traceroute")]
                 traceroute,
