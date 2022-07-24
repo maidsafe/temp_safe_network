@@ -536,124 +536,132 @@ mod core {
             Ok(())
         }
 
-        /// Generate cmds and fire events based upon any node state changes.
-        pub(crate) async fn update_self_for_new_node_state(
+        /// Updates various state if elders changed.
+        pub(crate) async fn update_on_elder_change(
             &mut self,
             old: StateSnapshot,
         ) -> Result<Vec<Cmd>> {
-            let mut cmds = vec![];
             let new = self.state_snapshot();
 
-            if new.section_key != old.section_key {
-                if new.is_elder {
-                    let sap = self.network_knowledge.authority_provider();
-                    info!(
-                        "Section updated: prefix: ({:b}), key: {:?}, elders: {}",
-                        new.prefix,
-                        new.section_key,
-                        sap.elders().format(", ")
-                    );
+            if new.section_key == old.section_key {
+                // there was no change
+                return Ok(vec![]);
+            }
 
-                    // It can happen that we recieve the SAP demonstrating that we've become elders
-                    // before our local DKG can update the section_keys_provider with our Elder key share.
-                    //
-                    // Eventually our local DKG instance will complete and add our key_share to the
-                    // `section_keys_provider` cache. Once that happens, this function will be called
-                    // again and we can complete our Elder state transition.
-                    let we_have_our_key_share_for_new_section_key = self
-                        .section_keys_provider
-                        .key_share(&new.section_key)
-                        .is_ok();
+            let mut cmds = vec![];
 
-                    if we_have_our_key_share_for_new_section_key {
-                        // The section-key has changed, we are now able to function as an elder.
-                        self.initialize_elder_state()?;
+            if new.is_elder {
+                let sap = self.network_knowledge.authority_provider();
+                info!(
+                    "Section updated: prefix: ({:b}), key: {:?}, elders: {}",
+                    new.prefix,
+                    new.section_key,
+                    sap.elders().format(", ")
+                );
 
-                        cmds.extend(self.promote_and_demote_elders_except(&BTreeSet::new())?);
+                // It can happen that we recieve the SAP demonstrating that we've become elders
+                // before our local DKG can update the section_keys_provider with our Elder key share.
+                //
+                // Eventually our local DKG instance will complete and add our key_share to the
+                // `section_keys_provider` cache. Once that happens, this function will be called
+                // again and we can complete our Elder state transition.
+                let we_have_our_key_share_for_new_section_key = self
+                    .section_keys_provider
+                    .key_share(&new.section_key)
+                    .is_ok();
 
-                        // NB TODO make sure this in only called once (after handover)
-                        // and that it cannot interfere with the handover voting process as it resets the handover state completely
-                        // NB TODO we should keep a copy of old handover states (since they contain valuable information like who is faulty)
-                        self.initialize_handover()?;
+                if we_have_our_key_share_for_new_section_key {
+                    // The section-key has changed, we are now able to function as an elder.
+                    self.initialize_elder_state()?;
 
-                        // Whenever there is an elders change, casting a round of joins_allowed
-                        // proposals to sync.
-                        cmds.extend(self.propose(Proposal::JoinsAllowed(self.joins_allowed))?);
-                    }
+                    cmds.extend(self.promote_and_demote_elders_except(&BTreeSet::new())?);
 
-                    self.print_network_stats();
-                    self.log_section_stats();
-                } else {
-                    // if not elder
-                    self.handover_voting = None;
+                    // NB TODO make sure this in only called once (after handover)
+                    // and that it cannot interfere with the handover voting process as it resets the handover state completely
+                    // NB TODO we should keep a copy of old handover states (since they contain valuable information like who is faulty)
+                    self.initialize_handover()?;
+
+                    // Whenever there is an elders change, casting a round of joins_allowed
+                    // proposals to sync this particular state.
+                    cmds.extend(self.propose(Proposal::JoinsAllowed(self.joins_allowed))?);
                 }
 
-                if new.is_elder || old.is_elder {
-                    cmds.extend(self.send_ae_update_to_our_section());
+                self.print_network_stats();
+                self.log_section_stats();
+            } else {
+                // if not elder
+                self.handover_voting = None;
+            }
+
+            if new.is_elder || old.is_elder {
+                cmds.extend(self.send_ae_update_to_our_section());
+            }
+
+            let current: BTreeSet<_> = self.network_knowledge.authority_provider().names();
+            let added = current.difference(&old.elders).copied().collect();
+            let removed = old.elders.difference(&current).copied().collect();
+            let remaining = old.elders.intersection(&current).copied().collect();
+
+            let elders = Elders {
+                prefix: new.prefix,
+                key: new.section_key,
+                remaining,
+                added,
+                removed,
+            };
+
+            let self_status_change = if !old.is_elder && new.is_elder {
+                info!("{}: {:?}", LogMarker::PromotedToElder, new.prefix);
+                NodeElderChange::Promoted
+            } else if old.is_elder && !new.is_elder {
+                info!("{}", LogMarker::DemotedFromElder);
+                self.section_keys_provider.wipe();
+                NodeElderChange::Demoted
+            } else {
+                NodeElderChange::None
+            };
+
+            let mut events = vec![];
+
+            let new_elders = !elders.added.is_empty();
+            let section_split = new.prefix != old.prefix;
+            let elders_changed = !elders.added.is_empty() || !elders.removed.is_empty();
+
+            if section_split && new.is_elder {
+                info!("{}: {:?}", LogMarker::SplitSuccess, new.prefix);
+
+                if old.is_elder {
+                    info!("{}: {:?}", LogMarker::StillElderAfterSplit, new.prefix);
                 }
 
-                let current: BTreeSet<_> = self.network_knowledge.authority_provider().names();
-                let added = current.difference(&old.elders).copied().collect();
-                let removed = old.elders.difference(&current).copied().collect();
-                let remaining = old.elders.intersection(&current).copied().collect();
-
-                let elders = Elders {
-                    prefix: new.prefix,
-                    key: new.section_key,
-                    remaining,
-                    added,
-                    removed,
-                };
-
-                let self_status_change = if !old.is_elder && new.is_elder {
-                    info!("{}: {:?}", LogMarker::PromotedToElder, new.prefix);
-                    NodeElderChange::Promoted
-                } else if old.is_elder && !new.is_elder {
-                    info!("{}", LogMarker::DemotedFromElder);
-                    self.section_keys_provider.wipe();
-                    NodeElderChange::Demoted
-                } else {
-                    NodeElderChange::None
-                };
+                cmds.extend(self.send_updates_to_sibling_section(&old)?);
+                self.liveness_retain_only(
+                    self.network_knowledge
+                        .adults()
+                        .iter()
+                        .map(|peer| peer.name())
+                        .collect(),
+                )?;
 
                 // During the split, sibling's SAP could be unknown to us yet.
                 // Hence, fire the SectionSplit event whenever detect a prefix change.
-                // We also need to update other nodes w/ our known data.
-                let event = if (new.prefix != old.prefix) && new.is_elder {
-                    info!("{}: {:?}", LogMarker::SplitSuccess, new.prefix);
+                events.push(Event::Membership(MembershipEvent::SectionSplit {
+                    elders: elders.clone(),
+                    self_status_change,
+                }))
+            };
 
-                    if old.is_elder {
-                        info!("{}: {:?}", LogMarker::StillElderAfterSplit, new.prefix);
-                    }
+            if !section_split && elders_changed {
+                events.push(Event::Membership(MembershipEvent::EldersChanged {
+                    elders,
+                    self_status_change,
+                }))
+            }
 
-                    cmds.extend(self.send_updates_to_sibling_section(&old)?);
-                    self.liveness_retain_only(
-                        self.network_knowledge
-                            .adults()
-                            .iter()
-                            .map(|peer| peer.name())
-                            .collect(),
-                    )?;
-
-                    Event::Membership(MembershipEvent::SectionSplit {
-                        elders,
-                        self_status_change,
-                    })
-                } else {
-                    cmds.extend(self.send_metadata_updates_to_nodes(
-                        self.network_knowledge.authority_provider().elders_vec(),
-                        &self.network_knowledge.prefix(),
-                        new.section_key,
-                    )?);
-
-                    Event::Membership(MembershipEvent::EldersChanged {
-                        elders,
-                        self_status_change,
-                    })
-                };
-
+            // update new elders if we were an elder (regardless if still or not)
+            if new_elders && old.is_elder {
                 cmds.extend(
-                    self.send_metadata_updates_to_nodes(
+                    self.send_metadata_updates(
                         self.network_knowledge
                             .authority_provider()
                             .elders()
@@ -664,7 +672,9 @@ mod core {
                         new.section_key,
                     )?,
                 );
+            };
 
+            for event in events {
                 self.send_event(event).await
             }
 
