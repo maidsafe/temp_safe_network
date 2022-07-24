@@ -258,7 +258,7 @@ impl std::fmt::Display for CmdProcessEvent {
 
 /// A flag in `EldersChanged` event, indicating
 /// whether the node got promoted, demoted or did not change.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum NodeElderChange {
     /// The node was promoted to Elder.
     Promoted,
