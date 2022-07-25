@@ -173,10 +173,12 @@ impl Dispatcher {
 
                 node.handle_new_elders_agreement(new_elders, sig).await
             }
-            Cmd::HandlePeerLost(peer) => {
+            Cmd::HandlePeerFailedSend(peer) => {
                 let mut node = self.node.write().await;
 
-                node.handle_peer_lost(&peer.addr())
+                node.handle_failed_send(&peer.addr())?;
+
+                Ok(vec![])
             }
             Cmd::HandleDkgOutcome {
                 section_auth,
@@ -228,7 +230,7 @@ impl Dispatcher {
 
                 node.cast_offline_proposals(&names)
             }
-            Cmd::StartConnectivityTest(name) => {
+            Cmd::TellEldersToStartConnectivityTest(name) => {
                 let node = self.node.read().await;
 
                 Ok(vec![node.send_msg_to_our_elders(
@@ -287,7 +289,7 @@ impl Dispatcher {
             DeliveryStatus::DeliveredToAll(failed_recipients)
             | DeliveryStatus::FailedToDeliverAll(failed_recipients) => Ok(failed_recipients
                 .into_iter()
-                .map(Cmd::HandlePeerLost)
+                .map(Cmd::HandlePeerFailedSend)
                 .collect()),
             _ => Ok(vec![]),
         }

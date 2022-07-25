@@ -129,7 +129,7 @@ pub(crate) enum Cmd {
     /// Handle a timeout previously scheduled with `ScheduleDkgTimeout`.
     HandleDkgTimeout(u64),
     /// Handle peer that's been detected as lost.
-    HandlePeerLost(Peer),
+    HandlePeerFailedSend(Peer),
     /// Handle agreement on a proposal.
     HandleAgreement { proposal: Proposal, sig: KeyedSig },
     /// Handle a new Node joining agreement.
@@ -178,7 +178,7 @@ pub(crate) enum Cmd {
     ProposeOffline(BTreeSet<XorName>),
     /// Send a signal to all Elders to
     /// test the connectivity to a specific node
-    StartConnectivityTest(XorName),
+    TellEldersToStartConnectivityTest(XorName),
     /// Test Connectivity
     TestConnectivity(XorName),
     /// Comm Commands
@@ -202,7 +202,7 @@ impl Cmd {
             HandleDkgFailure(_) => 10,
             HandleDkgTimeout(_) => 10,
 
-            HandlePeerLost(_) => 9,
+            HandlePeerFailedSend(_) => 9,
             HandleNodeLeft(_) => 9,
             ProposeOffline(_) => 9,
             HandleJoinDecision(_) => 9,
@@ -210,7 +210,7 @@ impl Cmd {
             CleanupPeerLinks => 9,
 
             ScheduleDkgTimeout { .. } => 8,
-            StartConnectivityTest(_) => 8,
+            TellEldersToStartConnectivityTest(_) => 8,
             TestConnectivity(_) => 8,
 
             Comm(_) => 7,
@@ -252,7 +252,7 @@ impl fmt::Display for Cmd {
             Cmd::HandleValidServiceMsg { msg_id, msg, .. } => {
                 write!(f, "HandleValidServiceMsg {:?}: {:?}", msg_id, msg)
             }
-            Cmd::HandlePeerLost(peer) => write!(f, "HandlePeerLost({:?})", peer.name()),
+            Cmd::HandlePeerFailedSend(peer) => write!(f, "HandlePeerFailedSend({:?})", peer.name()),
             Cmd::HandleAgreement { .. } => write!(f, "HandleAgreement"),
             Cmd::HandleNewEldersAgreement { .. } => write!(f, "HandleNewEldersAgreement"),
             Cmd::HandleJoinDecision(_) => write!(f, "HandleJoinDecision"),
@@ -275,7 +275,9 @@ impl fmt::Display for Cmd {
             Cmd::SignOutgoingSystemMsg { .. } => write!(f, "SignOutgoingSystemMsg"),
             Cmd::EnqueueDataForReplication { .. } => write!(f, "ThrottledSendBatchMsgs"),
             Cmd::ProposeOffline(_) => write!(f, "ProposeOffline"),
-            Cmd::StartConnectivityTest(_) => write!(f, "StartConnectivityTest"),
+            Cmd::TellEldersToStartConnectivityTest(_) => {
+                write!(f, "TellEldersToStartConnectivityTest")
+            }
             Cmd::TestConnectivity(_) => write!(f, "TestConnectivity"),
             Cmd::Comm(comm) => write!(f, "Comm({:?})", comm),
         }
