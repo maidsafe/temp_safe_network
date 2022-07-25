@@ -190,9 +190,11 @@ impl Cmd {
         match self {
             // TODO: check if we can pull out node DST here
             SendMsg { wire_msg, .. } => match wire_msg.dst_location() {
-                DstLocation::EndUser(_) => 19,
+                DstLocation::EndUser(_) => 18,
                 _ => 20,
             },
+            // Note: This is more important than getting our EndUser msgs, and is a prereq for actually getting a msg out the door
+            SignOutgoingSystemMsg { .. } => 19,
             HandleAgreement { .. } => 10,
             HandleNewEldersAgreement { .. } => 10,
             HandleDkgOutcome { .. } => 10,
@@ -214,7 +216,6 @@ impl Cmd {
             // See [`MsgType`] for the priority constants and the range of possible values.
             HandleValidSystemMsg { msg, .. } => msg.priority(),
             HandleValidServiceMsg { msg, .. } => msg.priority(),
-            SignOutgoingSystemMsg { msg, .. } => msg.priority(),
 
             ValidateMsg { .. } => -9, // before it's validated, we cannot give it high prio, as it would be a spam vector
         }
