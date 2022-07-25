@@ -9,16 +9,22 @@
 #[cfg(feature = "back-pressure")]
 mod back_pressure;
 
+mod h3_listener;
 mod link;
+mod link_h3;
 mod listener;
+mod peer_h3_session;
 mod peer_session;
 
 #[cfg(feature = "back-pressure")]
 use self::back_pressure::BackPressure;
 
 use self::{
+    h3_listener::{H3MsgListener, ListenerH3Event},
     link::Link,
+    link_h3::LinkH3,
     listener::{ListenerEvent, MsgListener},
+    peer_h3_session::PeerH3Session,
     peer_session::{PeerSession, SendWatcher},
 };
 
@@ -42,10 +48,13 @@ use tokio::{
 #[derive(Clone)]
 pub(crate) struct Comm {
     our_endpoint: Endpoint,
+    our_h3_endpoint: h3_quinn::quinn::Endpoint,
     msg_listener: MsgListener,
+    h3_msg_listener: H3MsgListener,
     #[cfg(feature = "back-pressure")]
     back_pressure: BackPressure,
     sessions: Arc<DashMap<Peer, PeerSession>>,
+    h3_sessions: Arc<DashMap<Peer, PeerH3Session>>,
 }
 
 /// Commands for interacting with Comm.
@@ -60,7 +69,7 @@ pub(crate) enum Cmd {
 impl Comm {
     #[tracing::instrument(skip_all)]
     pub(crate) async fn first_node(
-        local_addr: SocketAddr,
+        mut local_addr: SocketAddr,
         config: qp2p::Config,
         monitoring: RateLimits,
         incoming_msg_pipe: Sender<MsgEvent>,
@@ -70,9 +79,15 @@ impl Comm {
         let (our_endpoint, incoming_connections, _) =
             Endpoint::new_peer(local_addr, Default::default(), config).await?;
 
+        local_addr.set_port(our_endpoint.local_addr().port() + 1);
+        let (our_h3_endpoint, incoming_h3_connections) =
+            H3MsgListener::new_endpoint(local_addr).await?;
+
         let (comm, _) = setup_comms(
             our_endpoint,
+            our_h3_endpoint,
             incoming_connections,
+            incoming_h3_connections,
             monitoring,
             incoming_msg_pipe,
         );
@@ -82,7 +97,7 @@ impl Comm {
 
     #[tracing::instrument(skip_all)]
     pub(crate) async fn bootstrap(
-        local_addr: SocketAddr,
+        mut local_addr: SocketAddr,
         bootstrap_nodes: &[SocketAddr],
         config: qp2p::Config,
         monitoring: RateLimits,
@@ -93,9 +108,15 @@ impl Comm {
         let (our_endpoint, incoming_connections, bootstrap_node) =
             Endpoint::new_peer(local_addr, bootstrap_nodes, config).await?;
 
+        local_addr.set_port(our_endpoint.local_addr().port() + 1);
+        let (our_h3_endpoint, incoming_h3_connections) =
+            H3MsgListener::new_endpoint(local_addr).await?;
+
         let (comm, msg_listener) = setup_comms(
             our_endpoint,
+            our_h3_endpoint,
             incoming_connections,
+            incoming_h3_connections,
             monitoring,
             incoming_msg_pipe,
         );
@@ -211,8 +232,8 @@ impl Comm {
         recipient: &Peer,
         mut wire_msg: WireMsg,
     ) -> Result<(), Error> {
-        trace!(
-            "Sending msg on existing connection to client {:?}",
+        info!(
+            ">>>>> H3: TO CLIENT Sending msg on existing connection to client {:?}",
             recipient
         );
 
@@ -223,9 +244,33 @@ impl Comm {
 
         let msg_id = wire_msg.msg_id();
 
-        let priority = wire_msg.priority();
+        let msg_priority = wire_msg.priority();
 
-        let (_, result) = self.send_to_one(*recipient, wire_msg, priority).await;
+        // ***************************************
+        let msg_bytes = match wire_msg.serialize() {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                return Err(Error::Messaging(error));
+            }
+        };
+
+        trace!(
+            ">>>>> H3: SEND TO CLIENT Sending message ({} bytes, msg_id: {:?}) to {:?}",
+            msg_bytes.len(),
+            msg_id,
+            recipient,
+        );
+
+        let result = if let Some(entry) = self.h3_sessions.get(recipient) {
+            info!(">>>>> H3: found H3 session for {:?}", recipient);
+            let peer = entry.value().clone();
+            peer.send(msg_id, msg_priority, msg_bytes).await
+        } else {
+            error!(">>>>> H3: cannot find H3 session for {:?}", recipient);
+            Err(Error::FailedSend(*recipient))
+        };
+
+        // ******************************************
 
         match result {
             Err(error) => {
@@ -251,15 +296,15 @@ impl Comm {
                 // and we now watch the status of the send
                 loop {
                     match watcher.await_change().await {
-                        SendStatus::Sent => {
+                        self::peer_h3_session::SendStatus::Sent => {
                             return Ok(()); // all good
                         }
-                        SendStatus::Enqueued => {
+                        self::peer_h3_session::SendStatus::Enqueued => {
                             // this block should be unreachable, as Enqueued is the initial state
                             // but let's handle it anyway..
                             continue; // moves on to awaiting a new change
                         }
-                        SendStatus::PeerLinkDropped => {
+                        self::peer_h3_session::SendStatus::PeerLinkDropped => {
                             // The connection was closed by us which means
                             // we have dropped this peer for some reason
                             error!(
@@ -270,7 +315,7 @@ impl Comm {
                             );
                             return Err(Error::PeerLinkDropped(*recipient));
                         }
-                        SendStatus::WatcherDropped => {
+                        self::peer_h3_session::SendStatus::WatcherDropped => {
                             // the send job is dropped for some reason,
                             // that happens when the peer session dropped
                             // or the msg was sent, meaning the send didn't actually fail,
@@ -282,7 +327,7 @@ impl Comm {
                             );
                             return Err(Error::FailedSend(*recipient));
                         }
-                        SendStatus::TransientError(error) => {
+                        self::peer_h3_session::SendStatus::TransientError(error) => {
                             // An individual connection can for example have been lost when we tried to send. This
                             // could indicate the connection timed out whilst it was held, or some other
                             // transient connection issue. We don't treat this as a failed recipient, but we sleep a little longer here.
@@ -293,7 +338,7 @@ impl Comm {
                             );
                             continue; // moves on to awaiting a new change
                         }
-                        SendStatus::MaxRetriesReached => {
+                        self::peer_h3_session::SendStatus::MaxRetriesReached => {
                             error!(
                                 "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed, as we've reached maximum retries",
                                 msg_id,
@@ -482,6 +527,33 @@ impl Comm {
         }
     }
 
+    ///
+    async fn add_h3_incoming(
+        &self,
+        peer: &Peer,
+        stream: h3::server::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes>,
+    ) {
+        info!(">>>>> H3: adding incoming connection for: {:?}", peer);
+        if let Some(entry) = self.h3_sessions.get(peer) {
+            // peer already exists
+            let peer_h3_session = entry.value();
+            // add to it
+            peer_h3_session.add(stream).await;
+            info!(">>>>> H3: added incoming connection for: {:?}", peer);
+        } else {
+            let link = LinkH3::new_with(
+                *peer,
+                self.our_h3_endpoint.clone(),
+                self.h3_msg_listener.clone(),
+                stream,
+            )
+            .await;
+            let h3_session = PeerH3Session::new(link);
+            let _ = self.h3_sessions.insert(*peer, h3_session);
+            info!(">>>>> H3: adding session link for: {:?}", peer);
+        }
+    }
+
     // Helper to send a message to a single recipient.
     #[instrument(skip(self, wire_msg))]
     async fn send_to_one(
@@ -515,13 +587,21 @@ impl Comm {
 #[tracing::instrument(skip_all)]
 fn setup_comms(
     our_endpoint: Endpoint,
+    our_h3_endpoint: h3_quinn::quinn::Endpoint,
     incoming_connections: IncomingConnections,
+    incoming_h3_connections: h3_quinn::quinn::Incoming,
     monitoring: RateLimits,
     incoming_msg_pipe: Sender<MsgEvent>,
 ) -> (Comm, MsgListener) {
-    let (comm, msg_listener) = setup(our_endpoint, monitoring, incoming_msg_pipe);
+    let (comm, msg_listener, h3_msg_listener) =
+        setup(our_endpoint, our_h3_endpoint, monitoring, incoming_msg_pipe);
 
-    listen_for_incoming_msgs(msg_listener.clone(), incoming_connections);
+    listen_for_incoming_msgs(
+        msg_listener.clone(),
+        h3_msg_listener,
+        incoming_connections,
+        incoming_h3_connections,
+    );
 
     (comm, msg_listener)
 }
@@ -529,33 +609,40 @@ fn setup_comms(
 #[tracing::instrument(skip_all)]
 fn setup(
     our_endpoint: Endpoint,
+    our_h3_endpoint: h3_quinn::quinn::Endpoint,
     #[cfg(feature = "back-pressure")] monitoring: RateLimits,
     #[cfg(not(feature = "back-pressure"))] _monitoring: RateLimits,
     receive_msg: Sender<MsgEvent>,
-) -> (Comm, MsgListener) {
+) -> (Comm, MsgListener, H3MsgListener) {
     #[cfg(feature = "back-pressure")]
     let back_pressure = BackPressure::new(monitoring);
     let (add_connection, conn_receiver) = mpsc::channel(100);
+    let (add_h3_connection, conn_h3_receiver) = mpsc::channel(100);
     #[cfg(feature = "back-pressure")]
     let (count_msg, msg_counter) = mpsc::channel(1000);
     #[cfg(not(feature = "back-pressure"))]
     let (count_msg, _msg_counter) = mpsc::channel(1000);
 
-    let msg_listener = MsgListener::new(add_connection, receive_msg, count_msg);
+    let msg_listener = MsgListener::new(add_connection, receive_msg.clone(), count_msg);
+    let h3_msg_listener = H3MsgListener::new(add_h3_connection, receive_msg);
 
     let comm = Comm {
         our_endpoint,
+        our_h3_endpoint,
         msg_listener: msg_listener.clone(),
+        h3_msg_listener: h3_msg_listener.clone(),
         #[cfg(feature = "back-pressure")]
         back_pressure: back_pressure.clone(),
         sessions: Arc::new(DashMap::new()),
+        h3_sessions: Arc::new(DashMap::new()),
     };
 
     #[cfg(feature = "back-pressure")]
     let _ = task::spawn_local(async move { count_msgs(back_pressure, msg_counter).await });
     let _ = task::spawn_local(receive_conns(comm.clone(), conn_receiver));
+    let _ = task::spawn_local(receive_h3_conns(comm.clone(), conn_h3_receiver));
 
-    (comm, msg_listener)
+    (comm, msg_listener, h3_msg_listener)
 }
 
 #[tracing::instrument(skip_all)]
@@ -576,9 +663,18 @@ async fn receive_conns(comm: Comm, mut conn_receiver: Receiver<ListenerEvent>) {
 }
 
 #[tracing::instrument(skip_all)]
+async fn receive_h3_conns(comm: Comm, mut conn_receiver: Receiver<ListenerH3Event>) {
+    while let Some(ListenerH3Event::Connected { peer, stream }) = conn_receiver.recv().await {
+        comm.add_h3_incoming(&peer, stream).await;
+    }
+}
+
+#[tracing::instrument(skip_all)]
 fn listen_for_incoming_msgs(
     msg_listener: MsgListener,
+    h3_msg_listener: H3MsgListener,
     mut incoming_connections: IncomingConnections,
+    mut incoming_h3_connections: h3_quinn::quinn::Incoming,
 ) {
     let _ = task::spawn_local(async move {
         while let Some((connection, incoming_msgs)) = incoming_connections.next().await {
@@ -589,6 +685,13 @@ fn listen_for_incoming_msgs(
             );
 
             msg_listener.listen(connection, incoming_msgs);
+        }
+    });
+
+    // Spawn the listener for H3 connections
+    let _ = task::spawn_local(async move {
+        while let Some(new_conn) = incoming_h3_connections.next().await {
+            h3_msg_listener.listen(new_conn);
         }
     });
 }
