@@ -71,7 +71,7 @@ impl Session {
     }
 
     fn send_dkg_not_ready(
-        &mut self,
+        &self,
         node: &NodeInfo,
         message: DkgMessage,
         sender: XorName,
