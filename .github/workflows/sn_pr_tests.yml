@@ -528,7 +528,7 @@ jobs:
         run: ./target/release/testnet
         id: section-startup
         env:
-          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction=trace"
+          RUST_LOG: "sn_node,sn_consensus,sn_dysfunction,sn_api,sn_client,sn_dbc=trace"
 
       - name: Print Network Log Stats at start
         shell: bash
