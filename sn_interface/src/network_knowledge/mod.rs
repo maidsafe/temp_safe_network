@@ -614,7 +614,7 @@ impl NetworkKnowledge {
         self.chain.has_key(key)
     }
 
-    /// Return weather current section chain has the provided key
+    /// Return a vec of all known keys
     pub fn known_keys(&self) -> Vec<bls::PublicKey> {
         let mut known_keys: Vec<_> = self.section_chain().keys().copied().collect();
         known_keys.extend(self.prefix_map().section_keys());
