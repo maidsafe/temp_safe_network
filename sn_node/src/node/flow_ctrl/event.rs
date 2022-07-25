@@ -92,15 +92,6 @@ pub enum CmdProcessEvent {
         time: SystemTime,
     },
     ///
-    Retrying {
-        ///
-        job: CmdJob,
-        ///
-        retry: usize,
-        ///
-        time: SystemTime,
-    },
-    ///
     Finished {
         ///
         job: CmdJob,
@@ -111,8 +102,6 @@ pub enum CmdProcessEvent {
     Failed {
         ///
         job: CmdJob,
-        ///
-        retry: usize,
         ///
         time: SystemTime,
         ///
@@ -215,17 +204,6 @@ impl std::fmt::Display for CmdProcessEvent {
                     cmd,
                 )
             }
-            Self::Retrying { job, retry, time } => {
-                let time: DateTime<Utc> = (*time).into();
-                write!(
-                    f,
-                    "{}: Retry #{} of id: {}, prio: {}",
-                    time.to_rfc3339(),
-                    retry,
-                    job.id(),
-                    job.priority(),
-                )
-            }
             Self::Finished { job, time } => {
                 let time: DateTime<Utc> = (*time).into();
                 write!(
@@ -236,20 +214,14 @@ impl std::fmt::Display for CmdProcessEvent {
                     job.priority(),
                 )
             }
-            Self::Failed {
-                job,
-                retry,
-                time,
-                error,
-            } => {
+            Self::Failed { job, time, error } => {
                 let time: DateTime<Utc> = (*time).into();
                 write!(
                     f,
-                    "{}: Failed id: {}, prio: {}, on try #{}, due to: {}",
+                    "{}: Failed id: {}, prio: {}, due to: {}",
                     time.to_rfc3339(),
                     job.id(),
                     job.priority(),
-                    retry,
                     error,
                 )
             }
