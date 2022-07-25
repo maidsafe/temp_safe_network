@@ -387,13 +387,14 @@ impl Node {
 
         // ...and verify the SpentProofs are signed by section keys known to us,
         // unless the public key of the SpentProof is the genesis key
-        if spent_proofs_keys
+        spent_proofs_keys
             .iter()
-            .any(|pk| !self.network_knowledge.verify_section_key_is_known(pk))
-        {
-            debug!("Dropping DBC spend request (key_image: {:?}) since a SpentProof is not signed by a section known to us", key_image);
-            return Ok(None);
-        }
+            .for_each(|pk| if !self.network_knowledge.verify_section_key_is_known(pk) {
+                warn!("Invalid DBC spend request (key_image: {:?}) since a SpentProof is not signed by a section known to us: {:?}", key_image, pk);
+                // TODO: temporarily allowing spent proofs signed by section keys we are not aware of.
+                // We shall return an error to the client so it can update us with a valid proof chain.
+                //return Ok(None);
+            });
 
         // Obtain Commitments from the TX
         let mut public_commitments_info = Vec::<(KeyImage, Vec<Commitment>)>::new();
