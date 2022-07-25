@@ -18,9 +18,11 @@ use sn_node::{
     UsedSpace,
 };
 
+use bytes::{Bytes, BytesMut};
 use criterion::{BenchmarkId, Criterion};
 use eyre::{Result, WrapErr};
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use rand::{distributions::Alphanumeric, rngs::OsRng, thread_rng, Rng};
+use rayon::current_num_threads;
 use std::{collections::BTreeMap, path::Path};
 use tempfile::tempdir;
 use tokio::runtime::Runtime;
@@ -28,6 +30,51 @@ use tokio::runtime::Runtime;
 // sample size is _NOT_ the number of times the command is run...
 // https://bheisler.github.io/criterion.rs/book/analysis.html#measurement
 const SAMPLE_SIZE: usize = 10;
+
+/// Generates a random vector using provided `length`.
+fn random_vector(length: usize) -> Vec<u8> {
+    use rayon::prelude::*;
+    let threads = current_num_threads();
+
+    if threads > length {
+        let mut rng = OsRng;
+        return ::std::iter::repeat(())
+            .map(|()| rng.gen::<u8>())
+            .take(length)
+            .collect();
+    }
+
+    let per_thread = length / threads;
+    let remainder = length % threads;
+
+    let mut bytes: Vec<u8> = (0..threads)
+        .par_bridge()
+        .map(|_| vec![0u8; per_thread])
+        .map(|mut bytes| {
+            let bytes = bytes.as_mut_slice();
+            rand::thread_rng().fill(bytes);
+            bytes.to_owned()
+        })
+        .flatten()
+        .collect();
+
+    bytes.extend(vec![0u8; remainder]);
+
+    bytes
+}
+
+/// We only testing with 4000 different data inputs.
+/// Making the first 4 bytes random shall be enough.
+fn grows_vec_to_bytes(seed: &[u8]) -> Bytes {
+    let mut bytes = BytesMut::from(seed);
+    let mut rng = OsRng;
+    bytes[0] = rng.gen::<u8>();
+    bytes[1] = rng.gen::<u8>();
+    bytes[2] = rng.gen::<u8>();
+    bytes[3] = rng.gen::<u8>();
+
+    Bytes::from(bytes)
+}
 
 fn main() -> Result<()> {
     let mut criterion = custom_criterion();
@@ -50,20 +97,21 @@ fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
     let size_ranges = [100, 1_000, 4_000];
 
     for size in size_ranges.iter() {
+        let data_set: Vec<_> = (0..*size)
+            .map(|_| create_random_register_replicated_data())
+            .collect();
         group.bench_with_input(
             BenchmarkId::new("register_writes", size),
-            size,
-            |b, &size| {
+            &(size, &data_set),
+            |b, (size, data_set)| {
                 let storage = get_new_data_store()
                     .context("Could not create a temp data store")
                     .unwrap();
-
                 b.to_async(&runtime).iter(|| async {
-                    for _ in 0..size {
-                        let random_data = create_random_register_replicated_data();
+                    for i in 0..**size {
                         let _ = storage
                             .clone()
-                            .store(&random_data, pk, keypair.clone())
+                            .store(&data_set[i], pk, keypair.clone())
                             .await;
                     }
                 })
@@ -72,23 +120,27 @@ fn bench_data_storage_writes(c: &mut Criterion) -> Result<()> {
     }
 
     for size in size_ranges.iter() {
-        group.bench_with_input(BenchmarkId::new("chunk writes", size), size, |b, &size| {
-            let storage = get_new_data_store()
-                .context("Could not create a temp data store")
-                .unwrap();
-
-            b.to_async(&runtime).iter(|| async {
-                for _ in 0..size {
-                    let file = sn_interface::types::utils::random_bytes(NONSENSE_CHUNK_SIZE);
-                    let random_data = ReplicatedData::Chunk(Chunk::new(file));
-                    storage
-                        .clone()
-                        .store(&random_data, pk, keypair.clone())
-                        .await
-                        .expect("failed to write chunk {i}");
-                }
-            })
-        });
+        let seed = random_vector(NONSENSE_CHUNK_SIZE);
+        group.bench_with_input(
+            BenchmarkId::new("chunk writes", size),
+            &(size, &seed),
+            |b, (size, seed)| {
+                let storage = get_new_data_store()
+                    .context("Could not create a temp data store")
+                    .unwrap();
+                b.to_async(&runtime).iter(|| async {
+                    for _ in 0..**size {
+                        let random_data =
+                            ReplicatedData::Chunk(Chunk::new(grows_vec_to_bytes(&seed)));
+                        storage
+                            .clone()
+                            .store(&random_data, pk, keypair.clone())
+                            .await
+                            .expect("failed to write chunk {i}");
+                    }
+                })
+            },
+        );
     }
 
     Ok(())
