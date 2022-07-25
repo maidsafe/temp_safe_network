@@ -122,23 +122,7 @@ impl Node {
                 };
 
                 if let Some(decision) = decision {
-                    // process the membership change
-                    debug!(
-                        "Handling Membership Decision {:?}",
-                        BTreeSet::from_iter(decision.proposals.keys())
-                    );
-                    let public_key = self.network_knowledge.section_key();
-                    for (value, signature) in decision.proposals.clone() {
-                        let sig = KeyedSig {
-                            public_key,
-                            signature,
-                        };
-                        if membership.is_leaving_section(&value, prefix) {
-                            cmds.push(Cmd::HandleNodeLeft(SectionAuth { value, sig }));
-                        }
-                    }
-
-                    cmds.push(Cmd::HandleJoinDecision(decision));
+                    cmds.push(Cmd::HandleMembershipDecision(decision));
                 }
             } else {
                 error!(
@@ -190,27 +174,34 @@ impl Node {
         Ok(cmds)
     }
 
-    pub(crate) async fn handle_join_decision(
+    pub(crate) async fn handle_membership_decision(
         &mut self,
         decision: Decision<NodeState>,
     ) -> Result<Vec<Cmd>> {
         debug!("{}", LogMarker::AgreementOfOnline);
         let mut cmds = vec![];
 
-        cmds.extend(self.send_node_approval(decision.clone()));
-        let joining_nodes = Vec::from_iter(
-            decision
-                .proposals
-                .clone()
-                .into_iter()
-                .filter(|(n, _)| n.state == MembershipState::Joined),
+        let (joining_nodes, leaving_nodes): (Vec<_>, Vec<_>) = decision
+            .proposals
+            .clone()
+            .into_iter()
+            .partition(|(n, _)| n.state == MembershipState::Joined);
+
+        info!(
+            "Handling membership decision: joining = {:?}, leaving = {:?}",
+            Vec::from_iter(joining_nodes.iter().map(|(n, _)| n.name)),
+            Vec::from_iter(leaving_nodes.iter().map(|(n, _)| n.name))
         );
 
         for (new_info, signature) in joining_nodes.iter().cloned() {
-            cmds.extend(self.handle_joining_node(new_info, signature).await?);
+            cmds.extend(self.handle_node_joined(new_info, signature).await);
         }
 
-        self.log_section_stats();
+        for (new_info, signature) in leaving_nodes.iter().cloned() {
+            cmds.extend(self.handle_node_left(new_info, signature)?);
+        }
+
+        cmds.extend(self.send_node_approvals(decision.clone()));
 
         // Do not disable node joins in first section.
         let our_prefix = self.network_knowledge.prefix();
@@ -220,7 +211,7 @@ impl Node {
             self.joins_allowed = false;
         }
 
-        if let Some((_, sig)) = joining_nodes.iter().max_by_key(|(_, sig)| sig) {
+        if let Some((_, sig)) = decision.proposals.iter().max_by_key(|(_, sig)| *sig) {
             let churn_id = ChurnId(sig.to_bytes().to_vec());
             let excluded_from_relocation =
                 BTreeSet::from_iter(joining_nodes.iter().map(|(n, _)| n.name));
@@ -228,28 +219,28 @@ impl Node {
             cmds.extend(self.relocate_peers(churn_id, excluded_from_relocation)?);
         }
 
-        let result = self.promote_and_demote_elders_except(&BTreeSet::default())?;
+        cmds.extend(self.promote_and_demote_elders_except(&BTreeSet::default())?);
+        cmds.extend(self.send_ae_update_to_our_section());
 
-        // TODO: this should move into the `promote_and_demote_elders_except()` call
-        if result.is_empty() {
-            // Send AE-Update to our section
-            cmds.extend(self.send_ae_update_to_our_section());
+        self.liveness_retain_only(
+            self.network_knowledge
+                .adults()
+                .iter()
+                .map(|peer| peer.name())
+                .collect(),
+        )?;
+
+        if !leaving_nodes.is_empty() {
+            self.joins_allowed = true;
         }
 
-        cmds.extend(result);
-
-        info!("cmds in queue for Accepting node {:?}", cmds);
-
+        self.log_section_stats();
         self.print_network_stats();
 
         Ok(cmds)
     }
 
-    async fn handle_joining_node(
-        &mut self,
-        new_info: NodeState,
-        signature: Signature,
-    ) -> Result<Vec<Cmd>> {
+    async fn handle_node_joined(&mut self, new_info: NodeState, signature: Signature) -> Vec<Cmd> {
         let sig = KeyedSig {
             public_key: self.network_knowledge.section_key(),
             signature,
@@ -262,7 +253,7 @@ impl Node {
 
         if !self.network_knowledge.update_member(new_info.clone()) {
             info!("ignore Online: {}", new_info.peer());
-            return Ok(vec![]);
+            return vec![];
         }
 
         self.add_new_adult_to_trackers(new_info.name());
@@ -277,11 +268,11 @@ impl Node {
         }))
         .await;
 
-        Ok(vec![])
+        vec![]
     }
 
     // Send `NodeApproval` to a joining node which makes it a section member
-    pub(crate) fn send_node_approval(&self, decision: Decision<NodeState>) -> Vec<Cmd> {
+    pub(crate) fn send_node_approvals(&self, decision: Decision<NodeState>) -> Vec<Cmd> {
         let peers = Vec::from_iter(
             decision
                 .proposals
@@ -313,6 +304,40 @@ impl Node {
                 error!("Failed to send join approval to new peers {peers:?}: {err:?}");
                 vec![]
             }
+        }
+    }
+
+    pub(crate) fn handle_node_left(
+        &mut self,
+        node_state: NodeState,
+        signature: Signature,
+    ) -> Result<Vec<Cmd>> {
+        let sig = KeyedSig {
+            public_key: self.network_knowledge.section_key(),
+            signature,
+        };
+
+        let node_state = SectionAuth {
+            value: node_state,
+            sig,
+        }
+        .into_authed_state();
+
+        let _ = self.network_knowledge.update_member(node_state.clone());
+
+        info!(
+            "{}: {}",
+            LogMarker::AcceptedNodeAsOffline,
+            node_state.peer()
+        );
+
+        // If this is an Offline agreement where the new node state is Relocated,
+        // we then need to send the Relocate msg to the peer attaching the signed NodeState
+        // containing the relocation details.
+        if node_state.is_relocated() {
+            Ok(vec![self.send_relocate(*node_state.peer(), node_state)?])
+        } else {
+            Ok(vec![])
         }
     }
 }

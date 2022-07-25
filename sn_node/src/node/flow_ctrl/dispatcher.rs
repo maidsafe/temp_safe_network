@@ -156,15 +156,10 @@ impl Dispatcher {
 
                 node.handle_general_agreements(proposal, sig).await
             }
-            Cmd::HandleJoinDecision(decision) => {
+            Cmd::HandleMembershipDecision(decision) => {
                 let mut node = self.node.write().await;
 
-                node.handle_join_decision(decision).await
-            }
-            Cmd::HandleNodeLeft(auth) => {
-                let mut node = self.node.write().await;
-
-                node.handle_node_left(auth.value.into_state(), auth.sig)
+                node.handle_membership_decision(decision).await
             }
             Cmd::HandleNewEldersAgreement { new_elders, sig } => {
                 let mut node = self.node.write().await;
