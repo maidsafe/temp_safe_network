@@ -74,7 +74,7 @@ impl NetworkPrefixMap {
     /// Returns a boolean indicating whether anything changed.
     //
     // This is not a public API since we shall not allow any insert/update without a
-    // proof chain, users shall call either `update` or `verify_with_chain_and_update` API.
+    // proof chain, users shall call the `update` API.
     fn insert(&self, sap: SectionAuth<SectionAuthorityProvider>) -> bool {
         let prefix = sap.prefix();
         // Don't insert if any descendant is already present in the map.
@@ -270,10 +270,16 @@ impl NetworkPrefixMap {
         // root/child key in our sections_dag
         let _res = self.sections_dag.write().await.join(proof_chain.clone());
 
-        for section in self.sections.iter() {
-            let prefix = section.key();
-            trace!("Known prefix after update: {:?}", prefix);
-        }
+        // for section in self.sections.iter() {
+        //     let prefix = section.key();
+        //     let section_key = section.value().value.section_key();
+        //     println!(
+        //         "Known prefix,section_key after update: {:?} = {:?}",
+        //         prefix, section_key
+        //     );
+        // }
+        // println!("proof chain to update: {:?}", proof_chain);
+        // println!("updated sections_dag: {:?}", self.sections_dag.read().await);
 
         Ok(changed)
     }
@@ -422,9 +428,15 @@ impl NetworkPrefixMapSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
-    // sn_interface::network_knowledge::test_utils::gen_section_authority_provider
     use crate::network_knowledge::test_utils::{random_sap, section_signed};
     use eyre::{eyre, Context, Result};
+    use rand::{
+        prelude::{SeedableRng, SmallRng},
+        thread_rng, Rng,
+    };
+    use std::cell::RefCell;
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::rc::Rc;
 
     #[test]
     fn insert_existing_prefix() -> Result<()> {
@@ -669,6 +681,65 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn sections_should_be_synced_with_sections_dag() -> Result<()> {
+        let (map, chain) = generate_random_prefix_map(None, 10000)?;
+        let leaves: Vec<bls::PublicKey> = map
+            .iter()
+            .filter(|(_, (status, ..))| matches!(status, SectionStatus::None))
+            .map(|(section_key, ..)| *section_key)
+            .collect();
+
+        let genesis_key = *chain.root_key();
+        let prefix_map = NetworkPrefixMap::new(genesis_key);
+
+        // TODO: instead of inserting upto leaf, insert upto a random location
+        // insert each leaf by getting proof chain from a random ancestor of leaf's prefix
+        for leaf in leaves.iter() {
+            let (_, _, leaf_signed_sap) = map.get(leaf).unwrap().clone();
+            let leaf_prefix = leaf_signed_sap.prefix();
+
+            // list of all prefixes we are aware of
+            let mut known_prefixes: BTreeSet<Prefix> = BTreeSet::new();
+            prefix_map
+                .sections
+                .iter()
+                .map(|gg| *gg.key())
+                .for_each(|prefix| {
+                    known_prefixes.insert(prefix);
+                    prefix.ancestors().for_each(|p| {
+                        known_prefixes.insert(p);
+                    });
+                });
+
+            // select only the ancestors of leaf's prefix
+            let ancestors: BTreeSet<Prefix> = known_prefixes
+                .into_iter()
+                .filter(|p| leaf_prefix.is_extension_of(p))
+                .collect();
+            let mut random_ancestor = Prefix::default();
+            if !ancestors.is_empty() {
+                random_ancestor = *ancestors
+                    .iter()
+                    .nth(thread_rng().gen::<usize>() % ancestors.len())
+                    .unwrap();
+            }
+            // get the section key of that random ancestor
+            let random_anc_key = map
+                .iter()
+                .find(|(_, (.., v))| v.prefix() == random_ancestor)
+                .map(|(k, _)| *k);
+            let random_anc_key = random_anc_key.unwrap_or(genesis_key);
+
+            // get proof chain and update
+            let proof_chain = chain.get_proof_chain(&random_anc_key, leaf)?;
+            prefix_map.update(leaf_signed_sap, &proof_chain).await?;
+        }
+        println!("{:?} is_synced ", is_synced(&prefix_map).await?);
+
+        Ok(())
+    }
+
     // Test helpers
 
     fn prefix(s: &str) -> Result<Prefix> {
@@ -689,5 +760,144 @@ mod tests {
         let map = NetworkPrefixMap::new(genesis_pk);
 
         (map, genesis_sk, genesis_pk)
+    }
+
+    // Check if the sections and sections_dag are in sync
+    // Get the leaves of the 'sections_dag' from 'section' and verify
+    // the length from the leaves matches the actual length of the 'sections_dag'
+    async fn is_synced(prefix_map: &NetworkPrefixMap) -> Result<bool> {
+        let sections_dag = prefix_map.get_sections_dag().read().await;
+        let root_key = sections_dag.root_key();
+        let mut count: BTreeSet<bls::PublicKey> = BTreeSet::new();
+
+        // count.insert(root_key);
+        // for sap in prefix_map.all() {
+        //     let mut chain = sections_dag.get_proof_chain(&root_key, &sap.section_key()).unwrap();
+        //     while *chain.last_key() != root_key {
+        //         count.insert(*chain.last_key());
+        //         chain = sections_dag.get_proof_chain(&root_key, chain.prev_key()).unwrap();
+        //     }
+        // }
+
+        for sap in prefix_map.all() {
+            let chain = sections_dag.get_proof_chain(root_key, &sap.section_key())?;
+            for key in chain.keys() {
+                count.insert(*key);
+            }
+        }
+
+        Ok(sections_dag.len() == count.len())
+    }
+
+    type SectionInfo = (
+        SectionStatus,
+        bls::SecretKey,
+        SectionAuth<SectionAuthorityProvider>,
+    );
+
+    // Return SectionChain and the sap for all the sections. Can have multiple SAPs per prefix.
+    fn generate_random_prefix_map(
+        seed: Option<u64>,
+        n_sections: usize,
+    ) -> Result<(BTreeMap<bls::PublicKey, SectionInfo>, SecuredLinkedList)> {
+        let mut rng = match seed {
+            Some(seed) => SmallRng::seed_from_u64(seed),
+            None => SmallRng::from_entropy(),
+        };
+        // map of each section key to its sk, sap and its status. Current section can have children
+        // only if its SectionStatus is None
+        let sections_map: Rc<RefCell<BTreeMap<bls::PublicKey, SectionInfo>>> =
+            Rc::new(RefCell::new(BTreeMap::new()));
+
+        // genesis section; inserted at the end
+        let (gen_sap, _, gen_sk) = random_sap(Prefix::default(), 0);
+        let gen_sap_signed = section_signed(gen_sk.secret_key(), gen_sap.clone())?;
+        let mut chain = SecuredLinkedList::new(gen_sap.section_key());
+
+        // insert a new section
+        let mut insert = |prefix: Prefix, parent_sk: &bls::SecretKey| -> Result<()> {
+            let (sap, _, sk) = random_sap(prefix, 0);
+            let section_key_signed =
+                bincode::serialize(&sap.section_key()).map(|bytes| parent_sk.sign(&bytes))?;
+            let sap_signed = section_signed(sk.secret_key(), sap.clone())?;
+
+            sections_map.borrow_mut().insert(
+                sap.section_key(),
+                (SectionStatus::None, sk.secret_key().clone(), sap_signed),
+            );
+            chain.insert(
+                &parent_sk.public_key(),
+                sap.section_key(),
+                section_key_signed,
+            )?;
+            Ok(())
+        };
+
+        // initial sections
+        insert(prefix("0")?, gen_sk.secret_key())?;
+        insert(prefix("1")?, gen_sk.secret_key())?;
+
+        // +1 for genesis
+        while sections_map.borrow().len() + 1 < n_sections {
+            // get random section only if it's status is None
+            let (_, p_sk, p_sap) = match sections_map
+                .borrow()
+                .iter()
+                .nth(rng.gen::<usize>() % sections_map.borrow().len())
+            {
+                Some((_, (status, _, _))) if !matches!(status, SectionStatus::None) => continue,
+                Some((pk, (_, sk, sap))) => (*pk, sk.clone(), sap.clone()),
+                None => continue,
+            };
+
+            let switch: i8 = rng.gen_range(0..2);
+            if switch % 2 == 0 {
+                // Churn event for the parent, so leads to single child with same prefix
+                insert(p_sap.prefix(), &p_sk)?;
+                // update parent
+                assert!(sections_map
+                    .borrow_mut()
+                    .insert(p_sap.section_key(), (SectionStatus::Churn, p_sk, p_sap))
+                    .is_some());
+            } else {
+                // Split event for the parent, so leads to 2 children
+                insert(prefix(format!("{:b}0", p_sap.prefix()).as_str())?, &p_sk)?;
+                insert(prefix(format!("{:b}1", p_sap.prefix()).as_str())?, &p_sk)?;
+                // update parent
+                assert!(sections_map
+                    .borrow_mut()
+                    .insert(p_sap.section_key(), (SectionStatus::Split, p_sk, p_sap))
+                    .is_some());
+            };
+        }
+
+        // insert genesis
+        sections_map.borrow_mut().insert(
+            gen_sap.section_key(),
+            (
+                SectionStatus::Split,
+                gen_sk.secret_key().clone(),
+                gen_sap_signed,
+            ),
+        );
+
+        // for (status, _, section) in sections_map.borrow().values() {
+        //     println!(
+        //         "{:?} -> {:?} {:?}",
+        //         section.prefix(),
+        //         section.section_key(),
+        //         status
+        //     );
+        // }
+        // println!("{:?}", chain);
+        return Ok((sections_map.borrow().clone(), chain));
+    }
+
+    // Denotes if a section has gone through Split/Churn
+    #[derive(Debug, Clone, Copy)]
+    enum SectionStatus {
+        Split,
+        Churn,
+        None,
     }
 }
