@@ -173,6 +173,9 @@ pub enum Error {
         /// Number of Chunks generated
         chunked: usize,
     },
+    /// H3 error
+    #[error("H3 error: {0}")]
+    H3Error(String),
 }
 
 impl From<(CmdError, MsgId)> for Error {

@@ -602,6 +602,21 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn store_1mb() -> Result<()> {
+        init_logger();
+        let _outer_span = tracing::info_span!("store_1mb").entered();
+        let client = create_test_client().await?;
+
+        let bytes = random_bytes(10 * 1024);
+        let expected_address = Client::calculate_address(bytes.clone())?;
+
+        let address = client.upload(bytes.clone()).await?;
+        assert_eq!(address, expected_address);
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn store_and_read_10mb() -> Result<()> {
         init_logger();
         let _outer_span = tracing::info_span!("store_and_read_10mb").entered();

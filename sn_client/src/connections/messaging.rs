@@ -531,21 +531,37 @@ pub(super) async fn send_msg(
 
     let mut successful_sends = 0usize;
 
+    info!("SENDING TO NODES: {:?}", nodes);
+
     for peer in nodes.clone() {
         let session = session.clone();
         let msg_bytes_clone = msg_bytes.clone();
         let peer_name = peer.name();
 
         let task_handle: JoinHandle<(XorName, Result<()>)> = tokio::spawn(async move {
-            let link = session.peer_links.get_or_create(&peer).await;
+            //let link = session.peer_links.get_or_create(&peer).await;
 
+            /*
             let listen = |conn, incoming_msgs| {
                 Session::spawn_msg_listener_thread(session.clone(), peer, conn, incoming_msgs);
             };
-
+            */
             let mut retries = 0;
 
             let send_and_retry = || async {
+                // ********* H3 TESTING**************
+                match super::h3_client::send_on_h3(session.clone(), peer, msg_bytes_clone.clone())
+                    .await
+                {
+                    Ok(()) => Ok(()),
+                    Err(err) => {
+                        error!("FAILED SENDING H3 message: {:?}", err);
+                        Err(Error::H3Error(format!("H3 error: {:?}", err)))
+                    }
+                }
+                // **********************************
+
+                /***** OLD QP2P CLIENT *******
                 match link
                     .send_with(msg_bytes_clone.clone(), priority, None, listen)
                     .await
@@ -556,6 +572,7 @@ pub(super) async fn send_msg(
                         SendToOneError::Send(err) => Err(Error::QuicP2pSend(err)),
                     },
                 }
+                *******************************/
             };
             let mut result = send_and_retry().await;
 

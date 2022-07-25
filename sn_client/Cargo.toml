@@ -53,8 +53,16 @@ ed25519 = { version = "1.2.0", features = ["serde_bytes"] }
 ed25519-dalek = { version = "1.0.0", features = ["serde"] }
 eyre = { version = "~0.6.5", optional = true }
 futures = "~0.3.13"
+h3 = { path = "../../h3/h3" }
+h3-quinn = { path = "../../h3/h3-quinn" }
 hex = "~0.4.3"
 hex_fmt = "~0.3.0"
+
+http = "0.2"
+rcgen = { version = "0.9" }
+rustls = { version = "0.20", features = ["dangerous_configuration"] }
+rustls-native-certs = "0.6"
+
 itertools = "~0.10.0"
 lazy_static = "1"
 multibase = "~0.9.1"
