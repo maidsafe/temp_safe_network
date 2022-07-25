@@ -97,9 +97,6 @@ impl FlowCtrl {
                     tokio::time::sleep(Duration::from_millis(100)).await;
                     continue;
                 }
-                CtrlStatus::MaxRetriesReached(retries) => {
-                    return Err(Error::MaxCmdRetriesReached(retries));
-                }
                 CtrlStatus::WatcherDropped => {
                     // the send job is dropped for some reason,
                     return Err(Error::CmdJobWatcherDropped);
