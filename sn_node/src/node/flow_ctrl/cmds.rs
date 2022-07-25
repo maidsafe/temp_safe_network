@@ -131,10 +131,8 @@ pub(crate) enum Cmd {
     HandlePeerFailedSend(Peer),
     /// Handle agreement on a proposal.
     HandleAgreement { proposal: Proposal, sig: KeyedSig },
-    /// Handle a new Node joining agreement.
-    HandleJoinDecision(Decision<NodeState>),
-    /// Handle a Node leaving agreement.
-    HandleNodeLeft(SectionAuth<NodeState>),
+    /// Handle a membership decision.
+    HandleMembershipDecision(Decision<NodeState>),
     /// Handle agree on elders. This blocks node message processing until complete.
     HandleNewEldersAgreement {
         new_elders: SectionAuth<SectionAuthorityProvider>,
@@ -202,9 +200,8 @@ impl Cmd {
             HandleDkgTimeout(_) => 10,
 
             HandlePeerFailedSend(_) => 9,
-            HandleNodeLeft(_) => 9,
             ProposeOffline(_) => 9,
-            HandleJoinDecision(_) => 9,
+            HandleMembershipDecision(_) => 9,
             EnqueueDataForReplication { .. } => 9,
             CleanupPeerLinks => 9,
 
@@ -254,8 +251,7 @@ impl fmt::Display for Cmd {
             Cmd::HandlePeerFailedSend(peer) => write!(f, "HandlePeerFailedSend({:?})", peer.name()),
             Cmd::HandleAgreement { .. } => write!(f, "HandleAgreement"),
             Cmd::HandleNewEldersAgreement { .. } => write!(f, "HandleNewEldersAgreement"),
-            Cmd::HandleJoinDecision(_) => write!(f, "HandleJoinDecision"),
-            Cmd::HandleNodeLeft(_) => write!(f, "HandleNodeLeft"),
+            Cmd::HandleMembershipDecision(_) => write!(f, "HandleJoinDecision"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Cmd::HandleDkgFailure(_) => write!(f, "HandleDkgFailure"),
             #[cfg(not(feature = "test-utils"))]

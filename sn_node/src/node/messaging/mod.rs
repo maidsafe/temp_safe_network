@@ -11,7 +11,6 @@ mod anti_entropy;
 mod dkg;
 mod handover;
 mod join;
-mod left;
 mod membership;
 mod proposal;
 mod relocation;

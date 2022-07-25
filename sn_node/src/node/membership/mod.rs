@@ -210,15 +210,6 @@ impl Membership {
         }
     }
 
-    pub(crate) fn is_leaving_section(&self, node: &NodeState, our_prefix: Prefix) -> bool {
-        // TODO: ideally this logic is combined with the logic in self.section_members() for deciding if a node is leaving
-        match &node.state {
-            MembershipState::Joined => false,
-            MembershipState::Left => true,
-            MembershipState::Relocated(r) => !our_prefix.matches(&r.dst),
-        }
-    }
-
     pub(crate) fn current_section_members(&self) -> BTreeMap<XorName, NodeState> {
         self.section_members(self.gen).unwrap_or_default()
     }
