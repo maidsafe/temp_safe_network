@@ -28,7 +28,7 @@ use tokio::{sync::mpsc, time::Instant};
 // type Priority = i32;
 
 /// These retries are how may _new_ connection attempts do we make.
-/// If cargo we fail all of these, HandleLostPeer will be triggered
+/// If we fail all of these, HandlePeerFailedSend will be triggered
 /// for section nodes, which in turn kicks off a ConnectivityTest
 const MAX_SENDJOB_RETRIES: usize = 3;
 const DEFAULT_DESIRED_RATE: f64 = 10.0; // 10 msgs / s

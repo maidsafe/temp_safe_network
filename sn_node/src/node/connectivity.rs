@@ -11,23 +11,23 @@ use std::{collections::BTreeSet, net::SocketAddr};
 use xor_name::XorName;
 
 impl Node {
-    pub(crate) fn handle_peer_lost(&mut self, addr: &SocketAddr) -> Result<Vec<Cmd>> {
+    /// Track comms issue if this is a peer we know and care about
+    pub(crate) fn handle_failed_send(&mut self, addr: &SocketAddr) -> Result<()> {
         let name = if let Some(peer) = self.network_knowledge.find_member_by_addr(addr) {
             debug!("Lost known peer {}", peer);
             peer.name()
         } else {
             trace!("Lost unknown peer {}", addr);
-            return Ok(vec![]);
+            return Ok(());
         };
 
         if self.is_not_elder() {
             // Adults cannot complain about connectivity.
-            return Ok(vec![]);
+            return Ok(());
         }
 
         self.log_comm_issue(name)?;
-        let cmds = vec![Cmd::StartConnectivityTest(name)];
-        Ok(cmds)
+        Ok(())
     }
 
     pub(crate) fn cast_offline_proposals(&mut self, names: &BTreeSet<XorName>) -> Result<Vec<Cmd>> {

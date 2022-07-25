@@ -415,6 +415,15 @@ impl FlowCtrl {
 
                 if !unresponsive_nodes.is_empty() {
                     debug!("{:?} : {unresponsive_nodes:?}", LogMarker::ProposeOffline);
+                    for name in &unresponsive_nodes {
+                        if let Err(e) = self
+                            .cmd_ctrl
+                            .push(Cmd::TellEldersToStartConnectivityTest(*name))
+                            .await
+                        {
+                            error!("Error sending TellEldersToStartConnectivityTest for dysfunctional nodes: {e:?}");
+                        }
+                    }
                     if let Err(e) = self
                         .cmd_ctrl
                         .push(Cmd::ProposeOffline(unresponsive_nodes))
