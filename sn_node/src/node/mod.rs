@@ -113,6 +113,11 @@ mod core {
     };
     use uluru::LRUCache;
 
+    #[cfg(feature = "traceroute")]
+    use sn_interface::messaging::Entity;
+    #[cfg(feature = "traceroute")]
+    use sn_interface::types::PublicKey;
+
     /// Amount of tokens to be owned by the Genesis DBC.
     /// At the inception of the Network a total supply of 4,525,524,120 whole tokens will be created.
     /// Each whole token can be subdivided 10^9 times,
@@ -728,6 +733,15 @@ mod core {
                     error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);
                 }
             });
+        }
+
+        #[cfg(feature = "traceroute")]
+        pub(crate) fn identity(&self) -> Entity {
+            if self.is_elder() {
+                Entity::Elder(PublicKey::Ed25519(self.info().keypair.public))
+            } else {
+                Entity::Adult(PublicKey::Ed25519(self.info().keypair.public))
+            }
         }
     }
 
