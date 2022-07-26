@@ -14,6 +14,7 @@ use tiny_keccak::{Hasher, Sha3};
 
 use serde::{Deserialize, Serialize};
 use sn_dbc::{KeyImage, RingCtTransaction, SpentProof};
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
 /// Spentbook read operations.
@@ -33,8 +34,8 @@ pub enum SpentbookCmd {
     Spend {
         key_image: KeyImage,
         tx: RingCtTransaction,
-        spent_proofs: Vec<SpentProof>,
-        spent_transactions: Vec<RingCtTransaction>,
+        spent_proofs: BTreeSet<SpentProof>,
+        spent_transactions: BTreeSet<RingCtTransaction>,
     },
 }
 

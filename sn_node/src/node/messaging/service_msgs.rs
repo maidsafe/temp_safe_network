@@ -361,8 +361,8 @@ impl Node {
         &self,
         key_image: &KeyImage,
         tx: &RingCtTransaction,
-        spent_proofs: &[SpentProof],
-        spent_transactions: &[RingCtTransaction],
+        spent_proofs: &BTreeSet<SpentProof>,
+        spent_transactions: &BTreeSet<RingCtTransaction>,
     ) -> Result<Option<SpentProofShare>> {
         trace!(
             "Processing DBC spend request for key image: {:?}",

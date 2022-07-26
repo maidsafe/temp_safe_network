@@ -36,8 +36,8 @@ impl Client {
         let cmd = SpentbookCmd::Spend {
             key_image,
             tx,
-            spent_proofs: spent_proofs.into_iter().collect::<Vec<_>>(),
-            spent_transactions: spent_transactions.into_iter().collect::<Vec<_>>(),
+            spent_proofs,
+            spent_transactions,
         };
         self.send_cmd(DataCmd::Spentbook(cmd)).await
     }
