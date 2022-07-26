@@ -10,7 +10,7 @@ use crate::node::{messages::WireMsgUtils, Cmd, Node, Result};
 
 use crate::comm::{Comm, DeliveryStatus};
 use sn_interface::{
-    messaging::{data::ServiceMsg, system::SystemMsg, DstLocation, WireMsg},
+    messaging::{data::ServiceMsg, system::SystemMsg, WireMsg},
     types::Peer,
 };
 
@@ -273,26 +273,12 @@ impl Dispatcher {
         }
     }
 
+    /// Takes recipients and a WireMsg and will send to each recipient via the comms module.
+    /// This ensures the DstLocation name is set correctly (so for many recipients, it's updated for each)
+    ///
+    /// Any failed sends are tracked via Cmd::HandlePeerFailedSend, which will log dysfunction for any peers
+    /// in the section (otherwise ignoring failed send to out of section nodes or clients)
     async fn send_msg_via_comms(&self, recipients: &[Peer], wire_msg: WireMsg) -> Result<Vec<Cmd>> {
-        let cmds = match wire_msg.dst_location() {
-            DstLocation::EndUser(_) => {
-                for peer in recipients {
-                    if let Err(err) = self.comm.send_to_client(peer, wire_msg.clone()).await {
-                        error!(
-                            "Failed sending message {:?} to client {:?} with error {:?}",
-                            wire_msg, peer, err
-                        );
-                    }
-                }
-                vec![]
-            }
-            _ => self.deliver_msgs(recipients, wire_msg).await?,
-        };
-
-        Ok(cmds)
-    }
-
-    async fn deliver_msgs(&self, recipients: &[Peer], wire_msg: WireMsg) -> Result<Vec<Cmd>> {
         let status = self.comm.send(recipients, wire_msg).await?;
 
         match status {
