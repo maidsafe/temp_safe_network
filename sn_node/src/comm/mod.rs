@@ -33,7 +33,6 @@ use sn_interface::{
 
 use bytes::Bytes;
 use dashmap::DashMap;
-use futures::stream::{FuturesUnordered, StreamExt};
 use qp2p::{Endpoint, IncomingConnections};
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
@@ -212,109 +211,6 @@ impl Comm {
         session.update_send_rate(msgs_per_s).await;
     }
 
-    /// Sends a message to a client. Reuses an existing or creates a connection if none.
-    pub(crate) async fn send_to_client(
-        &self,
-        recipient: &Peer,
-        mut wire_msg: WireMsg,
-    ) -> Result<(), Error> {
-        trace!(
-            "Sending msg on existing connection to client {:?}",
-            recipient
-        );
-
-        let name = recipient.name();
-        let addr = recipient.addr();
-
-        wire_msg.set_dst_xorname(name);
-
-        let msg_id = wire_msg.msg_id();
-
-        let priority = wire_msg.priority();
-
-        let (_, result) = self.send_to_one(*recipient, wire_msg, priority).await;
-
-        match result {
-            Err(error) => {
-                // there is only one type of error returned: [`Error::InvalidState`]
-                // which should not happen (be reachable) if we only access PeerSession from Comm
-                // The error means we accessed a peer that we disconnected from.
-                // So, this would potentially be a bug!
-                warn!(
-                    "Accessed a disconnected peer: {}. This is potentially a bug!",
-                    recipient
-                );
-                error!(
-                    "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed as we have disconnected from the peer. (Error is: {})",
-                    msg_id,
-                    addr,
-                    name,
-                    error,
-                );
-                Err(Error::FailedSend(*recipient))
-            }
-            Ok(mut watcher) => {
-                // here we can monitor the sending
-                // and we now watch the status of the send
-                loop {
-                    match watcher.await_change().await {
-                        SendStatus::Sent => {
-                            return Ok(()); // all good
-                        }
-                        SendStatus::Enqueued => {
-                            // this block should be unreachable, as Enqueued is the initial state
-                            // but let's handle it anyway..
-                            continue; // moves on to awaiting a new change
-                        }
-                        SendStatus::PeerLinkDropped => {
-                            // The connection was closed by us which means
-                            // we have dropped this peer for some reason
-                            error!(
-                                "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed, as we have dropped the link to it.",
-                                msg_id,
-                                addr,
-                                name,
-                            );
-                            return Err(Error::PeerLinkDropped(*recipient));
-                        }
-                        SendStatus::WatcherDropped => {
-                            // the send job is dropped for some reason,
-                            // that happens when the peer session dropped
-                            // or the msg was sent, meaning the send didn't actually fail,
-                            error!(
-                                "Sending message (msg_id: {:?}) to {:?} (name {:?}) possibly failed, as monitoring of the send job was aborted",
-                                msg_id,
-                                addr,
-                                name,
-                            );
-                            return Err(Error::FailedSend(*recipient));
-                        }
-                        SendStatus::TransientError(error) => {
-                            // An individual connection can for example have been lost when we tried to send. This
-                            // could indicate the connection timed out whilst it was held, or some other
-                            // transient connection issue. We don't treat this as a failed recipient, but we sleep a little longer here.
-                            // Retries are managed by the peer session, where it will open a new connection.
-                            debug!(
-                                "Transient error when sending to peer {}: {}",
-                                recipient, error
-                            );
-                            continue; // moves on to awaiting a new change
-                        }
-                        SendStatus::MaxRetriesReached => {
-                            error!(
-                                "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed, as we've reached maximum retries",
-                                msg_id,
-                                addr,
-                                name,
-                            );
-                            return Err(Error::FailedSend(*recipient));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     /// Sends a message to multiple recipients. Attempts to send to `delivery_group_size`
     /// recipients out of the `recipients` list. If a send fails, attempts to send to the next peer
     /// until `delivery_group_size` successful sends complete or there are no more recipients to
@@ -341,10 +237,12 @@ impl Comm {
 
         let priority = wire_msg.priority();
 
-        // Run all the sends concurrently (using `FuturesUnordered`). If any of them fails, pick
-        // the next recipient and try to send to them. Proceed until the needed number of sends
-        // succeeds or if there are no more recipients to pick.
-        let mut tasks: FuturesUnordered<_> = recipients
+        let delivery_group_size = recipients.len();
+        let mut successes = 0;
+        let mut failed_recipients = vec![];
+
+        // Run all the sends concurrently.
+        let tasks: Vec<_> = recipients
             .iter()
             .map(|recipient| {
                 let mut msg = wire_msg.clone();
@@ -353,66 +251,69 @@ impl Comm {
             })
             .collect();
 
-        let delivery_group_size = recipients.len();
-        let mut next = delivery_group_size;
-        let mut successes = 0;
-        let mut failed_recipients = vec![];
+        let watchers = futures::future::join_all(tasks).await;
 
-        let mut try_next = |error, recipient, tasks: &mut FuturesUnordered<_>| {
-            warn!("during sending, received error {:?}", error);
-            failed_recipients.push(recipient);
+        for (recipient, result) in watchers {
+            let name = recipient.name();
+            let addr = recipient.addr();
 
-            if next < recipients.len() {
-                let mut msg = wire_msg.clone();
-                msg.set_dst_xorname(recipients[next].name());
-                tasks.push(self.send_to_one(recipients[next], msg, priority));
-                next += 1;
-            }
-        };
-
-        while let Some((recipient, result)) = tasks.next().await {
             match result {
                 Err(error) => {
                     // there is only one type of error returned: [`Error::InvalidState`]
                     // which should not happen (be reachable) if we only access PeerSession from Comm
                     // The error means we accessed a peer that we disconnected from.
                     // So, this would potentially be a bug!
-                    //
-                    // (let's log that bug here, but continue running anyway, as it isn't that critical)
                     warn!(
                         "Accessed a disconnected peer: {}. This is potentially a bug!",
                         recipient
                     );
-                    try_next(error, recipient, &mut tasks);
+                    error!(
+                        "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed as we have disconnected from the peer. (Error is: {})",
+                        msg_id,
+                        addr,
+                        name,
+                        error,
+                    );
+                    break;
                 }
                 Ok(mut watcher) => {
-                    // we now watch the status of the send for this particular recipient..
+                    // here we can monitor the sending
+                    // and we now watch the status of the send
                     loop {
                         match watcher.await_change().await {
                             SendStatus::Sent => {
                                 successes += 1;
-                                break; // we now move to checking next recipient send task..
+                                break;
                             }
                             SendStatus::Enqueued => {
                                 // this block should be unreachable, as Enqueued is the initial state
                                 // but let's handle it anyway..
-                                tokio::time::sleep(Duration::from_millis(100)).await;
-                                continue; // await change on the same recipient again
+                                continue; // moves on to awaiting a new change
                             }
                             SendStatus::PeerLinkDropped => {
                                 // The connection was closed by us which means
-                                // we have dropped this peer for some reason, thus try next
-                                try_next(Error::PeerLinkDropped(recipient), recipient, &mut tasks);
-                                break; // we now move to checking next recipient send task..
+                                // we have dropped this peer for some reason
+                                error!(
+                                    "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed, as we have dropped the link to it.",
+                                    msg_id,
+                                    addr,
+                                    name,
+                                );
+                                failed_recipients.push(recipient);
+                                break;
                             }
                             SendStatus::WatcherDropped => {
                                 // the send job is dropped for some reason,
                                 // that happens when the peer session dropped
                                 // or the msg was sent, meaning the send didn't actually fail,
-                                // so we would be sending an extra msg here in case of such a glitch
-                                info!("Watcher Dropped");
-                                try_next(Error::FailedSend(recipient), recipient, &mut tasks);
-                                break; // we now move to checking next recipient send task..
+                                error!(
+                                    "Sending message (msg_id: {:?}) to {:?} (name {:?}) possibly failed, as monitoring of the send job was aborted",
+                                    msg_id,
+                                    addr,
+                                    name,
+                                );
+                                failed_recipients.push(recipient);
+                                break;
                             }
                             SendStatus::TransientError(error) => {
                                 // An individual connection can for example have been lost when we tried to send. This
@@ -424,12 +325,18 @@ impl Comm {
                                     recipient, error
                                 );
                                 tokio::time::sleep(Duration::from_millis(200)).await;
-                                continue;
+
+                                continue; // moves on to awaiting a new change
                             }
                             SendStatus::MaxRetriesReached => {
-                                info!("Max retries reached");
-                                try_next(Error::FailedSend(recipient), recipient, &mut tasks);
-                                break; // we now move to checking next recipient send task..
+                                error!(
+                                    "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed, as we've reached maximum retries",
+                                    msg_id,
+                                    addr,
+                                    name,
+                                );
+                                failed_recipients.push(recipient);
+                                break;
                             }
                         }
                     }
