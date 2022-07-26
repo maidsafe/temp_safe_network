@@ -198,6 +198,8 @@ impl Node {
                     proof_chain,
                     bounced_msg,
                     sender,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
                 )
                 .await
             }
@@ -214,6 +216,8 @@ impl Node {
                     section_chain,
                     bounced_msg,
                     sender,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
                 )
                 .await
             }

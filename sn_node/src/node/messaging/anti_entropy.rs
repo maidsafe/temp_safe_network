@@ -27,6 +27,9 @@ use sn_interface::{
 use std::{collections::BTreeSet, time::Duration};
 use xor_name::{Prefix, XorName};
 
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Entity;
+
 impl Node {
     /// Send `AntiEntropyUpdate` message to all nodes in our own section.
     pub(crate) fn send_ae_update_to_our_section(&self) -> Option<Cmd> {
@@ -184,6 +187,7 @@ impl Node {
         proof_chain: SecuredLinkedList,
         bounced_msg: Bytes,
         sender: Peer,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
         let snapshot = self.state_snapshot();
 
@@ -216,7 +220,16 @@ impl Node {
                     result.extend(cmds);
                 }
 
-                result.push(self.send_system_msg(msg_to_resend, Peers::Single(sender)));
+                if cfg!(feature = "traceroute") {
+                    result.push(self.trace_system_msg(
+                        msg_to_resend,
+                        Peers::Single(sender),
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    ));
+                } else {
+                    result.push(self.send_system_msg(msg_to_resend, Peers::Single(sender)));
+                }
 
                 Ok(result)
             }
@@ -230,6 +243,7 @@ impl Node {
         section_chain: SecuredLinkedList,
         bounced_msg: Bytes,
         sender: Peer,
+        #[cfg(feature = "traceroute")] mut traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
         let dst_section_key = section_auth.section_key();
 
@@ -276,9 +290,18 @@ impl Node {
 
                     self.create_or_wait_for_backoff(&elder).await;
 
-                    Ok(vec![
-                        self.send_system_msg(msg_to_redirect, Peers::Single(elder))
-                    ])
+                    if cfg!(feature = "traceroute") {
+                        Ok(vec![self.trace_system_msg(
+                            msg_to_redirect,
+                            Peers::Single(elder),
+                            #[cfg(feature = "traceroute")]
+                            traceroute,
+                        )])
+                    } else {
+                        Ok(vec![
+                            self.send_system_msg(msg_to_redirect, Peers::Single(elder))
+                        ])
+                    }
                 }
             },
         }
@@ -414,7 +437,7 @@ impl Node {
                 "AE: prefix not matching. We are: {:?}, they sent to: {:?}",
                 our_prefix, dst_name
             );
-            match self
+            return match self
                 .network_knowledge
                 .get_closest_or_opposite_signed_sap(&dst_name)
             {
@@ -447,9 +470,9 @@ impl Node {
                         dst_name, dst_section_key
                     );
 
-                    return Err(Error::NoMatchingSection);
+                    Err(Error::NoMatchingSection)
                 }
-            }
+            };
         }
 
         let section_key = self.network_knowledge.section_key();
