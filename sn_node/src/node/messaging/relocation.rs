@@ -104,8 +104,6 @@ impl Node {
 
         // Create a new instance of JoiningAsRelocated to start the relocation
         // flow. This same instance will handle responses till relocation is complete.
-        let genesis_key = *self.network_knowledge.genesis_key();
-
         let bootstrap_addrs = if let Ok(sap) = self.network_knowledge.section_by_name(&dst_xorname)
         {
             sap.addresses()
@@ -114,7 +112,6 @@ impl Node {
         };
         let (joining_as_relocated, cmd) = JoiningAsRelocated::start(
             node,
-            genesis_key,
             relocate_proof,
             bootstrap_addrs,
             dst_xorname,

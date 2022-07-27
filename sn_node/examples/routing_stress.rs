@@ -443,19 +443,16 @@ impl Network {
         // section health to appear lower than it actually is.
 
         // just some valid message
-        let node_msg = SystemMsg::NodeMsgError {
+        let msg = SystemMsg::NodeMsgError {
             error: FailedToWriteFile,
             correlation_id: MsgId::new(),
         };
-
-        let dst_location = DstLocation::Section {
+        let dst = DstLocation::Section {
             name: dst,
             section_pk: public_key_set.public_key(),
         };
 
-        let wire_msg = node.sign_single_src_msg(node_msg, dst_location).await?;
-
-        match node.send_msg_to_nodes(wire_msg).await {
+        match node.send(msg, dst).await {
             Ok(()) => Ok(true),
             Err(error) => {
                 Err(error).context(format!("failed to send probe by {}", node.name().await))

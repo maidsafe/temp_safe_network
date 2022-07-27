@@ -301,7 +301,6 @@ mod core {
 
             let message = SystemMsg::AntiEntropyProbe;
             let section_key = matching_section.section_key();
-            let dst_name = matching_section.prefix().name();
             let recipients = matching_section.elders_vec();
 
             info!(
@@ -310,24 +309,20 @@ mod core {
                 section_key
             );
 
-            self.send_direct_msg_to_nodes(recipients, message, dst_name, section_key)
+            self.send_direct_msg(recipients, message)
         }
 
         pub(crate) fn generate_section_probe_msg(&self) -> Result<Cmd> {
             let our_section = self.network_knowledge.authority_provider();
-
-            let message = SystemMsg::AntiEntropyProbe;
-            let section_key = our_section.section_key();
-            let dst_name = our_section.prefix().name();
             let recipients = our_section.elders_vec();
 
             info!(
-                "ProbeMsg target section {:?} w/key {:?}",
+                "ProbeMsg target section {:?} recipients {:?}",
                 our_section.prefix(),
-                section_key
+                recipients,
             );
 
-            self.send_direct_msg_to_nodes(recipients, message, dst_name, section_key)
+            self.send_direct_msg(recipients, SystemMsg::AntiEntropyProbe)
         }
 
         /// returns names that are relatively dysfunctional
@@ -548,6 +543,11 @@ mod core {
                 return Ok(vec![]);
             }
 
+            if new.section_key == old.section_key {
+                // there was no change
+                return Ok(vec![]);
+            }
+
             let mut cmds = vec![];
 
             if new.is_elder {
@@ -669,7 +669,6 @@ mod core {
                             .cloned()
                             .collect(),
                         &self.network_knowledge.prefix(),
-                        new.section_key,
                     )?,
                 );
             };
@@ -681,6 +680,7 @@ mod core {
             Ok(cmds)
         }
 
+        #[allow(unused)]
         pub(crate) fn section_key_by_name(&self, name: &XorName) -> bls::PublicKey {
             if self.network_knowledge.prefix().matches(name) {
                 self.network_knowledge.section_key()

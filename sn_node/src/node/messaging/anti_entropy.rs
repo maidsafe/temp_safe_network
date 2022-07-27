@@ -7,8 +7,9 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    flow_ctrl::cmds::Cmd, messages::WireMsgUtils, Error, Event, MembershipEvent, Node, Result,
-    StateSnapshot,
+    flow_ctrl::cmds::Cmd,
+    messaging::{OutgoingMsg, Recipients},
+    Error, Event, MembershipEvent, Node, Result, StateSnapshot,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
@@ -18,7 +19,7 @@ use secured_linked_list::SecuredLinkedList;
 use sn_interface::{
     messaging::{
         system::{KeyedSig, NodeCmd, SectionAuth, SectionPeers, SystemMsg},
-        MsgId, MsgType, SrcLocation, WireMsg,
+        MsgId, MsgType, WireMsg,
     },
     network_knowledge::SectionAuthorityProvider,
     types::{log_markers::LogMarker, Peer, PublicKey},
@@ -66,13 +67,7 @@ impl Node {
             }
         };
 
-        let our_section_key = self.network_knowledge.section_key();
-        match self.send_direct_msg_to_nodes(
-            recipients.clone(),
-            node_msg,
-            prefix.name(),
-            our_section_key,
-        ) {
+        match self.send_direct_msg(recipients.clone(), node_msg) {
             Ok(cmd) => vec![cmd],
             Err(err) => {
                 error!(
@@ -89,17 +84,11 @@ impl Node {
         &self,
         recipients: Vec<Peer>,
         prefix: &Prefix,
-        section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
         let metadata = self.get_metadata_of(prefix);
         let data_update_msg = SystemMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata });
 
-        match self.send_direct_msg_to_nodes(
-            recipients.clone(),
-            data_update_msg,
-            prefix.name(),
-            section_pk,
-        ) {
+        match self.send_direct_msg(recipients.clone(), data_update_msg) {
             Ok(cmd) => Ok(vec![cmd]),
             Err(err) => {
                 error!(
@@ -140,11 +129,8 @@ impl Node {
             let previous_section_key = our_prev_state.section_key;
             let sibling_prefix = sibling_sap.prefix();
 
-            let mut cmds = self.send_metadata_updates(
-                promoted_sibling_elders.clone(),
-                &sibling_prefix,
-                previous_section_key,
-            )?;
+            let mut cmds =
+                self.send_metadata_updates(promoted_sibling_elders.clone(), &sibling_prefix)?;
 
             // Also send AE update to sibling section's new Elders
             cmds.extend(self.send_ae_update_to_nodes(
@@ -233,7 +219,6 @@ impl Node {
         bounced_msg: Bytes,
         sender: Peer,
     ) -> Result<Vec<Cmd>> {
-        let dst_section_key = section_auth.section_key();
         let snapshot = self.state_snapshot();
 
         let to_resend = self
@@ -265,7 +250,7 @@ impl Node {
                     result.extend(cmds);
                 }
 
-                result.push(self.send_direct_msg(sender, msg_to_resend, dst_section_key)?);
+                result.push(self.send_direct_msg(vec![sender], msg_to_resend)?);
 
                 Ok(result)
             }
@@ -325,7 +310,7 @@ impl Node {
 
                     self.create_or_wait_for_backoff(&elder).await;
 
-                    let cmd = self.send_direct_msg(elder, msg_to_redirect, dst_section_key)?;
+                    let cmd = self.send_direct_msg(vec![elder], msg_to_redirect)?;
 
                     Ok(vec![cmd])
                 }
@@ -452,7 +437,6 @@ impl Node {
     pub(crate) fn check_for_entropy(
         &self,
         original_bytes: Bytes,
-        src_location: &SrcLocation,
         dst_section_key: &BlsPublicKey,
         dst_name: XorName,
         sender: &Peer,
@@ -481,17 +465,14 @@ impl Node {
                         section_chain,
                         bounced_msg,
                     };
-                    let wire_msg = WireMsg::single_src(
-                        &self.info(),
-                        src_location.to_dst(),
-                        ae_msg,
-                        self.network_knowledge.section_key(),
-                    )?;
+
                     trace!("{}", LogMarker::AeSendRedirect);
 
                     return Ok(Some(Cmd::SendMsg {
-                        recipients: vec![*sender],
-                        wire_msg,
+                        msg: OutgoingMsg::System(ae_msg),
+                        recipients: Recipients::from_single(*sender),
+                        #[cfg(feature = "traceroute")]
+                        traceroute: vec![],
                     }));
                 }
                 None => {
@@ -567,16 +548,11 @@ impl Node {
             }
         };
 
-        let wire_msg = WireMsg::single_src(
-            &self.info(),
-            src_location.to_dst(),
-            ae_msg,
-            self.network_knowledge.section_key(),
-        )?;
-
         Ok(Some(Cmd::SendMsg {
-            recipients: vec![*sender],
-            wire_msg,
+            msg: OutgoingMsg::System(ae_msg),
+            recipients: Recipients::from_single(*sender),
+            #[cfg(feature = "traceroute")]
+            traceroute: vec![],
         }))
     }
 
@@ -584,7 +560,6 @@ impl Node {
     pub(crate) fn ae_redirect_to_our_elders(
         &self,
         sender: Peer,
-        src_location: &SrcLocation,
         original_wire_msg: &Bytes,
     ) -> Result<Cmd> {
         let signed_sap = self.network_knowledge.section_signed_authority_provider();
@@ -596,18 +571,13 @@ impl Node {
             bounced_msg: original_wire_msg.clone(),
         };
 
-        let wire_msg = WireMsg::single_src(
-            &self.info(),
-            src_location.to_dst(),
-            ae_msg,
-            self.network_knowledge.section_key(),
-        )?;
-
         trace!("{} in ae_redirect", LogMarker::AeSendRedirect);
 
         Ok(Cmd::SendMsg {
-            recipients: vec![sender],
-            wire_msg,
+            msg: OutgoingMsg::System(ae_msg),
+            recipients: Recipients::from_single(sender),
+            #[cfg(feature = "traceroute")]
+            traceroute: vec![],
         })
     }
 }
@@ -626,7 +596,7 @@ mod tests {
     use sn_interface::{
         elder_count,
         messaging::{
-            AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, NodeAuth, NodeMsgAuthority,
+            AuthKind, AuthorityProof, DstLocation, MsgId, NodeAuth, NodeMsgAuthority,
             SectionAuth as SectionAuthMsg,
         },
         network_knowledge::{
@@ -653,7 +623,7 @@ mod tests {
             .run_until(async move {
                 let env = Env::new().await?;
                 let our_prefix = env.node.network_knowledge().prefix();
-                let (msg, src_location) =
+                let msg =
                     env.create_msg(&our_prefix, env.node.network_knowledge().section_key())?;
                 let sender = env.node.info().peer();
                 let dst_name = our_prefix.substituted_in(xor_name::rand::random());
@@ -661,7 +631,6 @@ mod tests {
 
                 let cmd = env.node.check_for_entropy(
                     msg.serialize()?,
-                    &src_location,
                     &dst_section_key,
                     dst_name,
                     &sender,
@@ -730,32 +699,29 @@ mod tests {
             let other_sk = bls::SecretKey::random();
             let other_pk = other_sk.public_key();
 
-            let (msg, src_location) = env.create_msg(&env.other_sap.prefix(), other_pk)?;
+            let msg = env.create_msg(&env.other_sap.prefix(), other_pk)?;
             let sender = env.node.info().peer();
 
             // since it's not aware of the other prefix, it will redirect to self
             let dst_section_key = other_pk;
             let dst_name = env.other_sap.prefix().name();
+
+            let original_bytes = msg.serialize()?;
             let cmd = env
                 .node
                 .check_for_entropy(
-                    msg.serialize()?,
-                    &src_location,
+                    original_bytes.clone(),
                     &dst_section_key,
                     dst_name,
                     &sender,
                 );
 
-            let msg_type = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { wire_msg, .. })) => {
-                wire_msg
-                    .into_msg()
-                    .context("failed to deserialised anti-entropy message")?
+            let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::System(msg), .. })) => {
+                msg
             });
 
-            assert_matches!(msg_type, MsgType::System{ msg, .. } => {
-                assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
-                    assert_eq!(section_auth, env.node.network_knowledge().authority_provider().to_msg());
-                });
+            assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
+                assert_eq!(section_auth, env.node.network_knowledge().authority_provider().to_msg());
             });
 
             // now let's insert the other SAP to make it aware of the other prefix
@@ -776,23 +742,18 @@ mod tests {
             let cmd = env
                 .node
                 .check_for_entropy(
-                    msg.serialize()?,
-                    &src_location,
+                    original_bytes,
                     &dst_section_key,
                     dst_name,
                     &sender,
                 );
 
-            let msg_type = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { wire_msg, .. })) => {
-                wire_msg
-                    .into_msg()
-                    .context("failed to deserialised anti-entropy message")?
+            let msg = assert_matches!(cmd, Ok(Some(Cmd::SendMsg { msg: OutgoingMsg::System(msg), .. })) => {
+                msg
             });
 
-            assert_matches!(msg_type, MsgType::System{ msg, .. } => {
-                assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
-                    assert_eq!(section_auth, env.other_sap.value.to_msg());
-                });
+            assert_matches!(msg, SystemMsg::AntiEntropyRedirect { section_auth, .. } => {
+                assert_eq!(section_auth, env.other_sap.value.to_msg());
             });
             Result::<()>::Ok(())
         }).await
@@ -810,7 +771,7 @@ mod tests {
             let env = Env::new().await?;
             let our_prefix = env.node.network_knowledge().prefix();
 
-            let (msg, src_location) = env.create_msg(
+            let msg = env.create_msg(
                 &our_prefix,
                 env.node.network_knowledge().section_key(),
             )?;
@@ -822,23 +783,18 @@ mod tests {
                 .node
                 .check_for_entropy(
                     msg.serialize()?,
-                    &src_location,
                     dst_section_key,
                     dst_name,
                     &sender,
                 )?;
 
-            let msg_type = assert_matches!(cmd, Some(Cmd::SendMsg { wire_msg, .. }) => {
-                wire_msg
-                    .into_msg()
-                    .context("failed to deserialised anti-entropy message")?
+            let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::System(msg), .. }) => {
+                msg
             });
 
-            assert_matches!(msg_type, MsgType::System{ msg, .. } => {
-                assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
-                    assert_eq!(section_auth, &env.node.network_knowledge().authority_provider().to_msg());
-                    assert_eq!(proof_chain, &env.node.section_chain());
-                });
+            assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
+                assert_eq!(section_auth, &env.node.network_knowledge().authority_provider().to_msg());
+                assert_eq!(proof_chain, &env.node.section_chain());
             });
             Result::<()>::Ok(())
         }).await
@@ -855,7 +811,7 @@ mod tests {
             let env = Env::new().await?;
             let our_prefix = env.node.network_knowledge().prefix();
 
-            let (msg, src_location) = env.create_msg(
+            let msg = env.create_msg(
                 &our_prefix,
                 env.node.network_knowledge().section_key(),
             )?;
@@ -869,23 +825,18 @@ mod tests {
                 .node
                 .check_for_entropy(
                     msg.serialize()?,
-                    &src_location,
                     dst_section_key,
                     dst_name,
                     &sender,
                 )?;
 
-            let msg_type = assert_matches!(cmd, Some(Cmd::SendMsg { wire_msg, .. }) => {
-                wire_msg
-                    .into_msg()
-                    .context("failed to deserialised anti-entropy message")?
+            let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::System(msg), .. }) => {
+                msg
             });
 
-            assert_matches!(msg_type, MsgType::System{ msg, .. } => {
-                assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
-                    assert_eq!(*section_auth, env.node.network_knowledge().authority_provider().to_msg());
-                    assert_eq!(*proof_chain, env.node.section_chain());
-                });
+            assert_matches!(msg, SystemMsg::AntiEntropyRetry { ref section_auth, ref proof_chain, .. } => {
+                assert_eq!(*section_auth, env.node.network_knowledge().authority_provider().to_msg());
+                assert_eq!(*proof_chain, env.node.section_chain());
             });
             Result::<()>::Ok(())
         }).await
@@ -962,13 +913,12 @@ mod tests {
             &self,
             src_section_prefix: &Prefix,
             src_section_pk: BlsPublicKey,
-        ) -> Result<(WireMsg, SrcLocation)> {
+        ) -> Result<WireMsg> {
             let sender = NodeInfo::new(
                 ed25519::gen_keypair(&src_section_prefix.range_inclusive(), MIN_ADULT_AGE),
                 gen_addr(),
             );
 
-            let sender_name = sender.name();
             let src_node_keypair = sender.keypair;
 
             let payload_msg = SystemMsg::StartConnectivityTest(xor_name::rand::random());
@@ -987,14 +937,7 @@ mod tests {
 
             let auth = AuthKind::Node(node_auth.into_inner());
 
-            let wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst_location)?;
-
-            let src_location = SrcLocation::Node {
-                name: sender_name,
-                section_pk: src_section_pk,
-            };
-
-            Ok((wire_msg, src_location))
+            Ok(WireMsg::new_msg(msg_id, payload, auth, dst_location)?)
         }
 
         fn create_update_msg(
