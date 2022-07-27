@@ -67,7 +67,7 @@ pub async fn get_next_bearer_dbc() -> Result<(Dbc, Token)> {
                 match reissue_bearer_dbcs().await {
                     Ok(dbcs) => break dbcs,
                     Err(err) => {
-                        attempts -= 0;
+                        attempts -= 1;
                         if attempts == 0 {
                             panic!("Failed to reissue DBCs from genesis DBC: {:?}", err);
                         }
