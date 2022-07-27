@@ -6,9 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{messages::WireMsgUtils, Cmd, Node, Result};
-
 use crate::comm::{Comm, DeliveryStatus};
+use crate::node::{delivery_group, messaging::Recipients, Cmd, Node, Result};
+
 use sn_interface::{
     messaging::{data::ServiceMsg, system::SystemMsg, WireMsg},
     types::Peer,
@@ -16,11 +16,6 @@ use sn_interface::{
 
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::{sync::watch, sync::RwLock, time};
-
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Entity;
-#[cfg(feature = "traceroute")]
-use sn_interface::types::PublicKey;
 
 // Cmd Dispatcher.
 pub(crate) struct Dispatcher {
@@ -62,31 +57,37 @@ impl Dispatcher {
                 self.comm.cleanup_peers(members).await?;
                 Ok(vec![])
             }
-            Cmd::SignOutgoingSystemMsg {
+            Cmd::SendMsg {
                 msg,
-                dst,
+                recipients,
                 #[cfg(feature = "traceroute")]
-                mut traceroute,
+                traceroute,
             } => {
                 let node = self.node.read().await;
-                let info = node.info();
 
-                let src_section_pk = node.network_knowledge().section_key();
+                let wire_msg = node.sign_msg(
+                    msg,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
+                )?;
 
-                #[allow(unused_mut)]
-                let mut wire_msg = WireMsg::single_src(&info, dst, msg, src_section_pk)?;
+                let recipients = match recipients {
+                    Recipients::Peers(peers) => peers,
+                    Recipients::Dst(dst) => {
+                        let mut peers = BTreeSet::new();
+                        peers.extend(
+                            delivery_group::delivery_targets(
+                                &dst,
+                                &node.info().name(),
+                                &node.network_knowledge,
+                            )?
+                            .0,
+                        );
+                        peers
+                    }
+                };
 
-                #[cfg(feature = "traceroute")]
-                {
-                    let key = node.info().keypair.public;
-                    traceroute.push(Entity::Adult(PublicKey::Ed25519(key)));
-                    wire_msg.add_trace(&mut traceroute);
-                }
-
-                let mut cmds = vec![];
-                cmds.extend(node.send_msg_on_to_nodes(wire_msg)?);
-
-                Ok(cmds)
+                self.send_msg_via_comms(recipients, wire_msg).await
             }
             Cmd::TrackNodeIssueInDysfunction { name, issue } => {
                 let mut node = self.node.write().await;
@@ -205,10 +206,6 @@ impl Dispatcher {
 
                 node.handle_dkg_failure(signeds).map(|cmd| vec![cmd])
             }
-            Cmd::SendMsg {
-                recipients,
-                wire_msg,
-            } => self.send_msg_via_comms(&recipients, wire_msg).await,
             Cmd::EnqueueDataForReplication {
                 // throttle_duration,
                 recipient,
@@ -278,8 +275,13 @@ impl Dispatcher {
     ///
     /// Any failed sends are tracked via Cmd::HandlePeerFailedSend, which will log dysfunction for any peers
     /// in the section (otherwise ignoring failed send to out of section nodes or clients)
-    async fn send_msg_via_comms(&self, recipients: &[Peer], wire_msg: WireMsg) -> Result<Vec<Cmd>> {
-        let status = self.comm.send(recipients, wire_msg).await?;
+    async fn send_msg_via_comms(
+        &self,
+        recipients: BTreeSet<Peer>,
+        wire_msg: WireMsg,
+    ) -> Result<Vec<Cmd>> {
+        let recipients: Vec<Peer> = recipients.into_iter().collect();
+        let status = self.comm.send(&recipients, wire_msg).await?;
 
         match status {
             DeliveryStatus::DeliveredToAll(failed_recipients)

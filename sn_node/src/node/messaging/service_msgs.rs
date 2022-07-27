@@ -6,11 +6,12 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::cmds::Cmd, Error, Node, Result};
-use bytes::Bytes;
-use ed25519_dalek::Signer;
-use itertools::Itertools;
-use rand::thread_rng;
+use crate::node::{
+    flow_ctrl::cmds::Cmd,
+    messaging::{OutgoingMsg, Recipients},
+    Error, Node, Result,
+};
+
 use sn_dbc::{
     Commitment, Hash, IndexedSignatureShare, KeyImage, RingCtTransaction, SpentProof,
     SpentProofContent, SpentProofShare,
@@ -23,14 +24,16 @@ use sn_interface::{
             SignedRegisterEdit, SpentbookCmd,
         },
         system::{NodeQueryResponse, SystemMsg},
-        AuthKind, AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
+        AuthorityProof, EndUser, MsgId, ServiceAuth,
     },
     types::{
         log_markers::LogMarker,
         register::{Permissions, Policy, Register, User},
-        Keypair, Peer, PublicKey, RegisterCmd, ReplicatedData, Signature, SPENTBOOK_TYPE_TAG,
+        Keypair, Peer, PublicKey, RegisterCmd, ReplicatedData, SPENTBOOK_TYPE_TAG,
     },
 };
+
+use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
@@ -81,43 +84,15 @@ impl Node {
         &self,
         target: Peer,
         msg: ServiceMsg,
-        #[cfg(feature = "traceroute")] mut traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
-        let dst = DstLocation::EndUser(EndUser(target.name()));
-
-        let (auth, payload) = self.ed_sign_client_msg(&msg)?;
-
-        #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::new_msg(MsgId::new(), payload, auth, dst)?;
-
-        #[cfg(feature = "traceroute")]
-        {
-            traceroute.push(Entity::Elder(PublicKey::Ed25519(
-                self.info().keypair.public,
-            )));
-            wire_msg.add_trace(&mut traceroute);
-        }
-
         let cmd = Cmd::SendMsg {
-            recipients: vec![target],
-            wire_msg,
+            msg: OutgoingMsg::Service(msg),
+            recipients: Recipients::from_single(target),
+            #[cfg(feature = "traceroute")]
+            traceroute,
         };
-
         Ok(vec![cmd])
-    }
-
-    /// Currently using node's Ed key. May need to use bls key share for concensus purpose.
-    pub(crate) fn ed_sign_client_msg(&self, client_msg: &ServiceMsg) -> Result<(AuthKind, Bytes)> {
-        let keypair = self.keypair.clone();
-        let payload = WireMsg::serialize_msg_payload(client_msg)?;
-        let signature = keypair.sign(&payload);
-
-        let msg = AuthKind::Service(ServiceAuth {
-            public_key: PublicKey::Ed25519(keypair.public),
-            signature: Signature::Ed25519(signature),
-        });
-
-        Ok((msg, payload))
     }
 
     /// Handle data query
@@ -127,7 +102,7 @@ impl Node {
         query: &DataQueryVariant,
         auth: ServiceAuth,
         user: EndUser,
-        requesting_elder: XorName,
+        requesting_elder: Peer,
         #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
@@ -144,16 +119,9 @@ impl Node {
             user,
         };
 
-        // Setup node authority on this response and send this back to our elders
-        let section_pk = self.network_knowledge().section_key();
-        let dst = DstLocation::Node {
-            name: requesting_elder,
-            section_pk,
-        };
-
-        cmds.push(Cmd::SignOutgoingSystemMsg {
-            msg,
-            dst,
+        cmds.push(Cmd::SendMsg {
+            msg: OutgoingMsg::System(msg),
+            recipients: Recipients::from_single(requesting_elder),
             #[cfg(feature = "traceroute")]
             traceroute,
         });
@@ -172,7 +140,6 @@ impl Node {
         sending_node_pk: PublicKey,
         #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
-        let msg_id = MsgId::new();
         let mut cmds = vec![];
         let op_id = response.operation_id()?;
         debug!(
@@ -239,28 +206,12 @@ impl Node {
             response: query_response,
             correlation_id,
         };
-        let (auth, payload) = self.ed_sign_client_msg(&msg)?;
-
-        // set a random xorname first. We set it specifically per peer thereafter
-        // This is overwritten in comm.send_to_client
-        let mut rng = thread_rng();
-        let dst = DstLocation::EndUser(EndUser(xor_name::XorName::random(&mut rng)));
-
-        #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst)?;
-
-        #[cfg(feature = "traceroute")]
-        {
-            let mut trace = traceroute;
-            trace.push(Entity::Elder(PublicKey::Ed25519(
-                self.info().keypair.public,
-            )));
-            wire_msg.add_trace(&mut trace);
-        }
 
         cmds.push(Cmd::SendMsg {
-            recipients: waiting_peers.into_iter().collect_vec(),
-            wire_msg,
+            msg: OutgoingMsg::Service(msg),
+            recipients: Recipients::Peers(waiting_peers),
+            #[cfg(feature = "traceroute")]
+            traceroute,
         });
 
         Ok(cmds)

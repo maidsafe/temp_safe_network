@@ -12,7 +12,7 @@ use xor_name::{Prefix, XorName};
 
 /// An `EndUser` is represented by a name which is mapped to
 // a SocketAddr at the Elders where the `EndUser` is proxied through.
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub struct EndUser(pub XorName);
 
 /// Message source location.
@@ -64,7 +64,7 @@ impl SrcLocation {
 }
 
 /// Message destination location.
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub enum DstLocation {
     /// An EndUser.
     EndUser(EndUser),

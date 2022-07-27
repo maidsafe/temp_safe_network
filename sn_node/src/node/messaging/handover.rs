@@ -341,16 +341,8 @@ impl Node {
                 Err(Error::RequestHandoverAntiEntropy(gen)) => {
                     // We hit an error while processing this vote, perhaps we are missing information.
                     // We'll send a handover AE request to see if they can help us catch up.
-                    let sap = self.network_knowledge.authority_provider();
-                    let dst_section_pk = sap.section_key();
-                    let section_name = self.network_knowledge.prefix().name();
                     let msg = SystemMsg::HandoverAE(gen);
-                    let cmd = self.send_direct_msg_to_nodes(
-                        vec![peer],
-                        msg,
-                        section_name,
-                        dst_section_pk,
-                    )?;
+                    let cmd = self.send_direct_msg(vec![peer], msg)?;
 
                     debug!("{:?}", LogMarker::HandoverSendingAeUpdateRequest);
                     cmds.push(cmd);
@@ -382,11 +374,7 @@ impl Node {
         let cmds = if let Some(handover) = self.handover_voting.as_ref() {
             match handover.anti_entropy(gen) {
                 Ok(catchup_votes) => {
-                    vec![self.send_direct_msg(
-                        peer,
-                        SystemMsg::HandoverVotes(catchup_votes),
-                        self.network_knowledge.section_key(),
-                    )?]
+                    vec![self.send_direct_msg(vec![peer], SystemMsg::HandoverVotes(catchup_votes))?]
                 }
                 Err(e) => {
                     error!("Handover - Error while processing anti-entropy {:?}", e);
