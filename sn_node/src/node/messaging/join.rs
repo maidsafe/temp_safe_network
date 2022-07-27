@@ -69,11 +69,7 @@ impl Node {
 
             trace!("Sending {:?} to {}", node_msg, peer);
             trace!("{}", LogMarker::SendJoinRedirected);
-            return Ok(vec![self.send_direct_msg(
-                peer,
-                node_msg,
-                our_section_key,
-            )?]);
+            return Ok(vec![self.send_direct_msg(vec![peer], node_msg)?]);
         }
 
         if !self.joins_allowed {
@@ -88,11 +84,7 @@ impl Node {
             trace!("{}", LogMarker::SendJoinsDisallowed);
 
             trace!("Sending {:?} to {}", node_msg, peer);
-            return Ok(vec![self.send_direct_msg(
-                peer,
-                node_msg,
-                our_section_key,
-            )?]);
+            return Ok(vec![self.send_direct_msg(vec![peer], node_msg)?]);
         }
 
         let (is_age_invalid, expected_age) = self.verify_joining_node_age(&peer);
@@ -136,11 +128,7 @@ impl Node {
             }));
 
             trace!("Sending {:?} to {}", node_msg, peer);
-            return Ok(vec![self.send_direct_msg(
-                peer,
-                node_msg,
-                our_section_key,
-            )?]);
+            return Ok(vec![self.send_direct_msg(vec![peer], node_msg)?]);
         }
 
         // Do reachability check only for the initial join request
@@ -152,7 +140,7 @@ impl Node {
             trace!("{}", LogMarker::SendJoinRejected);
 
             trace!("Sending {:?} to {}", node_msg, peer);
-            self.send_direct_msg(peer, node_msg, our_section_key)?
+            self.send_direct_msg(vec![peer], node_msg)?
         } else {
             // It's reachable, let's then send the proof challenge
             self.send_resource_proof_challenge(peer)?
@@ -220,11 +208,7 @@ impl Node {
             trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);
 
             trace!("Sending {node_msg:?} to {peer}");
-            return Ok(vec![self.send_direct_msg(
-                peer,
-                node_msg,
-                self.network_knowledge.section_key(),
-            )?]);
+            return Ok(vec![self.send_direct_msg(vec![peer], node_msg)?]);
         }
 
         let relocate_details = if let MembershipState::Relocated(ref details) =
@@ -263,11 +247,7 @@ impl Node {
             trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
 
             trace!("Sending {:?} to {}", node_msg, peer);
-            return Ok(vec![self.send_direct_msg(
-                peer,
-                node_msg,
-                self.network_knowledge.section_key(),
-            )?]);
+            return Ok(vec![self.send_direct_msg(vec![peer], node_msg)?]);
         };
 
         self.propose_membership_change(join_request.relocate_proof.value)

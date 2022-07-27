@@ -6,18 +6,22 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::cmds::Cmd, messages::WireMsgUtils, Error, Node, Proposal, Result};
+use crate::node::{
+    flow_ctrl::cmds::Cmd,
+    messaging::{OutgoingMsg, Recipients},
+    Error, Node, Proposal, Result,
+};
 
+use bytes::Bytes;
 use sn_interface::{
     messaging::{
-        system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
-        DstLocation, WireMsg,
+        system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SigShare, SystemMsg},
+        AuthorityProof, BlsShareAuth, NodeMsgAuthority, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     types::{log_markers::LogMarker, Peer},
 };
 
-use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use std::collections::BTreeSet;
 use xor_name::XorName;
@@ -36,57 +40,71 @@ impl Node {
             recipients
         );
 
-        let prefix = session_id.prefix;
-        let node_msg = SystemMsg::DkgStart(session_id);
-        let section_pk = self.network_knowledge.section_key();
-        self.send_msg_for_dst_accumulation(
-            prefix.name(),
-            DstLocation::Section {
-                name: prefix.name(),
-                section_pk,
-            },
-            node_msg,
-            recipients,
-        )
+        let mut handle = true;
+        let mut cmds = vec![];
+        let mut others = BTreeSet::new();
+
+        // remove ourself from recipients
+        let our_name = self.info().name();
+        for recipient in recipients.into_iter() {
+            if recipient.name() == our_name {
+                handle = true;
+            } else {
+                let _ = others.insert(recipient);
+            }
+        }
+
+        let src_name = session_id.prefix.name();
+        let msg = SystemMsg::DkgStart(session_id);
+        let (auth, payload) = self.get_auth(msg.clone(), src_name)?;
+
+        if !others.is_empty() {
+            cmds.push(Cmd::SendMsg {
+                msg: OutgoingMsg::DstAggregated((auth.clone(), payload.clone())),
+                recipients: Recipients::Peers(others),
+                #[cfg(feature = "traceroute")]
+                traceroute: vec![],
+            });
+        }
+
+        if handle {
+            cmds.push(Cmd::HandleValidSystemMsg {
+                origin: Peer::new(our_name, self.addr),
+                msg_id: sn_interface::messaging::MsgId::new(),
+                msg,
+                msg_authority: NodeMsgAuthority::BlsShare(AuthorityProof(auth)),
+                wire_msg_payload: payload,
+                #[cfg(feature = "traceroute")]
+                traceroute: vec![],
+            });
+        }
+
+        Ok(cmds)
     }
 
-    fn send_msg_for_dst_accumulation(
-        &self,
-        src: XorName,
-        dst: DstLocation,
-        node_msg: SystemMsg,
-        recipients: Vec<Peer>,
-    ) -> Result<Vec<Cmd>> {
+    fn get_auth(&self, msg: SystemMsg, src_name: XorName) -> Result<(BlsShareAuth, Bytes)> {
         let section_key = self.network_knowledge.section_key();
-
         let key_share = self
             .section_keys_provider
             .key_share(&section_key)
             .map_err(|err| {
-                trace!(
-                    "Can't create message {:?} for accumulation at dst {:?}: {:?}",
-                    node_msg,
-                    dst,
-                    err
-                );
+                trace!("Can't create message {:?} for accumulation: {:?}", msg, err);
                 err
             })?;
 
-        #[cfg(feature = "test-utils")]
-        let node_msg_clone = node_msg.clone();
+        let payload = WireMsg::serialize_msg_payload(&msg).map_err(|_| Error::InvalidMessage)?;
 
-        let wire_msg = WireMsg::for_dst_accumulation(&key_share, src, dst, node_msg, section_key)?;
+        let auth = BlsShareAuth {
+            section_pk: section_key,
+            src_name,
+            sig_share: SigShare {
+                public_key_set: key_share.public_key_set.clone(),
+                index: key_share.index,
+                signature_share: key_share.secret_key_share.sign(&payload),
+            },
+        };
 
-        #[cfg(feature = "test-utils")]
-        let wire_msg = wire_msg.set_payload_debug(node_msg_clone);
-
-        trace!(
-            "Send {:?} for accumulation at dst to {:?}",
-            wire_msg,
-            recipients
-        );
-
-        self.send_messages_to_all_nodes_or_directly_handle_for_accumulation(recipients, wire_msg)
+        Ok((auth, payload))
     }
 
     pub(crate) fn handle_dkg_start(&mut self, session_id: DkgSessionId) -> Result<Vec<Cmd>> {
@@ -160,28 +178,19 @@ impl Node {
         sender: Peer,
         message: DkgMessage,
         session_id: DkgSessionId,
-        section_pk: BlsPublicKey,
-    ) -> Result<Vec<Cmd>> {
-        let message_history = self.dkg_voter.get_cached_msgs(&session_id);
-        let node_msg = SystemMsg::DkgRetry {
-            message_history,
+    ) -> Cmd {
+        let msg = SystemMsg::DkgRetry {
+            message_history: self.dkg_voter.get_cached_msgs(&session_id),
             message,
             session_id,
         };
-        let wire_msg = WireMsg::single_src(
-            &self.info(),
-            DstLocation::Node {
-                name: sender.name(),
-                section_pk,
-            },
-            node_msg,
-            section_pk,
-        )?;
 
-        Ok(vec![Cmd::SendMsg {
-            recipients: vec![sender],
-            wire_msg,
-        }])
+        Cmd::SendMsg {
+            msg: OutgoingMsg::System(msg),
+            recipients: Recipients::from_single(sender),
+            #[cfg(feature = "traceroute")]
+            traceroute: vec![],
+        }
     }
 
     pub(crate) fn handle_dkg_retry(
