@@ -62,17 +62,9 @@ pub async fn get_next_bearer_dbc() -> Result<(Dbc, Token)> {
     lazy_static! {
         static ref NEXT_DBC_INDEX: Mutex<usize> = Mutex::new(0);
         static ref REISSUED_DBCS: AsyncOnce<Vec<(Dbc, Token)>> = AsyncOnce::new(async {
-            let mut attempts = 3;
-            loop {
-                match reissue_bearer_dbcs().await {
-                    Ok(dbcs) => break dbcs,
-                    Err(err) => {
-                        attempts -= 1;
-                        if attempts == 0 {
-                            panic!("Failed to reissue DBCs from genesis DBC: {:?}", err);
-                        }
-                    }
-                }
+            match reissue_bearer_dbcs().await {
+                Ok(dbcs) => dbcs,
+                Err(err) => panic!("Failed to reissue DBCs from genesis DBC: {:?}", err),
             }
         });
     }

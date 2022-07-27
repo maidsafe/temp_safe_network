@@ -70,7 +70,6 @@ impl Dispatcher {
             } => {
                 let node = self.node.read().await;
                 let info = node.info();
-                let key = node.info().keypair.public;
 
                 let src_section_pk = node.network_knowledge().section_key();
 
@@ -79,6 +78,7 @@ impl Dispatcher {
 
                 #[cfg(feature = "traceroute")]
                 {
+                    let key = node.info().keypair.public;
                     traceroute.push(Entity::Adult(PublicKey::Ed25519(key)));
                     wire_msg.add_trace(&mut traceroute);
                 }
