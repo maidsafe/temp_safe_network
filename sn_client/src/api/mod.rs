@@ -6,6 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+/// A [`Client`] builder
+pub mod client_builder;
 mod cmds;
 mod data;
 mod file_apis;
@@ -13,6 +15,7 @@ mod queries;
 mod register_apis;
 mod spentbook_apis;
 
+pub use client_builder::ClientBuilder;
 pub use register_apis::RegisterWriteAheadLog;
 
 use crate::{connections::Session, errors::Error, ClientConfig};
@@ -259,6 +262,11 @@ impl Client {
             .read()
             .await
             .has_key(section_key)
+    }
+
+    /// Create a builder to instantiate a [`Client`]
+    pub fn builder() -> ClientBuilder {
+        ClientBuilder::new()
     }
 }
 

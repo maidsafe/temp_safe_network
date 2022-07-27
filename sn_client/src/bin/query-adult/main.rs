@@ -3,7 +3,7 @@ use clap::Parser;
 use eyre::{eyre, Result};
 use rand::{thread_rng, Rng};
 use self_encryption::MIN_ENCRYPTABLE_BYTES;
-use sn_client::{Client, ClientConfig, Error};
+use sn_client::{Client, Error};
 use sn_interface::{
     data_copy_count,
     messaging::{
@@ -19,6 +19,8 @@ use std::{
 };
 use tokio::time::timeout;
 use xor_name::XorName;
+
+mod log;
 
 #[derive(Parser, Debug)]
 #[clap(long_about = None)]
@@ -38,10 +40,12 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    log::init();
+
     // Initialize
 
     let (args, bytes) = init()?;
-    let client = client().await?;
+    let client = Client::builder().build().await?;
 
     // Print out chunk information of file
 
@@ -169,11 +173,4 @@ fn self_encryptable_file() -> Bytes {
     thread_rng().fill(&mut file[..]);
 
     Bytes::copy_from_slice(&file)
-}
-
-/// Construct Client from configuration files in default location
-async fn client() -> Result<Client> {
-    let config = ClientConfig::new(None, None, None, None, None).await;
-
-    Ok(Client::new(config, None, None).await?)
 }
