@@ -18,7 +18,7 @@ use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::{sync::watch, sync::RwLock, time};
 
 #[cfg(feature = "traceroute")]
-use sn_interface::messaging::Entity;
+use sn_interface::messaging::{data::ServiceMsg, Entity};
 #[cfg(feature = "traceroute")]
 use sn_interface::types::PublicKey;
 
@@ -109,19 +109,33 @@ impl Dispatcher {
                 auth,
                 #[cfg(feature = "traceroute")]
                 traceroute,
-            } => {
-                let mut node = self.node.write().await;
+            } => match msg {
+                ServiceMsg::Query(_) => {
+                    let mut node = self.node.write().await;
 
-                node.handle_valid_service_msg(
-                    msg_id,
-                    msg,
-                    auth,
-                    origin,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
-                )
-                .await
-            }
+                    node.handle_valid_query_msg(
+                        msg_id,
+                        msg,
+                        auth,
+                        origin,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
+                    .await
+                }
+                _ => {
+                    let node = self.node.read().await;
+
+                    node.handle_valid_service_msg(
+                        msg_id,
+                        msg,
+                        origin,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
+                    .await
+                }
+            },
             Cmd::HandleValidSystemMsg {
                 origin,
                 msg_id,

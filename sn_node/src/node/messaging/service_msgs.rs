@@ -269,12 +269,12 @@ impl Node {
         Ok(cmds)
     }
 
-    /// Handle incoming service msgs.
+    /// Handle incoming service msgs. Though NOT queries, as this requires
+    /// mutable access to the Node
     pub(crate) async fn handle_valid_service_msg(
-        &mut self,
+        &self,
         msg_id: MsgId,
         msg: ServiceMsg,
-        auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
         #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
@@ -302,18 +302,6 @@ impl Node {
                 }
             }
             ServiceMsg::Cmd(DataCmd::StoreChunk(chunk)) => ReplicatedData::Chunk(chunk),
-            ServiceMsg::Query(query) => {
-                return self
-                    .read_data_from_adults(
-                        query,
-                        msg_id,
-                        auth,
-                        origin,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )
-                    .await;
-            }
             _ => {
                 warn!(
                     "!!!! Unexpected ServiceMsg received, and it was not handled: {:?}",
@@ -354,6 +342,40 @@ impl Node {
         )?);
 
         Ok(cmds)
+    }
+
+    /// Handle incoming service msgs.
+    pub(crate) async fn handle_valid_query_msg(
+        &mut self,
+        msg_id: MsgId,
+        msg: ServiceMsg,
+        auth: AuthorityProof<ServiceAuth>,
+        origin: Peer,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+    ) -> Result<Vec<Cmd>> {
+        trace!("{:?} {:?}", LogMarker::QueryServiceMsgToBeHandled, msg);
+        // Check we're handling a query and continue
+        match msg {
+            ServiceMsg::Query(query) => {
+                return self
+                    .read_data_from_adults(
+                        query,
+                        msg_id,
+                        auth,
+                        origin,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
+                    .await;
+            }
+            _ => {
+                warn!(
+                    "Unexpected ServiceMsg received while handling QUERY msgs, and it was not handled: {:?}",
+                    msg
+                );
+                Ok(vec![])
+            }
+        }
     }
 
     // Private helper to generate spent proof share
