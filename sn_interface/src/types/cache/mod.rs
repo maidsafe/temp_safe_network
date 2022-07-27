@@ -144,8 +144,7 @@ where
             let excess = len - self.capacity;
             let excess_keys: Vec<_>;
             {
-                let read_items = &self.items;
-                let mut items = read_items.iter().collect_vec();
+                let mut items = self.items.iter().collect_vec();
 
                 // reversed sort
                 items.sort_by(|(_, item_a), (_, item_b)| item_b.elapsed().cmp(&item_a.elapsed()));
