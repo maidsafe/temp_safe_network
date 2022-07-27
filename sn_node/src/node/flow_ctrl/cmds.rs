@@ -6,7 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{Proposal, XorName};
+use crate::node::{
+    messaging::{OutgoingMsg, Recipients},
+    Proposal, XorName,
+};
 
 use bytes::Bytes;
 use custom_debug::Debug;
@@ -16,7 +19,7 @@ use sn_interface::{
     messaging::{
         data::ServiceMsg,
         system::{DkgFailureSigSet, KeyedSig, NodeState, SectionAuth, SystemMsg},
-        AuthorityProof, DstLocation, MsgId, NodeMsgAuthority, ServiceAuth, WireMsg,
+        AuthorityProof, MsgId, NodeMsgAuthority, ServiceAuth, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     types::{Peer, ReplicatedDataAddress},
@@ -148,11 +151,6 @@ pub(crate) enum Cmd {
     },
     /// Handle a DKG failure that was observed by a majority of the DKG participants.
     HandleDkgFailure(DkgFailureSigSet),
-    /// Send a message to the given `recipients`.
-    SendMsg {
-        recipients: Vec<Peer>,
-        wire_msg: WireMsg,
-    },
     /// Send the batch of data messages in a throttled/controlled fashion to the given `recipients`.
     /// chunks addresses are provided, so that we only retrieve the data right before we send it,
     /// hopefully reducing memory impact or data replication
@@ -162,11 +160,10 @@ pub(crate) enum Cmd {
         /// Batches of ReplicatedDataAddress to be sent together
         data_batch: Vec<ReplicatedDataAddress>,
     },
-    /// Performs serialisation and signing for sending of NodeMsg.
-    /// This cmd only send this to other nodes
-    SignOutgoingSystemMsg {
-        msg: SystemMsg,
-        dst: DstLocation,
+    /// Performs serialisation and signing and sends the msg.
+    SendMsg {
+        msg: OutgoingMsg,
+        recipients: Recipients,
         #[cfg(feature = "traceroute")]
         traceroute: Vec<Entity>,
     },
@@ -190,13 +187,11 @@ impl Cmd {
     pub(crate) fn priority(&self) -> i32 {
         use Cmd::*;
         match self {
-            // TODO: check if we can pull out node DST here
-            SendMsg { wire_msg, .. } => match wire_msg.dst_location() {
-                DstLocation::EndUser(_) => 18,
-                _ => 20,
+            SendMsg { msg, .. } => match msg {
+                OutgoingMsg::System(_) => 20,
+                _ => 19,
             },
-            // Note: This is more important than getting our EndUser msgs, and is a prereq for actually getting a msg out the door
-            SignOutgoingSystemMsg { .. } => 19,
+
             HandleAgreement { .. } => 10,
             HandleNewEldersAgreement { .. } => 10,
             HandleDkgOutcome { .. } => 10,
@@ -255,23 +250,10 @@ impl fmt::Display for Cmd {
             Cmd::HandlePeerFailedSend(peer) => write!(f, "HandlePeerFailedSend({:?})", peer.name()),
             Cmd::HandleAgreement { .. } => write!(f, "HandleAgreement"),
             Cmd::HandleNewEldersAgreement { .. } => write!(f, "HandleNewEldersAgreement"),
-            Cmd::HandleMembershipDecision(_) => write!(f, "HandleJoinDecision"),
+            Cmd::HandleMembershipDecision(_) => write!(f, "HandleMembershipDecision"),
             Cmd::HandleDkgOutcome { .. } => write!(f, "HandleDkgOutcome"),
             Cmd::HandleDkgFailure(_) => write!(f, "HandleDkgFailure"),
-            #[cfg(not(feature = "test-utils"))]
-            Cmd::SendMsg { wire_msg, .. } => {
-                write!(f, "SendMsg {:?}", wire_msg.msg_id())
-            }
-            #[cfg(feature = "test-utils")]
-            Cmd::SendMsg { wire_msg, .. } => {
-                write!(
-                    f,
-                    "SendMsg {:?} {:?}",
-                    wire_msg.msg_id(),
-                    wire_msg.payload_debug
-                )
-            }
-            Cmd::SignOutgoingSystemMsg { .. } => write!(f, "SignOutgoingSystemMsg"),
+            Cmd::SendMsg { .. } => write!(f, "SendMsg"),
             Cmd::EnqueueDataForReplication { .. } => write!(f, "ThrottledSendBatchMsgs"),
             Cmd::TrackNodeIssueInDysfunction { name, issue } => {
                 write!(f, "TrackNodeIssueInDysfunction {:?}, {:?}", name, issue)

@@ -6,14 +6,19 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use std::collections::BTreeSet;
+
 use crate::node::{
-    dkg::SigShare, flow_ctrl::cmds::Cmd, messages::WireMsgUtils, Node, Proposal, Result,
+    dkg::SigShare,
+    flow_ctrl::cmds::Cmd,
+    messaging::{OutgoingMsg, Recipients},
+    Node, Proposal, Result,
 };
 use sn_interface::{
     messaging::{
         signature_aggregator::{Error as AggregatorError, SignatureAggregator},
         system::SystemMsg,
-        DstLocation, MsgId, WireMsg,
+        MsgId,
     },
     network_knowledge::{NetworkKnowledge, SectionKeyShare},
     types::Peer,
@@ -61,31 +66,12 @@ impl Node {
         )?;
 
         // Broadcast the proposal to the rest of the section elders.
-        let node_msg = SystemMsg::Propose {
+        let msg = SystemMsg::Propose {
             proposal: proposal.clone().into_msg(),
             sig_share: sig_share.clone(),
         };
 
-        #[cfg(feature = "test-utils")]
-        let node_msg_clone = node_msg.clone();
-
-        // Name of the section_pk may not matches the section prefix.
-        // Carry out a substitution to prevent the dst_location becomes other section.
-        let section_key = self.network_knowledge.section_key();
-        let wire_msg = WireMsg::single_src(
-            &self.info(),
-            DstLocation::Section {
-                name: self.network_knowledge.prefix().name(),
-                section_pk: section_key,
-            },
-            node_msg,
-            section_key,
-        )?;
-
-        #[cfg(feature = "test-utils")]
-        let wire_msg = wire_msg.set_payload_debug(node_msg_clone);
-
-        let msg_id = wire_msg.msg_id();
+        let msg_id = MsgId::new();
 
         let mut cmds = vec![];
         let our_name = self.info().name();
@@ -104,16 +90,17 @@ impl Node {
         }
 
         // remove ourself from recipients
-        let recipients = recipients
+        let recipients: BTreeSet<_> = recipients
             .into_iter()
             .filter(|peer| peer.name() != our_name)
             .collect();
 
-        cmds.extend(
-            self.send_messages_to_all_nodes_or_directly_handle_for_accumulation(
-                recipients, wire_msg,
-            )?,
-        );
+        cmds.push(Cmd::SendMsg {
+            msg: OutgoingMsg::System(msg),
+            recipients: Recipients::Peers(recipients),
+            #[cfg(feature = "traceroute")]
+            traceroute: vec![],
+        });
 
         Ok(cmds)
     }

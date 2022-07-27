@@ -11,8 +11,9 @@ mod capacity;
 pub(crate) use self::capacity::{Capacity, MIN_LEVEL_WHEN_FULL};
 
 use crate::node::{
-    error::convert_to_error_msg, messages::WireMsgUtils, Cmd, Error, Node, Prefix, Result,
-    MAX_WAITING_PEERS_PER_QUERY,
+    error::convert_to_error_msg,
+    messaging::{OutgoingMsg, Recipients},
+    Cmd, Error, Node, Prefix, Result, MAX_WAITING_PEERS_PER_QUERY,
 };
 
 use itertools::Itertools;
@@ -24,7 +25,7 @@ use sn_interface::{
     messaging::{
         data::{CmdError, DataQuery, MetadataExchange, StorageLevel},
         system::{NodeCmd, NodeQuery, SystemMsg},
-        AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth, WireMsg,
+        AuthorityProof, EndUser, MsgId, ServiceAuth,
     },
     types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData},
 };
@@ -37,7 +38,7 @@ impl Node {
     pub(crate) fn replicate_data(
         &self,
         data: ReplicatedData,
-        #[cfg(feature = "traceroute")] mut traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
         trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
         if self.is_elder() {
@@ -50,11 +51,11 @@ impl Node {
             );
 
             let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data]));
-            self.send_node_msg_to_nodes(
+            self.send_msg(
                 msg,
                 targets,
                 #[cfg(feature = "traceroute")]
-                &mut traceroute,
+                traceroute,
             )
         } else {
             Err(Error::InvalidState)
@@ -67,7 +68,7 @@ impl Node {
         msg_id: MsgId,
         auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
-        #[cfg(feature = "traceroute")] mut traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
         let address = query.variant.address();
@@ -150,14 +151,12 @@ impl Node {
                 correlation_id: msg_id,
             });
 
-            let send_msg_cmds = self.send_node_msg_to_nodes(
+            cmds.extend(self.send_msg(
                 msg,
                 targets,
                 #[cfg(feature = "traceroute")]
-                &mut traceroute,
-            )?;
-
-            cmds.extend(send_msg_cmds);
+                traceroute,
+            )?);
 
             Ok(cmds)
         } else {
@@ -296,51 +295,19 @@ impl Node {
         candidates
     }
 
-    // Takes a message for specified targets, and builds internal send cmds
+    // Takes a message for specified targets, and builds internal send cmd
     // for sending to each of the targets.
-    // Targets are XorName specified so must be within the section
-    fn send_node_msg_to_nodes(
+    fn send_msg(
         &self,
         msg: SystemMsg,
         targets: BTreeSet<Peer>,
-        #[cfg(feature = "traceroute")] traceroute: &mut Vec<Entity>,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
-        // we create a dummy/random dst location,
-        // we will set it correctly for each msg and target
-        let section_pk = self.network_knowledge().section_key();
-        let our_name = self.info().name();
-        let dummy_dst_location = DstLocation::Node {
-            name: our_name,
-            section_pk,
-        };
-
-        // separate this into form_wire_msg based on agg
-        #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::single_src(&self.info(), dummy_dst_location, msg, section_pk)?;
-
-        #[cfg(feature = "traceroute")]
-        {
-            traceroute.push(Entity::Elder(PublicKey::Ed25519(
-                self.info().keypair.public,
-            )));
-            wire_msg.add_trace(traceroute);
-        }
-
-        let mut cmds = vec![];
-
-        for target in targets {
-            debug!("Queueing Send of {:?} to {:?}", wire_msg, target);
-            let mut wire_msg = wire_msg.clone();
-            let dst_section_pk = self.section_key_by_name(&target.name());
-            wire_msg.set_dst_section_pk(dst_section_pk);
-            wire_msg.set_dst_xorname(target.name());
-
-            cmds.push(Cmd::SendMsg {
-                recipients: vec![target],
-                wire_msg,
-            });
-        }
-
-        Ok(cmds)
+        Ok(vec![Cmd::SendMsg {
+            msg: OutgoingMsg::System(msg),
+            recipients: Recipients::Peers(targets),
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        }])
     }
 }

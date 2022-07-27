@@ -6,14 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::cmds::Cmd, Node, Result};
+use crate::node::{
+    flow_ctrl::cmds::Cmd,
+    messaging::{OutgoingMsg, Recipients},
+    Node, Result,
+};
 
 use sn_interface::{
     data_copy_count,
-    messaging::{
-        system::{NodeCmd, SystemMsg},
-        DstLocation,
-    },
+    messaging::system::{NodeCmd, SystemMsg},
     types::{log_markers::LogMarker, Peer, ReplicatedDataAddress},
 };
 
@@ -90,43 +91,39 @@ impl Node {
         let mut cmds = vec![];
 
         let adults = self.network_knowledge.adults();
-        let adults_names = adults.iter().map(|p2p_node| p2p_node.name()).collect_vec();
 
         let elders = self.network_knowledge.elders();
         let my_name = self.info().name();
 
         // find data targets that are not us.
-        let mut target_member_names = adults_names
+        let mut target_members = adults
             .into_iter()
-            .sorted_by(|lhs, rhs| my_name.cmp_distance(lhs, rhs))
-            .filter(|peer| peer != &my_name)
+            .sorted_by(|lhs, rhs| my_name.cmp_distance(&lhs.name(), &rhs.name()))
+            .filter(|peer| peer.name() != my_name)
             .take(data_copy_count())
             .collect::<BTreeSet<_>>();
 
         trace!(
             "nearest neighbours for data req: {}: {:?}",
-            target_member_names.len(),
-            target_member_names
+            target_members.len(),
+            target_members
         );
 
         // also send to our elders in case they are holding but were just promoted
         for elder in elders {
-            let _existed = target_member_names.insert(elder.name());
+            let _existed = target_members.insert(elder);
         }
 
-        let section_pk = self.network_knowledge.section_key();
+        trace!("Sending our data list to: {:?}", target_members);
 
-        for name in target_member_names {
-            trace!("Sending our data list to: {:?}", name);
-            cmds.push(Cmd::SignOutgoingSystemMsg {
-                msg: SystemMsg::NodeCmd(
-                    NodeCmd::SendAnyMissingRelevantData(data_i_have.clone()).clone(),
-                ),
-                dst: DstLocation::Node { name, section_pk },
-                #[cfg(feature = "traceroute")]
-                traceroute: vec![],
-            })
-        }
+        cmds.push(Cmd::SendMsg {
+            msg: OutgoingMsg::System(SystemMsg::NodeCmd(NodeCmd::SendAnyMissingRelevantData(
+                data_i_have,
+            ))),
+            recipients: Recipients::Peers(target_members),
+            #[cfg(feature = "traceroute")]
+            traceroute: vec![],
+        });
 
         Ok(cmds)
     }

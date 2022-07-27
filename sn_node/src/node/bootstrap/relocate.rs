@@ -8,14 +8,15 @@
 
 use super::UsedRecipientSaps;
 
-use crate::node::{flow_ctrl::cmds::Cmd, messages::WireMsgUtils, Error, Result};
+use crate::node::{
+    flow_ctrl::cmds::Cmd,
+    messaging::{OutgoingMsg, Recipients},
+    Error, Result,
+};
 
 use sn_interface::{
-    messaging::{
-        system::{
-            JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeState, SectionAuth, SystemMsg,
-        },
-        DstLocation, WireMsg,
+    messaging::system::{
+        JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeState, SectionAuth, SystemMsg,
     },
     network_knowledge::{NodeInfo, SectionAuthorityProvider},
     types::{keys::ed25519, Peer, PublicKey},
@@ -29,7 +30,6 @@ use xor_name::{Prefix, XorName};
 /// Re-join as a relocated node.
 pub(crate) struct JoiningAsRelocated {
     pub(crate) node: NodeInfo,
-    genesis_key: BlsPublicKey,
     relocate_proof: SectionAuth<NodeState>,
     // Avoid sending more than one duplicated request (with same SectionKey) to the same peer.
     used_recipient_saps: UsedRecipientSaps,
@@ -44,7 +44,6 @@ impl JoiningAsRelocated {
     // shall be fed back with `handle_join_response` function.
     pub(crate) fn start(
         node: NodeInfo,
-        genesis_key: BlsPublicKey,
         relocate_proof: SectionAuth<NodeState>,
         bootstrap_addrs: Vec<SocketAddr>,
         dst_xorname: XorName,
@@ -70,7 +69,6 @@ impl JoiningAsRelocated {
 
         let relocating = Self {
             node,
-            genesis_key,
             relocate_proof,
             used_recipient_saps,
             dst_xorname,
@@ -78,7 +76,7 @@ impl JoiningAsRelocated {
             new_age,
             old_keypair,
         };
-        let cmd = relocating.build_join_request_cmd(&recipients, dst_xorname, dummy_signature)?;
+        let cmd = relocating.build_join_request_cmd(&recipients, dummy_signature)?;
 
         Ok((relocating, cmd))
     }
@@ -132,11 +130,7 @@ impl JoiningAsRelocated {
                 self.dst_section_key = section_auth.section_key();
 
                 let new_name_sig = self.build_relocation_name(&section_auth.prefix());
-                let cmd = self.build_join_request_cmd(
-                    &new_recipients,
-                    section_auth.prefix().name(),
-                    new_name_sig,
-                )?;
+                let cmd = self.build_join_request_cmd(&new_recipients, new_name_sig)?;
 
                 Ok(Some(cmd))
             }
@@ -176,11 +170,7 @@ impl JoiningAsRelocated {
                 self.dst_section_key = section_auth.section_key();
 
                 let new_name_sig = self.build_relocation_name(&section_auth.prefix());
-                let cmd = self.build_join_request_cmd(
-                    &new_recipients,
-                    section_auth.prefix().name(),
-                    new_name_sig,
-                )?;
+                let cmd = self.build_join_request_cmd(&new_recipients, new_name_sig)?;
 
                 Ok(Some(cmd))
             }
@@ -213,12 +203,7 @@ impl JoiningAsRelocated {
         signature_over_new_name
     }
 
-    fn build_join_request_cmd(
-        &self,
-        recipients: &[Peer],
-        dst_name: XorName,
-        new_name_sig: Signature,
-    ) -> Result<Cmd> {
+    fn build_join_request_cmd(&self, recipients: &[Peer], new_name_sig: Signature) -> Result<Cmd> {
         let join_request = JoinAsRelocatedRequest {
             section_key: self.dst_section_key,
             relocate_proof: self.relocate_proof.clone(),
@@ -227,20 +212,11 @@ impl JoiningAsRelocated {
 
         info!("Sending {:?} to {:?}", join_request, recipients);
 
-        let node_msg = SystemMsg::JoinAsRelocatedRequest(Box::new(join_request));
-        let wire_msg = WireMsg::single_src(
-            &self.node,
-            DstLocation::Section {
-                name: dst_name,
-                section_pk: self.dst_section_key,
-            },
-            node_msg,
-            self.genesis_key,
-        )?;
-
         let cmd = Cmd::SendMsg {
-            recipients: recipients.to_vec(),
-            wire_msg,
+            msg: OutgoingMsg::System(SystemMsg::JoinAsRelocatedRequest(Box::new(join_request))),
+            recipients: Recipients::from(recipients),
+            #[cfg(feature = "traceroute")]
+            traceroute: vec![],
         };
 
         Ok(cmd)
@@ -269,14 +245,17 @@ impl JoiningAsRelocated {
 #[cfg(test)]
 mod tests {
     use super::JoiningAsRelocated;
-    use crate::node::Cmd;
+    use crate::node::{
+        messaging::{OutgoingMsg, Recipients},
+        Cmd,
+    };
     use color_eyre::Result;
     use eyre::eyre;
     use sn_interface::{
         elder_count,
         messaging::{
             system::{JoinAsRelocatedResponse, NodeState, SystemMsg},
-            MsgType, SectionAuthorityProvider,
+            SectionAuthorityProvider,
         },
         network_knowledge::{
             test_utils::{gen_addr, section_signed},
@@ -305,7 +284,6 @@ mod tests {
         let bootstrap: Vec<SocketAddr> = to_sap.elders.iter().map(|(_, addr)| *addr).collect();
         let (_, cmd) = JoiningAsRelocated::start(
             node.clone(),
-            from_sk_set.secret_key().public_key(),
             signed_node_state,
             bootstrap.clone(),
             node.name(),
@@ -315,16 +293,15 @@ mod tests {
 
         match cmd {
             Cmd::SendMsg {
-                recipients,
-                wire_msg,
+                msg, recipients, ..
             } => {
-                assert_eq!(bootstrap.len(), recipients.len());
+                match recipients {
+                    Recipients::Dst(_) => return Err(eyre!("Should be Recipients::Peers")),
+                    Recipients::Peers(recipients) => assert_eq!(bootstrap.len(), recipients.len()),
+                }
                 if !matches!(
-                    wire_msg.into_msg(),
-                    Ok(MsgType::System {
-                        msg: SystemMsg::JoinAsRelocatedRequest(_),
-                        ..
-                    })
+                    msg,
+                    OutgoingMsg::System(SystemMsg::JoinAsRelocatedRequest(_))
                 ) {
                     return Err(eyre!("Should be JoinAsRelocatedRequest"));
                 }
@@ -358,7 +335,6 @@ mod tests {
             let bootstrap: Vec<SocketAddr> = to_sap.elders.iter().map(|(_, addr)| *addr).collect();
             let (mut joining, _) = JoiningAsRelocated::start(
                 node.clone(),
-                from_sk_set.secret_key().public_key(),
                 signed_node_state,
                 bootstrap,
                 // initially with our own xorname
@@ -384,18 +360,11 @@ mod tests {
             assert_eq!(joining.dst_section_key, to_sk_set.secret_key().public_key());
             // new name is set
             assert_ne!(joining.node.name(), node.name());
-            if let Ok(Some(Cmd::SendMsg {
-                recipients,
-                wire_msg,
-            })) = handled
-            {
-                assert_eq!(recipients.len(), elder_count());
-                assert_eq!(
-                    wire_msg
-                        .dst_section_pk()
-                        .ok_or_else(|| eyre!("Should be present"))?,
-                    joining.dst_section_key
-                );
+            if let Ok(Some(Cmd::SendMsg { recipients, .. })) = handled {
+                match recipients {
+                    Recipients::Dst(_) => return Err(eyre!("Should be Recipients::Peers")),
+                    Recipients::Peers(recipients) => assert_eq!(elder_count(), recipients.len()),
+                }
             }
 
             // The to_sap's elder list is exhausted after the first handle_join_response
@@ -432,7 +401,6 @@ mod tests {
             let bootstrap: Vec<SocketAddr> = to_sap.elders.iter().map(|(_, addr)| *addr).collect();
             let (mut joining, _) = JoiningAsRelocated::start(
                 node.clone(),
-                from_sk_set.secret_key().public_key(),
                 signed_node_state,
                 bootstrap,
                 node.name(),
