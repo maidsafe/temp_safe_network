@@ -115,9 +115,8 @@ impl DysfunctionDetection {
         }
 
         debug!("node {node} {issue_type:?} count: {:?}", node_issue_count);
-        let all_tracked_nodes = &self.nodes;
         let mut other_node_counts = Vec::new();
-        for itr in all_tracked_nodes {
+        for itr in &self.nodes {
             if itr == node {
                 continue;
             }

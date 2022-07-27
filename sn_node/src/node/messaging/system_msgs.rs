@@ -18,6 +18,8 @@ use crate::{
 };
 
 use bytes::Bytes;
+use std::collections::BTreeSet;
+
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
@@ -39,7 +41,6 @@ use sn_interface::{
     network_knowledge::NetworkKnowledge,
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey},
 };
-use std::collections::BTreeSet;
 use xor_name::XorName;
 
 impl Node {
@@ -213,7 +214,6 @@ impl Node {
                 let mut recipients = BTreeSet::new();
                 let _existed = recipients.insert(sender);
                 cmds.push(self.send_ae_update_to_nodes(recipients, section_key));
-                trace!("cmds for responding to ae to {sender} formed");
                 Ok(cmds)
             }
             #[cfg(feature = "back-pressure")]

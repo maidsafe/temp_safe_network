@@ -54,6 +54,7 @@ const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 // Which should hopefully trigger dysfunction if we're not getting responses back
 const ADULT_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
 const ELDER_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(3);
+
 const LOOP_SLEEP_INTERVAL: Duration = Duration::from_millis(10);
 
 pub(crate) struct FlowCtrl {
@@ -78,8 +79,8 @@ impl FlowCtrl {
         debug!("Starting internal------------------------------------------");
         let mut last_probe = Instant::now();
         let mut last_section_probe = Instant::now();
-        let mut last_health_check = Instant::now();
-        // ctrl.clone().health_check_elders_in_section();
+        let mut last_adult_health_check = Instant::now();
+        let mut last_elder_health_check = Instant::now();
         let mut last_vote_check = Instant::now();
         let mut last_data_batch_check = Instant::now();
         let mut last_link_cleanup = Instant::now();
@@ -103,7 +104,8 @@ impl FlowCtrl {
             #[cfg(feature = "back-pressure")]
             if last_backpressure_check.elapsed() > BACKPRESSURE_INTERVAL {
                 last_backpressure_check = now;
-                cmds.extend(Self::start_backpressure_reporting(node))
+
+                cmds.extend(Self::report_backpressure(self.node.clone(), &self.cmd_ctrl).await)
             }
 
             // Things that should only happen to non elder nodes
@@ -143,8 +145,8 @@ impl FlowCtrl {
                 }
             }
 
-            if last_health_check.elapsed() > HEALTH_CHECK_INTERVAL {
-                last_health_check = now;
+            if last_adult_health_check.elapsed() > ADULT_HEALTH_CHECK_INTERVAL {
+                last_adult_health_check = now;
                 let health_cmds = match Self::perform_health_checks(self.node.clone()).await {
                     Ok(cmds) => cmds,
                     Err(error) => {
@@ -153,6 +155,16 @@ impl FlowCtrl {
                     }
                 };
                 cmds.extend(health_cmds);
+            }
+
+            // The above health check only queries for chunks
+            // here we specifically ask for AE prob msgs and manually
+            // track dysfunction
+            if last_elder_health_check.elapsed() > ELDER_HEALTH_CHECK_INTERVAL {
+                last_elder_health_check = now;
+                for cmd in Self::health_check_elders_in_section(self.node.clone()).await {
+                    cmds.push(cmd);
+                }
             }
 
             if last_vote_check.elapsed() > MISSING_VOTE_INTERVAL {
@@ -265,45 +277,6 @@ impl FlowCtrl {
         .await
     }
 
-    /// Generates a probe msg, which goes to all section elders in order to
-    /// passively maintain network knowledge over time and track dysfunction
-    /// Tracking dysfunction while awaiting a response
-    fn health_check_elders_in_section(self) {
-        let _handle: JoinHandle<Result<()>> = tokio::task::spawn_local(async move {
-            let mut interval = tokio::time::interval(ELDER_HEALTH_CHECK_INTERVAL);
-            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-
-            loop {
-                let _instant = interval.tick().await;
-                let node = self.node.read().await;
-                let mut cmds = vec![];
-
-                // Send a probe message to an elder
-                debug!("Going to health check elders");
-
-                let elders = node.network_knowledge.elders();
-                for elder in elders {
-                    // we track a knowledge issue
-                    // whhich is countered when an AE-Update is
-                    cmds.push(Cmd::TrackNodeIssueInDysfunction {
-                        name: elder.name(),
-                        issue: sn_dysfunction::IssueType::AwaitingProbeResponse,
-                    });
-                }
-
-                // Send a probe message to an elder
-                cmds.push(node.generate_section_probe_msg());
-
-                for cmd in cmds {
-                    info!("Sending healthcheck elder probe {:?}", cmd);
-                    if let Err(e) = self.cmd_ctrl.push(cmd).await {
-                        error!("Error sending a health check msg to the network: {:?}", e);
-                    }
-                }
-            }
-        });
-    }
-
     /// Generates a probe msg, which goes to a random section in order to
     /// passively maintain network knowledge over time
     async fn probe_the_network(node: Arc<RwLock<Node>>) -> Option<Cmd> {
@@ -344,6 +317,32 @@ impl FlowCtrl {
         }
     }
 
+    /// Generates a probe msg, which goes to all section elders in order to
+    /// passively maintain network knowledge over time and track dysfunction
+    /// Tracking dysfunction while awaiting a response
+    async fn health_check_elders_in_section(node: Arc<RwLock<Node>>) -> Vec<Cmd> {
+        let mut cmds = vec![];
+        let node = node.read().await;
+
+        // Send a probe message to an elder
+        debug!("Going to health check elders");
+
+        let elders = node.network_knowledge.elders();
+        for elder in elders {
+            // we track a knowledge issue
+            // whhich is countered when an AE-Update is
+            cmds.push(Cmd::TrackNodeIssueInDysfunction {
+                name: elder.name(),
+                issue: sn_dysfunction::IssueType::AwaitingProbeResponse,
+            });
+        }
+
+        // Send a probe message to an elder
+        cmds.push(node.generate_section_probe_msg());
+
+        cmds
+    }
+
     /// Checks the interval since last vote received during a generation
     async fn check_for_missed_votes(node: Arc<RwLock<Node>>) -> Option<Cmd> {
         info!("Checking for missed votes");
@@ -353,27 +352,23 @@ impl FlowCtrl {
         if let Some(membership) = &membership {
             let last_received_vote_time = membership.last_received_vote_time();
 
-                    if let Some(time) = last_received_vote_time {
-                        // we want to resend the prev vote
-                        if time.elapsed() >= MISSING_VOTE_INTERVAL {
-                            debug!("Vote consensus appears stalled...");
-                            if let Some(cmd) = node.membership_gossip_votes().await {
-                                trace!("Vote resending cmd");
-                                if let Err(e) = self.cmd_ctrl.push(cmd).await {
-                                    error!("Error resending a vote msg to the network: {:?}", e);
-                                }
-                            }
-                        }
+            if let Some(time) = last_received_vote_time {
+                // we want to resend the prev vote
+                if time.elapsed() >= MISSING_VOTE_INTERVAL {
+                    debug!("Vote consensus appears stalled...");
+                    if let Some(cmd) = node.membership_gossip_votes().await {
+                        trace!("Vote resending cmd");
+
+                        return Some(cmd);
                     }
                 }
             }
-        });
+        }
+        None
     }
 
     /// Periodically loop over any pending data batches and queue up `send_msg` for those
     async fn replicate_queued_data(node: Arc<RwLock<Node>>) -> Result<Option<Cmd>> {
-        info!("Starting sending any queued data for replication in batches");
-
         use rand::seq::IteratorRandom;
         let mut rng = rand::rngs::OsRng;
 
@@ -452,7 +447,7 @@ impl FlowCtrl {
             for name in &unresponsive_nodes {
                 cmds.push(Cmd::TellEldersToStartConnectivityTest(*name))
             }
-            cmds.push(Cmd::ProposeOffline(unresponsive_nodes))
+            cmds.push(Cmd::ProposeVoteNodesOffline(unresponsive_nodes))
         }
 
         cmds
@@ -466,7 +461,7 @@ impl FlowCtrl {
     /// know about our load just now. Though that would only be AE messages... and if backpressure is working we should
     /// not be overloaded...
     #[cfg(feature = "back-pressure")]
-    fn start_backpressure_reporting(node: Arc<RwLock<Node>>, cmd_ctrl: &CmdCtrl) -> Vec<Cmd> {
+    async fn start_backpressure_reporting(node: Arc<RwLock<Node>>, cmd_ctrl: &CmdCtrl) -> Vec<Cmd> {
         use sn_interface::messaging::DstLocation;
 
         info!("Firing off backpressure reports");
@@ -554,13 +549,11 @@ impl FlowCtrl {
                     wire_msg
                 };
 
-                let cmd = Cmd::ValidateMsg {
+                Cmd::ValidateMsg {
                     origin: sender,
                     wire_msg,
                     original_bytes,
-                };
-
-                return cmd;
+                }
             }
         }
     }
