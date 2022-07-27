@@ -10,11 +10,13 @@ use crate::{
     comm::Comm,
     dbs::Error as DbError,
     node::{
-        flow_ctrl::cmds::Cmd, messages::WireMsgUtils, DkgSessionInfo, Error, Event,
-        MembershipEvent, Node, Proposal as CoreProposal, Result, MIN_LEVEL_WHEN_FULL,
+        flow_ctrl::cmds::Cmd,
+        messaging::{OutgoingMsg, Recipients},
+        DkgSessionInfo, Error, Event, MembershipEvent, Node, Proposal as CoreProposal, Result,
+        MIN_LEVEL_WHEN_FULL,
     },
 };
-use bls::PublicKey as BlsPublicKey;
+
 use bytes::Bytes;
 use sn_interface::{
     messaging::{
@@ -28,12 +30,11 @@ use sn_interface::{
             NodeMsgAuthorityUtils,
             NodeQuery,
             Proposal as ProposalMsg,
-            SectionAuth as SectionAuthAgreement,
             SystemMsg,
         },
-        AuthKind, AuthorityProof, DstLocation, MsgId, NodeMsgAuthority, SectionAuth, WireMsg,
+        AuthorityProof, DstLocation, MsgId, NodeMsgAuthority, SectionAuth, WireMsg,
     },
-    network_knowledge::{NetworkKnowledge, NodeState},
+    network_knowledge::NetworkKnowledge,
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey},
 };
 use xor_name::XorName;
@@ -42,117 +43,23 @@ use xor_name::XorName;
 use sn_interface::messaging::Entity;
 
 impl Node {
-    /// Send a direct (`SystemMsg`) message to a node in the specified section
-    pub(crate) fn send_direct_msg(
-        &self,
-        recipient: Peer,
-        node_msg: SystemMsg,
-        section_pk: BlsPublicKey,
-    ) -> Result<Cmd> {
-        let section_name = recipient.name();
-        self.send_direct_msg_to_nodes(vec![recipient], node_msg, section_name, section_pk)
-    }
-
-    /// Send a direct (`SystemMsg`) message to a set of nodes in the specified section
-    pub(crate) fn send_direct_msg_to_nodes(
-        &self,
-        recipients: Vec<Peer>,
-        node_msg: SystemMsg,
-        section_name: XorName,
-        section_pk: BlsPublicKey,
-    ) -> Result<Cmd> {
+    /// Send a direct (`SystemMsg`) message to a set of nodes
+    pub(crate) fn send_direct_msg(&self, recipients: Vec<Peer>, msg: SystemMsg) -> Result<Cmd> {
         trace!("{}", LogMarker::SendDirectToNodes);
-        let our_node = self.info();
-        let our_section_key = self.network_knowledge.section_key();
-
-        let wire_msg = WireMsg::single_src(
-            &our_node,
-            DstLocation::Section {
-                name: section_name,
-                section_pk,
-            },
-            node_msg,
-            our_section_key,
-        )?;
 
         Ok(Cmd::SendMsg {
-            recipients,
-            wire_msg,
+            msg: OutgoingMsg::System(msg),
+            recipients: Recipients::from(&recipients),
+            #[cfg(feature = "traceroute")]
+            traceroute: vec![],
         })
     }
 
-    /// Send a `Relocate` message to the specified node
-    pub(crate) fn send_relocate(
-        &self,
-        recipient: Peer,
-        node_state: SectionAuthAgreement<NodeState>,
-    ) -> Result<Cmd> {
-        let node_msg = SystemMsg::Relocate(node_state.into_authed_msg());
-        let section_pk = self.network_knowledge.section_key();
-        self.send_direct_msg(recipient, node_msg, section_pk)
-    }
-
     /// Send a direct (`SystemMsg`) message to all Elders in our section
-    pub(crate) fn send_msg_to_our_elders(&self, node_msg: SystemMsg) -> Result<Cmd> {
+    pub(crate) fn send_msg_to_our_elders(&self, msg: SystemMsg) -> Result<Cmd> {
         let sap = self.network_knowledge.authority_provider();
-        let dst_section_pk = sap.section_key();
-        let section_name = sap.prefix().name();
         let elders = sap.elders_vec();
-        self.send_direct_msg_to_nodes(elders, node_msg, section_name, dst_section_pk)
-    }
-
-    // Send the message to all `recipients`. If one of the recipients is us, don't send it over the
-    // network but handle it directly (should only be used when accumulation is necessary)
-    pub(crate) fn send_messages_to_all_nodes_or_directly_handle_for_accumulation(
-        &self,
-        recipients: Vec<Peer>,
-        mut wire_msg: WireMsg,
-    ) -> Result<Vec<Cmd>> {
-        let mut cmds = vec![];
-        let mut others = Vec::new();
-        let mut handle = false;
-
-        trace!("Send {:?} to {:?}", wire_msg, recipients);
-
-        let our_name = self.info().name();
-        for recipient in recipients.into_iter() {
-            if recipient.name() == our_name {
-                match wire_msg.auth() {
-                    AuthKind::NodeBlsShare(_) => {
-                        // do nothing, continue we should be accumulating this
-                        handle = true;
-                    }
-                    _ => return Err(Error::SendOrHandlingNormalMsg),
-                }
-            } else {
-                others.push(recipient);
-            }
-        }
-
-        if !others.is_empty() {
-            let dst_section_pk = self.section_key_by_name(&others[0].name());
-            wire_msg.set_dst_section_pk(dst_section_pk);
-
-            trace!("{}", LogMarker::SendOrHandle);
-            cmds.push(Cmd::SendMsg {
-                recipients: others,
-                wire_msg: wire_msg.clone(),
-            });
-        }
-
-        if handle {
-            wire_msg.set_dst_section_pk(self.network_knowledge.section_key());
-            wire_msg.set_dst_xorname(our_name);
-            let original_bytes = wire_msg.serialize()?;
-
-            cmds.push(Cmd::ValidateMsg {
-                origin: Peer::new(our_name, self.addr),
-                wire_msg,
-                original_bytes,
-            });
-        }
-
-        Ok(cmds)
+        self.send_direct_msg(elders, msg)
     }
 
     /// Aggregation of system messages
@@ -482,12 +389,7 @@ impl Node {
             SystemMsg::DkgNotReady {
                 message,
                 session_id,
-            } => self.handle_dkg_not_ready(
-                sender,
-                message,
-                session_id,
-                self.network_knowledge.section_key(),
-            ),
+            } => Ok(vec![self.handle_dkg_not_ready(sender, message, session_id)]),
             SystemMsg::DkgRetry {
                 message_history,
                 message,
@@ -561,7 +463,7 @@ impl Node {
                                     level_report,
                                     #[cfg(feature = "traceroute")]
                                     traceroute.clone(),
-                                ));
+                                )?);
 
                                 #[cfg(feature = "traceroute")]
                                 info!("End of message flow. Trace: {:?}", traceroute);
@@ -613,13 +515,12 @@ impl Node {
                         );
                         // There is no point in verifying a sig from a sender A or B here.
                         // Send back response to the sending elder
-                        let sender_xorname = msg_authority.get_auth_xorname();
                         self.handle_data_query_at_adult(
                             correlation_id,
                             &query,
                             auth,
                             origin,
-                            sender_xorname,
+                            sender,
                             #[cfg(feature = "traceroute")]
                             traceroute,
                         )
@@ -665,26 +566,17 @@ impl Node {
                         &sender
                     );
 
-                    let node_msg = SystemMsg::DkgSessionInfo {
+                    let msg = SystemMsg::DkgSessionInfo {
                         session_id,
                         section_auth: session_info.authority,
                         message_cache,
                         message,
                     };
-                    let section_pk = self.network_knowledge.section_key();
-                    let wire_msg = WireMsg::single_src(
-                        &self.info(),
-                        DstLocation::Node {
-                            name: sender.name(),
-                            section_pk,
-                        },
-                        node_msg,
-                        section_pk,
-                    )?;
-
                     Ok(vec![Cmd::SendMsg {
-                        recipients: vec![sender],
-                        wire_msg,
+                        msg: OutgoingMsg::System(msg),
+                        recipients: Recipients::from_single(sender),
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
                     }])
                 } else {
                     warn!("Unknown DkgSessionInfo: {:?} requested", &session_id);
@@ -737,7 +629,7 @@ impl Node {
         &self,
         level: Option<StorageLevel>,
         #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
-    ) -> Vec<Cmd> {
+    ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
         if let Some(level) = level {
             info!("Storage has now passed {} % used.", 10 * level.value());
@@ -751,19 +643,18 @@ impl Node {
                 level,
             });
 
-            let dst = DstLocation::Section {
-                name: node_xorname,
-                section_pk: self.network_knowledge.section_key(),
-            };
-
-            cmds.push(Cmd::SignOutgoingSystemMsg {
-                msg,
-                dst,
+            cmds.push(Cmd::SendMsg {
+                msg: OutgoingMsg::System(msg),
+                recipients: Recipients::Dst(DstLocation::Section {
+                    name: node_xorname,
+                    section_pk: self.network_knowledge.section_key(),
+                }),
                 #[cfg(feature = "traceroute")]
                 traceroute,
             });
         }
-        cmds
+
+        Ok(cmds)
     }
 
     // Converts the provided NodeMsgAuthority to be a `Section` message

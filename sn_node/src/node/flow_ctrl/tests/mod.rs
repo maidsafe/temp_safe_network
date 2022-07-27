@@ -10,6 +10,7 @@
 
 use crate::comm::{Comm, MsgEvent};
 use crate::dbs::UsedSpace;
+use crate::node::messaging::{OutgoingMsg, Recipients};
 use crate::node::{
     cfg::create_test_max_capacity_and_root_storage,
     flow_ctrl::{dispatcher::Dispatcher, event_channel},
@@ -128,15 +129,10 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
             assert!(all_cmds.into_iter().any(|cmd| {
                 match cmd {
-                    Cmd::SendMsg { wire_msg, .. } => match wire_msg.into_msg() {
-                        Ok(MsgType::System {
-                            msg: SystemMsg::JoinResponse(response),
-                            ..
-                        }) => {
-                            matches!(*response, JoinResponse::ResourceChallenge { .. })
-                        }
-                        _ => false,
-                    },
+                    Cmd::SendMsg {
+                        msg: OutgoingMsg::System(SystemMsg::JoinResponse(response)),
+                        ..
+                    } => matches!(*response, JoinResponse::ResourceChallenge { .. }),
                     _ => false,
                 }
             }));
@@ -465,33 +461,35 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             let _changed = expected_new_elders.insert(&new_peer);
 
             for cmd in cmds {
-                let (recipients, wire_msg) = match cmd {
+                let (payload, recipients) = match cmd {
                     Cmd::SendMsg {
                         recipients,
-                        wire_msg,
+                        msg: OutgoingMsg::DstAggregated((_, payload)),
                         ..
-                    } => (recipients, wire_msg),
+                    } => (payload, recipients),
                     _ => continue,
                 };
 
-                let actual_elder_candidates = match wire_msg.into_msg() {
-                    Ok(MsgType::System {
-                        msg: SystemMsg::DkgStart(session),
-                        ..
-                    }) => session.elders,
+                let actual_elder_candidates = match rmp_serde::from_slice(&payload) {
+                    Ok(SystemMsg::DkgStart(session)) => session.elders,
                     _ => continue,
                 };
+
                 itertools::assert_equal(
                     actual_elder_candidates,
                     expected_new_elders.iter().map(|p| (p.name(), p.addr())),
                 );
 
-                let expected_dkg_start_recipients: Vec<_> = expected_new_elders
-                    .iter()
+                let expected_dkg_start_recipients: BTreeSet<_> = expected_new_elders
+                    .clone()
+                    .into_iter()
                     .filter(|peer| peer.name() != node_name)
                     .cloned()
                     .collect();
-                assert_eq!(recipients, expected_dkg_start_recipients);
+
+                assert_matches!(recipients, Recipients::Peers(peers) => {
+                    assert_eq!(peers, expected_dkg_start_recipients);
+                });
 
                 dkg_start_sent = true;
             }
@@ -524,38 +522,33 @@ async fn handle_online_cmd(
     };
 
     for cmd in all_cmds {
-        let (recipients, wire_msg) = match cmd {
+        let (msg, recipients) = match cmd {
             Cmd::SendMsg {
                 recipients,
-                wire_msg,
+                msg: OutgoingMsg::System(msg),
                 ..
-            } => (recipients, wire_msg),
+            } => (msg, recipients),
             _ => continue,
         };
 
-        match wire_msg.into_msg() {
-            Ok(MsgType::System {
-                msg: SystemMsg::JoinResponse(response),
-                ..
-            }) => {
+        match msg {
+            SystemMsg::JoinResponse(response) => {
                 if let JoinResponse::Approval {
                     section_auth: signed_sap,
                     ..
                 } = *response
                 {
                     assert_eq!(signed_sap.value, section_auth.clone().to_msg());
-                    assert_eq!(recipients, [peer]);
+                    assert_matches!(recipients, Recipients::Peers(peers) => {
+                        assert_eq!(peers, BTreeSet::from([*peer]));
+                    });
                     status.node_approval_sent = true;
                 }
             }
-            Ok(MsgType::System {
-                msg:
-                    SystemMsg::Propose {
-                        proposal: sn_interface::messaging::system::Proposal::Offline(node_state),
-                        ..
-                    },
+            SystemMsg::Propose {
+                proposal: sn_interface::messaging::system::Proposal::Offline(node_state),
                 ..
-            }) => {
+            } => {
                 if let MembershipState::Relocated(details) = node_state.state {
                     if details.previous_name != peer.name() {
                         continue;
@@ -995,99 +988,88 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
     let local = tokio::task::LocalSet::new();
 
     // Run the local task set.
-    local.run_until(async move {
+    local
+        .run_until(async move {
+            let prefix: Prefix = "0".parse().unwrap();
+            let section_size = match relocated_peer_role {
+                RelocatedPeerRole::Elder => elder_count(),
+                RelocatedPeerRole::NonElder => recommended_section_size(),
+            };
+            let (section_auth, mut nodes, sk_set) = random_sap(prefix, elder_count());
+            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
 
+            let mut adults = section_size - elder_count();
+            while adults > 0 {
+                adults -= 1;
+                let non_elder_peer = create_peer(MIN_ADULT_AGE);
+                let node_state = NodeState::joined(non_elder_peer, None);
+                let node_state = section_signed(sk_set.secret_key(), node_state)?;
+                assert!(section.update_member(node_state));
+            }
 
-        let prefix: Prefix = "0".parse().unwrap();
-        let section_size = match relocated_peer_role {
-            RelocatedPeerRole::Elder => elder_count(),
-            RelocatedPeerRole::NonElder => recommended_section_size(),
-        };
-        let (section_auth, mut nodes, sk_set) = random_sap(prefix, elder_count());
-        let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
-
-        let mut adults = section_size - elder_count();
-        while adults > 0 {
-            adults -= 1;
-            let non_elder_peer = create_peer(MIN_ADULT_AGE);
+            let non_elder_peer = create_peer(MIN_ADULT_AGE - 1);
             let node_state = NodeState::joined(non_elder_peer, None);
             let node_state = section_signed(sk_set.secret_key(), node_state)?;
             assert!(section.update_member(node_state));
-        }
+            let node = nodes.remove(0);
+            let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
+            let comm = create_comm().await?;
+            let node = Node::new(
+                comm.socket_addr(),
+                node.keypair.clone(),
+                section,
+                Some(section_key_share),
+                event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
+                UsedSpace::new(max_capacity),
+                root_storage_dir,
+            )
+            .await?;
+            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
 
-        let non_elder_peer = create_peer(MIN_ADULT_AGE - 1);
-        let node_state = NodeState::joined(non_elder_peer, None);
-        let node_state = section_signed(sk_set.secret_key(), node_state)?;
-        assert!(section.update_member(node_state));
-        let node = nodes.remove(0);
-        let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
-        let comm = create_comm().await?;
-        let node = Node::new(
-            comm.socket_addr(),
-            node.keypair.clone(),
-            section,
-            Some(section_key_share),
-            event_channel::new(TEST_EVENT_CHANNEL_SIZE).0,
-            UsedSpace::new(max_capacity),
-            root_storage_dir,
-        )
-        .await?;
-        let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
-
-        let relocated_peer = match relocated_peer_role {
-            RelocatedPeerRole::Elder => *section_auth.elders().nth(1).expect("too few elders"),
-            RelocatedPeerRole::NonElder => non_elder_peer,
-        };
-
-        let membership_decision = create_relocation_trigger(&sk_set, relocated_peer.age())?;
-        let cmds = run_and_collect_cmds(Cmd::HandleMembershipDecision(membership_decision), &dispatcher).await?;
-
-        let mut offline_relocate_sent = false;
-
-        for cmd in cmds {
-            let wire_msg = match cmd {
-                Cmd::SendMsg { wire_msg, .. } => wire_msg,
-                _ => continue,
+            let relocated_peer = match relocated_peer_role {
+                RelocatedPeerRole::Elder => *section_auth.elders().nth(1).expect("too few elders"),
+                RelocatedPeerRole::NonElder => non_elder_peer,
             };
 
-            if let Ok(MsgType::System {
-                msg:
-                    SystemMsg::Propose {
-                        proposal: sn_interface::messaging::system::Proposal::Offline(node_state),
+            let membership_decision = create_relocation_trigger(&sk_set, relocated_peer.age())?;
+            let cmds = run_and_collect_cmds(
+                Cmd::HandleMembershipDecision(membership_decision),
+                &dispatcher,
+            )
+            .await?;
+
+            let mut offline_relocate_sent = false;
+
+            for cmd in cmds {
+                let msg = match cmd {
+                    Cmd::SendMsg {
+                        msg: OutgoingMsg::System(msg),
                         ..
-                    },
-                ..
-            }) = wire_msg.into_msg()
-            {
-                assert_eq!(node_state.name, relocated_peer.name());
-                if let MembershipState::Relocated(relocate_details) = node_state.state {
-                    assert_eq!(relocate_details.age, relocated_peer.age() + 1);
-                    offline_relocate_sent = true;
+                    } => msg,
+                    _ => continue,
+                };
+
+                if let SystemMsg::Propose {
+                    proposal: sn_interface::messaging::system::Proposal::Offline(node_state),
+                    ..
+                } = msg
+                {
+                    assert_eq!(node_state.name, relocated_peer.name());
+                    if let MembershipState::Relocated(relocate_details) = node_state.state {
+                        assert_eq!(relocate_details.age, relocated_peer.age() + 1);
+                        offline_relocate_sent = true;
+                    }
                 }
             }
-        }
 
-        assert!(offline_relocate_sent);
-       Result::<()>::Ok(())
-   }).await
+            assert!(offline_relocate_sent);
+            Result::<()>::Ok(())
+        })
+        .await
 }
 
 #[tokio::test]
-async fn node_msg_to_self() -> Result<()> {
-    message_to_self(MessageDst::Node).await
-}
-
-#[tokio::test]
-async fn section_msg_to_self() -> Result<()> {
-    message_to_self(MessageDst::Section).await
-}
-
-enum MessageDst {
-    Node,
-    Section,
-}
-
-async fn message_to_self(dst: MessageDst) -> Result<()> {
+async fn msg_to_self() -> Result<()> {
     // Construct a local task set that can run `!Send` futures.
     let local = tokio::task::LocalSet::new();
 
@@ -1116,32 +1098,20 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
         )
         .await?;
         let info = node.info();
-        let section_pk = node.network_knowledge().section_key();
         let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
-
-        let dst_location = match dst {
-            MessageDst::Node => DstLocation::Node {
-                name: info.name(),
-                section_pk,
-            },
-            MessageDst::Section => DstLocation::Section {
-                name: info.name(),
-                section_pk,
-            },
-        };
 
         let node_msg = SystemMsg::NodeMsgError {
             error: sn_interface::messaging::data::Error::FailedToWriteFile,
             correlation_id: MsgId::new(),
         };
-        let wire_msg = WireMsg::single_src(&info, dst_location, node_msg.clone(), section_pk)?;
 
         // don't use the cmd collection fn, as it skips Cmd::SendMsg
         let cmds = dispatcher
             .process_cmd(
                 Cmd::SendMsg {
-                    recipients: vec![info.peer()],
-                    wire_msg,
+                    msg: OutgoingMsg::System(node_msg.clone()),
+                    recipients: Recipients::from_single(info.peer()),
+                    #[cfg(feature = "traceroute")] traceroute: vec![],
                 },
             )
             .await?;
@@ -1153,8 +1123,7 @@ async fn message_to_self(dst: MessageDst) -> Result<()> {
             assert_matches!(wire_msg.into_msg(), Ok(msg_type) => msg_type)
         });
 
-        assert_matches!(msg_type, MsgType::System { msg, dst_location: dst, .. } => {
-            assert_eq!(dst, dst_location);
+        assert_matches!(msg_type, MsgType::System { msg, .. } => {
             assert_eq!(
                 msg,
                 node_msg
@@ -1260,28 +1229,21 @@ async fn handle_elders_update() -> Result<()> {
         let mut update_actual_recipients = HashSet::new();
 
         for cmd in cmds {
-            let (recipients, wire_msg) = match cmd {
+            let (msg, recipients) = match cmd {
                 Cmd::SendMsg {
-                    recipients,
-                    wire_msg,
+                    msg: OutgoingMsg::System(msg),
+                    recipients: Recipients::Peers(recipients),
                     ..
-                } => (recipients, wire_msg),
+                } => (msg, recipients),
                 _ => continue,
             };
 
-            let (proof_chain, msg_authority) = match wire_msg.into_msg() {
-                Ok(MsgType::System {
-                    msg: SystemMsg::AntiEntropyUpdate { proof_chain, .. },
-                    msg_authority,
-                    ..
-                }) => (proof_chain, msg_authority),
+            let proof_chain = match msg {
+                SystemMsg::AntiEntropyUpdate { proof_chain, .. } => proof_chain,
                 _ => continue,
             };
 
             assert_eq!(proof_chain.last_key(), &pk1);
-
-            // The message is trusted even by peers who don't yet know the new section key.
-            assert!(msg_authority.verify_src_section_key_is_known(&[pk0]));
 
             // Merging the section contained in the message with the original section succeeds.
             // TODO: how to do this here?
@@ -1451,22 +1413,16 @@ async fn handle_demote_during_split() -> Result<()> {
             let mut update_recipients = BTreeMap::new();
 
             for cmd in cmds {
-                let (recipients, wire_msg) = match cmd {
+                let (msg, recipients) = match cmd {
                     Cmd::SendMsg {
-                        recipients,
-                        wire_msg,
+                        msg: OutgoingMsg::System(msg),
+                        recipients: Recipients::Peers(recipients),
                         ..
-                    } => (recipients, wire_msg),
+                    } => (msg, recipients),
                     _ => continue,
                 };
 
-                if matches!(
-                    wire_msg.into_msg(),
-                    Ok(MsgType::System {
-                        msg: SystemMsg::AntiEntropyUpdate { .. },
-                        ..
-                    })
-                ) {
+                if matches!(msg, SystemMsg::AntiEntropyUpdate { .. }) {
                     for recipient in recipients {
                         let _old = update_recipients.insert(recipient.name(), recipient.addr());
                     }
@@ -1576,6 +1532,7 @@ async fn run_and_collect_cmds(cmd: Cmd, dispatcher: &Dispatcher) -> Result<Vec<C
         all_cmds.extend(cmds.clone());
         let mut new_cmds = vec![];
         for cmd in cmds {
+            println!("cmd: {:?}", cmd);
             if !matches!(cmd, Cmd::SendMsg { .. }) {
                 new_cmds.extend(dispatcher.process_cmd(cmd).await?);
             }
