@@ -62,7 +62,7 @@ impl Node {
         let operation_id = query.variant.operation_id()?;
         trace!(
             "{:?} preparing to query adults for data at {:?} with op_id: {:?}",
-            LogMarker::DataQueryReceviedAtElder,
+            LogMarker::DataQueryReceivedAtElder,
             address,
             operation_id
         );

@@ -28,10 +28,10 @@ static AE_PROBE_WEIGHTING: f32 = 150.0;
 /// Weighted score value relative to std_deviation, above which we're calling a node dysfunctional
 static DYSFUNCTION_SCORE_THRESHOLD: usize = 500;
 
-#[derive(Clone, Debug)]
 /// Represents the different type of issues that can be recorded by the Dysfunction Detection
 /// system.
 /// Issues have a xorname so they can be reliable assignd to the same nodes
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IssueType {
     /// Represents an AEProbeMsg has been sent, but we're awaiting response.
     AwaitingProbeResponse,

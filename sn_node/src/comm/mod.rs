@@ -27,8 +27,7 @@ use crate::node::{Error, RateLimits, Result};
 use qp2p::UsrMsgBytes;
 
 use sn_interface::{
-    messaging::{system::MembershipState, MsgId, WireMsg},
-    network_knowledge::NodeState,
+    messaging::{MsgId, WireMsg},
     types::Peer,
 };
 
@@ -39,6 +38,7 @@ use tokio::{
     sync::mpsc::{self, Receiver, Sender},
     task,
 };
+use xor_name::XorName;
 
 // Communication component of the node to interact with other nodes.
 #[derive(Clone)]
@@ -51,7 +51,7 @@ pub(crate) struct Comm {
 }
 
 /// Commands for interacting with Comm.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Cmd {
     #[cfg(feature = "back-pressure")]
     /// Set message rate for peer to the desired msgs per second
@@ -120,7 +120,7 @@ impl Comm {
         self.our_endpoint.public_addr()
     }
 
-    pub(crate) async fn cleanup_peers(&self, section_members: BTreeSet<NodeState>) {
+    pub(crate) async fn cleanup_peers(&self, section_members: BTreeSet<XorName>) {
         debug!(
             "Cleanup peers , known section members: {:?}",
             section_members
@@ -128,19 +128,10 @@ impl Comm {
 
         let mut peers_to_cleanup = vec![];
 
-        let mut retain_peers = vec![];
-
-        // first lets look out for members only.
-        for member in section_members {
-            if MembershipState::Joined == member.state() {
-                retain_peers.push(member.name());
-            }
-        }
-
         for entry in self.sessions.iter() {
             let peer = entry.key();
 
-            if !retain_peers.contains(&peer.name()) {
+            if !section_members.contains(&peer.name()) {
                 peers_to_cleanup.push(*peer);
             } else {
                 let session = entry.value();
@@ -151,9 +142,7 @@ impl Comm {
         // cleanup any and all conns that are not active section members
         for peer in peers_to_cleanup {
             trace!("Cleaning up peer's sessions: {peer:?}");
-            let perhaps_peer = self.sessions.remove(&peer);
-
-            if let Some((_peer, session)) = perhaps_peer {
+            if let Some((_, session)) = self.sessions.remove(&peer) {
                 session.disconnect().await
             };
         }
@@ -652,17 +641,12 @@ mod tests {
         let query = ServiceMsg::Query(query);
         let payload = WireMsg::serialize_msg_payload(&query)?;
 
-        let auth = ServiceAuth {
+        let auth = AuthKind::Service(ServiceAuth {
             public_key: src_keypair.public_key(),
             signature: src_keypair.sign(&payload),
-        };
+        });
 
-        Ok(WireMsg::new_msg(
-            MsgId::new(),
-            payload,
-            AuthKind::Service(auth),
-            dst,
-        ))
+        Ok(WireMsg::new_msg(MsgId::new(), payload, auth, dst))
     }
 
     async fn new_peer() -> Result<(Peer, Receiver<UsrMsgBytes>)> {

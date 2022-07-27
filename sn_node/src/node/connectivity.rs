@@ -30,6 +30,7 @@ impl Node {
     }
 
     pub(crate) fn cast_offline_proposals(&mut self, names: &BTreeSet<XorName>) -> Result<Vec<Cmd>> {
+        info!("Casting offline proposals for {names:?}");
         // Don't send the `Offline` proposal to the peer being lost as that send would fail,
         // triggering a chain of further `Offline` proposals.
         let elders: Vec<_> = self

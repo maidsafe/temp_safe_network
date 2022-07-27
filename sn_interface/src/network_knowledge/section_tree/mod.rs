@@ -215,7 +215,7 @@ impl SectionTree {
             }
             Some(sap) => {
                 // We are then aware of the prefix, let's just verify the new SAP can
-                // be trusted based on the SAP we aware of and the proof chain provided.
+                // be trusted based on the SAP we are aware of and the proof chain provided.
                 if !proof_chain.has_key(&sap.section_key()) {
                     // This case may happen when both the sender and receiver is about to using
                     // a new SAP. The AE-Update was sent before sender switching to use new SAP,
@@ -226,8 +226,8 @@ impl SectionTree {
                     // there is no need to bounce back here (assuming the sender is outdated) to
                     // avoid potential looping.
                     return Err(Error::UntrustedProofChain(format!(
-                        "provided proof_chain doesn't cover the SAP's key we currently know: {:?}",
-                        sap.value
+                        "provided proof_chain doesn't cover the SAP's key we currently know: {:?} not in {:?}",
+                        sap.section_key(), Vec::from_iter(proof_chain.keys())
                     )));
                 }
             }

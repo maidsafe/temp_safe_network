@@ -134,11 +134,16 @@ impl SectionAuthorityProvider {
         E: IntoIterator<Item = Peer>,
         M: IntoIterator<Item = NodeState>,
     {
+        let elders = BTreeSet::from_iter(elders);
+        let members = BTreeSet::from_iter(members);
+
+        debug_assert!(elders.is_subset(&BTreeSet::from_iter(members.iter().map(|n| *n.peer()))));
+
         Self {
             prefix,
             public_key_set: pk_set,
-            elders: elders.into_iter().collect(),
-            members: members.into_iter().collect(),
+            elders,
+            members,
             membership_gen,
         }
     }
@@ -228,11 +233,7 @@ impl SectionAuthorityProvider {
                 .iter()
                 .map(|elder| (elder.name(), elder.addr()))
                 .collect(),
-            members: self
-                .members
-                .iter()
-                .map(|state| (state.name(), state.to_msg()))
-                .collect(),
+            members: self.members.iter().map(|state| state.to_msg()).collect(),
             membership_gen: self.membership_gen,
         }
     }
@@ -254,9 +255,7 @@ impl SectionAuthorityProviderMsg {
                 .into_iter()
                 .map(|(name, value)| Peer::new(name, value)),
             self.prefix,
-            self.members
-                .into_iter()
-                .map(|(_name, state)| state.into_state()),
+            self.members.into_iter().map(|state| state.into_state()),
             self.public_key_set,
             self.membership_gen,
         )
@@ -353,6 +352,7 @@ pub mod test_utils {
 
     pub fn section_decision<P: Proposition>(
         secret_key_set: &bls::SecretKeySet,
+        gen: Generation,
         proposal: P,
     ) -> Result<Decision<P>> {
         let n = secret_key_set.threshold() + 1;
@@ -362,7 +362,7 @@ pub mod test_utils {
         }));
 
         let first_vote = nodes[0].sign_vote(Vote {
-            gen: 0,
+            gen,
             ballot: Ballot::Propose(proposal),
             faults: Default::default(),
         })?;

@@ -20,7 +20,6 @@ pub enum LogMarker {
     SplitSuccess,
     SplitAttempt,
     NewPrefix,
-    AeSendUpdateToSiblings,
     AgreementOfOnline,
     // ProposalAgreed
     ProposalAgreed,
@@ -43,10 +42,11 @@ pub enum LogMarker {
     MembershipVotesBeingHandled,
     MembershipSendingAeUpdateRequest,
     MembershipAeRequestReceived,
+    MembershipFailedToProposeChange,
     GossippingMembershipVotes,
     // Data
     DataStoreReceivedAtElder,
-    DataQueryReceviedAtElder,
+    DataQueryReceivedAtElder,
     // Chunks
     StoringChunk,
     StoredNewChunk,
@@ -85,6 +85,8 @@ pub enum LogMarker {
     // Anti-Entropy
     AeResendAfterRetry,
     AeResendAfterAeRedirect,
+    AeSendUpdateToSiblings,
+    AeSendRetry,
     AeSendRedirect,
     AeSendRetryAsOutdated,
     AeSendRetryDstPkFail,

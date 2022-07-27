@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::comm::Comm;
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, Node, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node, Result};
 
 use sn_interface::{
     elder_count,
@@ -28,7 +28,7 @@ impl Node {
         peer: Peer,
         join_request: JoinRequest,
         comm: &Comm,
-    ) -> Result<Option<Cmd>> {
+    ) -> Result<Vec<Cmd>> {
         debug!("Received {:?} from {}", join_request, peer);
 
         let provided_section_key = match join_request {
@@ -37,11 +37,11 @@ impl Node {
                 // Require resource signed if joining as a new node.
                 if !self.validate_resource_proof(&peer.name(), *proof) {
                     debug!("Ignoring JoinRequest from {peer} - invalid resource signed response");
-                    return Ok(None);
+                    return Ok(vec![]);
                 }
 
                 let node_state = NodeState::joined(peer.name(), peer.addr(), None);
-                return Ok(self.propose_membership_change(node_state));
+                return Ok(self.propose_membership_change(node_state).await);
             }
         };
 
@@ -57,7 +57,7 @@ impl Node {
             // properly handling this message.
             // This is OK because in the worst case the join request just timeouts and the
             // joining node sends it again.
-            return Ok(None);
+            return Ok(vec![]);
         }
 
         let our_prefix = self.network_knowledge.prefix();
@@ -67,7 +67,7 @@ impl Node {
             let msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(retry_sap.to_msg())));
             trace!("Sending {:?} to {}", msg, peer);
             trace!("{}", LogMarker::SendJoinRedirected);
-            return Ok(Some(self.send_system_msg(msg, Peers::Single(peer))));
+            return Ok(vec![self.send_system_msg(msg, Peers::Single(peer))]);
         }
 
         if !self.joins_allowed {
@@ -80,7 +80,7 @@ impl Node {
             )));
             trace!("{}", LogMarker::SendJoinsDisallowed);
             trace!("Sending {:?} to {}", msg, peer);
-            return Ok(Some(self.send_system_msg(msg, Peers::Single(peer))));
+            return Ok(vec![self.send_system_msg(msg, Peers::Single(peer))]);
         }
 
         let (is_age_invalid, expected_age) = self.verify_joining_node_age(&peer)?;
@@ -122,7 +122,7 @@ impl Node {
                 expected_age,
             }));
             trace!("Sending {:?} to {}", msg, peer);
-            return Ok(Some(self.send_system_msg(msg, Peers::Single(peer))));
+            return Ok(vec![self.send_system_msg(msg, Peers::Single(peer))]);
         }
 
         // Do reachability check only for the initial join request
@@ -132,10 +132,10 @@ impl Node {
             )));
             trace!("{}", LogMarker::SendJoinRejected);
             trace!("Sending {:?} to {}", msg, peer);
-            Ok(Some(self.send_system_msg(msg, Peers::Single(peer))))
+            Ok(vec![self.send_system_msg(msg, Peers::Single(peer))])
         } else {
             // It's reachable, let's then send the proof challenge
-            self.send_resource_proof_challenge(peer).map(Some)
+            Ok(vec![self.send_resource_proof_challenge(peer)?])
         }
     }
 
@@ -144,46 +144,41 @@ impl Node {
         // relocated at the same time. After the first section splits, nodes shall only
         // start with an age of MIN_ADULT_AGE
 
-        if let Some(membership) = &self.membership {
-            let current_section_size = membership.current_section_members().len();
-            let our_prefix = self.network_knowledge.prefix();
+        let current_section_size = self.network_knowledge.section_members().len();
+        let our_prefix = self.network_knowledge.prefix();
 
-            // Prefix will be empty for first section
-            if our_prefix.is_empty() {
-                let elders = self.network_knowledge.elders();
-                // Forces the joining node to be younger than the youngest elder in genesis section
-                // avoiding unnecessary churn.
+        // Prefix will be empty for first section
+        if our_prefix.is_empty() {
+            let elders = self.network_knowledge.elders();
+            // Forces the joining node to be younger than the youngest elder in genesis section
+            // avoiding unnecessary churn.
 
-                // Check if `elder_count()` Elders are already present
-                if elders.len() == elder_count() {
-                    // Check if the joining node is younger than the youngest elder and older than
-                    // MIN_ADULT_AGE in the first section, to avoid unnecessary churn during genesis.
-                    let mut expected_age =
-                        FIRST_SECTION_MIN_ELDER_AGE - (current_section_size as u8 * 2);
-                    if expected_age < MIN_ADULT_AGE {
-                        expected_age = MIN_ADULT_AGE
-                    }
-
-                    let is_age_invalid = peer.age() < MIN_ADULT_AGE || peer.age() > expected_age;
-
-                    Ok((is_age_invalid, expected_age))
-                } else {
-                    // Since enough elders haven't joined the first section calculate a value
-                    // within the range [FIRST_SECTION_MIN_ELDER_AGE, FIRST_SECTION_MAX_AGE].
-                    let expected_age = FIRST_SECTION_MAX_AGE - (current_section_size as u8 * 2);
-
-                    // TODO: avoid looping by ensure can only update to lower non-FIRST_SECTION_MIN_ELDER_AGE age
-                    let is_age_invalid = peer.age() != expected_age;
-                    Ok((is_age_invalid, expected_age))
+            // Check if `elder_count()` Elders are already present
+            if elders.len() == elder_count() {
+                // Check if the joining node is younger than the youngest elder and older than
+                // MIN_ADULT_AGE in the first section, to avoid unnecessary churn during genesis.
+                let mut expected_age =
+                    FIRST_SECTION_MIN_ELDER_AGE - (current_section_size as u8 * 2);
+                if expected_age < MIN_ADULT_AGE {
+                    expected_age = MIN_ADULT_AGE
                 }
+
+                let is_age_invalid = peer.age() < MIN_ADULT_AGE || peer.age() > expected_age;
+
+                Ok((is_age_invalid, expected_age))
             } else {
-                // Age should be MIN_ADULT_AGE for joining nodes after genesis section.
-                let is_age_invalid = peer.age() != MIN_ADULT_AGE;
-                Ok((is_age_invalid, MIN_ADULT_AGE))
+                // Since enough elders haven't joined the first section calculate a value
+                // within the range [FIRST_SECTION_MIN_ELDER_AGE, FIRST_SECTION_MAX_AGE].
+                let expected_age = FIRST_SECTION_MAX_AGE - (current_section_size as u8 * 2);
+
+                // TODO: avoid looping by ensure can only update to lower non-FIRST_SECTION_MIN_ELDER_AGE age
+                let is_age_invalid = peer.age() != expected_age;
+                Ok((is_age_invalid, expected_age))
             }
         } else {
-            error!("No membership found, cannot guage age of joining nodes.");
-            Err(Error::NoMembershipFound)
+            // Age should be MIN_ADULT_AGE for joining nodes after genesis section.
+            let is_age_invalid = peer.age() != MIN_ADULT_AGE;
+            Ok((is_age_invalid, MIN_ADULT_AGE))
         }
     }
 
@@ -192,7 +187,7 @@ impl Node {
         peer: Peer,
         join_request: JoinAsRelocatedRequest,
         comm: &Comm,
-    ) -> Option<Cmd> {
+    ) -> Vec<Cmd> {
         debug!("Received JoinAsRelocatedRequest {join_request:?} from {peer}",);
 
         let our_prefix = self.network_knowledge.prefix();
@@ -210,7 +205,7 @@ impl Node {
             trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);
 
             trace!("Sending {msg:?} to {peer}");
-            return Some(self.send_system_msg(msg, Peers::Single(peer)));
+            return vec![self.send_system_msg(msg, Peers::Single(peer))];
         }
 
         let relocate_details = if let MembershipState::Relocated(ref details) =
@@ -219,12 +214,12 @@ impl Node {
             // Check for signatures and trust of the relocate_proof
             if !join_request.relocate_proof.self_verify() {
                 debug!("Ignoring JoinAsRelocatedRequest from {peer} - invalid sig.");
-                return None;
+                return vec![];
             }
             let known_keys = self.network_knowledge.known_keys();
             if !known_keys.contains(&join_request.relocate_proof.sig.public_key) {
                 debug!("Ignoring JoinAsRelocatedRequest from {peer} - untrusted src.");
-                return None;
+                return vec![];
             }
 
             details
@@ -233,12 +228,12 @@ impl Node {
                 "Ignoring JoinAsRelocatedRequest from {peer} with invalid relocate proof state: {:?}",
                 join_request.relocate_proof.value.state
             );
-            return None;
+            return vec![];
         };
 
         if !relocate_details.verify_identity(&peer.name(), &join_request.signature_over_new_name) {
             debug!("Ignoring JoinAsRelocatedRequest from {peer} - invalid node name signature.");
-            return None;
+            return vec![];
         }
 
         // Finally do reachability check
@@ -249,9 +244,10 @@ impl Node {
             trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
 
             trace!("Sending {:?} to {}", msg, peer);
-            return Some(self.send_system_msg(msg, Peers::Single(peer)));
+            return vec![self.send_system_msg(msg, Peers::Single(peer))];
         };
 
         self.propose_membership_change(join_request.relocate_proof.value)
+            .await
     }
 }

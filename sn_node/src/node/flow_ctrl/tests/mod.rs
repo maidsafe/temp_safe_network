@@ -177,13 +177,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
             )
             .await?;
 
-            assert!(node
-                .read()
-                .await
-                .membership
-                .as_ref()
-                .ok_or_else(|| eyre!("Membership for the node must be set"))?
-                .is_churn_in_progress());
+            assert!(node.read().await.is_churn_in_progress());
             // makes sure that the nonce signature is always valid
             let random_peer = Peer::new(xor_name::rand::random(), gen_addr());
             assert!(!node
@@ -258,15 +252,8 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
             )
             .await?;
 
-            assert!(node
-                .read()
-                .await
-                .membership
-                .as_ref()
-                .ok_or_else(|| eyre!("Membership for the node must be set"))?
-                .is_churn_in_progress());
-
-            Result::<()>::Ok(())
+            assert!(node.read().await.is_churn_in_progress());
+            Ok(())
         })
         .await
 }
@@ -357,17 +344,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             let new_peer = network_utils::create_peer(MIN_ADULT_AGE + 1);
             let node_state = NodeState::joined(new_peer, Some(xor_name::rand::random()));
 
-            let membership_decision = section_decision(&sk_set, node_state.to_msg())?;
-
-            // Force this node to join
-            dispatcher
-                .node()
-                .write()
-                .await
-                .membership
-                .as_mut()
-                .ok_or_else(|| eyre!("Membership for the node must be set"))?
-                .force_bootstrap(node_state.to_msg());
+            let membership_decision = section_decision(&sk_set, 1, node_state.to_msg())?;
 
             let cmds = run_and_collect_cmds(
                 Cmd::HandleMembershipDecision(membership_decision),
@@ -425,21 +402,20 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
         .run_until(async move {
             init_logger();
             let prefix = Prefix::default();
-            let (dispatcher, _, _, _) =
+            let (dispatcher, _, _, sks) =
                 network_utils::TestNodeBuilder::new(Prefix::default(), elder_count())
                     .build()
                     .await?;
 
             // Make a left peer.
             let peer = network_utils::create_peer_in_prefix(&prefix, MIN_ADULT_AGE);
-            dispatcher
+            let leave_decision = section_decision(&sks, 1, NodeState::left(peer, None).to_msg())?;
+            let _ = dispatcher
                 .node()
                 .write()
                 .await
-                .membership
-                .as_mut()
-                .ok_or_else(|| eyre!("Membership for the node must be set"))?
-                .force_bootstrap(NodeState::left(peer, None).to_msg());
+                .handle_membership_decision(leave_decision)
+                .await?;
 
             // Simulate the same peer rejoining
             let node_state = NodeState::joined(peer, None).to_msg();
@@ -447,18 +423,12 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
                 .node()
                 .write()
                 .await
-                .propose_membership_change(node_state.clone());
+                .propose_membership_change(node_state.clone())
+                .await;
 
             // A rejoining node will always be rejected
-            assert!(join_cmd.is_none()); // no cmd signals this membership proposal was dropped.
-            assert!(!dispatcher
-                .node()
-                .read()
-                .await
-                .membership
-                .as_ref()
-                .ok_or_else(|| eyre!("Membership for the node must be set"))?
-                .is_churn_in_progress());
+            assert_eq!(join_cmd, vec![]); // no cmds signals this membership proposal was dropped.
+            assert!(!dispatcher.node().read().await.is_churn_in_progress());
             Ok(())
         })
         .await
@@ -480,11 +450,13 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
                     .await?;
 
             let node_state = NodeState::left(existing_peer, None);
-            let proposal = Proposal::VoteNodeOffline(node_state.clone());
-            let sig = keyed_signed(sk_set.secret_key(), &proposal.as_signable_bytes()?);
-
-            let _cmds =
-                run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
+            let decision = section_decision(&sk_set, 2, node_state.to_msg())?;
+            let _ = dispatcher
+                .node()
+                .write()
+                .await
+                .handle_membership_decision(decision)
+                .await?;
 
             assert!(!dispatcher
                 .node()
@@ -492,7 +464,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
                 .await
                 .network_knowledge()
                 .section_members()
-                .contains(&node_state));
+                .contains_key(&node_state.name()));
             Result::<()>::Ok(())
         })
         .await
@@ -505,12 +477,12 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         .run_until(async move {
             let (section_auth, mut nodes, sk_set) = network_utils::create_section_auth();
 
-            let (section, _) = network_utils::create_section(&sk_set, &section_auth)?;
+            let (mut section, _) = network_utils::create_section(&sk_set, &section_auth)?;
 
             let existing_peer = network_utils::create_peer(MIN_ADULT_AGE);
             let node_state = NodeState::joined(existing_peer, None);
-            let node_state = section_signed(sk_set.secret_key(), node_state)?;
-            let _updated = section.update_member(node_state);
+            let decision = section_decision(&sk_set, 1, node_state.to_msg())?;
+            assert!(section.handle_membership_decision(decision)?);
 
             // Pick the elder to remove.
             let auth_peers = section_auth.elders();
@@ -535,14 +507,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
                 run_and_collect_cmds(Cmd::HandleAgreement { proposal, sig }, &dispatcher).await?;
 
             // Verify we initiated a membership churn
-            assert!(dispatcher
-                .node()
-                .read()
-                .await
-                .membership
-                .as_ref()
-                .ok_or_else(|| eyre!("Membership for the node must be set"))?
-                .is_churn_in_progress());
+            assert!(dispatcher.node().read().await.is_churn_in_progress());
             Result::<()>::Ok(())
         })
         .await
@@ -568,7 +533,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let pk0 = sk0.public_key();
 
             let (old_sap, mut nodes, sk_set1) = network_utils::create_section_auth();
-            let members =
+            let mut members =
                 BTreeSet::from_iter(nodes.iter().map(|n| NodeState::joined(n.peer(), None)));
             let pk1 = sk_set1.secret_key().public_key();
             let pk1_signature = sk0.sign(bincode::serialize(&pk1)?);
@@ -610,6 +575,8 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
             // Create the new `SectionAuthorityProvider` by replacing the last peer with a new one.
             let new_peer = network_utils::create_peer(MIN_ADULT_AGE);
+            let _ = members.insert(NodeState::joined(new_peer, None));
+
             let new_elders = old_sap
                 .elders()
                 .take(old_sap.elder_count() - 1)
@@ -638,7 +605,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                     section_signed: signed_new_sap.sig,
                     proof_chain: chain,
                     kind: AntiEntropyKind::Update {
-                        members: BTreeSet::default(),
+                        membership_decisions: vec![],
                     },
                 },
                 src_section_pk,
@@ -699,7 +666,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
                 section_signed: signed_sap.sig,
                 proof_chain: SecuredLinkedList::new(bogus_section_pk),
                 kind: AntiEntropyKind::Update {
-                    members: BTreeSet::default(),
+                    membership_decisions: vec![],
                 },
             };
 
@@ -772,22 +739,25 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                 RelocatedPeerRole::NonElder => recommended_section_size(),
             };
             let (section_auth, mut nodes, sk_set) = random_sap(prefix, elder_count(), 0, None);
-            let (section, section_key_share) =
+            let (mut section, section_key_share) =
                 network_utils::create_section(&sk_set, &section_auth)?;
 
             let mut adults = section_size - elder_count();
+            let mut gen = 0;
             while adults > 0 {
                 adults -= 1;
+                gen += 1;
                 let non_elder_peer = network_utils::create_peer(MIN_ADULT_AGE);
                 let node_state = NodeState::joined(non_elder_peer, None);
-                let node_state = section_signed(sk_set.secret_key(), node_state)?;
-                assert!(section.update_member(node_state));
+                let decision = section_decision(&sk_set, gen, node_state.to_msg())?;
+                assert!(section.handle_membership_decision(decision)?);
             }
 
             let non_elder_peer = network_utils::create_peer(MIN_ADULT_AGE - 1);
             let node_state = NodeState::joined(non_elder_peer, None);
-            let node_state = section_signed(sk_set.secret_key(), node_state)?;
-            assert!(section.update_member(node_state));
+            gen += 1;
+            let decision = section_decision(&sk_set, gen, node_state.to_msg())?;
+            assert!(section.handle_membership_decision(decision)?);
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let comm = network_utils::create_comm().await?;
@@ -920,6 +890,7 @@ async fn handle_elders_update() -> Result<()> {
         let members = BTreeSet::from_iter(
             [info.peer(), adult_peer, promoted_peer]
                 .into_iter()
+                .chain(other_elder_peers.clone())
                 .map(|p| NodeState::joined(p, None)),
         );
 
@@ -936,13 +907,7 @@ async fn handle_elders_update() -> Result<()> {
 
         let (section0, section_key_share) = network_utils::create_section_with_elders(&sk_set0, &sap0)?;
 
-        for peer in [&adult_peer, &promoted_peer] {
-            let node_state = NodeState::joined(*peer, None);
-            let node_state = section_signed(sk_set0.secret_key(), node_state)?;
-            assert!(section0.update_member(node_state));
-        }
-
-        let demoted_peer = other_elder_peers.remove(0);
+        let _demoted_peer = other_elder_peers.remove(0);
 
         let sk_set1 = SecretKeySet::random(None);
 
@@ -991,7 +956,7 @@ async fn handle_elders_update() -> Result<()> {
 
         let cmds = run_and_collect_cmds(Cmd::HandleNewEldersAgreement { new_elders: signed_sap1, sig }, &dispatcher).await?;
 
-        let mut update_actual_recipients = HashSet::new();
+        let mut update_actual_recipients = BTreeSet::new();
 
         for cmd in cmds {
             let (msg, recipients) = match cmd {
@@ -1018,12 +983,14 @@ async fn handle_elders_update() -> Result<()> {
             update_actual_recipients.extend(recipients);
         }
 
-        let update_expected_recipients: HashSet<_> = other_elder_peers
-            .into_iter()
-            .chain(iter::once(promoted_peer))
-            .chain(iter::once(demoted_peer))
-            .chain(iter::once(adult_peer))
-            .collect();
+        let update_expected_recipients =
+            BTreeSet::from_iter(
+                section0
+                    .section_members()
+                    .values()
+                    .map(|n| *n.peer())
+                    .filter(|p| p != &info.peer())
+            );
 
         assert_eq!(update_actual_recipients, update_expected_recipients);
 
@@ -1090,14 +1057,20 @@ async fn handle_demote_during_split() -> Result<()> {
                 sk_set_v0.public_keys(),
                 0,
             );
-            let (section, section_key_share) =
+            let (mut section, section_key_share) =
                 network_utils::create_section_with_elders(&sk_set_v0, &section_auth_v0)?;
 
             // all peers b are added
-            for peer in peers_b.iter().chain(iter::once(&peer_c)).cloned() {
+            for (gen, peer) in peers_b
+                .iter()
+                .chain(iter::once(&peer_c))
+                .cloned()
+                .enumerate()
+            {
                 let node_state = NodeState::joined(peer, None);
-                let node_state = section_signed(sk_set_v0.secret_key(), node_state)?;
-                assert!(section.update_member(node_state));
+                let decision = section_decision(&sk_set_v0, gen as u64 + 1, node_state.to_msg())?;
+
+                assert!(section.handle_membership_decision(decision)?);
             }
 
             // we make a new full node from info, to see what it does
@@ -1150,7 +1123,10 @@ async fn handle_demote_during_split() -> Result<()> {
             let section_auth = SectionAuthorityProvider::new(
                 peers_a.iter().cloned().chain(iter::once(peer_c)),
                 prefix0,
-                members.clone(),
+                members
+                    .iter()
+                    .filter(|n| prefix0.matches(&n.name()))
+                    .cloned(),
                 sk_set_v1_p0.public_keys(),
                 0,
             );
@@ -1163,7 +1139,10 @@ async fn handle_demote_during_split() -> Result<()> {
             let section_auth = SectionAuthorityProvider::new(
                 peers_b.iter().cloned(),
                 prefix1,
-                members,
+                members
+                    .iter()
+                    .filter(|n| prefix1.matches(&n.name()))
+                    .cloned(),
                 sk_set_v1_p1.public_keys(),
                 0,
             );
@@ -1175,7 +1154,7 @@ async fn handle_demote_during_split() -> Result<()> {
 
             cmds.extend(new_cmds);
 
-            let mut update_recipients = BTreeMap::new();
+            let mut update_recipients = BTreeSet::new();
 
             for cmd in cmds {
                 let (msg, recipients) = match cmd {
@@ -1195,14 +1174,14 @@ async fn handle_demote_during_split() -> Result<()> {
                     }
                 ) {
                     for recipient in recipients {
-                        let _old = update_recipients.insert(recipient.name(), recipient.addr());
+                        let _ = update_recipients.insert(recipient.name());
                     }
                 }
             }
 
             // our node's whole section
             assert_eq!(update_recipients.len(), elder_count());
-            Result::<()>::Ok(())
+            Ok(())
         })
         .await
 }

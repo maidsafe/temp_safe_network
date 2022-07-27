@@ -78,7 +78,7 @@ mod core {
             dkg::DkgVoter,
             flow_ctrl::{cmds::Cmd, event_channel::EventSender},
             handover::Handover,
-            membership::{elder_candidates, try_split_dkg, Membership},
+            membership::{elder_candidates, try_split_dkg},
             messaging::Peers,
             split_barrier::SplitBarrier,
             DataStorage, Elders, Error, Event, MembershipEvent, NodeElderChange, Prefix, Proposal,
@@ -86,6 +86,7 @@ mod core {
         },
         UsedSpace,
     };
+    use sn_consensus::Consensus;
     use sn_dysfunction::{DysfunctionDetection, IssueType};
     #[cfg(feature = "traceroute")]
     use sn_interface::messaging::Entity;
@@ -111,7 +112,7 @@ mod core {
         net::SocketAddr,
         path::PathBuf,
         sync::Arc,
-        time::Duration,
+        time::{Duration, Instant},
     };
     use uluru::LRUCache;
 
@@ -179,7 +180,8 @@ mod core {
         pub(crate) dkg_voter: DkgVoter,
         pub(crate) relocate_state: Option<Box<JoiningAsRelocated>>,
         // ======================== Elder only ========================
-        pub(crate) membership: Option<Membership>,
+        pub(crate) membership: Option<Consensus<NodeState>>,
+        pub(crate) membership_last_received_vote_time: Option<Instant>,
         // Section handover consensus state (Some for Elders, None for others)
         pub(crate) handover_voting: Option<Handover>,
         pub(crate) joins_allowed: bool,
@@ -208,19 +210,10 @@ mod core {
                     .section_signed_authority_provider()
                     .elder_count();
 
-                // TODO: the bootstrap members should come from handover
-                let bootstrap_members = BTreeSet::from_iter(
-                    network_knowledge
-                        .section_signed_members()
-                        .into_iter()
-                        .map(|section_auth| section_auth.value.to_msg()),
-                );
-
-                Some(Membership::from(
+                Some(Consensus::from(
                     (key.index as u8, key.secret_key_share),
                     key.public_key_set,
                     n_elders,
-                    bootstrap_members,
                 ))
             } else {
                 None
@@ -233,9 +226,8 @@ mod core {
             info!("Creating DysfunctionDetection checks");
             let node_dysfunction_detector = DysfunctionDetection::new(
                 network_knowledge
-                    .members()
-                    .iter()
-                    .map(|peer| peer.name())
+                    .section_members()
+                    .into_keys()
                     .collect::<Vec<XorName>>(),
             );
             info!(
@@ -281,6 +273,7 @@ mod core {
                 pending_data_to_replicate_to_peers: BTreeMap::new(),
                 ae_backoff_cache: AeBackoffCache::default(),
                 membership,
+                membership_last_received_vote_time: None,
             };
 
             node.statemap_log_metadata();
@@ -382,9 +375,8 @@ mod core {
                 elders: self.network_knowledge().authority_provider().names(),
                 members: self
                     .network_knowledge()
-                    .members()
-                    .into_iter()
-                    .map(|p| p.name())
+                    .section_members()
+                    .into_keys()
                     .collect(),
             }
         }
@@ -400,20 +392,14 @@ mod core {
             let chain_len = self.network_knowledge.chain_len();
 
             // get current gen and members
-            let current_gen;
-            let members: BTreeMap<XorName, NodeState> = if let Some(m) = self.membership.as_ref() {
-                current_gen = m.generation();
-                m.current_section_members()
-                    .iter()
-                    .filter(|(name, _node_state)| !excluded_names.contains(*name))
-                    .map(|(n, s)| (*n, s.clone()))
-                    .collect()
-            } else {
-                error!(
-                "attempted to promote and demote elders when we don't have a membership instance"
-            );
-                return vec![];
-            };
+            let current_gen = self.network_knowledge.membership_gen();
+            let members: BTreeMap<XorName, NodeState> = self
+                .network_knowledge
+                .section_members()
+                .iter()
+                .filter(|(name, _node_state)| !excluded_names.contains(*name))
+                .map(|(n, s)| (*n, s.to_msg()))
+                .collect();
 
             // Try splitting
             trace!("{}", LogMarker::SplitAttempt);
@@ -508,12 +494,13 @@ mod core {
                 .section_keys_provider
                 .key_share(&self.network_knowledge.section_key())?;
 
-            self.membership = Some(Membership::from(
+            self.membership = Some(Consensus::from(
                 (key.index as u8, key.secret_key_share),
                 key.public_key_set,
                 sap.elders.len(),
-                BTreeSet::from_iter(sap.members.into_values()),
             ));
+
+            self.membership_last_received_vote_time = None;
 
             Ok(())
         }
@@ -605,7 +592,7 @@ mod core {
             }
 
             if new.is_elder || old.is_elder {
-                if let Some(cmd) = self.send_ae_update_to_our_section() {
+                if let Some(cmd) = self.send_ae_update_to_our_section(None) {
                     cmds.push(cmd);
                 }
             }
@@ -721,18 +708,25 @@ mod core {
         }
 
         pub(crate) fn log_section_stats(&self) {
-            if let Some(m) = self.membership.as_ref() {
-                let adults = self.network_knowledge.adults().len();
+            let elders = BTreeSet::from_iter(
+                self.network_knowledge
+                    .authority_provider()
+                    .elders()
+                    .map(|e| e.name()),
+            );
+            let adults = BTreeSet::from_iter(
+                self.network_knowledge
+                    .adults()
+                    .into_iter()
+                    .map(|n| n.name()),
+            );
 
-                let elders = self.network_knowledge.authority_provider().elder_count();
+            let n_elders = elders.len();
+            let n_adults = adults.len();
 
-                let membership_adults = m.current_section_members().len() - elders;
-                let prefix = self.network_knowledge.prefix();
+            let prefix = self.network_knowledge.prefix();
 
-                debug!("{prefix:?}: {elders} Elders, {adults}~{membership_adults} Adults.");
-            } else {
-                debug!("log_section_stats: No membership instance");
-            };
+            debug!("{prefix:?}: {n_elders} Elders, {n_adults} Adults.");
         }
 
         pub(crate) async fn write_section_tree(&self) {

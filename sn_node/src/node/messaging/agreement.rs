@@ -21,31 +21,34 @@ impl Node {
         &mut self,
         proposal: Proposal,
         sig: KeyedSig,
-    ) -> Result<Option<Cmd>> {
+    ) -> Result<Vec<Cmd>> {
         debug!("{:?} {:?}", LogMarker::ProposalAgreed, proposal);
         match proposal {
             Proposal::VoteNodeOffline(node_state) => {
-                Ok(self.handle_offline_agreement(node_state, sig))
+                Ok(self.handle_offline_agreement(node_state, sig).await)
             }
-            Proposal::SectionInfo(sap) => self.handle_section_info_agreement(sap, sig).await,
+            Proposal::SectionInfo(sap) => self
+                .handle_section_info_agreement(sap, sig)
+                .await
+                .map(Vec::from_iter),
             Proposal::NewElders(_) => {
                 error!("Elders agreement should be handled in a separate blocking fashion");
-                Ok(None)
+                Ok(vec![])
             }
             Proposal::JoinsAllowed(joins_allowed) => {
                 self.joins_allowed = joins_allowed;
-                Ok(None)
+                Ok(vec![])
             }
         }
     }
 
     #[instrument(skip(self))]
-    fn handle_offline_agreement(&mut self, node_state: NodeState, sig: KeyedSig) -> Option<Cmd> {
+    async fn handle_offline_agreement(&mut self, node_state: NodeState, sig: KeyedSig) -> Vec<Cmd> {
         info!(
             "Agreement - proposing membership change with node offline: {}",
             node_state.peer()
         );
-        self.propose_membership_change(node_state.to_msg())
+        self.propose_membership_change(node_state.to_msg()).await
     }
 
     #[instrument(skip(self), level = "trace")]
@@ -160,7 +163,7 @@ impl Node {
                 match self.network_knowledge.update_knowledge_if_valid(
                     signed_section_auth.clone(),
                     &proof_chain,
-                    None,
+                    vec![],
                     &our_name,
                     &self.section_keys_provider,
                 ) {

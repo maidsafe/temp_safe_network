@@ -33,7 +33,7 @@ use sn_interface::{
 use bytes::Bytes;
 use std::collections::BTreeSet;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[allow(clippy::large_enum_variant)]
 pub(crate) enum OutgoingMsg {
     System(SystemMsg),
@@ -41,7 +41,7 @@ pub(crate) enum OutgoingMsg {
     DstAggregated((BlsShareAuth, Bytes)),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Peers {
     Single(Peer),
     Multiple(BTreeSet<Peer>),
@@ -86,17 +86,14 @@ impl Node {
             } => {
                 // Verify that the section key in the msg authority is trusted
                 if !self.verify_section_key(&msg_authority, &msg).await {
-                    warn!(
-                        "Untrusted message ({:?}) dropped from {:?}: {:?} ",
-                        msg_id, origin, msg
-                    );
+                    warn!("Untrusted message ({msg_id:?}) dropped from {origin:?}: {msg:?}");
                     return Ok(vec![]);
                 };
 
                 // Check for entropy before we proceed further
                 // Anythign returned here means there's an issue and we should
                 // short-circuit below
-                let ae_cmds = self.apply_ae(&origin, &msg, &wire_msg, &dst).await?;
+                let mut ae_cmds = self.apply_ae(&origin, &msg, &wire_msg, &dst).await?;
 
                 if !ae_cmds.is_empty() {
                     // short circuit and send those AE responses
@@ -106,7 +103,8 @@ impl Node {
                 #[cfg(feature = "traceroute")]
                 let traceroute = wire_msg.traceroute();
 
-                Ok(vec![Cmd::HandleValidSystemMsg {
+                // cmds.extend(self.check_for_membership_entropy(membership_gen, &origin));
+                ae_cmds.push(Cmd::HandleValidSystemMsg {
                     origin,
                     msg_id,
                     msg,
@@ -114,7 +112,9 @@ impl Node {
                     wire_msg_payload,
                     #[cfg(feature = "traceroute")]
                     traceroute,
-                }])
+                });
+
+                Ok(ae_cmds)
             }
             MsgType::Service {
                 msg_id,

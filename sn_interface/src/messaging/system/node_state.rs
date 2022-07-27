@@ -9,13 +9,14 @@
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{Signature, Verifier};
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use std::net::SocketAddr;
 use xor_name::{XorName, XOR_NAME_LEN};
 
 use crate::{network_knowledge::NetworkKnowledge, types::Peer};
 
 /// Information about a member of our section.
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct NodeState {
     /// Peer's name.
     pub name: XorName,
@@ -25,6 +26,16 @@ pub struct NodeState {
     pub state: MembershipState,
     /// To avoid sybil attack via relocation, a relocated node's original name will be recorded.
     pub previous_name: Option<XorName>,
+}
+
+impl Debug for NodeState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NodeState({}, {:?}", self.name, self.state)?;
+        if let Some(prev_name) = self.previous_name {
+            write!(f, ", prev: {prev_name}")?;
+        };
+        write!(f, ")")
+    }
 }
 
 impl NodeState {

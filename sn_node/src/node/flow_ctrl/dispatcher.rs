@@ -63,7 +63,8 @@ impl Dispatcher {
         match cmd {
             Cmd::CleanupPeerLinks => {
                 let members = { self.node.read().await.network_knowledge.section_members() };
-                self.comm.cleanup_peers(members).await;
+                let names = members.into_keys().collect();
+                self.comm.cleanup_peers(names).await;
                 Ok(vec![])
             }
             Cmd::SendMsg {
@@ -193,14 +194,14 @@ impl Dispatcher {
                 #[cfg(feature = "traceroute")]
                 traceroute,
             } => {
-                debug!("init of handling valid msg {:?}", msg_id);
                 let mut node = self.node.write().await;
 
                 if let Some(msg_authority) = node
                     .aggregate_system_msg(msg_id, msg_authority, wire_msg_payload)
                     .await
                 {
-                    debug!("handling valid msg {:?}", msg_id);
+                    debug!("Handling valid msg {:?}", msg_id);
+
                     node.handle_valid_system_msg(
                         msg_id,
                         msg_authority,

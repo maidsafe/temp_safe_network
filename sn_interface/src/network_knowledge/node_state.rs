@@ -75,8 +75,6 @@ impl NodeState {
         archived: &BTreeSet<XorName>,
     ) -> Result<()> {
         let name = self.name();
-        info!("Validating node state for {name}");
-
         if !prefix.matches(&name) {
             info!("Membership - rejecting node {name}, name doesn't match our prefix {prefix:?}");
             return Err(Error::WrongSection);
@@ -87,16 +85,16 @@ impl NodeState {
         match self.state {
             MembershipState::Joined | MembershipState::Relocated(_) => {
                 if members.contains_key(&name) {
-                    info!("Rejecting join from existing member {name}");
+                    info!("Membership - rejecting join from existing member {name}");
                     Err(Error::ExistingMemberConflict)
                 } else if !section_has_room_for_node(name, prefix, members.keys().copied()) {
-                    info!("Rejecting join since we are at capacity");
+                    info!("Membership - rejecting join since we are at capacity");
                     Err(Error::TryJoinLater)
                 } else if let Some(existing_node) = members
                     .values()
                     .find(|n| n.peer().addr() == self.peer().addr())
                 {
-                    info!("Rejecting join since we have an existing node with this address: {existing_node:?}");
+                    info!("Membership - rejecting join since we have an existing node with this address: {existing_node:?}");
                     Err(Error::ExistingMemberConflict)
                 } else if archived.contains(&name) {
                     Err(Error::ArchivedNodeRejoined)

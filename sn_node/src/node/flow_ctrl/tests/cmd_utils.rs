@@ -33,7 +33,14 @@ pub(crate) async fn handle_online_cmd(
     section_auth: &SectionAuthorityProvider,
 ) -> Result<HandleOnlineStatus> {
     let node_state = NodeState::joined(*peer, None);
-    let membership_decision = section_decision(sk_set, node_state.to_msg())?;
+    let generation = dispatcher
+        .node()
+        .read()
+        .await
+        .network_knowledge
+        .membership_gen()
+        + 1;
+    let membership_decision = section_decision(sk_set, generation, node_state.to_msg())?;
 
     let all_cmds = run_and_collect_cmds(
         Cmd::HandleMembershipDecision(membership_decision),

@@ -15,13 +15,13 @@ use crate::node::{
 };
 use sn_consensus::{Generation, SignedVote, VoteResponse};
 use sn_interface::{
-    messaging::system::{NodeState, SectionAuth},
+    messaging::system::SectionAuth,
     network_knowledge::{SapCandidate, SectionAuthorityProvider},
     types::log_markers::LogMarker,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use tracing::warn;
-use xor_name::{Prefix, XorName};
+use xor_name::Prefix;
 
 impl Node {
     /// Make a handover consensus proposal vote for a sap candidate
@@ -145,15 +145,6 @@ impl Node {
         Ok(())
     }
 
-    fn get_members_at_gen(&self, gen: Generation) -> Result<BTreeMap<XorName, NodeState>> {
-        if let Some(m) = self.membership.as_ref() {
-            Ok(m.section_members(gen)?)
-        } else {
-            error!("Missing membership instance when checking handover SAP candidates");
-            Err(Error::MissingMembershipInstance)
-        }
-    }
-
     fn get_sap_for_prefix(&self, prefix: Prefix) -> Result<SectionAuthorityProvider> {
         self.network_knowledge
             .section_tree()
@@ -164,15 +155,18 @@ impl Node {
     fn check_elder_handover_candidates(&self, sap: &SectionAuthorityProvider) -> Result<()> {
         // in regular handover the previous SAP's prefix is the same
         let previous_gen_sap = self.get_sap_for_prefix(sap.prefix())?;
-        let members = self.get_members_at_gen(sap.membership_gen())?;
-        let received_candidates: BTreeSet<&Peer> = sap.elders().collect();
+        let members = self
+            .network_knowledge
+            .section_members_upto_gen(sap.membership_gen())
+            .into_values()
+            .map(|n| n.to_msg());
 
-        let expected_peers: BTreeSet<Peer> =
-            elder_candidates(members.values().cloned(), &previous_gen_sap)
-                .iter()
-                .map(|node| Peer::new(node.name, node.addr))
-                .collect();
+        let expected_peers: BTreeSet<Peer> = elder_candidates(members, &previous_gen_sap)
+            .iter()
+            .map(|node| Peer::new(node.name, node.addr))
+            .collect();
         let expected_candidates: BTreeSet<&Peer> = expected_peers.iter().collect();
+        let received_candidates: BTreeSet<&Peer> = sap.elders().collect();
         if received_candidates != expected_candidates {
             debug!("InvalidElderCandidates: received SAP at gen {} with candidates {:#?}, expected candidates {:#?}", sap.membership_gen(), received_candidates, expected_candidates);
             return Err(Error::InvalidElderCandidates);
@@ -190,7 +184,12 @@ impl Node {
         // and the same ancestor prefix
         let prev_prefix = sap1.prefix().popped();
         let previous_gen_sap = self.get_sap_for_prefix(prev_prefix)?;
-        let members = self.get_members_at_gen(sap1.membership_gen())?;
+        let members = BTreeMap::from_iter(
+            self.network_knowledge
+                .section_members_upto_gen(sap1.membership_gen())
+                .into_iter()
+                .map(|(name, node)| (name, node.to_msg())),
+        );
         let dummy_chain_len = 0;
         let dummy_gen = 0;
 

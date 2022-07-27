@@ -14,16 +14,16 @@ use crate::node::{
 };
 
 use qp2p::UsrMsgBytes;
-use sn_interface::messaging::system::AntiEntropyKind;
+use sn_consensus::Generation;
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        system::{KeyedSig, NodeCmd, SectionAuth, SystemMsg},
+        system::{AntiEntropyKind, KeyedSig, NodeCmd, SectionAuth, SystemMsg},
         MsgType, WireMsg,
     },
-    network_knowledge::SectionAuthorityProvider,
     types::{log_markers::LogMarker, Peer, PublicKey},
+    SectionAuthorityProvider,
 };
 
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -34,14 +34,17 @@ use xor_name::{Prefix, XorName};
 
 impl Node {
     /// Send `AntiEntropy` update message to all nodes in our own section.
-    pub(crate) fn send_ae_update_to_our_section(&self) -> Option<Cmd> {
+    pub(crate) fn send_ae_update_to_our_section(
+        &self,
+        membership_gen: Option<Generation>,
+    ) -> Option<Cmd> {
         let our_name = self.info().name();
         let recipients: BTreeSet<_> = self
             .network_knowledge
             .section_members()
             .into_iter()
-            .filter(|info| info.name() != our_name)
-            .map(|info| *info.peer())
+            .filter(|(name, _)| name != &our_name)
+            .map(|(_, info)| *info.peer())
             .collect();
 
         if recipients.is_empty() {
@@ -51,7 +54,7 @@ impl Node {
 
         // The previous PK which is likely what adults know
         let previous_pk = *self.our_section_dag().prev_key();
-        Some(self.send_ae_update_to_nodes(recipients, previous_pk))
+        Some(self.send_ae_update_to_nodes(recipients, previous_pk, membership_gen))
     }
 
     /// Send `AntiEntropy` update message to the specified nodes.
@@ -59,15 +62,22 @@ impl Node {
         &self,
         recipients: BTreeSet<Peer>,
         section_pk: BlsPublicKey,
+        membership_gen: Option<Generation>,
     ) -> Cmd {
-        let members = self
-            .network_knowledge
-            .section_signed_members()
-            .iter()
-            .map(|state| state.clone().into_authed_msg())
-            .collect();
+        // If they don't provide a membership generation, assume they are up-to-date on section membership.
+        let membership_gen =
+            membership_gen.unwrap_or_else(|| self.network_knowledge.membership_gen());
 
-        let ae_msg = self.generate_ae_msg(Some(section_pk), AntiEntropyKind::Update { members });
+        let membership_decisions = self
+            .network_knowledge
+            .membership_decisions_since(membership_gen);
+
+        let ae_msg = self.generate_ae_msg(
+            Some(section_pk),
+            AntiEntropyKind::Update {
+                membership_decisions,
+            },
+        );
 
         self.send_system_msg(ae_msg, Peers::Multiple(recipients))
     }
@@ -114,7 +124,11 @@ impl Node {
                 vec![self.send_metadata_updates(promoted_sibling_elders.clone(), &sibling_prefix)];
 
             // Also send AE update to sibling section's new Elders
-            cmds.push(self.send_ae_update_to_nodes(promoted_sibling_elders, previous_section_key));
+            cmds.push(self.send_ae_update_to_nodes(
+                promoted_sibling_elders,
+                previous_section_key,
+                None,
+            ));
 
             Ok(cmds)
         } else {
@@ -162,22 +176,38 @@ impl Node {
             sig: section_signed.clone(),
         };
 
-        let members = if let AntiEntropyKind::Update { members } = kind.clone() {
-            Some(members)
+        let membership_decisions = if let AntiEntropyKind::Update {
+            membership_decisions,
+        } = kind.clone()
+        {
+            membership_decisions
         } else {
-            None
+            vec![]
         };
+
+        let mut cmds = vec![];
+        for decision in membership_decisions.iter().cloned() {
+            let current_gen = self.network_knowledge.membership_gen();
+            let decision_gen = decision.generation()?;
+            if decision_gen != current_gen + 1 {
+                info!("Dropping AE membership generation: {decision_gen} != {current_gen} + 1");
+                continue;
+            }
+
+            cmds.extend(self.membership_process_decision(decision).await?);
+        }
 
         let updated = self.network_knowledge.update_knowledge_if_valid(
             signed_sap.clone(),
             &proof_chain,
-            members,
+            // membership_decisions.clone(),
+            vec![],
             &our_name,
             &self.section_keys_provider,
         )?;
 
         // always run this, only changes will trigger events
-        let mut cmds = self.update_on_elder_change(&snapshot).await?;
+        cmds.extend(self.update_on_elder_change(&snapshot).await?);
 
         // Only trigger reorganize data when there is a membership change happens.
         if updated && self.is_not_elder() {
@@ -355,11 +385,7 @@ impl Node {
         }
 
         let section_key = self.network_knowledge.section_key();
-        trace!(
-            "Performing AE checks, provided pk was: {:?} ours is: {:?}",
-            dst_section_key,
-            section_key
-        );
+        trace!("Performing SAP AE check, provided = {dst_section_key:?}, ours = {section_key:?}");
 
         if dst_section_key == &section_key {
             // Destination section key matches our current section key
@@ -410,7 +436,7 @@ mod tests {
     use sn_interface::{
         elder_count,
         messaging::{
-            AuthKind, AuthorityProof, Dst, MsgId, NodeAuth, NodeMsgAuthority,
+            system::SectionAuth, AuthKind, AuthorityProof, Dst, MsgId, NodeAuth, NodeMsgAuthority,
             SectionAuth as SectionAuthMsg,
         },
         network_knowledge::{
@@ -418,13 +444,13 @@ mod tests {
             NetworkKnowledge, NodeInfo, SectionKeyShare, SectionKeysProvider,
         },
         types::keys::ed25519,
+        SectionAuthorityProvider,
     };
 
     use assert_matches::assert_matches;
     use bls::SecretKey;
     use eyre::{Context, Result};
     use secured_linked_list::SecuredLinkedList;
-    use std::collections::BTreeSet;
     use xor_name::Prefix;
 
     #[tokio::test]
@@ -487,7 +513,10 @@ mod tests {
                 ));
 
                 // Other messages shall get rejected.
-                let other_msg = SystemMsg::AntiEntropyProbe(known_keys[0]);
+                let other_msg = SystemMsg::AntiEntropyProbe {
+                    section_key: known_keys[0],
+                    membership_gen: None,
+                };
                 assert!(!NetworkKnowledge::verify_node_msg_can_be_trusted(
                     &msg_authority,
                     &other_msg,
@@ -541,7 +570,7 @@ mod tests {
                     .update_knowledge_if_valid(
                         env.other_sap.clone(),
                         &env.proof_chain,
-                        None,
+                        vec![],
                         &env.node.info().name(),
                         &env.node.section_keys_provider
                     )?
@@ -637,7 +666,7 @@ mod tests {
                     &msg,
                     dst_section_key,
                     dst_name,
-                    &sender,
+                    &sender
                 )?;
 
             let msg = assert_matches!(cmd, Some(Cmd::SendMsg { msg: OutgoingMsg::System(msg), .. }) => {
@@ -698,7 +727,7 @@ mod tests {
             let _ = node.network_knowledge.update_knowledge_if_valid(
                 signed_sap.clone(),
                 &chain,
-                None,
+                vec![],
                 &info.name(),
                 &node.section_keys_provider,
             );
@@ -731,7 +760,10 @@ mod tests {
             );
 
             // just some message we can construct easily
-            let payload_msg = SystemMsg::AntiEntropyProbe(src_section_pk);
+            let payload_msg = SystemMsg::AntiEntropyProbe {
+                section_key: src_section_pk,
+                membership_gen: None,
+            };
 
             let payload = WireMsg::serialize_msg_payload(&payload_msg)?;
 
@@ -756,10 +788,9 @@ mod tests {
                 section_signed: self.other_sap.sig.clone(),
                 proof_chain,
                 kind: AntiEntropyKind::Update {
-                    members: BTreeSet::new(),
+                    membership_decisions: vec![],
                 },
             };
-
             let auth_proof = AuthorityProof(SectionAuthMsg {
                 src_name: self.other_sap.value.prefix().name(),
                 sig: self.other_sap.sig.clone(),

@@ -65,8 +65,10 @@ pub enum Error {
     FailedSend(Peer),
     #[error("Messaging protocol error: {0}")]
     Messaging(#[from] sn_interface::messaging::Error),
-    #[error("Membership error: {0}")]
-    Membership(#[from] crate::node::membership::Error),
+    #[error("Consensus error: {0}")]
+    Consensus(#[from] sn_consensus::Error),
+    #[error("Invalid payload")]
+    InvalidPayload,
     #[error("The section is currently set to not allow taking any new node")]
     TryJoinLater,
     #[error("No matching Section")]
@@ -172,6 +174,11 @@ pub enum Error {
     /// Cannot handle more queries at this point
     #[error("Cannot handle more queries at this point: {0:?}")]
     CannotHandleQuery(DataQuery),
+    /// Invalid membership proposal
+    #[error("Invalid membership proposal")]
+    InvalidMembershipProposal,
+    #[error("Received membership vote for wrong generation")]
+    MembershipVoteForWrongGeneration,
 }
 
 impl From<qp2p::ClientEndpointError> for Error {

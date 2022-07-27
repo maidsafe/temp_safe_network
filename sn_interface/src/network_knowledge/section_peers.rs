@@ -11,7 +11,8 @@ use crate::network_knowledge::NodeState;
 
 use dashmap::{mapref::entry::Entry, DashMap};
 use secured_linked_list::SecuredLinkedList;
-use std::{collections::BTreeSet, sync::Arc};
+use std::collections::BTreeSet;
+use std::sync::Arc;
 use xor_name::{Prefix, XorName};
 
 // Number of Elder churn events before a Left/Relocated member
@@ -26,33 +27,11 @@ pub(super) struct SectionPeers {
 }
 
 impl SectionPeers {
-    /// Returns set of current members, i.e. those with state == `Joined`.
-    pub(super) fn members(&self) -> BTreeSet<SectionAuth<NodeState>> {
-        self.members
-            .iter()
-            .map(|entry| {
-                let (_, state) = entry.pair();
-                state.clone()
-            })
-            .collect()
-    }
-
-    /// Returns the number of current members.
-    pub(super) fn num_of_members(&self) -> usize {
-        self.members.len()
-    }
-
-    /// Get the `NodeState` for the member with the given name.
-    pub(super) fn get(&self, name: &XorName) -> Option<NodeState> {
-        self.members.get(name).map(|state| state.value.clone())
-    }
-
-    /// Returns whether the given peer is currently a member of our section.
-    pub(super) fn is_member(&self, name: &XorName) -> bool {
-        self.members.get(name).is_some()
-    }
-
     /// Get section signed `NodeState` for the member with the given name.
+    pub(crate) fn archived_members(&self) -> BTreeSet<XorName> {
+        BTreeSet::from_iter(self.archive.iter().map(|e| *e.key()))
+    }
+
     pub(super) fn is_either_member_or_archived(
         &self,
         name: &XorName,

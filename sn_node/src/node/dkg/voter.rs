@@ -220,10 +220,7 @@ impl DkgVoter {
         if let Some(mut session) = self.sessions.get_mut(&session_id.hash()) {
             session.handle_dkg_history(node, message_history, section_pk)
         } else {
-            warn!(
-                "Recieved DKG message cache from {} without an active DKG session: {:?}",
-                &sender, &session_id,
-            );
+            warn!("Recieved DKG message cache from {sender} without an active DKG session: {session_id:?}");
             Ok(vec![])
         }
     }

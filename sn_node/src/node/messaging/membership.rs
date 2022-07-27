@@ -7,12 +7,12 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    flow_ctrl::cmds::Cmd, membership, messaging::Peers, relocation::ChurnId, Event,
-    MembershipEvent, Node, Result,
+    flow_ctrl::cmds::Cmd, messaging::Peers, relocation::ChurnId, Event, MembershipEvent, Node,
+    Result,
 };
 
 use bls::Signature;
-use sn_consensus::{Decision, Generation, SignedVote, VoteResponse};
+use sn_consensus::{Decision, SignedVote};
 use sn_interface::{
     messaging::system::{
         JoinResponse, KeyedSig, MembershipState, NodeState, SectionAuth, SystemMsg,
@@ -24,24 +24,18 @@ use std::{collections::BTreeSet, vec};
 
 // Message handling
 impl Node {
-    pub(crate) fn propose_membership_change(&mut self, node_state: NodeState) -> Option<Cmd> {
+    pub(crate) async fn propose_membership_change(&mut self, node_state: NodeState) -> Vec<Cmd> {
         info!(
             "Proposing membership change: {} - {:?}",
             node_state.name, node_state.state
         );
         let prefix = self.network_knowledge.prefix();
-        if let Some(membership) = self.membership.as_mut() {
-            let membership_vote = match membership.propose(node_state, &prefix) {
-                Ok(vote) => vote,
-                Err(e) => {
-                    warn!("Membership - failed to propose change: {e:?}");
-                    return None;
-                }
-            };
-            Some(self.send_msg_to_our_elders(SystemMsg::MembershipVotes(vec![membership_vote])))
-        } else {
-            error!("Membership - Failed to propose membership change, no membership instance");
-            None
+        match self.membership_propose(node_state, &prefix).await {
+            Ok(cmds) => cmds,
+            Err(e) => {
+                warn!("{:?}: {e:?}", LogMarker::MembershipFailedToProposeChange);
+                vec![]
+            }
         }
     }
 
@@ -49,20 +43,16 @@ impl Node {
     /// (which should in turn trigger them to resend their votes)
     #[instrument(skip_all)]
     pub(crate) async fn membership_gossip_votes(&self) -> Option<Cmd> {
-        let membership = self.membership.clone();
-
-        if let Some(membership) = membership {
-            trace!("{}", LogMarker::GossippingMembershipVotes);
-            if let Ok(ae_votes) = membership.anti_entropy(membership.generation()) {
-                let cmd = self.send_msg_to_our_elders(SystemMsg::MembershipVotes(ae_votes));
-                return Some(cmd);
-            }
+        trace!("{}", LogMarker::GossippingMembershipVotes);
+        if let Ok(ae_votes) = self.membership_anti_entropy() {
+            let cmd = self.send_msg_to_our_elders(SystemMsg::MembershipVotes(ae_votes));
+            Some(cmd)
+        } else {
+            None
         }
-
-        None
     }
 
-    pub(crate) fn handle_membership_votes(
+    pub(crate) async fn handle_membership_votes(
         &mut self,
         peer: Peer,
         signed_votes: Vec<SignedVote<NodeState>>,
@@ -75,85 +65,17 @@ impl Node {
 
         let mut cmds = vec![];
 
-        for signed_vote in signed_votes {
-            let mut vote_broadcast = None;
-            if let Some(membership) = self.membership.as_mut() {
-                let (vote_response, decision) = match membership
-                    .handle_signed_vote(signed_vote, &prefix)
-                {
-                    Ok(result) => result,
-                    Err(membership::Error::RequestAntiEntropy) => {
-                        debug!("Membership - We are behind the voter, requesting AE");
-                        // We hit an error while processing this vote, perhaps we are missing information.
-                        // We'll send a membership AE request to see if they can help us catch up.
-                        debug!("{:?}", LogMarker::MembershipSendingAeUpdateRequest);
-                        let msg = SystemMsg::MembershipAE(membership.generation());
-                        cmds.push(self.send_system_msg(msg, Peers::Single(peer)));
-                        // return the vec w/ the AE cmd there so as not to loop and generate AE for
-                        // any subsequent commands
-                        return Ok(cmds);
-                    }
-                    Err(e) => {
-                        error!("Membership - error while processing vote {e:?}, dropping this and all votes in this batch thereafter");
-                        break;
-                    }
-                };
-
-                match vote_response {
-                    VoteResponse::Broadcast(response_vote) => {
-                        vote_broadcast = Some(SystemMsg::MembershipVotes(vec![response_vote]));
-                    }
-                    VoteResponse::WaitingForMoreVotes => {
-                        // do nothing
-                    }
-                };
-
-                if let Some(decision) = decision {
-                    cmds.push(Cmd::HandleMembershipDecision(decision));
+        for vote in signed_votes {
+            match self.membership_handle_signed_vote(vote, &prefix).await {
+                Ok(membership_cmds) => cmds.extend(membership_cmds),
+                Err(e) => {
+                    error!("Membership - error while processing vote {e:?}, dropping this and all votes in this batch thereafter");
+                    break;
                 }
-            } else {
-                error!(
-                    "Attempted to handle membership vote when we don't yet have a membership instance"
-                );
             };
-
-            if let Some(vote_msg) = vote_broadcast {
-                cmds.push(self.send_msg_to_our_elders(vote_msg));
-            }
         }
 
         Ok(cmds)
-    }
-
-    pub(crate) fn handle_membership_anti_entropy(
-        &self,
-        peer: Peer,
-        gen: Generation,
-    ) -> Option<Cmd> {
-        debug!(
-            "{:?} membership anti-entropy request for gen {:?} from {}",
-            LogMarker::MembershipAeRequestReceived,
-            gen,
-            peer
-        );
-
-        if let Some(membership) = self.membership.as_ref() {
-            match membership.anti_entropy(gen) {
-                Ok(catchup_votes) => Some(self.send_system_msg(
-                    SystemMsg::MembershipVotes(catchup_votes),
-                    Peers::Single(peer),
-                )),
-                Err(e) => {
-                    error!("Membership - Error while processing anti-entropy {:?}", e);
-                    None
-                }
-            }
-        } else {
-            error!(
-                "Attempted to handle membership anti-entropy when we don't yet have a membership instance"
-            );
-            None
-        }
     }
 
     pub(crate) async fn handle_membership_decision(
@@ -174,6 +96,10 @@ impl Node {
             Vec::from_iter(joining_nodes.iter().map(|(n, _)| n.name)),
             Vec::from_iter(leaving_nodes.iter().map(|(n, _)| n.name))
         );
+
+        let _ = self
+            .network_knowledge
+            .handle_membership_decision(decision.clone())?;
 
         for (new_info, signature) in joining_nodes.iter().cloned() {
             cmds.extend(self.handle_node_joined(new_info, signature).await);
@@ -202,7 +128,7 @@ impl Node {
         }
 
         cmds.extend(self.promote_and_demote_elders_except(&BTreeSet::default())?);
-        cmds.extend(self.send_ae_update_to_our_section());
+        cmds.extend(self.send_ae_update_to_our_section(Some(decision.generation()?)));
 
         self.liveness_retain_only(
             self.network_knowledge

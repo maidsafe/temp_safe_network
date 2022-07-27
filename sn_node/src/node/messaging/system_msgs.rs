@@ -122,10 +122,7 @@ impl Node {
         #[cfg(feature = "traceroute")]
         {
             if !traceroute.0.is_empty() {
-                info!(
-                    "Handling SystemMsg {}:{:?} with trace \n{:?}",
-                    msg, msg_id, traceroute
-                );
+                info!("Handling SystemMsg {msg} : {msg_id:?} with trace {traceroute:?}");
             }
         }
 
@@ -177,7 +174,11 @@ impl Node {
             // Respond to a probe msg
             // We always respond to probe msgs if we're an elder as health checks use this to see if a node is alive
             // and repsonsive, as well as being a method of keeping nodes up to date.
-            SystemMsg::AntiEntropyProbe(section_key) => {
+            SystemMsg::AntiEntropyProbe {
+                section_key,
+                membership_gen,
+            } => {
+                trace!("Handling msg: AE Probe from {sender}: {msg_id:?} - section_key={section_key:?}, membership={membership_gen:?}");
                 let mut cmds = vec![];
                 if !self.is_elder() {
                     // early return here as we do not get health checks as adults,
@@ -185,10 +186,9 @@ impl Node {
                     return Ok(cmds);
                 }
 
-                trace!("Received Probe message from {}: {:?}", sender, msg_id);
                 let mut recipients = BTreeSet::new();
                 let _existed = recipients.insert(sender);
-                cmds.push(self.send_ae_update_to_nodes(recipients, section_key));
+                cmds.push(self.send_ae_update_to_nodes(recipients, section_key, membership_gen));
                 Ok(cmds)
             }
             #[cfg(feature = "back-pressure")]
@@ -207,6 +207,7 @@ impl Node {
             }
             // The AcceptedOnlineShare for relocation will be received here.
             SystemMsg::JoinResponse(join_response) => {
+                trace!("Handling msg: JoinResponse from {sender}");
                 match *join_response {
                     JoinResponse::Approved {
                         section_auth,
@@ -277,16 +278,22 @@ impl Node {
                 trace!("Handling msg: Dkg-FailureAgreement from {}", sender);
                 self.handle_dkg_failure_agreement(&src_name, &sig_set)
             }
-            SystemMsg::HandoverVotes(votes) => self.handle_handover_msg(sender, votes).await,
-            SystemMsg::HandoverAE(gen) => Ok(self
-                .handle_handover_anti_entropy(sender, gen)
-                .into_iter()
-                .collect()),
+            SystemMsg::HandoverVotes(votes) => {
+                trace!("Handling msg: HandoverVotes {sender}");
+                self.handle_handover_msg(sender, votes).await
+            }
+            SystemMsg::HandoverAE(gen) => {
+                trace!("Handling msg: HandoverAE {sender}");
+                Ok(self
+                    .handle_handover_anti_entropy(sender, gen)
+                    .into_iter()
+                    .collect())
+            }
             SystemMsg::JoinRequest(join_request) => {
                 trace!("Handling msg {:?}: JoinRequest from {}", msg_id, sender);
                 self.handle_join_request(sender, join_request, comm)
                     .await
-                    .map(|c| c.into_iter().collect())
+                    .map(Vec::from_iter)
             }
             SystemMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
@@ -295,21 +302,17 @@ impl Node {
                 {
                     return Ok(vec![]);
                 }
-                Ok(self
-                    .handle_join_as_relocated_request(sender, *join_request, comm)
-                    .await
-                    .into_iter()
-                    .collect())
+                Ok(Vec::from_iter(
+                    self.handle_join_as_relocated_request(sender, *join_request, comm)
+                        .await,
+                ))
             }
             SystemMsg::MembershipVotes(votes) => {
-                let mut cmds = vec![];
-                cmds.extend(self.handle_membership_votes(sender, votes)?);
-                Ok(cmds)
+                trace!("Handling msg: MembershipVotes {sender}");
+                Ok(Vec::from_iter(
+                    self.handle_membership_votes(sender, votes).await?,
+                ))
             }
-            SystemMsg::MembershipAE(gen) => Ok(self
-                .handle_membership_anti_entropy(sender, gen)
-                .into_iter()
-                .collect()),
             SystemMsg::Propose {
                 proposal,
                 sig_share,
@@ -318,11 +321,7 @@ impl Node {
                     trace!("Adult handling a Propose msg from {}: {:?}", sender, msg_id);
                 }
 
-                trace!(
-                    "Handling proposal msg: {proposal:?} from {}: {:?}",
-                    sender,
-                    msg_id
-                );
+                trace!("Handling msg: Proposal {proposal:?} from {sender}: {msg_id:?}");
 
                 // lets convert our message into a usable proposal for core
                 let core_proposal = match proposal {
@@ -366,8 +365,9 @@ impl Node {
                 message,
             } => {
                 trace!(
-                    "Handling msg: Dkg-Msg ({:?} - {:?}) from {}",
-                    session_id,
+                    "Handling msg: Dkg-Msg ({:?}@{:?} - {:?}) from {}",
+                    session_id.prefix,
+                    Vec::from_iter(session_id.elders.keys()),
                     message,
                     sender
                 );

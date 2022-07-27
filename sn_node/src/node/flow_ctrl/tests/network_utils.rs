@@ -319,7 +319,7 @@ pub(crate) fn create_relocation_trigger(
     loop {
         let node_state =
             NodeState::joined(create_peer(MIN_ADULT_AGE), Some(xor_name::rand::random())).to_msg();
-        let decision = section_decision(sk_set, node_state.clone())?;
+        let decision = section_decision(sk_set, 1, node_state.clone())?;
 
         let sig: Signature = decision.proposals[&node_state].clone();
         let churn_id = ChurnId(sig.to_bytes());

@@ -264,20 +264,14 @@ impl FlowCtrl {
     async fn check_for_missed_votes(node: Arc<RwLock<Node>>) -> Option<Cmd> {
         info!("Checking for missed votes");
         let node = node.read().await;
-        let membership = &node.membership;
+        if let Some(time) = node.membership_last_received_vote_time {
+            // we want to resend the prev vote
+            if time.elapsed() >= MISSING_VOTE_INTERVAL {
+                debug!("Vote consensus appears stalled...");
+                if let Some(cmd) = node.membership_gossip_votes().await {
+                    trace!("Vote resending cmd");
 
-        if let Some(membership) = &membership {
-            let last_received_vote_time = membership.last_received_vote_time();
-
-            if let Some(time) = last_received_vote_time {
-                // we want to resend the prev vote
-                if time.elapsed() >= MISSING_VOTE_INTERVAL {
-                    debug!("Vote consensus appears stalled...");
-                    if let Some(cmd) = node.membership_gossip_votes().await {
-                        trace!("Vote resending cmd");
-
-                        return Some(cmd);
-                    }
+                    return Some(cmd);
                 }
             }
         }

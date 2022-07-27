@@ -68,11 +68,8 @@ impl Node {
         new_keypair: Arc<Keypair>,
         new_section: NetworkKnowledge,
     ) -> Result<()> {
-        // we first try to relocate section info.
-        self.network_knowledge.relocated_to(new_section)?;
-
+        self.network_knowledge = new_section;
         self.keypair = new_keypair;
-
         Ok(())
     }
 

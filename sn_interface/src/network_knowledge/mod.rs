@@ -31,8 +31,8 @@ pub use self::{
 use crate::{
     messaging::{
         system::{
-            KeyedSig, NodeMsgAuthorityUtils, SectionAuth, SectionPeers as SectionPeersMsg,
-            SystemMsg,
+            KeyedSig, MembershipState, NodeMsgAuthorityUtils, NodeState as NodeStateMsg,
+            SectionAuth, SystemMsg,
         },
         Dst, NodeMsgAuthority,
     },
@@ -43,7 +43,12 @@ use bls::PublicKey as BlsPublicKey;
 use section_peers::SectionPeers;
 use secured_linked_list::SecuredLinkedList;
 use serde::Serialize;
-use std::{collections::BTreeSet, iter, net::SocketAddr};
+use sn_consensus::{Decision, Generation};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    iter,
+    net::SocketAddr,
+};
 use xor_name::{Prefix, XorName};
 
 /// The minimum age a node becomes an adult node.
@@ -143,6 +148,8 @@ pub fn section_has_room_for_node(
 pub struct NetworkKnowledge {
     /// Signed Section Authority Provider
     signed_sap: SectionAuth<SectionAuthorityProvider>,
+    /// Changes in section membership since last SAP
+    membership_decisions: Vec<Decision<NodeStateMsg>>,
     /// Members of our section
     section_peers: SectionPeers,
     /// The network section tree, i.e. a map from prefix to SAPs plus all sections keys
@@ -189,18 +196,10 @@ impl NetworkKnowledge {
 
         Ok(Self {
             signed_sap,
+            membership_decisions: vec![],
             section_peers: SectionPeers::default(),
             section_tree,
         })
-    }
-
-    /// update all section info for our new section
-    pub fn relocated_to(&mut self, new_network_knowledge: Self) -> Result<()> {
-        debug!("Node was relocated to {:?}", new_network_knowledge);
-        self.signed_sap = new_network_knowledge.signed_sap();
-        let _updated = self.merge_members(new_network_knowledge.section_signed_members())?;
-
-        Ok(())
     }
 
     /// Creates `NetworkKnowledge` for the first node in the network
@@ -313,18 +312,19 @@ impl NetworkKnowledge {
     }
 
     pub fn anti_entropy_probe(&self) -> SystemMsg {
-        SystemMsg::AntiEntropyProbe(self.section_key())
+        SystemMsg::AntiEntropyProbe {
+            section_key: self.section_key(),
+            membership_gen: Some(self.membership_gen()),
+        }
     }
 
     /// Update our network knowledge if the provided SAP is valid and can be verified
     /// with the provided proof chain.
-    /// If the '`update_sap`' flag is set to 'true', the provided SAP and chain will be
-    /// set as our current.
     pub fn update_knowledge_if_valid(
         &mut self,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
         proof_chain: &SecuredLinkedList,
-        updated_members: Option<SectionPeersMsg>,
+        membership_decisions: Vec<Decision<NodeStateMsg>>,
         our_name: &XorName,
         section_keys_provider: &SectionKeysProvider,
     ) -> Result<bool> {
@@ -388,6 +388,7 @@ impl NetworkKnowledge {
                     let our_prev_prefix = self.prefix();
                     // Remove any peer which doesn't belong to our new section's prefix
                     self.section_peers.retain(&provided_sap.prefix());
+                    self.membership_decisions = vec![];
                     info!(
                         "Updated our section's SAP ({:?} to {:?}) with new one: {:?}",
                         our_prev_prefix,
@@ -409,8 +410,8 @@ impl NetworkKnowledge {
             }
             Ok(false) => {
                 debug!(
-                    "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records: {:?}",
-                    provided_sap.prefix(), provided_sap
+                    "Anti-Entropy: discarded SAP for {:?} since it's the same as the one in our records",
+                    provided_sap.prefix()
                 );
             }
             Err(err) => {
@@ -421,21 +422,10 @@ impl NetworkKnowledge {
             }
         }
 
-        // Update members if changes were provided
-        if let Some(members) = updated_members {
-            let peers: BTreeSet<_> = members
-                .into_iter()
-                .map(|member| member.into_authed_state())
-                .collect();
-
-            if !peers.is_empty() && self.merge_members(peers)? {
-                there_was_an_update = true;
-                let prefix = self.prefix();
-                info!(
-                    "Updated our section's members ({:?}): {:?}",
-                    prefix, self.section_peers
-                );
-            }
+        // Update members based on decisions.
+        info!("Processing {} decision(s)", membership_decisions.len());
+        for decision in membership_decisions {
+            there_was_an_update |= self.handle_membership_decision(decision)?;
         }
 
         Ok(there_was_an_update)
@@ -444,6 +434,60 @@ impl NetworkKnowledge {
     // Returns reference to network section tree
     pub fn section_tree(&self) -> &SectionTree {
         &self.section_tree
+    }
+
+    pub fn handle_membership_decision(&mut self, decision: Decision<NodeStateMsg>) -> Result<bool> {
+        let public_key = self.signed_sap.section_key();
+        let our_gen = self.membership_gen(); // !important to re-calculate each loop iteration since it's changing.
+        let gen = decision.generation()?;
+        if gen != our_gen + 1 {
+            info!("Dropping decision for wrong generation {gen} != {our_gen} + 1");
+            return Ok(false);
+        }
+
+        // We validate decisions w.r.t. the current sap. since decisions are only valid in the current SAP.
+        let pks = self.signed_sap.value.public_key_set();
+        if decision.validate(&pks).is_err() {
+            info!("Dropping membership decision from wrong SAP");
+            return Ok(false);
+        };
+
+        let peers = BTreeSet::from_iter(decision.proposals.clone().into_iter().map(
+            |(member, signature)| {
+                SectionAuth::new(
+                    member.into_state(),
+                    KeyedSig {
+                        public_key,
+                        signature,
+                    },
+                )
+            },
+        ));
+
+        let _ = self.merge_members(peers)?;
+
+        self.membership_decisions.push(decision);
+
+        for (gen, decision) in self.membership_decisions.iter().enumerate() {
+            assert_eq!(gen as Generation + 1, decision.generation()?);
+        }
+
+        Ok(true)
+    }
+
+    pub fn membership_decisions_since(&self, gen: Generation) -> Vec<Decision<NodeStateMsg>> {
+        Vec::from_iter(
+            self.membership_decisions
+                .iter()
+                // .skip(gen.saturating_sub(1) as usize)
+                .skip(gen as usize)
+                .cloned(),
+        )
+    }
+
+    /// Current membership generation
+    pub fn membership_gen(&self) -> Generation {
+        self.membership_decisions.len() as Generation
     }
 
     // Returns mutable reference to network section tree
@@ -492,7 +536,7 @@ impl NetworkKnowledge {
     /// Checks if we're already up to date before attempting to verify and merge members
     pub fn merge_members(&self, peers: BTreeSet<SectionAuth<NodeState>>) -> Result<bool> {
         let mut there_was_an_update = false;
-        let our_current_members = self.section_peers.members();
+        let our_current_members = BTreeSet::from_iter(self.section_members().into_values());
 
         for node_state in &peers {
             if our_current_members.contains(node_state) {
@@ -600,11 +644,6 @@ impl NetworkKnowledge {
         self.signed_sap.prefix()
     }
 
-    /// Returns the members of our section
-    pub fn members(&self) -> BTreeSet<Peer> {
-        self.elders().into_iter().chain(self.adults()).collect()
-    }
-
     /// Returns the elders of our section
     pub fn elders(&self) -> BTreeSet<Peer> {
         self.authority_provider().elders_set()
@@ -612,13 +651,12 @@ impl NetworkKnowledge {
 
     /// Returns live adults from our section.
     pub fn adults(&self) -> BTreeSet<Peer> {
-        let mut live_adults = BTreeSet::new();
-        for node_state in self.section_peers.members() {
-            if !self.is_elder(&node_state.name()) {
-                let _ = live_adults.insert(*node_state.peer());
-            }
-        }
-        live_adults
+        BTreeSet::from_iter(
+            self.section_members()
+                .into_iter()
+                .filter(|(name, _)| !self.is_elder(name))
+                .map(|(_, node)| *node.peer()),
+        )
     }
 
     /// Return whether the name provided belongs to an Elder, by checking if
@@ -641,28 +679,48 @@ impl NetworkKnowledge {
         })
     }
 
-    /// Returns members that are joined.
-    pub fn section_members(&self) -> BTreeSet<NodeState> {
-        self.section_peers
-            .members()
-            .into_iter()
-            .map(|state| state.value)
-            .collect()
+    pub fn section_members_upto_gen(&self, gen: Generation) -> BTreeMap<XorName, NodeState> {
+        let mut members = BTreeMap::from_iter(
+            self.signed_sap
+                .members()
+                .filter(|n| matches!(n.state(), MembershipState::Joined))
+                .cloned()
+                .map(|n| (n.name(), n)),
+        );
+
+        for decision in self.membership_decisions.iter().take(gen as usize) {
+            for (node_state, _sig) in decision.proposals.iter() {
+                match node_state.state {
+                    MembershipState::Joined => {
+                        let _ = members.insert(node_state.name, node_state.clone().into_state());
+                    }
+                    _ => {
+                        let _ = members.remove(&node_state.name);
+                    }
+                }
+            }
+        }
+
+        members
     }
 
-    /// Returns current list of section signed members.
-    pub fn section_signed_members(&self) -> BTreeSet<SectionAuth<NodeState>> {
-        self.section_peers.members()
+    /// Returns members that are joined.
+    pub fn section_members(&self) -> BTreeMap<XorName, NodeState> {
+        self.section_members_upto_gen(self.membership_gen())
     }
 
     /// Returns current section size, i.e. number of peers in the section.
     pub fn section_size(&self) -> usize {
-        self.section_peers.num_of_members()
+        self.section_members().len()
     }
 
     /// Get info for the member with the given name.
     pub fn get_section_member(&self, name: &XorName) -> Option<NodeState> {
-        self.section_peers.get(name)
+        self.section_members().get(name).cloned()
+    }
+
+    pub fn archived_members(&self) -> BTreeSet<XorName> {
+        self.section_peers.archived_members()
     }
 
     /// Get info for the member with the given name either from current members list,
@@ -673,13 +731,12 @@ impl NetworkKnowledge {
 
     /// Get info for the member with the given name.
     pub fn is_section_member(&self, name: &XorName) -> bool {
-        self.section_peers.is_member(name)
+        self.section_members().contains_key(name)
     }
 
     pub fn find_member_by_addr(&self, addr: &SocketAddr) -> Option<Peer> {
-        self.section_peers
-            .members()
-            .into_iter()
+        self.section_members()
+            .into_values()
             .find(|info| info.addr() == *addr)
             .map(|info| *info.peer())
     }

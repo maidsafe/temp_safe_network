@@ -461,7 +461,10 @@ impl<'a> Joiner<'a> {
                 MsgEvent::Received {
                     sender, wire_msg, ..
                 } => match wire_msg.auth() {
-                    AuthKind::Service(_) => continue,
+                    AuthKind::Service(_) => {
+                        info!("Bootstrap service message discarded: sender: {sender:?} wire_msg: {wire_msg:?}");
+                        continue;
+                    }
                     AuthKind::NodeBlsShare(_) => {
                         trace!("Bootstrap message discarded: sender: {sender:?} wire_msg: {wire_msg:?}");
                         continue;
@@ -476,7 +479,7 @@ impl<'a> Joiner<'a> {
                             continue;
                         }
                         Err(err) => {
-                            debug!("Failed to deserialize message payload: {:?}", err);
+                            debug!("Failed to deserialize message payload: {err:?}");
                             continue;
                         }
                     },
@@ -525,7 +528,10 @@ mod tests {
 
     use sn_interface::{
         elder_count, init_logger,
-        messaging::SectionAuthorityProvider as SectionAuthorityProviderMsg,
+        messaging::{
+            system::NodeState as NodeStateMsg,
+            SectionAuthorityProvider as SectionAuthorityProviderMsg,
+        },
         network_knowledge::{test_utils::*, NodeState},
         types::PublicKey,
     };
@@ -537,7 +543,10 @@ mod tests {
         pin_mut,
     };
     use secured_linked_list::SecuredLinkedList;
-    use std::{collections::BTreeMap, net::SocketAddr};
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        net::SocketAddr,
+    };
     use tokio::task;
     use xor_name::XorName;
 
@@ -633,7 +642,7 @@ mod tests {
 
             // Send JoinResponse::Approved
             let section_auth = section_signed(sk, section_auth.clone())?;
-            let decision = section_decision(&sk_set, NodeState::joined(peer, None).to_msg())?;
+            let decision = section_decision(&sk_set, 1, NodeState::joined(peer, None).to_msg())?;
             let section_chain = SecuredLinkedList::new(original_section_key);
             send_response(
                 &recv_tx,
@@ -710,7 +719,10 @@ mod tests {
                     prefix: Prefix::default(),
                     public_key_set: new_pk_set.clone(),
                     elders: new_bootstrap_addrs.clone(),
-                    members: BTreeMap::new(),
+                    members: new_bootstrap_addrs
+                        .iter()
+                        .map(|(name, addr)| NodeStateMsg::joined(*name, *addr, None))
+                        .collect(),
                     membership_gen: 0,
                 }),
                 &bootstrap_node,
@@ -794,7 +806,7 @@ mod tests {
                     prefix: Prefix::default(),
                     public_key_set: new_pk_set.clone(),
                     elders: BTreeMap::new(),
-                    members: BTreeMap::new(),
+                    members: BTreeSet::new(),
                     membership_gen: 0,
                 }),
                 &bootstrap_node,
@@ -812,7 +824,10 @@ mod tests {
                     prefix: Prefix::default(),
                     public_key_set: new_pk_set.clone(),
                     elders: addrs.clone(),
-                    members: BTreeMap::new(),
+                    members: addrs
+                        .iter()
+                        .map(|(n, a)| NodeStateMsg::joined(*n, *a, None))
+                        .collect(),
                     membership_gen: 0,
                 }),
                 &bootstrap_node,

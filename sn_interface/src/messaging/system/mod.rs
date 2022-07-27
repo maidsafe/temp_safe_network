@@ -29,7 +29,7 @@ use qp2p::UsrMsgBytes;
 use crate::messaging::{EndUser, MsgId, SectionAuthorityProvider};
 use crate::network_knowledge::SapCandidate;
 
-use sn_consensus::{Generation, SignedVote};
+use sn_consensus::{Decision, Generation, SignedVote};
 
 use bls_dkg::key_gen::message::Message as DkgMessage;
 use secured_linked_list::SecuredLinkedList;
@@ -52,7 +52,9 @@ pub enum AntiEntropyKind {
     /// can resend it to the correct section with up to date destination information.
     Redirect { bounced_msg: UsrMsgBytes },
     /// This AE message is sent to update a peer when we notice they are behind
-    Update { members: SectionPeers },
+    Update {
+        membership_decisions: Vec<Decision<NodeState>>,
+    },
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
@@ -73,7 +75,10 @@ pub enum SystemMsg {
     /// Probes the network by sending a message to a random or chosen dst triggering an AE flow.
     /// Sends the current section key of target section which we know
     /// This expects a response, even if we're up to date.
-    AntiEntropyProbe(BlsPublicKey),
+    AntiEntropyProbe {
+        section_key: BlsPublicKey,
+        membership_gen: Option<Generation>,
+    },
     #[cfg(feature = "back-pressure")]
     /// Sent when a msg-consuming node wants to update a msg-producing node on the number of msgs per s it wants to receive.
     /// It tells the node to adjust msg sending rate according to the provided value in this msg.
@@ -82,8 +87,6 @@ pub enum SystemMsg {
     Relocate(SectionAuth<NodeState>),
     /// Membership Votes, in order they should be processed in.
     MembershipVotes(Vec<SignedVote<NodeState>>),
-    /// Membership Anti-Entropy request
-    MembershipAE(Generation),
     /// Sent from a bootstrapping peer to the section requesting to join as a new member
     JoinRequest(JoinRequest),
     /// Response to a `JoinRequest`
@@ -201,14 +204,13 @@ impl SystemMsg {
             | Self::DkgFailureAgreement(_) => DKG_MSG_PRIORITY,
 
             // Inter-node comms for AE updates
-            Self::AntiEntropy { .. } | Self::AntiEntropyProbe(_) => ANTIENTROPY_MSG_PRIORITY,
+            Self::AntiEntropy { .. } | Self::AntiEntropyProbe { .. } => ANTIENTROPY_MSG_PRIORITY,
 
             // Join responses
             Self::JoinResponse(_) | Self::JoinAsRelocatedResponse(_) => JOIN_RESPONSE_PRIORITY,
 
             Self::Propose { .. }
             | Self::MembershipVotes(_)
-            | Self::MembershipAE(_)
             | Self::HandoverAE(_)
             | Self::HandoverVotes(_) => MEMBERSHIP_PRIORITY,
 
@@ -236,7 +238,6 @@ impl SystemMsg {
             Self::AntiEntropy { .. } => State::AntiEntropy,
             Self::AntiEntropyProbe { .. } => State::AntiEntropy,
             Self::Relocate(_) => State::Relocate,
-            Self::MembershipAE(_) => State::Membership,
             Self::MembershipVotes(_) => State::Membership,
             Self::JoinRequest(_) => State::Join,
             Self::JoinResponse(_) => State::Join,
@@ -271,7 +272,6 @@ impl Display for SystemMsg {
             Self::AntiEntropyProbe { .. } => write!(f, "SystemMsg::AntiEntropyProbe"),
             Self::Relocate { .. } => write!(f, "SystemMsg::Relocate"),
             Self::MembershipVotes { .. } => write!(f, "SystemMsg::MembershipVotes"),
-            Self::MembershipAE { .. } => write!(f, "SystemMsg::MembershipAE"),
             Self::JoinRequest { .. } => write!(f, "SystemMsg::JoinRequest"),
             Self::JoinResponse { .. } => write!(f, "SystemMsg::JoinResponse"),
             Self::JoinAsRelocatedRequest { .. } => {
