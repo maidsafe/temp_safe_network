@@ -32,8 +32,11 @@ use sn_interface::{
 
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::{
-    sync::{mpsc, RwLock},
-    time::Instant,
+    sync::{
+        mpsc::{self, error::TryRecvError},
+        RwLock,
+    },
+    time::{sleep, Instant},
 };
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
@@ -47,6 +50,8 @@ const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 // 30 adult nodes checked per minute., so each node should be queried 10x in 10 mins
 // Which should hopefully trigger dysfunction if we're not getting responses back
 const HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
+// to prevent cpu racing
+const LOOP_SLEEP_INTERVAL: Duration = Duration::from_millis(10);
 
 pub(crate) struct FlowCtrl {
     node: Arc<RwLock<Node>>,
@@ -95,7 +100,8 @@ impl FlowCtrl {
             #[cfg(feature = "back-pressure")]
             if last_backpressure_check.elapsed() > BACKPRESSURE_INTERVAL {
                 last_backpressure_check = now;
-                cmds.extend(Self::start_backpressure_reporting(node))
+
+                cmds.extend(Self::report_backpressure(self.node.clone(), &self.cmd_ctrl).await)
             }
 
             // Things that should only happen to non elder nodes
@@ -167,10 +173,21 @@ impl FlowCtrl {
 
             // Finally, handle any incoming conn messages
             // this requires mut self
-            if let Some(msg) = self.incoming_msg_events.recv().await {
-                debug!("msggggeventtt");
-                let node_info = self.node.read().await.info();
-                cmds.push(self.handle_new_msg_event(node_info.clone(), msg).await)
+            match self.incoming_msg_events.try_recv() {
+                Ok(msg) => {
+                    debug!("msggggeventtt");
+                    let node_info = self.node.read().await.info();
+                    cmds.push(self.handle_new_msg_event(node_info.clone(), msg).await)
+                }
+                Err(TryRecvError::Empty) => {
+                    // prevent cpu racing
+                    sleep(LOOP_SLEEP_INTERVAL).await;
+                    continue;
+                }
+                Err(TryRecvError::Disconnected) => {
+                    trace!("Senders to `incoming_msg_events` have disconnected. Stopping node periodic tasks.");
+                    break;
+                }
             }
 
             for cmd in cmds {
@@ -202,7 +219,7 @@ impl FlowCtrl {
                 CtrlStatus::Enqueued => {
                     // this block should be unreachable, as Enqueued is the initial state
                     // but let's handle it anyway..
-                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    sleep(Duration::from_millis(100)).await;
                     continue;
                 }
                 CtrlStatus::WatcherDropped => {
@@ -248,16 +265,15 @@ impl FlowCtrl {
         let origin = our_info.peer();
 
         // generate the cmds, and ensure we go through dysfunction tracking
-        Ok(node
-            .handle_valid_service_msg(
-                msg_id,
-                msg,
-                proofed_auth,
-                origin,
-                #[cfg(feature = "traceroute")]
-                vec![],
-            )
-            .await?)
+        node.handle_valid_service_msg(
+            msg_id,
+            msg,
+            proofed_auth,
+            origin,
+            #[cfg(feature = "traceroute")]
+            vec![],
+        )
+        .await
     }
 
     /// Generates a probe msg, which goes to a random section in order to
@@ -386,8 +402,7 @@ impl FlowCtrl {
                     name,
                     section_pk: src_section_pk,
                 };
-                let wire_msg =
-                    WireMsg::single_src(&our_info, dst, system_msg.clone(), src_section_pk)?;
+                let wire_msg = WireMsg::single_src(&our_info, dst, system_msg, src_section_pk)?;
 
                 debug!(
                     "{:?} Data {:?} to: {:?} w/ {:?} ",
@@ -438,7 +453,7 @@ impl FlowCtrl {
     /// Worst case is after a split, nodes sending messaging from a sibling section to update us may not
     /// know about our load just now. Though that would only be AE messages... and if backpressure is working we should
     /// not be overloaded...
-    fn start_backpressure_reporting(node: Arc<RwLock<Node>>, cmd_ctrl: &CmdCtrl) -> Vec<Cmd> {
+    async fn report_backpressure(node: Arc<RwLock<Node>>, cmd_ctrl: &CmdCtrl) -> Vec<Cmd> {
         use sn_interface::messaging::DstLocation;
 
         info!("Firing off backpressure reports");
@@ -526,13 +541,11 @@ impl FlowCtrl {
                     wire_msg
                 };
 
-                let cmd = Cmd::ValidateMsg {
+                Cmd::ValidateMsg {
                     origin: sender,
                     wire_msg,
                     original_bytes,
-                };
-
-                return cmd;
+                }
             }
         }
     }
