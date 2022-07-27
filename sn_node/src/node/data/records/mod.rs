@@ -69,6 +69,7 @@ impl Node {
         origin: Peer,
         #[cfg(feature = "traceroute")] mut traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
+        let mut cmds = vec![];
         let address = query.variant.address();
         let operation_id = query.variant.operation_id()?;
         trace!(
@@ -127,10 +128,10 @@ impl Node {
             // ensure we only add a pending request when we're actually sending out requests.
             for target in &targets {
                 trace!("adding pending req for {target:?} in dysfunction tracking");
-                self.dysfunction_tracking.track_issue(
-                    target.name(),
-                    IssueType::PendingRequestOperation(Some(operation_id)),
-                )?;
+                cmds.push(Cmd::TrackNodeIssueInDysfunction {
+                    name: target.name(),
+                    issue: IssueType::PendingRequestOperation(Some(operation_id)),
+                })
             }
 
             trace!(
@@ -149,15 +150,19 @@ impl Node {
                 correlation_id: msg_id,
             });
 
-            self.send_node_msg_to_nodes(
+            let send_msg_cmds = self.send_node_msg_to_nodes(
                 msg,
                 targets,
                 #[cfg(feature = "traceroute")]
                 &mut traceroute,
-            )
+            )?;
+
+            cmds.extend(send_msg_cmds);
+
+            Ok(cmds)
         } else {
             // we don't do anything as we're still within data query timeout
-            Ok(vec![])
+            Ok(cmds)
         }
     }
 
