@@ -454,9 +454,11 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                 .unwrap()
                 .force_bootstrap(node_state.to_msg());
 
-            let cmds =
-                run_and_collect_cmds(Cmd::HandleJoinDecision(membership_decision), &dispatcher)
-                    .await?;
+            let cmds = run_and_collect_cmds(
+                Cmd::HandleMembershipDecision(membership_decision),
+                &dispatcher,
+            )
+            .await?;
 
             // Verify we sent a `DkgStart` message with the expected participants.
             let mut dkg_start_sent = false;
@@ -510,8 +512,11 @@ async fn handle_online_cmd(
     let node_state = NodeState::joined(*peer, None);
     let membership_decision = section_decision(sk_set, node_state.to_msg())?;
 
-    let all_cmds =
-        run_and_collect_cmds(Cmd::HandleJoinDecision(membership_decision), dispatcher).await?;
+    let all_cmds = run_and_collect_cmds(
+        Cmd::HandleMembershipDecision(membership_decision),
+        dispatcher,
+    )
+    .await?;
 
     let mut status = HandleOnlineStatus {
         node_approval_sent: false,
@@ -1035,7 +1040,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
         };
 
         let membership_decision = create_relocation_trigger(&sk_set, relocated_peer.age())?;
-        let cmds = run_and_collect_cmds(Cmd::HandleJoinDecision(membership_decision), &dispatcher).await?;
+        let cmds = run_and_collect_cmds(Cmd::HandleMembershipDecision(membership_decision), &dispatcher).await?;
 
         let mut offline_relocate_sent = false;
 

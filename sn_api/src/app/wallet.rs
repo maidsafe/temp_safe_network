@@ -159,9 +159,7 @@ impl Safe {
             })
             .collect();
 
-        let proof_key_verifier = SpentProofKeyVerifier {
-            client: self.get_safe_client()?,
-        };
+        let proof_key_verifier = SpentProofKeyVerifier { client };
 
         // Among all different proof shares that could have been signed for different
         // transactions, let's try to find one set of shares which can actually
@@ -522,9 +520,7 @@ impl Safe {
 
         // Perform verifications of input TX and spentproofs,
         // as well as building the output DBCs.
-        let proof_key_verifier = SpentProofKeyVerifier {
-            client: self.get_safe_client()?,
-        };
+        let proof_key_verifier = SpentProofKeyVerifier { client };
         let dbcs = dbc_builder.build(&proof_key_verifier)?;
 
         Ok((dbcs, change_owneronce))

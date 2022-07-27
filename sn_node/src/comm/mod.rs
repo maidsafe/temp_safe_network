@@ -25,14 +25,17 @@ use self::{
 use crate::node::{Error, RateLimits, Result};
 use peer_session::SendStatus;
 
-use sn_dysfunction::DysfunctionDetection;
-use sn_interface::{messaging::WireMsg, types::Peer};
+use sn_interface::{
+    messaging::{system::MembershipState, WireMsg},
+    network_knowledge::NodeState,
+    types::Peer,
+};
 
 use bytes::Bytes;
 use dashmap::DashMap;
 use futures::stream::{FuturesUnordered, StreamExt};
 use qp2p::{Endpoint, IncomingConnections};
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{collections::BTreeSet, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     sync::mpsc::{self, Receiver, Sender},
     task,
@@ -119,34 +122,38 @@ impl Comm {
         self.our_endpoint.public_addr()
     }
 
-    pub(crate) async fn cleanup_peers(
-        &self,
-        retain_peers: Vec<Peer>,
-        mut dysfunction: DysfunctionDetection,
-    ) -> Result<()> {
+    pub(crate) async fn cleanup_peers(&self, section_members: BTreeSet<NodeState>) -> Result<()> {
+        debug!(
+            "Cleanup peers , known section members: {:?}",
+            section_members
+        );
+
         let mut peers_to_cleanup = vec![];
-        for entry in self.sessions.iter() {
-            let peer = entry.key();
-            let session = entry.value();
 
-            session.remove_expired().await;
+        let mut retain_peers = vec![];
 
-            let is_connected = session.is_connected();
-
-            if !is_connected {
-                if !retain_peers.contains(peer) {
-                    peers_to_cleanup.push(*peer);
-                }
-
-                dysfunction.track_issue(peer.name(), sn_dysfunction::IssueType::Communication)?;
+        // first lets look out for members only.
+        for member in section_members {
+            if MembershipState::Joined == member.state() {
+                retain_peers.push(member.name());
             }
         }
 
-        // cleanup any and all conns that are not connected
-        // TODO: check if we need to remove client conns manually, or if we can assume they're disconnected...
-        // Perhaps above a threshold we cleanup non-section conns?
+        for entry in self.sessions.iter() {
+            let peer = entry.key();
+
+            if !retain_peers.contains(&peer.name()) {
+                peers_to_cleanup.push(*peer);
+            } else {
+                let session = entry.value();
+                session.remove_expired().await;
+            }
+        }
+
+        // cleanup any and all conns that are not active section members
         if !peers_to_cleanup.is_empty() {
             for peer in peers_to_cleanup {
+                trace!("Cleaning up peer's sessions: {peer:?}");
                 let perhaps_peer = self.sessions.remove(&peer);
 
                 if let Some((_peer, session)) = perhaps_peer {
@@ -155,7 +162,7 @@ impl Comm {
             }
         }
 
-        debug!("PeerLink count post-cleanup: ${:?}", self.sessions.len());
+        debug!("PeerSessions count post-cleanup: {:?}", self.sessions.len());
         Ok(())
     }
 

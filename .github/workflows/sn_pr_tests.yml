@@ -144,9 +144,9 @@ jobs:
           cache-on-failure: true
           sharedKey: ${{github.run_id}}-unit
 
-      - name: Build all test targets
-       # all = all crates in workspace, lib/bins targets, with these features...
-        run: cargo test --no-run --release -p sn_interface -p sn_dysfunction -p sn_node -p sn_cli
+      - name: Build interface tests before running
+        run: cd sn_interface && cargo test --no-run --release
+        timeout-minutes: 50
 
       - name: Run sn_interface tests
         timeout-minutes: 25
@@ -158,6 +158,10 @@ jobs:
           package: sn_interface
           release: true
 
+      - name: Build dysfunction tests before running
+        run: cd sn_dysfunction && cargo test --no-run --release
+        timeout-minutes: 50
+
       - name: Run sn_dysfunction unit tests
         timeout-minutes: 15
         uses: maidsafe/cargo-nextest@main
@@ -167,6 +171,9 @@ jobs:
           junit-path: junit.xml
           package: sn_dysfunction
           release: true
+      - name: Build node tests before running
+        run: cd sn_node && cargo test --no-run --release
+        timeout-minutes: 50
 
       - name: Run node unit tests
         timeout-minutes: 20
@@ -177,6 +184,10 @@ jobs:
           junit-path: junit.xml
           package: sn_node
           release: true
+
+      - name: Build cli tests before running
+        run: cd sn_cli && cargo test --no-run --release
+        timeout-minutes: 50
 
       - name: Run CLI unit tests
         uses: maidsafe/cargo-nextest@main

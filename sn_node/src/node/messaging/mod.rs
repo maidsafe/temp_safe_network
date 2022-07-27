@@ -11,7 +11,6 @@ mod anti_entropy;
 mod dkg;
 mod handover;
 mod join;
-mod left;
 mod membership;
 mod proposal;
 mod relocation;
@@ -130,7 +129,7 @@ impl Node {
                     }
                 };
 
-                let src_location = wire_msg.auth_kind().src();
+                let src_location = wire_msg.auth().src();
 
                 if self.is_not_elder() {
                     trace!("Redirecting from adult to section elders");
@@ -189,11 +188,7 @@ impl Node {
     /// Verifies that the section key in the msg authority is trusted
     /// based on our current knowledge of the network and sections chains.
     #[instrument(skip_all)]
-    async fn verify_section_key(
-        &mut self,
-        msg_authority: &NodeMsgAuthority,
-        msg: &SystemMsg,
-    ) -> bool {
+    async fn verify_section_key(&self, msg_authority: &NodeMsgAuthority, msg: &SystemMsg) -> bool {
         let known_keys = self.network_knowledge.known_keys();
         NetworkKnowledge::verify_node_msg_can_be_trusted(
             msg_authority.clone(),

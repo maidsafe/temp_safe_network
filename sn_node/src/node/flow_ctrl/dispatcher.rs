@@ -58,17 +58,8 @@ impl Dispatcher {
     pub(crate) async fn process_cmd(&self, cmd: Cmd) -> Result<Vec<Cmd>> {
         match cmd {
             Cmd::CleanupPeerLinks => {
-                // Scoping access to the RwLock
-                let (elders, dysfunction_tracking) = {
-                    let node = self.node.read().await;
-                    (
-                        node.network_knowledge.elders(),
-                        node.dysfunction_tracking.clone(),
-                    )
-                };
-                self.comm
-                    .cleanup_peers(elders, dysfunction_tracking)
-                    .await?;
+                let members = { self.node.read().await.network_knowledge.section_members() };
+                self.comm.cleanup_peers(members).await?;
                 Ok(vec![])
             }
             Cmd::SignOutgoingSystemMsg {
@@ -165,25 +156,22 @@ impl Dispatcher {
 
                 node.handle_general_agreements(proposal, sig).await
             }
-            Cmd::HandleJoinDecision(decision) => {
+            Cmd::HandleMembershipDecision(decision) => {
                 let mut node = self.node.write().await;
 
-                node.handle_join_decision(decision).await
-            }
-            Cmd::HandleNodeLeft(auth) => {
-                let mut node = self.node.write().await;
-
-                node.handle_node_left(auth.value.into_state(), auth.sig)
+                node.handle_membership_decision(decision).await
             }
             Cmd::HandleNewEldersAgreement { new_elders, sig } => {
                 let mut node = self.node.write().await;
 
                 node.handle_new_elders_agreement(new_elders, sig).await
             }
-            Cmd::HandlePeerLost(peer) => {
+            Cmd::HandlePeerFailedSend(peer) => {
                 let mut node = self.node.write().await;
 
-                node.handle_peer_lost(&peer.addr())
+                node.handle_failed_send(&peer.addr())?;
+
+                Ok(vec![])
             }
             Cmd::HandleDkgOutcome {
                 section_auth,
@@ -235,7 +223,7 @@ impl Dispatcher {
 
                 node.cast_offline_proposals(&names)
             }
-            Cmd::StartConnectivityTest(name) => {
+            Cmd::TellEldersToStartConnectivityTest(name) => {
                 let node = self.node.read().await;
 
                 Ok(vec![node.send_msg_to_our_elders(
@@ -292,7 +280,7 @@ impl Dispatcher {
             DeliveryStatus::DeliveredToAll(failed_recipients)
             | DeliveryStatus::FailedToDeliverAll(failed_recipients) => Ok(failed_recipients
                 .into_iter()
-                .map(Cmd::HandlePeerLost)
+                .map(Cmd::HandlePeerFailedSend)
                 .collect()),
             _ => Ok(vec![]),
         }

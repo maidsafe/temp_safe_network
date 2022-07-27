@@ -27,7 +27,10 @@ use tokio::{sync::mpsc, time::Instant};
 // TODO: temporarily disable priority while we transition to channels
 // type Priority = i32;
 
-const MAX_SENDJOB_RETRIES: usize = 1;
+/// These retries are how may _new_ connection attempts do we make.
+/// If we fail all of these, HandlePeerFailedSend will be triggered
+/// for section nodes, which in turn kicks off a ConnectivityTest
+const MAX_SENDJOB_RETRIES: usize = 3;
 const DEFAULT_DESIRED_RATE: f64 = 10.0; // 10 msgs / s
 
 #[derive(Debug)]
@@ -59,10 +62,6 @@ impl PeerSession {
         if let Err(e) = self.channel.send(SessionCmd::RemoveExpired).await {
             error!("Error while sending RemoveExpired cmd {e:?}");
         }
-    }
-
-    pub(crate) fn is_connected(&self) -> bool {
-        !self.channel.is_closed()
     }
 
     // this must be restricted somehow, we can't allow an unbounded inflow

@@ -85,10 +85,10 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         let dst = DstLocation::EndUser(EndUser(target.name()));
 
-        let (auth_kind, payload) = self.ed_sign_client_msg(&msg)?;
+        let (auth, payload) = self.ed_sign_client_msg(&msg)?;
 
         #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::new_msg(MsgId::new(), payload, auth_kind, dst)?;
+        let mut wire_msg = WireMsg::new_msg(MsgId::new(), payload, auth, dst)?;
 
         #[cfg(feature = "traceroute")]
         {
@@ -122,7 +122,7 @@ impl Node {
 
     /// Handle data query
     pub(crate) async fn handle_data_query_at_adult(
-        &mut self,
+        &self,
         correlation_id: MsgId,
         query: &DataQueryVariant,
         auth: ServiceAuth,
@@ -242,7 +242,7 @@ impl Node {
             response: query_response,
             correlation_id,
         };
-        let (auth_kind, payload) = self.ed_sign_client_msg(&msg)?;
+        let (auth, payload) = self.ed_sign_client_msg(&msg)?;
 
         // set a random xorname first. We set it specifically per peer thereafter
         // This is overwritten in comm.send_to_client
@@ -250,7 +250,7 @@ impl Node {
         let dst = DstLocation::EndUser(EndUser(xor_name::XorName::random(&mut rng)));
 
         #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst)?;
+        let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst)?;
 
         #[cfg(feature = "traceroute")]
         {
@@ -361,8 +361,8 @@ impl Node {
         &self,
         key_image: &KeyImage,
         tx: &RingCtTransaction,
-        spent_proofs: &[SpentProof],
-        spent_transactions: &[RingCtTransaction],
+        spent_proofs: &BTreeSet<SpentProof>,
+        spent_transactions: &BTreeSet<RingCtTransaction>,
     ) -> Result<Option<SpentProofShare>> {
         trace!(
             "Processing DBC spend request for key image: {:?}",
@@ -387,13 +387,14 @@ impl Node {
 
         // ...and verify the SpentProofs are signed by section keys known to us,
         // unless the public key of the SpentProof is the genesis key
-        if spent_proofs_keys
+        spent_proofs_keys
             .iter()
-            .any(|pk| !self.network_knowledge.verify_section_key_is_known(pk))
-        {
-            debug!("Dropping DBC spend request (key_image: {:?}) since a SpentProof is not signed by a section known to us", key_image);
-            return Ok(None);
-        }
+            .for_each(|pk| if !self.network_knowledge.verify_section_key_is_known(pk) {
+                warn!("Invalid DBC spend request (key_image: {:?}) since a SpentProof is not signed by a section known to us: {:?}", key_image, pk);
+                // TODO: temporarily allowing spent proofs signed by section keys we are not aware of.
+                // We shall return an error to the client so it can update us with a valid proof chain.
+                //return Ok(None);
+            });
 
         // Obtain Commitments from the TX
         let mut public_commitments_info = Vec::<(KeyImage, Vec<Commitment>)>::new();

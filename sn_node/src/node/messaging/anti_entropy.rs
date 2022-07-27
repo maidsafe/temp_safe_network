@@ -85,7 +85,7 @@ impl Node {
     }
 
     /// Send `MetadataExchange` packet to the specified nodes
-    pub(crate) fn send_metadata_updates_to_nodes(
+    pub(crate) fn send_metadata_updates(
         &self,
         recipients: Vec<Peer>,
         prefix: &Prefix,
@@ -140,7 +140,7 @@ impl Node {
             let previous_section_key = our_prev_state.section_key;
             let sibling_prefix = sibling_sap.prefix();
 
-            let mut cmds = self.send_metadata_updates_to_nodes(
+            let mut cmds = self.send_metadata_updates(
                 promoted_sibling_elders.clone(),
                 &sibling_prefix,
                 previous_section_key,
@@ -215,7 +215,7 @@ impl Node {
         )?;
 
         // always run this, only changes will trigger events
-        let mut cmds = self.update_self_for_new_node_state(snapshot).await?;
+        let mut cmds = self.update_on_elder_change(snapshot).await?;
 
         // Only trigger reorganize data when there is a membership change happens.
         if updated {
@@ -261,7 +261,7 @@ impl Node {
                 self.create_or_wait_for_backoff(&sender).await;
 
                 let mut result = Vec::new();
-                if let Ok(cmds) = self.update_self_for_new_node_state(snapshot).await {
+                if let Ok(cmds) = self.update_on_elder_change(snapshot).await {
                     result.extend(cmds);
                 }
 
@@ -985,9 +985,9 @@ mod tests {
 
             let node_auth = NodeAuth::authorize(src_section_pk, &src_node_keypair, &payload);
 
-            let auth_kind = AuthKind::Node(node_auth.into_inner());
+            let auth = AuthKind::Node(node_auth.into_inner());
 
-            let wire_msg = WireMsg::new_msg(msg_id, payload, auth_kind, dst_location)?;
+            let wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst_location)?;
 
             let src_location = SrcLocation::Node {
                 name: sender_name,
