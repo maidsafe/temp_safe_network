@@ -16,16 +16,18 @@ mod proposal;
 mod relocation;
 mod resource_proof;
 mod service_msgs;
+mod signing;
 mod system_msgs;
 mod update_section;
+
+use std::collections::BTreeSet;
 
 use crate::node::{flow_ctrl::cmds::Cmd, Node, Result, DATA_QUERY_LIMIT};
 
 use sn_interface::{
     messaging::{
-        data::ServiceMsg,
-        system::{NodeMsgAuthorityUtils, SystemMsg},
-        DstLocation, MsgType, NodeMsgAuthority, WireMsg,
+        data::ServiceMsg, system::SystemMsg, BlsShareAuth, DstLocation, MsgType, NodeMsgAuthority,
+        WireMsg,
     },
     network_knowledge::NetworkKnowledge,
     types::Peer,
@@ -33,6 +35,31 @@ use sn_interface::{
 
 use bytes::Bytes;
 use itertools::Itertools;
+
+#[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
+pub(crate) enum OutgoingMsg {
+    System(SystemMsg),
+    Service(ServiceMsg),
+    DstAggregated((BlsShareAuth, Bytes)),
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum Recipients {
+    Dst(DstLocation),
+    Peers(BTreeSet<Peer>),
+}
+
+impl Recipients {
+    pub(crate) fn from(peers: &[Peer]) -> Self {
+        let mut set = BTreeSet::new();
+        set.extend(peers);
+        Self::Peers(set)
+    }
+    pub(crate) fn from_single(peer: Peer) -> Self {
+        Self::Peers(BTreeSet::from([peer]))
+    }
+}
 
 // Message handling
 impl Node {
@@ -84,7 +111,6 @@ impl Node {
                         &msg,
                         &wire_msg,
                         &dst_location,
-                        &msg_authority,
                         original_bytes.clone(), // a cheap clone w/ Bytes
                     )
                     .await?;
@@ -132,16 +158,12 @@ impl Node {
                     }
                 };
 
-                let src_location = wire_msg.auth().src();
-
                 if self.is_not_elder() {
                     trace!("Redirecting from adult to section elders");
 
-                    return Ok(vec![self.ae_redirect_to_our_elders(
-                        origin,
-                        &src_location,
-                        &original_bytes,
-                    )?]);
+                    return Ok(vec![
+                        self.ae_redirect_to_our_elders(origin, &original_bytes)?
+                    ]);
                 }
 
                 // First we check if it's query and we have too many on the go at the moment...
@@ -165,13 +187,9 @@ impl Node {
                     }
                 };
 
-                if let Some(cmd) = self.check_for_entropy(
-                    original_bytes,
-                    &src_location,
-                    &received_section_pk,
-                    dst_name,
-                    &origin,
-                )? {
+                if let Some(cmd) =
+                    self.check_for_entropy(original_bytes, &received_section_pk, dst_name, &origin)?
+                {
                     // short circuit and send those AE responses
                     return Ok(vec![cmd]);
                 }
@@ -209,7 +227,6 @@ impl Node {
         msg: &SystemMsg,
         wire_msg: &WireMsg,
         dst_location: &DstLocation,
-        msg_authority: &NodeMsgAuthority,
         msg_bytes: Bytes,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
@@ -241,7 +258,6 @@ impl Node {
                 Some(dst_section_pk) => {
                     if let Some(ae_cmd) = self.check_for_entropy(
                         msg_bytes,
-                        &msg_authority.src_location(),
                         &dst_section_pk,
                         dst_location.name(),
                         origin,

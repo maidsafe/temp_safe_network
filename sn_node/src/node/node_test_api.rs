@@ -6,12 +6,11 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::FlowCtrl, messages::WireMsgUtils, Node, Peer, Result};
+use crate::node::{flow_ctrl::FlowCtrl, Node, Peer, Result};
 
 use sn_interface::{
-    messaging::{system::SystemMsg, DstLocation, WireMsg},
+    messaging::{system::SystemMsg, DstLocation},
     network_knowledge::SectionAuthorityProvider,
-    types::log_markers::LogMarker,
 };
 
 use ed25519_dalek::PublicKey;
@@ -19,6 +18,11 @@ use secured_linked_list::SecuredLinkedList;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};
+
+use super::{
+    flow_ctrl::cmds::Cmd,
+    messaging::{OutgoingMsg, Recipients},
+};
 
 /// Test interface for sending and receiving messages to and from other nodes.
 ///
@@ -92,37 +96,20 @@ impl NodeTestApi {
         self.node.read().await.matching_section(name)
     }
 
-    /// Builds a `WireMsg` signed by this Node
-    pub async fn sign_single_src_msg(
-        &self,
-        node_msg: SystemMsg,
-        dst: DstLocation,
-    ) -> Result<WireMsg> {
-        let src_section_pk = *self.section_chain().await.last_key();
-        WireMsg::single_src(
-            &self.node.read().await.info(),
-            dst,
-            node_msg,
-            src_section_pk,
-        )
+    /// Send a system msg.
+    pub async fn send(&self, msg: SystemMsg, dst: DstLocation) -> Result<()> {
+        let cmd = Cmd::SendMsg {
+            msg: OutgoingMsg::System(msg),
+            recipients: Recipients::Dst(dst),
+            #[cfg(feature = "traceroute")]
+            traceroute: vec![],
+        };
+        self.send_cmd(cmd).await
     }
 
-    /// Send a message.
-    /// Messages sent here, either section to section or node to node.
-    pub async fn send_msg_to_nodes(&self, wire_msg: WireMsg) -> Result<()> {
-        trace!(
-            "{:?} {:?}",
-            LogMarker::DispatchSendMsgCmd,
-            wire_msg.msg_id()
-        );
-
-        let cmds = self.node.read().await.send_msg_on_to_nodes(wire_msg)?;
-
-        if let Some(cmd) = cmds {
-            self.flow_ctrl.fire_and_forget(cmd).await?;
-        }
-
-        Ok(())
+    /// Send a cmd.
+    async fn send_cmd(&self, cmd: Cmd) -> Result<()> {
+        self.flow_ctrl.fire_and_forget(cmd).await
     }
 
     /// Returns the current BLS public key set if this node has one, or
