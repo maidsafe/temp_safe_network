@@ -10,7 +10,7 @@ use crate::node::{messages::WireMsgUtils, Cmd, Node, Result};
 
 use crate::comm::{Comm, DeliveryStatus};
 use sn_interface::{
-    messaging::{system::SystemMsg, DstLocation, WireMsg},
+    messaging::{data::ServiceMsg, system::SystemMsg, DstLocation, WireMsg},
     types::Peer,
 };
 
@@ -18,7 +18,7 @@ use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::{sync::watch, sync::RwLock, time};
 
 #[cfg(feature = "traceroute")]
-use sn_interface::messaging::{data::ServiceMsg, Entity};
+use sn_interface::messaging::Entity;
 #[cfg(feature = "traceroute")]
 use sn_interface::types::PublicKey;
 
