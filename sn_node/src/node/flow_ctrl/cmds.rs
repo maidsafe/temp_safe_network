@@ -8,7 +8,10 @@
 
 use crate::node::{Proposal, XorName};
 
+use bytes::Bytes;
+use custom_debug::Debug;
 use sn_consensus::Decision;
+use sn_dysfunction::IssueType;
 use sn_interface::{
     messaging::{
         data::ServiceMsg,
@@ -18,9 +21,6 @@ use sn_interface::{
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     types::{Peer, ReplicatedDataAddress},
 };
-
-use bytes::Bytes;
-use custom_debug::Debug;
 use std::{
     collections::BTreeSet,
     fmt,
@@ -106,6 +106,8 @@ pub(crate) enum Cmd {
         // original bytes to avoid reserializing for entropy checks
         original_bytes: Bytes,
     },
+    /// Log a Node's Punishment, this pulls dysfunction and write locks out of some functions
+    TrackNodeIssueInDysfunction { name: XorName, issue: IssueType },
     HandleValidSystemMsg {
         msg_id: MsgId,
         msg: SystemMsg,
@@ -202,6 +204,7 @@ impl Cmd {
             HandleDkgTimeout(_) => 10,
 
             HandlePeerFailedSend(_) => 9,
+            TrackNodeIssueInDysfunction { .. } => 9,
             ProposeOffline(_) => 9,
             HandleMembershipDecision(_) => 9,
             EnqueueDataForReplication { .. } => 9,
@@ -270,6 +273,9 @@ impl fmt::Display for Cmd {
             }
             Cmd::SignOutgoingSystemMsg { .. } => write!(f, "SignOutgoingSystemMsg"),
             Cmd::EnqueueDataForReplication { .. } => write!(f, "ThrottledSendBatchMsgs"),
+            Cmd::TrackNodeIssueInDysfunction { name, issue } => {
+                write!(f, "TrackNodeIssueInDysfunction {:?}, {:?}", name, issue)
+            }
             Cmd::ProposeOffline(_) => write!(f, "ProposeOffline"),
             Cmd::TellEldersToStartConnectivityTest(_) => {
                 write!(f, "TellEldersToStartConnectivityTest")
