@@ -17,7 +17,12 @@ pub(crate) mod tests;
 pub(crate) use self::cmd_ctrl::CmdCtrl;
 
 use crate::comm::MsgEvent;
-use crate::node::{flow_ctrl::cmds::Cmd, messages::WireMsgUtils, Error, Node, Result};
+use crate::node::{
+    flow_ctrl::cmds::Cmd,
+    messaging::{OutgoingMsg, Recipients},
+    Error, Node, Result,
+};
+
 use ed25519_dalek::Signer;
 use sn_interface::{
     messaging::{
@@ -25,8 +30,7 @@ use sn_interface::{
         system::{NodeCmd, SystemMsg},
         AuthorityProof, MsgId, ServiceAuth, WireMsg,
     },
-    types::log_markers::LogMarker,
-    types::{ChunkAddress, PublicKey, Signature},
+    types::{log_markers::LogMarker, ChunkAddress, PublicKey, Signature},
 };
 
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
@@ -296,19 +300,15 @@ impl FlowCtrl {
 
                 let mut this_batch_address = None;
 
-                let (src_section_pk, our_info, data_queued) = {
+                let data_queued = {
                     let node = self.node.read().await;
-                    // get info for the WireMsg
-                    let src_section_pk = node.network_knowledge().section_key();
-                    let our_info = node.info();
                     // choose a data to replicate at random
                     let data_queued = node
                         .pending_data_to_replicate_to_peers
                         .iter()
                         .choose(&mut rng)
                         .map(|(address, _)| *address);
-
-                    (src_section_pk, our_info, data_queued)
+                    data_queued
                 };
 
                 if let Some(data_addr) = data_queued {
@@ -344,32 +344,20 @@ impl FlowCtrl {
                             .data_storage
                             .get_from_local_store(&address)
                             .await?;
-                        let system_msg =
-                            SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
-
-                        let name = recipients[0].name();
-                        let dst = sn_interface::messaging::DstLocation::Node {
-                            name,
-                            section_pk: src_section_pk,
-                        };
-                        let wire_msg = WireMsg::single_src(
-                            &our_info,
-                            dst,
-                            system_msg.clone(),
-                            src_section_pk,
-                        )?;
 
                         debug!(
-                            "{:?} Data {:?} to: {:?} w/ {:?} ",
+                            "{:?} Data {:?} to: {:?}",
                             LogMarker::SendingMissingReplicatedData,
                             address,
                             recipients,
-                            wire_msg.msg_id()
                         );
 
+                        let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
                         let cmd = Cmd::SendMsg {
-                            wire_msg,
-                            recipients,
+                            msg: OutgoingMsg::System(msg),
+                            recipients: Recipients::from(&recipients),
+                            #[cfg(feature = "traceroute")]
+                            traceroute: vec![],
                         };
 
                         if let Err(e) = self.cmd_ctrl.push(cmd).await {
@@ -441,7 +429,6 @@ impl FlowCtrl {
         });
     }
 
-    #[cfg(feature = "back-pressure")]
     /// Periodically send back-pressure reports to our section.
     ///
     /// We do not send reports outside of the section as most messages will come from within our section
@@ -449,9 +436,8 @@ impl FlowCtrl {
     /// Worst case is after a split, nodes sending messaging from a sibling section to update us may not
     /// know about our load just now. Though that would only be AE messages... and if backpressure is working we should
     /// not be overloaded...
+    #[cfg(feature = "back-pressure")]
     fn start_backpressure_reporting(self) {
-        use sn_interface::messaging::DstLocation;
-
         info!("Firing off backpressure reports");
         let _handle = tokio::task::spawn_local(async move {
             let mut interval = tokio::time::interval(BACKPRESSURE_INTERVAL);
@@ -466,7 +452,6 @@ impl FlowCtrl {
                 let our_name = our_info.name();
 
                 let members = node.network_knowledge().section_members();
-                let section_pk = node.network_knowledge().section_key();
                 drop(node);
 
                 if let Some(load_report) =
@@ -477,33 +462,15 @@ impl FlowCtrl {
                     // TODO: use comms to send report to anyone connected? (can we ID end users there?)
                     for member in members {
                         let peer = member.peer();
-
                         if peer.name() == our_name {
                             continue;
                         }
 
-                        let wire_msg = match WireMsg::single_src(
-                            &our_info,
-                            DstLocation::Node {
-                                name: peer.name(),
-                                section_pk,
-                            },
-                            SystemMsg::BackPressure(load_report),
-                            section_pk,
-                        ) {
-                            Ok(msg) => msg,
-                            Err(e) => {
-                                error!(
-                                    "Error forming backpressure message to section member {:?}",
-                                    e
-                                );
-                                continue;
-                            }
-                        };
-
                         let cmd = Cmd::SendMsg {
-                            wire_msg,
-                            recipients: vec![*peer],
+                            msg: OutgoingMsg::System(SystemMsg::BackPressure(load_report)),
+                            recipients: Recipients::from_single(*peer),
+                            #[cfg(feature = "traceroute")]
+                            traceroute: vec![],
                         };
 
                         if let Err(e) = self.cmd_ctrl.push(cmd).await {

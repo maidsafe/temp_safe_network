@@ -89,16 +89,8 @@ impl Node {
                         debug!("Membership - We are behind the voter, requesting AE");
                         // We hit an error while processing this vote, perhaps we are missing information.
                         // We'll send a membership AE request to see if they can help us catch up.
-                        let sap = self.network_knowledge.authority_provider();
-                        let dst_section_pk = sap.section_key();
-                        let section_name = prefix.name();
                         let msg = SystemMsg::MembershipAE(membership.generation());
-                        let cmd = self.send_direct_msg_to_nodes(
-                            vec![peer],
-                            msg,
-                            section_name,
-                            dst_section_pk,
-                        )?;
+                        let cmd = self.send_direct_msg(vec![peer], msg)?;
 
                         debug!("{:?}", LogMarker::MembershipSendingAeUpdateRequest);
                         cmds.push(cmd);
@@ -153,11 +145,8 @@ impl Node {
         let cmds = if let Some(membership) = self.membership.as_ref() {
             match membership.anti_entropy(gen) {
                 Ok(catchup_votes) => {
-                    vec![self.send_direct_msg(
-                        peer,
-                        SystemMsg::MembershipVotes(catchup_votes),
-                        self.network_knowledge.section_key(),
-                    )?]
+                    vec![self
+                        .send_direct_msg(vec![peer], SystemMsg::MembershipVotes(catchup_votes))?]
                 }
                 Err(e) => {
                     error!("Membership - Error while processing anti-entropy {:?}", e);
@@ -293,12 +282,8 @@ impl Node {
             decision,
         }));
 
-        let sap = self.network_knowledge.authority_provider();
-        let dst_section_pk = sap.section_key();
-        let section_name = sap.prefix().name();
-
         trace!("{}", LogMarker::SendNodeApproval);
-        match self.send_direct_msg_to_nodes(peers.clone(), node_msg, section_name, dst_section_pk) {
+        match self.send_direct_msg(peers.clone(), node_msg) {
             Ok(cmd) => vec![cmd],
             Err(err) => {
                 error!("Failed to send join approval to new peers {peers:?}: {err:?}");
@@ -335,7 +320,10 @@ impl Node {
         // we then need to send the Relocate msg to the peer attaching the signed NodeState
         // containing the relocation details.
         if node_state.is_relocated() {
-            Ok(vec![self.send_relocate(*node_state.peer(), node_state)?])
+            Ok(vec![self.send_direct_msg(
+                vec![*node_state.peer()],
+                SystemMsg::Relocate(node_state.into_authed_msg()),
+            )?])
         } else {
             Ok(vec![])
         }

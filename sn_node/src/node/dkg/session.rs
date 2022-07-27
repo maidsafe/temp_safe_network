@@ -8,17 +8,14 @@
 
 use crate::node::{
     flow_ctrl::cmds::{next_timer_token, Cmd},
-    messages::WireMsgUtils,
+    messaging::{OutgoingMsg, Recipients},
     Result,
 };
 
 use sn_interface::{
-    messaging::{
-        system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
-        DstLocation, WireMsg,
-    },
+    messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
     network_knowledge::{NodeInfo, SectionAuthorityProvider, SectionKeyShare},
-    types::{keys::ed25519, log_markers::LogMarker, Peer, PublicKey},
+    types::{keys::ed25519, log_markers::LogMarker, Peer},
 };
 
 use bls::PublicKey as BlsPublicKey;
@@ -70,13 +67,7 @@ impl Session {
         self.timer_token
     }
 
-    fn send_dkg_not_ready(
-        &self,
-        node: &NodeInfo,
-        message: DkgMessage,
-        sender: XorName,
-        section_pk: BlsPublicKey,
-    ) -> Result<Vec<Cmd>> {
+    fn send_dkg_not_ready(&self, message: DkgMessage, sender: XorName) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
         // When the message in trouble is an Acknowledgement,
         // we shall query the ack.proposer .
@@ -98,23 +89,15 @@ impl Session {
                 target,
                 message
             );
-            let node_msg = SystemMsg::DkgNotReady {
+            let msg = SystemMsg::DkgNotReady {
                 session_id: self.session_id.clone(),
                 message,
             };
-            let wire_msg = WireMsg::single_src(
-                node,
-                DstLocation::Node {
-                    name: target,
-                    section_pk,
-                },
-                node_msg,
-                section_pk,
-            )?;
-
             cmds.push(Cmd::SendMsg {
-                recipients: vec![*peer],
-                wire_msg,
+                msg: OutgoingMsg::System(msg),
+                recipients: Recipients::from_single(*peer),
+                #[cfg(feature = "traceroute")]
+                traceroute: vec![],
             });
         } else {
             warn!(
@@ -147,15 +130,15 @@ impl Session {
                 if add_reset_timer {
                     cmds.push(self.reset_timer());
                 }
-                cmds.extend(self.check(node, section_pk)?);
+                cmds.extend(self.check(node)?);
             }
             Err(DkgError::UnexpectedPhase { expected, actual })
                 if is_dkg_behind(expected, actual) =>
             {
-                cmds.extend(self.send_dkg_not_ready(node, message, sender, section_pk)?);
+                cmds.extend(self.send_dkg_not_ready(message, sender)?);
             }
             Err(DkgError::MissingPart) => {
-                cmds.extend(self.send_dkg_not_ready(node, message, sender, section_pk)?);
+                cmds.extend(self.send_dkg_not_ready(message, sender)?);
             }
             Err(error) => {
                 error!("Error processing DKG message: {:?}", error);
@@ -211,29 +194,16 @@ impl Session {
                     self.session_id,
                     target
                 );
-                let node_msg = SystemMsg::DkgMessage {
+                let msg = SystemMsg::DkgMessage {
                     session_id: self.session_id.clone(),
                     message: message.clone(),
                 };
-                let wire_msg = WireMsg::single_src(
-                    node,
-                    DstLocation::Node {
-                        name: target,
-                        section_pk,
-                    },
-                    node_msg,
-                    section_pk,
-                )?;
-
-                trace!(
-                    "DKG sending {:?} with msg_id {:?}",
-                    message,
-                    wire_msg.msg_id()
-                );
 
                 cmds.push(Cmd::SendMsg {
-                    recipients: vec![*peer],
-                    wire_msg,
+                    msg: OutgoingMsg::System(msg),
+                    recipients: Recipients::from_single(*peer),
+                    #[cfg(feature = "traceroute")]
+                    traceroute: vec![],
                 });
             } else {
                 error!("Failed to find target {:?} among peers {:?}", target, peers);
@@ -260,7 +230,7 @@ impl Session {
                 let mut cmds = vec![];
                 cmds.extend(self.broadcast(node, messages, section_pk)?);
                 cmds.push(self.reset_timer());
-                cmds.extend(self.check(node, section_pk)?);
+                cmds.extend(self.check(node)?);
                 Ok(cmds)
             }
             Err(error) => {
@@ -277,7 +247,7 @@ impl Session {
                     let mut cmds = vec![];
                     cmds.extend(self.broadcast(node, messages, section_pk)?);
                     cmds.push(self.reset_timer());
-                    cmds.extend(self.check(node, section_pk)?);
+                    cmds.extend(self.check(node)?);
                     Ok(cmds)
                 } else {
                     trace!(
@@ -287,14 +257,14 @@ impl Session {
                         error
                     );
                     let failed_participants = self.key_gen.possible_blockers();
-                    self.report_failure(node, failed_participants, section_pk)
+                    self.report_failure(node, failed_participants)
                 }
             }
         }
     }
 
     // Check whether a key generator is finalized to give a DKG outcome.
-    fn check(&mut self, node: &NodeInfo, section_pk: BlsPublicKey) -> Result<Vec<Cmd>> {
+    fn check(&mut self, node: &NodeInfo) -> Result<Vec<Cmd>> {
         if self.complete {
             trace!(
                 "{} {:?}",
@@ -333,7 +303,7 @@ impl Session {
                 .filter(|elder| !participants.contains(elder))
                 .collect();
 
-            return self.report_failure(node, failed_participants, section_pk);
+            return self.report_failure(node, failed_participants);
         }
 
         // Corrupted DKG outcome. This can happen when a DKG session is restarted using the same set
@@ -349,7 +319,7 @@ impl Session {
                 "DKG failed due to corrupted outcome for {:?}",
                 self.session_id
             );
-            return self.report_failure(node, BTreeSet::new(), section_pk);
+            return self.report_failure(node, BTreeSet::new());
         }
 
         trace!(
@@ -381,7 +351,6 @@ impl Session {
         &mut self,
         node: &NodeInfo,
         failed_participants: BTreeSet<XorName>,
-        section_pk: BlsPublicKey,
     ) -> Result<Vec<Cmd>> {
         let sig = DkgFailureSig::new(&node.keypair, &failed_participants, self.session_id.clone());
 
@@ -393,24 +362,17 @@ impl Session {
             .check_failure_agreement()
             .into_iter()
             .chain(iter::once({
-                let node_msg = SystemMsg::DkgFailureObservation {
+                let msg = SystemMsg::DkgFailureObservation {
                     session_id: self.session_id.clone(),
                     sig,
                     failed_participants,
                 };
-                let wire_msg = WireMsg::single_src(
-                    node,
-                    DstLocation::Section {
-                        name: XorName::from(PublicKey::Bls(section_pk)),
-                        section_pk,
-                    },
-                    node_msg,
-                    section_pk,
-                )?;
                 trace!("{}", LogMarker::DkgSendFailureObservation);
                 Cmd::SendMsg {
-                    recipients: self.recipients(),
-                    wire_msg,
+                    msg: OutgoingMsg::System(msg),
+                    recipients: Recipients::from(&self.recipients()),
+                    #[cfg(feature = "traceroute")]
+                    traceroute: vec![],
                 }
             }))
             .collect();
@@ -461,7 +423,7 @@ impl Session {
         if add_reset_timer {
             cmds.push(self.reset_timer());
         }
-        cmds.extend(self.check(node, section_pk)?);
+        cmds.extend(self.check(node)?);
 
         if !unhandleable.is_empty() {
             trace!(
@@ -502,10 +464,7 @@ mod tests {
 
     use sn_interface::{
         elder_count,
-        messaging::{
-            system::{MembershipState, NodeState},
-            MsgType,
-        },
+        messaging::system::{MembershipState, NodeState},
         network_knowledge::{test_utils::gen_addr, NodeInfo, MIN_ADULT_AGE},
         types::keys::ed25519::{self, proptesting::arbitrary_keypair},
     };
@@ -656,16 +615,13 @@ mod tests {
         ) -> Result<Vec<(SocketAddr, DkgMessage)>> {
             match cmd {
                 Cmd::SendMsg {
-                    recipients,
-                    wire_msg,
-                } => match wire_msg.into_msg()? {
-                    MsgType::System {
-                        msg:
-                            SystemMsg::DkgMessage {
-                                session_id,
-                                message,
-                            },
-                        ..
+                    msg: OutgoingMsg::System(msg),
+                    recipients: Recipients::Peers(recipients),
+                    ..
+                } => match msg {
+                    SystemMsg::DkgMessage {
+                        session_id,
+                        message,
                     } => {
                         assert_eq!(session_id.hash(), expected_dkg_key.hash());
                         Ok(recipients
@@ -673,10 +629,7 @@ mod tests {
                             .map(|peer| (peer.addr(), message.clone()))
                             .collect())
                     }
-                    MsgType::System {
-                        msg: SystemMsg::DkgNotReady { message, .. },
-                        ..
-                    } => Ok(vec![(self.node.addr, message)]),
+                    SystemMsg::DkgNotReady { message, .. } => Ok(vec![(self.node.addr, message)]),
                     other_msg => bail!("Unexpected msg: {:?}", other_msg),
                 },
                 Cmd::HandleDkgOutcome { outcome, .. } => {

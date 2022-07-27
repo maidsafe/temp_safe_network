@@ -8,7 +8,6 @@
 
 use crate::{
     node::{
-        delivery_group,
         flow_ctrl::{cmds::Cmd, event_channel::EventSender},
         Error, Event, Node, Result, GENESIS_DBC_AMOUNT,
     },
@@ -16,7 +15,6 @@ use crate::{
 };
 
 use sn_interface::{
-    messaging::WireMsg,
     network_knowledge::{NetworkKnowledge, NodeInfo, SectionAuthorityProvider, SectionKeyShare},
     types::log_markers::LogMarker,
 };
@@ -127,48 +125,6 @@ impl Node {
     pub(crate) fn handle_dkg_timeout(&self, token: u64) -> Result<Vec<Cmd>> {
         self.dkg_voter
             .handle_timeout(&self.info(), token, self.network_knowledge().section_key())
-    }
-
-    // Send message to peers on the network.
-    pub(crate) fn send_msg_on_to_nodes(&self, mut wire_msg: WireMsg) -> Result<Option<Cmd>> {
-        let dst_location = wire_msg.dst_location();
-        let (targets, _dg_size) = delivery_group::delivery_targets(
-            dst_location,
-            &self.info().name(),
-            &self.network_knowledge,
-        )?;
-
-        let target_name = dst_location.name();
-
-        // To avoid loop: if destination is to Node, targets are multiple, self is an elder,
-        //     self section prefix matches the destination name, then don't carry out a relay.
-        if self.is_elder()
-            && targets.len() > 1
-            && dst_location.is_to_node()
-            && self.network_knowledge.prefix().matches(&target_name)
-        {
-            // This actually means being an elder, but we don't know the member yet. Which most likely
-            // happens during the join process that a node's name is changed.
-            // we just drop the message
-            return Ok(None);
-        }
-
-        trace!(
-            "relay {:?} to {:?} (Section PK: {:?})",
-            wire_msg,
-            targets,
-            wire_msg.src_section_pk(),
-        );
-
-        let dst_pk = self.section_key_by_name(&target_name);
-        wire_msg.set_dst_section_pk(dst_pk);
-
-        let cmd = Cmd::SendMsg {
-            recipients: targets.into_iter().collect(),
-            wire_msg,
-        };
-
-        Ok(Some(cmd))
     }
 
     // Generate a new section info based on the current set of members, but

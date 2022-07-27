@@ -6,13 +6,15 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{dkg::session::Session, flow_ctrl::cmds::Cmd, messages::WireMsgUtils, Result};
+use crate::node::{
+    dkg::session::Session,
+    flow_ctrl::cmds::Cmd,
+    messaging::{OutgoingMsg, Recipients},
+    Result,
+};
 
 use sn_interface::{
-    messaging::{
-        system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
-        DstLocation, WireMsg,
-    },
+    messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
     network_knowledge::{supermajority, NodeInfo, SectionAuthorityProvider, SectionKeyShare},
     types::{
         keys::ed25519::{self, Digest256},
@@ -176,23 +178,15 @@ impl DkgVoter {
                 &sender
             );
 
-            let node_msg = SystemMsg::DkgSessionUnknown {
+            let msg = SystemMsg::DkgSessionUnknown {
                 session_id: session_id.clone(),
                 message,
             };
-            let wire_msg = WireMsg::single_src(
-                node,
-                DstLocation::Node {
-                    name: sender.name(),
-                    section_pk,
-                },
-                node_msg,
-                section_pk,
-            )?;
-
             cmds.push(Cmd::SendMsg {
-                recipients: vec![sender],
-                wire_msg,
+                msg: OutgoingMsg::System(msg),
+                recipients: Recipients::from_single(sender),
+                #[cfg(feature = "traceroute")]
+                traceroute: vec![],
             });
         }
         Ok(cmds)
