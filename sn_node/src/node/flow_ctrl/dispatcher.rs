@@ -69,17 +69,17 @@ impl Dispatcher {
                 mut traceroute,
             } => {
                 let node = self.node.read().await;
+                let info = node.info();
+                let key = node.info().keypair.public;
 
                 let src_section_pk = node.network_knowledge().section_key();
 
                 #[allow(unused_mut)]
-                let mut wire_msg = WireMsg::single_src(&node.info(), dst, msg, src_section_pk)?;
+                let mut wire_msg = WireMsg::single_src(&info, dst, msg, src_section_pk)?;
 
                 #[cfg(feature = "traceroute")]
                 {
-                    traceroute.push(Entity::Adult(PublicKey::Ed25519(
-                        self.node.read().await.info().keypair.public,
-                    )));
+                    traceroute.push(Entity::Adult(PublicKey::Ed25519(key)));
                     wire_msg.add_trace(&mut traceroute);
                 }
 
@@ -88,13 +88,18 @@ impl Dispatcher {
 
                 Ok(cmds)
             }
+            Cmd::TrackNodeIssueInDysfunction { name, issue } => {
+                let mut node = self.node.write().await;
+                node.log_node_issue(name, issue)?;
+
+                Ok(vec![])
+            }
             Cmd::ValidateMsg {
                 origin,
                 wire_msg,
                 original_bytes,
             } => {
-                let mut node = self.node.write().await;
-
+                let node = self.node.read().await;
                 node.validate_msg(origin, wire_msg, original_bytes).await
             }
             Cmd::HandleValidServiceMsg {
