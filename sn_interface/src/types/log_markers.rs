@@ -38,7 +38,6 @@ pub enum LogMarker {
     VotedOffline,
     // Messaging
     ServiceMsgToBeHandled,
-    QueryServiceMsgToBeHandled,
     SystemMsgToBeHandled,
     // Membership
     MembershipVotesBeingHandled,

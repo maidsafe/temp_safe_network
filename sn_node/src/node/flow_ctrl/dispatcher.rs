@@ -12,8 +12,9 @@ use crate::node::{
     Cmd, Error, Node, Result,
 };
 
+use sn_interface::messaging::{AuthKind, Dst, MsgId};
 use sn_interface::{
-    messaging::{data::ServiceMsg, system::SystemMsg, AuthKind, Dst, MsgId, WireMsg},
+    messaging::{system::SystemMsg, WireMsg},
     types::Peer,
 };
 
@@ -103,6 +104,25 @@ impl Dispatcher {
             Cmd::TrackNodeIssueInDysfunction { name, issue } => {
                 let mut node = self.node.write().await;
                 node.log_node_issue(name, issue)?;
+                Ok(vec![])
+            }
+            Cmd::AddToPendingQueries {
+                operation_id,
+                origin,
+            } => {
+                let mut node = self.node.write().await;
+
+                if let Some(peers) = node.pending_data_queries.get_mut(&operation_id) {
+                    trace!(
+                        "Adding to pending data queries for op id: {:?}",
+                        operation_id
+                    );
+                    let _ = peers.insert(origin);
+                } else {
+                    let _prior_value =
+                        node.pending_data_queries
+                            .set(operation_id, BTreeSet::from([origin]), None);
+                };
 
                 Ok(vec![])
             }
@@ -121,33 +141,18 @@ impl Dispatcher {
                 auth,
                 #[cfg(feature = "traceroute")]
                 traceroute,
-            } => match msg {
-                ServiceMsg::Query(_) => {
-                    let mut node = self.node.write().await;
-
-                    node.handle_valid_query_msg(
-                        msg_id,
-                        msg,
-                        auth,
-                        origin,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )
-                    .await
-                }
-                _ => {
-                    let node = self.node.read().await;
-
-                    node.handle_valid_service_msg(
-                        msg_id,
-                        msg,
-                        origin,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )
-                    .await
-                }
-            },
+            } => {
+                let node = self.node.read().await;
+                node.handle_valid_service_msg(
+                    msg_id,
+                    msg,
+                    auth,
+                    origin,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
+                )
+                .await
+            }
             Cmd::HandleValidSystemMsg {
                 origin,
                 msg_id,

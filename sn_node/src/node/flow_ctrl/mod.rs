@@ -124,9 +124,9 @@ impl FlowCtrl {
 
             loop {
                 let _instant = interval.tick().await;
-                let mut node = self.node.write().await;
+                let node = self.node.read().await;
 
-                if !node.is_elder() {
+                if node.is_not_elder() {
                     // don't send health checks as an adult
                     continue;
                 }
@@ -148,23 +148,14 @@ impl FlowCtrl {
                 let our_info = node.info();
                 let origin = our_info.peer();
 
-                let keypair = node.keypair.clone();
-                let payload = WireMsg::serialize_msg_payload(&msg)?;
-                let signature = keypair.sign(&payload);
-
-                let auth = ServiceAuth {
-                    public_key: PublicKey::Ed25519(keypair.public),
-                    signature: Signature::Ed25519(signature),
-                };
-
-                let proofed_auth = AuthorityProof::verify(auth, payload)?;
+                let auth = auth(&node, &msg)?;
 
                 // generate the cmds, and ensure we go through dysfunction tracking
                 let cmds = node
-                    .handle_valid_query_msg(
+                    .handle_valid_service_msg(
                         msg_id,
                         msg,
-                        proofed_auth,
+                        auth,
                         origin,
                         #[cfg(feature = "traceroute")]
                         vec![],
@@ -500,4 +491,17 @@ async fn handle_connection_events(ctrl: FlowCtrl, mut incoming_conns: mpsc::Rece
     }
 
     error!("Fatal error, the stream for incoming connections has been unexpectedly closed. No new connections or messages can be received from the network from here on.");
+}
+
+fn auth(node: &Node, msg: &ServiceMsg) -> Result<AuthorityProof<ServiceAuth>> {
+    let keypair = node.keypair.clone();
+    let payload = WireMsg::serialize_msg_payload(&msg)?;
+    let signature = keypair.sign(&payload);
+
+    let auth = ServiceAuth {
+        public_key: PublicKey::Ed25519(keypair.public),
+        signature: Signature::Ed25519(signature),
+    };
+
+    Ok(AuthorityProof::verify(auth, payload)?)
 }

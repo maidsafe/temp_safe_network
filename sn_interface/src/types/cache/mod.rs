@@ -76,17 +76,25 @@ where
     }
 
     /// Get a value from the cache if one is set and not expired.
-    ///
-    /// A clone of the value is returned, so this is only implemented when `V: Clone`.
-    pub fn get(&self, key: &T) -> Option<V>
+    pub fn get(&self, key: &T) -> Option<&V>
     where
         T: Eq + Hash,
-        V: Clone,
     {
         self.items
             .get(key)
             .filter(|&item| !item.expired())
-            .map(|k| k.object.clone())
+            .map(|k| &k.object)
+    }
+
+    /// Get a mut value from the cache if one is set and not expired.
+    pub fn get_mut(&mut self, key: &T) -> Option<&mut V>
+    where
+        T: Eq + Hash,
+    {
+        self.items
+            .get_mut(key)
+            .filter(|item| !item.expired())
+            .map(|k| &mut k.object)
     }
 
     /// Get a list of all items in the cache
@@ -185,7 +193,7 @@ mod tests {
         let mut cache = Cache::with_expiry_duration(Duration::from_secs(2));
         let _prev = cache.set(KEY, VALUE, None);
         let value = cache.get(&KEY);
-        assert_eq!(value, Some(VALUE), "value was not found in cache");
+        assert_eq!(value, Some(&VALUE), "value was not found in cache");
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -193,7 +201,7 @@ mod tests {
         let mut cache = Cache::with_capacity(usize::MAX);
         let _prev = cache.set(KEY, VALUE, None);
         let value = cache.get(&KEY);
-        assert_eq!(value, Some(VALUE), "value was not found in cache");
+        assert_eq!(value, Some(&VALUE), "value was not found in cache");
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -201,7 +209,7 @@ mod tests {
         let mut cache = Cache::with_expiry_duration(Duration::from_secs(0));
         let _prev = cache.set(KEY, VALUE, Some(Duration::from_secs(2)));
         let value = cache.get(&KEY);
-        assert_eq!(value, Some(VALUE), "value was not found in cache");
+        assert_eq!(value, Some(&VALUE), "value was not found in cache");
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -231,7 +239,7 @@ mod tests {
         let _prev = cache.set(KEY, VALUE, None);
         let _prev = cache.set(KEY, NEW_VALUE, None);
         let value = cache.get(&KEY);
-        assert_eq!(value, Some(NEW_VALUE), "value was not found in cache");
+        assert_eq!(value, Some(&NEW_VALUE), "value was not found in cache");
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -302,6 +310,6 @@ mod tests {
         let value: &str = "hello";
         let _prev = cache.set(key, value, None);
         assert!(cache.get(&KEY).is_none());
-        assert_eq!(cache.get(&key), Some(value));
+        assert_eq!(cache.get(&key), Some(&value));
     }
 }
