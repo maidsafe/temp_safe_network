@@ -147,7 +147,7 @@ impl Node {
                 // First we check if it's query and we have too many on the go at the moment...
                 if let ServiceMsg::Query(_) = msg {
                     // we have a query, check if we have too many on the go....
-                    let pending_query_length = self.pending_data_queries.len().await;
+                    let pending_query_length = self.pending_data_queries.len();
 
                     if pending_query_length > DATA_QUERY_LIMIT {
                         // TODO: check if query is pending for this already.. add to that if that makes sense.

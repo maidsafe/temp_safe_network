@@ -17,16 +17,14 @@ pub(crate) mod tests;
 pub(crate) use self::cmd_ctrl::CmdCtrl;
 use crate::comm::MsgEvent;
 use crate::node::{flow_ctrl::cmds::Cmd, messages::WireMsgUtils, Error, Node, Result};
-use ed25519_dalek::Signer;
 use sn_interface::{
     messaging::{
         data::{DataQuery, DataQueryVariant, ServiceMsg},
         system::{NodeCmd, SystemMsg},
-        AuthorityProof, MsgId, ServiceAuth, WireMsg,
+        MsgId, WireMsg,
     },
     types::log_markers::LogMarker,
     types::ChunkAddress,
-    types::{PublicKey, Signature},
 };
 
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
@@ -124,7 +122,7 @@ impl FlowCtrl {
 
             loop {
                 let _instant = interval.tick().await;
-                let mut node = self.node.write().await;
+                let node = self.node.read().await;
                 // random chunk addr will be sent to relevant nodes in the section.
                 let chunk_addr = xor_name::rand::random();
                 // lets make sure it's relevant to our section, to avoid any
@@ -138,16 +136,6 @@ impl FlowCtrl {
                     adult_index: 0,
                 });
 
-                let keypair = node.keypair.clone();
-                let payload = WireMsg::serialize_msg_payload(&msg)?;
-                let signature = keypair.sign(&payload);
-
-                let auth = ServiceAuth {
-                    public_key: PublicKey::Ed25519(keypair.public),
-                    signature: Signature::Ed25519(signature),
-                };
-
-                let proofed_auth = AuthorityProof::verify(auth, payload)?;
                 let msg_id = MsgId::new();
                 let our_info = node.info();
                 let origin = our_info.peer();
@@ -157,7 +145,6 @@ impl FlowCtrl {
                     .handle_valid_service_msg(
                         msg_id,
                         msg,
-                        proofed_auth,
                         origin,
                         #[cfg(feature = "traceroute")]
                         vec![],

@@ -10,7 +10,7 @@ use crate::node::{messages::WireMsgUtils, Cmd, Node, Result};
 
 use crate::comm::{Comm, DeliveryStatus};
 use sn_interface::{
-    messaging::{system::SystemMsg, DstLocation, WireMsg},
+    messaging::{data::ServiceMsg, system::SystemMsg, DstLocation, WireMsg},
     types::Peer,
 };
 
@@ -109,19 +109,33 @@ impl Dispatcher {
                 auth,
                 #[cfg(feature = "traceroute")]
                 traceroute,
-            } => {
-                let mut node = self.node.write().await;
+            } => match msg {
+                ServiceMsg::Query(_) => {
+                    let mut node = self.node.write().await;
 
-                node.handle_valid_service_msg(
-                    msg_id,
-                    msg,
-                    auth,
-                    origin,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
-                )
-                .await
-            }
+                    node.handle_valid_query_msg(
+                        msg_id,
+                        msg,
+                        auth,
+                        origin,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
+                    .await
+                }
+                _ => {
+                    let node = self.node.read().await;
+
+                    node.handle_valid_service_msg(
+                        msg_id,
+                        msg,
+                        origin,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
+                    .await
+                }
+            },
             Cmd::HandleValidSystemMsg {
                 origin,
                 msg_id,
