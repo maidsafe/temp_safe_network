@@ -23,13 +23,14 @@ use crate::node::{
     Error, Node, Result,
 };
 
+use signature::Signer;
 use sn_interface::{
     messaging::{
         data::{DataQuery, DataQueryVariant, ServiceMsg},
         system::{NodeCmd, SystemMsg},
-        MsgId,
+        AuthorityProof, MsgId, ServiceAuth, WireMsg,
     },
-    types::{log_markers::LogMarker, ChunkAddress},
+    types::{log_markers::LogMarker, ChunkAddress, PublicKey, Signature},
 };
 
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
@@ -145,11 +146,14 @@ impl FlowCtrl {
                 let our_info = node.info();
                 let origin = our_info.peer();
 
+                let auth = auth(&node, &msg)?;
+
                 // generate the cmds, and ensure we go through dysfunction tracking
                 let cmds = node
                     .handle_valid_service_msg(
                         msg_id,
                         msg,
+                        auth,
                         origin,
                         #[cfg(feature = "traceroute")]
                         vec![],
@@ -515,4 +519,17 @@ async fn handle_connection_events(ctrl: FlowCtrl, mut incoming_conns: mpsc::Rece
     }
 
     error!("Fatal error, the stream for incoming connections has been unexpectedly closed. No new connections or messages can be received from the network from here on.");
+}
+
+fn auth(node: &Node, msg: &ServiceMsg) -> Result<AuthorityProof<ServiceAuth>> {
+    let keypair = node.keypair.clone();
+    let payload = WireMsg::serialize_msg_payload(&msg)?;
+    let signature = keypair.sign(&payload);
+
+    let auth = ServiceAuth {
+        public_key: PublicKey::Ed25519(keypair.public),
+        signature: Signature::Ed25519(signature),
+    };
+
+    Ok(AuthorityProof::verify(auth, payload)?)
 }
