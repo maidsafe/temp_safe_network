@@ -11,7 +11,7 @@ repository = "https://github.com/maidsafe/safe_network"
 version = "0.8.2"
 
 [features]
-default = ["chunks", "registers", "spentbook"]
+default = ["chunks", "registers", "spentbook", "traceroute"]
 back-pressure = []
 chunks = []
 registers = []
