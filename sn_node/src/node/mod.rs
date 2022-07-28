@@ -337,19 +337,19 @@ mod core {
                 .map_err(Error::from)
         }
 
+        /// Log an issue in dysfunction
+        pub(crate) fn log_node_issue(&mut self, name: XorName, issue: IssueType) -> Result<()> {
+            trace!("Logging issue {issue:?} in dysfunction");
+            self.dysfunction_tracking
+                .track_issue(name, issue)
+                .map_err(Error::from)
+        }
+
         /// Log a communication problem
         pub(crate) fn log_comm_issue(&mut self, name: XorName) -> Result<()> {
             trace!("Logging comms issue in dysfunction");
             self.dysfunction_tracking
                 .track_issue(name, IssueType::Communication)
-                .map_err(Error::from)
-        }
-
-        /// Log a knowledge issue
-        pub(crate) fn log_knowledge_issue(&mut self, name: XorName) -> Result<()> {
-            trace!("Logging Knowledge issue in dysfunction");
-            self.dysfunction_tracking
-                .track_issue(name, IssueType::Knowledge)
                 .map_err(Error::from)
         }
 

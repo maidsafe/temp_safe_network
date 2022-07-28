@@ -38,7 +38,7 @@ use itertools::Itertools;
 impl Node {
     #[instrument(skip(self, original_bytes))]
     pub(crate) async fn validate_msg(
-        &mut self,
+        &self,
         origin: Peer,
         wire_msg: WireMsg,
         original_bytes: Bytes,
@@ -76,7 +76,9 @@ impl Node {
                 };
 
                 // Check for entropy before we proceed further
-                if let Some(ae_cmd) = self
+                // Anythign returned here means there's an issue and we should
+                // short-circuit below
+                let cmds = self
                     .apply_ae(
                         &origin,
                         &msg,
@@ -85,10 +87,11 @@ impl Node {
                         &msg_authority,
                         original_bytes.clone(), // a cheap clone w/ Bytes
                     )
-                    .await?
-                {
+                    .await?;
+
+                if !cmds.is_empty() {
                     // short circuit and send those AE responses
-                    return Ok(vec![ae_cmd]);
+                    return Ok(cmds);
                 }
 
                 #[cfg(feature = "traceroute")]
@@ -201,18 +204,19 @@ impl Node {
     /// Returns an ae cmd if we need to halt msg validation and update the origin instead.
     #[instrument(skip_all)]
     async fn apply_ae(
-        &mut self,
+        &self,
         origin: &Peer,
         msg: &SystemMsg,
         wire_msg: &WireMsg,
         dst_location: &DstLocation,
         msg_authority: &NodeMsgAuthority,
         msg_bytes: Bytes,
-    ) -> Result<Option<Cmd>> {
+    ) -> Result<Vec<Cmd>> {
+        let mut cmds = vec![];
         // Adult nodes don't need to carry out entropy checking,
         // however the message shall always be handled.
         if !self.is_elder() {
-            return Ok(None);
+            return Ok(cmds);
         }
         // For the case of receiving a join request not matching our prefix,
         // we just let the join request handler to deal with it later on.
@@ -230,10 +234,10 @@ impl Node {
                     "Entropy check skipped for {:?}, handling message directly",
                     wire_msg.msg_id()
                 );
-                Ok(None)
+                Ok(cmds)
             }
             _ => match dst_location.section_pk() {
-                None => Ok(None),
+                None => Ok(cmds),
                 Some(dst_section_pk) => {
                     if let Some(ae_cmd) = self.check_for_entropy(
                         msg_bytes,
@@ -248,10 +252,15 @@ impl Node {
 
                         if known_elders.contains(&origin.name()) {
                             // we track a dysfunction against our elder here
-                            self.log_knowledge_issue(origin.name())?;
+                            cmds.push(Cmd::TrackNodeIssueInDysfunction {
+                                name: origin.name(),
+                                issue: sn_dysfunction::IssueType::Knowledge,
+                            });
                         }
 
-                        return Ok(Some(ae_cmd));
+                        cmds.push(ae_cmd);
+
+                        return Ok(cmds);
                     }
 
                     trace!(
@@ -259,7 +268,7 @@ impl Node {
                         wire_msg.msg_id()
                     );
 
-                    Ok(None)
+                    Ok(cmds)
                 }
             },
         }
