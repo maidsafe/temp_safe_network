@@ -27,37 +27,27 @@ impl Node {
     pub(crate) fn propose_handover_consensus(
         &mut self,
         sap_candidates: SapCandidate,
-    ) -> Result<Vec<Cmd>> {
+    ) -> Result<Option<Cmd>> {
         match &self.handover_voting {
             Some(handover_voting_state) => {
                 let mut vs = handover_voting_state.clone();
                 let vote = vs.propose(sap_candidates)?;
                 self.handover_voting = Some(vs);
                 debug!("{}: {:?}", LogMarker::HandoverConsensusTrigger, &vote);
-                Ok(self.broadcast_handover_vote_msg(vote))
+                Ok(Some(self.broadcast_handover_vote_msg(vote)))
             }
             None => {
                 warn!("Failed to make handover consensus proposal because node is not an Elder");
-                Ok(vec![])
+                Ok(None)
             }
         }
     }
 
     /// Broadcast handover Vote message to Elders
-    pub(crate) fn broadcast_handover_vote_msg(
-        &self,
-        signed_vote: SignedVote<SapCandidate>,
-    ) -> Vec<Cmd> {
+    pub(crate) fn broadcast_handover_vote_msg(&self, signed_vote: SignedVote<SapCandidate>) -> Cmd {
         // Deliver each SignedVote to all current Elders
         trace!("Broadcasting Vote msg: {:?}", signed_vote);
-        let node_msg = SystemMsg::HandoverVotes(vec![signed_vote]);
-        match self.send_msg_to_our_elders(node_msg) {
-            Ok(cmd) => vec![cmd],
-            Err(err) => {
-                error!("Failed to send SystemMsg::Handover message: {:?}", err);
-                vec![]
-            }
-        }
+        self.send_msg_to_our_elders(SystemMsg::HandoverVotes(vec![signed_vote]))
     }
 
     /// Broadcast the decision of the terminated handover consensus by proposing the NewElders SAP
@@ -115,7 +105,7 @@ impl Node {
                     ">>> Handover Vote msg successfully handled, broadcasting our vote: {:?}",
                     signed_vote
                 );
-                Ok(self.broadcast_handover_vote_msg(signed_vote))
+                Ok(vec![self.broadcast_handover_vote_msg(signed_vote)])
             }
             Ok(VoteResponse::WaitingForMoreVotes) => {
                 trace!(
@@ -335,17 +325,14 @@ impl Node {
 
         for vote in signed_votes {
             match self.handle_handover_vote(peer, vote).await {
-                Ok(commands) => {
-                    cmds.extend(commands);
+                Ok(vec) => {
+                    cmds.extend(vec);
                 }
                 Err(Error::RequestHandoverAntiEntropy(gen)) => {
                     // We hit an error while processing this vote, perhaps we are missing information.
                     // We'll send a handover AE request to see if they can help us catch up.
-                    let msg = SystemMsg::HandoverAE(gen);
-                    let cmd = self.send_direct_msg(vec![peer], msg)?;
-
                     debug!("{:?}", LogMarker::HandoverSendingAeUpdateRequest);
-                    cmds.push(cmd);
+                    cmds.push(self.send_system_to_one(SystemMsg::HandoverAE(gen), peer));
                     // return the vec w/ the AE cmd there so as not to loop and generate AE for
                     // any subsequent commands
                     return Ok(cmds);
@@ -359,11 +346,7 @@ impl Node {
         Ok(cmds)
     }
 
-    pub(crate) fn handle_handover_anti_entropy(
-        &self,
-        peer: Peer,
-        gen: Generation,
-    ) -> Result<Vec<Cmd>> {
+    pub(crate) fn handle_handover_anti_entropy(&self, peer: Peer, gen: Generation) -> Option<Cmd> {
         debug!(
             "{:?} handover anti-entropy request for gen {:?} from {}",
             LogMarker::HandoverAeRequestReceived,
@@ -371,21 +354,19 @@ impl Node {
             peer,
         );
 
-        let cmds = if let Some(handover) = self.handover_voting.as_ref() {
+        if let Some(handover) = self.handover_voting.as_ref() {
             match handover.anti_entropy(gen) {
                 Ok(catchup_votes) => {
-                    vec![self.send_direct_msg(vec![peer], SystemMsg::HandoverVotes(catchup_votes))?]
+                    Some(self.send_system_to_one(SystemMsg::HandoverVotes(catchup_votes), peer))
                 }
                 Err(e) => {
                     error!("Handover - Error while processing anti-entropy {:?}", e);
-                    vec![]
+                    None
                 }
             }
         } else {
             error!("Unexpected attempt to handle handover anti-entropy when we don't have a handover instance (handover is for elders only)");
-            vec![]
-        };
-
-        Ok(cmds)
+            None
+        }
     }
 }

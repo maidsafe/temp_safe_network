@@ -611,15 +611,14 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
 
             // Simulate the same peer rejoining
             let node_state = NodeState::joined(peer, None).to_msg();
-            let join_cmds = dispatcher
+            let join_cmd = dispatcher
                 .node()
                 .write()
                 .await
-                .propose_membership_change(node_state.clone())
-                .unwrap();
+                .propose_membership_change(node_state.clone());
 
             // A rejoining node will always be rejected
-            assert!(join_cmds.is_empty()); // no commands signals this membership proposal was dropped.
+            assert!(join_cmd.is_none()); // no cmd signals this membership proposal was dropped.
             assert!(!dispatcher
                 .node()
                 .read()

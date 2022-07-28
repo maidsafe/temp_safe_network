@@ -65,7 +65,6 @@ pub enum LogMarker {
     RegisterQueryReceivedAtAdult,
     // Routing cmds
     DispatchHandleMsgCmd,
-    DispatchSendMsgCmd,
     CmdHandlingSpawned,
     CmdProcessStart,
     CmdProcessEnd,
@@ -91,9 +90,7 @@ pub enum LogMarker {
     AeSendRetryAsOutdated,
     AeSendRetryDstPkFail,
     // Sending messages
-    SendOrHandle,
-    SendDirect,
-    SendDirectToNodes,
+    SendToNodes,
     SendResourceProofChallenge,
     SendJoinRequest,
     SendJoinAsRelocatedResponse,

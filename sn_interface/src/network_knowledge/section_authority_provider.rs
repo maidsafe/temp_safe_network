@@ -179,6 +179,11 @@ impl SectionAuthorityProvider {
         self.elders.iter().cloned().collect()
     }
 
+    /// A convenience function since we often use SAP elders as recipients.
+    pub fn elders_set(&self) -> BTreeSet<Peer> {
+        self.elders.iter().cloned().collect()
+    }
+
     // Returns a copy of the public key set
     pub fn public_key_set(&self) -> PublicKeySet {
         self.public_key_set.clone()

@@ -160,7 +160,6 @@ impl Node {
 
                 if self.is_not_elder() {
                     trace!("Redirecting from adult to section elders");
-
                     return Ok(vec![
                         self.ae_redirect_to_our_elders(origin, &original_bytes)?
                     ]);
@@ -169,10 +168,7 @@ impl Node {
                 // First we check if it's query and we have too many on the go at the moment...
                 if let ServiceMsg::Query(_) = msg {
                     // we have a query, check if we have too many on the go....
-                    let pending_query_length = self.pending_data_queries.len();
-
-                    if pending_query_length > DATA_QUERY_LIMIT {
-                        // TODO: check if query is pending for this already.. add to that if that makes sense.
+                    if self.pending_data_queries.len() > DATA_QUERY_LIMIT {
                         warn!("Pending queries length exceeded, dropping query {msg:?}");
                         return Ok(vec![]);
                     }

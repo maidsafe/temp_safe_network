@@ -21,33 +21,28 @@ impl Node {
         &mut self,
         proposal: Proposal,
         sig: KeyedSig,
-    ) -> Result<Vec<Cmd>> {
+    ) -> Result<Option<Cmd>> {
         debug!("{:?} {:?}", LogMarker::ProposalAgreed, proposal);
         match proposal {
-            Proposal::Offline(node_state) => self.handle_offline_agreement(node_state, sig),
+            Proposal::Offline(node_state) => Ok(self.handle_offline_agreement(node_state, sig)),
             Proposal::SectionInfo(sap) => self.handle_section_info_agreement(sap, sig).await,
             Proposal::NewElders(_) => {
                 error!("Elders agreement should be handled in a separate blocking fashion");
-                Ok(vec![])
+                Ok(None)
             }
             Proposal::JoinsAllowed(joins_allowed) => {
                 self.joins_allowed = joins_allowed;
-                Ok(vec![])
+                Ok(None)
             }
         }
     }
 
     #[instrument(skip(self))]
-    fn handle_offline_agreement(
-        &mut self,
-        node_state: NodeState,
-        sig: KeyedSig,
-    ) -> Result<Vec<Cmd>> {
+    fn handle_offline_agreement(&mut self, node_state: NodeState, sig: KeyedSig) -> Option<Cmd> {
         info!(
             "Agreement - proposing membership change with node offline: {}",
             node_state.peer()
         );
-
         self.propose_membership_change(node_state.to_msg())
     }
 
@@ -56,7 +51,7 @@ impl Node {
         &mut self,
         section_auth: SectionAuthorityProvider,
         sig: KeyedSig,
-    ) -> Result<Vec<Cmd>> {
+    ) -> Result<Option<Cmd>> {
         // check if section matches our prefix
         let equal_prefix = section_auth.prefix() == self.network_knowledge.prefix();
         let is_extension_prefix = section_auth
@@ -69,7 +64,7 @@ impl Node {
                 "Ignoring Proposal::SectionInfo since prefix doesn't match ours: {:?}",
                 section_auth
             );
-            return Ok(vec![]);
+            return Ok(None);
         }
         debug!(
             "Updating section info for our prefix: {:?}",
@@ -90,7 +85,7 @@ impl Node {
             .all(|session| !session.elder_names().eq(agreeing_elders.iter().copied()))
         {
             warn!("SectionInfo out of date, ignore");
-            return Ok(vec![]);
+            return Ok(None);
         };
 
         // handle regular elder handover (1 to 1)
@@ -128,7 +123,7 @@ impl Node {
             ))
         } else {
             debug!("Waiting for more split handover candidates");
-            Ok(vec![])
+            Ok(None)
         }
     }
 
