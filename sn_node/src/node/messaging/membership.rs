@@ -22,6 +22,9 @@ use sn_interface::{
 
 use std::{collections::BTreeSet, vec};
 
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Traceroute;
+
 // Message handling
 impl Node {
     pub(crate) fn propose_membership_change(&mut self, node_state: NodeState) -> Option<Cmd> {

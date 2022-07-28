@@ -116,7 +116,7 @@ mod core {
     #[cfg(feature = "traceroute")]
     use sn_interface::messaging::Entity;
     #[cfg(feature = "traceroute")]
-    use sn_interface::types::PublicKey;
+    use sn_interface::messaging::Traceroute;
 
     /// Amount of tokens to be owned by the Genesis DBC.
     /// At the inception of the Network a total supply of 4,525,524,120 whole tokens will be created.
@@ -738,9 +738,9 @@ mod core {
         #[cfg(feature = "traceroute")]
         pub(crate) fn identity(&self) -> Entity {
             if self.is_elder() {
-                Entity::Elder(PublicKey::Ed25519(self.info().keypair.public))
+                Entity::Elder(self.info().public_key())
             } else {
-                Entity::Adult(PublicKey::Ed25519(self.info().keypair.public))
+                Entity::Adult(self.info().public_key())
             }
         }
     }

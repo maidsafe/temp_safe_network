@@ -38,7 +38,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
 
 #[cfg(feature = "traceroute")]
-use sn_interface::messaging::Entity;
+use sn_interface::messaging::Traceroute;
 
 impl Node {
     /// Forms a `CmdError` msg to send back to the client
@@ -47,7 +47,7 @@ impl Node {
         error: CmdError,
         target: Peer,
         msg_id: MsgId,
-        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
         let the_error_msg = ServiceMsg::CmdError {
             error,
@@ -66,7 +66,7 @@ impl Node {
         &self,
         target: Peer,
         msg_id: MsgId,
-        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
         let the_ack_msg = ServiceMsg::CmdAck {
             correlation_id: msg_id,
@@ -84,7 +84,7 @@ impl Node {
         &self,
         msg: ServiceMsg,
         recipients: Peers,
-        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
         Cmd::SendMsg {
             msg: OutgoingMsg::Service(msg),
@@ -103,7 +103,7 @@ impl Node {
         auth: ServiceAuth,
         user: EndUser,
         requesting_elder: Peer,
-        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
         let response = self
             .data_storage
@@ -134,7 +134,7 @@ impl Node {
         response: NodeQueryResponse,
         user: EndUser,
         sending_node_pk: PublicKey,
-        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Option<Cmd> {
         let op_id = if let Ok(op_id) = response.operation_id() {
             op_id
@@ -224,7 +224,7 @@ impl Node {
         msg: ServiceMsg,
         auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
-        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         if !self.is_elder() {
             return Ok(vec![]);

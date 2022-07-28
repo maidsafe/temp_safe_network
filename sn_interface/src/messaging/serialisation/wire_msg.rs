@@ -21,6 +21,9 @@ use crate::types::PublicKey;
 #[cfg(feature = "traceroute")]
 use serde::Deserialize;
 
+#[cfg(feature = "traceroute")]
+use std::fmt::{Debug as StdDebug, Display, Formatter};
+
 /// In order to send a message over the wire, it needs to be serialized
 /// along with a header (`WireMsgHeader`) which contains the information needed
 /// by the recipient to properly deserialize it.
@@ -47,6 +50,34 @@ pub enum Entity {
     Elder(PublicKey),
     Adult(PublicKey),
     Client(PublicKey),
+}
+
+#[cfg(feature = "traceroute")]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Traceroute(pub Vec<Entity>);
+
+#[cfg(feature = "traceroute")]
+impl Display for Traceroute {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut res = String::from("Traceroute:");
+        for entity in self.0.iter() {
+            res.push_str(&format!(" => {:?}", entity))
+        }
+
+        write!(f, "{:?}", res)
+    }
+}
+
+#[cfg(feature = "traceroute")]
+impl StdDebug for Traceroute {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut res = String::from("Traceroute:");
+        for entity in self.0.iter() {
+            res.push_str(&format!(" => {:?}", entity))
+        }
+
+        write!(f, "{:?}", res)
+    }
 }
 
 impl PartialEq for WireMsg {
@@ -79,7 +110,7 @@ impl WireMsg {
                 auth,
                 dst,
                 #[cfg(feature = "traceroute")]
-                vec![],
+                Traceroute(vec![]),
             ),
             payload,
             #[cfg(feature = "test-utils")]
@@ -255,11 +286,15 @@ impl WireMsg {
 
 #[cfg(feature = "traceroute")]
 impl WireMsg {
-    pub fn add_trace(&mut self, traceroute: &mut Vec<Entity>) {
-        self.header.msg_envelope.traceroute.append(traceroute)
+    pub fn add_trace(&mut self, traceroute: &mut Traceroute) {
+        self.header
+            .msg_envelope
+            .traceroute
+            .0
+            .append(&mut traceroute.0)
     }
 
-    pub fn show_trace(&self) -> Vec<Entity> {
+    pub fn show_trace(&self) -> Traceroute {
         self.header.msg_envelope.traceroute.clone()
     }
 }

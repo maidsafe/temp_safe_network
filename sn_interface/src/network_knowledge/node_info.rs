@@ -49,6 +49,10 @@ impl NodeInfo {
         XorName::from(PublicKey::from(self.keypair.public))
     }
 
+    pub fn public_key(&self) -> PublicKey {
+        PublicKey::from(self.keypair.public)
+    }
+
     // Last byte of the name represents the age.
     pub fn age(&self) -> u8 {
         self.name()[XOR_NAME_LEN - 1]

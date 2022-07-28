@@ -35,6 +35,9 @@ use sn_interface::types::PublicKey;
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Entity;
 
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Traceroute;
+
 // Number of Elders subset to send queries to
 pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;
 
@@ -85,7 +88,7 @@ impl Session {
         let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
 
         #[cfg(feature = "traceroute")]
-        wire_msg.add_trace(&mut vec![Entity::Client(client_pk)]);
+        wire_msg.add_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
 
         // The insertion of channel will be executed AFTER the completion of the `send_message`.
         let (sender, mut receiver) = channel::<CmdResponse>(elders_len);
@@ -215,7 +218,7 @@ impl Session {
         let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
 
         #[cfg(feature = "traceroute")]
-        wire_msg.add_trace(&mut vec![Entity::Client(client_pk)]);
+        wire_msg.add_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
 
         send_msg_in_bg(self.clone(), elders, wire_msg, msg_id)?;
 

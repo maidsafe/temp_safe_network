@@ -36,6 +36,9 @@ use tokio::{
     time::MissedTickBehavior,
 };
 
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Traceroute;
+
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 const MISSING_VOTE_INTERVAL: Duration = Duration::from_secs(15);
 #[cfg(feature = "back-pressure")]
@@ -158,7 +161,7 @@ impl FlowCtrl {
                         auth,
                         origin,
                         #[cfg(feature = "traceroute")]
-                        vec![],
+                        Traceroute(vec![]),
                     )
                     .await?;
 

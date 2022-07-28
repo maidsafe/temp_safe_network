@@ -56,7 +56,7 @@ impl Node {
             msg,
             recipients,
             #[cfg(feature = "traceroute")]
-            vec![],
+            Traceroute(vec![]),
         )
     }
 
@@ -72,7 +72,7 @@ impl Node {
             OutgoingMsg::System(msg),
             recipients,
             #[cfg(feature = "traceroute")]
-            traceroute,
+            Traceroute(vec![]),
         )
     }
 
@@ -114,9 +114,19 @@ impl Node {
         msg: SystemMsg,
         sender: Peer,
         comm: &Comm,
-        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         trace!("{:?}", LogMarker::SystemMsgToBeHandled);
+
+        #[cfg(feature = "traceroute")]
+        {
+            if !traceroute.0.is_empty() {
+                info!(
+                    "Handling SystemMsg {}:{:?} with trace \n{:?}",
+                    msg, msg_id, traceroute
+                );
+            }
+        }
 
         let src_name = msg_authority.name();
         match msg {
@@ -192,6 +202,10 @@ impl Node {
                 bounced_msg,
             } => {
                 trace!("Handling msg: AE-Retry from {}: {:?}", sender, msg_id,);
+
+                #[cfg(feature = "traceroute")]
+                info!("Handling AE-Retry message with trace {:?}", traceroute);
+
                 self.handle_anti_entropy_retry_msg(
                     section_auth.into_state(),
                     section_signed,
@@ -666,7 +680,7 @@ impl Node {
     fn record_storage_level_if_any(
         &self,
         level: Option<StorageLevel>,
-        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
         if let Some(level) = level {

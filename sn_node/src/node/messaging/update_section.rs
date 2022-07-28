@@ -17,6 +17,9 @@ use sn_interface::{
 use itertools::Itertools;
 use std::collections::BTreeSet;
 
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Traceroute;
+
 impl Node {
     /// Given what data the peer has, we shall calculate what data the peer is missing that
     /// we have, and send such data to the peer.
