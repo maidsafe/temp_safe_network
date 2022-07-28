@@ -70,21 +70,14 @@ pub async fn connect(safe: &mut Safe, config: &Config, timeout: Duration) -> Res
         info!("No credentials found for CLI, connecting with read-only access...");
     }
 
-    let client_cfg = client_config_path();
-
     match safe
-        .connect(
-            app_keypair.clone(),
-            client_cfg.as_deref(),
-            Some(timeout),
-            config.dbc_owner.clone(),
-        )
+        .connect(app_keypair.clone(), Some(timeout), config.dbc_owner.clone())
         .await
     {
         Ok(()) => Ok(()),
         Err(_) if found_app_keypair => {
             warn!("Credentials found for CLI are invalid, connecting with read-only access...");
-            safe.connect(None, None, Some(timeout), config.dbc_owner.clone())
+            safe.connect(None, Some(timeout), config.dbc_owner.clone())
                 .await
                 .wrap_err("Failed to connect with read-only access")
         }
@@ -134,17 +127,4 @@ pub fn get_credentials_file_path(config: &Config) -> Result<(PathBuf, PathBuf)> 
     let credentials_folder = pb;
     let file_path = credentials_folder.join(AUTH_CREDENTIALS_FILENAME);
     Ok((credentials_folder, file_path))
-}
-
-///
-/// Private helpers
-///
-
-fn client_config_path() -> Option<PathBuf> {
-    let mut client_cfg_path = dirs_next::home_dir()?;
-    client_cfg_path.push(".safe");
-    client_cfg_path.push("client");
-    client_cfg_path.push("sn_client.config");
-
-    Some(client_cfg_path)
 }

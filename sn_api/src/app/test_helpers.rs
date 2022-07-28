@@ -183,7 +183,7 @@ pub async fn new_safe_instance() -> Result<Safe> {
         })?,
         Err(_) => Keypair::new_ed25519(),
     };
-    let safe = Safe::connected(Some(credentials), None, None, None, None).await?;
+    let safe = Safe::connected(Some(credentials), None, None, None).await?;
     Ok(safe)
 }
 
@@ -202,8 +202,7 @@ pub async fn new_safe_instance_with_dbc_owner(secret_key: &str) -> Result<(Safe,
     let sk: SecretKey = bincode::deserialize(secret_key.as_bytes())
         .with_context(|| "Failed to deserialize secret key for DBC owner")?;
     let dbc_owner = Owner::from(sk);
-    let safe =
-        Safe::connected(Some(credentials), None, None, None, Some(dbc_owner.clone())).await?;
+    let safe = Safe::connected(Some(credentials), None, None, Some(dbc_owner.clone())).await?;
 
     Ok((safe, dbc_owner))
 }
@@ -211,7 +210,7 @@ pub async fn new_safe_instance_with_dbc_owner(secret_key: &str) -> Result<(Safe,
 // Instantiate a Safe instance with read-only access
 pub async fn new_read_only_safe_instance() -> Result<Safe> {
     init_logger();
-    let safe = Safe::connected(None, None, None, None, None).await?;
+    let safe = Safe::connected(None, None, None, None).await?;
     Ok(safe)
 }
 

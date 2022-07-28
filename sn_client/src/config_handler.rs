@@ -6,16 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{Error, Result};
 use qp2p::Config as QuicP2pConfig;
 use serde::{Deserialize, Serialize};
 use std::{
     net::{Ipv4Addr, SocketAddr},
-    path::Path,
     time::Duration,
 };
-use tokio::{fs::File, io::AsyncReadExt};
-use tracing::{debug, warn};
+use tracing::warn;
 
 const DEFAULT_LOCAL_ADDR: (Ipv4Addr, u16) = (Ipv4Addr::UNSPECIFIED, 0);
 
@@ -57,17 +54,12 @@ impl ClientConfig {
     /// If `query_timeout` is not specified, [`DEFAULT_OPERATION_TIMEOUT`] will be used.
     pub async fn new(
         local_addr: Option<SocketAddr>,
-        config_file_path: Option<&Path>,
+        qp2p_config: Option<QuicP2pConfig>,
         query_timeout: Option<Duration>,
         cmd_timeout: Option<Duration>,
         cmd_ack_wait: Option<Duration>,
     ) -> Self {
-        // If a config file path was provided we try to read it,
-        // otherwise we use default qp2p config.
-        let qp2p = match &config_file_path {
-            None => QuicP2pConfig::default(),
-            Some(path) => read_config_file(path).await.unwrap_or_default(),
-        };
+        let qp2p = qp2p_config.unwrap_or_default();
 
         let query_timeout = query_timeout.unwrap_or(DEFAULT_OPERATION_TIMEOUT);
         let cmd_timeout = cmd_timeout.unwrap_or(DEFAULT_OPERATION_TIMEOUT);
@@ -141,23 +133,6 @@ impl ClientConfig {
     }
 }
 
-async fn read_config_file(filepath: &Path) -> Result<QuicP2pConfig, Error> {
-    debug!("Reading config file '{}' ...", filepath.display());
-    let mut file = File::open(filepath).await?;
-
-    let mut contents = vec![];
-    let _size = file.read_to_end(&mut contents).await?;
-
-    serde_json::from_slice(&contents).map_err(|err| {
-        warn!(
-            "Could not parse content of config file '{}': {}",
-            filepath.display(),
-            err
-        );
-        err.into()
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -190,7 +165,7 @@ mod tests {
 
         // In the absence of a config file, the config handler
         // should initialize bootstrap_cache_dir only
-        let config = ClientConfig::new(None, Some(&config_filepath), None, None, None).await;
+        let config = ClientConfig::new(None, None, None, None, None).await;
         // convert to string for assert
         let mut str_path = root_dir
             .to_str()
@@ -240,8 +215,7 @@ mod tests {
         create_dir_all(&root_dir).await?;
         let mut file = File::create(&config_filepath)?;
 
-        let config_on_disk =
-            ClientConfig::new(None, Some(&config_filepath), None, None, None).await;
+        let config_on_disk = ClientConfig::new(None, None, None, None, None).await;
         serde_json::to_writer_pretty(&mut file, &config_on_disk)?;
         file.sync_all()?;
 
