@@ -17,8 +17,6 @@ use crate::node::{
 
 use itertools::Itertools;
 use sn_dysfunction::IssueType;
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Entity;
 use sn_interface::{
     data_copy_count,
     messaging::{
@@ -32,13 +30,16 @@ use std::{cmp::Ordering, collections::BTreeSet};
 use tracing::info;
 use xor_name::XorName;
 
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Traceroute;
+
 impl Node {
     // Locate ideal holders for this data, instruct them to store the data
     pub(crate) fn replicate_data(
         &self,
         data: ReplicatedData,
         targets: BTreeSet<Peer>,
-        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Cmd {
         info!(
             "Replicating data {:?} to holders {:?}",
@@ -60,7 +61,7 @@ impl Node {
         msg_id: MsgId,
         auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
-        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         let address = query.variant.address();
         let operation_id = query.variant.operation_id()?;

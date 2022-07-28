@@ -32,7 +32,7 @@ use std::{
 };
 
 #[cfg(feature = "traceroute")]
-use sn_interface::messaging::Entity;
+use sn_interface::messaging::Traceroute;
 
 /// A struct for the job of controlling the flow
 /// of a [`Cmd`] in the system.
@@ -125,7 +125,7 @@ pub(crate) enum Cmd {
         #[debug(skip)]
         wire_msg_payload: Bytes,
         #[cfg(feature = "traceroute")]
-        traceroute: Vec<Entity>,
+        traceroute: Traceroute,
     },
     HandleValidServiceMsg {
         msg_id: MsgId,
@@ -134,7 +134,7 @@ pub(crate) enum Cmd {
         /// Requester's authority over this message
         auth: AuthorityProof<ServiceAuth>,
         #[cfg(feature = "traceroute")]
-        traceroute: Vec<Entity>,
+        traceroute: Traceroute,
     },
     /// Handle a timeout previously scheduled with `ScheduleDkgTimeout`.
     HandleDkgTimeout(u64),
@@ -172,7 +172,7 @@ pub(crate) enum Cmd {
         msg_id: MsgId,
         recipients: Peers,
         #[cfg(feature = "traceroute")]
-        traceroute: Vec<Entity>,
+        traceroute: Traceroute,
     },
     /// Schedule a timeout after the given duration. When the timeout expires, a `HandleDkgTimeout`
     /// cmd is raised. The token is used to identify the timeout.

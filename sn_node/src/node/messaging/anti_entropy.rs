@@ -28,7 +28,7 @@ use std::{collections::BTreeSet, time::Duration};
 use xor_name::{Prefix, XorName};
 
 #[cfg(feature = "traceroute")]
-use sn_interface::messaging::Entity;
+use sn_interface::messaging::Traceroute;
 
 impl Node {
     /// Send `AntiEntropyUpdate` message to all nodes in our own section.
@@ -187,7 +187,7 @@ impl Node {
         proof_chain: SecuredLinkedList,
         bounced_msg: Bytes,
         sender: Peer,
-        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         let snapshot = self.state_snapshot();
 
@@ -243,7 +243,7 @@ impl Node {
         section_chain: SecuredLinkedList,
         bounced_msg: Bytes,
         sender: Peer,
-        #[cfg(feature = "traceroute")] mut traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] mut traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         let dst_section_key = section_auth.section_key();
 

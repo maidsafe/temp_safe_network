@@ -17,7 +17,8 @@ use serde::{Deserialize, Serialize};
 use std::mem::size_of;
 
 #[cfg(feature = "traceroute")]
-use crate::messaging::Entity;
+use crate::messaging::Traceroute;
+use custom_debug::Debug as CustomDebug;
 
 // Current version of the messaging protocol.
 // At this point this implementation supports only this version.
@@ -38,13 +39,15 @@ pub struct WireMsgHeader {
 // This is all part of the message header, and it gets deserialized
 // when the `WireMsgHeader` is deserialized, allowing the caller to read
 // all this information before deciding to deserialise the actual message payload.
-#[derive(Debug, Eq, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(CustomDebug, Eq, PartialEq, Clone, Serialize, Deserialize)]
 pub struct MsgEnvelope {
     pub msg_id: MsgId,
     pub auth: AuthKind,
     pub dst: Dst,
     #[cfg(feature = "traceroute")]
-    pub traceroute: Vec<Entity>,
+    // Remove if necessary to debug from WireMsg
+    #[debug(skip)]
+    pub traceroute: Traceroute,
 }
 
 // The first two fields in the header. This is not part of the public interface.
@@ -82,7 +85,7 @@ impl WireMsgHeader {
         msg_id: MsgId,
         auth: AuthKind,
         dst: Dst,
-        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Self {
         Self {
             //header_size: Self::max_size(),

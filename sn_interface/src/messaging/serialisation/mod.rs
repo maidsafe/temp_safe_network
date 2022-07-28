@@ -20,6 +20,9 @@ use xor_name::XorName;
 #[cfg(feature = "traceroute")]
 pub use self::wire_msg::Entity;
 
+#[cfg(feature = "traceroute")]
+pub use self::wire_msg::Traceroute;
+
 /// Authority of a `NodeMsg`.
 /// Src of message and authority to send it. Authority is validated by the signature.
 #[derive(Eq, PartialEq, Debug, Clone)]

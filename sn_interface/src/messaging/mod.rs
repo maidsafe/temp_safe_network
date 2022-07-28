@@ -63,3 +63,6 @@ use xor_name::XorName;
 // a SocketAddr at the Elders where the `EndUser` is proxied through.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
 pub struct EndUser(pub XorName);
+
+#[cfg(feature = "traceroute")]
+pub use self::serialisation::Traceroute;
