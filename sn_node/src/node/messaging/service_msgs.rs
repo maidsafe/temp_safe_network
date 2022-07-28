@@ -48,12 +48,12 @@ impl Node {
         target: Peer,
         msg_id: MsgId,
         #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
-    ) -> Result<Vec<Cmd>> {
+    ) -> Cmd {
         let the_error_msg = ServiceMsg::CmdError {
             error,
             correlation_id: msg_id,
         };
-        self.send_cmd_response(
+        self.send_service_msg(
             target,
             the_error_msg,
             #[cfg(feature = "traceroute")]
@@ -67,11 +67,11 @@ impl Node {
         target: Peer,
         msg_id: MsgId,
         #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
-    ) -> Result<Vec<Cmd>> {
+    ) -> Cmd {
         let the_ack_msg = ServiceMsg::CmdAck {
             correlation_id: msg_id,
         };
-        self.send_cmd_response(
+        self.send_service_msg(
             target,
             the_ack_msg,
             #[cfg(feature = "traceroute")]
@@ -80,19 +80,18 @@ impl Node {
     }
 
     /// Forms a cmd to send a cmd response error/ack to the client
-    fn send_cmd_response(
+    fn send_service_msg(
         &self,
         target: Peer,
         msg: ServiceMsg,
         #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
-    ) -> Result<Vec<Cmd>> {
-        let cmd = Cmd::SendMsg {
+    ) -> Cmd {
+        Cmd::SendMsg {
             msg: OutgoingMsg::Service(msg),
             recipients: Recipients::from_single(target),
             #[cfg(feature = "traceroute")]
             traceroute,
-        };
-        Ok(vec![cmd])
+        }
     }
 
     /// Handle data query
@@ -139,36 +138,41 @@ impl Node {
         user: EndUser,
         sending_node_pk: PublicKey,
         #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
-    ) -> Result<Vec<Cmd>> {
-        let mut cmds = vec![];
-        let op_id = response.operation_id()?;
+    ) -> Option<Cmd> {
+        let op_id = if let Ok(op_id) = response.operation_id() {
+            op_id
+        } else {
+            warn!(
+                "There is no operation id. Dropping chunk query response from Adult {}, to user: {}.",
+                sending_node_pk, user.0
+            );
+            return None;
+        };
+
         debug!(
             "Handling data read @ elders, received from {:?}, op id: {:?}",
             sending_node_pk, op_id
         );
 
         let node_id = XorName::from(sending_node_pk);
-
-        let querys_peers = self.pending_data_queries.remove(&op_id);
+        let query_peers = self.pending_data_queries.remove(&op_id);
         // Clear expired queries from the cache.
         self.pending_data_queries.remove_expired();
 
         // First check for waiting peers. If no one is waiting, we drop the response
-        let waiting_peers = if let Some(peers) = querys_peers {
+        let waiting_peers = if let Some(peers) = query_peers {
+            if peers.is_empty() {
+                // nothing to do
+                return None;
+            }
             peers
         } else {
             warn!(
                 "Dropping chunk query response from Adult {}. We might have already forwarded this chunk to the requesting client or the client connection cache has expired: {}",
                 sending_node_pk, user.0
             );
-
-            return Ok(cmds);
+            return None;
         };
-
-        if waiting_peers.is_empty() {
-            // nothing to do
-            return Ok(cmds);
-        }
 
         let query_response = response.convert();
 
@@ -178,7 +182,7 @@ impl Node {
 
         if !pending_removed {
             trace!("Ignoring un-expected response");
-            return Ok(cmds);
+            return None;
         }
 
         // dont reply if data not found (but do keep peers around...)
@@ -199,7 +203,7 @@ impl Node {
                 sending_node_pk,
                 op_id
             );
-            return Ok(cmds);
+            return None;
         }
 
         let msg = ServiceMsg::QueryResponse {
@@ -207,14 +211,12 @@ impl Node {
             correlation_id,
         };
 
-        cmds.push(Cmd::SendMsg {
+        Some(Cmd::SendMsg {
             msg: OutgoingMsg::Service(msg),
             recipients: Recipients::Peers(waiting_peers),
             #[cfg(feature = "traceroute")]
             traceroute,
-        });
-
-        Ok(cmds)
+        })
     }
 
     /// Handle incoming service msgs. Though NOT queries, as this requires
@@ -227,6 +229,10 @@ impl Node {
         origin: Peer,
         #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
+        if !self.is_elder() {
+            return Ok(vec![]);
+        }
+
         trace!("{:?} {:?}", LogMarker::ServiceMsgToBeHandled, msg);
 
         // extract the data from the request
@@ -272,35 +278,45 @@ impl Node {
             }
         };
 
-        // build the replication cmds
-        let mut cmds = self.replicate_data(
-            data,
-            #[cfg(feature = "traceroute")]
-            traceroute.clone(),
-        )?;
+        trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
+
+        let mut cmds = vec![];
+        let targets = self.target_data_holders(data.name());
+
         // make sure the expected replication factor is achieved
-        if data_copy_count() > cmds.len() {
+        if data_copy_count() > targets.len() {
             error!("InsufficientAdults for storing data reliably");
             let error = CmdError::Data(ErrorMsg::InsufficientAdults {
                 prefix: self.network_knowledge().prefix(),
                 expected: data_copy_count() as u8,
-                found: cmds.len() as u8,
+                found: targets.len() as u8,
             });
-            return self.send_cmd_error_response(
+            cmds.push(self.send_cmd_error_response(
                 error,
                 origin,
                 msg_id,
                 #[cfg(feature = "traceroute")]
                 traceroute,
-            );
+            ));
+            // return early with error sent to client
+            return Ok(cmds);
         }
 
-        cmds.extend(self.send_cmd_ack(
+        // the replication msg sent to adults
+        cmds.push(self.replicate_data(
+            data,
+            targets,
+            #[cfg(feature = "traceroute")]
+            traceroute.clone(),
+        ));
+
+        // the ack sent to client
+        cmds.push(self.send_cmd_ack(
             origin,
             msg_id,
             #[cfg(feature = "traceroute")]
             traceroute,
-        )?);
+        ));
 
         Ok(cmds)
     }

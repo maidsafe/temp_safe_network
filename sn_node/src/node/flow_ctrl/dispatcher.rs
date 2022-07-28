@@ -172,29 +172,25 @@ impl Dispatcher {
             }
             Cmd::HandleDkgTimeout(token) => {
                 let node = self.node.read().await;
-
                 node.handle_dkg_timeout(token)
             }
             Cmd::HandleAgreement { proposal, sig } => {
                 let mut node = self.node.write().await;
-
-                node.handle_general_agreements(proposal, sig).await
+                node.handle_general_agreements(proposal, sig)
+                    .await
+                    .map(|c| c.into_iter().collect())
             }
             Cmd::HandleMembershipDecision(decision) => {
                 let mut node = self.node.write().await;
-
                 node.handle_membership_decision(decision).await
             }
             Cmd::HandleNewEldersAgreement { new_elders, sig } => {
                 let mut node = self.node.write().await;
-
                 node.handle_new_elders_agreement(new_elders, sig).await
             }
             Cmd::HandlePeerFailedSend(peer) => {
                 let mut node = self.node.write().await;
-
                 node.handle_failed_send(&peer.addr())?;
-
                 Ok(vec![])
             }
             Cmd::HandleDkgOutcome {
@@ -202,13 +198,11 @@ impl Dispatcher {
                 outcome,
             } => {
                 let mut node = self.node.write().await;
-
                 node.handle_dkg_outcome(section_auth, outcome).await
             }
             Cmd::HandleDkgFailure(signeds) => {
                 let mut node = self.node.write().await;
-
-                node.handle_dkg_failure(signeds).map(|cmd| vec![cmd])
+                Ok(vec![node.handle_dkg_failure(signeds)?])
             }
             Cmd::EnqueueDataForReplication {
                 // throttle_duration,
@@ -240,15 +234,13 @@ impl Dispatcher {
                 .collect()),
             Cmd::ProposeOffline(names) => {
                 let mut node = self.node.write().await;
-
                 node.cast_offline_proposals(&names)
             }
             Cmd::TellEldersToStartConnectivityTest(name) => {
                 let node = self.node.read().await;
-
                 Ok(vec![node.send_msg_to_our_elders(
                     SystemMsg::StartConnectivityTest(name),
-                )?])
+                )])
             }
             Cmd::TestConnectivity(name) => {
                 let node_state = self

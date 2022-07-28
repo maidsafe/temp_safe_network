@@ -17,7 +17,8 @@ use crate::{
     },
 };
 
-use bytes::Bytes;
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Entity;
 use sn_interface::{
     messaging::{
         data::StorageLevel,
@@ -37,29 +38,64 @@ use sn_interface::{
     network_knowledge::NetworkKnowledge,
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey},
 };
+
+use bytes::Bytes;
+use std::collections::BTreeSet;
 use xor_name::XorName;
 
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Entity;
-
 impl Node {
-    /// Send a direct (`SystemMsg`) message to a set of nodes
-    pub(crate) fn send_direct_msg(&self, recipients: Vec<Peer>, msg: SystemMsg) -> Result<Cmd> {
-        trace!("{}", LogMarker::SendDirectToNodes);
-
-        Ok(Cmd::SendMsg {
-            msg: OutgoingMsg::System(msg),
-            recipients: Recipients::from(&recipients),
-            #[cfg(feature = "traceroute")]
-            traceroute: vec![],
-        })
+    /// Send a (`SystemMsg`) message to all Elders in our section
+    pub(crate) fn send_msg_to_our_elders(&self, msg: SystemMsg) -> Cmd {
+        let sap = self.network_knowledge.authority_provider();
+        let recipients = sap.elders_set();
+        self.send_system_to_many(msg, recipients)
     }
 
-    /// Send a direct (`SystemMsg`) message to all Elders in our section
-    pub(crate) fn send_msg_to_our_elders(&self, msg: SystemMsg) -> Result<Cmd> {
-        let sap = self.network_knowledge.authority_provider();
-        let elders = sap.elders_vec();
-        self.send_direct_msg(elders, msg)
+    /// Send a (`SystemMsg`) message to a node
+    pub(crate) fn send_system_to_one(&self, msg: SystemMsg, recipient: Peer) -> Cmd {
+        self.send_system_to_many(msg, BTreeSet::from([recipient]))
+    }
+
+    /// Send a (`SystemMsg`) message to a set of nodes
+    pub(crate) fn send_system_to_many(&self, msg: SystemMsg, recipients: BTreeSet<Peer>) -> Cmd {
+        trace!("{}", LogMarker::SendToNodes);
+        self.trace_system_to_many(
+            msg,
+            recipients,
+            #[cfg(feature = "traceroute")]
+            vec![],
+        )
+    }
+
+    /// Send a (`SystemMsg`) message to a node
+    pub(crate) fn trace_system_to_one(
+        &self,
+        msg: SystemMsg,
+        recipient: Peer,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+    ) -> Cmd {
+        self.trace_system_to_many(
+            msg,
+            BTreeSet::from([recipient]),
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        )
+    }
+
+    /// Send a (`SystemMsg`) message to a set of nodes
+    pub(crate) fn trace_system_to_many(
+        &self,
+        msg: SystemMsg,
+        recipients: BTreeSet<Peer>,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+    ) -> Cmd {
+        trace!("{}", LogMarker::SendToNodes);
+        Cmd::SendMsg {
+            msg: OutgoingMsg::System(msg),
+            recipients: Recipients::Peers(recipients),
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        }
     }
 
     /// Aggregation of system messages
@@ -294,10 +330,15 @@ impl Node {
                 self.handle_dkg_failure_agreement(&src_name, &sig_set)
             }
             SystemMsg::HandoverVotes(votes) => self.handle_handover_msg(sender, votes).await,
-            SystemMsg::HandoverAE(gen) => self.handle_handover_anti_entropy(sender, gen),
+            SystemMsg::HandoverAE(gen) => Ok(self
+                .handle_handover_anti_entropy(sender, gen)
+                .into_iter()
+                .collect()),
             SystemMsg::JoinRequest(join_request) => {
                 trace!("Handling msg: JoinRequest from {}", sender);
-                self.handle_join_request(sender, *join_request, comm).await
+                self.handle_join_request(sender, *join_request, comm)
+                    .await
+                    .map(|c| c.into_iter().collect())
             }
             SystemMsg::JoinAsRelocatedRequest(join_request) => {
                 trace!("Handling msg: JoinAsRelocatedRequest from {}", sender);
@@ -306,17 +347,21 @@ impl Node {
                 {
                     return Ok(vec![]);
                 }
-
-                self.handle_join_as_relocated_request(sender, *join_request, comm)
+                Ok(self
+                    .handle_join_as_relocated_request(sender, *join_request, comm)
                     .await
+                    .into_iter()
+                    .collect())
             }
             SystemMsg::MembershipVotes(votes) => {
                 let mut cmds = vec![];
                 cmds.extend(self.handle_membership_votes(sender, votes)?);
-
                 Ok(cmds)
             }
-            SystemMsg::MembershipAE(gen) => self.handle_membership_anti_entropy(sender, gen),
+            SystemMsg::MembershipAE(gen) => Ok(self
+                .handle_membership_anti_entropy(sender, gen)
+                .into_iter()
+                .collect()),
             SystemMsg::Propose {
                 proposal,
                 sig_share,
@@ -417,79 +462,83 @@ impl Node {
                     "Processing CouldNotStoreData event with MsgId: {:?}",
                     msg_id
                 );
-
-                if self.is_elder() {
-                    if full {
-                        let changed = self
-                            .set_storage_level(&node_id, StorageLevel::from(StorageLevel::MAX)?);
-                        if changed {
-                            // ..then we accept a new node in place of the full node
-                            self.joins_allowed = true;
-                        }
-                    }
-                    self.replicate_data(
-                        data,
-                        #[cfg(feature = "traceroute")]
-                        traceroute,
-                    )
-                } else {
+                if self.is_not_elder() {
                     error!("Received unexpected message while Adult");
-                    Ok(vec![])
+                    return Ok(vec![]);
                 }
+
+                if full {
+                    let changed =
+                        self.set_storage_level(&node_id, StorageLevel::from(StorageLevel::MAX)?);
+                    if changed {
+                        // ..then we accept a new node in place of the full node
+                        self.joins_allowed = true;
+                    }
+                }
+
+                let targets = self.target_data_holders(data.name());
+
+                Ok(vec![self.replicate_data(
+                    data,
+                    targets,
+                    #[cfg(feature = "traceroute")]
+                    traceroute,
+                )])
             }
             SystemMsg::NodeCmd(NodeCmd::ReplicateData(data_collection)) => {
                 info!("ReplicateData MsgId: {:?}", msg_id);
+
                 if self.is_elder() {
                     error!("Received unexpected message while Elder");
-                    Ok(vec![])
-                } else {
-                    let mut cmds = vec![];
+                    return Ok(vec![]);
+                }
 
-                    let section_pk = PublicKey::Bls(self.network_knowledge.section_key());
-                    let own_keypair = Keypair::Ed25519(self.keypair.clone());
+                let mut cmds = vec![];
 
-                    for data in data_collection {
-                        // We are an adult here, so just store away!
-                        // This may return a DatabaseFull error... but we should have reported storage increase
-                        // well before this
-                        match self
-                            .data_storage
-                            .store(&data, section_pk, own_keypair.clone())
-                            .await
-                        {
-                            Ok(level_report) => {
-                                info!("Storage level report: {:?}", level_report);
-                                cmds.extend(self.record_storage_level_if_any(
-                                    level_report,
-                                    #[cfg(feature = "traceroute")]
-                                    traceroute.clone(),
-                                )?);
+                let section_pk = PublicKey::Bls(self.network_knowledge.section_key());
+                let own_keypair = Keypair::Ed25519(self.keypair.clone());
 
+                for data in data_collection {
+                    // We are an adult here, so just store away!
+                    // This may return a DatabaseFull error... but we should have reported storage increase
+                    // well before this
+                    match self
+                        .data_storage
+                        .store(&data, section_pk, own_keypair.clone())
+                        .await
+                    {
+                        Ok(level_report) => {
+                            info!("Storage level report: {:?}", level_report);
+                            cmds.extend(self.record_storage_level_if_any(
+                                level_report,
                                 #[cfg(feature = "traceroute")]
-                                info!("End of message flow. Trace: {:?}", traceroute);
-                            }
-                            Err(DbError::NotEnoughSpace) => {
-                                // db full
-                                error!("Not enough space to store more data");
+                                traceroute.clone(),
+                            )?);
 
-                                let node_id = PublicKey::from(self.keypair.public);
-                                let msg = SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
-                                    node_id,
-                                    data,
-                                    full: true,
-                                });
+                            #[cfg(feature = "traceroute")]
+                            info!("End of message flow. Trace: {:?}", traceroute);
+                        }
+                        Err(DbError::NotEnoughSpace) => {
+                            // db full
+                            error!("Not enough space to store more data");
 
-                                cmds.push(self.send_msg_to_our_elders(msg)?)
-                            }
-                            Err(error) => {
-                                // the rest seem to be non-problematic errors.. (?)
-                                error!("Problem storing data, but it was ignored: {error}");
-                            }
+                            let node_id = PublicKey::from(self.keypair.public);
+                            let msg = SystemMsg::NodeEvent(NodeEvent::CouldNotStoreData {
+                                node_id,
+                                data,
+                                full: true,
+                            });
+
+                            cmds.push(self.send_msg_to_our_elders(msg))
+                        }
+                        Err(error) => {
+                            // the rest seem to be non-problematic errors.. (?)
+                            error!("Problem storing data, but it was ignored: {error}");
                         }
                     }
-
-                    Ok(cmds)
                 }
+
+                Ok(cmds)
             }
             SystemMsg::NodeCmd(NodeCmd::SendAnyMissingRelevantData(known_data_addresses)) => {
                 info!(
@@ -536,23 +585,25 @@ impl Node {
                 debug!(
                     "{:?}: op_id {:?}, correlation_id: {correlation_id:?}, sender: {sender} origin msg_id: {:?}",
                     LogMarker::ChunkQueryResponseReceviedFromAdult,
-                    response.operation_id()?,
+                    response.operation_id().map(|s| s.to_string()).unwrap_or_else(|_| "None".to_string()),
                     msg_id
                 );
                 let sending_nodes_pk = match msg_authority {
                     NodeMsgAuthority::Node(auth) => PublicKey::from(auth.into_inner().node_ed_pk),
                     _ => return Err(Error::InvalidQueryResponseAuthority),
                 };
-
-                self.handle_data_query_response_at_elder(
-                    correlation_id,
-                    response,
-                    user,
-                    sending_nodes_pk,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
-                )
-                .await
+                Ok(self
+                    .handle_data_query_response_at_elder(
+                        correlation_id,
+                        response,
+                        user,
+                        sending_nodes_pk,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
+                    .await
+                    .into_iter()
+                    .collect())
             }
             SystemMsg::DkgSessionUnknown {
                 session_id,

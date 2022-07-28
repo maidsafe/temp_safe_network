@@ -54,8 +54,7 @@ impl Node {
             nonce,
             nonce_signature: ed25519::sign(&serialized, &self.keypair),
         }));
-
         trace!("{}", LogMarker::SendResourceProofChallenge);
-        self.send_direct_msg(vec![peer], response)
+        Ok(self.send_system_to_one(response, peer))
     }
 }

@@ -299,9 +299,8 @@ mod core {
 
             let matching_section = self.network_knowledge.section_by_name(&dst)?;
 
-            let message = SystemMsg::AntiEntropyProbe;
             let section_key = matching_section.section_key();
-            let recipients = matching_section.elders_vec();
+            let recipients = matching_section.elders_set();
 
             info!(
                 "ProbeMsg target {:?} w/key {:?}",
@@ -309,12 +308,12 @@ mod core {
                 section_key
             );
 
-            self.send_direct_msg(recipients, message)
+            Ok(self.send_system_to_many(SystemMsg::AntiEntropyProbe, recipients))
         }
 
-        pub(crate) fn generate_section_probe_msg(&self) -> Result<Cmd> {
+        pub(crate) fn generate_section_probe_msg(&self) -> Cmd {
             let our_section = self.network_knowledge.authority_provider();
-            let recipients = our_section.elders_vec();
+            let recipients = our_section.elders_set();
 
             info!(
                 "ProbeMsg target section {:?} recipients {:?}",
@@ -322,7 +321,7 @@ mod core {
                 recipients,
             );
 
-            self.send_direct_msg(recipients, SystemMsg::AntiEntropyProbe)
+            self.send_system_to_many(SystemMsg::AntiEntropyProbe, recipients)
         }
 
         /// returns names that are relatively dysfunctional
@@ -594,7 +593,9 @@ mod core {
             }
 
             if new.is_elder || old.is_elder {
-                cmds.extend(self.send_ae_update_to_our_section());
+                if let Some(cmd) = self.send_ae_update_to_our_section() {
+                    cmds.push(cmd);
+                }
             }
 
             let current: BTreeSet<_> = self.network_knowledge.authority_provider().names();
@@ -660,7 +661,7 @@ mod core {
 
             // update new elders if we were an elder (regardless if still or not)
             if new_elders && old.is_elder {
-                cmds.extend(
+                cmds.push(
                     self.send_metadata_updates(
                         self.network_knowledge
                             .authority_provider()
@@ -669,7 +670,7 @@ mod core {
                             .cloned()
                             .collect(),
                         &self.network_knowledge.prefix(),
-                    )?,
+                    ),
                 );
             };
 
