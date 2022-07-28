@@ -63,14 +63,13 @@ impl Node {
     }
 
     pub(crate) async fn read_data_from_adults(
-        &mut self,
+        &self,
         query: DataQuery,
         msg_id: MsgId,
         auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
         #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
-        let mut cmds = vec![];
         let address = query.variant.address();
         let operation_id = query.variant.operation_id()?;
         trace!(
@@ -83,18 +82,10 @@ impl Node {
         let targets = self.get_adults_holding_data_including_full(address.name());
 
         // Query only the nth adult
-        let targets = BTreeSet::from_iter(
-            targets
-                .iter()
-                .nth(query.adult_index) // Grab only nth adult
-                .iter() // Get Iter of length 0 (if nth adult does not exists) or 1
-                .copied() // &&XorName -> &XorName
-                .copied(), // &XorName -> XorName
-        );
-
-        if targets.is_empty() {
+        let target = if let Some(peer) = targets.into_iter().nth(query.adult_index) {
+            peer
+        } else {
             let error = convert_to_error_msg(Error::NoAdults(self.network_knowledge().prefix()));
-
             debug!("No targets found for {msg_id:?}");
             return self.send_cmd_error_response(
                 CmdError::Data(error),
@@ -103,66 +94,46 @@ impl Node {
                 #[cfg(feature = "traceroute")]
                 traceroute,
             );
-        }
-
-        let mut op_was_already_underway = false;
-        let waiting_peers = if let Some(mut peers) = self.pending_data_queries.get(&operation_id) {
-            op_was_already_underway = peers.insert(origin);
-
-            peers
-        } else {
-            let mut peers = BTreeSet::new();
-            let _false_as_fresh = peers.insert(origin);
-            peers
         };
 
-        // drop if we exceed
-        if waiting_peers.len() > MAX_WAITING_PEERS_PER_QUERY {
-            warn!("Dropping query from {origin:?}, there are more than {MAX_WAITING_PEERS_PER_QUERY} waiting already");
-            return Ok(vec![]);
-        }
+        let mut cmds = vec![Cmd::AddToPendingQueries {
+            origin,
+            operation_id,
+        }];
 
-        // only set pending data query cache if non existed.
-        // otherwise we've appended to the Peers above
-        // we rely on the data query cache timeout to decide as/when we'll be re-sending a query to adults
-        if !op_was_already_underway {
-            // ensure we only add a pending request when we're actually sending out requests.
-            for target in &targets {
-                trace!("adding pending req for {target:?} in dysfunction tracking");
-                cmds.push(Cmd::TrackNodeIssueInDysfunction {
-                    name: target.name(),
-                    issue: IssueType::PendingRequestOperation(Some(operation_id)),
-                })
+        if let Some(peers) = self.pending_data_queries.get(&operation_id) {
+            if peers.len() > MAX_WAITING_PEERS_PER_QUERY {
+                warn!("Dropping query from {origin:?}, there are more than {MAX_WAITING_PEERS_PER_QUERY} waiting already");
+                return Ok(vec![]);
+            } else {
+                // we don't respond to the actual query, as we're still within data query timeout
+                // we rely on the data query cache timeout to decide as/when we'll be re-sending a query to adults
+                return Ok(cmds);
             }
-
-            trace!(
-                "Adding to pending data queries for op id: {:?}",
-                operation_id
-            );
-
-            let _prior_value = self
-                .pending_data_queries
-                .set(operation_id, waiting_peers, None);
-
-            let msg = SystemMsg::NodeQuery(NodeQuery::Data {
-                query: query.variant,
-                auth: auth.into_inner(),
-                origin: EndUser(origin.name()),
-                correlation_id: msg_id,
-            });
-
-            cmds.extend(self.send_msg(
-                msg,
-                targets,
-                #[cfg(feature = "traceroute")]
-                traceroute,
-            )?);
-
-            Ok(cmds)
-        } else {
-            // we don't do anything as we're still within data query timeout
-            Ok(cmds)
         }
+
+        // we only add a pending request when we're actually sending out requests
+        trace!("adding pending req for {target:?} in dysfunction tracking");
+        cmds.push(Cmd::TrackNodeIssueInDysfunction {
+            name: target.name(),
+            issue: IssueType::PendingRequestOperation(Some(operation_id)),
+        });
+
+        let msg = SystemMsg::NodeQuery(NodeQuery::Data {
+            query: query.variant,
+            auth: auth.into_inner(),
+            origin: EndUser(origin.name()),
+            correlation_id: msg_id,
+        });
+
+        cmds.extend(self.send_msg(
+            msg,
+            BTreeSet::from([target]),
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        )?);
+
+        Ok(cmds)
     }
 
     pub(crate) fn get_metadata_of(&self, prefix: &Prefix) -> MetadataExchange {
