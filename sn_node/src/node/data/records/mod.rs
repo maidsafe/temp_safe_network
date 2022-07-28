@@ -11,9 +11,7 @@ mod capacity;
 pub(crate) use self::capacity::{Capacity, MIN_LEVEL_WHEN_FULL};
 
 use crate::node::{
-    error::convert_to_error_msg,
-    messaging::{OutgoingMsg, Recipients},
-    Cmd, Error, Node, Prefix, Result, MAX_WAITING_PEERS_PER_QUERY,
+    error::convert_to_error_msg, Cmd, Error, Node, Prefix, Result, MAX_WAITING_PEERS_PER_QUERY,
 };
 
 use itertools::Itertools;
@@ -34,32 +32,25 @@ use tracing::info;
 use xor_name::XorName;
 
 impl Node {
-    // Locate ideal holders for this data, line up wiremsgs for those to instruct them to store the data
+    // Locate ideal holders for this data, instruct them to store the data
     pub(crate) fn replicate_data(
         &self,
         data: ReplicatedData,
+        targets: BTreeSet<Peer>,
         #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
-    ) -> Result<Vec<Cmd>> {
-        trace!("{:?}: {:?}", LogMarker::DataStoreReceivedAtElder, data);
-        if self.is_elder() {
-            let targets = self.get_adults_who_should_store_data(data.name());
+    ) -> Cmd {
+        info!(
+            "Replicating data {:?} to holders {:?}",
+            data.name(),
+            &targets,
+        );
 
-            info!(
-                "Replicating data {:?} to holders {:?}",
-                data.name(),
-                &targets,
-            );
-
-            let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data]));
-            self.send_msg(
-                msg,
-                targets,
-                #[cfg(feature = "traceroute")]
-                traceroute,
-            )
-        } else {
-            Err(Error::InvalidState)
-        }
+        self.trace_system_to_many(
+            SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data])),
+            targets,
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        )
     }
 
     pub(crate) async fn read_data_from_adults(
@@ -80,15 +71,14 @@ impl Node {
             operation_id
         );
 
-        let targets = self.get_adults_holding_data_including_full(address.name());
+        let targets = self.target_data_holders_including_full(address.name());
 
         // Query only the nth adult
         let targets = BTreeSet::from_iter(
             targets
-                .iter()
+                .into_iter()
                 .nth(query.adult_index) // Grab only nth adult
                 .iter() // Get Iter of length 0 (if nth adult does not exists) or 1
-                .copied() // &&XorName -> &XorName
                 .copied(), // &XorName -> XorName
         );
 
@@ -96,13 +86,13 @@ impl Node {
             let error = convert_to_error_msg(Error::NoAdults(self.network_knowledge().prefix()));
 
             debug!("No targets found for {msg_id:?}");
-            return self.send_cmd_error_response(
+            return Ok(vec![self.send_cmd_error_response(
                 CmdError::Data(error),
                 origin,
                 msg_id,
                 #[cfg(feature = "traceroute")]
                 traceroute,
-            );
+            )]);
         }
 
         let mut op_was_already_underway = false;
@@ -151,12 +141,12 @@ impl Node {
                 correlation_id: msg_id,
             });
 
-            cmds.extend(self.send_msg(
+            cmds.push(self.trace_system_to_many(
                 msg,
                 targets,
                 #[cfg(feature = "traceroute")]
                 traceroute,
-            )?);
+            ));
 
             Ok(cmds)
         } else {
@@ -181,10 +171,8 @@ impl Node {
     pub(crate) fn liveness_retain_only(&mut self, members: BTreeSet<XorName>) -> Result<()> {
         // full adults
         self.capacity.retain_members_only(&members);
-
         // stop tracking liveness of absent holders
         self.dysfunction_tracking.retain_members_only(members);
-
         Ok(())
     }
 
@@ -192,7 +180,6 @@ impl Node {
     pub(crate) fn add_new_adult_to_trackers(&mut self, adult: XorName) {
         info!("Adding new Adult: {adult} to trackers");
         self.capacity.add_new_adult(adult);
-
         self.dysfunction_tracking.add_new_node(adult);
     }
 
@@ -218,7 +205,7 @@ impl Node {
 
     /// Construct list of adults that hold target data, including full nodes.
     /// List is sorted by distance from `target`.
-    fn get_adults_holding_data_including_full(&self, target: &XorName) -> BTreeSet<Peer> {
+    fn target_data_holders_including_full(&self, target: &XorName) -> BTreeSet<Peer> {
         let full_adults = self.full_adults();
         let adults = self.network_knowledge().adults();
 
@@ -271,7 +258,7 @@ impl Node {
     }
 
     /// Used to fetch the list of holders for given name of data. Excludes full nodes
-    fn get_adults_who_should_store_data(&self, target: XorName) -> BTreeSet<Peer> {
+    pub(crate) fn target_data_holders(&self, target: XorName) -> BTreeSet<Peer> {
         let full_adults = self.full_adults();
         // TODO: reuse our_adults_sorted_by_distance_to API when core is merged into upper layer
         let adults = self.network_knowledge().adults();
@@ -293,21 +280,5 @@ impl Node {
         );
 
         candidates
-    }
-
-    // Takes a message for specified targets, and builds internal send cmd
-    // for sending to each of the targets.
-    fn send_msg(
-        &self,
-        msg: SystemMsg,
-        targets: BTreeSet<Peer>,
-        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
-    ) -> Result<Vec<Cmd>> {
-        Ok(vec![Cmd::SendMsg {
-            msg: OutgoingMsg::System(msg),
-            recipients: Recipients::Peers(targets),
-            #[cfg(feature = "traceroute")]
-            traceroute,
-        }])
     }
 }
