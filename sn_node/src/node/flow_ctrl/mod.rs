@@ -15,16 +15,18 @@ pub(super) mod event_channel;
 pub(crate) mod tests;
 
 pub(crate) use self::cmd_ctrl::CmdCtrl;
+
 use crate::comm::MsgEvent;
 use crate::node::{flow_ctrl::cmds::Cmd, messages::WireMsgUtils, Error, Node, Result};
+use ed25519_dalek::Signer;
 use sn_interface::{
     messaging::{
         data::{DataQuery, DataQueryVariant, ServiceMsg},
         system::{NodeCmd, SystemMsg},
-        MsgId, WireMsg,
+        AuthorityProof, MsgId, ServiceAuth, WireMsg,
     },
     types::log_markers::LogMarker,
-    types::ChunkAddress,
+    types::{ChunkAddress, PublicKey, Signature},
 };
 
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
@@ -122,7 +124,13 @@ impl FlowCtrl {
 
             loop {
                 let _instant = interval.tick().await;
-                let node = self.node.read().await;
+                let mut node = self.node.write().await;
+
+                if !node.is_elder() {
+                    // don't send health checks as an adult
+                    continue;
+                }
+
                 // random chunk addr will be sent to relevant nodes in the section.
                 let chunk_addr = xor_name::rand::random();
                 // lets make sure it's relevant to our section, to avoid any
@@ -140,11 +148,23 @@ impl FlowCtrl {
                 let our_info = node.info();
                 let origin = our_info.peer();
 
+                let keypair = node.keypair.clone();
+                let payload = WireMsg::serialize_msg_payload(&msg)?;
+                let signature = keypair.sign(&payload);
+
+                let auth = ServiceAuth {
+                    public_key: PublicKey::Ed25519(keypair.public),
+                    signature: Signature::Ed25519(signature),
+                };
+
+                let proofed_auth = AuthorityProof::verify(auth, payload)?;
+
                 // generate the cmds, and ensure we go through dysfunction tracking
                 let cmds = node
-                    .handle_valid_service_msg(
+                    .handle_valid_query_msg(
                         msg_id,
                         msg,
+                        proofed_auth,
                         origin,
                         #[cfg(feature = "traceroute")]
                         vec![],

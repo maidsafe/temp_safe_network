@@ -17,12 +17,11 @@ use bytes::Bytes;
 use log::{debug, warn};
 use sn_client::Client;
 use sn_dbc::{
-    rng, AmountSecrets, Error as DbcError, Hash, IndexedSignatureShare, KeyImage, Owner, OwnerOnce,
-    PublicKey, RingCtTransaction, Signature, SpentProof, SpentProofContent, SpentProofShare,
-    TransactionBuilder,
+    rng, AmountSecrets, Error as DbcError, Hash, KeyImage, Owner, OwnerOnce, PublicKey,
+    RingCtTransaction, Signature, SpentProof, SpentProofShare, TransactionBuilder,
 };
 use sn_interface::types::Token;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 /// Type tag to use for the Wallet stored on Register
 pub const WALLET_TYPE_TAG: u64 = 1_000;
@@ -166,16 +165,15 @@ impl Safe {
         // transactions, let's try to find one set of shares which can actually
         // be aggregated onto a valid proof signature for the provided DBC's key_image,
         // and which is signed by a known section key.
-        let is_spent = spent_transactions.iter().any(|tx_hash| {
-            let shares_for_current_tx: Vec<&SpentProofShare> = spent_proof_shares
+        let is_spent = spent_transactions.into_iter().any(|tx_hash| {
+            let shares_for_current_tx = spent_proof_shares
                 .iter()
-                .filter(|share| &share.content.transaction_hash == tx_hash)
-                .collect();
+                .filter(|share| share.content.transaction_hash == tx_hash);
 
             verify_spent_proof_shares_for_tx(
                 key_image,
                 tx_hash,
-                &shares_for_current_tx,
+                shares_for_current_tx,
                 &proof_key_verifier,
             )
         });
@@ -493,22 +491,21 @@ impl Safe {
                 // TODO: we temporarilly filter the spent proof shares which correspond to the TX we
                 // are spending now. This is because current implementation of Spentbook allows
                 // double spents, so we may be retrieving spent proof shares for others spent TXs.
-                let shares_for_current_tx: Vec<&SpentProofShare> = spent_proof_shares
-                    .iter()
-                    .filter(|proof_share| {
-                        proof_share.content.transaction_hash == Hash::from(tx.hash())
-                    })
+                let shares_for_current_tx: HashSet<SpentProofShare> = spent_proof_shares
+                    .into_iter()
+                    .filter(|proof_share| proof_share.content.transaction_hash == tx_hash)
                     .collect();
 
                 if verify_spent_proof_shares_for_tx(
                     key_image,
-                    &tx_hash,
-                    &shares_for_current_tx,
+                    tx_hash,
+                    shares_for_current_tx.iter(),
                     &proof_key_verifier,
                 ) {
                     dbc_builder = dbc_builder
-                        .add_spent_proof_shares(shares_for_current_tx.into_iter().cloned())
+                        .add_spent_proof_shares(shares_for_current_tx.into_iter())
                         .add_spent_transaction(tx);
+
                     break;
                 } else if attempts == NUM_OF_DBC_REISSUE_ATTEMPTS {
                     return Err(Error::DbcReissueError(format!(
@@ -528,39 +525,16 @@ impl Safe {
 }
 
 // Private helper to verify if a set of spent proof shares are valid for a given key_image and TX
-fn verify_spent_proof_shares_for_tx(
+fn verify_spent_proof_shares_for_tx<'a>(
     key_image: KeyImage,
-    tx_hash: &Hash,
-    proof_shares: &[&SpentProofShare],
+    tx_hash: Hash,
+    proof_shares: impl Iterator<Item = &'a SpentProofShare>,
     proof_key_verifier: &SpentProofKeyVerifier,
 ) -> bool {
-    match proof_shares.get(0) {
-        None => false,
-        Some(share) => {
-            match share.spentbook_pks.combine_signatures(
-                proof_shares
-                    .iter()
-                    .map(|share| SpentProofShare::spentbook_sig_share(share))
-                    .map(IndexedSignatureShare::threshold_crypto),
-            ) {
-                Ok(section_signature) => {
-                    let spent_proof = SpentProof {
-                        content: SpentProofContent {
-                            key_image,
-                            transaction_hash: *tx_hash,
-                            public_commitments: share.public_commitments().clone(),
-                        },
-                        spentbook_pub_key: share.spentbook_pks().public_key(),
-                        spentbook_sig: section_signature,
-                    };
-
-                    spent_proof
-                        .verify(share.content.transaction_hash, proof_key_verifier)
-                        .is_ok()
-                }
-                Err(_) => false,
-            }
-        }
+    if let Ok(spent_proof) = SpentProof::try_from_proof_shares(key_image, tx_hash, proof_shares) {
+        spent_proof.verify(tx_hash, proof_key_verifier).is_ok()
+    } else {
+        false
     }
 }
 
