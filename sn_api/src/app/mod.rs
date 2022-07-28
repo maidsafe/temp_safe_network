@@ -39,7 +39,7 @@ use sn_client::{Client, ClientConfig, DEFAULT_OPERATION_TIMEOUT};
 use sn_dbc::Owner;
 use sn_interface::types::Keypair;
 
-use std::{path::Path, time::Duration};
+use std::time::Duration;
 use tracing::debug;
 
 const APP_NOT_CONNECTED: &str = "Application is not connected to the network";
@@ -64,7 +64,6 @@ impl Safe {
     /// Create a Safe instance connected to the SAFE Network
     pub async fn connected(
         keypair: Option<Keypair>,
-        config_path: Option<&Path>,
         xorurl_base: Option<XorUrlBase>,
         timeout: Option<Duration>,
         dbc_owner: Option<Owner>,
@@ -75,8 +74,7 @@ impl Safe {
             dry_run_mode: false,
         };
 
-        safe.connect(keypair, config_path, timeout, dbc_owner)
-            .await?;
+        safe.connect(keypair, timeout, dbc_owner).await?;
 
         Ok(safe)
     }
@@ -85,19 +83,15 @@ impl Safe {
     pub async fn connect(
         &mut self,
         keypair: Option<Keypair>,
-        config_path: Option<&Path>,
         timeout: Option<Duration>,
         dbc_owner: Option<Owner>,
     ) -> Result<()> {
         debug!("Connecting to SAFE Network...");
-
-        let config_path = config_path.map(|p| p.to_path_buf());
-
         debug!("Client to be instantiated with specific pk?: {:?}", keypair);
 
         let config = ClientConfig::new(
             None,
-            config_path.as_deref(),
+            None,
             timeout.or(Some(DEFAULT_OPERATION_TIMEOUT)),
             timeout.or(Some(DEFAULT_OPERATION_TIMEOUT)),
             None,
