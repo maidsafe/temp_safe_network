@@ -32,7 +32,10 @@ pub const WALLET_TYPE_TAG: u64 = 1_000;
 pub type WalletSpendableDbcs = BTreeMap<String, (Dbc, EntryHash)>;
 
 // Number of attempts to make trying to spend inputs when reissuing DBCs
-const NUM_OF_DBC_REISSUE_ATTEMPTS: u8 = 3;
+// As the spend and query cmds are cascaded closely, there is high chance
+// that the first two query attempts could both be failed.
+// Hence the max number of attempts set to a higher value.
+const NUM_OF_DBC_REISSUE_ATTEMPTS: u8 = 5;
 
 /// Verifier required by sn_dbc API to check a SpentProof
 /// is validly signed by known sections keys.
