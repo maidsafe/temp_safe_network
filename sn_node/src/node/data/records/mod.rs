@@ -61,7 +61,7 @@ impl Node {
         msg_id: MsgId,
         auth: AuthorityProof<ServiceAuth>,
         origin: Peer,
-        #[cfg(feature = "traceroute")] traceroute: Traceroute,
+        #[cfg(feature = "traceroute")] mut traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         let address = query.variant.address();
         let operation_id = query.variant.operation_id()?;
