@@ -12,7 +12,7 @@ version = "0.1.0"
 
 
 [features]
-default = []
+default = ["traceroute"]
 # required to pass on flag to node builds
 chaos = []
 traceroute = []
