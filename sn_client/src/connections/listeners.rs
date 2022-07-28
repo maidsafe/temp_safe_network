@@ -111,7 +111,7 @@ impl Session {
             #[cfg(feature = "traceroute")]
             {
                 info!(
-                    "Message {} with the Traceroute received at client: {:?}",
+                    "Message {} with the Traceroute received at client:\n {:?}",
                     msg_type,
                     wire_msg.show_trace()
                 )

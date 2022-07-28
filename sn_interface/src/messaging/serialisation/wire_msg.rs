@@ -22,6 +22,8 @@ use crate::types::PublicKey;
 use serde::Deserialize;
 
 #[cfg(feature = "traceroute")]
+use itertools::Itertools;
+#[cfg(feature = "traceroute")]
 use std::fmt::{Debug as StdDebug, Display, Formatter};
 
 /// In order to send a message over the wire, it needs to be serialized
@@ -52,6 +54,16 @@ pub enum Entity {
     Client(PublicKey),
 }
 
+impl Display for Entity {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Elder(key) => write!(f, "Elder({})", key),
+            Self::Adult(key) => write!(f, "Adult({})", key),
+            Self::Client(key) => write!(f, "Client({})", key),
+        }
+    }
+}
+
 #[cfg(feature = "traceroute")]
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Traceroute(pub Vec<Entity>);
@@ -59,24 +71,18 @@ pub struct Traceroute(pub Vec<Entity>);
 #[cfg(feature = "traceroute")]
 impl Display for Traceroute {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut res = String::from("Traceroute:");
-        for entity in self.0.iter() {
-            res.push_str(&format!(" => {:?}", entity))
-        }
-
-        write!(f, "{:?}", res)
+        write!(f, "Traceroute: ")?;
+        let res = self.0.iter().join(" => ");
+        write!(f, "{}", res)
     }
 }
 
 #[cfg(feature = "traceroute")]
 impl StdDebug for Traceroute {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut res = String::from("Traceroute:");
-        for entity in self.0.iter() {
-            res.push_str(&format!(" => {:?}", entity))
-        }
-
-        write!(f, "{:?}", res)
+        write!(f, "Traceroute: ")?;
+        let res = self.0.iter().join(" => ");
+        write!(f, "{}", res)
     }
 }
 
