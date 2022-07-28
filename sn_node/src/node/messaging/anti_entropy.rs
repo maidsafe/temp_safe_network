@@ -24,14 +24,14 @@ use sn_interface::{
     network_knowledge::SectionAuthorityProvider,
     types::{log_markers::LogMarker, Peer, PublicKey},
 };
-use std::time::Duration;
+use std::{collections::BTreeSet, time::Duration};
 use xor_name::{Prefix, XorName};
 
 impl Node {
     /// Send `AntiEntropyUpdate` message to all nodes in our own section.
-    pub(crate) fn send_ae_update_to_our_section(&self) -> Vec<Cmd> {
+    pub(crate) fn send_ae_update_to_our_section(&self) -> Option<Cmd> {
         let our_name = self.info().name();
-        let nodes: Vec<_> = self
+        let recipients: BTreeSet<_> = self
             .network_knowledge
             .section_members()
             .into_iter()
@@ -39,65 +39,33 @@ impl Node {
             .map(|info| *info.peer())
             .collect();
 
-        if nodes.is_empty() {
+        if recipients.is_empty() {
             warn!("No peers of our section found in our network knowledge to send AE-Update");
-            return vec![];
+            return None;
         }
 
         // The previous PK which is likely what adults know
         let previous_pk = *self.section_chain().prev_key();
-
-        let our_prefix = self.network_knowledge.prefix();
-
-        self.send_ae_update_to_nodes(nodes, &our_prefix, previous_pk)
+        Some(self.send_ae_update_to_nodes(recipients, previous_pk))
     }
 
     /// Send `AntiEntropyUpdate` message to the specified nodes.
     pub(crate) fn send_ae_update_to_nodes(
         &self,
-        recipients: Vec<Peer>,
-        prefix: &Prefix,
+        recipients: BTreeSet<Peer>,
         section_pk: BlsPublicKey,
-    ) -> Vec<Cmd> {
-        let node_msg = match self.generate_ae_update_msg(section_pk) {
-            Ok(node_msg) => node_msg,
-            Err(err) => {
-                warn!("Failed to generate AE-Update msg to send: {:?}", err);
-                return vec![];
-            }
-        };
-
-        match self.send_direct_msg(recipients.clone(), node_msg) {
-            Ok(cmd) => vec![cmd],
-            Err(err) => {
-                error!(
-                    "Failed to send AE update to ({:?}) {:?}: {:?}",
-                    prefix, recipients, err
-                );
-                vec![]
-            }
-        }
+    ) -> Cmd {
+        let ae_msg = self.generate_ae_update_msg(section_pk);
+        self.send_system_to_many(ae_msg, recipients)
     }
 
     /// Send `MetadataExchange` packet to the specified nodes
-    pub(crate) fn send_metadata_updates(
-        &self,
-        recipients: Vec<Peer>,
-        prefix: &Prefix,
-    ) -> Result<Vec<Cmd>> {
+    pub(crate) fn send_metadata_updates(&self, recipients: BTreeSet<Peer>, prefix: &Prefix) -> Cmd {
         let metadata = self.get_metadata_of(prefix);
-        let data_update_msg = SystemMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata });
-
-        match self.send_direct_msg(recipients.clone(), data_update_msg) {
-            Ok(cmd) => Ok(vec![cmd]),
-            Err(err) => {
-                error!(
-                    "Failed to send data updates to: {:?} with {:?}",
-                    recipients, err
-                );
-                Ok(vec![])
-            }
-        }
+        self.send_system_to_many(
+            SystemMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }),
+            recipients,
+        )
     }
 
     #[instrument(skip_all)]
@@ -113,7 +81,7 @@ impl Node {
             .prefix_map()
             .get_signed(&sibling_prefix)
         {
-            let promoted_sibling_elders: Vec<_> = sibling_sap
+            let promoted_sibling_elders: BTreeSet<_> = sibling_sap
                 .elders()
                 .filter(|peer| !our_prev_state.elders.contains(&peer.name()))
                 .cloned()
@@ -130,14 +98,10 @@ impl Node {
             let sibling_prefix = sibling_sap.prefix();
 
             let mut cmds =
-                self.send_metadata_updates(promoted_sibling_elders.clone(), &sibling_prefix)?;
+                vec![self.send_metadata_updates(promoted_sibling_elders.clone(), &sibling_prefix)];
 
             // Also send AE update to sibling section's new Elders
-            cmds.extend(self.send_ae_update_to_nodes(
-                promoted_sibling_elders,
-                &sibling_prefix,
-                previous_section_key,
-            ));
+            cmds.push(self.send_ae_update_to_nodes(promoted_sibling_elders, previous_section_key));
 
             Ok(cmds)
         } else {
@@ -148,7 +112,7 @@ impl Node {
 
     // Private helper to generate AntiEntropyUpdate message to update
     // a peer abot our SAP, with proof_chain and members list.
-    fn generate_ae_update_msg(&self, dst_section_key: BlsPublicKey) -> Result<SystemMsg> {
+    fn generate_ae_update_msg(&self, dst_section_key: BlsPublicKey) -> SystemMsg {
         let signed_sap = self.network_knowledge.section_signed_authority_provider();
 
         let proof_chain = if let Ok(chain) = self
@@ -168,12 +132,12 @@ impl Node {
             .map(|state| state.clone().into_authed_msg())
             .collect();
 
-        Ok(SystemMsg::AntiEntropyUpdate {
+        SystemMsg::AntiEntropyUpdate {
             section_auth: signed_sap.value.to_msg(),
             section_signed: signed_sap.sig,
             proof_chain,
             members,
-        })
+        }
     }
 
     #[instrument(skip_all)]
@@ -250,7 +214,7 @@ impl Node {
                     result.extend(cmds);
                 }
 
-                result.push(self.send_direct_msg(vec![sender], msg_to_resend)?);
+                result.push(self.send_system_to_one(msg_to_resend, sender));
 
                 Ok(result)
             }
@@ -310,9 +274,7 @@ impl Node {
 
                     self.create_or_wait_for_backoff(&elder).await;
 
-                    let cmd = self.send_direct_msg(vec![elder], msg_to_redirect)?;
-
-                    Ok(vec![cmd])
+                    Ok(vec![self.send_system_to_one(msg_to_redirect, elder)])
                 }
             },
         }

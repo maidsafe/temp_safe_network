@@ -23,7 +23,7 @@ use std::{collections::BTreeSet, vec};
 
 // Message handling
 impl Node {
-    pub(crate) fn propose_membership_change(&mut self, node_state: NodeState) -> Result<Vec<Cmd>> {
+    pub(crate) fn propose_membership_change(&mut self, node_state: NodeState) -> Option<Cmd> {
         info!(
             "Proposing membership change: {} - {:?}",
             node_state.name, node_state.state
@@ -34,35 +34,32 @@ impl Node {
                 Ok(vote) => vote,
                 Err(e) => {
                     warn!("Membership - failed to propose change: {e:?}");
-                    return Ok(vec![]);
+                    return None;
                 }
             };
-
-            let cmds =
-                self.send_msg_to_our_elders(SystemMsg::MembershipVotes(vec![membership_vote]))?;
-            Ok(vec![cmds])
+            Some(self.send_msg_to_our_elders(SystemMsg::MembershipVotes(vec![membership_vote])))
         } else {
             error!("Membership - Failed to propose membership change, no membership instance");
-            Ok(vec![])
+            None
         }
     }
 
     /// Get our latest vote if any at this generation, and get cmds to resend to all elders
     /// (which should in turn trigger them to resend their votes)
     #[instrument(skip_all)]
-    pub(crate) async fn resend_our_last_vote_to_elders(&self) -> Result<Vec<Cmd>> {
+    pub(crate) async fn resend_our_last_vote_to_elders(&self) -> Option<Cmd> {
         let membership = self.membership.clone();
 
         if let Some(membership) = membership {
             if let Some(prev_vote) = membership.get_our_latest_vote() {
                 trace!("{}", LogMarker::ResendingLastMembershipVote);
-                let cmds = self
-                    .send_msg_to_our_elders(SystemMsg::MembershipVotes(vec![prev_vote.clone()]))?;
-                return Ok(vec![cmds]);
+                let cmd = self
+                    .send_msg_to_our_elders(SystemMsg::MembershipVotes(vec![prev_vote.clone()]));
+                return Some(cmd);
             }
         }
 
-        Ok(vec![])
+        None
     }
 
     pub(crate) fn handle_membership_votes(
@@ -89,11 +86,9 @@ impl Node {
                         debug!("Membership - We are behind the voter, requesting AE");
                         // We hit an error while processing this vote, perhaps we are missing information.
                         // We'll send a membership AE request to see if they can help us catch up.
-                        let msg = SystemMsg::MembershipAE(membership.generation());
-                        let cmd = self.send_direct_msg(vec![peer], msg)?;
-
                         debug!("{:?}", LogMarker::MembershipSendingAeUpdateRequest);
-                        cmds.push(cmd);
+                        let msg = SystemMsg::MembershipAE(membership.generation());
+                        cmds.push(self.send_system_to_one(msg, peer));
                         // return the vec w/ the AE cmd there so as not to loop and generate AE for
                         // any subsequent commands
                         return Ok(cmds);
@@ -123,7 +118,7 @@ impl Node {
             };
 
             if let Some(vote_msg) = vote_broadcast {
-                cmds.push(self.send_msg_to_our_elders(vote_msg)?);
+                cmds.push(self.send_msg_to_our_elders(vote_msg));
             }
         }
 
@@ -134,7 +129,7 @@ impl Node {
         &self,
         peer: Peer,
         gen: Generation,
-    ) -> Result<Vec<Cmd>> {
+    ) -> Option<Cmd> {
         debug!(
             "{:?} membership anti-entropy request for gen {:?} from {}",
             LogMarker::MembershipAeRequestReceived,
@@ -142,25 +137,22 @@ impl Node {
             peer
         );
 
-        let cmds = if let Some(membership) = self.membership.as_ref() {
+        if let Some(membership) = self.membership.as_ref() {
             match membership.anti_entropy(gen) {
                 Ok(catchup_votes) => {
-                    vec![self
-                        .send_direct_msg(vec![peer], SystemMsg::MembershipVotes(catchup_votes))?]
+                    Some(self.send_system_to_one(SystemMsg::MembershipVotes(catchup_votes), peer))
                 }
                 Err(e) => {
                     error!("Membership - Error while processing anti-entropy {:?}", e);
-                    vec![]
+                    None
                 }
             }
         } else {
             error!(
                 "Attempted to handle membership anti-entropy when we don't yet have a membership instance"
             );
-            vec![]
-        };
-
-        Ok(cmds)
+            None
+        }
     }
 
     pub(crate) async fn handle_membership_decision(
@@ -187,10 +179,10 @@ impl Node {
         }
 
         for (new_info, signature) in leaving_nodes.iter().cloned() {
-            cmds.extend(self.handle_node_left(new_info, signature)?);
+            cmds.extend(self.handle_node_left(new_info, signature).into_iter());
         }
 
-        cmds.extend(self.send_node_approvals(decision.clone()));
+        cmds.push(self.send_node_approvals(decision.clone()));
 
         // Do not disable node joins in first section.
         let our_prefix = self.network_knowledge.prefix();
@@ -261,18 +253,17 @@ impl Node {
     }
 
     // Send `NodeApproval` to a joining node which makes it a section member
-    pub(crate) fn send_node_approvals(&self, decision: Decision<NodeState>) -> Vec<Cmd> {
-        let peers = Vec::from_iter(
-            decision
-                .proposals
-                .keys()
-                .filter(|n| n.state == MembershipState::Joined)
-                .map(|n| n.peer()),
-        );
+    pub(crate) fn send_node_approvals(&self, decision: Decision<NodeState>) -> Cmd {
+        let peers: BTreeSet<_> = decision
+            .proposals
+            .keys()
+            .filter(|n| n.state == MembershipState::Joined)
+            .map(|n| n.peer())
+            .collect();
         let prefix = self.network_knowledge.prefix();
         info!("Section {prefix:?} has approved new peers {peers:?}.");
 
-        let node_msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
+        let msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
             genesis_key: *self.network_knowledge.genesis_key(),
             section_auth: self
                 .network_knowledge
@@ -283,20 +274,14 @@ impl Node {
         }));
 
         trace!("{}", LogMarker::SendNodeApproval);
-        match self.send_direct_msg(peers.clone(), node_msg) {
-            Ok(cmd) => vec![cmd],
-            Err(err) => {
-                error!("Failed to send join approval to new peers {peers:?}: {err:?}");
-                vec![]
-            }
-        }
+        self.send_system_to_many(msg, peers)
     }
 
     pub(crate) fn handle_node_left(
         &mut self,
         node_state: NodeState,
         signature: Signature,
-    ) -> Result<Vec<Cmd>> {
+    ) -> Option<Cmd> {
         let sig = KeyedSig {
             public_key: self.network_knowledge.section_key(),
             signature,
@@ -320,12 +305,11 @@ impl Node {
         // we then need to send the Relocate msg to the peer attaching the signed NodeState
         // containing the relocation details.
         if node_state.is_relocated() {
-            Ok(vec![self.send_direct_msg(
-                vec![*node_state.peer()],
-                SystemMsg::Relocate(node_state.into_authed_msg()),
-            )?])
+            let peer = *node_state.peer();
+            let msg = SystemMsg::Relocate(node_state.into_authed_msg());
+            Some(self.send_system_to_one(msg, peer))
         } else {
-            Ok(vec![])
+            None
         }
     }
 }

@@ -220,15 +220,10 @@ impl FlowCtrl {
 
                 // Send a probe message to an elder
                 if !prefix.is_empty() {
-                    let probe = self.node.read().await.generate_section_probe_msg();
-                    match probe {
-                        Ok(cmd) => {
-                            info!("Sending section probe msg");
-                            if let Err(e) = self.cmd_ctrl.push(cmd).await {
-                                error!("Error sending section probe msg: {:?}", e);
-                            }
-                        }
-                        Err(error) => error!("Problem generating section probe msg: {:?}", error),
+                    let cmd = self.node.read().await.generate_section_probe_msg();
+                    info!("Sending section probe msg");
+                    if let Err(e) = self.cmd_ctrl.push(cmd).await {
+                        error!("Error sending section probe msg: {:?}", e);
                     }
                 }
             }
@@ -260,10 +255,8 @@ impl FlowCtrl {
                         // we want to resend the prev vote
                         if time.elapsed() >= MISSING_VOTE_INTERVAL {
                             debug!("Vote consensus appears stalled...");
-                            let cmds = node.resend_our_last_vote_to_elders().await?;
-
-                            trace!("Vote resending cmds: {:?}", cmds.len());
-                            for cmd in cmds {
+                            if let Some(cmd) = node.resend_our_last_vote_to_elders().await {
+                                trace!("Vote resending cmd");
                                 if let Err(e) = self.cmd_ctrl.push(cmd).await {
                                     error!("Error resending a vote msg to the network: {:?}", e);
                                 }

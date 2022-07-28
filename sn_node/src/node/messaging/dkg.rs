@@ -326,8 +326,6 @@ impl Node {
             trace!("Logging {name} as having Dkg issue in dysfunction");
             self.log_dkg_issue(*name)?;
         }
-
-        let node_msg = SystemMsg::DkgFailureAgreement(failure_set);
-        self.send_msg_to_our_elders(node_msg)
+        Ok(self.send_msg_to_our_elders(SystemMsg::DkgFailureAgreement(failure_set)))
     }
 }
