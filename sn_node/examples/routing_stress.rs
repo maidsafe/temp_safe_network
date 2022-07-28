@@ -764,7 +764,7 @@ impl ProbeTracker {
         let result = self
             .sections
             .iter_mut()
-            .find_map(|(prefix, cache)| cache.get(dst).map(|pk| (prefix, pk, cache)));
+            .find_map(|(prefix, cache)| cache.get(dst).cloned().map(|pk| (prefix, pk, cache)));
         let (_prefix, probe_state, cache) = match result {
             None => return,
             Some(state) => state,

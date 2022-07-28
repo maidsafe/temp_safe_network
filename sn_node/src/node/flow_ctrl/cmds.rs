@@ -17,7 +17,7 @@ use sn_consensus::Decision;
 use sn_dysfunction::IssueType;
 use sn_interface::{
     messaging::{
-        data::ServiceMsg,
+        data::{OperationId, ServiceMsg},
         system::{DkgFailureSigSet, KeyedSig, NodeState, SectionAuth, SystemMsg},
         AuthorityProof, MsgId, NodeMsgAuthority, ServiceAuth, WireMsg,
     },
@@ -111,6 +111,12 @@ pub(crate) enum Cmd {
     },
     /// Log a Node's Punishment, this pulls dysfunction and write locks out of some functions
     TrackNodeIssueInDysfunction { name: XorName, issue: IssueType },
+    /// Adds peer to set of recipients of an already pending query,
+    /// or adds a pending query if it didn't already exist.
+    AddToPendingQueries {
+        operation_id: OperationId,
+        origin: Peer,
+    },
     HandleValidSystemMsg {
         msg_id: MsgId,
         msg: SystemMsg,
@@ -211,6 +217,8 @@ impl Cmd {
 
             Comm(_) => 7,
 
+            AddToPendingQueries { .. } => 6,
+
             // See [`MsgType`] for the priority constants and the range of possible values.
             HandleValidSystemMsg { msg, .. } => msg.priority(),
             HandleValidServiceMsg { msg, .. } => msg.priority(),
@@ -259,6 +267,7 @@ impl fmt::Display for Cmd {
                 write!(f, "TrackNodeIssueInDysfunction {:?}, {:?}", name, issue)
             }
             Cmd::ProposeOffline(_) => write!(f, "ProposeOffline"),
+            Cmd::AddToPendingQueries { .. } => write!(f, "AddToPendingQueries"),
             Cmd::TellEldersToStartConnectivityTest(_) => {
                 write!(f, "TellEldersToStartConnectivityTest")
             }
