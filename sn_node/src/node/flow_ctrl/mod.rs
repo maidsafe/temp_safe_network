@@ -123,6 +123,12 @@ impl FlowCtrl {
             loop {
                 let _instant = interval.tick().await;
                 let node = self.node.read().await;
+
+                if !node.is_elder() {
+                    // don't send health checks as an adult
+                    continue;
+                }
+
                 // random chunk addr will be sent to relevant nodes in the section.
                 let chunk_addr = xor_name::rand::random();
                 // lets make sure it's relevant to our section, to avoid any
