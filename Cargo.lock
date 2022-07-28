@@ -188,9 +188,9 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
 name = "axum"
-version = "0.5.14"
+version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c943a505c17b494638a38a9af129067f760c9c06794b9f57d499266909be8e72"
+checksum = "6b9496f0c1d1afb7a2af4338bbe1d969cddfead41d87a9fb3aaa6d0bbc7af648"
 dependencies = [
  "async-trait",
  "axum-core",
@@ -719,9 +719,9 @@ dependencies = [
 
 [[package]]
 name = "console"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a28b32d32ca44b70c3e4acd7db1babf555fa026e385fb95f18028f88848b3c31"
+checksum = "89eab4d20ce20cea182308bca13088fecea9c05f6776cf287205d41a0ed3c847"
 dependencies = [
  "encode_unicode",
  "libc",
@@ -1816,7 +1816,7 @@ version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d207dc617c7a380ab07ff572a6e52fa202a2a8f355860ac9c38e23f8196be1b"
 dependencies = [
- "console 0.15.0",
+ "console 0.15.1",
  "lazy_static",
  "number_prefix",
  "regex",
@@ -2838,9 +2838,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.2.15"
+version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "534cfe58d6a18cc17120fbf4635d53d14691c1fe4d951064df9bd326178d7d5a"
+checksum = "fb5a58c1855b4b6819d59012155603f0b22ad30cad752600aadfcb695265519a"
 dependencies = [
  "bitflags",
 ]
@@ -3519,9 +3519,9 @@ dependencies = [
 
 [[package]]
 name = "sn_dbc"
-version = "7.0.1"
+version = "7.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "feb659f3d5bba169fcbd1fb3a1c3ac62d92fef95c2dff766288dfa6173c9236a"
+checksum = "796292f06a482933796f6c07dc01482e0d3e03b89fa2ef2d15fcad58a09e8cbd"
 dependencies = [
  "bincode",
  "bls_ringct",
