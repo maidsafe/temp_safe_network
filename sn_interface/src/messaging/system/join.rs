@@ -15,18 +15,25 @@ use serde::{Deserialize, Serialize};
 use sn_consensus::Decision;
 use std::{collections::VecDeque, net::SocketAddr};
 
-/// Request to join a section
+/// Response to a request to join a section
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub struct JoinRequest {
-    /// The public key of the section to join.
-    pub section_key: BlsPublicKey,
-    /// Proof of the resource proofing.
-    pub resource_proof_response: Option<ResourceProofResponse>,
+#[allow(clippy::large_enum_variant)]
+pub enum JoinRequest {
+    Initiate {
+        /// The public key of the section to join.
+        section_key: BlsPublicKey,
+    },
+    SubmitResourceProof {
+        /// The public key of the section to join.
+        section_key: BlsPublicKey,
+        /// The challenge solution
+        proof: Box<ResourceProof>,
+    },
 }
 
 /// Joining peer's proof of resolvement of given resource proofing challenge.
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
-pub struct ResourceProofResponse {
+pub struct ResourceProof {
     #[allow(missing_docs)]
     pub solution: u64,
     #[allow(missing_docs)]
@@ -72,7 +79,7 @@ pub enum JoinResponse {
     Redirect(SectionAuthorityProvider),
     /// Message sent to joining peer containing the necessary
     /// info to become a member of the section.
-    Approval {
+    Approved {
         /// Network genesis key (needed to validate) section_chain
         genesis_key: BlsPublicKey,
         /// SectionAuthorityProvider Signed by (current section)

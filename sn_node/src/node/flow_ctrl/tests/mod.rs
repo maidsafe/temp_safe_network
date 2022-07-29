@@ -19,15 +19,14 @@ use crate::node::{
     Result as RoutingResult, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
 };
 
-use bls::Signature;
 use sn_consensus::Decision;
 use sn_interface::{
     elder_count, init_logger,
     messaging::{
         system::{
             JoinAsRelocatedRequest, JoinRequest, JoinResponse, KeyedSig, MembershipState,
-            NodeMsgAuthorityUtils, NodeState as NodeStateMsg, RelocateDetails,
-            ResourceProofResponse, SectionAuth, SystemMsg,
+            NodeMsgAuthorityUtils, NodeState as NodeStateMsg, RelocateDetails, ResourceProof,
+            SectionAuth, SystemMsg,
         },
         AuthKind, AuthorityProof, Dst, MsgId, MsgType, NodeAuth, SectionAuth as MsgKindSectionAuth,
         WireMsg,
@@ -41,12 +40,13 @@ use sn_interface::{
 };
 
 use assert_matches::assert_matches;
+use bls::Signature;
 use bls_dkg::message::Message;
 use ed25519_dalek::Signer;
 use eyre::{bail, eyre, Context, Result};
 use itertools::Itertools;
 use rand::{distributions::Alphanumeric, rngs::OsRng, Rng};
-use resource_proof::ResourceProof;
+use resource_proof::ResourceProof as ChallengeSolver;
 use secured_linked_list::SecuredLinkedList;
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
@@ -108,10 +108,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
                     name: XorName::from(PublicKey::Bls(section_key)),
                     section_key,
                 },
-                SystemMsg::JoinRequest(Box::new(JoinRequest {
-                    section_key,
-                    resource_proof_response: None,
-                })),
+                SystemMsg::JoinRequest(JoinRequest::Initiate { section_key }),
                 section_key,
             )?;
 
@@ -182,11 +179,11 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
             let serialized = bincode::serialize(&(new_node.name(), nonce))?;
             let nonce_signature = ed25519::sign(&serialized, &node.read().await.info().keypair);
 
-            let rp = ResourceProof::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY);
+            let rp = ChallengeSolver::new(RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY);
             let data = rp.create_proof_data(&nonce);
             let mut prover = rp.create_prover(data.clone());
             let solution = prover.solve();
-            let resource_proof_response = ResourceProofResponse {
+            let resource_proof = ResourceProof {
                 solution,
                 data,
                 nonce,
@@ -198,10 +195,10 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
                     name: XorName::from(PublicKey::Bls(section_key)),
                     section_key,
                 },
-                SystemMsg::JoinRequest(Box::new(JoinRequest {
+                SystemMsg::JoinRequest(JoinRequest::SubmitResourceProof {
                     section_key,
-                    resource_proof_response: Some(resource_proof_response.clone()),
-                })),
+                    proof: Box::new(resource_proof.clone()),
+                }),
                 section_key,
             )?;
 
@@ -229,7 +226,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
             assert!(!node
                 .read()
                 .await
-                .validate_resource_proof_response(&random_peer.name(), resource_proof_response));
+                .validate_resource_proof(&random_peer.name(), resource_proof));
             Result::<()>::Ok(())
         })
         .await
@@ -533,7 +530,7 @@ async fn handle_online_cmd(
 
         match msg {
             SystemMsg::JoinResponse(response) => {
-                if let JoinResponse::Approval {
+                if let JoinResponse::Approved {
                     section_auth: signed_sap,
                     ..
                 } = *response
