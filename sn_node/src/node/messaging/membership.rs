@@ -265,7 +265,7 @@ impl Node {
         let prefix = self.network_knowledge.prefix();
         info!("Section {prefix:?} has approved new peers {peers:?}.");
 
-        let msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
+        let msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Approved {
             genesis_key: *self.network_knowledge.genesis_key(),
             section_auth: self
                 .network_knowledge

@@ -15,7 +15,7 @@ mod node_state;
 mod signed;
 
 pub use agreement::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, Proposal, SectionAuth};
-pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse};
+pub use join::{JoinRejectionReason, JoinRequest, JoinResponse, ResourceProof};
 pub use join_as_relocated::{JoinAsRelocatedRequest, JoinAsRelocatedResponse};
 pub use msg_authority::NodeMsgAuthorityUtils;
 pub use node_msgs::{NodeCmd, NodeEvent, NodeQuery, NodeQueryResponse};
@@ -99,7 +99,7 @@ pub enum SystemMsg {
     /// Membership Anti-Entropy request
     MembershipAE(Generation),
     /// Sent from a bootstrapping peer to the section requesting to join as a new member
-    JoinRequest(Box<JoinRequest>),
+    JoinRequest(JoinRequest),
     /// Response to a `JoinRequest`
     JoinResponse(Box<JoinResponse>),
     /// Sent from a peer to the section requesting to join as relocated from another section
