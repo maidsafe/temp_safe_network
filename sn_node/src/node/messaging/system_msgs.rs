@@ -260,7 +260,7 @@ impl Node {
             // The AcceptedOnlineShare for relocation will be received here.
             SystemMsg::JoinResponse(join_response) => {
                 match *join_response {
-                    JoinResponse::Approval {
+                    JoinResponse::Approved {
                         section_auth,
                         section_chain,
                         ..
@@ -336,7 +336,7 @@ impl Node {
                 .collect()),
             SystemMsg::JoinRequest(join_request) => {
                 trace!("Handling msg: JoinRequest from {}", sender);
-                self.handle_join_request(sender, *join_request, comm)
+                self.handle_join_request(sender, join_request, comm)
                     .await
                     .map(|c| c.into_iter().collect())
             }

@@ -31,19 +31,22 @@ impl Node {
     ) -> Result<Option<Cmd>> {
         debug!("Received {:?} from {}", join_request, peer);
 
-        // Require resource signed if joining as a new node.
-        if let Some(response) = join_request.resource_proof_response {
-            if !self.validate_resource_proof_response(&peer.name(), response) {
-                debug!("Ignoring JoinRequest from {peer} - invalid resource signed response");
-                return Ok(None);
-            }
+        let provided_section_key = match join_request {
+            JoinRequest::Initiate { section_key } => section_key,
+            JoinRequest::SubmitResourceProof { proof, .. } => {
+                // Require resource signed if joining as a new node.
+                if !self.validate_resource_proof(&peer.name(), *proof) {
+                    debug!("Ignoring JoinRequest from {peer} - invalid resource signed response");
+                    return Ok(None);
+                }
 
-            let node_state = NodeState::joined(peer.name(), peer.addr(), None);
-            return Ok(self.propose_membership_change(node_state));
-        }
+                let node_state = NodeState::joined(peer.name(), peer.addr(), None);
+                return Ok(self.propose_membership_change(node_state));
+            }
+        };
 
         let our_section_key = self.network_knowledge.section_key();
-        let section_key_matches = join_request.section_key == our_section_key;
+        let section_key_matches = provided_section_key == our_section_key;
 
         // Ignore `JoinRequest` if we are not elder, unless the join request
         // is outdated in which case we'll reply with `JoinResponse::Retry`
@@ -60,11 +63,8 @@ impl Node {
         let our_prefix = self.network_knowledge.prefix();
         if !our_prefix.matches(&peer.name()) {
             debug!("Redirecting JoinRequest from {peer} - name doesn't match our prefix {our_prefix:?}.");
-
             let retry_sap = self.matching_section(&peer.name())?;
-
             let msg = SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(retry_sap.to_msg())));
-
             trace!("Sending {:?} to {}", msg, peer);
             trace!("{}", LogMarker::SendJoinRedirected);
             return Ok(Some(self.send_system_to_one(msg, peer)));
@@ -95,10 +95,10 @@ impl Node {
         if !section_key_matches {
             trace!("{}", LogMarker::SendJoinRetryNotCorrectKey);
             trace!(
-                "JoinRequest from {} doesn't have our latest section_key {:?}, presented {:?}.",
+                "JoinRequest from {} doesn't have our latest section_key {:?}, provided {:?}.",
                 peer,
                 our_section_key,
-                join_request.section_key
+                provided_section_key,
             );
         }
 
