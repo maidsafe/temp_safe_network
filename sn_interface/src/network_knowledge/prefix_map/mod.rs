@@ -430,13 +430,18 @@ mod tests {
     use super::*;
     use crate::network_knowledge::test_utils::{random_sap, section_signed};
     use eyre::{eyre, Context, Result};
+    use proptest::prelude::any;
+    use proptest::{prelude::Strategy, proptest};
     use rand::{
         prelude::{SeedableRng, SmallRng},
-        thread_rng, Rng,
+        Rng,
     };
-    use std::cell::RefCell;
-    use std::collections::{BTreeMap, BTreeSet};
-    use std::rc::Rc;
+    use std::{
+        cell::RefCell,
+        collections::{BTreeMap, BTreeSet},
+        rc::Rc,
+    };
+    use tokio::runtime::Runtime;
 
     #[test]
     fn insert_existing_prefix() -> Result<()> {
@@ -681,63 +686,107 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn sections_should_be_synced_with_sections_dag() -> Result<()> {
-        let (map, chain) = generate_random_prefix_map(None, 10000)?;
-        let leaves: Vec<bls::PublicKey> = map
-            .iter()
-            .filter(|(_, (status, ..))| matches!(status, SectionStatus::None))
-            .map(|(section_key, ..)| *section_key)
-            .collect();
-
-        let genesis_key = *chain.root_key();
-        let prefix_map = NetworkPrefixMap::new(genesis_key);
-
-        // TODO: instead of inserting upto leaf, insert upto a random location
-        // insert each leaf by getting proof chain from a random ancestor of leaf's prefix
-        for leaf in leaves.iter() {
-            let (_, _, leaf_signed_sap) = map.get(leaf).unwrap().clone();
-            let leaf_prefix = leaf_signed_sap.prefix();
-
-            // list of all prefixes we are aware of
-            let mut known_prefixes: BTreeSet<Prefix> = BTreeSet::new();
-            prefix_map
-                .sections
-                .iter()
-                .map(|gg| *gg.key())
-                .for_each(|prefix| {
-                    known_prefixes.insert(prefix);
-                    prefix.ancestors().for_each(|p| {
-                        known_prefixes.insert(p);
-                    });
-                });
-
-            // select only the ancestors of leaf's prefix
-            let ancestors: BTreeSet<Prefix> = known_prefixes
-                .into_iter()
-                .filter(|p| leaf_prefix.is_extension_of(p))
-                .collect();
-            let mut random_ancestor = Prefix::default();
-            if !ancestors.is_empty() {
-                random_ancestor = *ancestors
-                    .iter()
-                    .nth(thread_rng().gen::<usize>() % ancestors.len())
-                    .unwrap();
+    proptest! {
+        #[test]
+        fn proptest_prefix_map_fields_should_stay_in_sync((main_chain, update_variations_list) in arb_sll_and_proof_chains(100, 3)) {
+            let runtime = Runtime::new()?;
+            for variation in update_variations_list {
+                let prefix_map = NetworkPrefixMap::new(*main_chain.root_key());
+                for (proof_chain, sap) in &variation {
+                    runtime
+                        .block_on(prefix_map.update(sap.clone(), proof_chain))?;
+                }
+                let synced = runtime.block_on(is_synced(&prefix_map)).unwrap();
+                assert!(synced);
             }
-            // get the section key of that random ancestor
-            let random_anc_key = map
-                .iter()
-                .find(|(_, (.., v))| v.prefix() == random_ancestor)
-                .map(|(k, _)| *k);
-            let random_anc_key = random_anc_key.unwrap_or(genesis_key);
-
-            // get proof chain and update
-            let proof_chain = chain.get_proof_chain(&random_anc_key, leaf)?;
-            prefix_map.update(leaf_signed_sap, &proof_chain).await?;
         }
-        println!("{:?} is_synced ", is_synced(&prefix_map).await?);
+    }
 
-        Ok(())
+    // Generate an arbitrary sized SecuredLinkedList and a List<list of proof_chains which inserted in
+    // that order gives back the main chain>; i.e., multiple variations of list of proof chains
+    fn arb_sll_and_proof_chains(
+        max_sections: usize,
+        update_variations: usize,
+    ) -> impl Strategy<
+        Value = (
+            SecuredLinkedList,
+            Vec<Vec<(SecuredLinkedList, SectionAuth<SectionAuthorityProvider>)>>,
+        ),
+    > {
+        (any::<u64>(), 0..max_sections).prop_map(move |(seed, size)| {
+            let (map, main_chain) = generate_random_prefix_map(Some(seed as u64), size).unwrap();
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let mut update_variations_list = Vec::new();
+            for _ in 0..update_variations {
+                let mut leaves: Vec<(bls::PublicKey, Prefix)> = map
+                    .iter()
+                    .filter(|(_, (status, ..))| matches!(status, SectionStatus::None))
+                    .map(|(section_key, (.., sap))| (*section_key, sap.prefix()))
+                    .collect();
+                let mut already_inserted_keys = BTreeSet::new();
+                already_inserted_keys.insert(*main_chain.root_key());
+
+                let mut list_of_proofs = Vec::new();
+                while !leaves.is_empty() {
+                    // get proof chain to a random leaf
+                    let (random_leaf, _) = *leaves
+                        .get(rng.gen::<usize>() % leaves.len())
+                        .expect("leaves cannot be empty");
+                    let proof_chain = main_chain
+                        .get_proof_chain(main_chain.root_key(), &random_leaf)
+                        .expect("cannot be error");
+
+                    // create a sub-chain of the proof chain by first selecting a random root for the
+                    // proof and then selecting a random last_key.
+                    let possible_roots: Vec<bls::PublicKey> = proof_chain
+                        .keys()
+                        .filter(|proof_key| {
+                            // keep the proof_key if it has been inserted
+                            already_inserted_keys
+                                .iter()
+                                .any(|ins_key| ins_key == *proof_key)
+                        })
+                        .cloned()
+                        .collect();
+                    let random_root = possible_roots
+                        .get(rng.gen::<usize>() % possible_roots.len())
+                        .expect("Cannot be None");
+
+                    // consider a prefix_map is aware of the prefix 011 with keys A->B->C
+                    // now our proof_chain can be [A/B/C to C/D/E/F]
+                    // B->C->D is valid, C->D is valid, C is also valid
+                    // but A->B is invalid since we are providing old information to the prefix_map
+                    // Now since proof_chain is a single branch, we can skip directly to "C" by len - 1
+                    let possible_last_keys: Vec<bls::PublicKey> = proof_chain
+                        .keys()
+                        .skip(possible_roots.len() - 1)
+                        .cloned()
+                        .collect();
+                    let random_last_key = possible_last_keys
+                        .get(rng.gen::<usize>() % possible_last_keys.len())
+                        .expect("Cannot be None");
+
+                    let proof_chain = proof_chain
+                        .get_proof_chain(random_root, random_last_key)
+                        .expect("cannot be error");
+
+                    // if last_key is a leaf, remove it from leaves vec
+                    if let Some(index) = leaves.iter().position(|(key, _)| *key == *random_last_key)
+                    {
+                        leaves.swap_remove(index);
+                    }
+                    // update the inserted list
+                    proof_chain.keys().for_each(|key| {
+                        already_inserted_keys.insert(*key);
+                    });
+
+                    let (_, _, sap) = map.get(random_last_key).expect("cannot be error").clone();
+                    list_of_proofs.push((proof_chain, sap));
+                }
+                update_variations_list.push(list_of_proofs);
+            }
+            (main_chain, update_variations_list)
+        })
     }
 
     // Test helpers
@@ -779,8 +828,9 @@ mod tests {
         //     }
         // }
 
-        for sap in prefix_map.all() {
-            let chain = sections_dag.get_proof_chain(root_key, &sap.section_key())?;
+        for leaf_sap in prefix_map.all() {
+            let chain = sections_dag.get_proof_chain(root_key, &leaf_sap.section_key())?;
+
             for key in chain.keys() {
                 count.insert(*key);
             }
@@ -813,6 +863,19 @@ mod tests {
         let (gen_sap, _, gen_sk) = random_sap(Prefix::default(), 0);
         let gen_sap_signed = section_signed(gen_sk.secret_key(), gen_sap.clone())?;
         let mut chain = SecuredLinkedList::new(gen_sap.section_key());
+
+        //  if n_sections == 0, return early with just the genesis attached
+        if n_sections == 0 {
+            sections_map.borrow_mut().insert(
+                gen_sap.section_key(),
+                (
+                    SectionStatus::None,
+                    gen_sk.secret_key().clone(),
+                    gen_sap_signed,
+                ),
+            );
+            return Ok((sections_map.borrow().clone(), chain));
+        }
 
         // insert a new section
         let mut insert = |prefix: Prefix, parent_sk: &bls::SecretKey| -> Result<()> {
