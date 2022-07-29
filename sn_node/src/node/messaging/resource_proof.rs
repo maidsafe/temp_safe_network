@@ -11,7 +11,7 @@ use crate::node::{
 };
 
 use sn_interface::{
-    messaging::system::{JoinResponse, ResourceProofResponse, SystemMsg},
+    messaging::system::{JoinResponse, ResourceProof, SystemMsg},
     types::{keys::ed25519, log_markers::LogMarker, Peer},
 };
 
@@ -20,12 +20,12 @@ use xor_name::XorName;
 
 // Resource signed
 impl Node {
-    pub(crate) fn validate_resource_proof_response(
+    pub(crate) fn validate_resource_proof(
         &self,
         peer_name: &XorName,
-        response: ResourceProofResponse,
+        proof: ResourceProof,
     ) -> bool {
-        let serialized = if let Ok(serialized) = bincode::serialize(&(peer_name, &response.nonce)) {
+        let serialized = if let Ok(serialized) = bincode::serialize(&(peer_name, &proof.nonce)) {
             serialized
         } else {
             return false;
@@ -34,14 +34,14 @@ impl Node {
         if self
             .keypair
             .public
-            .verify(&serialized, &response.nonce_signature)
+            .verify(&serialized, &proof.nonce_signature)
             .is_err()
         {
             return false;
         }
 
         self.resource_proof
-            .validate_all(&response.nonce, &response.data, response.solution)
+            .validate_all(&proof.nonce, &proof.data, proof.solution)
     }
 
     pub(crate) fn send_resource_proof_challenge(&self, peer: Peer) -> Result<Cmd> {

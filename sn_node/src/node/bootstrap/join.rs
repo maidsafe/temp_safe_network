@@ -7,16 +7,15 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::UsedRecipientSaps;
-use crate::comm::{Comm, DeliveryStatus, MsgEvent};
 
+use crate::comm::{Comm, DeliveryStatus, MsgEvent};
 use crate::node::{messages::WireMsgUtils, Error, Result};
 
-use sn_interface::messaging::system::MembershipState;
 use sn_interface::{
     messaging::{
         system::{
-            JoinRejectionReason, JoinRequest, JoinResponse, ResourceProofResponse, SectionAuth,
-            SystemMsg,
+            JoinRejectionReason, JoinRequest, JoinResponse, MembershipState, ResourceProof,
+            SectionAuth, SystemMsg,
         },
         AuthKind, DstLocation, MsgType, NodeAuth, WireMsg,
     },
@@ -27,7 +26,7 @@ use sn_interface::{
 use backoff::{backoff::Backoff, ExponentialBackoff};
 use bls::PublicKey as BlsPublicKey;
 use futures::future;
-use resource_proof::ResourceProof;
+use resource_proof::ResourceProof as ChallengeSolver;
 use std::net::SocketAddr;
 use tokio::{
     sync::mpsc,
@@ -152,15 +151,11 @@ impl<'a> Joiner<'a> {
         // We send a first join request to obtain the resource challenge, which
         // we will then use to generate the challenge proof and send the
         // `JoinRequest` again with it.
-        let join_request = JoinRequest {
-            section_key,
-            resource_proof_response: None,
-        };
+        let msg = JoinRequest::Initiate { section_key };
 
         let mut timer = Instant::now(); // start right before sending msgs
 
-        self.send_join_requests(join_request.clone(), &recipients, section_key, false)
-            .await?;
+        self.send(msg, &recipients, section_key, false).await?;
 
         // Avoid sending more than one duplicated request (with same SectionKey) to the same peer.
         let mut used_recipient_saps = UsedRecipientSaps::new();
@@ -175,18 +170,31 @@ impl<'a> Joiner<'a> {
             let (response, sender) = self.receive_join_response(join_timeout).await?;
 
             match response {
-                JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(addr)) => {
-                    error!(
-                        "Node cannot join the network since it is not externally reachable: {}",
-                        addr
-                    );
-                    return Err(Error::NodeNotReachable(addr));
+                JoinResponse::ResourceChallenge {
+                    data_size,
+                    difficulty,
+                    nonce,
+                    nonce_signature,
+                } => {
+                    trace!("Received a ResourceChallenge from {}", sender);
+
+                    let rp = ChallengeSolver::new(data_size, difficulty);
+                    let data = rp.create_proof_data(&nonce);
+                    let mut prover = rp.create_prover(data.clone());
+                    let solution = prover.solve();
+
+                    let msg = JoinRequest::SubmitResourceProof {
+                        section_key,
+                        proof: Box::new(ResourceProof {
+                            solution,
+                            data,
+                            nonce,
+                            nonce_signature,
+                        }),
+                    };
+                    self.send(msg, &[sender], section_key, false).await?;
                 }
-                JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed) => {
-                    error!("Network is set to not taking any new joining node, try join later.");
-                    return Err(Error::TryJoinLater);
-                }
-                JoinResponse::Approval {
+                JoinResponse::Approved {
                     section_auth,
                     genesis_key,
                     section_chain,
@@ -313,14 +321,11 @@ impl<'a> Joiner<'a> {
                     );
 
                     section_key = section_auth.section_key();
-                    let join_request = JoinRequest {
-                        section_key,
-                        resource_proof_response: None,
-                    };
 
+                    let msg = JoinRequest::Initiate { section_key };
                     let new_recipients = section_auth.elders_vec();
-                    self.send_join_requests(join_request, &new_recipients, section_key, true)
-                        .await?;
+
+                    self.send(msg, &new_recipients, section_key, true).await?;
                 }
                 JoinResponse::Redirect(section_auth) => {
                     trace!("Received a redirect/retry JoinResponse from {}. Sending request to the latest contacts", sender);
@@ -368,47 +373,26 @@ impl<'a> Joiner<'a> {
                     section_key = new_section_key;
                     self.prefix = section_auth.prefix();
 
-                    let join_request = JoinRequest {
-                        section_key,
-                        resource_proof_response: None,
-                    };
+                    let msg = JoinRequest::Initiate { section_key };
 
-                    self.send_join_requests(join_request, &new_recipients, section_key, true)
-                        .await?;
+                    self.send(msg, &new_recipients, section_key, true).await?;
                 }
-                JoinResponse::ResourceChallenge {
-                    data_size,
-                    difficulty,
-                    nonce,
-                    nonce_signature,
-                } => {
-                    trace!("Received a ResourceChallenge from {}", sender);
-                    let rp = ResourceProof::new(data_size, difficulty);
-                    let data = rp.create_proof_data(&nonce);
-                    let mut prover = rp.create_prover(data.clone());
-                    let solution = prover.solve();
-
-                    let join_request = JoinRequest {
-                        section_key,
-                        resource_proof_response: Some(ResourceProofResponse {
-                            solution,
-                            data,
-                            nonce,
-                            nonce_signature,
-                        }),
-                    };
-                    let recipients = &[sender];
-                    self.send_join_requests(join_request, recipients, section_key, false)
-                        .await?;
+                JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed) => {
+                    error!("Network is set to not taking any new joining node, try join later.");
+                    return Err(Error::TryJoinLater);
+                }
+                JoinResponse::Rejected(JoinRejectionReason::NodeNotReachable(addr)) => {
+                    error!("Join rejected since node is not externally reachable: {addr}");
+                    return Err(Error::NodeNotReachable(addr));
                 }
             }
         }
     }
 
     #[tracing::instrument(skip(self))]
-    async fn send_join_requests(
+    async fn send(
         &mut self,
-        join_request: JoinRequest,
+        msg: JoinRequest,
         recipients: &[Peer],
         section_key: BlsPublicKey,
         should_backoff: bool,
@@ -427,16 +411,15 @@ impl<'a> Joiner<'a> {
             }
         }
 
-        info!("Sending {:?} to {:?}", join_request, recipients);
+        info!("Sending {:?} to {:?}", msg, recipients);
 
-        let node_msg = SystemMsg::JoinRequest(Box::new(join_request));
         let wire_msg = WireMsg::single_src(
             &self.node,
             DstLocation::Section {
                 name: self.node.name(),
                 section_pk: section_key,
             },
-            node_msg,
+            SystemMsg::JoinRequest(msg),
             section_key,
         )?;
 
@@ -570,7 +553,7 @@ mod tests {
         let bootstrap_node = nodes.remove(0);
         let bootstrap_addr = bootstrap_node.addr;
         let sk = sk_set.secret_key();
-        let section_key = sk.public_key();
+        let original_section_key = sk.public_key();
 
         // Node in first section has to have a stepped age,
         // Otherwise during the bootstrap process, node will change its id and age.
@@ -584,7 +567,7 @@ mod tests {
             node,
             send_tx,
             &mut recv_rx,
-            NetworkPrefixMap::new(section_key),
+            NetworkPrefixMap::new(original_section_key),
         );
 
         // Create the bootstrap task, but don't run it yet.
@@ -612,12 +595,13 @@ mod tests {
             let node_msg = assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, .. }) =>
                 msg);
 
-            assert_matches!(node_msg, SystemMsg::JoinRequest(request) => {
-                assert!(request.resource_proof_response.is_none());
-            });
+            assert_matches!(
+                node_msg,
+                SystemMsg::JoinRequest(JoinRequest::Initiate { .. })
+            );
 
             // Send JoinResponse::Retry with section auth provider info
-            let section_chain = SecuredLinkedList::new(section_key);
+            let section_chain = SecuredLinkedList::new(original_section_key);
             let signed_sap = section_signed(sk, section_auth.clone())?;
 
             send_response(
@@ -640,20 +624,20 @@ mod tests {
             let (node_msg, dst_location) = assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, dst_location,.. }) =>
                 (msg, dst_location));
 
-            assert_eq!(dst_location.section_pk(), Some(section_key));
+            assert_eq!(dst_location.section_pk(), Some(original_section_key));
             itertools::assert_equal(recipients, section_auth.elders());
-            assert_matches!(node_msg, SystemMsg::JoinRequest(request) => {
-                assert_eq!(request.section_key, section_key);
+            assert_matches!(node_msg, SystemMsg::JoinRequest(JoinRequest::Initiate { section_key }) => {
+                assert_eq!(section_key, original_section_key);
             });
 
-            // Send JoinResponse::Approval
+            // Send JoinResponse::Approved
             let section_auth = section_signed(sk, section_auth.clone())?;
             let decision = section_decision(&sk_set, NodeState::joined(peer, None).to_msg())?;
-            let section_chain = SecuredLinkedList::new(section_key);
+            let section_chain = SecuredLinkedList::new(original_section_key);
             send_response(
                 &recv_tx,
-                SystemMsg::JoinResponse(Box::new(JoinResponse::Approval {
-                    genesis_key: section_key,
+                SystemMsg::JoinResponse(Box::new(JoinResponse::Approved {
+                    genesis_key: original_section_key,
                     section_auth: section_auth.clone().into_authed_msg(),
                     section_chain,
                     decision,
@@ -669,7 +653,7 @@ mod tests {
         let ((node, section), _) = future::try_join(bootstrap, others).await?;
 
         assert_eq!(section.authority_provider(), section_auth);
-        assert_eq!(section.section_key(), section_key);
+        assert_eq!(section.section_key(), original_section_key);
         assert_eq!(node.age(), node_age);
 
         Ok(())
@@ -760,8 +744,8 @@ mod tests {
                     (msg, dst_location));
 
             assert_eq!(dst_location.section_pk(), Some(new_pk_set.public_key()));
-            assert_matches!(node_msg, SystemMsg::JoinRequest(req) => {
-                assert_eq!(req.section_key, new_pk_set.public_key());
+            assert_matches!(node_msg, SystemMsg::JoinRequest(JoinRequest::Initiate { section_key }) => {
+                assert_eq!(section_key, new_pk_set.public_key());
             });
 
             Ok(())
@@ -981,7 +965,10 @@ mod tests {
 
             let node_msg =
                 assert_matches!(wire_msg.into_msg(), Ok(MsgType::System{ msg, .. }) => msg);
-            assert_matches!(node_msg, SystemMsg::JoinRequest(_));
+            assert_matches!(
+                node_msg,
+                SystemMsg::JoinRequest(JoinRequest::Initiate { .. })
+            );
 
             let section_chain = SecuredLinkedList::new(section_key);
             let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
@@ -1020,7 +1007,10 @@ mod tests {
 
             let node_msg =
                 assert_matches!(wire_msg.into_msg(), Ok(MsgType::System{ msg, .. }) => msg);
-            assert_matches!(node_msg, SystemMsg::JoinRequest(_));
+            assert_matches!(
+                node_msg,
+                SystemMsg::JoinRequest(JoinRequest::Initiate { .. })
+            );
 
             Ok(())
         };
