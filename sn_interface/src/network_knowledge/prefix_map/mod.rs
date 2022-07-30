@@ -23,29 +23,27 @@ use crate::messaging::system::SectionAuth;
 use crate::network_knowledge::{Error, Result, SectionAuthUtils, SectionAuthorityProvider};
 
 use bls::PublicKey as BlsPublicKey;
-use dashmap::{self, mapref::multiple::RefMulti, DashMap};
 use secured_linked_list::SecuredLinkedList;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::{
     cmp::Ordering,
     iter::{self, Iterator},
-    sync::Arc,
 };
-use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};
 
 /// Container for storing information about other sections in the network.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkPrefixMap {
     //TODO: get genesis_key from sections_dag once RwLock has been removed; else have to make
     // a lot of fns as async
     /// The network's genesis public key
     genesis_pk: BlsPublicKey,
     /// Map of sections prefixes to their latest signed section authority providers.
-    sections: Arc<DashMap<Prefix, SectionAuth<SectionAuthorityProvider>>>,
+    sections: BTreeMap<Prefix, SectionAuth<SectionAuthorityProvider>>,
     // TODO: remove RwLock
     /// A DAG containing all section chains of the whole network that we are aware of
-    sections_dag: Arc<RwLock<SecuredLinkedList>>,
+    sections_dag: SecuredLinkedList,
 }
 
 impl NetworkPrefixMap {
@@ -53,8 +51,8 @@ impl NetworkPrefixMap {
     pub fn new(genesis_pk: BlsPublicKey) -> Self {
         Self {
             genesis_pk,
-            sections: Arc::new(DashMap::new()),
-            sections_dag: Arc::new(RwLock::new(SecuredLinkedList::new(genesis_pk))),
+            sections: BTreeMap::new(),
+            sections_dag: SecuredLinkedList::new(genesis_pk),
         }
     }
 
@@ -63,8 +61,8 @@ impl NetworkPrefixMap {
         self.genesis_pk
     }
 
-    pub fn get_sections_dag(&self) -> &RwLock<SecuredLinkedList> {
-        &*self.sections_dag
+    pub fn get_sections_dag(&self) -> &SecuredLinkedList {
+        &self.sections_dag
     }
 
     /// Inserts new entry into the map. Replaces previous entry at the same prefix.
@@ -75,10 +73,14 @@ impl NetworkPrefixMap {
     //
     // This is not a public API since we shall not allow any insert/update without a
     // proof chain, users shall call the `update` API.
-    fn insert(&self, sap: SectionAuth<SectionAuthorityProvider>) -> bool {
+    fn insert(&mut self, sap: SectionAuth<SectionAuthorityProvider>) -> bool {
         let prefix = sap.prefix();
         // Don't insert if any descendant is already present in the map.
-        if self.descendants(&prefix).next().is_some() {
+        if self
+            .sections
+            .iter()
+            .any(|(p, _)| p.is_extension_of(&prefix))
+        {
             return false;
         }
 
@@ -95,7 +97,7 @@ impl NetworkPrefixMap {
 
     /// For testing purpose, we may need to populate a `prefix_map` without a proof chain.
     #[cfg(any(test, feature = "test-utils"))]
-    pub fn insert_without_chain(&self, sap: SectionAuth<SectionAuthorityProvider>) -> bool {
+    pub fn insert_without_chain(&mut self, sap: SectionAuth<SectionAuthorityProvider>) -> bool {
         self.insert(sap)
     }
 
@@ -109,15 +111,15 @@ impl NetworkPrefixMap {
     ) -> Option<SectionAuth<SectionAuthorityProvider>> {
         self.sections
             .iter()
-            .filter(|e| {
-                if let Some(prefix) = exclude {
-                    e.key() != prefix
+            .filter(|&(prefix, _)| {
+                if let Some(p) = exclude {
+                    prefix != p
                 } else {
                     true
                 }
             })
-            .min_by(|lhs, rhs| lhs.key().cmp_distance(rhs.key(), name))
-            .map(|e| e.value().clone())
+            .min_by(|&(prefix_lhs, _), &(prefix_rhs, _)| prefix_lhs.cmp_distance(prefix_rhs, name))
+            .map(|(_, sap)| sap.clone())
     }
 
     /// Returns the known section that is closest to the given name,
@@ -132,9 +134,9 @@ impl NetworkPrefixMap {
         self.closest(name, exclude).or_else(|| {
             self.sections
                 .iter()
-                .filter(|e| e.key().matches(&name.with_bit(0, !name.bit(0))))
-                .max_by_key(|e| e.key().bit_count())
-                .map(|entry| entry.value().clone())
+                .filter(|&(prefix, _)| prefix.matches(&name.with_bit(0, !name.bit(0))))
+                .max_by_key(|&(prefix, _)| prefix.bit_count())
+                .map(|(_, sap)| sap.clone())
         })
     }
 
@@ -142,28 +144,26 @@ impl NetworkPrefixMap {
     pub fn all(&self) -> Vec<SectionAuthorityProvider> {
         self.sections
             .iter()
-            .map(|e| e.value().value.clone())
+            .map(|(_, sap)| sap.value.clone())
             .collect()
     }
 
     /// Get `SectionAuthorityProvider` of a known section with the given prefix.
     #[allow(unused)]
     pub fn get(&self, prefix: &Prefix) -> Option<SectionAuthorityProvider> {
-        self.sections
-            .get(prefix)
-            .map(|entry| entry.value().value.clone())
+        self.sections.get(prefix).map(|sap| sap.value.clone())
     }
 
     /// Get signed `SectionAuthorityProvider` of a known section with the given prefix.
     pub fn get_signed(&self, prefix: &Prefix) -> Option<SectionAuth<SectionAuthorityProvider>> {
-        self.sections.get(prefix).map(|entry| entry.value().clone())
+        self.sections.get(prefix).cloned()
     }
 
     /// Update our knowledge on the remote section's SAP and our sections DAG
     /// if it's verifiable with the provided proof chain.
     /// Returns true if an update was made
-    pub async fn update(
-        &self,
+    pub fn update(
+        &mut self,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
         proof_chain: &SecuredLinkedList,
     ) -> Result<bool> {
@@ -207,14 +207,14 @@ impl NetworkPrefixMap {
         }
 
         match self.sections.get(incoming_prefix) {
-            Some(entry) if entry.value() == &signed_sap => {
+            Some(sap) if sap == &signed_sap => {
                 // It's the same SAP we are already aware of
                 return Ok(false);
             }
-            Some(entry) => {
+            Some(sap) => {
                 // We are then aware of the prefix, let's just verify the new SAP can
                 // be trusted based on the SAP we aware of and the proof chain provided.
-                if !proof_chain.has_key(&entry.value().section_key()) {
+                if !proof_chain.has_key(&sap.section_key()) {
                     // This case may happen when both the sender and receiver is about to using
                     // a new SAP. The AE-Update was sent before sender switching to use new SAP,
                     // hence it only contains proof_chain covering the old SAP.
@@ -225,14 +225,14 @@ impl NetworkPrefixMap {
                     // avoid potential looping.
                     return Err(Error::UntrustedProofChain(format!(
                         "provided proof_chain doesn't cover the SAP's key we currently know: {:?}",
-                        entry.value().value
+                        sap.value
                     )));
                 }
             }
             None => {
                 // We are not aware of the prefix, let's then verify it can be
                 // trusted based on our own section chain and the provided proof chain.
-                if !proof_chain.check_trust(self.sections_dag.read().await.keys()) {
+                if !proof_chain.check_trust(self.sections_dag.keys()) {
                     return Err(Error::UntrustedProofChain(format!(
                         "none of the keys were found on our section chain: {:?}",
                         signed_sap.value
@@ -268,7 +268,7 @@ impl NetworkPrefixMap {
         // update our sections DAG with the proof chain. Cannot be an error since in cases where we
         // have outdated SAP (aware of prefix)/ not aware of the prefix, we have the proof_chains's
         // root/child key in our sections_dag
-        let _res = self.sections_dag.write().await.join(proof_chain.clone());
+        self.sections_dag.join(proof_chain.clone())?;
 
         // for section in self.sections.iter() {
         //     let prefix = section.key();
@@ -288,7 +288,7 @@ impl NetworkPrefixMap {
     pub fn section_keys(&self) -> Vec<bls::PublicKey> {
         self.sections
             .iter()
-            .map(|e| e.value().section_key())
+            .map(|(_, sap)| sap.section_key())
             .collect()
     }
 
@@ -309,9 +309,9 @@ impl NetworkPrefixMap {
     pub fn section_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
         self.sections
             .iter()
-            .max_by_key(|e| e.key().common_prefix(name))
+            .max_by_key(|&(prefix, _)| prefix.common_prefix(name))
             .ok_or(Error::NoMatchingSection)
-            .map(|entry| entry.value().value.clone())
+            .map(|(_, sap)| sap.value.clone())
     }
 
     /// Get the section that matches `prefix`. In case of multiple matches, returns the
@@ -329,7 +329,7 @@ impl NetworkPrefixMap {
     pub fn network_stats(&self, our: &SectionAuthorityProvider) -> NetworkStats {
         // Let's compute an estimate of the total number of elders in the network
         // from the size of our routing table.
-        let section_prefixes = self.sections.iter().map(|e| *e.key());
+        let section_prefixes = self.sections.iter().map(|(prefix, _)| *prefix);
         let known_prefixes: Vec<_> = section_prefixes.chain(iter::once(our.prefix())).collect();
 
         let total_elders_exact = Prefix::default().is_covered_by(&known_prefixes);
@@ -342,7 +342,7 @@ impl NetworkPrefixMap {
             .sum();
 
         let network_elders_count: usize =
-            self.sections.iter().map(|e| e.value().elder_count()).sum();
+            self.sections.iter().map(|(_, sap)| sap.elder_count()).sum();
         let total = network_elders_count as f64 / network_fraction;
 
         // `total_elders_exact` indicates whether `total_elders` is
@@ -354,20 +354,8 @@ impl NetworkPrefixMap {
         }
     }
 
-    // Returns an iterator over all entries whose prefixes
-    // are descendants (extensions) of `prefix`.
-    fn descendants<'a>(
-        &'a self,
-        prefix: &'a Prefix,
-    ) -> impl Iterator<Item = RefMulti<'a, Prefix, SectionAuth<SectionAuthorityProvider>>> + 'a
-    {
-        self.sections
-            .iter()
-            .filter(move |e| e.key().is_extension_of(prefix))
-    }
-
     /// Remove `prefix` and any of its ancestors.
-    fn prune(&self, mut prefix: Prefix) {
+    fn prune(&mut self, mut prefix: Prefix) {
         loop {
             let _prev = self.sections.remove(&prefix);
 
@@ -376,14 +364,6 @@ impl NetworkPrefixMap {
             } else {
                 prefix = prefix.popped();
             }
-        }
-    }
-
-    pub async fn snapshot(&self) -> NetworkPrefixMapSnapshot {
-        NetworkPrefixMapSnapshot {
-            genesis_pk: self.genesis_pk,
-            sections: (*self.sections).clone(),
-            sections_dag: (*self.sections_dag.read().await).clone(),
         }
     }
 }
@@ -408,30 +388,15 @@ impl PartialEq for NetworkPrefixMap {
 
 impl Eq for NetworkPrefixMap {}
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct NetworkPrefixMapSnapshot {
-    genesis_pk: BlsPublicKey,
-    sections: DashMap<Prefix, SectionAuth<SectionAuthorityProvider>>,
-    sections_dag: SecuredLinkedList,
-}
-
-impl NetworkPrefixMapSnapshot {
-    pub fn to_prefix_map(self) -> NetworkPrefixMap {
-        NetworkPrefixMap {
-            genesis_pk: self.genesis_pk,
-            sections: Arc::new(self.sections),
-            sections_dag: Arc::new(RwLock::new(self.sections_dag)),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::network_knowledge::test_utils::{random_sap, section_signed};
     use eyre::{eyre, Context, Result};
-    use proptest::prelude::any;
-    use proptest::{prelude::Strategy, proptest};
+    use proptest::{
+        prelude::{any, Strategy},
+        prop_assert, proptest,
+    };
     use rand::{
         prelude::{SeedableRng, SmallRng},
         Rng,
@@ -441,11 +406,10 @@ mod tests {
         collections::{BTreeMap, BTreeSet},
         rc::Rc,
     };
-    use tokio::runtime::Runtime;
 
     #[test]
     fn insert_existing_prefix() -> Result<()> {
-        let (map, _, _) = new_network_prefix_map();
+        let (mut map, _, _) = new_network_prefix_map();
         let p0 = prefix("0")?;
         let sap0 = gen_section_auth(p0)?;
         let new_sap0 = gen_section_auth(p0)?;
@@ -460,7 +424,7 @@ mod tests {
 
     #[test]
     fn insert_direct_descendants_of_existing_prefix() -> Result<()> {
-        let (map, _, _) = new_network_prefix_map();
+        let (mut map, _, _) = new_network_prefix_map();
         let p0 = prefix("0")?;
         let p00 = prefix("00")?;
         let p01 = prefix("01")?;
@@ -489,7 +453,7 @@ mod tests {
 
     #[test]
     fn return_opposite_prefix_if_none_matching() -> Result<()> {
-        let (map, _, _) = new_network_prefix_map();
+        let (mut map, _, _) = new_network_prefix_map();
         let p0 = prefix("0")?;
         let p1 = prefix("1")?;
 
@@ -521,7 +485,7 @@ mod tests {
 
     #[test]
     fn insert_indirect_descendants_of_existing_prefix() -> Result<()> {
-        let (map, _, _) = new_network_prefix_map();
+        let (mut map, _, _) = new_network_prefix_map();
         let p0 = prefix("0")?;
         let p000 = prefix("000")?;
         let p001 = prefix("001")?;
@@ -561,7 +525,7 @@ mod tests {
 
     #[test]
     fn insert_ancestor_of_existing_prefix() -> Result<()> {
-        let (map, _, _) = new_network_prefix_map();
+        let (mut map, _, _) = new_network_prefix_map();
         let p0 = prefix("0")?;
         let p00 = prefix("00")?;
 
@@ -578,7 +542,7 @@ mod tests {
 
     #[test]
     fn get_matching() -> Result<()> {
-        let (map, _, _) = new_network_prefix_map();
+        let (mut map, _, _) = new_network_prefix_map();
         let p = prefix("")?;
         let p0 = prefix("0")?;
         let p1 = prefix("1")?;
@@ -627,7 +591,7 @@ mod tests {
 
     #[test]
     fn get_matching_prefix() -> Result<()> {
-        let (map, _, _) = new_network_prefix_map();
+        let (mut map, _, _) = new_network_prefix_map();
         let p0 = prefix("0")?;
         let p1 = prefix("1")?;
         let p10 = prefix("10")?;
@@ -652,10 +616,10 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
-    async fn closest() -> Result<()> {
+    #[test]
+    fn closest() -> Result<()> {
         // Create map containing sections (00), (01) and (10)
-        let (map, genesis_sk, genesis_pk) = new_network_prefix_map();
+        let (mut map, genesis_sk, genesis_pk) = new_network_prefix_map();
         let chain = SecuredLinkedList::new(genesis_pk);
         let p01 = prefix("01")?;
         let p10 = prefix("10")?;
@@ -666,14 +630,14 @@ mod tests {
         let pk01 = section_auth_01.section_key();
         let sig01 = bincode::serialize(&pk01).map(|bytes| genesis_sk.sign(&bytes))?;
         chain01.insert(&genesis_pk, pk01, sig01)?;
-        let _updated = map.update(section_auth_01, &chain01).await;
+        let _updated = map.update(section_auth_01, &chain01);
 
-        let mut chain10 = chain.clone();
+        let mut chain10 = chain;
         let section_auth_10 = gen_section_auth(p10)?;
         let pk10 = section_auth_10.section_key();
         let sig10 = bincode::serialize(&pk10).map(|bytes| genesis_sk.sign(&bytes))?;
         chain10.insert(&genesis_pk, pk10, sig10)?;
-        let _updated = map.update(section_auth_10, &chain10).await;
+        let _updated = map.update(section_auth_10, &chain10);
 
         let n01 = p01.substituted_in(xor_name::rand::random());
         let n10 = p10.substituted_in(xor_name::rand::random());
@@ -689,15 +653,13 @@ mod tests {
     proptest! {
         #[test]
         fn proptest_prefix_map_fields_should_stay_in_sync((main_chain, update_variations_list) in arb_sll_and_proof_chains(100, 3)) {
-            let runtime = Runtime::new()?;
             for variation in update_variations_list {
-                let prefix_map = NetworkPrefixMap::new(*main_chain.root_key());
+                let mut prefix_map = NetworkPrefixMap::new(*main_chain.root_key());
                 for (proof_chain, sap) in &variation {
-                    runtime
-                        .block_on(prefix_map.update(sap.clone(), proof_chain))?;
+                    let _ = prefix_map.update(sap.clone(), proof_chain)?;
                 }
-                let synced = runtime.block_on(is_synced(&prefix_map)).unwrap();
-                assert!(synced);
+                let synced = is_synced(&prefix_map).unwrap();
+                prop_assert!(synced);
             }
         }
     }
@@ -814,9 +776,7 @@ mod tests {
     // Check if the sections and sections_dag are in sync
     // Get the leaves of the 'sections_dag' from 'section' and verify
     // the length from the leaves matches the actual length of the 'sections_dag'
-    async fn is_synced(prefix_map: &NetworkPrefixMap) -> Result<bool> {
-        let sections_dag = prefix_map.get_sections_dag().read().await;
-        let root_key = sections_dag.root_key();
+    fn is_synced(prefix_map: &NetworkPrefixMap) -> Result<bool> {
         let mut count: BTreeSet<bls::PublicKey> = BTreeSet::new();
 
         // count.insert(root_key);
@@ -829,14 +789,16 @@ mod tests {
         // }
 
         for leaf_sap in prefix_map.all() {
-            let chain = sections_dag.get_proof_chain(root_key, &leaf_sap.section_key())?;
+            let chain = prefix_map
+                .sections_dag
+                .get_proof_chain(prefix_map.sections_dag.root_key(), &leaf_sap.section_key())?;
 
             for key in chain.keys() {
                 count.insert(*key);
             }
         }
 
-        Ok(sections_dag.len() == count.len())
+        Ok(prefix_map.sections_dag.len() == count.len())
     }
 
     type SectionInfo = (

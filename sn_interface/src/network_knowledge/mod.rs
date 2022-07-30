@@ -212,7 +212,7 @@ impl NetworkKnowledge {
 
         // Check if the genesis key in the provided prefix_map matches ours.
         // If no prefix map was provided, start afresh.
-        let prefix_map = match passed_prefix_map {
+        let mut prefix_map = match passed_prefix_map {
             Some(prefix_map) => {
                 if prefix_map.genesis_key() != genesis_key {
                     return Err(Error::InvalidGenesisKey(prefix_map.genesis_key()));
@@ -225,7 +225,7 @@ impl NetworkKnowledge {
 
         // At this point we know the prefix map corresponds to the correct genesis key,
         // let's make sure the prefix map contains also our own prefix and SAP,
-        if let Err(err) = prefix_map.update(signed_sap.clone(), &chain).await {
+        if let Err(err) = prefix_map.update(signed_sap.clone(), &chain) {
             debug!("Failed to update NetworkPrefixMap with SAP {:?} and chain {:?} upon creating new NetworkKnowledge intance: {:?}", signed_sap, chain, err);
         }
 
@@ -306,8 +306,6 @@ impl NetworkKnowledge {
                 let proof = self
                     .prefix_map
                     .get_sections_dag()
-                    .read()
-                    .await
                     .get_proof_chain(&self.genesis_key, &section_key);
                 // We have the signed SAP for the provided prefix and section key,
                 // we should be able to update our current SAP and section chain
@@ -342,11 +340,7 @@ impl NetworkKnowledge {
 
     /// Verify the given public key corresponds to any (current/old) section known to us
     pub async fn verify_section_key_is_known(&self, section_key: &BlsPublicKey) -> bool {
-        self.prefix_map
-            .get_sections_dag()
-            .read()
-            .await
-            .has_key(section_key)
+        self.prefix_map.get_sections_dag().has_key(section_key)
     }
 
     /// Given a `NodeMsg` can we trust it (including verifying contents of an AE message)
@@ -394,11 +388,7 @@ impl NetworkKnowledge {
         let provided_sap = signed_sap.value.clone();
 
         // Update the network prefix map
-        match self
-            .prefix_map
-            .update(signed_sap.clone(), proof_chain)
-            .await
-        {
+        match self.prefix_map.update(signed_sap.clone(), proof_chain) {
             Ok(true) => {
                 there_was_an_update = true;
                 debug!(
@@ -464,8 +454,6 @@ impl NetworkKnowledge {
                     let section_chain = self
                         .prefix_map
                         .get_sections_dag()
-                        .read()
-                        .await
                         .get_proof_chain(&self.genesis_key, &provided_sap.section_key())?;
 
                     // Prune list of archived members
@@ -515,6 +503,11 @@ impl NetworkKnowledge {
         &self.prefix_map
     }
 
+    // Returns mutable reference to network prefix map
+    pub fn mut_prefix_map(&mut self) -> &mut NetworkPrefixMap {
+        &mut self.prefix_map
+    }
+
     // Returns the section authority provider for the prefix that matches name.
     pub fn section_by_name(&self, name: &XorName) -> Result<SectionAuthorityProvider> {
         self.prefix_map.section_by_name(name)
@@ -538,8 +531,6 @@ impl NetworkKnowledge {
             if let Ok(proof_chain) = self
                 .prefix_map
                 .get_sections_dag()
-                .read()
-                .await
                 .get_proof_chain(&self.genesis_key, &signed_sap.value.section_key())
             {
                 return Some((signed_sap, proof_chain));

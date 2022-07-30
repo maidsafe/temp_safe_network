@@ -156,9 +156,9 @@ impl Session {
                 // based on our current knowledge of the network and sections chains.
                 let known_keys: Vec<BlsPublicKey> = session
                     .network
-                    .get_sections_dag()
                     .read()
                     .await
+                    .get_sections_dag()
                     .keys()
                     .cloned()
                     .collect();
@@ -403,24 +403,22 @@ impl Session {
         sender: Peer,
     ) {
         // Update our network PrefixMap based upon passed in knowledge
-        match session
-            .network
-            .update(
-                SectionAuth {
-                    value: sap.clone(),
-                    sig: section_signed,
-                },
-                &proof_chain,
-            )
-            .await
-        {
+        match session.network.write().await.update(
+            SectionAuth {
+                value: sap.clone(),
+                sig: section_signed,
+            },
+            &proof_chain,
+        ) {
             Ok(true) => {
                 debug!(
                     "Anti-Entropy: updated remote section SAP updated for {:?}",
                     sap.prefix()
                 );
                 // Update the PrefixMap on disk
-                if let Err(e) = compare_and_write_prefix_map_to_disk(&session.network).await {
+                if let Err(e) =
+                    compare_and_write_prefix_map_to_disk(&*session.network.read().await).await
+                {
                     error!(
                         "Error writing freshly updated PrefixMap to client dir: {:?}",
                         e

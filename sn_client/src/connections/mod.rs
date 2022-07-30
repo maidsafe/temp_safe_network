@@ -46,7 +46,7 @@ pub(super) struct Session {
     // Channels for sending CmdAck to upper layers
     pending_cmds: PendingCmdAcks,
     /// All elders we know about from AE messages
-    pub(super) network: NetworkPrefixMap,
+    pub(super) network: Arc<RwLock<NetworkPrefixMap>>,
     /// Initial network comms MsgId
     initial_connection_check_msg_id: Arc<RwLock<Option<MsgId>>>,
     /// Standard time to await potential AE messages:
@@ -72,7 +72,7 @@ impl Session {
             pending_queries: Arc::new(DashMap::default()),
             pending_cmds: Arc::new(DashMap::default()),
             endpoint,
-            network: prefix_map,
+            network: Arc::new(RwLock::new(prefix_map)),
             initial_connection_check_msg_id: Arc::new(RwLock::new(None)),
             cmd_ack_wait,
             peer_links,
