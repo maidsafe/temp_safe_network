@@ -11,7 +11,8 @@ mod capacity;
 pub(crate) use self::capacity::{Capacity, MIN_LEVEL_WHEN_FULL};
 
 use crate::node::{
-    error::convert_to_error_msg, Cmd, Error, Node, Prefix, Result, MAX_WAITING_PEERS_PER_QUERY,
+    error::convert_to_error_msg, messaging::Peers, Cmd, Error, Node, Prefix, Result,
+    MAX_WAITING_PEERS_PER_QUERY,
 };
 
 use itertools::Itertools;
@@ -45,9 +46,9 @@ impl Node {
             &targets,
         );
 
-        self.trace_system_to_many(
+        self.trace_system(
             SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data])),
-            targets,
+            Peers::Multiple(targets),
             #[cfg(feature = "traceroute")]
             traceroute,
         )
@@ -87,21 +88,21 @@ impl Node {
             )]);
         };
 
-        let mut cmds = vec![Cmd::AddToPendingQueries {
-            origin,
-            operation_id,
-        }];
-
         if let Some(peers) = self.pending_data_queries.get(&operation_id) {
             if peers.len() > MAX_WAITING_PEERS_PER_QUERY {
                 warn!("Dropping query from {origin:?}, there are more than {MAX_WAITING_PEERS_PER_QUERY} waiting already");
                 return Ok(vec![]);
-            } else {
+            } else if peers.contains(&origin) {
                 // we don't respond to the actual query, as we're still within data query timeout
                 // we rely on the data query cache timeout to decide as/when we'll be re-sending a query to adults
-                return Ok(cmds);
+                return Ok(vec![]);
             }
         }
+
+        let mut cmds = vec![Cmd::AddToPendingQueries {
+            origin,
+            operation_id,
+        }];
 
         // we only add a pending request when we're actually sending out requests
         trace!("adding pending req for {target:?} in dysfunction tracking");
@@ -117,9 +118,9 @@ impl Node {
             correlation_id: msg_id,
         });
 
-        cmds.push(self.trace_system_to_one(
+        cmds.push(self.trace_system(
             msg,
-            target,
+            Peers::Single(target),
             #[cfg(feature = "traceroute")]
             traceroute,
         ));

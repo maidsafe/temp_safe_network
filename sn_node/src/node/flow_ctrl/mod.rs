@@ -17,13 +17,8 @@ pub(crate) mod tests;
 pub(crate) use self::cmd_ctrl::CmdCtrl;
 
 use crate::comm::MsgEvent;
-use crate::node::{
-    flow_ctrl::cmds::Cmd,
-    messaging::{OutgoingMsg, Recipients},
-    Error, Node, Result,
-};
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, Node, Result};
 
-use signature::Signer;
 use sn_interface::{
     messaging::{
         data::{DataQuery, DataQueryVariant, ServiceMsg},
@@ -33,6 +28,7 @@ use sn_interface::{
     types::{log_markers::LogMarker, ChunkAddress, PublicKey, Signature},
 };
 
+use signature::Signer;
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::{
     sync::{mpsc, RwLock},
@@ -311,13 +307,7 @@ impl FlowCtrl {
                     if let Some(data_recipients) = target_peer {
                         debug!("Data queued to be replicated");
 
-                        let mut recipients = vec![];
-
-                        for peer in data_recipients.iter() {
-                            recipients.push(*peer);
-                        }
-
-                        if recipients.is_empty() {
+                        if data_recipients.is_empty() {
                             continue;
                         }
 
@@ -333,16 +323,12 @@ impl FlowCtrl {
                             "{:?} Data {:?} to: {:?}",
                             LogMarker::SendingMissingReplicatedData,
                             address,
-                            recipients,
+                            data_recipients,
                         );
 
                         let msg = SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data_to_send]));
-                        let cmd = Cmd::SendMsg {
-                            msg: OutgoingMsg::System(msg),
-                            recipients: Recipients::from(&recipients),
-                            #[cfg(feature = "traceroute")]
-                            traceroute: vec![],
-                        };
+                        let node = self.node.read().await;
+                        let cmd = node.send_system(msg, Peers::Multiple(data_recipients));
 
                         if let Err(e) = self.cmd_ctrl.push(cmd).await {
                             error!("Error in data replication loop: {:?}", e);
@@ -433,36 +419,23 @@ impl FlowCtrl {
 
                 let node = self.node.read().await;
                 let our_info = node.info();
-                let our_name = our_info.name();
+                let mut members = node.network_knowledge().members();
+                let _ = members.remove(&our_info.peer());
 
-                let members = node.network_knowledge().section_members();
                 drop(node);
 
                 if let Some(load_report) =
                     self.cmd_ctrl.dispatcher.comm().tolerated_msgs_per_s().await
                 {
                     trace!("New BackPressure report to disseminate: {:?}", load_report);
-
                     // TODO: use comms to send report to anyone connected? (can we ID end users there?)
-                    for member in members {
-                        let peer = member.peer();
-                        if peer.name() == our_name {
-                            continue;
-                        }
-
-                        let cmd = Cmd::SendMsg {
-                            msg: OutgoingMsg::System(SystemMsg::BackPressure(load_report)),
-                            recipients: Recipients::from_single(*peer),
-                            #[cfg(feature = "traceroute")]
-                            traceroute: vec![],
-                        };
-
-                        if let Err(e) = self.cmd_ctrl.push(cmd).await {
-                            error!(
-                                "Error sending backpressure report to section member {:?}: {:?}",
-                                peer, e
-                            );
-                        }
+                    let node = self.node.read().await;
+                    let cmd = node.send_system(
+                        SystemMsg::BackPressure(load_report),
+                        Peers::Multiple(members),
+                    );
+                    if let Err(e) = self.cmd_ctrl.push(cmd).await {
+                        error!("Error sending backpressure to section members: {e:?}");
                     }
                 }
             }

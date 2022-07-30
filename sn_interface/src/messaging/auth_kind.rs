@@ -6,8 +6,9 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use super::{BlsShareAuth, NodeAuth, ServiceAuth, SrcLocation};
+use super::{BlsShareAuth, NodeAuth, ServiceAuth};
 use serde::{Deserialize, Serialize};
+use xor_name::XorName;
 
 /// Source authority of a message.
 ///
@@ -39,18 +40,12 @@ pub enum AuthKind {
 
 impl AuthKind {
     /// The src location of the msg.
-    pub fn src(&self) -> SrcLocation {
+    pub fn src_name(&self) -> XorName {
         match self {
-            Self::NodeBlsShare(auth) => SrcLocation::Node {
-                name: auth.src_name,
-                section_pk: auth.sig_share.public_key_set.public_key(),
-            },
-            Self::Node(auth) => SrcLocation::Node {
-                name: crate::types::PublicKey::Ed25519(auth.node_ed_pk).into(),
-                section_pk: auth.section_pk,
-            },
+            Self::NodeBlsShare(auth) => auth.src_name,
+            Self::Node(auth) => crate::types::PublicKey::Ed25519(auth.node_ed_pk).into(),
             #[cfg(any(feature = "chunks", feature = "registers"))]
-            Self::Service(auth) => SrcLocation::EndUser(super::EndUser(auth.public_key.into())),
+            Self::Service(auth) => auth.public_key.into(),
         }
     }
 }

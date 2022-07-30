@@ -8,7 +8,7 @@
 
 use crate::node::{
     flow_ctrl::cmds::Cmd,
-    messaging::{OutgoingMsg, Recipients},
+    messaging::{OutgoingMsg, Peers},
     Error, Node, Proposal, Result,
 };
 
@@ -16,7 +16,7 @@ use bytes::Bytes;
 use sn_interface::{
     messaging::{
         system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SigShare, SystemMsg},
-        AuthorityProof, BlsShareAuth, NodeMsgAuthority, WireMsg,
+        AuthorityProof, BlsShareAuth, MsgId, NodeMsgAuthority, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     types::{log_markers::LogMarker, Peer},
@@ -61,7 +61,8 @@ impl Node {
         if !others.is_empty() {
             cmds.push(Cmd::SendMsg {
                 msg: OutgoingMsg::DstAggregated((auth.clone(), payload.clone())),
-                recipients: Recipients::Peers(others),
+                msg_id: MsgId::new(),
+                recipients: Peers::Multiple(others),
                 #[cfg(feature = "traceroute")]
                 traceroute: vec![],
             });
@@ -184,13 +185,7 @@ impl Node {
             message,
             session_id,
         };
-
-        Cmd::SendMsg {
-            msg: OutgoingMsg::System(msg),
-            recipients: Recipients::from_single(sender),
-            #[cfg(feature = "traceroute")]
-            traceroute: vec![],
-        }
+        self.send_system(msg, Peers::Single(sender))
     }
 
     pub(crate) fn handle_dkg_retry(
@@ -248,7 +243,7 @@ impl Node {
         failure_set: &DkgFailureSigSet,
     ) -> Result<Vec<Cmd>> {
         if !self.network_knowledge.is_section_member(sender) {
-            return Err(Error::InvalidSrcLocation);
+            return Err(Error::InvalidDkgParticipant);
         }
 
         let generation = self.network_knowledge.chain_len();

@@ -9,12 +9,15 @@
 use crate::node::{
     dkg::session::Session,
     flow_ctrl::cmds::Cmd,
-    messaging::{OutgoingMsg, Recipients},
+    messaging::{OutgoingMsg, Peers},
     Result,
 };
 
 use sn_interface::{
-    messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
+    messaging::{
+        system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
+        MsgId,
+    },
     network_knowledge::{supermajority, NodeInfo, SectionAuthorityProvider, SectionKeyShare},
     types::{
         keys::ed25519::{self, Digest256},
@@ -184,7 +187,8 @@ impl DkgVoter {
             };
             cmds.push(Cmd::SendMsg {
                 msg: OutgoingMsg::System(msg),
-                recipients: Recipients::from_single(sender),
+                msg_id: MsgId::new(),
+                recipients: Peers::Single(sender),
                 #[cfg(feature = "traceroute")]
                 traceroute: vec![],
             });

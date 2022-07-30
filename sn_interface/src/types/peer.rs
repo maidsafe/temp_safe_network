@@ -6,6 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ordering,
     fmt::{self, Display, Formatter},
@@ -15,7 +16,7 @@ use std::{
 use xor_name::{XorName, XOR_NAME_LEN};
 
 /// A Peer with name, derived from its `PublicKey`, and an address.
-#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Peer {
     name: XorName,
     addr: SocketAddr,

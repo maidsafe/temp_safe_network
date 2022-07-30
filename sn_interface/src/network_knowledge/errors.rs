@@ -38,6 +38,8 @@ pub enum Error {
     TryJoinLater,
     #[error("No matching Section")]
     NoMatchingSection,
+    #[error("No matching Relation between peers")]
+    NoMatchingRelation,
     #[error(
         "A JoinResponse was reeived after we've already joined the network. It has been ignored."
     )]

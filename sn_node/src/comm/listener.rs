@@ -69,7 +69,7 @@ impl MsgListener {
                         }
                     };
 
-                    let src_name = wire_msg.auth().src().name();
+                    let src_name = wire_msg.auth().src_name();
 
                     if first {
                         first = false;

@@ -8,12 +8,15 @@
 
 use crate::node::{
     flow_ctrl::cmds::{next_timer_token, Cmd},
-    messaging::{OutgoingMsg, Recipients},
+    messaging::{OutgoingMsg, Peers},
     Result,
 };
 
 use sn_interface::{
-    messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
+    messaging::{
+        system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
+        MsgId,
+    },
     network_knowledge::{NodeInfo, SectionAuthorityProvider, SectionKeyShare},
     types::{keys::ed25519, log_markers::LogMarker, Peer},
 };
@@ -95,7 +98,8 @@ impl Session {
             };
             cmds.push(Cmd::SendMsg {
                 msg: OutgoingMsg::System(msg),
-                recipients: Recipients::from_single(*peer),
+                msg_id: MsgId::new(),
+                recipients: Peers::Single(*peer),
                 #[cfg(feature = "traceroute")]
                 traceroute: vec![],
             });
@@ -148,7 +152,7 @@ impl Session {
         Ok(cmds)
     }
 
-    fn recipients(&self) -> Vec<Peer> {
+    fn recipients(&self) -> BTreeSet<Peer> {
         self.session_id
             .elder_peers()
             .enumerate()
@@ -201,7 +205,8 @@ impl Session {
 
                 cmds.push(Cmd::SendMsg {
                     msg: OutgoingMsg::System(msg),
-                    recipients: Recipients::from_single(*peer),
+                    msg_id: MsgId::new(),
+                    recipients: Peers::Single(*peer),
                     #[cfg(feature = "traceroute")]
                     traceroute: vec![],
                 });
@@ -370,7 +375,8 @@ impl Session {
                 trace!("{}", LogMarker::DkgSendFailureObservation);
                 Cmd::SendMsg {
                     msg: OutgoingMsg::System(msg),
-                    recipients: Recipients::from(&self.recipients()),
+                    msg_id: MsgId::new(),
+                    recipients: Peers::Multiple(self.recipients()),
                     #[cfg(feature = "traceroute")]
                     traceroute: vec![],
                 }
@@ -616,7 +622,7 @@ mod tests {
             match cmd {
                 Cmd::SendMsg {
                     msg: OutgoingMsg::System(msg),
-                    recipients: Recipients::Peers(recipients),
+                    recipients,
                     ..
                 } => match msg {
                     SystemMsg::DkgMessage {
@@ -625,6 +631,7 @@ mod tests {
                     } => {
                         assert_eq!(session_id.hash(), expected_dkg_key.hash());
                         Ok(recipients
+                            .get()
                             .into_iter()
                             .map(|peer| (peer.addr(), message.clone()))
                             .collect())

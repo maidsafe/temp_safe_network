@@ -19,14 +19,13 @@ use self::back_pressure::BackPressure;
 use self::{
     link::Link,
     listener::{ListenerEvent, MsgListener},
-    peer_session::{PeerSession, SendWatcher},
+    peer_session::{PeerSession, SendStatus, SendWatcher},
 };
 
 use crate::node::{Error, RateLimits, Result};
-use peer_session::SendStatus;
 
 use sn_interface::{
-    messaging::{system::MembershipState, WireMsg},
+    messaging::{system::MembershipState, MsgId, WireMsg},
     network_knowledge::NodeState,
     types::Peer,
 };
@@ -211,156 +210,97 @@ impl Comm {
         session.update_send_rate(msgs_per_s).await;
     }
 
-    /// Sends a message to multiple recipients. Attempts to send to `delivery_group_size`
-    /// recipients out of the `recipients` list. If a send fails, attempts to send to the next peer
-    /// until `delivery_group_size` successful sends complete or there are no more recipients to
-    /// try.
-    ///
-    /// Returns an `Error::EmptyRecipientList` if the recipient list is empty. Else it returns a
-    /// `DeliveryStatus::MinDeliveryGroupSizeReached` or `DeliveryStatus::MinDeliveryGroupSizeFailed` depending
-    /// on if the minimum delivery group size is met or not. The failed recipients are sent along
-    /// with the status. It returns a `DeliveryStatus::AllRecipients` if message is sent to all the recipients.
     #[tracing::instrument(skip(self))]
-    pub(crate) async fn send(
-        &self,
-        recipients: &[Peer],
-        wire_msg: WireMsg,
-    ) -> Result<DeliveryStatus> {
-        // todo: this type of task needs a send job, that we can come back to
+    pub(crate) async fn send(&self, peer: Peer, msg: WireMsg) -> Result<()> {
+        let msg_id = msg.msg_id();
+        let dst = *msg.dst();
+        let watcher = self.send_to_one(peer, msg).await;
 
-        let msg_id = wire_msg.msg_id();
-        trace!("Sending message (msg_id: {:?}) to {:?}", msg_id, recipients);
-
-        if recipients.is_empty() {
-            return Err(Error::EmptyRecipientList);
+        match watcher {
+            Ok(watcher) => {
+                if Self::is_sent(watcher, msg_id, peer).await {
+                    trace!("Msg {msg_id:?} sent to {dst:?}");
+                    Ok(())
+                } else {
+                    Err(Error::FailedSend(peer))
+                }
+            }
+            Err(error) => {
+                // there is only one type of error returned: [`Error::InvalidState`]
+                // which should not happen (be reachable) if we only access PeerSession from Comm
+                // The error means we accessed a peer that we disconnected from.
+                // So, this would potentially be a bug!
+                warn!(
+                    "Accessed a disconnected peer: {}. This is potentially a bug!",
+                    peer
+                );
+                error!(
+                    "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed as we have disconnected from the peer. (Error is: {})",
+                    msg_id,
+                    peer.addr(),
+                    peer.name(),
+                    error,
+                );
+                Err(Error::FailedSend(peer))
+            }
         }
+    }
 
-        let priority = wire_msg.priority();
-
-        let delivery_group_size = recipients.len();
-        let mut successes = 0;
-        let mut failed_recipients = vec![];
-
-        // Run all the sends concurrently.
-        let tasks: Vec<_> = recipients
-            .iter()
-            .map(|recipient| {
-                let mut msg = wire_msg.clone();
-                msg.set_dst_xorname(recipient.name());
-                self.send_to_one(*recipient, msg, priority)
-            })
-            .collect();
-
-        let watchers = futures::future::join_all(tasks).await;
-
-        for (recipient, result) in watchers {
-            let name = recipient.name();
-            let addr = recipient.addr();
-
-            match result {
-                Err(error) => {
-                    // there is only one type of error returned: [`Error::InvalidState`]
-                    // which should not happen (be reachable) if we only access PeerSession from Comm
-                    // The error means we accessed a peer that we disconnected from.
-                    // So, this would potentially be a bug!
-                    warn!(
-                        "Accessed a disconnected peer: {}. This is potentially a bug!",
-                        recipient
-                    );
+    async fn is_sent(mut watcher: SendWatcher, msg_id: MsgId, peer: Peer) -> bool {
+        // here we can monitor the sending
+        // and we now watch the status of the send
+        loop {
+            match &mut watcher.await_change().await {
+                SendStatus::Sent => {
+                    return true;
+                }
+                SendStatus::Enqueued => {
+                    // this block should be unreachable, as Enqueued is the initial state
+                    // but let's handle it anyway..
+                    continue; // moves on to awaiting a new change
+                }
+                SendStatus::PeerLinkDropped => {
+                    // The connection was closed by us which means
+                    // we have dropped this peer for some reason
                     error!(
-                        "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed as we have disconnected from the peer. (Error is: {})",
+                        "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed, as we have dropped the link to it.",
                         msg_id,
-                        addr,
-                        name,
-                        error,
+                        peer.addr(),
+                        peer.name(),
                     );
-                    break;
+                    return false;
                 }
-                Ok(mut watcher) => {
-                    // here we can monitor the sending
-                    // and we now watch the status of the send
-                    loop {
-                        match watcher.await_change().await {
-                            SendStatus::Sent => {
-                                successes += 1;
-                                break;
-                            }
-                            SendStatus::Enqueued => {
-                                // this block should be unreachable, as Enqueued is the initial state
-                                // but let's handle it anyway..
-                                continue; // moves on to awaiting a new change
-                            }
-                            SendStatus::PeerLinkDropped => {
-                                // The connection was closed by us which means
-                                // we have dropped this peer for some reason
-                                error!(
-                                    "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed, as we have dropped the link to it.",
-                                    msg_id,
-                                    addr,
-                                    name,
-                                );
-                                failed_recipients.push(recipient);
-                                break;
-                            }
-                            SendStatus::WatcherDropped => {
-                                // the send job is dropped for some reason,
-                                // that happens when the peer session dropped
-                                // or the msg was sent, meaning the send didn't actually fail,
-                                error!(
-                                    "Sending message (msg_id: {:?}) to {:?} (name {:?}) possibly failed, as monitoring of the send job was aborted",
-                                    msg_id,
-                                    addr,
-                                    name,
-                                );
-                                failed_recipients.push(recipient);
-                                break;
-                            }
-                            SendStatus::TransientError(error) => {
-                                // An individual connection can for example have been lost when we tried to send. This
-                                // could indicate the connection timed out whilst it was held, or some other
-                                // transient connection issue. We don't treat this as a failed recipient, but we sleep a little longer here.
-                                // Retries are managed by the peer session, where it will open a new connection.
-                                debug!(
-                                    "Transient error when sending to peer {}: {}",
-                                    recipient, error
-                                );
-                                tokio::time::sleep(Duration::from_millis(200)).await;
-
-                                continue; // moves on to awaiting a new change
-                            }
-                            SendStatus::MaxRetriesReached => {
-                                error!(
-                                    "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed, as we've reached maximum retries",
-                                    msg_id,
-                                    addr,
-                                    name,
-                                );
-                                failed_recipients.push(recipient);
-                                break;
-                            }
-                        }
-                    }
+                SendStatus::WatcherDropped => {
+                    // the send job is dropped for some reason,
+                    // that happens when the peer session dropped
+                    // or the msg was sent, meaning the send didn't actually fail,
+                    error!(
+                        "Sending message (msg_id: {:?}) to {:?} (name {:?}) possibly failed, as monitoring of the send job was aborted",
+                        msg_id,
+                        peer.addr(),
+                        peer.name(),
+                    );
+                    return false;
+                }
+                SendStatus::TransientError(error) => {
+                    // An individual connection can for example have been lost when we tried to send. This
+                    // could indicate the connection timed out whilst it was held, or some other
+                    // transient connection issue. We don't treat this as a failed recipient, but we sleep a little longer here.
+                    // Retries are managed by the peer session, where it will open a new connection.
+                    debug!("Transient error when sending to peer {}: {}", peer, error);
+                    tokio::time::sleep(Duration::from_millis(200)).await;
+                    continue; // moves on to awaiting a new change
+                }
+                SendStatus::MaxRetriesReached => {
+                    error!(
+                        "Sending message (msg_id: {:?}) to {:?} (name {:?}) failed, as we've reached maximum retries",
+                        msg_id,
+                        peer.addr(),
+                        peer.name(),
+                    );
+                    return false;
                 }
             }
-        }
-
-        trace!(
-            "Finished sending message {:?} to {}/{} recipients (failed: {:?})",
-            wire_msg,
-            successes,
-            delivery_group_size,
-            failed_recipients
-        );
-
-        if successes == delivery_group_size {
-            if failed_recipients.is_empty() {
-                Ok(DeliveryStatus::AllRecipients)
-            } else {
-                Ok(DeliveryStatus::DeliveredToAll(failed_recipients))
-            }
-        } else {
-            // todo: is this really a success case..?
-            Ok(DeliveryStatus::FailedToDeliverAll(failed_recipients))
         }
     }
 
@@ -398,18 +338,14 @@ impl Comm {
 
     // Helper to send a message to a single recipient.
     #[instrument(skip(self, wire_msg))]
-    async fn send_to_one(
-        &self,
-        recipient: Peer,
-        wire_msg: WireMsg,
-        msg_priority: i32,
-    ) -> (Peer, Result<SendWatcher>) {
+    async fn send_to_one(&self, recipient: Peer, wire_msg: WireMsg) -> Result<SendWatcher> {
         let msg_id = wire_msg.msg_id();
+        let priority = wire_msg.priority();
         let msg_bytes = match wire_msg.serialize() {
             Ok(bytes) => bytes,
             Err(error) => {
                 // early return if we cannot serialise msg
-                return (recipient, Err(Error::Messaging(error)));
+                return Err(Error::Messaging(error));
             }
         };
 
@@ -420,9 +356,7 @@ impl Comm {
             recipient,
         );
         let peer = self.get_or_create(&recipient).await;
-        let result = peer.send(msg_id, msg_priority, msg_bytes).await;
-
-        (recipient, result)
+        peer.send(msg_id, priority, msg_bytes).await
     }
 }
 
@@ -524,14 +458,6 @@ pub(crate) enum MsgEvent {
     },
 }
 
-/// Returns the status of the send operation.
-#[derive(Debug, Clone)]
-pub(crate) enum DeliveryStatus {
-    AllRecipients,
-    DeliveredToAll(Vec<Peer>),
-    FailedToDeliverAll(Vec<Peer>),
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -539,7 +465,7 @@ mod tests {
     use sn_interface::{
         messaging::{
             data::{DataQuery, DataQueryVariant, ServiceMsg},
-            AuthKind, DstLocation, MsgId, ServiceAuth,
+            AuthKind, Dst, MsgId, ServiceAuth,
         },
         types::{ChunkAddress, Keypair, Peer},
     };
@@ -568,26 +494,18 @@ mod tests {
                 let (peer0, mut rx0) = new_peer().await?;
                 let (peer1, mut rx1) = new_peer().await?;
 
-                let original_message = new_test_msg()?;
+                let peer0_msg = new_test_msg(dst(peer0))?;
+                let peer1_msg = new_test_msg(dst(peer1))?;
 
-                let status = comm.send(&[peer0, peer1], original_message.clone()).await?;
-
-                assert_matches!(status, DeliveryStatus::AllRecipients);
+                comm.send(peer0, peer0_msg.clone()).await?;
+                comm.send(peer1, peer1_msg.clone()).await?;
 
                 if let Some(bytes) = rx0.recv().await {
-                    // the dst location name is updated per sender, so
-                    // we need to update that here before we check
-                    let mut check_msg = original_message.clone();
-                    check_msg.set_dst_xorname(peer0.name());
-                    assert_eq!(WireMsg::from(bytes)?, check_msg);
+                    assert_eq!(WireMsg::from(bytes)?, peer0_msg);
                 }
 
                 if let Some(bytes) = rx1.recv().await {
-                    // the dst location name is updated per sender, so
-                    // we need to update that here before we check
-                    let mut check_msg = original_message.clone();
-                    check_msg.set_dst_xorname(peer1.name());
-                    assert_eq!(WireMsg::from(bytes)?, check_msg);
+                    assert_eq!(WireMsg::from(bytes)?, peer1_msg);
                 }
 
                 Result::<()>::Ok(())
@@ -615,101 +533,13 @@ mod tests {
                     tx,
                 )
                 .await?;
+
                 let invalid_peer = get_invalid_peer().await?;
                 let invalid_addr = invalid_peer.addr();
+                let result = comm.send(invalid_peer, new_test_msg(dst(invalid_peer))?).await;
 
-                let status = comm.send(&[invalid_peer], new_test_msg()?).await?;
+                assert_matches!(result, Err(Error::FailedSend(peer)) => assert_eq!(peer.addr(), invalid_addr));
 
-                assert_matches!(
-                    &status,
-                    &DeliveryStatus::FailedToDeliverAll(_) => vec![invalid_addr]
-                );
-
-                Result::<()>::Ok(())
-            })
-            .await
-    }
-
-    #[tokio::test]
-    async fn successful_send_after_failed_attempts() -> Result<()> {
-        // Construct a local task set that can run `!Send` futures.
-        let local = tokio::task::LocalSet::new();
-
-        // Run the local task set.
-        local
-            .run_until(async move {
-                let (tx, _rx) = mpsc::channel(1);
-                let comm = Comm::first_node(
-                    local_addr(),
-                    Config {
-                        idle_timeout: Some(Duration::from_millis(1)),
-                        ..Config::default()
-                    },
-                    RateLimits::new(),
-                    tx,
-                )
-                .await?;
-                let (peer, mut rx) = new_peer().await?;
-                let invalid_peer = get_invalid_peer().await?;
-
-                let message = new_test_msg()?;
-                let status = comm.send(&[invalid_peer, peer], message.clone()).await?;
-                assert_matches!(status, DeliveryStatus::FailedToDeliverAll(failed_recipients) => {
-                    assert_eq!(&failed_recipients, &[invalid_peer])
-                });
-
-                if let Some(bytes) = rx.recv().await {
-                    // the dst location name is updated per sender, so
-                    // we need to update that here before we check
-                    let mut check_msg = message.clone();
-                    check_msg.set_dst_xorname(peer.name());
-
-                    assert_eq!(WireMsg::from(bytes)?, check_msg);
-                }
-
-                Result::<()>::Ok(())
-            })
-            .await
-    }
-
-    #[tokio::test]
-    async fn partially_successful_send() -> Result<()> {
-        // Construct a local task set that can run `!Send` futures.
-        let local = tokio::task::LocalSet::new();
-
-        // Run the local task set.
-        local
-            .run_until(async move {
-                let (tx, _rx) = mpsc::channel(1);
-                let comm = Comm::first_node(
-                    local_addr(),
-                    Config {
-                        idle_timeout: Some(Duration::from_millis(1)),
-                        ..Config::default()
-                    },
-                    RateLimits::new(),
-                    tx,
-                )
-                .await?;
-                let (peer, mut rx) = new_peer().await?;
-                let invalid_peer = get_invalid_peer().await?;
-
-                let message = new_test_msg()?;
-                let status = comm.send(&[invalid_peer, peer], message.clone()).await?;
-
-                assert_matches!(
-                    status,
-                    DeliveryStatus::FailedToDeliverAll(_) => vec![invalid_peer]
-                );
-
-                if let Some(bytes) = rx.recv().await {
-                    // the dst location name is updated per sender, so
-                    // we need to update that here before we check
-                    let mut check_msg = message.clone();
-                    check_msg.set_dst_xorname(peer.name());
-
-                    assert_eq!(WireMsg::from(bytes)?, check_msg);
-                }
                 Result::<()>::Ok(())
             })
             .await
@@ -732,12 +562,10 @@ mod tests {
                     Endpoint::new_peer(local_addr(), &[], Config::default()).await?;
                 let recv_addr = recv_endpoint.public_addr();
                 let name = xor_name::rand::random();
+                let peer = Peer::new(name, recv_addr);
+                let msg0 = new_test_msg(dst(peer))?;
 
-                let msg0 = new_test_msg()?;
-                let status = send_comm
-                    .send(&[Peer::new(name, recv_addr)], msg0.clone())
-                    .await?;
-                assert_matches!(status, DeliveryStatus::AllRecipients);
+                send_comm.send(peer, msg0.clone()).await?;
 
                 let mut msg0_received = false;
 
@@ -745,40 +573,28 @@ mod tests {
                 {
                     if let Some((_, mut incoming_msgs)) = incoming_connections.next().await {
                         if let Some(msg) = time::timeout(TIMEOUT, incoming_msgs.next()).await?? {
-                            // the dst location name is updated per sender, so
-                            // we need to update that here before we check
-                            let mut check_msg = msg0.clone();
-                            check_msg.set_dst_xorname(name);
-                            assert_eq!(WireMsg::from(msg)?, check_msg);
+                            assert_eq!(WireMsg::from(msg)?, msg0);
                             msg0_received = true;
                         }
-
                         // connection dropped here
                     }
                     assert!(msg0_received);
                 }
 
-                let msg1 = new_test_msg()?;
-                let status = send_comm
-                    .send(&[Peer::new(name, recv_addr)], msg1.clone())
-                    .await?;
-                assert_matches!(status, DeliveryStatus::AllRecipients);
+                let msg1 = new_test_msg(dst(peer))?;
+                send_comm.send(peer, msg1.clone()).await?;
 
                 let mut msg1_received = false;
 
                 if let Some((_, mut incoming_msgs)) = incoming_connections.next().await {
                     if let Some(msg) = time::timeout(TIMEOUT, incoming_msgs.next()).await?? {
-                        // the dst location name is updated per sender, so
-                        // we need to update that here before we check
-                        let mut check_msg = msg1.clone();
-                        check_msg.set_dst_xorname(name);
-                        assert_eq!(WireMsg::from(msg)?, check_msg);
-
+                        assert_eq!(WireMsg::from(msg)?, msg1);
                         msg1_received = true;
                     }
                 }
 
                 assert!(msg1_received);
+
                 Result::<()>::Ok(())
             })
             .await
@@ -803,31 +619,31 @@ mod tests {
                     Comm::first_node(local_addr(), Config::default(), RateLimits::new(), tx)
                         .await?;
 
+                let peer = Peer::new(xor_name::rand::random(), addr0);
+                let msg = new_test_msg(dst(peer))?;
                 // Send a message to establish the connection
-                let status = comm1
-                    .send(
-                        &[Peer::new(xor_name::rand::random(), addr0)],
-                        new_test_msg()?,
-                    )
-                    .await?;
-                assert_matches!(status, DeliveryStatus::AllRecipients);
+                comm1.send(peer, msg).await?;
 
                 assert_matches!(rx0.recv().await, Some(MsgEvent::Received { .. }));
+
                 // Drop `comm1` to cause connection lost.
                 drop(comm1);
 
                 assert_matches!(time::timeout(TIMEOUT, rx0.recv()).await, Err(_));
+
                 Result::<()>::Ok(())
             })
             .await
     }
 
-    fn new_test_msg() -> Result<WireMsg> {
-        let dst_location = DstLocation::Node {
-            name: xor_name::rand::random(),
-            section_pk: bls::SecretKey::random().public_key(),
-        };
+    fn dst(peer: Peer) -> Dst {
+        Dst {
+            name: peer.name(),
+            section_key: bls::SecretKey::random().public_key(),
+        }
+    }
 
+    fn new_test_msg(dst: Dst) -> Result<WireMsg> {
         let src_keypair = Keypair::new_ed25519();
 
         let query = DataQueryVariant::GetChunk(ChunkAddress(xor_name::rand::random()));
@@ -843,10 +659,12 @@ mod tests {
             signature: src_keypair.sign(&payload),
         };
 
-        let wire_msg =
-            WireMsg::new_msg(MsgId::new(), payload, AuthKind::Service(auth), dst_location)?;
-
-        Ok(wire_msg)
+        Ok(WireMsg::new_msg(
+            MsgId::new(),
+            payload,
+            AuthKind::Service(auth),
+            dst,
+        ))
     }
 
     async fn new_peer() -> Result<(Peer, Receiver<Bytes>)> {

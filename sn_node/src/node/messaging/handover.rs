@@ -10,6 +10,7 @@ use crate::node::{
     flow_ctrl::cmds::Cmd,
     handover::{Error as HandoverError, Handover},
     membership::{elder_candidates, try_split_dkg},
+    messaging::Peers,
     Error, Node, Peer, Proposal, Result, SystemMsg,
 };
 use sn_consensus::{Generation, SignedVote, VoteResponse};
@@ -332,7 +333,7 @@ impl Node {
                     // We hit an error while processing this vote, perhaps we are missing information.
                     // We'll send a handover AE request to see if they can help us catch up.
                     debug!("{:?}", LogMarker::HandoverSendingAeUpdateRequest);
-                    cmds.push(self.send_system_to_one(SystemMsg::HandoverAE(gen), peer));
+                    cmds.push(self.send_system(SystemMsg::HandoverAE(gen), Peers::Single(peer)));
                     // return the vec w/ the AE cmd there so as not to loop and generate AE for
                     // any subsequent commands
                     return Ok(cmds);
@@ -356,9 +357,9 @@ impl Node {
 
         if let Some(handover) = self.handover_voting.as_ref() {
             match handover.anti_entropy(gen) {
-                Ok(catchup_votes) => {
-                    Some(self.send_system_to_one(SystemMsg::HandoverVotes(catchup_votes), peer))
-                }
+                Ok(catchup_votes) => Some(
+                    self.send_system(SystemMsg::HandoverVotes(catchup_votes), Peers::Single(peer)),
+                ),
                 Err(e) => {
                     error!("Handover - Error while processing anti-entropy {:?}", e);
                     None

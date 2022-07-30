@@ -6,11 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{
-    flow_ctrl::cmds::Cmd,
-    messaging::{OutgoingMsg, Recipients},
-    Node, Result,
-};
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node, Result};
 
 use sn_interface::{
     data_copy_count,
@@ -85,15 +81,14 @@ impl Node {
     /// These nodes should send back anything missing (in batches).
     /// Relevant nodes should be all _prior_ neighbours + _new_ elders.
     #[instrument(skip(self))]
-    pub(crate) fn ask_for_any_new_data(&self) -> Result<Vec<Cmd>> {
+    pub(crate) fn ask_for_any_new_data(&self) -> Result<Cmd> {
+        trace!("{:?}", LogMarker::DataReorganisationUnderway);
         debug!("Querying section for any new data");
         let data_i_have = self.data_storage.keys()?;
-        let mut cmds = vec![];
 
-        let adults = self.network_knowledge.adults();
-
-        let elders = self.network_knowledge.elders();
         let my_name = self.info().name();
+        let adults = self.network_knowledge.adults();
+        let elders = self.network_knowledge.elders();
 
         // find data targets that are not us.
         let mut target_members = adults
@@ -115,30 +110,8 @@ impl Node {
         }
 
         trace!("Sending our data list to: {:?}", target_members);
+        let msg = SystemMsg::NodeCmd(NodeCmd::SendAnyMissingRelevantData(data_i_have));
 
-        cmds.push(Cmd::SendMsg {
-            msg: OutgoingMsg::System(SystemMsg::NodeCmd(NodeCmd::SendAnyMissingRelevantData(
-                data_i_have,
-            ))),
-            recipients: Recipients::Peers(target_members),
-            #[cfg(feature = "traceroute")]
-            traceroute: vec![],
-        });
-
-        Ok(cmds)
-    }
-
-    /// Will reorganize data if we are an adult,
-    /// and there were changes to adults (any added or removed).
-    pub(crate) fn try_reorganize_data(&self) -> Result<Vec<Cmd>> {
-        // as an elder we dont want to get any more data for our name
-        // (elders will eventually be caching data in general)
-        if self.is_elder() {
-            return Ok(vec![]);
-        }
-
-        trace!("{:?}", LogMarker::DataReorganisationUnderway);
-
-        self.ask_for_any_new_data()
+        Ok(self.send_system(msg, Peers::Multiple(target_members)))
     }
 }

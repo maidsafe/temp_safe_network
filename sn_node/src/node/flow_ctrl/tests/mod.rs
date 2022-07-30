@@ -14,7 +14,7 @@ use crate::node::{
     cfg::create_test_max_capacity_and_root_storage,
     flow_ctrl::{dispatcher::Dispatcher, event_channel},
     messages::WireMsgUtils,
-    messaging::{OutgoingMsg, Recipients},
+    messaging::{OutgoingMsg, Peers},
     relocation_check, ChurnId, Cmd, Error, Event, MembershipEvent, Node, Proposal, RateLimits,
     Result as RoutingResult, RESOURCE_PROOF_DATA_SIZE, RESOURCE_PROOF_DIFFICULTY,
 };
@@ -28,8 +28,8 @@ use sn_interface::{
             NodeMsgAuthorityUtils, NodeState as NodeStateMsg, RelocateDetails, ResourceProof,
             SectionAuth, SystemMsg,
         },
-        AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, NodeAuth,
-        SectionAuth as MsgKindSectionAuth, WireMsg,
+        AuthKind, AuthorityProof, Dst, MsgId, MsgType, NodeAuth, SectionAuth as MsgKindSectionAuth,
+        WireMsg,
     },
     network_knowledge::{
         recommended_section_size, supermajority, test_utils::*, NetworkKnowledge, NodeInfo,
@@ -104,9 +104,9 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
 
             let wire_msg = WireMsg::single_src(
                 &new_node,
-                DstLocation::Section {
+                Dst {
                     name: XorName::from(PublicKey::Bls(section_key)),
-                    section_pk: section_key,
+                    section_key,
                 },
                 SystemMsg::JoinRequest(JoinRequest::Initiate { section_key }),
                 section_key,
@@ -191,9 +191,9 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
             };
             let wire_msg = WireMsg::single_src(
                 &new_node,
-                DstLocation::Section {
+                Dst {
                     name: XorName::from(PublicKey::Bls(section_key)),
-                    section_pk: section_key,
+                    section_key,
                 },
                 SystemMsg::JoinRequest(JoinRequest::SubmitResourceProof {
                     section_key,
@@ -290,9 +290,9 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
 
             let wire_msg = WireMsg::single_src(
                 &relocated_node,
-                DstLocation::Section {
+                Dst {
                     name: XorName::from(PublicKey::Bls(section_key)),
-                    section_pk: section_key,
+                    section_key,
                 },
                 SystemMsg::JoinAsRelocatedRequest(Box::new(JoinAsRelocatedRequest {
                     section_key,
@@ -484,7 +484,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
                     .cloned()
                     .collect();
 
-                assert_matches!(recipients, Recipients::Peers(peers) => {
+                assert_matches!(recipients, Peers::Multiple(peers) => {
                     assert_eq!(peers, expected_dkg_start_recipients);
                 });
 
@@ -536,7 +536,7 @@ async fn handle_online_cmd(
                 } = *response
                 {
                     assert_eq!(signed_sap.value, section_auth.clone().to_msg());
-                    assert_matches!(recipients, Recipients::Peers(peers) => {
+                    assert_matches!(recipients, Peers::Multiple(peers) => {
                         assert_eq!(peers, BTreeSet::from([*peer]));
                     });
                     status.node_approval_sent = true;
@@ -772,9 +772,9 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let sk0 = bls::SecretKey::random();
             let pk0 = sk0.public_key();
 
-            let (old_sap, mut nodes, sk_set1) = create_section_auth();
+            let (old_sap, mut elders, sk_set1) = create_section_auth();
             let members =
-                BTreeSet::from_iter(nodes.iter().map(|n| NodeState::joined(n.peer(), None)));
+                BTreeSet::from_iter(elders.iter().map(|n| NodeState::joined(n.peer(), None)));
             let pk1 = sk_set1.secret_key().public_key();
             let pk1_signature = sk0.sign(bincode::serialize(&pk1)?);
 
@@ -788,12 +788,12 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             // Create our node
             let (event_sender, mut event_receiver) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
             let section_key_share = create_section_key_share(&sk_set1, 0);
-            let node = nodes.remove(0);
+            let elder = elders.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let comm = create_comm().await?;
-            let mut node = Node::new(
+            let mut elder = Node::new(
                 comm.socket_addr(),
-                node.keypair.clone(),
+                elder.keypair.clone(),
                 network_knowledge,
                 Some(section_key_share),
                 event_sender,
@@ -809,7 +809,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
             let pk2_signature = sk_set1.secret_key().sign(bincode::serialize(&pk2)?);
             chain.insert(&pk1, pk2, pk2_signature)?;
 
-            let old_node = nodes.remove(0);
+            let old_elder = elders.remove(0);
             let src_section_pk = pk2;
 
             // Create the new `SectionAuthorityProvider` by replacing the last peer with a new one.
@@ -832,10 +832,10 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
             // Create the `Sync` message containing the new `Section`.
             let wire_msg = WireMsg::single_src(
-                &old_node,
-                DstLocation::Node {
+                &old_elder,
+                Dst {
                     name: XorName::from(PublicKey::Bls(pk1)),
-                    section_pk: pk1,
+                    section_key: pk1,
                 },
                 SystemMsg::AntiEntropyUpdate {
                     section_auth: new_sap.to_msg(),
@@ -848,16 +848,17 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
             // Simulate DKG round finished succesfully by adding
             // the new section key share to our cache
-            node.section_keys_provider
+            elder
+                .section_keys_provider
                 .insert(create_section_key_share(&sk_set2, 0));
 
-            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(node)), comm);
+            let dispatcher = Dispatcher::new(Arc::new(RwLock::new(elder)), comm);
 
             let original_bytes = wire_msg.serialize()?;
 
             let _cmds = run_and_collect_cmds(
                 Cmd::ValidateMsg {
-                    origin: old_node.peer(),
+                    origin: old_elder.peer(),
                     wire_msg,
                     original_bytes,
                 },
@@ -934,9 +935,9 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
             let sender = gen_info(MIN_ADULT_AGE, None);
             let wire_msg = WireMsg::single_src(
                 &sender,
-                DstLocation::Section {
+                Dst {
                     name: XorName::from(PublicKey::Bls(bogus_section_pk)),
-                    section_pk: bogus_section_pk,
+                    section_key: bogus_section_pk,
                 },
                 node_msg.clone(),
                 // we use the nonsense here
@@ -1106,7 +1107,8 @@ async fn msg_to_self() -> Result<()> {
             .process_cmd(
                 Cmd::SendMsg {
                     msg: OutgoingMsg::System(node_msg.clone()),
-                    recipients: Recipients::from_single(info.peer()),
+                    msg_id: MsgId::new(),
+                    recipients: Peers::Single(info.peer()),
                     #[cfg(feature = "traceroute")] traceroute: vec![],
                 },
             )
@@ -1228,7 +1230,7 @@ async fn handle_elders_update() -> Result<()> {
             let (msg, recipients) = match cmd {
                 Cmd::SendMsg {
                     msg: OutgoingMsg::System(msg),
-                    recipients: Recipients::Peers(recipients),
+                    recipients: Peers::Multiple(recipients),
                     ..
                 } => (msg, recipients),
                 _ => continue,
@@ -1412,7 +1414,7 @@ async fn handle_demote_during_split() -> Result<()> {
                 let (msg, recipients) = match cmd {
                     Cmd::SendMsg {
                         msg: OutgoingMsg::System(msg),
-                        recipients: Recipients::Peers(recipients),
+                        recipients: Peers::Multiple(recipients),
                         ..
                     } => (msg, recipients),
                     _ => continue,

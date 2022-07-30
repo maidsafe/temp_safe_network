@@ -6,9 +6,10 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
+use crate::messaging::Dst;
+
 use super::{
-    data::ServiceMsg, system::SystemMsg, AuthorityProof, DstLocation, MsgId, NodeMsgAuthority,
-    ServiceAuth,
+    data::ServiceMsg, system::SystemMsg, AuthorityProof, MsgId, NodeMsgAuthority, ServiceAuth,
 };
 use std::fmt::{Display, Formatter};
 
@@ -45,8 +46,8 @@ pub enum MsgType {
         msg_id: MsgId,
         /// Requester's authority over this message
         auth: AuthorityProof<ServiceAuth>,
-        /// Message destination location
-        dst_location: DstLocation,
+        /// Message route
+        dst: Dst,
         /// the message
         msg: ServiceMsg,
     },
@@ -56,8 +57,8 @@ pub enum MsgType {
         msg_id: MsgId,
         /// Node authority over this message
         msg_authority: NodeMsgAuthority,
-        /// Message destination location
-        dst_location: DstLocation,
+        /// Message dst
+        dst: Dst,
         /// the message
         msg: SystemMsg,
     },

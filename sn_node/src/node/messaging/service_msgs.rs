@@ -8,7 +8,7 @@
 
 use crate::node::{
     flow_ctrl::cmds::Cmd,
-    messaging::{OutgoingMsg, Recipients},
+    messaging::{OutgoingMsg, Peers},
     Error, Node, Result,
 };
 
@@ -54,8 +54,8 @@ impl Node {
             correlation_id: msg_id,
         };
         self.send_service_msg(
-            target,
             the_error_msg,
+            Peers::Single(target),
             #[cfg(feature = "traceroute")]
             traceroute,
         )
@@ -72,8 +72,8 @@ impl Node {
             correlation_id: msg_id,
         };
         self.send_service_msg(
-            target,
             the_ack_msg,
+            Peers::Single(target),
             #[cfg(feature = "traceroute")]
             traceroute,
         )
@@ -82,13 +82,14 @@ impl Node {
     /// Forms a cmd to send a cmd response error/ack to the client
     fn send_service_msg(
         &self,
-        target: Peer,
         msg: ServiceMsg,
+        recipients: Peers,
         #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Cmd {
         Cmd::SendMsg {
             msg: OutgoingMsg::Service(msg),
-            recipients: Recipients::from_single(target),
+            msg_id: MsgId::new(),
+            recipients,
             #[cfg(feature = "traceroute")]
             traceroute,
         }
@@ -103,9 +104,7 @@ impl Node {
         user: EndUser,
         requesting_elder: Peer,
         #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
-    ) -> Result<Vec<Cmd>> {
-        let mut cmds = vec![];
-
+    ) -> Cmd {
         let response = self
             .data_storage
             .query(query, User::Key(auth.public_key))
@@ -118,14 +117,12 @@ impl Node {
             user,
         };
 
-        cmds.push(Cmd::SendMsg {
-            msg: OutgoingMsg::System(msg),
-            recipients: Recipients::from_single(requesting_elder),
+        self.trace_system(
+            msg,
+            Peers::Single(requesting_elder),
             #[cfg(feature = "traceroute")]
             traceroute,
-        });
-
-        Ok(cmds)
+        )
     }
 
     /// Handle data read
@@ -174,8 +171,6 @@ impl Node {
             return None;
         };
 
-        let query_response = response.convert();
-
         let pending_removed = self
             .dysfunction_tracking
             .request_operation_fulfilled(&node_id, op_id);
@@ -184,6 +179,8 @@ impl Node {
             trace!("Ignoring un-expected response");
             return None;
         }
+
+        let query_response = response.convert();
 
         // dont reply if data not found (but do keep peers around...)
         if query_response.failed_with_data_not_found()
@@ -211,12 +208,12 @@ impl Node {
             correlation_id,
         };
 
-        Some(Cmd::SendMsg {
-            msg: OutgoingMsg::Service(msg),
-            recipients: Recipients::Peers(waiting_peers),
+        Some(self.send_service_msg(
+            msg,
+            Peers::Multiple(waiting_peers),
             #[cfg(feature = "traceroute")]
             traceroute,
-        })
+        ))
     }
 
     /// Handle incoming service msgs. Though NOT queries, as this requires

@@ -8,7 +8,7 @@
 
 use super::UsedRecipientSaps;
 
-use crate::comm::{Comm, DeliveryStatus, MsgEvent};
+use crate::comm::{Comm, MsgEvent};
 use crate::node::{messages::WireMsgUtils, Error, Result};
 
 use sn_interface::{
@@ -17,7 +17,7 @@ use sn_interface::{
             JoinRejectionReason, JoinRequest, JoinResponse, MembershipState, ResourceProof,
             SectionAuth, SystemMsg,
         },
-        AuthKind, DstLocation, MsgType, NodeAuth, WireMsg,
+        AuthKind, Dst, MsgType, NodeAuth, WireMsg,
     },
     network_knowledge::{prefix_map::NetworkPrefixMap, NetworkKnowledge, NodeInfo, MIN_ADULT_AGE},
     types::{keys::ed25519, log_markers::LogMarker, Peer},
@@ -405,7 +405,6 @@ impl<'a> Joiner<'a> {
                 sleep(wait).await;
             } else {
                 error!("Waiting before attempting to join again");
-
                 sleep(self.backoff.max_interval).await;
                 self.backoff.reset();
             }
@@ -415,9 +414,9 @@ impl<'a> Joiner<'a> {
 
         let wire_msg = WireMsg::single_src(
             &self.node,
-            DstLocation::Section {
-                name: self.node.name(),
-                section_pk: section_key,
+            Dst {
+                name: self.node.name(), // we want to target a section where our name fits
+                section_key,
             },
             SystemMsg::JoinRequest(msg),
             section_key,
@@ -500,17 +499,19 @@ async fn send_messages(
     mut outgoing_msgs: mpsc::Receiver<(WireMsg, Vec<Peer>)>,
     comm: &Comm,
 ) -> Result<()> {
-    while let Some((wire_msg, recipients)) = outgoing_msgs.recv().await {
-        match comm.send(&recipients, wire_msg.clone()).await {
-            Ok(DeliveryStatus::AllRecipients) | Ok(DeliveryStatus::DeliveredToAll(_)) => {}
-            Ok(DeliveryStatus::FailedToDeliverAll(recipients)) => {
-                error!("Failed to send message {:?} to {:?}", wire_msg, recipients)
-            }
-            Err(err) => {
-                error!(
-                    "Failed to send message {:?} to {:?}: {:?}",
-                    wire_msg, recipients, err
-                )
+    while let Some((msg, peers)) = outgoing_msgs.recv().await {
+        for peer in peers {
+            let dst = *msg.dst();
+            let msg_id = msg.msg_id();
+
+            match comm.send(peer, msg.clone()).await {
+                Ok(()) => trace!("Msg {msg_id:?} sent on {dst:?}"),
+                Err(Error::FailedSend(peer)) => {
+                    error!("Failed to send message {msg_id:?} to {peer:?}")
+                }
+                Err(error) => {
+                    warn!("Error in comms when sending msg {msg_id:?} to peer {peer:?}: {error}")
+                }
             }
         }
     }
@@ -606,12 +607,12 @@ mod tests {
 
             send_response(
                 &recv_tx,
-                SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
+                JoinResponse::Retry {
                     section_auth: section_auth.to_msg(),
                     section_signed: signed_sap.sig,
                     proof_chain: section_chain,
                     expected_age: MIN_ADULT_AGE,
-                })),
+                },
                 &bootstrap_node,
                 section_auth.section_key(),
             )?;
@@ -621,10 +622,10 @@ mod tests {
                 .recv()
                 .await
                 .ok_or_else(|| eyre!("JoinRequest was not received"))?;
-            let (node_msg, dst_location) = assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, dst_location,.. }) =>
-                (msg, dst_location));
+            let (node_msg, dst) = assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, dst,.. }) =>
+                (msg, dst));
 
-            assert_eq!(dst_location.section_pk(), Some(original_section_key));
+            assert_eq!(dst.section_key, original_section_key);
             itertools::assert_equal(recipients, section_auth.elders());
             assert_matches!(node_msg, SystemMsg::JoinRequest(JoinRequest::Initiate { section_key }) => {
                 assert_eq!(section_key, original_section_key);
@@ -636,12 +637,12 @@ mod tests {
             let section_chain = SecuredLinkedList::new(original_section_key);
             send_response(
                 &recv_tx,
-                SystemMsg::JoinResponse(Box::new(JoinResponse::Approved {
+                JoinResponse::Approved {
                     genesis_key: original_section_key,
                     section_auth: section_auth.clone().into_authed_msg(),
                     section_chain,
                     decision,
-                })),
+                },
                 &bootstrap_node,
                 section_auth.section_key(),
             )?;
@@ -709,15 +710,13 @@ mod tests {
 
             send_response(
                 &recv_tx,
-                SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(
-                    SectionAuthorityProviderMsg {
-                        prefix: Prefix::default(),
-                        public_key_set: new_pk_set.clone(),
-                        elders: new_bootstrap_addrs.clone(),
-                        members: BTreeMap::new(),
-                        membership_gen: 0,
-                    },
-                ))),
+                JoinResponse::Redirect(SectionAuthorityProviderMsg {
+                    prefix: Prefix::default(),
+                    public_key_set: new_pk_set.clone(),
+                    elders: new_bootstrap_addrs.clone(),
+                    members: BTreeMap::new(),
+                    membership_gen: 0,
+                }),
                 &bootstrap_node,
                 new_section_auth.section_key(),
             )?;
@@ -740,10 +739,10 @@ mod tests {
                     .collect::<Vec<_>>()
             );
 
-            let (node_msg, dst_location) = assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, dst_location,.. }) =>
-                    (msg, dst_location));
+            let (node_msg, dst) = assert_matches!(wire_msg.into_msg(), Ok(MsgType::System { msg, dst,.. }) =>
+                    (msg, dst));
 
-            assert_eq!(dst_location.section_pk(), Some(new_pk_set.public_key()));
+            assert_eq!(dst.section_key, new_pk_set.public_key());
             assert_matches!(node_msg, SystemMsg::JoinRequest(JoinRequest::Initiate { section_key }) => {
                 assert_eq!(section_key, new_pk_set.public_key());
             });
@@ -799,15 +798,13 @@ mod tests {
 
             send_response(
                 &recv_tx,
-                SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(
-                    SectionAuthorityProviderMsg {
-                        prefix: Prefix::default(),
-                        public_key_set: new_pk_set.clone(),
-                        elders: BTreeMap::new(),
-                        members: BTreeMap::new(),
-                        membership_gen: 0,
-                    },
-                ))),
+                JoinResponse::Redirect(SectionAuthorityProviderMsg {
+                    prefix: Prefix::default(),
+                    public_key_set: new_pk_set.clone(),
+                    elders: BTreeMap::new(),
+                    members: BTreeMap::new(),
+                    membership_gen: 0,
+                }),
                 &bootstrap_node,
                 new_section_auth.section_key(),
             )?;
@@ -819,15 +816,13 @@ mod tests {
 
             send_response(
                 &recv_tx,
-                SystemMsg::JoinResponse(Box::new(JoinResponse::Redirect(
-                    SectionAuthorityProviderMsg {
-                        prefix: Prefix::default(),
-                        public_key_set: new_pk_set.clone(),
-                        elders: addrs.clone(),
-                        members: BTreeMap::new(),
-                        membership_gen: 0,
-                    },
-                ))),
+                JoinResponse::Redirect(SectionAuthorityProviderMsg {
+                    prefix: Prefix::default(),
+                    public_key_set: new_pk_set.clone(),
+                    elders: addrs.clone(),
+                    members: BTreeMap::new(),
+                    membership_gen: 0,
+                }),
                 &bootstrap_node,
                 new_section_auth.section_key(),
             )?;
@@ -887,9 +882,7 @@ mod tests {
 
             send_response(
                 &recv_tx,
-                SystemMsg::JoinResponse(Box::new(JoinResponse::Rejected(
-                    JoinRejectionReason::JoinsDisallowed,
-                ))),
+                JoinResponse::Rejected(JoinRejectionReason::JoinsDisallowed),
                 &bootstrap_node,
                 section_auth.section_key(),
             )?;
@@ -976,12 +969,12 @@ mod tests {
             // Send `Retry` with bad prefix
             send_response(
                 &recv_tx,
-                SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
+                JoinResponse::Retry {
                     section_auth: random_sap(bad_prefix, elder_count()).0.to_msg(),
                     section_signed: signed_sap.sig.clone(),
                     proof_chain: section_chain.clone(),
                     expected_age: MIN_ADULT_AGE,
-                })),
+                },
                 &bootstrap_node,
                 section_key,
             )?;
@@ -990,12 +983,12 @@ mod tests {
             // Send `Retry` with good prefix
             send_response(
                 &recv_tx,
-                SystemMsg::JoinResponse(Box::new(JoinResponse::Retry {
+                JoinResponse::Retry {
                     section_auth: section_auth.to_msg(),
                     section_signed: signed_sap.sig,
                     proof_chain: section_chain,
                     expected_age: MIN_ADULT_AGE,
-                })),
+                },
                 &bootstrap_node,
                 section_key,
             )?;
@@ -1028,17 +1021,17 @@ mod tests {
     #[instrument]
     fn send_response(
         recv_tx: &mpsc::Sender<MsgEvent>,
-        node_msg: SystemMsg,
+        response: JoinResponse,
         bootstrap_node: &NodeInfo,
         section_pk: BlsPublicKey,
     ) -> Result<()> {
         let wire_msg = WireMsg::single_src(
             bootstrap_node,
-            DstLocation::Section {
+            Dst {
                 name: XorName::from(PublicKey::Bls(section_pk)),
-                section_pk,
+                section_key: section_pk,
             },
-            node_msg,
+            SystemMsg::JoinResponse(Box::new(response)),
             section_pk,
         )?;
 
