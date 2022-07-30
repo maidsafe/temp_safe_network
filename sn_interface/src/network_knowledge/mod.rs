@@ -141,10 +141,6 @@ pub fn section_has_room_for_node(
 /// Container for storing information about the network, including our own section.
 #[derive(Clone, Debug)]
 pub struct NetworkKnowledge {
-    // TODO: get genesis_key from NetworkPrefixMap::sections_dag once RwLock has been removed;
-    // else have to make a lot of fns as async
-    /// Network genesis key
-    genesis_key: BlsPublicKey,
     // TODO: get current section chain from NetworkPrefixMap::sections_dag once RwLock has been
     // removed; else have to make a lot of fns as async
     /// Current section chain of our own section, starting from genesis key
@@ -214,8 +210,8 @@ impl NetworkKnowledge {
         // If no prefix map was provided, start afresh.
         let mut prefix_map = match passed_prefix_map {
             Some(prefix_map) => {
-                if prefix_map.genesis_key() != genesis_key {
-                    return Err(Error::InvalidGenesisKey(prefix_map.genesis_key()));
+                if *prefix_map.genesis_key() != genesis_key {
+                    return Err(Error::InvalidGenesisKey(*prefix_map.genesis_key()));
                 } else {
                     prefix_map
                 }
@@ -230,7 +226,6 @@ impl NetworkKnowledge {
         }
 
         Ok(Self {
-            genesis_key,
             chain: chain.clone(),
             signed_sap,
             section_peers: SectionPeers::default(),
@@ -306,7 +301,7 @@ impl NetworkKnowledge {
                 let proof = self
                     .prefix_map
                     .get_sections_dag()
-                    .get_proof_chain(&self.genesis_key, &section_key);
+                    .get_proof_chain(self.genesis_key(), &section_key);
                 // We have the signed SAP for the provided prefix and section key,
                 // we should be able to update our current SAP and section chain
                 match proof {
@@ -454,7 +449,7 @@ impl NetworkKnowledge {
                     let section_chain = self
                         .prefix_map
                         .get_sections_dag()
-                        .get_proof_chain(&self.genesis_key, &provided_sap.section_key())?;
+                        .get_proof_chain(self.genesis_key(), &provided_sap.section_key())?;
 
                     // Prune list of archived members
                     self.section_peers.prune_members_archive(&section_chain);
@@ -531,7 +526,7 @@ impl NetworkKnowledge {
             if let Ok(proof_chain) = self
                 .prefix_map
                 .get_sections_dag()
-                .get_proof_chain(&self.genesis_key, &signed_sap.value.section_key())
+                .get_proof_chain(self.genesis_key(), &signed_sap.value.section_key())
             {
                 return Some((signed_sap, proof_chain));
             }
@@ -542,7 +537,7 @@ impl NetworkKnowledge {
 
     // Return the network genesis key
     pub fn genesis_key(&self) -> &bls::PublicKey {
-        &self.genesis_key
+        self.prefix_map.genesis_key()
     }
 
     // Try to merge this `NetworkKnowledge` members with `peers`.

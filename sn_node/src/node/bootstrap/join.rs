@@ -121,7 +121,7 @@ impl<'a> Joiner<'a> {
             "Bootstrap run, prefixmap as we have it: {:?}",
             self.prefix_map
         );
-        let genesis_key = self.prefix_map.genesis_key();
+        let genesis_key = *self.prefix_map.genesis_key();
 
         let (target_section_key, recipients) =
             if let Ok(sap) = self.prefix_map.section_by_name(&bootstrap_peer.name()) {

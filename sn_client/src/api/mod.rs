@@ -88,7 +88,6 @@ impl Client {
 
         // Create a session with the network
         let session = Session::new(
-            prefix_map.genesis_key(),
             config.qp2p,
             config.local_addr,
             config.cmd_ack_wait,

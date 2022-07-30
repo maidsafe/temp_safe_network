@@ -60,7 +60,7 @@ pub async fn networks_commander(
             let prefix_map = config.read_default_prefix_map().await?;
             let mut matched_network = None;
             for (network_name, network_info) in config.networks_iter() {
-                if network_info.matches(&prefix_map.genesis_key()) {
+                if network_info.matches(prefix_map.genesis_key()) {
                     matched_network = Some(network_name);
                     break;
                 }
