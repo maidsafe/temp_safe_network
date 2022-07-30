@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1659019527233,
+  "lastUpdate": 1659207057323,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -12737,6 +12737,144 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 4226078,
             "range": "± 77272",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "26634292+bors[bot]@users.noreply.github.com",
+            "name": "bors[bot]",
+            "username": "bors[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": false,
+          "id": "d0a5f771f40e575dfebb326393202c3249ecca5b",
+          "message": "Merge #1419\n\n1419: chore(ci): increase node startup interval to 5s r=oetyng a=oetyng\n\nThis not only removes the ci join issues, but also the fairly common other test errors (not enough spendproof shares, failed to obtain response, not enough chunks etc - seems this could be due to ghost nodes).\n\nWith this we do not need to override our ci all the time due to these tests failing.\n\nAlso it removes the risk of hiding new bugs introduced, behind what we assume were those join related errors.\n\n***\n\nInterval could probably be lowered some. But that'd optimally be done while working on fixing the underlying problem.\n\nGoal for that would be to not have any join-rate that is capable of throwing off the network like that.\n\nCo-authored-by: oetyng <oetyng@gmail.com>",
+          "timestamp": "2022-07-30T16:50:33Z",
+          "tree_id": "63a6f5e93354861acc9c786a34a99a5b2711c364",
+          "url": "https://github.com/maidsafe/safe_network/commit/d0a5f771f40e575dfebb326393202c3249ecca5b"
+        },
+        "date": 1659207055069,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 657379789,
+            "range": "± 15476814",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 694549180,
+            "range": "± 14600745",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 1235627231,
+            "range": "± 162954905",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 398496104,
+            "range": "± 27706683",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 397850636,
+            "range": "± 31703464",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 1102028254,
+            "range": "± 51775082",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 12706394,
+            "range": "± 4445301",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 1621863713,
+            "range": "± 592913118",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 7203706143,
+            "range": "± 1186219783",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 157973018,
+            "range": "± 32004276",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 1365501793,
+            "range": "± 367661933",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 5513370013,
+            "range": "± 538035962",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 11108728,
+            "range": "± 333288",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 102447673,
+            "range": "± 50110230",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 388187029,
+            "range": "± 28760553",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11110160,
+            "range": "± 441440",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 105184860,
+            "range": "± 9921357",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 358064860,
+            "range": "± 30196337",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 4966569,
+            "range": "± 157670",
             "unit": "ns/iter"
           }
         ]
