@@ -923,7 +923,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
             let node = Node::new(
                 comm.socket_addr(),
                 info.keypair.clone(),
-                our_section.clone(),
+                our_section,
                 None,
                 event_sender,
                 UsedSpace::new(max_capacity),
@@ -1209,7 +1209,7 @@ async fn handle_elders_update() -> Result<()> {
         let mut node = Node::new(
             comm.socket_addr(),
             info.keypair.clone(),
-            section0.clone(),
+            section0,
             Some(section_key_share),
             event_sender,
             UsedSpace::new(max_capacity),

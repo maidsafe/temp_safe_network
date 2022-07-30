@@ -92,7 +92,7 @@ impl Client {
             config.qp2p,
             config.local_addr,
             config.cmd_ack_wait,
-            prefix_map.clone(),
+            prefix_map,
         )?;
 
         let client = Self {
@@ -138,7 +138,11 @@ impl Client {
 
         // get bootstrap nodes
         let (bootstrap_nodes, section_pk) = {
-            let sap = prefix_map
+            let sap = client
+                .session
+                .network
+                .read()
+                .await
                 .closest_or_opposite(&random_dst_addr, None)
                 .ok_or(Error::NoNetworkKnowledge)?;
             (sap.elders_vec(), sap.section_key())

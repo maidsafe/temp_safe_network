@@ -24,7 +24,7 @@ use sn_interface::{
         AuthKind, AuthorityProof, Dst, MsgId, MsgType, ServiceAuth, WireMsg,
     },
     network_knowledge::{
-        utils::compare_and_write_prefix_map_to_disk, NetworkKnowledge, SectionAuthorityProvider,
+        utils::write_prefix_map_to_disk, NetworkKnowledge, SectionAuthorityProvider,
     },
     types::{log_markers::LogMarker, Peer},
 };
@@ -416,9 +416,7 @@ impl Session {
                     sap.prefix()
                 );
                 // Update the PrefixMap on disk
-                if let Err(e) =
-                    compare_and_write_prefix_map_to_disk(&*session.network.read().await).await
-                {
+                if let Err(e) = write_prefix_map_to_disk(&*session.network.read().await).await {
                     error!(
                         "Error writing freshly updated PrefixMap to client dir: {:?}",
                         e
