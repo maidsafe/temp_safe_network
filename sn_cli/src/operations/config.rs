@@ -247,7 +247,7 @@ impl Config {
                                         .prefix_maps_dir
                                         .join(format!("{:?}", prefix_map.genesis_key()));
                                     Self::write_prefix_map(&path, &prefix_map).await?;
-                                    *genesis_key = Some(prefix_map.genesis_key());
+                                    *genesis_key = Some(*prefix_map.genesis_key());
                                 } else {
                                     remove_list.push(network_name.clone());
                                 }
@@ -260,7 +260,7 @@ impl Config {
                                     .prefix_maps_dir
                                     .join(format!("{:?}", prefix_map.genesis_key()));
                                 Self::write_prefix_map(&path, &prefix_map).await?;
-                                *genesis_key = Some(prefix_map.genesis_key());
+                                *genesis_key = Some(*prefix_map.genesis_key());
                             } else {
                                 remove_list.push(network_name.clone());
                             }
@@ -277,7 +277,7 @@ impl Config {
                                     .prefix_maps_dir
                                     .join(format!("{:?}", prefix_map.genesis_key()));
                                 Self::write_prefix_map(&path, &prefix_map).await?;
-                                *genesis_key = Some(prefix_map.genesis_key());
+                                *genesis_key = Some(*prefix_map.genesis_key());
                             } else {
                                 remove_list.push(network_name.clone());
                             }
@@ -290,7 +290,7 @@ impl Config {
                                 .prefix_maps_dir
                                 .join(format!("{:?}", prefix_map.genesis_key()));
                             Self::write_prefix_map(&path, &prefix_map).await?;
-                            *genesis_key = Some(prefix_map.genesis_key());
+                            *genesis_key = Some(*prefix_map.genesis_key());
                         } else {
                             remove_list.push(network_name.clone());
                         }
@@ -307,7 +307,7 @@ impl Config {
             if !present {
                 let path = self.prefix_maps_dir.join(filename);
                 if let Ok(prefix_map) = Self::retrieve_local_prefix_map(&path).await {
-                    let genesis_key = prefix_map.genesis_key();
+                    let genesis_key = *prefix_map.genesis_key();
                     self.settings.networks.insert(
                         format!("{:?}", genesis_key),
                         NetworkInfo::Local(path, Some(genesis_key)),
@@ -351,7 +351,7 @@ impl Config {
                     .prefix_maps_dir
                     .join(format!("{:?}", prefix_map.genesis_key()));
                 Self::write_prefix_map(&path, &prefix_map).await?;
-                *genesis_key = Some(prefix_map.genesis_key());
+                *genesis_key = Some(*prefix_map.genesis_key());
             }
             NetworkInfo::Remote(ref url, ref mut genesis_key) => {
                 let url = Url::parse(url)?;
@@ -360,7 +360,7 @@ impl Config {
                     .prefix_maps_dir
                     .join(format!("{:?}", prefix_map.genesis_key()));
                 Self::write_prefix_map(&path, &prefix_map).await?;
-                *genesis_key = Some(prefix_map.genesis_key());
+                *genesis_key = Some(*prefix_map.genesis_key());
             }
         };
         self.settings
@@ -454,7 +454,7 @@ impl Config {
         for (network_name, net_info) in self.networks_iter() {
             let mut current = "";
             if let Ok(prefix_map) = &current_prefix_map {
-                if net_info.matches(&prefix_map.genesis_key()) {
+                if net_info.matches(prefix_map.genesis_key()) {
                     current = "*";
                 }
             }
@@ -1206,7 +1206,7 @@ mod networks {
             .ok_or_else(|| eyre!("network_1 should be present"))?;
         if let NetworkInfo::Local(_, genesis_key) = net_info {
             let gk = genesis_key.ok_or_else(|| eyre!("Genesis key should be written"))?;
-            assert_eq!(default.genesis_key(), gk);
+            assert_eq!(*default.genesis_key(), gk);
             assert_eq!(
                 format!("{:?}", default.genesis_key()),
                 "PublicKey(0382..dadc)".to_string()
@@ -1224,7 +1224,7 @@ mod networks {
             .ok_or_else(|| eyre!("network_2 should be present"))?;
         if let NetworkInfo::Local(_, genesis_key) = net_info {
             let gk = genesis_key.ok_or_else(|| eyre!("Genesis key should be written"))?;
-            assert_eq!(default.genesis_key(), gk);
+            assert_eq!(*default.genesis_key(), gk);
             assert_eq!(
                 format!("{:?}", default.genesis_key()),
                 "PublicKey(0699..31a2)".to_string()

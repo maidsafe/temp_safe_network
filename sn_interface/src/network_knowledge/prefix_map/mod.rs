@@ -35,13 +35,8 @@ use xor_name::{Prefix, XorName};
 /// Container for storing information about other sections in the network.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkPrefixMap {
-    //TODO: get genesis_key from sections_dag once RwLock has been removed; else have to make
-    // a lot of fns as async
-    /// The network's genesis public key
-    genesis_pk: BlsPublicKey,
     /// Map of sections prefixes to their latest signed section authority providers.
     sections: BTreeMap<Prefix, SectionAuth<SectionAuthorityProvider>>,
-    // TODO: remove RwLock
     /// A DAG containing all section chains of the whole network that we are aware of
     sections_dag: SecuredLinkedList,
 }
@@ -50,15 +45,14 @@ impl NetworkPrefixMap {
     /// Create an empty container
     pub fn new(genesis_pk: BlsPublicKey) -> Self {
         Self {
-            genesis_pk,
             sections: BTreeMap::new(),
             sections_dag: SecuredLinkedList::new(genesis_pk),
         }
     }
 
     /// Returns the genesis key of the Network
-    pub fn genesis_key(&self) -> BlsPublicKey {
-        self.genesis_pk
+    pub fn genesis_key(&self) -> &BlsPublicKey {
+        self.sections_dag.root_key()
     }
 
     pub fn get_sections_dag(&self) -> &SecuredLinkedList {
@@ -265,21 +259,18 @@ impl NetworkPrefixMap {
         // for the prefix since we've already checked that above.
         let changed = self.insert(signed_sap);
 
-        // update our sections DAG with the proof chain. Cannot be an error since in cases where we
+        // update our sections_dag with the proof_chain. Cannot be an error, since in cases where we
         // have outdated SAP (aware of prefix)/ not aware of the prefix, we have the proof_chains's
-        // root/child key in our sections_dag
+        // root/child key in our sections_dag. Checked in the above match statement.
         self.sections_dag.join(proof_chain.clone())?;
 
-        // for section in self.sections.iter() {
-        //     let prefix = section.key();
-        //     let section_key = section.value().value.section_key();
-        //     println!(
-        //         "Known prefix,section_key after update: {:?} = {:?}",
-        //         prefix, section_key
-        //     );
-        // }
-        // println!("proof chain to update: {:?}", proof_chain);
-        // println!("updated sections_dag: {:?}", self.sections_dag.read().await);
+        for (prefix, section_key) in self.sections.iter() {
+            debug!(
+                "Known prefix,section_key after update: {:?} = {:?}",
+                prefix, section_key
+            );
+        }
+        debug!("updated sections_dag: {:?}", self.sections_dag);
 
         Ok(changed)
     }
@@ -665,7 +656,7 @@ mod tests {
     }
 
     // Generate an arbitrary sized SecuredLinkedList and a List<list of proof_chains which inserted in
-    // that order gives back the main chain>; i.e., multiple variations of list of proof chains
+    // that order gives back the main_chain>; i.e., multiple variations of <list of proof_chains>
     fn arb_sll_and_proof_chains(
         max_sections: usize,
         update_variations: usize,
@@ -679,14 +670,15 @@ mod tests {
             let (map, main_chain) = generate_random_prefix_map(Some(seed as u64), size).unwrap();
             let mut rng = SmallRng::seed_from_u64(seed);
             let mut update_variations_list = Vec::new();
+
             for _ in 0..update_variations {
                 let mut leaves: Vec<(bls::PublicKey, Prefix)> = map
                     .iter()
                     .filter(|(_, (status, ..))| matches!(status, SectionStatus::None))
                     .map(|(section_key, (.., sap))| (*section_key, sap.prefix()))
                     .collect();
-                let mut already_inserted_keys = BTreeSet::new();
-                already_inserted_keys.insert(*main_chain.root_key());
+                let mut inserted_keys = BTreeSet::new();
+                inserted_keys.insert(*main_chain.root_key());
 
                 let mut list_of_proofs = Vec::new();
                 while !leaves.is_empty() {
@@ -698,15 +690,13 @@ mod tests {
                         .get_proof_chain(main_chain.root_key(), &random_leaf)
                         .expect("cannot be error");
 
-                    // create a sub-chain of the proof chain by first selecting a random root for the
+                    // create a sub-chain of the proof_chain by first selecting a random_root for the
                     // proof and then selecting a random last_key.
                     let possible_roots: Vec<bls::PublicKey> = proof_chain
                         .keys()
                         .filter(|proof_key| {
                             // keep the proof_key if it has been inserted
-                            already_inserted_keys
-                                .iter()
-                                .any(|ins_key| ins_key == *proof_key)
+                            inserted_keys.iter().any(|ins_key| ins_key == *proof_key)
                         })
                         .cloned()
                         .collect();
@@ -714,11 +704,11 @@ mod tests {
                         .get(rng.gen::<usize>() % possible_roots.len())
                         .expect("Cannot be None");
 
-                    // consider a prefix_map is aware of the prefix 011 with keys A->B->C
-                    // now our proof_chain can be [A/B/C to C/D/E/F]
-                    // B->C->D is valid, C->D is valid, C is also valid
+                    // Consider the prefix_map is aware of the prefix 011 with keys A->B->C
+                    // Now, our proof_chain can be [A/B/C to C/D/E/F]
+                    // i.e., B->C->D is valid, C->D is valid, C is also valid
                     // but A->B is invalid since we are providing old information to the prefix_map
-                    // Now since proof_chain is a single branch, we can skip directly to "C" by len - 1
+                    // Since proof_chain is a single branch, we can skip directly to "C" by len - 1
                     let possible_last_keys: Vec<bls::PublicKey> = proof_chain
                         .keys()
                         .skip(possible_roots.len() - 1)
@@ -732,14 +722,14 @@ mod tests {
                         .get_proof_chain(random_root, random_last_key)
                         .expect("cannot be error");
 
-                    // if last_key is a leaf, remove it from leaves vec
+                    // remove last_key from leaves if it's a leaf
                     if let Some(index) = leaves.iter().position(|(key, _)| *key == *random_last_key)
                     {
                         leaves.swap_remove(index);
                     }
                     // update the inserted list
                     proof_chain.keys().for_each(|key| {
-                        already_inserted_keys.insert(*key);
+                        inserted_keys.insert(*key);
                     });
 
                     let (_, _, sap) = map.get(random_last_key).expect("cannot be error").clone();
@@ -773,20 +763,11 @@ mod tests {
         (map, genesis_sk, genesis_pk)
     }
 
-    // Check if the sections and sections_dag are in sync
-    // Get the leaves of the 'sections_dag' from 'section' and verify
-    // the length from the leaves matches the actual length of the 'sections_dag'
+    // Check if the 'sections' and 'sections_dag' fields are in sync
+    // Get the leaves of the 'sections_dag' from 'sections' and verify that the added
+    // lengths from the leaves matches the actual length of the 'sections_dag'
     fn is_synced(prefix_map: &NetworkPrefixMap) -> Result<bool> {
         let mut count: BTreeSet<bls::PublicKey> = BTreeSet::new();
-
-        // count.insert(root_key);
-        // for sap in prefix_map.all() {
-        //     let mut chain = sections_dag.get_proof_chain(&root_key, &sap.section_key()).unwrap();
-        //     while *chain.last_key() != root_key {
-        //         count.insert(*chain.last_key());
-        //         chain = sections_dag.get_proof_chain(&root_key, chain.prev_key()).unwrap();
-        //     }
-        // }
 
         for leaf_sap in prefix_map.all() {
             let chain = prefix_map
@@ -807,7 +788,7 @@ mod tests {
         SectionAuth<SectionAuthorityProvider>,
     );
 
-    // Return SectionChain and the sap for all the sections. Can have multiple SAPs per prefix.
+    // Generate a random SectionChain and the sap for all the sections
     fn generate_random_prefix_map(
         seed: Option<u64>,
         n_sections: usize,
@@ -816,8 +797,8 @@ mod tests {
             Some(seed) => SmallRng::seed_from_u64(seed),
             None => SmallRng::from_entropy(),
         };
-        // map of each section key to its sk, sap and its status. Current section can have children
-        // only if its SectionStatus is None
+        // map of each section key to its Status, SecretKey and SAP. A seection can have
+        // children only if its SectionStatus is None. i.e., without Churn/Split
         let sections_map: Rc<RefCell<BTreeMap<bls::PublicKey, SectionInfo>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
 
@@ -864,7 +845,7 @@ mod tests {
 
         // +1 for genesis
         while sections_map.borrow().len() + 1 < n_sections {
-            // get random section only if it's status is None
+            // get a random section only if its SectionStatus is None
             let (_, p_sk, p_sap) = match sections_map
                 .borrow()
                 .iter()
@@ -906,15 +887,6 @@ mod tests {
             ),
         );
 
-        // for (status, _, section) in sections_map.borrow().values() {
-        //     println!(
-        //         "{:?} -> {:?} {:?}",
-        //         section.prefix(),
-        //         section.section_key(),
-        //         status
-        //     );
-        // }
-        // println!("{:?}", chain);
         return Ok((sections_map.borrow().clone(), chain));
     }
 

@@ -59,7 +59,6 @@ impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
     #[instrument(level = "debug")]
     pub(crate) fn new(
-        genesis_key: bls::PublicKey,
         qp2p_config: QuicP2pConfig,
         local_addr: SocketAddr,
         cmd_ack_wait: Duration,

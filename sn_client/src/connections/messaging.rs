@@ -687,11 +687,10 @@ mod tests {
         let prefix = prefix("0")?;
         let (section_auth, _, secret_key_set) = random_sap(prefix, elders_len);
         let sap0 = section_signed(secret_key_set.secret_key(), section_auth)?;
-        let (mut prefix_map, _genesis_sk, genesis_key) = new_network_prefix_map();
+        let (mut prefix_map, _genesis_sk, _) = new_network_prefix_map();
         assert!(prefix_map.insert_without_chain(sap0));
 
         let session = Session::new(
-            genesis_key,
             Config::default(),
             SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)),
             Duration::from_secs(10),

@@ -44,7 +44,7 @@ pub async fn write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap) -> Result<(
         .await
         .map_err(|e| Error::FileHandling(e.to_string()))?;
 
-    set_default_prefix_map(&prefix_map.genesis_key()).await?;
+    set_default_prefix_map(prefix_map.genesis_key()).await?;
     trace!("Wrote prefix_map to disk {:?}", prefix_map_file);
     Ok(())
 }
