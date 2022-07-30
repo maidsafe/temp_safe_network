@@ -92,7 +92,7 @@ mod core {
             AuthorityProof, SectionAuth, SectionAuthorityProvider,
         },
         network_knowledge::{
-            supermajority, utils::compare_and_write_prefix_map_to_disk, NetworkKnowledge, NodeInfo,
+            supermajority, utils::write_prefix_map_to_disk, NetworkKnowledge, NodeInfo,
             SectionKeyShare, SectionKeysProvider,
         },
         types::{
@@ -721,13 +721,11 @@ mod core {
 
         pub(crate) async fn write_prefix_map(&self) {
             info!("Writing our latest PrefixMap to disk");
-            // TODO: Make this serialization human readable
-
             let prefix_map = self.network_knowledge.prefix_map().clone();
 
             let _ = tokio::spawn(async move {
-                // Compare and write Prefix to `~/.safe/prefix_maps` dir
-                if let Err(e) = compare_and_write_prefix_map_to_disk(&prefix_map).await {
+                // write Prefix to `~/.safe/prefix_maps` dir
+                if let Err(e) = write_prefix_map_to_disk(&prefix_map).await {
                     error!("Error writing PrefixMap to `~/.safe` dir: {:?}", e);
                 }
             });
