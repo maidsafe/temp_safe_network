@@ -270,7 +270,7 @@ impl<'a> Joiner<'a> {
                     };
 
                     // make sure we received a valid and trusted new SAP
-                    let is_new_sap = match self.prefix_map.update(signed_sap, &proof_chain).await {
+                    let is_new_sap = match self.prefix_map.update(signed_sap, &proof_chain) {
                         Ok(updated) => updated,
                         Err(err) => {
                             debug!(

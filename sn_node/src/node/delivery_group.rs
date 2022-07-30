@@ -544,7 +544,7 @@ mod tests {
 
         let chain = SecuredLinkedList::new(genesis_pk);
 
-        let network_knowledge =
+        let mut network_knowledge =
             NetworkKnowledge::new(genesis_pk, chain, section_auth0, None).await?;
 
         for peer in elders0 {
@@ -571,10 +571,9 @@ mod tests {
         proof_chain.insert(&pk1, pk2, sig2)?;
 
         assert!(network_knowledge
-            .prefix_map()
-            .update(section_auth1, &proof_chain,)
-            .await
-            .is_ok(),);
+            .mut_prefix_map()
+            .update(section_auth1, &proof_chain)
+            .is_ok());
 
         let our_name = choose_elder_name(&network_knowledge.authority_provider())?;
 

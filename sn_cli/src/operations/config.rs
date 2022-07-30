@@ -13,7 +13,7 @@ use color_eyre::{eyre::bail, eyre::eyre, eyre::WrapErr, Help, Report, Result};
 use comfy_table::Table;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
-use sn_api::{NetworkPrefixMap, NetworkPrefixMapSnapshot, Safe, DEFAULT_PREFIX_HARDLINK_NAME};
+use sn_api::{NetworkPrefixMap, Safe, DEFAULT_PREFIX_HARDLINK_NAME};
 use sn_dbc::Owner;
 use std::{
     collections::BTreeMap,
@@ -614,14 +614,13 @@ impl Config {
     }
 
     fn deserialise_prefix_map(bytes: &[u8]) -> Result<NetworkPrefixMap> {
-        let snapshot: NetworkPrefixMapSnapshot = rmp_serde::from_slice(bytes)
+        let prefix_map = rmp_serde::from_slice(bytes)
             .wrap_err_with(|| "Failed to deserialize NetworkPrefixMapSnapshot")?;
-        Ok(snapshot.to_prefix_map())
+        Ok(prefix_map)
     }
 
     async fn serialise_prefix_map(prefix_map: &NetworkPrefixMap) -> Result<Vec<u8>> {
-        let snapshot = prefix_map.snapshot().await;
-        rmp_serde::to_vec(&snapshot).wrap_err_with(|| "Failed to serialise NetworkPrefixMap")
+        rmp_serde::to_vec(prefix_map).wrap_err_with(|| "Failed to serialise NetworkPrefixMap")
     }
 }
 

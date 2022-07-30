@@ -66,7 +66,7 @@ impl Session {
         let endpoint = self.endpoint.clone();
         // TODO: Consider other approach: Keep a session per section!
 
-        let (section_pk, elders) = self.get_cmd_elders(dst_address)?;
+        let (section_pk, elders) = self.get_cmd_elders(dst_address).await?;
 
         let msg_id = MsgId::new();
 
@@ -178,7 +178,7 @@ impl Session {
 
         let dst = query.variant.dst_name();
 
-        let (section_pk, elders) = self.get_query_elders(dst)?;
+        let (section_pk, elders) = self.get_query_elders(dst).await?;
         let elders_len = elders.len();
         let msg_id = MsgId::new();
 
@@ -374,7 +374,11 @@ impl Session {
 
         info!("Client startup... awaiting some network knowledge");
 
-        let mut known_sap = self.network.closest_or_opposite(&dst_address, None);
+        let mut known_sap = self
+            .network
+            .read()
+            .await
+            .closest_or_opposite(&dst_address, None);
 
         // wait until we have sufficient network knowledge
         while known_sap.is_none() {
@@ -382,7 +386,7 @@ impl Session {
                 return Err(Error::NetworkContact);
             }
 
-            let stats = self.network.known_sections_count();
+            let stats = self.network.read().await.known_sections_count();
             debug!("Client still has not received a complete section's AE-Retry message... Current sections known: {:?}", stats);
             knowledge_checks += 1;
 
@@ -427,21 +431,25 @@ impl Session {
                     tokio::time::sleep(wait).await;
                 }
 
-                known_sap = self.network.closest_or_opposite(&dst_address, None);
+                known_sap = self
+                    .network
+                    .read()
+                    .await
+                    .closest_or_opposite(&dst_address, None);
 
                 debug!("Known sap: {known_sap:?}");
             }
         }
 
-        let stats = self.network.known_sections_count();
+        let stats = self.network.read().await.known_sections_count();
         debug!("Client has received updated network knowledge. Current sections known: {:?}. Sap for our startup-query: {:?}", stats, known_sap);
 
         Ok(())
     }
 
-    fn get_query_elders(&self, dst: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
+    async fn get_query_elders(&self, dst: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
         // Get DataSection elders details. Resort to own section if DataSection is not available.
-        let sap = self.network.closest_or_opposite(&dst, None);
+        let sap = self.network.read().await.closest_or_opposite(&dst, None);
         let (section_pk, mut elders) = if let Some(sap) = &sap {
             (sap.section_key(), sap.elders_vec())
         } else {
@@ -467,8 +475,12 @@ impl Session {
         Ok((section_pk, elders))
     }
 
-    fn get_cmd_elders(&self, dst_address: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
-        let a_close_sap = self.network.closest_or_opposite(&dst_address, None);
+    async fn get_cmd_elders(&self, dst_address: XorName) -> Result<(bls::PublicKey, Vec<Peer>)> {
+        let a_close_sap = self
+            .network
+            .read()
+            .await
+            .closest_or_opposite(&dst_address, None);
 
         // Get DataSection elders details.
         if let Some(sap) = a_close_sap {
@@ -675,7 +687,7 @@ mod tests {
         let prefix = prefix("0")?;
         let (section_auth, _, secret_key_set) = random_sap(prefix, elders_len);
         let sap0 = section_signed(secret_key_set.secret_key(), section_auth)?;
-        let (prefix_map, _genesis_sk, genesis_key) = new_network_prefix_map();
+        let (mut prefix_map, _genesis_sk, genesis_key) = new_network_prefix_map();
         assert!(prefix_map.insert_without_chain(sap0));
 
         let session = Session::new(
@@ -687,7 +699,7 @@ mod tests {
         )?;
 
         let mut rng = rand::thread_rng();
-        let result = session.get_cmd_elders(XorName::random(&mut rng))?;
+        let result = session.get_cmd_elders(XorName::random(&mut rng)).await?;
         assert_eq!(result.0, secret_key_set.public_keys().public_key());
         assert_eq!(result.1.len(), elders_len);
 

@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::network_knowledge::prefix_map::{NetworkPrefixMap, NetworkPrefixMapSnapshot};
+use crate::network_knowledge::prefix_map::NetworkPrefixMap;
 use crate::types::{Error, Result};
 use std::path::PathBuf;
 use tokio::fs;
@@ -39,9 +39,8 @@ pub async fn compare_and_write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap)
     }
 
     trace!("Writing prefix_map to disk at {:?}", prefix_map_file);
-    let snapshot = prefix_map.snapshot().await;
     let serialized =
-        rmp_serde::to_vec(&snapshot).map_err(|e| Error::Serialisation(e.to_string()))?;
+        rmp_serde::to_vec(&prefix_map).map_err(|e| Error::Serialisation(e.to_string()))?;
 
     let mut file = fs::File::create(&prefix_map_file)
         .await
@@ -76,14 +75,14 @@ pub async fn read_prefix_map_from_disk() -> Result<NetworkPrefixMap> {
                     ))
                 })?;
 
-            let snapshot: NetworkPrefixMapSnapshot = rmp_serde::from_slice(&prefix_map_contents)
+            let prefix_map: NetworkPrefixMap = rmp_serde::from_slice(&prefix_map_contents)
                 .map_err(|err| {
                     Error::FileHandling(format!(
                         "Error deserializing PrefixMap from disk: {:?}",
                         err
                     ))
                 })?;
-            Ok(snapshot.to_prefix_map())
+            Ok(prefix_map)
         }
         Err(e) => Err(Error::FailedToParse(e.to_string())),
     }
