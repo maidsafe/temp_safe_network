@@ -93,11 +93,11 @@ impl CmdCtrl {
         self.cmd_queue.write().await.clear();
     }
 
-    async fn extend(&self, cmds: Vec<Cmd>, parent_id: Option<usize>) -> Vec<Result<SendWatcher>> {
+    async fn extend(&self, cmds: Vec<Cmd>, parent_id: usize) -> Vec<Result<SendWatcher>> {
         let mut results = vec![];
 
         for cmd in cmds {
-            results.push(self.push_internal(cmd, parent_id).await);
+            results.push(self.push_internal(cmd, Some(parent_id)).await);
         }
 
         results
@@ -204,7 +204,7 @@ impl CmdCtrl {
                             clone.monitoring.increment_cmds().await;
 
                             // evaluate: handle these watchers?
-                            let _watchers = clone.extend(cmds, enqueued.job.parent_id()).await;
+                            let _watchers = clone.extend(cmds, enqueued.job.id()).await;
                             clone
                                 .notify(Event::CmdProcessing(CmdProcessEvent::Finished {
                                     job: enqueued.job,
