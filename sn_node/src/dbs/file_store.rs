@@ -221,6 +221,9 @@ impl FileStore {
 }
 
 fn list_files_in(path: &Path) -> Result<Vec<String>> {
+    if !path.exists() {
+        return Ok(vec![]);
+    }
     let files = WalkDir::new(path)
         .into_iter()
         .filter_map(|e| match e {
