@@ -568,7 +568,6 @@ jobs:
           junit-path: junit.xml
           package: sn_api
           release: true
-          test-threads: 10
         timeout-minutes: 80
         # NRS is slow without this change
 
@@ -679,8 +678,7 @@ jobs:
           junit-path: junit.xml
           package: sn_cli
           release: true
-          test-threads: 10
-        timeout-minutes: 25
+        timeout-minutes: 50
 
       - name: Are nodes still running...?
         shell: bash
