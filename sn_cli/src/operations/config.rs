@@ -615,7 +615,7 @@ impl Config {
 
     fn deserialise_prefix_map(bytes: &[u8]) -> Result<NetworkPrefixMap> {
         let prefix_map = rmp_serde::from_slice(bytes)
-            .wrap_err_with(|| "Failed to deserialize NetworkPrefixMapSnapshot")?;
+            .wrap_err_with(|| "Failed to deserialize NetworkPrefixMap")?;
         Ok(prefix_map)
     }
 
@@ -629,22 +629,40 @@ pub mod test_utils {
     use super::{Config, NetworkInfo};
     use assert_fs::{prelude::*, TempDir};
     use color_eyre::{eyre::eyre, Result};
-    use sn_api::{DEFAULT_PREFIX_HARDLINK_NAME, SN_PREFIX_MAP_DIR};
+    use sn_api::{NetworkPrefixMap, DEFAULT_PREFIX_HARDLINK_NAME, SN_PREFIX_MAP_DIR};
     use std::collections::BTreeMap;
-    use std::{env, path::PathBuf};
+    use std::{
+        env,
+        path::{Path, PathBuf},
+    };
     use tokio::fs;
 
-    pub const TEST_PREFIX_MAPS_FOLDER: &str = "../resources/test_prefix_maps";
+    pub async fn store_dummy_prefix_maps(
+        path: &Path,
+        n_prefix_maps: usize,
+    ) -> Result<Vec<NetworkPrefixMap>> {
+        let mut prefix_maps: Vec<NetworkPrefixMap> = Vec::new();
+
+        for _ in 0..n_prefix_maps {
+            let sk = bls::SecretKey::random();
+            let prefix_map = NetworkPrefixMap::new(sk.public_key());
+            let filename = format!("{:?}", prefix_map.genesis_key());
+
+            Config::write_prefix_map(path.join(filename).as_path(), &prefix_map).await?;
+            prefix_maps.push(prefix_map);
+        }
+        Ok(prefix_maps)
+    }
 
     impl Config {
         pub async fn create_config(
             tmp_dir: &TempDir,
-            serialized_config: Option<&str>,
+            serialized_config: Option<String>,
         ) -> Result<Config> {
             let cli_config_dir = tmp_dir.child(".safe/cli");
             let cli_config_file = cli_config_dir.child("config.json");
             if let Some(serialized) = serialized_config {
-                cli_config_file.write_str(serialized)?;
+                cli_config_file.write_str(serialized.as_str())?;
             }
             let prefix_maps_dir = tmp_dir.child(".safe/prefix_maps");
             let prefix_maps_dir_string = prefix_maps_dir.path().display().to_string();
@@ -656,29 +674,16 @@ pub mod test_utils {
             .await
         }
 
-        pub async fn store_dummy_prefix_maps(&self, n_prefix_maps: usize) -> Result<Vec<String>> {
-            let dummy_prefix_maps_path = PathBuf::from(TEST_PREFIX_MAPS_FOLDER);
-            let mut counter: usize = 0;
-            let mut filenames: Vec<String> = Vec::new();
-
-            let mut dir = fs::read_dir(dummy_prefix_maps_path).await?;
-            while let Some(entry) = dir.next_entry().await? {
-                if counter < n_prefix_maps {
-                    if entry.metadata().await?.is_file() {
-                        counter += 1;
-                        let filename = entry
-                            .file_name()
-                            .into_string()
-                            .map_err(|_| eyre!("Error converting OsString to String"))?;
-                        fs::copy(entry.path(), self.prefix_maps_dir.join(&filename)).await?;
-                        self.set_default_prefix_map(filename.clone()).await?;
-                        filenames.push(filename);
-                    }
-                } else {
-                    return Ok(filenames);
-                }
-            }
-            Ok(filenames)
+        pub async fn store_dummy_prefix_maps_and_set_default(
+            &self,
+            n_prefix_maps: usize,
+        ) -> Result<Vec<NetworkPrefixMap>> {
+            let prefix_maps = store_dummy_prefix_maps(&self.prefix_maps_dir, n_prefix_maps).await?;
+            // set one as default
+            let prefix_map = prefix_maps.clone().pop().unwrap();
+            self.set_default_prefix_map(format!("{:?}", prefix_map.genesis_key()))
+                .await?;
+            Ok(prefix_maps)
         }
 
         /// Compare the network entries by creating a checklist using the settings and marking
@@ -733,6 +738,7 @@ pub mod test_utils {
 #[cfg(test)]
 mod constructor {
     use super::{Config, NetworkInfo};
+    use crate::operations::config::{test_utils::store_dummy_prefix_maps, Settings};
     use assert_fs::prelude::*;
     use bls::SecretKey;
     use color_eyre::{eyre::eyre, Result};
@@ -802,17 +808,26 @@ mod constructor {
 
     #[tokio::test]
     async fn given_config_file_exists_then_the_settings_should_be_read() -> Result<()> {
-        let serialized_config = r#"
-        {"networks":{
-          "network_1":{
-            "Remote":["https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(0699..31a2)", [134,153,176,17,8,146,92,141,244,153,46,24,65,181,135,178,186,81,108,10,203,11,239,242,1,94,117,120,16,175,164,116,198,71,92,27,196,151,99,26,255,8,181,241,53,118,97,108]]
-          },
-          "network_2":{
-            "Local": ["../resources/test_prefix_maps/PublicKey(0382..dadc)", [131,130,129,222,20,111,175,152,150,110,191,102,4,192,164,240,149,41,95,133,206,146,142,72,232,252,172,20,226,136,109,60,184,95,162,45,254,121,185,41,183,41,123,249,235,176,109,21]]
-          }
-        }}"#;
+        // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let config = Config::create_config(&tmp_dir, Some(serialized_config)).await?;
+        let prefix_map = store_dummy_prefix_maps(&tmp_dir.to_path_buf(), 1)
+            .await?
+            .pop()
+            .unwrap();
+        let prefix_map_path = tmp_dir
+            .path()
+            .join(format!("{:?}", prefix_map.genesis_key()));
+        let mut settings = Settings::default();
+        settings.networks.insert(
+            "network_1".to_string(),
+            NetworkInfo::Remote("https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(08d5..60a1)".to_string(), None)
+        );
+        settings.networks.insert(
+            "network_2".to_string(),
+            NetworkInfo::Local(prefix_map_path, Some(*prefix_map.genesis_key())),
+        );
+        let settings_serialized = serde_json::to_string(&settings)?;
+        let config = Config::create_config(&tmp_dir, Some(settings_serialized)).await?;
 
         assert_eq!(config.networks_iter().count(), 2);
         let mut iter = config.networks_iter();
@@ -821,32 +836,30 @@ mod constructor {
             .next()
             .ok_or_else(|| eyre!("failed to obtain item from networks list"))?;
         assert_eq!(network_name, "network_1");
-        if let NetworkInfo::Remote(_, genesis_key) = network_info {
-            assert_eq!(
-                format!("{:?}", genesis_key),
-                String::from("Some(PublicKey(0699..31a2))")
-            );
-        } else {
-            return Err(eyre!(
-                "The network information should be of type NetworkInfo::Remote"
-            ));
-        }
+        match network_info {
+            NetworkInfo::Remote(_, genesis_key) => assert_eq!(*genesis_key, None),
+            _ => {
+                return Err(eyre!(
+                    "The network information should be of type NetworkInfo::Remote"
+                ))
+            }
+        };
 
         // second network
         let (network_name, network_info) = iter
             .next()
             .ok_or_else(|| eyre!("failed to obtain item from networks list"))?;
         assert_eq!(network_name, "network_2");
-        if let NetworkInfo::Local(_, genesis_key) = network_info {
-            assert_eq!(
-                format!("{:?}", genesis_key),
-                String::from("Some(PublicKey(0382..dadc))")
-            );
-        } else {
-            return Err(eyre!(
-                "The network information should be of type NetworkInfo::Local"
-            ));
-        }
+        match network_info {
+            NetworkInfo::Local(_, genesis_key) => {
+                assert_eq!(*genesis_key, Some(*prefix_map.genesis_key()))
+            }
+            _ => {
+                return Err(eyre!(
+                    "The network information should be of type NetworkInfo::Local"
+                ))
+            }
+        };
         Ok(())
     }
 
@@ -873,7 +886,7 @@ mod constructor {
 #[cfg(test)]
 mod read_prefix_map {
     use super::Config;
-    use color_eyre::{eyre::eyre, Result};
+    use color_eyre::Result;
     use sn_api::DEFAULT_PREFIX_HARDLINK_NAME;
     use tokio::fs;
 
@@ -881,16 +894,14 @@ mod read_prefix_map {
     async fn given_default_prefix_map_it_should_be_read() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let config = Config::create_config(&tmp_dir, None).await?;
-        let mut file_name = config.store_dummy_prefix_maps(1).await?;
-        let file_name = file_name
+        let prefix_map = config
+            .store_dummy_prefix_maps_and_set_default(1)
+            .await?
             .pop()
-            .ok_or_else(|| eyre!("PrefixMap's filename should be present"))?;
+            .unwrap();
 
         let retrieved_prefix_map = config.read_default_prefix_map().await?;
-        assert_eq!(
-            format!("{:?}", retrieved_prefix_map.genesis_key()),
-            file_name
-        );
+        assert_eq!(retrieved_prefix_map, prefix_map);
 
         Ok(())
     }
@@ -899,7 +910,7 @@ mod read_prefix_map {
     async fn given_no_default_prefix_map_hardlink_it_should_be_an_error() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let config = Config::create_config(&tmp_dir, None).await?;
-        let _ = config.store_dummy_prefix_maps(1).await?;
+        let _ = config.store_dummy_prefix_maps_and_set_default(1).await?;
         fs::remove_file(&config.prefix_maps_dir.join(DEFAULT_PREFIX_HARDLINK_NAME)).await?;
 
         let retrieved_prefix_map = config.read_default_prefix_map().await;
@@ -922,19 +933,19 @@ mod read_prefix_map {
 #[cfg(test)]
 mod sync_prefix_maps_and_settings {
     use super::Config;
-    use crate::operations::config::NetworkInfo;
+    use crate::operations::config::{test_utils::store_dummy_prefix_maps, NetworkInfo, Settings};
     use color_eyre::eyre::eyre;
     use color_eyre::Result;
-    use std::path::PathBuf;
     use tokio::fs;
 
     #[tokio::test]
     async fn empty_cli_config_file_should_be_populated_by_existing_prefix_maps() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
-        let _ = config.store_dummy_prefix_maps(4).await?;
-        config.sync().await?;
+        let _ = config.store_dummy_prefix_maps_and_set_default(4).await?;
 
+        config.sync().await?;
+        // sync should not read "default" file; hence 4 networks as expected
         assert_eq!(config.settings.networks.len(), 4);
         config.compare_settings_and_prefix_maps_dir().await?;
         Ok(())
@@ -942,25 +953,34 @@ mod sync_prefix_maps_and_settings {
 
     #[tokio::test]
     async fn prefix_maps_should_be_fetched_from_cli_config_file() -> Result<()> {
-        let serialized_config = r#"
-        {"networks":{
-          "network_1":{
-            "Remote":["https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(0382..dadc)", null]
-          },
-          "network_2":{
-            "Remote":["https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(0699..31a2)", null]
-          },
-          "local_network_1":{
-            "Local": ["../resources/test_prefix_maps/PublicKey(0a3a..513d)", [128,33,141,121,52,118,157,130,242,109,189,19,194,123,82,125,23,160,217,211,27,2,46,33,25,19,4,5,79,32,54,221,111,75,125,169,51,226,203,56,155,252,217,104,177,44,12,90]]
-          },
-          "local_network_2":{
-            "Local": ["../resources/test_prefix_maps/PublicKey(134d..7bef)", null]
-          }
-        }}"#;
+        // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let mut config = Config::create_config(&tmp_dir, Some(serialized_config)).await?;
-        config.sync().await?;
+        let prefix_maps = store_dummy_prefix_maps(&tmp_dir.to_path_buf(), 2).await?;
+        let mut settings = Settings::default();
+        settings.networks.insert(
+            "network_1".to_string(),
+            NetworkInfo::Remote("https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(08d5..60a1)".to_string(), None)
+        );
+        settings.networks.insert(
+            "network_2".to_string(),
+            NetworkInfo::Remote("https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(16b0..6ec8)".to_string(), None)
+        );
+        prefix_maps
+            .iter()
+            .enumerate()
+            .for_each(|(idx, prefix_map)| {
+                let prefix_map_path = tmp_dir
+                    .path()
+                    .join(format!("{:?}", prefix_map.genesis_key()));
+                settings.networks.insert(
+                    format!("local_network_{}", idx + 1),
+                    NetworkInfo::Local(prefix_map_path, Some(*prefix_map.genesis_key())),
+                );
+            });
+        let serialized_settings = serde_json::to_string(&settings)?;
+        let mut config = Config::create_config(&tmp_dir, Some(serialized_settings)).await?;
 
+        config.sync().await?;
         assert_eq!(config.settings.networks.len(), 4);
         config.compare_settings_and_prefix_maps_dir().await?;
         Ok(())
@@ -969,19 +989,21 @@ mod sync_prefix_maps_and_settings {
     #[tokio::test]
     async fn unreachable_remote_and_local_variants_should_be_removed_from_cli_config_file(
     ) -> Result<()> {
-        let serialized_config = r#"
-        {"networks":{
-        "network_1":{
-            "Remote":["https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(0000..0000)", null]
-        },
-        "network_2":{
-            "Local":["../resources/test_prefix_maps/PublicKey(0000.0000)", null]
-        }
-        }}"#;
+        // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let mut config = Config::create_config(&tmp_dir, Some(serialized_config)).await?;
-        config.sync().await?;
+        let mut settings = Settings::default();
+        settings.networks.insert(
+            "network_1".to_string(),
+            NetworkInfo::Remote("https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(0000..0000)".to_string(), None)
+        );
+        settings.networks.insert(
+            "network_2".to_string(),
+            NetworkInfo::Local(tmp_dir.path().join("PublicKey(0000.0000)"), None),
+        );
+        let serialized_settings = serde_json::to_string(&settings)?;
+        let mut config = Config::create_config(&tmp_dir, Some(serialized_settings)).await?;
 
+        config.sync().await?;
         assert_eq!(config.settings.networks.len(), 0);
         config.compare_settings_and_prefix_maps_dir().await?;
         Ok(())
@@ -989,17 +1011,27 @@ mod sync_prefix_maps_and_settings {
 
     #[tokio::test]
     async fn genesis_key_field_should_be_set() -> Result<()> {
-        let serialized_config = r#"
-        {"networks":{
-        "network_1":{
-            "Remote":["https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(0382..dadc)", null]
-        },
-        "network_2":{
-            "Local":["../resources/test_prefix_maps/PublicKey(0699..31a2)", null]
-        }
-        }}"#;
+        // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let mut config = Config::create_config(&tmp_dir, Some(serialized_config)).await?;
+        let prefix_map = store_dummy_prefix_maps(&tmp_dir.to_path_buf(), 1)
+            .await?
+            .pop()
+            .unwrap();
+        let prefix_map_path = tmp_dir
+            .path()
+            .join(format!("{:?}", prefix_map.genesis_key()));
+        let mut settings = Settings::default();
+        settings.networks.insert(
+            "network_1".to_string(),
+            NetworkInfo::Remote("https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(08d5..60a1)".to_string(), None)
+        );
+        settings.networks.insert(
+            "network_2".to_string(),
+            NetworkInfo::Local(prefix_map_path, None),
+        );
+        let serialized_settings = serde_json::to_string(&settings)?;
+        let mut config = Config::create_config(&tmp_dir, Some(serialized_settings)).await?;
+
         config.sync().await?;
 
         let mut iter = config.networks_iter();
@@ -1027,27 +1059,36 @@ mod sync_prefix_maps_and_settings {
 
     #[tokio::test]
     async fn network_list_should_be_fetched_from_cli_config_file() -> Result<()> {
-        let serialized_config = r#"
-        {"networks":{
-        "network_1":{
-             "Local":["../resources/test_prefix_maps/PublicKey(0382..dadc)", null]
-        }}}"#;
+        // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let mut config = Config::create_config(&tmp_dir, Some(serialized_config)).await?;
-        let path = PathBuf::from("../resources/test_prefix_maps/PublicKey(0699..31a2)");
+        let mut prefix_maps = store_dummy_prefix_maps(&tmp_dir.to_path_buf(), 2).await?;
+        let prefix_map_path = tmp_dir
+            .path()
+            .join(format!("{:?}", prefix_maps.pop().unwrap().genesis_key()));
+        let mut settings = Settings::default();
+        settings.networks.insert(
+            "network_1".to_string(),
+            NetworkInfo::Local(prefix_map_path, None),
+        );
+        let serialized_settings = serde_json::to_string(&settings)?;
+        let mut config = Config::create_config(&tmp_dir, Some(serialized_settings)).await?;
 
+        let prefix_map_path = tmp_dir
+            .path()
+            .join(format!("{:?}", prefix_maps.pop().unwrap().genesis_key()));
         // will be ignored during sync since the network list is fetched from the config file
         config.settings.networks.insert(
             "network_2".to_string(),
-            NetworkInfo::Local(path.clone(), None),
+            NetworkInfo::Local(prefix_map_path.clone(), None),
         );
         config.sync().await?;
         assert_eq!(config.settings.networks.len(), 1);
 
-        config
-            .settings
-            .networks
-            .insert("network_2".to_string(), NetworkInfo::Local(path, None));
+        // but it will be read if it's present in the cli/config.json file
+        config.settings.networks.insert(
+            "network_2".to_string(),
+            NetworkInfo::Local(prefix_map_path, None),
+        );
         config.write_settings_to_file().await?;
         config.sync().await?;
         assert_eq!(config.settings.networks.len(), 2);
@@ -1057,19 +1098,28 @@ mod sync_prefix_maps_and_settings {
 
     #[tokio::test]
     async fn multiple_networks_with_the_same_prefix_map() -> Result<()> {
-        let serialized_config = r#"
-        {"networks":{
-          "network_1":{
-            "Local": ["../resources/test_prefix_maps/PublicKey(0382..dadc)", null]
-          },
-          "network_1_copy":{
-            "Local": ["../resources/test_prefix_maps/PublicKey(0699..31a2)", null]
-          }
-        }}"#;
+        // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let mut config = Config::create_config(&tmp_dir, Some(serialized_config)).await?;
-        config.sync().await?;
+        let prefix_map = store_dummy_prefix_maps(&tmp_dir.to_path_buf(), 1)
+            .await?
+            .pop()
+            .unwrap();
+        let prefix_map_path = tmp_dir
+            .path()
+            .join(format!("{:?}", prefix_map.genesis_key()));
+        let mut settings = Settings::default();
+        settings.networks.insert(
+            "network_1".to_string(),
+            NetworkInfo::Local(prefix_map_path.clone(), None),
+        );
+        settings.networks.insert(
+            "network_1_copy".to_string(),
+            NetworkInfo::Local(prefix_map_path, None),
+        );
+        let serialized_settings = serde_json::to_string(&settings)?;
+        let mut config = Config::create_config(&tmp_dir, Some(serialized_settings)).await?;
 
+        config.sync().await?;
         assert_eq!(config.settings.networks.len(), 2);
         config.compare_settings_and_prefix_maps_dir().await?;
         Ok(())
@@ -1080,8 +1130,11 @@ mod sync_prefix_maps_and_settings {
         // This is the case if prefix map was directly pasted into the dir. It should behave as expected
         let tmp_dir = assert_fs::TempDir::new()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
-        let mut file_name = config.store_dummy_prefix_maps(1).await?;
-        let file_name = file_name.pop().ok_or_else(|| eyre!("GG"))?;
+        let prefix_map = config
+            .store_dummy_prefix_maps_and_set_default(1)
+            .await?
+            .pop()
+            .unwrap();
 
         config.sync().await?;
 
@@ -1090,16 +1143,21 @@ mod sync_prefix_maps_and_settings {
             .networks_iter()
             .next()
             .ok_or_else(|| eyre!("failed to obtain item from networks list"))?;
-        assert_eq!(*network_name, file_name);
+        assert_eq!(*network_name, format!("{:?}", prefix_map.genesis_key()));
         if let NetworkInfo::Local(_, Some(genesis_key)) = network_info {
-            assert_eq!(format!("{:?}", genesis_key), file_name);
+            assert_eq!(genesis_key, prefix_map.genesis_key());
         } else {
             return Err(eyre!(
                 "The network information should be of type NetworkInfo::Remote"
             ));
         }
 
-        fs::remove_file(config.prefix_maps_dir.join(file_name)).await?;
+        fs::remove_file(
+            config
+                .prefix_maps_dir
+                .join(format!("{:?}", prefix_map.genesis_key())),
+        )
+        .await?;
         config.sync().await?;
         assert_eq!(config.settings.networks.len(), 0);
         config.compare_settings_and_prefix_maps_dir().await?;
@@ -1110,24 +1168,27 @@ mod sync_prefix_maps_and_settings {
 
 #[cfg(test)]
 mod networks {
-    use super::{Config, NetworkInfo};
+    use super::{test_utils::store_dummy_prefix_maps, Config, NetworkInfo};
     use color_eyre::eyre::eyre;
     use color_eyre::Result;
-    use std::path::PathBuf;
 
     #[tokio::test]
     async fn local_and_remote_networks_should_be_added() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
+        let prefix_map = store_dummy_prefix_maps(&tmp_dir.to_path_buf(), 1)
+            .await?
+            .pop()
+            .unwrap();
+        let prefix_map_path = tmp_dir
+            .path()
+            .join(format!("{:?}", prefix_map.genesis_key()));
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let network_1 = NetworkInfo::Remote(
-            "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(0382..dadc)".to_string(),
+            "https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/sn_cli_resources/PublicKey(08d5..60a1)".to_string(),
             None,
         );
-        let network_2 = NetworkInfo::Local(
-            PathBuf::from("../resources/test_prefix_maps/PublicKey(0699..31a2)"),
-            None,
-        );
+        let network_2 = NetworkInfo::Local(prefix_map_path, None);
         config.add_network("network_1", network_1).await?;
         config.add_network("network_2", network_2).await?;
 
@@ -1141,13 +1202,14 @@ mod networks {
     async fn add_local_network_where_path_lies_inside_prefix_maps_dir() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
-
-        // copy a NetworkPrefixMap to prefix_maps_dir
-        let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
-        let prefix_map_name = prefix_map_name
+        let prefix_map = config
+            .store_dummy_prefix_maps_and_set_default(1)
+            .await?
             .pop()
-            .ok_or_else(|| eyre!("Dummy prefix_map filename should be present"))?;
-        let path = config.prefix_maps_dir.join(prefix_map_name);
+            .unwrap();
+        let path = config
+            .prefix_maps_dir
+            .join(format!("{:?}", prefix_map.genesis_key()));
 
         let network_1 = NetworkInfo::Local(path, None);
         config.add_network("network_1", network_1).await?;
@@ -1160,12 +1222,16 @@ mod networks {
     #[tokio::test]
     async fn removing_network_should_give_the_desirable_output() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
+        let prefix_map = store_dummy_prefix_maps(&tmp_dir.to_path_buf(), 1)
+            .await?
+            .pop()
+            .unwrap();
+        let prefix_map_path = tmp_dir
+            .path()
+            .join(format!("{:?}", prefix_map.genesis_key()));
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let network_1 = NetworkInfo::Local(
-            PathBuf::from("../resources/test_prefix_maps/PublicKey(0382..dadc)"),
-            None,
-        );
+        let network_1 = NetworkInfo::Local(prefix_map_path, None);
         config.add_network("network_1", network_1).await?;
         assert_eq!(config.settings.networks.len(), 1);
 
@@ -1183,17 +1249,23 @@ mod networks {
     #[tokio::test]
     async fn switching_network_should_change_the_default_prefix_map() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
+        let mut prefix_maps = store_dummy_prefix_maps(&tmp_dir.to_path_buf(), 2).await?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
+        let prefix_map_1 = prefix_maps.pop().unwrap();
         let network_1 = NetworkInfo::Local(
-            PathBuf::from("../resources/test_prefix_maps/PublicKey(0382..dadc)"),
+            tmp_dir
+                .path()
+                .join(format!("{:?}", prefix_map_1.genesis_key())),
             None,
         );
+        let prefix_map_2 = prefix_maps.pop().unwrap();
         let network_2 = NetworkInfo::Local(
-            PathBuf::from("../resources/test_prefix_maps/PublicKey(0699..31a2)"),
+            tmp_dir
+                .path()
+                .join(format!("{:?}", prefix_map_2.genesis_key())),
             None,
         );
-
         config.add_network("network_1", network_1).await?;
         config.add_network("network_2", network_2).await?;
 
@@ -1207,10 +1279,7 @@ mod networks {
         if let NetworkInfo::Local(_, genesis_key) = net_info {
             let gk = genesis_key.ok_or_else(|| eyre!("Genesis key should be written"))?;
             assert_eq!(*default.genesis_key(), gk);
-            assert_eq!(
-                format!("{:?}", default.genesis_key()),
-                "PublicKey(0382..dadc)".to_string()
-            );
+            assert_eq!(default, prefix_map_1);
         } else {
             return Err(eyre!("NetworkInfo should be Local"));
         }
@@ -1225,10 +1294,7 @@ mod networks {
         if let NetworkInfo::Local(_, genesis_key) = net_info {
             let gk = genesis_key.ok_or_else(|| eyre!("Genesis key should be written"))?;
             assert_eq!(*default.genesis_key(), gk);
-            assert_eq!(
-                format!("{:?}", default.genesis_key()),
-                "PublicKey(0699..31a2)".to_string()
-            );
+            assert_eq!(default, prefix_map_2);
         } else {
             return Err(eyre!("NetworkInfo should be Local"));
         }

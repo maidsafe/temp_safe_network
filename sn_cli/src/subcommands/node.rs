@@ -225,7 +225,6 @@ pub async fn node_commander(
 #[cfg(test)]
 mod test {
     use crate::operations::config::{Config, NetworkLauncher};
-    use color_eyre::eyre::eyre;
     use color_eyre::Report;
     use futures::executor::block_on;
 
@@ -238,11 +237,10 @@ mod test {
         fn launch(&mut self, args: Vec<String>, _interval: u64) -> Result<(), Report> {
             self.launch_args.extend(args);
             block_on(async {
-                let mut file_name = self.config.store_dummy_prefix_maps(1).await?;
-                let file_name = file_name
-                    .pop()
-                    .ok_or_else(|| eyre!("file_name should have 1 value"))?;
-                self.config.set_default_prefix_map(file_name).await?;
+                let _ = self
+                    .config
+                    .store_dummy_prefix_maps_and_set_default(1)
+                    .await?;
                 Ok(())
             })
         }
@@ -567,7 +565,6 @@ mod join_command {
     use crate::operations::config::{Config, NetworkInfo};
     use crate::operations::node::SN_NODE_EXECUTABLE;
     use assert_fs::prelude::*;
-    use color_eyre::eyre::eyre;
     use color_eyre::Result;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use std::path::PathBuf;
@@ -579,12 +576,17 @@ mod join_command {
         node_dir.create_dir_all()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
-        let prefix_map_name = prefix_map_name
+        let prefix_map = config
+            .store_dummy_prefix_maps_and_set_default(1)
+            .await?
             .pop()
-            .ok_or_else(|| eyre!("Dummy prefix_map should be present"))?;
-        let baby_fleming =
-            NetworkInfo::Local(config.prefix_maps_dir.join(prefix_map_name.clone()), None);
+            .unwrap();
+        let baby_fleming = NetworkInfo::Local(
+            config
+                .prefix_maps_dir
+                .join(format!("{:?}", prefix_map.genesis_key())),
+            None,
+        );
         config.add_network("baby-fleming", baby_fleming).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
@@ -606,8 +608,8 @@ mod join_command {
         let result = node_commander(Some(cmd), &mut config, &mut launcher).await;
 
         assert!(result.is_ok());
-        let prefix_map = config.read_default_prefix_map().await?;
-        assert_eq!(prefix_map_name, format!("{:?}", prefix_map.genesis_key()));
+        let default_prefix_map = config.read_default_prefix_map().await?;
+        assert_eq!(prefix_map, default_prefix_map);
         Ok(())
     }
 
@@ -619,12 +621,17 @@ mod join_command {
         node_dir.create_dir_all()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
-        let prefix_map_name = prefix_map_name
+        let prefix_map = config
+            .store_dummy_prefix_maps_and_set_default(1)
+            .await?
             .pop()
-            .ok_or_else(|| eyre!("Dummy prefix_map should be present"))?;
-        let baby_fleming =
-            NetworkInfo::Local(config.prefix_maps_dir.join(prefix_map_name.clone()), None);
+            .unwrap();
+        let baby_fleming = NetworkInfo::Local(
+            config
+                .prefix_maps_dir
+                .join(format!("{:?}", prefix_map.genesis_key())),
+            None,
+        );
         config.add_network("baby-fleming", baby_fleming).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
@@ -661,12 +668,17 @@ mod join_command {
         node_dir.create_dir_all()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
-        let prefix_map_name = prefix_map_name
+        let prefix_map = config
+            .store_dummy_prefix_maps_and_set_default(1)
+            .await?
             .pop()
-            .ok_or_else(|| eyre!("Dummy prefix_map should be present"))?;
-        let baby_fleming =
-            NetworkInfo::Local(config.prefix_maps_dir.join(prefix_map_name.clone()), None);
+            .unwrap();
+        let baby_fleming = NetworkInfo::Local(
+            config
+                .prefix_maps_dir
+                .join(format!("{:?}", prefix_map.genesis_key())),
+            None,
+        );
         config.add_network("baby-fleming", baby_fleming).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
@@ -704,12 +716,17 @@ mod join_command {
         node_dir.create_dir_all()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
-        let prefix_map_name = prefix_map_name
+        let prefix_map = config
+            .store_dummy_prefix_maps_and_set_default(1)
+            .await?
             .pop()
-            .ok_or_else(|| eyre!("Dummy prefix_map should be present"))?;
-        let baby_fleming =
-            NetworkInfo::Local(config.prefix_maps_dir.join(prefix_map_name.clone()), None);
+            .unwrap();
+        let baby_fleming = NetworkInfo::Local(
+            config
+                .prefix_maps_dir
+                .join(format!("{:?}", prefix_map.genesis_key())),
+            None,
+        );
         config.add_network("baby-fleming", baby_fleming).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
@@ -746,12 +763,17 @@ mod join_command {
         node_dir.create_dir_all()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
-        let prefix_map_name = prefix_map_name
+        let prefix_map = config
+            .store_dummy_prefix_maps_and_set_default(1)
+            .await?
             .pop()
-            .ok_or_else(|| eyre!("Dummy prefix_map should be present"))?;
-        let baby_fleming =
-            NetworkInfo::Local(config.prefix_maps_dir.join(prefix_map_name.clone()), None);
+            .unwrap();
+        let baby_fleming = NetworkInfo::Local(
+            config
+                .prefix_maps_dir
+                .join(format!("{:?}", prefix_map.genesis_key())),
+            None,
+        );
         config.add_network("baby-fleming", baby_fleming).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
@@ -787,12 +809,17 @@ mod join_command {
         node_dir.create_dir_all()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
-        let prefix_map_name = prefix_map_name
+        let prefix_map = config
+            .store_dummy_prefix_maps_and_set_default(1)
+            .await?
             .pop()
-            .ok_or_else(|| eyre!("Dummy prefix_map should be present"))?;
-        let baby_fleming =
-            NetworkInfo::Local(config.prefix_maps_dir.join(prefix_map_name.clone()), None);
+            .unwrap();
+        let baby_fleming = NetworkInfo::Local(
+            config
+                .prefix_maps_dir
+                .join(format!("{:?}", prefix_map.genesis_key())),
+            None,
+        );
         config.add_network("baby-fleming", baby_fleming).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
@@ -826,12 +853,17 @@ mod join_command {
         node_dir.create_dir_all()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
-        let prefix_map_name = prefix_map_name
+        let prefix_map = config
+            .store_dummy_prefix_maps_and_set_default(1)
+            .await?
             .pop()
-            .ok_or_else(|| eyre!("Dummy prefix_map should be present"))?;
-        let baby_fleming =
-            NetworkInfo::Local(config.prefix_maps_dir.join(prefix_map_name.clone()), None);
+            .unwrap();
+        let baby_fleming = NetworkInfo::Local(
+            config
+                .prefix_maps_dir
+                .join(format!("{:?}", prefix_map.genesis_key())),
+            None,
+        );
         config.add_network("baby-fleming", baby_fleming).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
@@ -868,12 +900,17 @@ mod join_command {
         node_dir.create_dir_all()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
-        let prefix_map_name = prefix_map_name
+        let prefix_map = config
+            .store_dummy_prefix_maps_and_set_default(1)
+            .await?
             .pop()
-            .ok_or_else(|| eyre!("Dummy prefix_map should be present"))?;
-        let baby_fleming =
-            NetworkInfo::Local(config.prefix_maps_dir.join(prefix_map_name.clone()), None);
+            .unwrap();
+        let baby_fleming = NetworkInfo::Local(
+            config
+                .prefix_maps_dir
+                .join(format!("{:?}", prefix_map.genesis_key())),
+            None,
+        );
         config.add_network("baby-fleming", baby_fleming).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
@@ -906,12 +943,17 @@ mod join_command {
         node_dir.create_dir_all()?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
-        let prefix_map_name = prefix_map_name
+        let prefix_map = config
+            .store_dummy_prefix_maps_and_set_default(1)
+            .await?
             .pop()
-            .ok_or_else(|| eyre!("Dummy prefix_map should be present"))?;
-        let baby_fleming =
-            NetworkInfo::Local(config.prefix_maps_dir.join(prefix_map_name.clone()), None);
+            .unwrap();
+        let baby_fleming = NetworkInfo::Local(
+            config
+                .prefix_maps_dir
+                .join(format!("{:?}", prefix_map.genesis_key())),
+            None,
+        );
         config.add_network("baby-fleming", baby_fleming).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
@@ -945,12 +987,17 @@ mod join_command {
         let node_data_dir = node_dir.child(LOCAL_NODE_DIR_NAME);
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
-        let mut prefix_map_name = config.store_dummy_prefix_maps(1).await?;
-        let prefix_map_name = prefix_map_name
+        let prefix_map = config
+            .store_dummy_prefix_maps_and_set_default(1)
+            .await?
             .pop()
-            .ok_or_else(|| eyre!("Dummy prefix_map should be present"))?;
-        let baby_fleming =
-            NetworkInfo::Local(config.prefix_maps_dir.join(prefix_map_name.clone()), None);
+            .unwrap();
+        let baby_fleming = NetworkInfo::Local(
+            config
+                .prefix_maps_dir
+                .join(format!("{:?}", prefix_map.genesis_key())),
+            None,
+        );
         config.add_network("baby-fleming", baby_fleming).await?;
 
         let mut launcher = Box::new(FakeNetworkLauncher {
