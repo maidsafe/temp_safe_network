@@ -49,7 +49,6 @@ mod error;
 pub use detection::{DysfunctionSeverity, IssueType};
 
 pub use crate::error::Error;
-use crate::error::Result;
 use sn_interface::messaging::data::OperationId;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
@@ -93,7 +92,7 @@ impl DysfunctionDetection {
     /// Adds an issue to the dysfunction tracker.
     ///
     /// The `op_id` only applies when adding an operational issue.
-    pub fn track_issue(&mut self, node_id: NodeIdentifier, issue_type: IssueType) -> Result<()> {
+    pub fn track_issue(&mut self, node_id: NodeIdentifier, issue_type: IssueType) {
         trace!("Adding a new issue to the dysfunction tracker: {issue_type:?}");
         match issue_type {
             IssueType::Dkg => {
@@ -110,17 +109,10 @@ impl DysfunctionDetection {
             }
             IssueType::PendingRequestOperation(op_id) => {
                 let queue = self.unfulfilled_ops.entry(node_id).or_default();
-                let op_id = op_id.ok_or_else(|| {
-                    Error::OpIdNotSupplied(
-                        "An operation ID must be supplied for a pending request operation."
-                            .to_string(),
-                    )
-                })?;
                 trace!("New issue has associated operation ID: {op_id:#?}");
                 queue.push((op_id, Instant::now()));
             }
         }
-        Ok(())
     }
 
     /// Removes a `pending_operation` from the node liveness records. Returns true if a record was removed
@@ -306,20 +298,20 @@ mod tests {
 
         // Track some issues for nodes that are going to be removed.
         for node in nodes.iter().take(3) {
-            let _ = dysfunctional_detection.track_issue(*node, IssueType::Communication);
-            let _ = dysfunctional_detection.track_issue(*node, IssueType::Knowledge);
-            let _ = dysfunctional_detection.track_issue(
+            dysfunctional_detection.track_issue(*node, IssueType::Communication);
+            dysfunctional_detection.track_issue(*node, IssueType::Knowledge);
+            dysfunctional_detection.track_issue(
                 *node,
-                IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
+                IssueType::PendingRequestOperation(OperationId([1; 32])),
             );
         }
 
         // Track some issues for nodes that will be retained.
-        let _ = dysfunctional_detection.track_issue(nodes[5], IssueType::Communication);
-        let _ = dysfunctional_detection.track_issue(nodes[6], IssueType::Knowledge);
-        let _ = dysfunctional_detection.track_issue(
+        dysfunctional_detection.track_issue(nodes[5], IssueType::Communication);
+        dysfunctional_detection.track_issue(nodes[6], IssueType::Knowledge);
+        dysfunctional_detection.track_issue(
             nodes[7],
-            IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
+            IssueType::PendingRequestOperation(OperationId([1; 32])),
         );
 
         let nodes_to_retain = nodes[5..10].iter().cloned().collect::<BTreeSet<XorName>>();
@@ -338,7 +330,7 @@ mod tests {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
         let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
 
-        dysfunctional_detection.track_issue(nodes[0], IssueType::Communication)?;
+        dysfunctional_detection.track_issue(nodes[0], IssueType::Communication);
 
         assert_eq!(dysfunctional_detection.communication_issues.len(), 1);
         assert_eq!(dysfunctional_detection.knowledge_issues.len(), 0);
@@ -351,7 +343,7 @@ mod tests {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
         let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
 
-        dysfunctional_detection.track_issue(nodes[0], IssueType::Knowledge)?;
+        dysfunctional_detection.track_issue(nodes[0], IssueType::Knowledge);
 
         assert_eq!(dysfunctional_detection.knowledge_issues.len(), 1);
         assert_eq!(dysfunctional_detection.communication_issues.len(), 0);
@@ -366,29 +358,12 @@ mod tests {
 
         dysfunctional_detection.track_issue(
             nodes[0],
-            IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
-        )?;
+            IssueType::PendingRequestOperation(OperationId([1; 32])),
+        );
 
         assert_eq!(dysfunctional_detection.unfulfilled_ops.len(), 1);
         assert_eq!(dysfunctional_detection.knowledge_issues.len(), 0);
         assert_eq!(dysfunctional_detection.communication_issues.len(), 0);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn track_issue_should_return_error_when_adding_pending_op_issue_without_op_id(
-    ) -> Result<()> {
-        let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
-
-        let result =
-            dysfunctional_detection.track_issue(nodes[0], IssueType::PendingRequestOperation(None));
-
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "An operation ID must be supplied for a pending request operation."
-        );
         Ok(())
     }
 
@@ -413,16 +388,16 @@ mod tests {
 
         dysfunctional_detection.track_issue(
             nodes[0],
-            IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
-        )?;
+            IssueType::PendingRequestOperation(OperationId([1; 32])),
+        );
         dysfunctional_detection.track_issue(
             nodes[0],
-            IssueType::PendingRequestOperation(Some(OperationId([2; 32]))),
-        )?;
+            IssueType::PendingRequestOperation(OperationId([2; 32])),
+        );
         dysfunctional_detection.track_issue(
             nodes[0],
-            IssueType::PendingRequestOperation(Some(OperationId([3; 32]))),
-        )?;
+            IssueType::PendingRequestOperation(OperationId([3; 32])),
+        );
 
         let op_ids = dysfunctional_detection.get_unfulfilled_ops(nodes[0]);
 
@@ -437,16 +412,16 @@ mod tests {
 
         dysfunctional_detection.track_issue(
             nodes[0],
-            IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
-        )?;
+            IssueType::PendingRequestOperation(OperationId([1; 32])),
+        );
         dysfunctional_detection.track_issue(
             nodes[0],
-            IssueType::PendingRequestOperation(Some(OperationId([2; 32]))),
-        )?;
+            IssueType::PendingRequestOperation(OperationId([2; 32])),
+        );
         dysfunctional_detection.track_issue(
             nodes[0],
-            IssueType::PendingRequestOperation(Some(OperationId([3; 32]))),
-        )?;
+            IssueType::PendingRequestOperation(OperationId([3; 32])),
+        );
 
         let op_ids = dysfunctional_detection.get_unfulfilled_ops(nodes[1]);
 
@@ -462,16 +437,16 @@ mod tests {
 
         dysfunctional_detection.track_issue(
             nodes[0],
-            IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
-        )?;
+            IssueType::PendingRequestOperation(OperationId([1; 32])),
+        );
         dysfunctional_detection.track_issue(
             nodes[0],
-            IssueType::PendingRequestOperation(Some(OperationId([2; 32]))),
-        )?;
+            IssueType::PendingRequestOperation(OperationId([2; 32])),
+        );
         dysfunctional_detection.track_issue(
             nodes[0],
-            IssueType::PendingRequestOperation(Some(OperationId([3; 32]))),
-        )?;
+            IssueType::PendingRequestOperation(OperationId([3; 32])),
+        );
 
         let has_removed = dysfunctional_detection.request_operation_fulfilled(&nodes[0], op_id);
 
@@ -491,16 +466,16 @@ mod tests {
 
         dysfunctional_detection.track_issue(
             nodes[0],
-            IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
-        )?;
+            IssueType::PendingRequestOperation(OperationId([1; 32])),
+        );
         dysfunctional_detection.track_issue(
             nodes[0],
-            IssueType::PendingRequestOperation(Some(OperationId([2; 32]))),
-        )?;
+            IssueType::PendingRequestOperation(OperationId([2; 32])),
+        );
         dysfunctional_detection.track_issue(
             nodes[0],
-            IssueType::PendingRequestOperation(Some(OperationId([3; 32]))),
-        )?;
+            IssueType::PendingRequestOperation(OperationId([3; 32])),
+        );
 
         let has_removed = dysfunctional_detection.request_operation_fulfilled(&nodes[1], op_id);
 
@@ -517,16 +492,16 @@ mod tests {
 
         dysfunctional_detection.track_issue(
             nodes[0],
-            IssueType::PendingRequestOperation(Some(OperationId([1; 32]))),
-        )?;
+            IssueType::PendingRequestOperation(OperationId([1; 32])),
+        );
         dysfunctional_detection.track_issue(
             nodes[0],
-            IssueType::PendingRequestOperation(Some(OperationId([2; 32]))),
-        )?;
+            IssueType::PendingRequestOperation(OperationId([2; 32])),
+        );
         dysfunctional_detection.track_issue(
             nodes[0],
-            IssueType::PendingRequestOperation(Some(OperationId([3; 32]))),
-        )?;
+            IssueType::PendingRequestOperation(OperationId([3; 32])),
+        );
 
         let has_removed = dysfunctional_detection.request_operation_fulfilled(&nodes[1], op_id);
 

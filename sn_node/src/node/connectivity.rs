@@ -12,22 +12,21 @@ use xor_name::XorName;
 
 impl Node {
     /// Track comms issue if this is a peer we know and care about
-    pub(crate) fn handle_failed_send(&mut self, addr: &SocketAddr) -> Result<()> {
+    pub(crate) fn handle_failed_send(&mut self, addr: &SocketAddr) {
         let name = if let Some(peer) = self.network_knowledge.find_member_by_addr(addr) {
             debug!("Lost known peer {}", peer);
             peer.name()
         } else {
             trace!("Lost unknown peer {}", addr);
-            return Ok(());
+            return;
         };
 
         if self.is_not_elder() {
             // Adults cannot complain about connectivity.
-            return Ok(());
+            return;
         }
 
-        self.log_comm_issue(name)?;
-        Ok(())
+        self.log_comm_issue(name);
     }
 
     pub(crate) fn cast_offline_proposals(&mut self, names: &BTreeSet<XorName>) -> Result<Vec<Cmd>> {

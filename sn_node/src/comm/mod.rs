@@ -120,7 +120,7 @@ impl Comm {
         self.our_endpoint.public_addr()
     }
 
-    pub(crate) async fn cleanup_peers(&self, section_members: BTreeSet<NodeState>) -> Result<()> {
+    pub(crate) async fn cleanup_peers(&self, section_members: BTreeSet<NodeState>) {
         debug!(
             "Cleanup peers , known section members: {:?}",
             section_members
@@ -161,7 +161,6 @@ impl Comm {
         }
 
         debug!("PeerSessions count post-cleanup: {:?}", self.sessions.len());
-        Ok(())
     }
 
     /// Fake function used as replacement for testing only.

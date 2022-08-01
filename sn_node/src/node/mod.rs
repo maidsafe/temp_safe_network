@@ -332,27 +332,22 @@ mod core {
         }
 
         /// Log an issue in dysfunction
-        pub(crate) fn log_node_issue(&mut self, name: XorName, issue: IssueType) -> Result<()> {
+        pub(crate) fn log_node_issue(&mut self, name: XorName, issue: IssueType) {
             trace!("Logging issue {issue:?} in dysfunction");
-            self.dysfunction_tracking
-                .track_issue(name, issue)
-                .map_err(Error::from)
+            self.dysfunction_tracking.track_issue(name, issue)
         }
 
         /// Log a communication problem
-        pub(crate) fn log_comm_issue(&mut self, name: XorName) -> Result<()> {
+        pub(crate) fn log_comm_issue(&mut self, name: XorName) {
             trace!("Logging comms issue in dysfunction");
             self.dysfunction_tracking
                 .track_issue(name, IssueType::Communication)
-                .map_err(Error::from)
         }
 
         /// Log a dkg issue (ie, an initialised but unfinished dkg round for a given participant)
-        pub(crate) fn log_dkg_issue(&mut self, name: XorName) -> Result<()> {
+        pub(crate) fn log_dkg_issue(&mut self, name: XorName) {
             trace!("Logging Dkg issue in dysfunction");
-            self.dysfunction_tracking
-                .track_issue(name, IssueType::Dkg)
-                .map_err(Error::from)
+            self.dysfunction_tracking.track_issue(name, IssueType::Dkg)
         }
 
         /// Log a dkg session as responded to
@@ -376,7 +371,7 @@ mod core {
         pub(crate) fn promote_and_demote_elders(
             &mut self,
             excluded_names: &BTreeSet<XorName>,
-        ) -> Result<Vec<DkgSessionId>> {
+        ) -> Vec<DkgSessionId> {
             let sap = self.network_knowledge.authority_provider();
             let chain_len = self.network_knowledge.chain_len();
 
@@ -393,7 +388,7 @@ mod core {
                 error!(
                 "attempted to promote and demote elders when we don't have a membership instance"
             );
-                return Ok(vec![]);
+                return vec![];
             };
 
             // Try splitting
@@ -413,15 +408,15 @@ mod core {
                 // So, shall only track the side that we are in as well.
                 if zero_dkg_id.elders.contains_key(&self.info().name()) {
                     for candidate in zero_dkg_id.elders.keys() {
-                        self.log_dkg_issue(*candidate)?;
+                        self.log_dkg_issue(*candidate);
                     }
                 } else if one_dkg_id.elders.contains_key(&self.info().name()) {
                     for candidate in one_dkg_id.elders.keys() {
-                        self.log_dkg_issue(*candidate)?;
+                        self.log_dkg_issue(*candidate);
                     }
                 }
 
-                return Ok(vec![zero_dkg_id, one_dkg_id]);
+                return vec![zero_dkg_id, one_dkg_id];
             }
 
             // Candidates for elders out of all the nodes in the section, even out of the
@@ -477,13 +472,13 @@ mod core {
                 };
                 // track init of DKG
                 for candidate in session_id.elders.keys() {
-                    self.log_dkg_issue(*candidate)?;
+                    self.log_dkg_issue(*candidate);
                 }
 
                 vec![session_id]
             };
 
-            Ok(res)
+            res
         }
 
         fn initialize_membership(&mut self, sap: SectionAuthorityProvider) -> Result<()> {

@@ -249,7 +249,7 @@ impl Node {
         let generation = self.network_knowledge.chain_len();
 
         let dkg_session = if let Some(dkg_session) = self
-            .promote_and_demote_elders(&BTreeSet::new())?
+            .promote_and_demote_elders(&BTreeSet::new())
             .into_iter()
             .find(|session_id| failure_set.verify(session_id))
         {
@@ -315,12 +315,12 @@ impl Node {
         }
     }
 
-    pub(crate) fn handle_dkg_failure(&mut self, failure_set: DkgFailureSigSet) -> Result<Cmd> {
+    pub(crate) fn handle_dkg_failure(&mut self, failure_set: DkgFailureSigSet) -> Cmd {
         // track those failed participants
         for name in &failure_set.failed_participants {
             trace!("Logging {name} as having Dkg issue in dysfunction");
-            self.log_dkg_issue(*name)?;
+            self.log_dkg_issue(*name);
         }
-        Ok(self.send_msg_to_our_elders(SystemMsg::DkgFailureAgreement(failure_set)))
+        self.send_msg_to_our_elders(SystemMsg::DkgFailureAgreement(failure_set))
     }
 }
