@@ -255,7 +255,6 @@ impl std::hash::Hash for EnqueuedJob {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         //self.job.hash(state);
         self.job.id().hash(state);
-        // self.retries.hash(state);
     }
 }
 
