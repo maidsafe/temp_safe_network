@@ -289,8 +289,7 @@ impl Node {
                                 section_chain,
                                 section_auth.into_authed_state(),
                                 Some(prefix_map),
-                            )
-                            .await?;
+                            )?;
 
                             // TODO: confirm whether carry out the switch immediately here
                             //       or still using the cmd pattern.

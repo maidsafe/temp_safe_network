@@ -158,7 +158,7 @@ impl NetworkKnowledge {
     /// (`SAP`).
     ///
     /// Returns error if the `signed_sap` is not verifiable with the `chain`.
-    pub async fn new(
+    pub fn new(
         genesis_key: bls::PublicKey,
         chain: SecuredLinkedList,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
@@ -247,7 +247,7 @@ impl NetworkKnowledge {
     }
 
     /// Creates `NetworkKnowledge` for the first node in the network
-    pub async fn first_node(
+    pub fn first_node(
         peer: Peer,
         genesis_sk_set: bls::SecretKeySet,
     ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
@@ -264,8 +264,7 @@ impl NetworkKnowledge {
             SecuredLinkedList::new(genesis_key),
             section_auth,
             None,
-        )
-        .await?;
+        )?;
 
         let sap = network_knowledge.signed_sap.clone();
 
@@ -290,11 +289,7 @@ impl NetworkKnowledge {
     /// If we already have the signed SAP and section chain for the provided key and prefix
     /// we make them the current SAP and section chain, and if so, this returns 'true'.
     /// Note this function assumes we already have the key share for the provided section key.
-    pub async fn try_update_current_sap(
-        &mut self,
-        section_key: BlsPublicKey,
-        prefix: &Prefix,
-    ) -> bool {
+    pub fn try_update_current_sap(&mut self, section_key: BlsPublicKey, prefix: &Prefix) -> bool {
         // Let's try to find the signed SAP corresponding to the provided prefix and section key
         match self.prefix_map.get_signed(prefix) {
             Some(signed_sap) if signed_sap.value.section_key() == section_key => {
@@ -334,7 +329,7 @@ impl NetworkKnowledge {
     }
 
     /// Verify the given public key corresponds to any (current/old) section known to us
-    pub async fn verify_section_key_is_known(&self, section_key: &BlsPublicKey) -> bool {
+    pub fn verify_section_key_is_known(&self, section_key: &BlsPublicKey) -> bool {
         self.prefix_map.get_sections_dag().has_key(section_key)
     }
 
@@ -371,7 +366,7 @@ impl NetworkKnowledge {
     /// with the provided proof chain.
     /// If the '`update_sap`' flag is set to 'true', the provided SAP and chain will be
     /// set as our current.
-    pub async fn update_knowledge_if_valid(
+    pub fn update_knowledge_if_valid(
         &mut self,
         signed_sap: SectionAuth<SectionAuthorityProvider>,
         proof_chain: &SecuredLinkedList,
@@ -514,7 +509,7 @@ impl NetworkKnowledge {
 
     // Get SectionAuthorityProvider of a known section with the given prefix,
     // along with its section chain.
-    pub async fn get_closest_or_opposite_signed_sap(
+    pub fn get_closest_or_opposite_signed_sap(
         &self,
         name: &XorName,
     ) -> Option<(SectionAuth<SectionAuthorityProvider>, SecuredLinkedList)> {
