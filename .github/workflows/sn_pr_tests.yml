@@ -6,6 +6,10 @@ on:
   push:
     branches: [staging, trying]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_INCREMENTAL: 0  # bookkeeping for incremental builds has overhead, not useful in CI.
   RUSTFLAGS: "-D warnings"
