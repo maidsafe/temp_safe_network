@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1659364862533,
+  "lastUpdate": 1659368662004,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -13565,6 +13565,144 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 4192338,
             "range": "± 60772",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "oetyng@gmail.com",
+            "name": "oetyng",
+            "username": "oetyng"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "db4f4d07b155d732ad76d263563d81b5fee535f7",
+          "message": "refactor(messaging): remove more unused code\nMore reuse of methods to replace duplication of code.\nDeprecates delivery group, since it is no longer used.\nAlso, `DstLocation` and `SrcLocation` are removed.\nBREAKING CHANGE: WireMsg public type is changed.",
+          "timestamp": "2022-08-01T16:55:51+02:00",
+          "tree_id": "441638449092d934beeba1c9be5d1e539a0f5e1a",
+          "url": "https://github.com/maidsafe/safe_network/commit/db4f4d07b155d732ad76d263563d81b5fee535f7"
+        },
+        "date": 1659368660885,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 597822273,
+            "range": "± 20308533",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 643213186,
+            "range": "± 30298250",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 1241142531,
+            "range": "± 44582705",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 399635903,
+            "range": "± 16823791",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 397971298,
+            "range": "± 19932767",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 1098848105,
+            "range": "± 46389537",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 10424938,
+            "range": "± 4088991",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 1292735256,
+            "range": "± 483197115",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 6699457453,
+            "range": "± 1050585629",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 216751860,
+            "range": "± 73831487",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2161070772,
+            "range": "± 680131404",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 6188446564,
+            "range": "± 1445286072",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 12948716,
+            "range": "± 439099",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 110641752,
+            "range": "± 3781723",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 407374035,
+            "range": "± 34289435",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 12812674,
+            "range": "± 352390",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 110456955,
+            "range": "± 5130070",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 403834055,
+            "range": "± 38844168",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 5202642,
+            "range": "± 117707",
             "unit": "ns/iter"
           }
         ]
