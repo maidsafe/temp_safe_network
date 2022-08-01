@@ -206,21 +206,21 @@ impl DataStorage {
     }
 
     /// Retrieve all keys/ReplicatedDataAddresses of stored data
-    pub fn keys(&self) -> Result<Vec<ReplicatedDataAddress>> {
+    pub fn keys(&self) -> Vec<ReplicatedDataAddress> {
         let mut all_addrs = vec![];
 
         // TODO: Parallelize this below loops
-        let chunk_keys = self.chunks.keys()?;
+        let chunk_keys = self.chunks.keys();
         for addr in chunk_keys {
-            all_addrs.push(addr.to_replicated_data_address()?)
+            all_addrs.push(addr)
         }
 
-        let reg_keys = self.registers.keys()?;
+        let reg_keys = self.registers.keys();
         for addr in reg_keys {
-            all_addrs.push(addr.to_replicated_data_address()?)
+            all_addrs.push(addr)
         }
 
-        Ok(all_addrs)
+        all_addrs
     }
 }
 

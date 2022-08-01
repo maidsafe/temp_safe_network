@@ -6,9 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::types::register::User;
-use crate::types::DataAddress;
-use crate::types::PublicKey;
+use crate::types::{register::User, PublicKey, ReplicatedDataAddress as DataAddress};
 use serde::{Deserialize, Serialize};
 use std::result;
 use thiserror::Error;

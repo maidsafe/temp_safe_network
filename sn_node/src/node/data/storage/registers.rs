@@ -20,7 +20,8 @@ use sn_interface::{
     },
     types::{
         register::{Action, EntryHash, Permissions, Policy, Register, User},
-        DataAddress, Keypair, PublicKey, RegisterAddress, SPENTBOOK_TYPE_TAG,
+        Keypair, PublicKey, RegisterAddress, ReplicatedDataAddress as DataAddress,
+        SPENTBOOK_TYPE_TAG,
     },
 };
 
@@ -71,7 +72,7 @@ impl RegisterStorage {
         Ok(())
     }
 
-    pub(crate) fn keys(&self) -> Result<Vec<DataAddress>> {
+    pub(crate) fn keys(&self) -> Vec<DataAddress> {
         self.file_db.list_all_data_addresses()
     }
 
@@ -148,7 +149,7 @@ impl RegisterStorage {
     pub(crate) async fn get_data_of(&mut self, prefix: Prefix) -> Result<RegisterStoreExport> {
         let mut the_data = vec![];
 
-        let all_keys = self.keys()?;
+        let all_keys = self.keys();
 
         // TODO: make this concurrent
         for addr in all_keys {

@@ -15,7 +15,6 @@ pub use register::RegisterAddress;
 pub use spentbook::SpentbookAddress;
 
 use super::{utils, Result};
-use crate::types::Error;
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;
 
@@ -72,15 +71,6 @@ impl DataAddress {
     pub fn spentbook(name: XorName) -> DataAddress {
         DataAddress::Spentbook(SpentbookAddress::new(name))
     }
-
-    pub fn to_replicated_data_address(self) -> Result<ReplicatedDataAddress> {
-        match self {
-            Self::Bytes(addr) => Ok(ReplicatedDataAddress::Chunk(addr)),
-            Self::Register(addr) => Ok(ReplicatedDataAddress::Register(addr)),
-            Self::Spentbook(addr) => Ok(ReplicatedDataAddress::Spentbook(addr)),
-            _ => Err(Error::InvalidOperation),
-        }
-    }
 }
 
 /// An address of data on the network
@@ -102,6 +92,16 @@ impl ReplicatedDataAddress {
             Self::Register(address) => address.name(),
             Self::Spentbook(address) => address.name(),
         }
+    }
+
+    /// Returns the Address serialised and encoded in z-base-32.
+    pub fn encode_to_zbase32(&self) -> Result<String> {
+        utils::encode(&self)
+    }
+
+    /// Creates from z-base-32 encoded string.
+    pub fn decode_from_zbase32<T: AsRef<str>>(encoded: T) -> Result<Self> {
+        utils::decode(encoded)
     }
 }
 

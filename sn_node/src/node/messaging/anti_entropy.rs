@@ -171,7 +171,7 @@ impl Node {
         if updated && self.is_not_elder() {
             // only done if adult, since as an elder we dont want to get any more
             // data for our name (elders will eventually be caching data in general)
-            cmds.push(self.ask_for_any_new_data()?);
+            cmds.push(self.ask_for_any_new_data());
         }
 
         Ok(cmds)
