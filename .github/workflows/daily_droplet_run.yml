@@ -202,8 +202,9 @@ jobs:
           mkdir -p ~/.safe/prefix_maps
           curl https://safe-testnet-tool.s3.eu-west-2.amazonaws.com/${{ env.TESTNET_ID }}-prefix-map > ~/.safe/prefix_maps/default
 
-      - name: Build all test targets
-        run: cargo test --no-run --release
+      - name: Build all client tests before running
+        run: cd sn_client && cargo test --no-run --release
+        timeout-minutes: 25
 
       - name: Run client tests
         uses: jacderida/cargo-nextest@main
@@ -256,7 +257,8 @@ jobs:
           sharedKey: ${{github.run_id}}
 
       - name: Build all sn_api tests
-        run: cargo test --no-run -p sn_api --release --lib
+        run: cd sn_api && cargo test --no-run --release --lib
+        timeout-minutes: 25
 
       - name: Download genesis DBC
         shell: bash
@@ -316,7 +318,8 @@ jobs:
             > /tmp/genesis_dbc
 
       - name: Build all CLI tests
-        run: cargo test --no-run -p sn_cli --release
+        run: cd sn_cli && cargo test --no-run --release
+        timeout-minutes: 25
 
       - name: Generate keys for test run
         run: cargo run --package sn_cli --release -- keys create --for-cli
