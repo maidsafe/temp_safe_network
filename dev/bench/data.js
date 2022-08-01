@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1659368662004,
+  "lastUpdate": 1659368717420,
   "repoUrl": "https://github.com/maidsafe/safe_network",
   "entries": {
     "Safe Network Benchmarks": [
@@ -13703,6 +13703,144 @@ window.BENCHMARK_DATA = {
             "name": "generating keys",
             "value": 5202642,
             "range": "± 117707",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bzeeman@live.nl",
+            "name": "Benno Zeeman",
+            "username": "b-zee"
+          },
+          "committer": {
+            "email": "joshuef@gmail.com",
+            "name": "joshuef",
+            "username": "joshuef"
+          },
+          "distinct": true,
+          "id": "db7dcdc7968d1d7e946274650d5a0c48719b4955",
+          "message": "chore!: remove providing path to qp2p cfg\n\nThis configuration seems never to be provided or stored anyway. It looks\nlike some code was also taking this parameter to be the client config,\nnot the qp2p config, which is a source of confusion.\n\nBREAKING CHANGE: One less argument to pass to `ClientConfig::new`",
+          "timestamp": "2022-08-01T16:56:24+02:00",
+          "tree_id": "317870c09adb0db0c9013edc7c536e6124570946",
+          "url": "https://github.com/maidsafe/safe_network/commit/db7dcdc7968d1d7e946274650d5a0c48719b4955"
+        },
+        "date": 1659368716640,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "upload-sampling/upload and read 3072b",
+            "value": 598729305,
+            "range": "± 186849117",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 1mb",
+            "value": 651444342,
+            "range": "± 201286072",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload and read 10mb",
+            "value": 1232486077,
+            "range": "± 123287142",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 3072b",
+            "value": 396794920,
+            "range": "± 19865067",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 1mb",
+            "value": 400516648,
+            "range": "± 47669298",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "upload-sampling/upload 10mb",
+            "value": 1092332349,
+            "range": "± 3831422297",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/100",
+            "value": 8815488,
+            "range": "± 9222424",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/1000",
+            "value": 460758312,
+            "range": "± 53297605",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/register_writes/4000",
+            "value": 6218536054,
+            "range": "± 1054348760",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/100",
+            "value": 263001953,
+            "range": "± 83326145",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/1000",
+            "value": 2421275733,
+            "range": "± 554529840",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "write-sampling/chunk writes/4000",
+            "value": 5032298648,
+            "range": "± 1119781122",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/100",
+            "value": 11208270,
+            "range": "± 234105",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/1000",
+            "value": 94980047,
+            "range": "± 197333911",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/register_keys/4000",
+            "value": 423883010,
+            "range": "± 50456853",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/100",
+            "value": 11825660,
+            "range": "± 361259",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/1000",
+            "value": 95029766,
+            "range": "± 18717324",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "read-sampling/chunk keys/4000",
+            "value": 357896171,
+            "range": "± 21830070",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "generating keys",
+            "value": 4070762,
+            "range": "± 116992",
             "unit": "ns/iter"
           }
         ]
