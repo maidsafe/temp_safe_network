@@ -239,7 +239,6 @@ impl CmdThroughput {
 #[derive(Debug)]
 pub(crate) struct EnqueuedJob {
     job: CmdJob,
-    // retries: usize,
     reporter: StatusReporting,
 }
 
