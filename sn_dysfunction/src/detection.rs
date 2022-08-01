@@ -37,7 +37,7 @@ pub enum IssueType {
     /// Represents a knowledge issue to be tracked by Dysfunction Detection.
     Knowledge,
     /// Represents a pending request operation issue to be tracked by Dysfunction Detection.
-    PendingRequestOperation(Option<OperationId>),
+    PendingRequestOperation(OperationId),
 }
 
 #[derive(Debug)]
@@ -93,7 +93,7 @@ impl DysfunctionDetection {
                 self.calculate_node_score(
                     node,
                     nodes.clone(),
-                    &IssueType::PendingRequestOperation(None),
+                    &IssueType::PendingRequestOperation(rand_op_id()),
                 ),
             );
         }
@@ -286,6 +286,12 @@ impl DysfunctionDetection {
     }
 }
 
+fn rand_op_id() -> OperationId {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    OperationId(rng.gen())
+}
+
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;
@@ -352,7 +358,7 @@ mod tests {
             0 => Just(IssueType::Dkg),
             0 => Just(IssueType::Knowledge),
             3400 => (any::<[u8; 32]>())
-                .prop_map(|x| IssueType::PendingRequestOperation(Some(OperationId(x))))
+                .prop_map(|x| IssueType::PendingRequestOperation(OperationId(x)))
         ]
     }
 
@@ -483,7 +489,7 @@ mod tests {
                 let nodes = (0..node_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
                 let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
                 for _ in 0..5 {
-                    let _ = dysfunctional_detection.track_issue(
+                    dysfunctional_detection.track_issue(
                         nodes[0], issue_type.clone());
                 }
 
@@ -515,7 +521,7 @@ mod tests {
                 let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
                 let mut pending_operation_count = 0;
                 for _ in 0..issue_count {
-                    let _ = dysfunctional_detection.track_issue(
+                    dysfunctional_detection.track_issue(
                         nodes[0], issue_type.clone());
                     if let IssueType::PendingRequestOperation(_) = issue_type {
                         pending_operation_count += 1;
@@ -605,7 +611,7 @@ mod tests {
                             let msg_failed = &fail_test < failure_chance;
 
                             if msg_failed {
-                                let _ = dysfunctional_detection.track_issue(
+                                dysfunctional_detection.track_issue(
                                     node, issue.clone());
                             }
 
@@ -699,7 +705,7 @@ mod tests {
                         let msg_failed = &fail_test < failure_chance;
 
                         if msg_failed {
-                            let _ = dysfunctional_detection.track_issue(
+                            dysfunctional_detection.track_issue(
                                 node, issue.clone());
                         }
 
@@ -748,7 +754,7 @@ mod tests {
                 let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
                 for node in nodes.iter() {
                     for _ in 0..issue_count {
-                        let _ = dysfunctional_detection.track_issue(
+                        dysfunctional_detection.track_issue(
                             *node, issue_type.clone());
                     }
                 }
@@ -781,18 +787,12 @@ mod tests {
 mod ops_tests {
     use super::*;
 
-    use crate::{error::Result, DysfunctionDetection, DysfunctionSeverity, IssueType, OperationId};
-    use rand::Rng;
+    use crate::{error::Result, DysfunctionDetection, DysfunctionSeverity, IssueType};
     use xor_name::{rand::random as random_xorname, XorName};
 
     // some example numbers as guidance
     // we can see 500 pending issues under load
     pub(crate) const NORMAL_OPERATIONS_ISSUES: usize = 500;
-
-    fn get_random_operation_id() -> Option<OperationId> {
-        let mut rng = rand::thread_rng();
-        Some(OperationId(rng.gen()))
-    }
 
     #[tokio::test]
     async fn op_dysfunction() -> Result<()> {
@@ -801,9 +801,9 @@ mod ops_tests {
         let mut pending_operations = Vec::new();
         for node in &nodes {
             for _ in 0..NORMAL_OPERATIONS_ISSUES {
-                let op_id = get_random_operation_id();
-                pending_operations.push((node, op_id.unwrap()));
-                let _ = dysfunctional_detection
+                let op_id = rand_op_id();
+                pending_operations.push((node, op_id));
+                dysfunctional_detection
                     .track_issue(*node, IssueType::PendingRequestOperation(op_id));
             }
         }
@@ -881,7 +881,7 @@ mod comm_tests {
 
         for node in &nodes {
             for _ in 0..NORMAL_CONNECTION_PROBLEM_COUNT {
-                dysfunctional_detection.track_issue(*node, IssueType::Communication)?;
+                dysfunctional_detection.track_issue(*node, IssueType::Communication);
             }
         }
 
@@ -927,7 +927,7 @@ mod knowledge_tests {
         // Write data NORMAL_KNOWLEDGE_ISSUES times to the 10 nodes
         for node in &nodes {
             for _ in 0..NORMAL_KNOWLEDGE_ISSUES {
-                dysfunctional_detection.track_issue(*node, IssueType::Knowledge)?;
+                dysfunctional_detection.track_issue(*node, IssueType::Knowledge);
             }
         }
 
@@ -966,7 +966,7 @@ mod knowledge_tests {
 
         // Add just one knowledge issue...
         for _ in 0..1 {
-            dysfunctional_detection.track_issue(new_node, IssueType::Knowledge)?;
+            dysfunctional_detection.track_issue(new_node, IssueType::Knowledge);
         }
 
         let sus =

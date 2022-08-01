@@ -19,9 +19,6 @@ pub enum Error {
     /// System time error
     #[error("Could not calculate system time")]
     CouldNotCalculateSystemTime,
-    /// Error when an operation ID is not supplied when adding a pending request operation.
-    #[error("An operation ID must be supplied for a pending request operation.")]
-    OpIdNotSupplied(String),
     /// Error when an operation ID is supplied that doesn't apply to this type of issue.
     #[error("An operation ID only applies to pending unfulfilled requests.")]
     UnusedOpIdSupplied(String),

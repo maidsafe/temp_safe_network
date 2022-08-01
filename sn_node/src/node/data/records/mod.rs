@@ -108,7 +108,7 @@ impl Node {
         trace!("adding pending req for {target:?} in dysfunction tracking");
         cmds.push(Cmd::TrackNodeIssueInDysfunction {
             name: target.name(),
-            issue: IssueType::PendingRequestOperation(Some(operation_id)),
+            issue: IssueType::PendingRequestOperation(operation_id),
         });
 
         let msg = SystemMsg::NodeQuery(NodeQuery::Data {

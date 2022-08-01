@@ -62,7 +62,7 @@ impl Dispatcher {
         match cmd {
             Cmd::CleanupPeerLinks => {
                 let members = { self.node.read().await.network_knowledge.section_members() };
-                self.comm.cleanup_peers(members).await?;
+                self.comm.cleanup_peers(members).await;
                 Ok(vec![])
             }
             Cmd::SendMsg {
@@ -103,7 +103,7 @@ impl Dispatcher {
             }
             Cmd::TrackNodeIssueInDysfunction { name, issue } => {
                 let mut node = self.node.write().await;
-                node.log_node_issue(name, issue)?;
+                node.log_node_issue(name, issue);
                 Ok(vec![])
             }
             Cmd::AddToPendingQueries {
@@ -202,7 +202,7 @@ impl Dispatcher {
             }
             Cmd::HandlePeerFailedSend(peer) => {
                 let mut node = self.node.write().await;
-                node.handle_failed_send(&peer.addr())?;
+                node.handle_failed_send(&peer.addr());
                 Ok(vec![])
             }
             Cmd::HandleDkgOutcome {
@@ -214,7 +214,7 @@ impl Dispatcher {
             }
             Cmd::HandleDkgFailure(signeds) => {
                 let mut node = self.node.write().await;
-                Ok(vec![node.handle_dkg_failure(signeds)?])
+                Ok(vec![node.handle_dkg_failure(signeds)])
             }
             Cmd::EnqueueDataForReplication {
                 // throttle_duration,
@@ -265,8 +265,7 @@ impl Dispatcher {
                 if let Some(member_info) = node_state {
                     if self.comm.is_reachable(&member_info.addr()).await.is_err() {
                         let mut node = self.node.write().await;
-
-                        node.log_comm_issue(member_info.name())?
+                        node.log_comm_issue(member_info.name());
                     }
                 }
                 Ok(vec![])

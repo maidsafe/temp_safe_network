@@ -136,7 +136,7 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         debug!("{}", LogMarker::TriggeringPromotionAndDemotion);
         let mut cmds = vec![];
-        for session_id in self.promote_and_demote_elders(excluded_names)? {
+        for session_id in self.promote_and_demote_elders(excluded_names) {
             cmds.extend(self.send_dkg_start(session_id)?);
         }
 
