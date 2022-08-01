@@ -29,14 +29,14 @@ pub mod system;
 mod authority;
 // Error types definitions
 mod errors;
-// Source and destination structs for messages
-mod location;
 // Message ID definition
 mod msg_id;
 // Message types
 mod msg_type;
 // Types of messages and corresponding source authorities
 mod auth_kind;
+// Msg dst
+mod dst;
 // SectionAuthorityProvider
 mod sap;
 
@@ -45,8 +45,8 @@ pub use self::{
     authority::{
         AuthorityProof, BlsShareAuth, NodeAuth, SectionAuth, ServiceAuth, VerifyAuthority,
     },
+    dst::Dst,
     errors::{Error, Result},
-    location::{DstLocation, EndUser, SrcLocation},
     msg_id::{MsgId, MESSAGE_ID_LEN},
     msg_type::MsgType,
     sap::SectionAuthorityProvider,
@@ -55,3 +55,11 @@ pub use self::{
 
 #[cfg(feature = "traceroute")]
 pub use self::serialisation::Entity;
+
+use serde::{Deserialize, Serialize};
+use xor_name::XorName;
+
+/// An `EndUser` is represented by a name which is mapped to
+// a SocketAddr at the Elders where the `EndUser` is proxied through.
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize, Debug)]
+pub struct EndUser(pub XorName);

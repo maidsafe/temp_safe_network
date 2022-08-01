@@ -7,7 +7,8 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    flow_ctrl::cmds::Cmd, membership, relocation::ChurnId, Event, MembershipEvent, Node, Result,
+    flow_ctrl::cmds::Cmd, membership, messaging::Peers, relocation::ChurnId, Event,
+    MembershipEvent, Node, Result,
 };
 
 use bls::Signature;
@@ -88,7 +89,7 @@ impl Node {
                         // We'll send a membership AE request to see if they can help us catch up.
                         debug!("{:?}", LogMarker::MembershipSendingAeUpdateRequest);
                         let msg = SystemMsg::MembershipAE(membership.generation());
-                        cmds.push(self.send_system_to_one(msg, peer));
+                        cmds.push(self.send_system_msg(msg, Peers::Single(peer)));
                         // return the vec w/ the AE cmd there so as not to loop and generate AE for
                         // any subsequent commands
                         return Ok(cmds);
@@ -139,9 +140,10 @@ impl Node {
 
         if let Some(membership) = self.membership.as_ref() {
             match membership.anti_entropy(gen) {
-                Ok(catchup_votes) => {
-                    Some(self.send_system_to_one(SystemMsg::MembershipVotes(catchup_votes), peer))
-                }
+                Ok(catchup_votes) => Some(self.send_system_msg(
+                    SystemMsg::MembershipVotes(catchup_votes),
+                    Peers::Single(peer),
+                )),
                 Err(e) => {
                     error!("Membership - Error while processing anti-entropy {:?}", e);
                     None
@@ -274,7 +276,7 @@ impl Node {
         }));
 
         trace!("{}", LogMarker::SendNodeApproval);
-        self.send_system_to_many(msg, peers)
+        self.send_system_msg(msg, Peers::Multiple(peers))
     }
 
     pub(crate) fn handle_node_left(
@@ -307,7 +309,7 @@ impl Node {
         if node_state.is_relocated() {
             let peer = *node_state.peer();
             let msg = SystemMsg::Relocate(node_state.into_authed_msg());
-            Some(self.send_system_to_one(msg, peer))
+            Some(self.send_system_msg(msg, Peers::Single(peer)))
         } else {
             None
         }

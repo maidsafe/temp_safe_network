@@ -18,22 +18,26 @@ pub mod utils;
 #[cfg(any(test, feature = "test-utils"))]
 pub use self::section_authority_provider::test_utils;
 
-pub use self::section_keys::{SectionKeyShare, SectionKeysProvider};
-
-pub use node_info::NodeInfo;
-pub use node_state::NodeState;
-pub use section_authority_provider::{SapCandidate, SectionAuthUtils, SectionAuthorityProvider};
-
-use crate::messaging::{
-    system::{
-        KeyedSig, NodeMsgAuthorityUtils, SectionAuth, SectionPeers as SectionPeersMsg, SystemMsg,
-    },
-    NodeMsgAuthority,
+pub use self::{
+    errors::{Error, Result},
+    node_info::NodeInfo,
+    node_state::NodeState,
+    section_authority_provider::{SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
+    section_keys::{SectionKeyShare, SectionKeysProvider},
 };
-use prefix_map::NetworkPrefixMap;
-// use crate::node::{dkg::SectionAuthUtils, recommended_section_size};
-use crate::types::Peer;
-pub use errors::{Error, Result};
+
+use self::prefix_map::NetworkPrefixMap;
+
+use crate::{
+    messaging::{
+        system::{
+            KeyedSig, NodeMsgAuthorityUtils, SectionAuth, SectionPeers as SectionPeersMsg,
+            SystemMsg,
+        },
+        Dst, NodeMsgAuthority,
+    },
+    types::Peer,
+};
 
 use bls::PublicKey as BlsPublicKey;
 use section_peers::SectionPeers;
@@ -637,15 +641,44 @@ impl NetworkKnowledge {
         self.signed_sap.prefix()
     }
 
+    /// Returns the members of our section
+    pub fn members(&self) -> BTreeSet<Peer> {
+        self.elders().into_iter().chain(self.adults()).collect()
+    }
+
     /// Returns the elders of our section
-    pub fn elders(&self) -> Vec<Peer> {
-        self.authority_provider().elders_vec()
+    pub fn elders(&self) -> BTreeSet<Peer> {
+        self.authority_provider().elders_set()
+    }
+
+    /// Returns live adults from our section.
+    pub fn adults(&self) -> BTreeSet<Peer> {
+        let mut live_adults = BTreeSet::new();
+        for node_state in self.section_peers.members() {
+            if !self.is_elder(&node_state.name()) {
+                let _ = live_adults.insert(*node_state.peer());
+            }
+        }
+        live_adults
     }
 
     /// Return whether the name provided belongs to an Elder, by checking if
     /// it is one of the current section's SAP member,
     pub fn is_elder(&self, name: &XorName) -> bool {
         self.signed_sap.contains_elder(name)
+    }
+
+    /// Return whether the name provided belongs to an Adult, by checking if
+    /// it is one of the current section's SAP member,
+    pub fn is_adult(&self, name: &XorName) -> bool {
+        self.adults().iter().any(|a| a.name() == *name)
+    }
+
+    pub fn dst(&self, recipient: &XorName) -> Result<Dst> {
+        Ok(Dst {
+            name: *recipient,
+            section_key: self.section_by_name(recipient)?.section_key(),
+        })
     }
 
     /// Returns members that are joined.
@@ -665,17 +698,6 @@ impl NetworkKnowledge {
     /// Returns current section size, i.e. number of peers in the section.
     pub fn section_size(&self) -> usize {
         self.section_peers.num_of_members()
-    }
-
-    /// Returns live adults from our section.
-    pub fn adults(&self) -> Vec<Peer> {
-        let mut live_adults = vec![];
-        for node_state in self.section_peers.members() {
-            if !self.is_elder(&node_state.name()) {
-                live_adults.push(*node_state.peer())
-            }
-        }
-        live_adults
     }
 
     /// Get info for the member with the given name.

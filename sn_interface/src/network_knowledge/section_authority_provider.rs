@@ -326,14 +326,16 @@ pub mod test_utils {
         prefix: Prefix,
         count: usize,
     ) -> (SectionAuthorityProvider, Vec<NodeInfo>, SecretKeySet) {
-        let nodes = gen_sorted_nodes(&prefix, count, false);
-        let elders = nodes.iter().map(NodeInfo::peer);
-        let members = nodes.iter().map(|i| NodeState::joined(i.peer(), None));
+        let elder_nodes = gen_sorted_nodes(&prefix, count, false);
+        let elders = elder_nodes.iter().map(NodeInfo::peer);
+        let members = elder_nodes
+            .iter()
+            .map(|i| NodeState::joined(i.peer(), None));
         let secret_key_set = SecretKeySet::random();
         let section_auth =
             SectionAuthorityProvider::new(elders, prefix, members, secret_key_set.public_keys(), 0);
 
-        (section_auth, nodes, secret_key_set)
+        (section_auth, elder_nodes, secret_key_set)
     }
 
     // Create signature for the given payload using the given secret key.

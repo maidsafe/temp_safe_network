@@ -21,7 +21,7 @@ use sn_interface::{
     messaging::{
         data::{CmdError, ServiceMsg},
         system::{KeyedSig, SectionAuth, SystemMsg},
-        AuthKind, AuthorityProof, DstLocation, MsgId, MsgType, ServiceAuth, WireMsg,
+        AuthKind, AuthorityProof, Dst, MsgId, MsgType, ServiceAuth, WireMsg,
     },
     network_knowledge::{
         utils::compare_and_write_prefix_map_to_disk, NetworkKnowledge, SectionAuthorityProvider,
@@ -33,8 +33,7 @@ use bls::PublicKey as BlsPublicKey;
 use bytes::Bytes;
 use itertools::Itertools;
 use qp2p::{Close, ConnectionError, ConnectionIncoming as IncomingMsgs, SendError};
-use rand::rngs::OsRng;
-use rand::seq::SliceRandom;
+use rand::{rngs::OsRng, seq::SliceRandom};
 use secured_linked_list::SecuredLinkedList;
 use std::net::SocketAddr;
 use tracing::Instrument;
@@ -363,7 +362,7 @@ impl Session {
         )
         .await;
 
-        if let Some((msg_id, elders, service_msg, dst_location, auth)) =
+        if let Some((msg_id, elders, service_msg, dst, auth)) =
             Self::new_target_elders(bounced_msg.clone(), &target_sap).await?
         {
             let ae_msg_src_name = src_peer.name();
@@ -379,12 +378,8 @@ impl Session {
             // there should always be one
             if let Some(elder) = target_elder {
                 let payload = WireMsg::serialize_msg_payload(&service_msg)?;
-                let wire_msg = WireMsg::new_msg(
-                    msg_id,
-                    payload,
-                    AuthKind::Service(auth.into_inner()),
-                    dst_location,
-                )?;
+                let wire_msg =
+                    WireMsg::new_msg(msg_id, payload, AuthKind::Service(auth.into_inner()), dst);
 
                 debug!("Resending original message on AE-Redirect with updated details. Expecting an AE-Retry next");
 
@@ -474,27 +469,26 @@ impl Session {
             MsgId,
             Vec<Peer>,
             ServiceMsg,
-            DstLocation,
+            Dst,
             AuthorityProof<ServiceAuth>,
         )>,
         Error,
     > {
-        let (msg_id, service_msg, mut dst_location, auth) =
-            match WireMsg::deserialize(bounced_msg.clone())? {
-                MsgType::Service {
-                    msg_id,
-                    msg,
-                    auth,
-                    dst_location,
-                } => (msg_id, msg, dst_location, auth),
-                other => {
-                    warn!(
-                        "Unexpected non-serviceMsg returned in AE-Redirect response: {:?}",
-                        other
-                    );
-                    return Ok(None);
-                }
-            };
+        let (msg_id, service_msg, dst, auth) = match WireMsg::deserialize(bounced_msg.clone())? {
+            MsgType::Service {
+                msg_id,
+                msg,
+                auth,
+                dst,
+            } => (msg_id, msg, dst, auth),
+            other => {
+                warn!(
+                    "Unexpected non-serviceMsg returned in AE-Redirect response: {:?}",
+                    other
+                );
+                return Ok(None);
+            }
+        };
 
         trace!(
             "Bounced msg ({:?}) received in an AE response: {:?}",
@@ -537,7 +531,10 @@ impl Session {
         target_elders.shuffle(&mut OsRng);
 
         // Let's rebuild the msg with the updated destination details
-        dst_location.set_section_pk(target_public_key);
+        let dst = Dst {
+            name: dst.name,
+            section_key: target_public_key,
+        };
 
         if !target_elders.is_empty() {
             debug!(
@@ -546,14 +543,6 @@ impl Session {
             );
         }
 
-        // drop(the_cache_guard);
-
-        Ok(Some((
-            msg_id,
-            target_elders,
-            service_msg,
-            dst_location,
-            auth,
-        )))
+        Ok(Some((msg_id, target_elders, service_msg, dst, auth)))
     }
 }

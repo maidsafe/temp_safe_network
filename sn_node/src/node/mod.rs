@@ -15,7 +15,6 @@ mod api;
 mod bootstrap;
 mod connectivity;
 mod data;
-mod delivery_group;
 mod dkg;
 pub(crate) mod error;
 mod flow_ctrl;
@@ -77,6 +76,7 @@ mod core {
             flow_ctrl::{cmds::Cmd, event_channel::EventSender},
             handover::Handover,
             membership::{elder_candidates, try_split_dkg, Membership},
+            messaging::Peers,
             split_barrier::SplitBarrier,
             DataStorage, Elders, Error, Event, MembershipEvent, NodeElderChange, Prefix, Proposal,
             Result, XorName,
@@ -308,7 +308,7 @@ mod core {
                 section_key
             );
 
-            Ok(self.send_system_to_many(SystemMsg::AntiEntropyProbe, recipients))
+            Ok(self.send_system_msg(SystemMsg::AntiEntropyProbe, Peers::Multiple(recipients)))
         }
 
         pub(crate) fn generate_section_probe_msg(&self) -> Cmd {
@@ -321,7 +321,7 @@ mod core {
                 recipients,
             );
 
-            self.send_system_to_many(SystemMsg::AntiEntropyProbe, recipients)
+            self.send_system_msg(SystemMsg::AntiEntropyProbe, Peers::Multiple(recipients))
         }
 
         /// returns names that are relatively dysfunctional

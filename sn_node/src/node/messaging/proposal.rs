@@ -6,14 +6,8 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use std::collections::BTreeSet;
+use crate::node::{dkg::SigShare, flow_ctrl::cmds::Cmd, messaging::Peers, Node, Proposal, Result};
 
-use crate::node::{
-    dkg::SigShare,
-    flow_ctrl::cmds::Cmd,
-    messaging::{OutgoingMsg, Recipients},
-    Node, Proposal, Result,
-};
 use sn_interface::{
     messaging::{
         signature_aggregator::{Error as AggregatorError, SignatureAggregator},
@@ -90,17 +84,12 @@ impl Node {
         }
 
         // remove ourself from recipients
-        let recipients: BTreeSet<_> = recipients
+        let recipients = recipients
             .into_iter()
             .filter(|peer| peer.name() != our_name)
             .collect();
 
-        cmds.push(Cmd::SendMsg {
-            msg: OutgoingMsg::System(msg),
-            recipients: Recipients::Peers(recipients),
-            #[cfg(feature = "traceroute")]
-            traceroute: vec![],
-        });
+        cmds.push(self.send_system_msg(msg, Peers::Multiple(recipients)));
 
         Ok(cmds)
     }

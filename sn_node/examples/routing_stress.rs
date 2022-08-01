@@ -9,7 +9,7 @@
 #![recursion_limit = "256"]
 
 use sn_interface::{
-    messaging::{data::Error::FailedToWriteFile, system::SystemMsg, DstLocation, MsgId},
+    messaging::{data::Error::FailedToWriteFile, system::SystemMsg, MsgId},
     types::Cache,
 };
 use sn_node::node::{
@@ -303,15 +303,9 @@ impl Network {
             }
             Event::Routing { id, event } => match event {
                 RoutingEvent::Messaging(MessagingEvent::SystemMsgReceived { dst, .. }) => {
-                    let (dst, dst_section_pk) = match dst {
-                        DstLocation::Section { name, section_pk } => (name, section_pk),
-                        DstLocation::Node { name, section_pk } => (name, section_pk),
-                        DstLocation::EndUser(_) => {
-                            return Err(eyre!("unexpected probe message dst: {:?}", dst))
-                        }
-                    };
-
-                    self.probe_tracker.receive(&dst, &dst_section_pk).await;
+                    self.probe_tracker
+                        .receive(&dst.name, &dst.section_key)
+                        .await;
                 }
                 RoutingEvent::Membership(e) => match e {
                     MembershipEvent::EldersChanged {
@@ -415,7 +409,8 @@ impl Network {
                 .context("No pk found for our node's section")?;
 
             let nodes_section_pk = nodes_section.section_key();
-            if self.try_send_probe(node, dst).await? {
+
+            if self.try_send_probe(node).await? {
                 self.probe_tracker
                     .send(*prefix, dst, nodes_section_pk)
                     .await;
@@ -429,13 +424,11 @@ impl Network {
         Ok(())
     }
 
-    async fn try_send_probe(&self, node: &NodeApi, dst: XorName) -> Result<bool> {
-        let public_key_set = if let Ok(public_key_set) = node.public_key_set().await {
-            public_key_set
-        } else {
+    async fn try_send_probe(&self, node: &NodeApi) -> Result<bool> {
+        if node.public_key_set().await.is_err() {
             // The node doesn't have BLS keys. Skip.
             return Ok(false);
-        };
+        }
 
         // There can be a significant delay between a node being relocated and us receiving the
         // `Relocated` event. Using the current node name instead of the one reported by the last
@@ -447,12 +440,10 @@ impl Network {
             error: FailedToWriteFile,
             correlation_id: MsgId::new(),
         };
-        let dst = DstLocation::Section {
-            name: dst,
-            section_pk: public_key_set.public_key(),
-        };
 
-        match node.send(msg, dst).await {
+        let recipients = node.our_elders().await;
+
+        match node.send(msg, recipients).await {
             Ok(()) => Ok(true),
             Err(error) => {
                 Err(error).context(format!("failed to send probe by {}", node.name().await))

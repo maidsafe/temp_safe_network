@@ -11,7 +11,8 @@ mod capacity;
 pub(crate) use self::capacity::{Capacity, MIN_LEVEL_WHEN_FULL};
 
 use crate::node::{
-    error::convert_to_error_msg, Cmd, Error, Node, Prefix, Result, MAX_WAITING_PEERS_PER_QUERY,
+    error::convert_to_error_msg, messaging::Peers, Cmd, Error, Node, Prefix, Result,
+    MAX_WAITING_PEERS_PER_QUERY,
 };
 
 use itertools::Itertools;
@@ -45,9 +46,9 @@ impl Node {
             &targets,
         );
 
-        self.trace_system_to_many(
+        self.trace_system_msg(
             SystemMsg::NodeCmd(NodeCmd::ReplicateData(vec![data])),
-            targets,
+            Peers::Multiple(targets),
             #[cfg(feature = "traceroute")]
             traceroute,
         )
@@ -61,7 +62,6 @@ impl Node {
         origin: Peer,
         #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Result<Vec<Cmd>> {
-        let mut cmds = vec![];
         let address = query.variant.address();
         let operation_id = query.variant.operation_id()?;
         trace!(
@@ -115,44 +115,46 @@ impl Node {
         // only set pending data query cache if non existed.
         // otherwise we've appended to the Peers above
         // we rely on the data query cache timeout to decide as/when we'll be re-sending a query to adults
-        if !op_was_already_underway {
-            // ensure we only add a pending request when we're actually sending out requests.
-            for target in &targets {
-                trace!("adding pending req for {target:?} in dysfunction tracking");
-                cmds.push(Cmd::TrackNodeIssueInDysfunction {
-                    name: target.name(),
-                    issue: IssueType::PendingRequestOperation(Some(operation_id)),
-                })
-            }
-
-            trace!(
-                "Adding to pending data queries for op id: {:?}",
-                operation_id
-            );
-
-            let _prior_value = self
-                .pending_data_queries
-                .set(operation_id, waiting_peers, None);
-
-            let msg = SystemMsg::NodeQuery(NodeQuery::Data {
-                query: query.variant,
-                auth: auth.into_inner(),
-                origin: EndUser(origin.name()),
-                correlation_id: msg_id,
-            });
-
-            cmds.push(self.trace_system_to_many(
-                msg,
-                targets,
-                #[cfg(feature = "traceroute")]
-                traceroute,
-            ));
-
-            Ok(cmds)
-        } else {
+        if op_was_already_underway {
             // we don't do anything as we're still within data query timeout
-            Ok(cmds)
+            return Ok(vec![]);
         }
+
+        let mut cmds = vec![];
+
+        // ensure we only add a pending request when we're actually sending out requests.
+        for target in &targets {
+            trace!("adding pending req for {target:?} in dysfunction tracking");
+            cmds.push(Cmd::TrackNodeIssueInDysfunction {
+                name: target.name(),
+                issue: IssueType::PendingRequestOperation(Some(operation_id)),
+            })
+        }
+
+        trace!(
+            "Adding to pending data queries for op id: {:?}",
+            operation_id
+        );
+
+        let _prior_value = self
+            .pending_data_queries
+            .set(operation_id, waiting_peers, None);
+
+        let msg = SystemMsg::NodeQuery(NodeQuery::Data {
+            query: query.variant,
+            auth: auth.into_inner(),
+            origin: EndUser(origin.name()),
+            correlation_id: msg_id,
+        });
+
+        cmds.push(self.trace_system_msg(
+            msg,
+            Peers::Multiple(targets),
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        ));
+
+        Ok(cmds)
     }
 
     pub(crate) fn get_metadata_of(&self, prefix: &Prefix) -> MetadataExchange {

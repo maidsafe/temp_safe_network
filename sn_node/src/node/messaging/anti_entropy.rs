@@ -8,7 +8,7 @@
 
 use crate::node::{
     flow_ctrl::cmds::Cmd,
-    messaging::{OutgoingMsg, Recipients},
+    messaging::{OutgoingMsg, Peers},
     Error, Event, MembershipEvent, Node, Result, StateSnapshot,
 };
 use backoff::{backoff::Backoff, ExponentialBackoff};
@@ -56,15 +56,15 @@ impl Node {
         section_pk: BlsPublicKey,
     ) -> Cmd {
         let ae_msg = self.generate_ae_update_msg(section_pk);
-        self.send_system_to_many(ae_msg, recipients)
+        self.send_system_msg(ae_msg, Peers::Multiple(recipients))
     }
 
     /// Send `MetadataExchange` packet to the specified nodes
     pub(crate) fn send_metadata_updates(&self, recipients: BTreeSet<Peer>, prefix: &Prefix) -> Cmd {
         let metadata = self.get_metadata_of(prefix);
-        self.send_system_to_many(
+        self.send_system_msg(
             SystemMsg::NodeCmd(NodeCmd::ReceiveMetadata { metadata }),
-            recipients,
+            Peers::Multiple(recipients),
         )
     }
 
@@ -168,8 +168,10 @@ impl Node {
         let mut cmds = self.update_on_elder_change(snapshot).await?;
 
         // Only trigger reorganize data when there is a membership change happens.
-        if updated {
-            cmds.extend(self.try_reorganize_data()?);
+        if updated && self.is_not_elder() {
+            // only done if adult, since as an elder we dont want to get any more
+            // data for our name (elders will eventually be caching data in general)
+            cmds.push(self.ask_for_any_new_data()?);
         }
 
         Ok(cmds)
@@ -214,7 +216,7 @@ impl Node {
                     result.extend(cmds);
                 }
 
-                result.push(self.send_system_to_one(msg_to_resend, sender));
+                result.push(self.send_system_msg(msg_to_resend, Peers::Single(sender)));
 
                 Ok(result)
             }
@@ -274,7 +276,9 @@ impl Node {
 
                     self.create_or_wait_for_backoff(&elder).await;
 
-                    Ok(vec![self.send_system_to_one(msg_to_redirect, elder)])
+                    Ok(vec![
+                        self.send_system_msg(msg_to_redirect, Peers::Single(elder))
+                    ])
                 }
             },
         }
@@ -289,13 +293,10 @@ impl Node {
         bounced_msg: Bytes,
         sender: Peer,
     ) -> Result<Option<(SystemMsg, MsgId)>> {
-        let (bounced_msg, msg_id, dst_location) = match WireMsg::deserialize(bounced_msg)? {
+        let (bounced_msg, msg_id, dst) = match WireMsg::deserialize(bounced_msg)? {
             MsgType::System {
-                msg,
-                msg_id,
-                dst_location,
-                ..
-            } => (msg, msg_id, dst_location),
+                msg, msg_id, dst, ..
+            } => (msg, msg_id, dst),
             _ => {
                 warn!("Non System MsgType received in AE response. We do not handle any other type in AE msgs yet.");
                 return Ok(None);
@@ -352,7 +353,7 @@ impl Node {
 
         // If the new SAP's section key is the same as the section key set when the
         // bounced message was originally sent, we just drop it.
-        if dst_location.section_pk() == Some(dst_section_key) {
+        if dst.section_key == dst_section_key {
             error!("Dropping bounced msg ({:?}) received in AE-Retry from {} as suggested new dst section key is the same as previously sent: {:?}", msg_id, sender,dst_section_key);
             Ok(None)
         } else {
@@ -430,12 +431,10 @@ impl Node {
 
                     trace!("{}", LogMarker::AeSendRedirect);
 
-                    return Ok(Some(Cmd::SendMsg {
-                        msg: OutgoingMsg::System(ae_msg),
-                        recipients: Recipients::from_single(*sender),
-                        #[cfg(feature = "traceroute")]
-                        traceroute: vec![],
-                    }));
+                    return Ok(Some(Cmd::send_msg(
+                        OutgoingMsg::System(ae_msg),
+                        Peers::Single(*sender),
+                    )));
                 }
                 None => {
                     warn!("Our PrefixMap is empty");
@@ -510,12 +509,10 @@ impl Node {
             }
         };
 
-        Ok(Some(Cmd::SendMsg {
-            msg: OutgoingMsg::System(ae_msg),
-            recipients: Recipients::from_single(*sender),
-            #[cfg(feature = "traceroute")]
-            traceroute: vec![],
-        }))
+        Ok(Some(Cmd::send_msg(
+            OutgoingMsg::System(ae_msg),
+            Peers::Single(*sender),
+        )))
     }
 
     // Generate an AE redirect cmd for the given message
@@ -535,12 +532,10 @@ impl Node {
 
         trace!("{} in ae_redirect", LogMarker::AeSendRedirect);
 
-        Ok(Cmd::SendMsg {
-            msg: OutgoingMsg::System(ae_msg),
-            recipients: Recipients::from_single(sender),
-            #[cfg(feature = "traceroute")]
-            traceroute: vec![],
-        })
+        Ok(Cmd::send_msg(
+            OutgoingMsg::System(ae_msg),
+            Peers::Single(sender),
+        ))
     }
 }
 
@@ -558,7 +553,7 @@ mod tests {
     use sn_interface::{
         elder_count,
         messaging::{
-            AuthKind, AuthorityProof, DstLocation, MsgId, NodeAuth, NodeMsgAuthority,
+            AuthKind, AuthorityProof, Dst, MsgId, NodeAuth, NodeMsgAuthority,
             SectionAuth as SectionAuthMsg,
         },
         network_knowledge::{
@@ -881,25 +876,19 @@ mod tests {
                 gen_addr(),
             );
 
-            let src_node_keypair = sender.keypair;
-
             let payload_msg = SystemMsg::StartConnectivityTest(xor_name::rand::random());
             let payload = WireMsg::serialize_msg_payload(&payload_msg)?;
 
-            let dst_name = xor_name::rand::random();
-            let dst_section_key = SecretKey::random().public_key();
-            let dst_location = DstLocation::Node {
-                name: dst_name,
-                section_pk: dst_section_key,
+            let dst = Dst {
+                name: xor_name::rand::random(),
+                section_key: SecretKey::random().public_key(),
             };
 
             let msg_id = MsgId::new();
-
-            let node_auth = NodeAuth::authorize(src_section_pk, &src_node_keypair, &payload);
-
+            let node_auth = NodeAuth::authorize(src_section_pk, &sender.keypair, &payload);
             let auth = AuthKind::Node(node_auth.into_inner());
 
-            Ok(WireMsg::new_msg(msg_id, payload, auth, dst_location)?)
+            Ok(WireMsg::new_msg(msg_id, payload, auth, dst))
         }
 
         fn create_update_msg(

@@ -20,14 +20,11 @@ mod signing;
 mod system_msgs;
 mod update_section;
 
-use std::collections::BTreeSet;
-
 use crate::node::{flow_ctrl::cmds::Cmd, Node, Result, DATA_QUERY_LIMIT};
 
 use sn_interface::{
     messaging::{
-        data::ServiceMsg, system::SystemMsg, BlsShareAuth, DstLocation, MsgType, NodeMsgAuthority,
-        WireMsg,
+        data::ServiceMsg, system::SystemMsg, BlsShareAuth, Dst, MsgType, NodeMsgAuthority, WireMsg,
     },
     network_knowledge::NetworkKnowledge,
     types::Peer,
@@ -35,6 +32,7 @@ use sn_interface::{
 
 use bytes::Bytes;
 use itertools::Itertools;
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
@@ -45,19 +43,18 @@ pub(crate) enum OutgoingMsg {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum Recipients {
-    Dst(DstLocation),
-    Peers(BTreeSet<Peer>),
+pub(crate) enum Peers {
+    Single(Peer),
+    Multiple(BTreeSet<Peer>),
 }
 
-impl Recipients {
-    pub(crate) fn from(peers: &[Peer]) -> Self {
-        let mut set = BTreeSet::new();
-        set.extend(peers);
-        Self::Peers(set)
-    }
-    pub(crate) fn from_single(peer: Peer) -> Self {
-        Self::Peers(BTreeSet::from([peer]))
+impl Peers {
+    #[allow(unused)]
+    pub(crate) fn get(&self) -> BTreeSet<Peer> {
+        match self {
+            Self::Single(peer) => BTreeSet::from([*peer]),
+            Self::Multiple(peers) => peers.clone(),
+        }
     }
 }
 
@@ -90,7 +87,7 @@ impl Node {
             MsgType::System {
                 msg_id,
                 msg_authority,
-                dst_location,
+                dst,
                 msg,
             } => {
                 // Verify that the section key in the msg authority is trusted
@@ -110,7 +107,7 @@ impl Node {
                         &origin,
                         &msg,
                         &wire_msg,
-                        &dst_location,
+                        &dst,
                         original_bytes.clone(), // a cheap clone w/ Bytes
                     )
                     .await?;
@@ -136,17 +133,9 @@ impl Node {
             MsgType::Service {
                 msg_id,
                 msg,
-                dst_location,
+                dst,
                 auth,
             } => {
-                if let DstLocation::EndUser(_) = dst_location {
-                    warn!(
-                        "Service msg has been dropped as its destination location ({:?}) is invalid: {:?}",
-                        dst_location, msg
-                    );
-                    return Ok(vec![]);
-                }
-
                 let dst_name = match msg.dst_address() {
                     Some(name) => name,
                     None => {
@@ -175,16 +164,8 @@ impl Node {
                 }
 
                 // Then we perform AE checks
-                let received_section_pk = match dst_location.section_pk() {
-                    Some(section_pk) => section_pk,
-                    None => {
-                        warn!("Dropping service message as there is no valid dst section_pk.");
-                        return Ok(vec![]);
-                    }
-                };
-
                 if let Some(cmd) =
-                    self.check_for_entropy(original_bytes, &received_section_pk, dst_name, &origin)?
+                    self.check_for_entropy(original_bytes, &dst.section_key, dst_name, &origin)?
                 {
                     // short circuit and send those AE responses
                     return Ok(vec![cmd]);
@@ -222,7 +203,7 @@ impl Node {
         origin: &Peer,
         msg: &SystemMsg,
         wire_msg: &WireMsg,
-        dst_location: &DstLocation,
+        dst: &Dst,
         msg_bytes: Bytes,
     ) -> Result<Vec<Cmd>> {
         let mut cmds = vec![];
@@ -249,40 +230,34 @@ impl Node {
                 );
                 Ok(cmds)
             }
-            _ => match dst_location.section_pk() {
-                None => Ok(cmds),
-                Some(dst_section_pk) => {
-                    if let Some(ae_cmd) = self.check_for_entropy(
-                        msg_bytes,
-                        &dst_section_pk,
-                        dst_location.name(),
-                        origin,
-                    )? {
-                        // we want to log issues with an elder who is out of sync here...
-                        let knowledge = self.network_knowledge.elders();
-                        let mut known_elders = knowledge.iter().map(|peer| peer.name());
+            _ => {
+                if let Some(ae_cmd) =
+                    self.check_for_entropy(msg_bytes, &dst.section_key, dst.name, origin)?
+                {
+                    // we want to log issues with an elder who is out of sync here...
+                    let knowledge = self.network_knowledge.elders();
+                    let mut known_elders = knowledge.iter().map(|peer| peer.name());
 
-                        if known_elders.contains(&origin.name()) {
-                            // we track a dysfunction against our elder here
-                            cmds.push(Cmd::TrackNodeIssueInDysfunction {
-                                name: origin.name(),
-                                issue: sn_dysfunction::IssueType::Knowledge,
-                            });
-                        }
-
-                        cmds.push(ae_cmd);
-
-                        return Ok(cmds);
+                    if known_elders.contains(&origin.name()) {
+                        // we track a dysfunction against our elder here
+                        cmds.push(Cmd::TrackNodeIssueInDysfunction {
+                            name: origin.name(),
+                            issue: sn_dysfunction::IssueType::Knowledge,
+                        });
                     }
 
-                    trace!(
-                        "Entropy check passed. Handling verified msg {:?}",
-                        wire_msg.msg_id()
-                    );
+                    cmds.push(ae_cmd);
 
-                    Ok(cmds)
+                    return Ok(cmds);
                 }
-            },
+
+                trace!(
+                    "Entropy check passed. Handling verified msg {:?}",
+                    wire_msg.msg_id()
+                );
+
+                Ok(cmds)
+            }
         }
     }
 }
