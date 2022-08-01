@@ -524,8 +524,10 @@ impl Node {
                     LogMarker::RequestForAnyMissingData,
                     msg_id
                 );
-
-                self.get_missing_data_for_node(sender, known_data_addresses)
+                Ok(self
+                    .get_missing_data_for_node(sender, known_data_addresses)
+                    .into_iter()
+                    .collect())
             }
             SystemMsg::NodeQuery(node_query) => {
                 match node_query {

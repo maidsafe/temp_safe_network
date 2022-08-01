@@ -8,7 +8,7 @@
 
 use sn_interface::{
     messaging::data::Error as ErrorMsg,
-    types::{convert_dt_error_to_error_msg, DataAddress, PublicKey, ReplicatedDataAddress},
+    types::{convert_dt_error_to_error_msg, PublicKey, ReplicatedDataAddress as DataAddress},
 };
 
 use std::io;
@@ -41,15 +41,9 @@ pub enum Error {
     /// Data id not found.
     #[error("Data id not found: {0:?}")]
     DataIdNotFound(DataAddress),
-    /// Cannot delete public data
-    #[error("Cannot delete public data {0:?}")]
-    CannotDeletePublicData(DataAddress),
     /// Data not found.
     #[error("No such data: {0:?}")]
     NoSuchData(DataAddress),
-    /// Data not found for replication
-    #[error("No such data for replication: {0:?}")]
-    NoSuchDataForReplication(ReplicatedDataAddress),
     /// Chunk not found.
     #[error("Chunk not found: {0:?}")]
     ChunkNotFound(XorName),

@@ -7,15 +7,22 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use super::{Error, Result};
-use std::collections::btree_map::BTreeMap;
 
 use crate::UsedSpace;
-use sn_interface::types::{Chunk, DataAddress, RegisterAddress, RegisterCmd};
+
+use sn_interface::{
+    messaging::data::DataCmd,
+    types::{
+        utils::{deserialise, serialise},
+        Chunk, RegisterAddress, RegisterCmd, ReplicatedDataAddress as DataAddress,
+    },
+};
 
 use bytes::Bytes;
-use sn_interface::messaging::data::DataCmd;
-use sn_interface::types::utils::{deserialise, serialise};
-use std::path::{Path, PathBuf};
+use std::{
+    collections::btree_map::BTreeMap,
+    path::{Path, PathBuf},
+};
 use tokio::fs::{create_dir_all, metadata, read, remove_file, File};
 use tokio::io::AsyncWriteExt;
 use walkdir::WalkDir;
@@ -109,7 +116,6 @@ impl FileStore {
         // Only chunk go through here
         if let DataCmd::StoreChunk(chunk) = data {
             file.write_all(chunk.value()).await?;
-
             self.used_space.increase(chunk.value().len());
         }
 
@@ -137,36 +143,32 @@ impl FileStore {
         Ok(filepath.exists())
     }
 
-    pub(crate) fn list_all_files(&self) -> Result<Vec<String>> {
+    pub(crate) fn list_all_files(&self) -> Vec<String> {
         list_files_in(&self.file_store_path)
     }
 
-    pub(crate) fn list_all_data_addresses(&self) -> Result<Vec<DataAddress>> {
-        let all_files = self.list_all_files()?;
-        let all_addrs = all_files
+    pub(crate) fn list_all_data_addresses(&self) -> Vec<DataAddress> {
+        self.list_all_files()
             .iter()
-            .map(|filepath| self.filepath_to_address(filepath))
-            .collect();
-        all_addrs
+            .filter_map(|filepath| self.filepath_to_address(filepath).ok()) // perfectly fine to filter map, as list_all_files walks through existing valid files
+            .collect()
     }
 
     #[allow(unused)]
     /// quickly find chunks related or not to a section, might be useful when adults change sections
     /// not used yet
-    pub(crate) fn list_files_without_prefix(&self, prefix: Prefix) -> Result<Vec<String>> {
-        let all_files = self.list_all_files()?;
+    pub(crate) fn list_files_without_prefix(&self, prefix: Prefix) -> Vec<String> {
         let prefix_path = self.prefix_tree_path(prefix.name(), prefix.bit_count());
-        let outside_prefix = all_files
+        self.list_all_files()
             .into_iter()
             .filter(|p| !Path::new(&p).starts_with(&prefix_path.as_path()))
-            .collect();
-        Ok(outside_prefix)
+            .collect()
     }
 
     #[allow(unused)]
     /// quickly find chunks related or not to a section, might be useful when adults change sections
     /// not used yet
-    pub(crate) fn list_files_with_prefix(&self, prefix: Prefix) -> Result<Vec<String>> {
+    pub(crate) fn list_files_with_prefix(&self, prefix: Prefix) -> Vec<String> {
         let prefix_path = self.prefix_tree_path(prefix.name(), prefix.bit_count());
         list_files_in(prefix_path.as_path())
     }
@@ -220,11 +222,11 @@ impl FileStore {
     }
 }
 
-fn list_files_in(path: &Path) -> Result<Vec<String>> {
+fn list_files_in(path: &Path) -> Vec<String> {
     if !path.exists() {
-        return Ok(vec![]);
+        return vec![];
     }
-    let files = WalkDir::new(path)
+    WalkDir::new(path)
         .into_iter()
         .filter_map(|e| match e {
             Ok(direntry) => Some(direntry),
@@ -235,8 +237,7 @@ fn list_files_in(path: &Path) -> Result<Vec<String>> {
         })
         .filter(|e| e.file_type().is_file())
         .map(|e| e.path().display().to_string())
-        .collect();
-    Ok(files)
+        .collect()
 }
 
 #[cfg(test)]

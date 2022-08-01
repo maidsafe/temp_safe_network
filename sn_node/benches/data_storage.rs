@@ -175,11 +175,8 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
                 }
             }
 
-            b.to_async(&runtime).iter(|| async {
-                match storage.keys() {
-                    Ok(_) => {}
-                    Err(error) => panic!("Reading store register keys failed with {:?}", error),
-                }
+            b.iter(|| {
+                let _keys = storage.keys();
             })
         });
     }
@@ -202,11 +199,8 @@ fn bench_data_storage_reads(c: &mut Criterion) -> Result<()> {
                 };
             }
 
-            b.to_async(&runtime).iter(|| async {
-                match &storage.keys() {
-                    Ok(_keys) => {}
-                    Err(error) => panic!("Reading store chunk keys failed with {:?}", error),
-                }
+            b.iter(|| {
+                let _keys = storage.keys();
             })
         });
     }

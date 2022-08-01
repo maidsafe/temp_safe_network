@@ -10,12 +10,10 @@ use crate::dbs::{convert_to_error_msg, Error, FileStore, Result};
 use crate::UsedSpace;
 
 use sn_interface::{
-    messaging::system::NodeQueryResponse,
-    types::{log_markers::LogMarker, Chunk, ChunkAddress},
+    messaging::{data::DataCmd, system::NodeQueryResponse},
+    types::{log_markers::LogMarker, Chunk, ChunkAddress, ReplicatedDataAddress as DataAddress},
 };
 
-use sn_interface::messaging::data::DataCmd;
-use sn_interface::types::DataAddress;
 use std::{
     fmt::{self, Display, Formatter},
     io::ErrorKind,
@@ -38,20 +36,20 @@ impl ChunkStorage {
         })
     }
 
-    pub(crate) fn keys(&self) -> Result<Vec<DataAddress>> {
+    pub(crate) fn keys(&self) -> Vec<DataAddress> {
         self.db.list_all_data_addresses()
     }
 
     #[allow(dead_code)]
     pub(crate) async fn remove_chunk(&self, address: &ChunkAddress) -> Result<()> {
         trace!("Removing chunk, {:?}", address);
-        self.db.delete_data(&DataAddress::Bytes(*address)).await
+        self.db.delete_data(&DataAddress::Chunk(*address)).await
     }
 
     pub(crate) async fn get_chunk(&self, address: &ChunkAddress) -> Result<Chunk> {
         debug!("Getting chunk {:?}", address);
 
-        match self.db.read_data(&DataAddress::Bytes(*address)).await {
+        match self.db.read_data(&DataAddress::Chunk(*address)).await {
             Ok(res) => Ok(res),
             Err(error) => match error {
                 Error::Io(io_error) if io_error.kind() == ErrorKind::NotFound => {

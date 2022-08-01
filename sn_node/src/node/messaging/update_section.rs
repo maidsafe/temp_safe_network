@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node};
 
 use sn_interface::{
     data_copy_count,
@@ -25,17 +25,17 @@ impl Node {
         &self,
         sender: Peer,
         data_sender_has: Vec<ReplicatedDataAddress>,
-    ) -> Result<Vec<Cmd>> {
+    ) -> Option<Cmd> {
         trace!("Getting missing data for node");
         // Collection of data addresses that we do not have
 
         // TODO: can we cache this data stored per churn event?
-        let data_i_have = self.data_storage.keys()?;
+        let data_i_have = self.data_storage.keys();
         trace!("Our data got");
 
         if data_i_have.is_empty() {
             trace!("We have no data");
-            return Ok(vec![]);
+            return None;
         }
 
         let adults = self.network_knowledge.adults();
@@ -66,25 +66,23 @@ impl Node {
 
         if data_for_sender.is_empty() {
             trace!("We have no data worth sending");
-            return Ok(vec![]);
+            return None;
         }
 
-        let cmd = Cmd::EnqueueDataForReplication {
+        Some(Cmd::EnqueueDataForReplication {
             recipient: sender,
             data_batch: data_for_sender,
-        };
-
-        Ok(vec![cmd])
+        })
     }
 
     /// Will send a list of currently known/owned data to relevant nodes.
     /// These nodes should send back anything missing (in batches).
     /// Relevant nodes should be all _prior_ neighbours + _new_ elders.
     #[instrument(skip(self))]
-    pub(crate) fn ask_for_any_new_data(&self) -> Result<Cmd> {
+    pub(crate) fn ask_for_any_new_data(&self) -> Cmd {
         trace!("{:?}", LogMarker::DataReorganisationUnderway);
         debug!("Querying section for any new data");
-        let data_i_have = self.data_storage.keys()?;
+        let data_i_have = self.data_storage.keys();
 
         let my_name = self.info().name();
         let adults = self.network_knowledge.adults();
@@ -109,9 +107,13 @@ impl Node {
             let _existed = target_members.insert(elder);
         }
 
-        trace!("Sending our data list to: {:?}", target_members);
-        let msg = SystemMsg::NodeCmd(NodeCmd::SendAnyMissingRelevantData(data_i_have));
+        if target_members.is_empty() {
+            warn!("We have no peers to ask for data!");
+        } else {
+            trace!("Sending our data list to: {:?}", target_members);
+        }
 
-        Ok(self.send_system_msg(msg, Peers::Multiple(target_members)))
+        let msg = SystemMsg::NodeCmd(NodeCmd::SendAnyMissingRelevantData(data_i_have));
+        self.send_system_msg(msg, Peers::Multiple(target_members))
     }
 }

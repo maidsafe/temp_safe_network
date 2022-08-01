@@ -34,8 +34,9 @@ pub use self::{
 use crate::messaging::{data::Error as ErrorMsg, MsgId};
 use crate::types::{
     register::{Entry, EntryHash, Permissions, Policy, Register, User},
-    utils, Chunk, ChunkAddress, DataAddress,
+    utils, Chunk, ChunkAddress, ReplicatedDataAddress as DataAddress,
 };
+
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use sn_dbc::SpentProofShare;
@@ -300,7 +301,7 @@ impl QueryResponse {
             GetChunk(result) => match result {
                 Ok(chunk) => chunk_operation_id(chunk.address()),
                 Err(ErrorMsg::ChunkNotFound(name)) => chunk_operation_id(&ChunkAddress(*name)),
-                Err(ErrorMsg::DataNotFound(DataAddress::Bytes(address))) => {
+                Err(ErrorMsg::DataNotFound(DataAddress::Chunk(address))) => {
                     chunk_operation_id(address)
                 }
                 Err(ErrorMsg::DataNotFound(another_address)) => {
