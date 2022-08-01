@@ -648,7 +648,7 @@ pub mod test_utils {
             let prefix_map = NetworkPrefixMap::new(sk.public_key());
             let filename = format!("{:?}", prefix_map.genesis_key());
 
-            Config::write_prefix_map(path.join(filename).as_path(), &prefix_map).await?;
+            Config::write_prefix_map(&path.join(filename), &prefix_map).await?;
             prefix_maps.push(prefix_map);
         }
         Ok(prefix_maps)

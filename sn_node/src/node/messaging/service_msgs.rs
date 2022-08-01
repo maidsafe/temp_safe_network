@@ -243,9 +243,8 @@ impl Node {
                 spent_transactions,
             })) => {
                 // Generate and sign spent proof share
-                if let Some(spent_proof_share) = self
-                    .gen_spent_proof_share(&key_image, &tx, &spent_proofs, &spent_transactions)
-                    .await?
+                if let Some(spent_proof_share) =
+                    self.gen_spent_proof_share(&key_image, &tx, &spent_proofs, &spent_transactions)?
                 {
                     // Store spent proof share to adults
                     let reg_cmd = self.gen_register_cmd(&key_image, &spent_proof_share)?;
@@ -320,7 +319,7 @@ impl Node {
     }
 
     // Private helper to generate spent proof share
-    async fn gen_spent_proof_share(
+    fn gen_spent_proof_share(
         &self,
         key_image: &KeyImage,
         tx: &RingCtTransaction,
@@ -350,14 +349,14 @@ impl Node {
 
         // ...and verify the SpentProofs are signed by section keys known to us,
         // unless the public key of the SpentProof is the genesis key
-        for pk in spent_proofs_keys.iter() {
-            if !self.network_knowledge.verify_section_key_is_known(pk).await {
+        spent_proofs_keys
+            .iter()
+            .for_each(|pk| if !self.network_knowledge.verify_section_key_is_known(pk) {
                 warn!("Invalid DBC spend request (key_image: {:?}) since a SpentProof is not signed by a section known to us: {:?}", key_image, pk);
                 // TODO: temporarily allowing spent proofs signed by section keys we are not aware of.
                 // We shall return an error to the client so it can update us with a valid proof chain.
                 //return Ok(None);
-            }
-        }
+            });
 
         // Obtain Commitments from the TX
         let mut public_commitments_info = Vec::<(KeyImage, Vec<Commitment>)>::new();

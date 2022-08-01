@@ -230,8 +230,7 @@ impl<'a> Joiner<'a> {
                         section_chain,
                         section_auth,
                         Some(self.prefix_map),
-                    )
-                    .await?;
+                    )?;
 
                     return Ok((self.node, network_knowledge));
                 }

@@ -158,17 +158,13 @@ impl Node {
                 err
             ),
             Ok(()) => {
-                match self
-                    .network_knowledge
-                    .update_knowledge_if_valid(
-                        signed_section_auth.clone(),
-                        &proof_chain,
-                        None,
-                        &our_name,
-                        &self.section_keys_provider,
-                    )
-                    .await
-                {
+                match self.network_knowledge.update_knowledge_if_valid(
+                    signed_section_auth.clone(),
+                    &proof_chain,
+                    None,
+                    &our_name,
+                    &self.section_keys_provider,
+                ) {
                     Err(err) => error!(
                         "Error updating our network knowledge for {:?}: {:?}",
                         prefix, err

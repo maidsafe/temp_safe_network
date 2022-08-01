@@ -79,7 +79,7 @@ async fn receive_join_request_without_resource_proof_response() -> Result<()> {
             let pk_set = sk_set.public_keys();
             let section_key = pk_set.public_key();
 
-            let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
+            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
 
@@ -154,7 +154,7 @@ async fn membership_churn_starts_on_join_request_with_resource_proof() -> Result
             let pk_set = sk_set.public_keys();
             let section_key = pk_set.public_key();
 
-            let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
+            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let comm = create_comm().await?;
@@ -248,7 +248,7 @@ async fn membership_churn_starts_on_join_request_from_relocated_node() -> Result
             let pk_set = sk_set.public_keys();
             let section_key = pk_set.public_key();
 
-            let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
+            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
             let node = nodes.remove(0);
             let relocated_node_old_name = node.name();
             let relocated_node_old_keypair = node.keypair.clone();
@@ -342,7 +342,7 @@ async fn handle_agreement_on_online() -> Result<()> {
 
             let (section_auth, mut nodes, sk_set) =
                 random_sap(prefix, elder_count());
-            let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
+            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
             let node = nodes.remove(0);
             let (max_capacity, root_storage_dir) = create_test_max_capacity_and_root_storage()?;
             let comm = create_comm().await?;
@@ -400,7 +400,7 @@ async fn handle_agreement_on_online_of_elder_candidate() -> Result<()> {
             );
             let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
-            let section = NetworkKnowledge::new(*chain.root_key(), chain, signed_sap, None).await?;
+            let section = NetworkKnowledge::new(*chain.root_key(), chain, signed_sap, None)?;
             let mut expected_new_elders = BTreeSet::new();
 
             for peer in section_auth.elders() {
@@ -577,7 +577,7 @@ async fn handle_join_request_of_rejoined_node() -> Result<()> {
             init_logger();
             let prefix = Prefix::default();
             let (sap, mut node_infos, sk_set) = random_sap(prefix, elder_count());
-            let (section, section_key_share) = create_section(&sk_set, &sap).await?;
+            let (section, section_key_share) = create_section(&sk_set, &sap)?;
 
             // Make a Node
             let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
@@ -643,7 +643,7 @@ async fn handle_agreement_on_offline_of_non_elder() -> Result<()> {
 
             let (section_auth, mut nodes, sk_set) = create_section_auth();
 
-            let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
+            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
 
             let existing_peer = create_peer(MIN_ADULT_AGE);
 
@@ -696,7 +696,7 @@ async fn handle_agreement_on_offline_of_elder() -> Result<()> {
         .run_until(async move {
             let (section_auth, mut nodes, sk_set) = create_section_auth();
 
-            let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
+            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
 
             let existing_peer = create_peer(MIN_ADULT_AGE);
             let node_state = NodeState::joined(existing_peer, None);
@@ -784,7 +784,7 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
 
             let signed_old_sap = section_signed(sk_set1.secret_key(), old_sap.clone())?;
             let network_knowledge =
-                NetworkKnowledge::new(pk0, chain.clone(), signed_old_sap, None).await?;
+                NetworkKnowledge::new(pk0, chain.clone(), signed_old_sap, None)?;
 
             // Create our node
             let (event_sender, mut event_receiver) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
@@ -904,8 +904,7 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
                 SecuredLinkedList::new(pk0),
                 section_signed_our_section_auth.clone(),
                 None,
-            )
-            .await?;
+            )?;
 
             // a valid AE msg but with a non-verifiable SAP...
             let bogus_section_pk = bls::SecretKey::random().public_key();
@@ -995,7 +994,7 @@ async fn relocation(relocated_peer_role: RelocatedPeerRole) -> Result<()> {
                 RelocatedPeerRole::NonElder => recommended_section_size(),
             };
             let (section_auth, mut nodes, sk_set) = random_sap(prefix, elder_count());
-            let (section, section_key_share) = create_section(&sk_set, &section_auth).await?;
+            let (section, section_key_share) = create_section(&sk_set, &section_auth)?;
 
             let mut adults = section_size - elder_count();
             while adults > 0 {
@@ -1169,7 +1168,7 @@ async fn handle_elders_update() -> Result<()> {
             0,
         );
 
-        let (section0, section_key_share) = create_section(&sk_set0, &sap0).await?;
+        let (section0, section_key_share) = create_section(&sk_set0, &sap0)?;
 
         for peer in [&adult_peer, &promoted_peer] {
             let node_state = NodeState::joined(*peer, None);
@@ -1326,7 +1325,7 @@ async fn handle_demote_during_split() -> Result<()> {
                 sk_set_v0.public_keys(),
                 0,
             );
-            let (section, section_key_share) = create_section(&sk_set_v0, &section_auth_v0).await?;
+            let (section, section_key_share) = create_section(&sk_set_v0, &section_auth_v0)?;
 
             // all peers b are added
             for peer in peers_b.iter().chain(iter::once(&peer_c)).cloned() {
@@ -1478,7 +1477,7 @@ fn create_section_key_share(sk_set: &bls::SecretKeySet, index: usize) -> Section
     }
 }
 
-async fn create_section(
+fn create_section(
     sk_set: &SecretKeySet,
     section_auth: &SectionAuthorityProvider,
 ) -> Result<(NetworkKnowledge, SectionKeyShare)> {
@@ -1486,7 +1485,7 @@ async fn create_section(
     let signed_sap = section_signed(sk_set.secret_key(), section_auth.clone())?;
 
     let section =
-        NetworkKnowledge::new(*section_chain.root_key(), section_chain, signed_sap, None).await?;
+        NetworkKnowledge::new(*section_chain.root_key(), section_chain, signed_sap, None)?;
 
     for peer in section_auth.elders() {
         let node_state = NodeState::joined(*peer, None);
