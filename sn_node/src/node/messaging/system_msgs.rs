@@ -11,7 +11,7 @@ use crate::{
     dbs::Error as DbError,
     node::{
         flow_ctrl::cmds::Cmd,
-        messaging::{OutgoingMsg, Recipients},
+        messaging::{OutgoingMsg, Peers},
         DkgSessionInfo, Error, Event, MembershipEvent, Node, Proposal as CoreProposal, Result,
         MIN_LEVEL_WHEN_FULL,
     },
@@ -33,14 +33,13 @@ use sn_interface::{
             Proposal as ProposalMsg,
             SystemMsg,
         },
-        AuthorityProof, DstLocation, MsgId, NodeMsgAuthority, SectionAuth, WireMsg,
+        AuthorityProof, MsgId, NodeMsgAuthority, SectionAuth, WireMsg,
     },
     network_knowledge::NetworkKnowledge,
     types::{log_markers::LogMarker, Keypair, Peer, PublicKey},
 };
 
 use bytes::Bytes;
-use std::collections::BTreeSet;
 use xor_name::XorName;
 
 impl Node {
@@ -48,18 +47,12 @@ impl Node {
     pub(crate) fn send_msg_to_our_elders(&self, msg: SystemMsg) -> Cmd {
         let sap = self.network_knowledge.authority_provider();
         let recipients = sap.elders_set();
-        self.send_system_to_many(msg, recipients)
+        self.send_system_msg(msg, Peers::Multiple(recipients))
     }
 
     /// Send a (`SystemMsg`) message to a node
-    pub(crate) fn send_system_to_one(&self, msg: SystemMsg, recipient: Peer) -> Cmd {
-        self.send_system_to_many(msg, BTreeSet::from([recipient]))
-    }
-
-    /// Send a (`SystemMsg`) message to a set of nodes
-    pub(crate) fn send_system_to_many(&self, msg: SystemMsg, recipients: BTreeSet<Peer>) -> Cmd {
-        trace!("{}", LogMarker::SendToNodes);
-        self.trace_system_to_many(
+    pub(crate) fn send_system_msg(&self, msg: SystemMsg, recipients: Peers) -> Cmd {
+        self.trace_system_msg(
             msg,
             recipients,
             #[cfg(feature = "traceroute")]
@@ -67,20 +60,20 @@ impl Node {
         )
     }
 
-    /// Send a (`SystemMsg`) message to a set of nodes
-    pub(crate) fn trace_system_to_many(
+    /// Send a (`SystemMsg`) message to a node
+    pub(crate) fn trace_system_msg(
         &self,
         msg: SystemMsg,
-        recipients: BTreeSet<Peer>,
+        recipients: Peers,
         #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
     ) -> Cmd {
         trace!("{}", LogMarker::SendToNodes);
-        Cmd::SendMsg {
-            msg: OutgoingMsg::System(msg),
-            recipients: Recipients::Peers(recipients),
+        Cmd::send_traced_msg(
+            OutgoingMsg::System(msg),
+            recipients,
             #[cfg(feature = "traceroute")]
             traceroute,
-        }
+        )
     }
 
     /// Aggregation of system messages
@@ -549,16 +542,18 @@ impl Node {
                         );
                         // There is no point in verifying a sig from a sender A or B here.
                         // Send back response to the sending elder
-                        self.handle_data_query_at_adult(
-                            correlation_id,
-                            &query,
-                            auth,
-                            origin,
-                            sender,
-                            #[cfg(feature = "traceroute")]
-                            traceroute,
-                        )
-                        .await
+                        Ok(vec![
+                            self.handle_data_query_at_adult(
+                                correlation_id,
+                                &query,
+                                auth,
+                                origin,
+                                sender,
+                                #[cfg(feature = "traceroute")]
+                                traceroute,
+                            )
+                            .await,
+                        ])
                     }
                 }
             }
@@ -608,12 +603,13 @@ impl Node {
                         message_cache,
                         message,
                     };
-                    Ok(vec![Cmd::SendMsg {
-                        msg: OutgoingMsg::System(msg),
-                        recipients: Recipients::from_single(sender),
+
+                    Ok(vec![Cmd::send_traced_msg(
+                        OutgoingMsg::System(msg),
+                        Peers::Single(sender),
                         #[cfg(feature = "traceroute")]
                         traceroute,
-                    }])
+                    )])
                 } else {
                     warn!("Unknown DkgSessionInfo: {:?} requested", &session_id);
                     Ok(vec![])
@@ -679,15 +675,14 @@ impl Node {
                 level,
             });
 
-            cmds.push(Cmd::SendMsg {
-                msg: OutgoingMsg::System(msg),
-                recipients: Recipients::Dst(DstLocation::Section {
-                    name: node_xorname,
-                    section_pk: self.network_knowledge.section_key(),
-                }),
+            let dst = Peers::Multiple(self.network_knowledge.elders());
+
+            cmds.push(Cmd::send_traced_msg(
+                OutgoingMsg::System(msg),
+                dst,
                 #[cfg(feature = "traceroute")]
                 traceroute,
-            });
+            ));
         }
 
         Ok(cmds)

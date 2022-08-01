@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::comm::Comm;
-use crate::node::{flow_ctrl::cmds::Cmd, Node, Result};
+use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Node, Result};
 
 use sn_interface::{
     elder_count,
@@ -67,7 +67,7 @@ impl Node {
 
             trace!("Sending {:?} to {}", msg, peer);
             trace!("{}", LogMarker::SendJoinRedirected);
-            return Ok(Some(self.send_system_to_one(msg, peer)));
+            return Ok(Some(self.send_system_msg(msg, Peers::Single(peer))));
         }
 
         if !self.joins_allowed {
@@ -80,7 +80,7 @@ impl Node {
             )));
             trace!("{}", LogMarker::SendJoinsDisallowed);
             trace!("Sending {:?} to {}", msg, peer);
-            return Ok(Some(self.send_system_to_one(msg, peer)));
+            return Ok(Some(self.send_system_msg(msg, Peers::Single(peer))));
         }
 
         let (is_age_invalid, expected_age) = self.verify_joining_node_age(&peer);
@@ -122,7 +122,7 @@ impl Node {
                 expected_age,
             }));
             trace!("Sending {:?} to {}", msg, peer);
-            return Ok(Some(self.send_system_to_one(msg, peer)));
+            return Ok(Some(self.send_system_msg(msg, Peers::Single(peer))));
         }
 
         // Do reachability check only for the initial join request
@@ -132,7 +132,7 @@ impl Node {
             )));
             trace!("{}", LogMarker::SendJoinRejected);
             trace!("Sending {:?} to {}", msg, peer);
-            Ok(Some(self.send_system_to_one(msg, peer)))
+            Ok(Some(self.send_system_msg(msg, Peers::Single(peer))))
         } else {
             // It's reachable, let's then send the proof challenge
             self.send_resource_proof_challenge(peer).map(Some)
@@ -197,7 +197,7 @@ impl Node {
             trace!("{} b", LogMarker::SendJoinAsRelocatedResponse);
 
             trace!("Sending {msg:?} to {peer}");
-            return Some(self.send_system_to_one(msg, peer));
+            return Some(self.send_system_msg(msg, Peers::Single(peer)));
         }
 
         let relocate_details = if let MembershipState::Relocated(ref details) =
@@ -236,7 +236,7 @@ impl Node {
             trace!("{}", LogMarker::SendJoinAsRelocatedResponse);
 
             trace!("Sending {:?} to {}", msg, peer);
-            return Some(self.send_system_to_one(msg, peer));
+            return Some(self.send_system_msg(msg, Peers::Single(peer)));
         };
 
         self.propose_membership_change(join_request.relocate_proof.value)

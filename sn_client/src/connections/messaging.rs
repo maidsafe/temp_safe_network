@@ -13,7 +13,7 @@ use crate::{connections::CmdResponse, Error, Result};
 use sn_interface::{
     messaging::{
         data::{DataQuery, DataQueryVariant, QueryResponse},
-        AuthKind, DstLocation, MsgId, ServiceAuth, WireMsg,
+        AuthKind, Dst, MsgId, ServiceAuth, WireMsg,
     },
     network_knowledge::supermajority,
     types::{Peer, SendToOneError},
@@ -74,15 +74,15 @@ impl Session {
             endpoint.public_addr(),
         );
 
-        let dst_location = DstLocation::Section {
+        let dst = Dst {
             name: dst_address,
-            section_pk,
+            section_key: section_pk,
         };
 
         let auth = AuthKind::Service(auth);
 
         #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst_location)?;
+        let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
 
         #[cfg(feature = "traceroute")]
         wire_msg.add_trace(&mut vec![Entity::Client(client_pk)]);
@@ -205,14 +205,14 @@ impl Session {
             warn!("No op_id found for query");
         }
 
-        let dst_location = DstLocation::Section {
+        let dst = Dst {
             name: dst,
-            section_pk,
+            section_key: section_pk,
         };
         let auth = AuthKind::Service(auth);
 
         #[allow(unused_mut)]
-        let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst_location)?;
+        let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
 
         #[cfg(feature = "traceroute")]
         wire_msg.add_trace(&mut vec![Entity::Client(client_pk)]);
@@ -334,12 +334,12 @@ impl Session {
             nodes
         );
 
-        let dst_location = DstLocation::Section {
+        let dst = Dst {
             name: dst_address,
-            section_pk,
+            section_key: section_pk,
         };
         let auth = AuthKind::Service(auth);
-        let wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst_location)?;
+        let wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
 
         let initial_contacts = nodes
             .clone()

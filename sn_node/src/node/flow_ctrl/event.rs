@@ -9,8 +9,7 @@
 use super::cmds::CmdJob;
 
 use sn_interface::messaging::{
-    data::ServiceMsg, system::SystemMsg, AuthorityProof, DstLocation, EndUser, MsgId, ServiceAuth,
-    SrcLocation,
+    data::ServiceMsg, system::SystemMsg, AuthorityProof, Dst, EndUser, MsgId, NodeAuth, ServiceAuth,
 };
 
 use bls::PublicKey as BlsPublicKey;
@@ -57,10 +56,10 @@ pub enum MessagingEvent {
     SystemMsgReceived {
         /// The msg ID
         msg_id: MsgId,
-        /// Source location
-        src: SrcLocation,
-        /// Destination location
-        dst: DstLocation,
+        /// Msg authority
+        auth: AuthorityProof<NodeAuth>,
+        /// Dst of the msg
+        dst: Dst,
         /// The msg.
         msg: Box<SystemMsg>,
     },
@@ -70,14 +69,14 @@ pub enum MessagingEvent {
         msg_id: MsgId,
         /// The content of the msg.
         msg: Box<ServiceMsg>,
-        /// Data authority
+        /// Msg authority
         auth: AuthorityProof<ServiceAuth>,
         /// The end user that sent the msg.
         /// Its xorname is derived from the client public key,
         /// and the socket_id maps against the actual socketaddr
         user: EndUser,
-        /// DstLocation for the msg
-        dst_location: DstLocation,
+        /// Dst of the msg
+        dst: Dst,
     },
 }
 

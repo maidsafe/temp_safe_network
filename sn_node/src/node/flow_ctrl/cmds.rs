@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use crate::node::{
-    messaging::{OutgoingMsg, Recipients},
+    messaging::{OutgoingMsg, Peers},
     Proposal, XorName,
 };
 
@@ -163,7 +163,8 @@ pub(crate) enum Cmd {
     /// Performs serialisation and signing and sends the msg.
     SendMsg {
         msg: OutgoingMsg,
-        recipients: Recipients,
+        msg_id: MsgId,
+        recipients: Peers,
         #[cfg(feature = "traceroute")]
         traceroute: Vec<Entity>,
     },
@@ -183,6 +184,29 @@ pub(crate) enum Cmd {
 }
 
 impl Cmd {
+    pub(crate) fn send_msg(msg: OutgoingMsg, recipients: Peers) -> Self {
+        Self::send_traced_msg(
+            msg,
+            recipients,
+            #[cfg(feature = "traceroute")]
+            vec![],
+        )
+    }
+
+    pub(crate) fn send_traced_msg(
+        msg: OutgoingMsg,
+        recipients: Peers,
+        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+    ) -> Self {
+        Cmd::SendMsg {
+            msg,
+            msg_id: MsgId::new(),
+            recipients,
+            #[cfg(feature = "traceroute")]
+            traceroute,
+        }
+    }
+
     /// The priority of the cmd
     pub(crate) fn priority(&self) -> i32 {
         use Cmd::*;

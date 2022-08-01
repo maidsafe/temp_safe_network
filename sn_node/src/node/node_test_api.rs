@@ -9,27 +9,26 @@
 use crate::node::{flow_ctrl::FlowCtrl, Node, Peer, Result};
 
 use sn_interface::{
-    messaging::{system::SystemMsg, DstLocation},
+    messaging::{system::SystemMsg, MsgId},
     network_knowledge::SectionAuthorityProvider,
 };
 
 use ed25519_dalek::PublicKey;
 use secured_linked_list::SecuredLinkedList;
-use std::{net::SocketAddr, sync::Arc};
+use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};
 
 use super::{
     flow_ctrl::cmds::Cmd,
-    messaging::{OutgoingMsg, Recipients},
+    messaging::{OutgoingMsg, Peers},
 };
 
 /// Test interface for sending and receiving messages to and from other nodes.
 ///
 /// A node is a part of the network that can route messages and be a member of a section or group
 /// location. Its methods can be used to send requests and responses as either an individual
-/// `Node` or as a part of a section or group location. Their `src` argument indicates that
-/// role, and can be `use sn_interface::messaging::SrcLocation::Node` or `use sn_interface::messaging::SrcLocation::Section`.
+/// `Node` or as a part of a section or group location.
 #[allow(missing_debug_implementations)]
 pub struct NodeTestApi {
     node: Arc<RwLock<Node>>,
@@ -82,12 +81,12 @@ impl NodeTestApi {
     }
 
     /// Returns the information of all the current section elders.
-    pub async fn our_elders(&self) -> Vec<Peer> {
+    pub async fn our_elders(&self) -> BTreeSet<Peer> {
         self.node.read().await.network_knowledge().elders()
     }
 
     /// Returns the information of all the current section adults.
-    pub async fn our_adults(&self) -> Vec<Peer> {
+    pub async fn our_adults(&self) -> BTreeSet<Peer> {
         self.node.read().await.network_knowledge().adults()
     }
 
@@ -97,10 +96,11 @@ impl NodeTestApi {
     }
 
     /// Send a system msg.
-    pub async fn send(&self, msg: SystemMsg, dst: DstLocation) -> Result<()> {
+    pub async fn send(&self, msg: SystemMsg, recipients: BTreeSet<Peer>) -> Result<()> {
         let cmd = Cmd::SendMsg {
             msg: OutgoingMsg::System(msg),
-            recipients: Recipients::Dst(dst),
+            msg_id: MsgId::new(),
+            recipients: Peers::Multiple(recipients),
             #[cfg(feature = "traceroute")]
             traceroute: vec![],
         };

@@ -10,13 +10,16 @@ use super::UsedRecipientSaps;
 
 use crate::node::{
     flow_ctrl::cmds::Cmd,
-    messaging::{OutgoingMsg, Recipients},
+    messaging::{OutgoingMsg, Peers},
     Error, Result,
 };
 
 use sn_interface::{
-    messaging::system::{
-        JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeState, SectionAuth, SystemMsg,
+    messaging::{
+        system::{
+            JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeState, SectionAuth, SystemMsg,
+        },
+        MsgId,
     },
     network_knowledge::{NodeInfo, SectionAuthorityProvider},
     types::{keys::ed25519, Peer, PublicKey},
@@ -24,7 +27,7 @@ use sn_interface::{
 
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{Keypair, Signature};
-use std::{net::SocketAddr, sync::Arc};
+use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
 use xor_name::{Prefix, XorName};
 
 /// Re-join as a relocated node.
@@ -50,7 +53,7 @@ impl JoiningAsRelocated {
         dst_section_key: BlsPublicKey,
         new_age: u8,
     ) -> Result<(Self, Cmd)> {
-        let recipients: Vec<_> = bootstrap_addrs
+        let recipients: BTreeSet<_> = bootstrap_addrs
             .iter()
             .map(|addr| Peer::new(dst_xorname, *addr))
             .collect();
@@ -76,7 +79,7 @@ impl JoiningAsRelocated {
             new_age,
             old_keypair,
         };
-        let cmd = relocating.build_join_request_cmd(&recipients, dummy_signature)?;
+        let cmd = relocating.build_join_request_cmd(recipients, dummy_signature)?;
 
         Ok((relocating, cmd))
     }
@@ -106,7 +109,7 @@ impl JoiningAsRelocated {
                 }
 
                 let new_section_key = section_auth.section_key();
-                let new_recipients: Vec<_> = section_auth
+                let new_recipients: BTreeSet<_> = section_auth
                     .elders()
                     .filter(|peer| {
                         self.used_recipient_saps
@@ -130,7 +133,7 @@ impl JoiningAsRelocated {
                 self.dst_section_key = section_auth.section_key();
 
                 let new_name_sig = self.build_relocation_name(&section_auth.prefix());
-                let cmd = self.build_join_request_cmd(&new_recipients, new_name_sig)?;
+                let cmd = self.build_join_request_cmd(new_recipients, new_name_sig)?;
 
                 Ok(Some(cmd))
             }
@@ -146,7 +149,7 @@ impl JoiningAsRelocated {
                 }
 
                 let new_section_key = section_auth.section_key();
-                let new_recipients: Vec<_> = section_auth
+                let new_recipients: BTreeSet<_> = section_auth
                     .elders()
                     .filter(|peer| {
                         self.used_recipient_saps
@@ -170,7 +173,7 @@ impl JoiningAsRelocated {
                 self.dst_section_key = section_auth.section_key();
 
                 let new_name_sig = self.build_relocation_name(&section_auth.prefix());
-                let cmd = self.build_join_request_cmd(&new_recipients, new_name_sig)?;
+                let cmd = self.build_join_request_cmd(new_recipients, new_name_sig)?;
 
                 Ok(Some(cmd))
             }
@@ -203,7 +206,11 @@ impl JoiningAsRelocated {
         signature_over_new_name
     }
 
-    fn build_join_request_cmd(&self, recipients: &[Peer], new_name_sig: Signature) -> Result<Cmd> {
+    fn build_join_request_cmd(
+        &self,
+        recipients: BTreeSet<Peer>,
+        new_name_sig: Signature,
+    ) -> Result<Cmd> {
         let join_request = JoinAsRelocatedRequest {
             section_key: self.dst_section_key,
             relocate_proof: self.relocate_proof.clone(),
@@ -214,7 +221,8 @@ impl JoiningAsRelocated {
 
         let cmd = Cmd::SendMsg {
             msg: OutgoingMsg::System(SystemMsg::JoinAsRelocatedRequest(Box::new(join_request))),
-            recipients: Recipients::from(recipients),
+            msg_id: MsgId::new(),
+            recipients: Peers::Multiple(recipients),
             #[cfg(feature = "traceroute")]
             traceroute: vec![],
         };
@@ -246,7 +254,7 @@ impl JoiningAsRelocated {
 mod tests {
     use super::JoiningAsRelocated;
     use crate::node::{
-        messaging::{OutgoingMsg, Recipients},
+        messaging::{OutgoingMsg, Peers},
         Cmd,
     };
     use color_eyre::Result;
@@ -296,8 +304,8 @@ mod tests {
                 msg, recipients, ..
             } => {
                 match recipients {
-                    Recipients::Dst(_) => return Err(eyre!("Should be Recipients::Peers")),
-                    Recipients::Peers(recipients) => assert_eq!(bootstrap.len(), recipients.len()),
+                    Peers::Single(_) => assert_eq!(bootstrap.len(), 1),
+                    Peers::Multiple(recipients) => assert_eq!(bootstrap.len(), recipients.len()),
                 }
                 if !matches!(
                     msg,
@@ -362,8 +370,8 @@ mod tests {
             assert_ne!(joining.node.name(), node.name());
             if let Ok(Some(Cmd::SendMsg { recipients, .. })) = handled {
                 match recipients {
-                    Recipients::Dst(_) => return Err(eyre!("Should be Recipients::Peers")),
-                    Recipients::Peers(recipients) => assert_eq!(elder_count(), recipients.len()),
+                    Peers::Single(_) => assert_eq!(elder_count(), 1),
+                    Peers::Multiple(recipients) => assert_eq!(elder_count(), recipients.len()),
                 }
             }
 

@@ -6,13 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::messaging::{NodeMsgAuthority, SrcLocation};
+use crate::messaging::NodeMsgAuthority;
 use crate::types::keys::ed25519::{self};
 use bls::PublicKey as BlsPublicKey;
 use xor_name::XorName;
 
 pub trait NodeMsgAuthorityUtils {
-    fn src_location(&self) -> SrcLocation;
+    fn src_location(&self) -> (XorName, bls::PublicKey);
 
     fn name(&self) -> XorName;
 
@@ -22,20 +22,17 @@ pub trait NodeMsgAuthorityUtils {
 }
 
 impl NodeMsgAuthorityUtils for NodeMsgAuthority {
-    fn src_location(&self) -> SrcLocation {
+    fn src_location(&self) -> (XorName, bls::PublicKey) {
         match self {
-            NodeMsgAuthority::Node(node_auth) => SrcLocation::Node {
-                name: ed25519::name(&node_auth.node_ed_pk),
-                section_pk: node_auth.section_pk,
-            },
-            NodeMsgAuthority::BlsShare(bls_share_auth) => SrcLocation::Section {
-                name: bls_share_auth.src_name,
-                section_pk: bls_share_auth.section_pk,
-            },
-            NodeMsgAuthority::Section(section_auth) => SrcLocation::Section {
-                name: section_auth.src_name,
-                section_pk: section_auth.sig.public_key,
-            },
+            NodeMsgAuthority::Node(node_auth) => {
+                (ed25519::name(&node_auth.node_ed_pk), node_auth.section_pk)
+            }
+            NodeMsgAuthority::BlsShare(bls_share_auth) => {
+                (bls_share_auth.src_name, bls_share_auth.section_pk)
+            }
+            NodeMsgAuthority::Section(section_auth) => {
+                (section_auth.src_name, section_auth.sig.public_key)
+            }
         }
     }
 

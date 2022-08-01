@@ -11,7 +11,7 @@ use crate::node::{Error, Result};
 use sn_interface::{
     messaging::{
         system::{SigShare, SystemMsg},
-        AuthKind, AuthorityProof, BlsShareAuth, DstLocation, MsgId, NodeAuth, WireMsg,
+        AuthKind, AuthorityProof, BlsShareAuth, Dst, MsgId, NodeAuth, WireMsg,
     },
     network_knowledge::{NodeInfo, SectionKeyShare},
 };
@@ -25,7 +25,7 @@ pub(crate) trait WireMsgUtils {
     fn for_dst_accumulation(
         key_share: &SectionKeyShare,
         src_name: XorName,
-        dst: DstLocation,
+        dst: Dst,
         node_msg: SystemMsg,
         src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg, Error>;
@@ -33,7 +33,7 @@ pub(crate) trait WireMsgUtils {
     /// Creates a signed message from single node.
     fn single_src(
         node: &NodeInfo,
-        dst: DstLocation,
+        dst: Dst,
         node_msg: SystemMsg,
         src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg>;
@@ -44,7 +44,7 @@ impl WireMsgUtils for WireMsg {
     fn for_dst_accumulation(
         key_share: &SectionKeyShare,
         src_name: XorName,
-        dst: DstLocation,
+        dst: Dst,
         msg: SystemMsg,
         src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg, Error> {
@@ -55,7 +55,7 @@ impl WireMsgUtils for WireMsg {
             bls_share_authorize(src_section_pk, src_name, key_share, &msg_payload).into_inner(),
         );
 
-        let wire_msg = WireMsg::new_msg(MsgId::new(), msg_payload, auth, dst)?;
+        let wire_msg = WireMsg::new_msg(MsgId::new(), msg_payload, auth, dst);
 
         #[cfg(feature = "test-utils")]
         let wire_msg = wire_msg.set_payload_debug(msg);
@@ -66,7 +66,7 @@ impl WireMsgUtils for WireMsg {
     /// Creates a signed message from single node.
     fn single_src(
         node: &NodeInfo,
-        dst: DstLocation,
+        dst: Dst,
         msg: SystemMsg,
         src_section_pk: BlsPublicKey,
     ) -> Result<WireMsg> {
@@ -77,7 +77,7 @@ impl WireMsgUtils for WireMsg {
             NodeAuth::authorize(src_section_pk, &node.keypair, &msg_payload).into_inner(),
         );
 
-        let wire_msg = WireMsg::new_msg(MsgId::new(), msg_payload, auth, dst)?;
+        let wire_msg = WireMsg::new_msg(MsgId::new(), msg_payload, auth, dst);
 
         #[cfg(feature = "test-utils")]
         let wire_msg = wire_msg.set_payload_debug(msg);

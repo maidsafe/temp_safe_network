@@ -6,14 +6,21 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::comm::{Comm, DeliveryStatus};
-use crate::node::{delivery_group, messaging::Recipients, Cmd, Node, Result};
+use crate::comm::Comm;
+use crate::node::{
+    messaging::{OutgoingMsg, Peers},
+    Cmd, Error, Node, Result,
+};
 
 use sn_interface::{
-    messaging::{data::ServiceMsg, system::SystemMsg, WireMsg},
+    messaging::{data::ServiceMsg, system::SystemMsg, AuthKind, Dst, MsgId, WireMsg},
     types::Peer,
 };
 
+#[cfg(feature = "traceroute")]
+use sn_interface::{messaging::Entity, types::PublicKey};
+
+use bytes::Bytes;
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 use tokio::{sync::watch, sync::RwLock, time};
 
@@ -59,35 +66,39 @@ impl Dispatcher {
             }
             Cmd::SendMsg {
                 msg,
+                msg_id,
                 recipients,
                 #[cfg(feature = "traceroute")]
                 traceroute,
             } => {
-                let node = self.node.read().await;
-
-                let wire_msg = node.sign_msg(
-                    msg,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
-                )?;
-
-                let recipients = match recipients {
-                    Recipients::Peers(peers) => peers,
-                    Recipients::Dst(dst) => {
-                        let mut peers = BTreeSet::new();
-                        peers.extend(
-                            delivery_group::delivery_targets(
-                                &dst,
-                                &node.info().name(),
-                                &node.network_knowledge,
-                            )?
-                            .0,
-                        );
-                        peers
-                    }
+                let peer_msgs = {
+                    let node = self.node.read().await;
+                    into_wire_msgs(
+                        &node,
+                        msg,
+                        msg_id,
+                        recipients,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )?
                 };
 
-                self.send_msg_via_comms(recipients, wire_msg).await
+                let tasks = peer_msgs
+                    .into_iter()
+                    .map(|(peer, msg)| self.comm.send(peer, msg));
+                let results = futures::future::join_all(tasks).await;
+
+                // Any failed sends are tracked via Cmd::HandlePeerFailedSend, which will log dysfunction for any peers
+                // in the section (otherwise ignoring failed send to out of section nodes or clients)
+                let cmds = results
+                    .into_iter()
+                    .filter_map(|result| match result {
+                        Err(Error::FailedSend(peer)) => Some(Cmd::HandlePeerFailedSend(peer)),
+                        _ => None,
+                    })
+                    .collect();
+
+                Ok(cmds)
             }
             Cmd::TrackNodeIssueInDysfunction { name, issue } => {
                 let mut node = self.node.write().await;
@@ -262,29 +273,6 @@ impl Dispatcher {
         }
     }
 
-    /// Takes recipients and a WireMsg and will send to each recipient via the comms module.
-    /// This ensures the DstLocation name is set correctly (so for many recipients, it's updated for each)
-    ///
-    /// Any failed sends are tracked via Cmd::HandlePeerFailedSend, which will log dysfunction for any peers
-    /// in the section (otherwise ignoring failed send to out of section nodes or clients)
-    async fn send_msg_via_comms(
-        &self,
-        recipients: BTreeSet<Peer>,
-        wire_msg: WireMsg,
-    ) -> Result<Vec<Cmd>> {
-        let recipients: Vec<Peer> = recipients.into_iter().collect();
-        let status = self.comm.send(&recipients, wire_msg).await?;
-
-        match status {
-            DeliveryStatus::DeliveredToAll(failed_recipients)
-            | DeliveryStatus::FailedToDeliverAll(failed_recipients) => Ok(failed_recipients
-                .into_iter()
-                .map(Cmd::HandlePeerFailedSend)
-                .collect()),
-            _ => Ok(vec![]),
-        }
-    }
-
     async fn handle_scheduled_dkg_timeout(&self, duration: Duration, token: u64) -> Option<Cmd> {
         let mut cancel_rx = self.dkg_timeout.cancel_timer_rx.clone();
 
@@ -298,6 +286,87 @@ impl Dispatcher {
             _ = cancel_rx.changed() => None,
         }
     }
+}
+
+// Serializes and signs the msg,
+// and produces one [`WireMsg`] instance per recipient -
+// the last step before passing it over to comms module.
+fn into_wire_msgs(
+    node: &Node,
+    msg: OutgoingMsg,
+    msg_id: MsgId,
+    recipients: Peers,
+    #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+) -> Result<Vec<(Peer, WireMsg)>> {
+    let (auth, payload) = node.sign_msg(msg)?;
+    let recipients = match recipients {
+        Peers::Single(peer) => vec![peer],
+        Peers::Multiple(peers) => peers.into_iter().collect(),
+    };
+
+    let msgs = recipients
+        .into_iter()
+        .filter_map(|peer| match node.network_knowledge.dst(&peer.name()) {
+            Ok(dst) => {
+                #[cfg(feature = "traceroute")]
+                let trace = Trace {
+                    entity: entity(node),
+                    traceroute: traceroute.clone(),
+                };
+                let wire_msg = wire_msg(
+                    msg_id,
+                    payload.clone(),
+                    auth.clone(),
+                    dst,
+                    #[cfg(feature = "traceroute")]
+                    trace,
+                );
+                Some((peer, wire_msg))
+            }
+            Err(error) => {
+                error!("Could not get route for {peer:?}: {error}");
+                None
+            }
+        })
+        .collect();
+
+    Ok(msgs)
+}
+
+#[cfg(feature = "traceroute")]
+fn entity(node: &Node) -> Entity {
+    let key = PublicKey::Ed25519(node.info().keypair.public);
+    if node.is_elder() {
+        Entity::Elder(key)
+    } else {
+        Entity::Adult(key)
+    }
+}
+
+#[cfg(feature = "traceroute")]
+struct Trace {
+    entity: Entity,
+    traceroute: Vec<Entity>,
+}
+
+fn wire_msg(
+    msg_id: MsgId,
+    payload: Bytes,
+    auth: AuthKind,
+    dst: Dst,
+    #[cfg(feature = "traceroute")] trace: Trace,
+) -> WireMsg {
+    #[allow(unused_mut)]
+    let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
+    #[cfg(feature = "traceroute")]
+    {
+        let mut traceroute = trace.traceroute;
+        traceroute.push(trace.entity);
+        wire_msg.add_trace(&mut traceroute);
+    }
+    #[cfg(feature = "test-utils")]
+    let wire_msg = wire_msg.set_payload_debug(msg);
+    wire_msg
 }
 
 impl Drop for Dispatcher {

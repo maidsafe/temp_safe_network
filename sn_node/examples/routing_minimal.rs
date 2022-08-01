@@ -199,9 +199,12 @@ async fn handle_event(index: usize, node: &mut NodeApi, event: Event) -> bool {
     use MessagingEvent::*;
     match event {
         Event::Messaging(e) => match e {
-            SystemMsgReceived { msg, src, dst, .. } => info!(
-                "Node #{} received message - src: {:?}, dst: {:?}, content: {:?}",
-                index, src, dst, msg
+            SystemMsgReceived { msg, auth, dst, .. } => info!(
+                "Node #{} received message - auth: {:?}, route: {:?}, content: {:?}",
+                index,
+                auth.into_inner(),
+                dst,
+                msg
             ),
             ServiceMsgReceived { msg, user, .. } => info!(
                 "Node #{} received message from user: {:?}, msg: {:?}",

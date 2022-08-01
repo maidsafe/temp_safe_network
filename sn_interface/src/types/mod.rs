@@ -26,14 +26,14 @@ mod errors;
 mod peer;
 mod token;
 
-pub use connections::{PeerLinks, SendToOneError};
-
 pub use crate::messaging::data::{RegisterCmd, ReplicatedRegisterLog, ReplicatedSpentbookLog};
+
 pub use address::{
     ChunkAddress, DataAddress, RegisterAddress, ReplicatedDataAddress, SpentbookAddress,
 };
 pub use cache::Cache;
 pub use chunk::{Chunk, MAX_CHUNK_SIZE_IN_BYTES};
+pub use connections::{PeerLinks, SendToOneError};
 pub use errors::{convert_dt_error_to_error_msg, Error, Result};
 pub use keys::{
     keypair::{BlsKeypairShare, Encryption, Keypair, OwnerType, Signing},

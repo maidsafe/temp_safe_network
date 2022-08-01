@@ -10,14 +10,11 @@ use super::wire_msg_header::WireMsgHeader;
 use crate::messaging::{
     data::{ServiceError, ServiceMsg},
     system::SystemMsg,
-    AuthKind, AuthorityProof, DstLocation, Error, MsgId, MsgType, NodeMsgAuthority, Result,
-    ServiceAuth,
+    AuthKind, AuthorityProof, Dst, Error, MsgId, MsgType, NodeMsgAuthority, Result, ServiceAuth,
 };
-use bls::PublicKey as BlsPublicKey;
 use bytes::{Bytes, BytesMut};
 use custom_debug::Debug;
 use serde::Serialize;
-use xor_name::XorName;
 
 #[cfg(feature = "traceroute")]
 use crate::types::PublicKey;
@@ -75,24 +72,19 @@ impl WireMsg {
     }
 
     /// Creates a new `WireMsg` with the provided serialized payload and `MsgKind`.
-    pub fn new_msg(
-        msg_id: MsgId,
-        payload: Bytes,
-        auth: AuthKind,
-        dst_location: DstLocation,
-    ) -> Result<Self> {
-        Ok(Self {
+    pub fn new_msg(msg_id: MsgId, payload: Bytes, auth: AuthKind, dst: Dst) -> Self {
+        Self {
             header: WireMsgHeader::new(
                 msg_id,
                 auth,
-                dst_location,
+                dst,
                 #[cfg(feature = "traceroute")]
                 vec![],
             ),
             payload,
             #[cfg(feature = "test-utils")]
             payload_debug: None,
-        })
+        }
     }
 
     /// Attempts to create an instance of `WireMsg` by deserialising the bytes provided.
@@ -149,7 +141,7 @@ impl WireMsg {
                 Ok(MsgType::Service {
                     msg_id: self.header.msg_envelope.msg_id,
                     auth,
-                    dst_location: self.header.msg_envelope.dst_location,
+                    dst: self.header.msg_envelope.dst,
                     msg,
                 })
             }
@@ -164,7 +156,7 @@ impl WireMsg {
                         node_signed,
                         &self.payload,
                     )?),
-                    dst_location: self.header.msg_envelope.dst_location,
+                    dst: self.header.msg_envelope.dst,
                     msg,
                 })
             }
@@ -182,7 +174,7 @@ impl WireMsg {
                         bls_share_signed,
                         &self.payload,
                     )?),
-                    dst_location: self.header.msg_envelope.dst_location,
+                    dst: self.header.msg_envelope.dst,
                     msg,
                 })
             }
@@ -220,13 +212,13 @@ impl WireMsg {
     }
 
     /// Return the destination section `PublicKey` for this message
-    pub fn dst_section_pk(&self) -> Option<BlsPublicKey> {
-        self.header.msg_envelope.dst_location.section_pk()
+    pub fn dst_section_key(&self) -> bls::PublicKey {
+        self.header.msg_envelope.dst.section_key
     }
 
     /// Return the source section `PublicKey` for this
     /// message if it's a `NodeMsg`
-    pub fn src_section_pk(&self) -> Option<BlsPublicKey> {
+    pub fn src_section_pk(&self) -> Option<bls::PublicKey> {
         match &self.header.msg_envelope.auth {
             AuthKind::Node(node_signed) => Some(node_signed.section_pk),
             AuthKind::NodeBlsShare(bls_share_signed) => Some(bls_share_signed.section_pk),
@@ -234,24 +226,9 @@ impl WireMsg {
         }
     }
 
-    /// Update the message ID
-    pub fn set_msg_id(&mut self, msg_id: MsgId) {
-        self.header.msg_envelope.msg_id = msg_id;
-    }
-
-    /// Update the destination section `PublicKey` for this message
-    pub fn set_dst_section_pk(&mut self, pk: BlsPublicKey) {
-        self.header.msg_envelope.dst_location.set_section_pk(pk)
-    }
-
-    /// Update the destination `XorName` for this message
-    pub fn set_dst_xorname(&mut self, name: XorName) {
-        self.header.msg_envelope.dst_location.set_name(name)
-    }
-
-    /// Return the destination for this message
-    pub fn dst_location(&self) -> &DstLocation {
-        &self.header.msg_envelope.dst_location
+    /// Return the dst of this msg
+    pub fn dst(&self) -> &Dst {
+        &self.header.msg_envelope.dst
     }
 
     /// Convenience function which creates a temporary `WireMsg` from the provided
@@ -308,15 +285,13 @@ mod tests {
         let mut rng = OsRng;
         let src_node_keypair = ed25519_dalek::Keypair::generate(&mut rng);
 
-        let dst_name = xor_name::rand::random();
-        let dst_section_pk = SecretKey::random().public_key();
-        let dst_location = DstLocation::Node {
-            name: dst_name,
-            section_pk: dst_section_pk,
+        let dst = Dst {
+            name: xor_name::rand::random(),
+            section_key: SecretKey::random().public_key(),
         };
 
         let msg_id = MsgId::new();
-        let pk = crate::types::PublicKey::Bls(dst_section_pk);
+        let pk = crate::types::PublicKey::Bls(dst.section_key);
 
         let msg = SystemMsg::NodeCmd(NodeCmd::RecordStorageLevel {
             node_id: pk,
@@ -329,15 +304,15 @@ mod tests {
 
         let auth = AuthKind::Node(node_auth.clone().into_inner());
 
-        let wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst_location)?;
+        let wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header
         let deserialized = WireMsg::from(serialized)?;
         assert_eq!(deserialized, wire_msg);
         assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
-        assert_eq!(deserialized.dst_location(), &dst_location);
-        assert_eq!(deserialized.dst_section_pk(), Some(dst_section_pk));
+        assert_eq!(deserialized.dst(), &dst);
+        assert_eq!(deserialized.dst_section_key(), dst.section_key);
         assert_eq!(deserialized.src_section_pk(), Some(src_section_pk));
 
         // test deserialisation of payload
@@ -346,7 +321,7 @@ mod tests {
             MsgType::System {
                 msg_id: wire_msg.msg_id(),
                 msg_authority: NodeMsgAuthority::Node(node_auth),
-                dst_location,
+                dst,
                 msg,
             }
         );
@@ -358,11 +333,9 @@ mod tests {
     fn serialisation_client_msg() -> Result<()> {
         let src_client_keypair = Keypair::new_ed25519();
 
-        let dst_name = xor_name::rand::random();
-        let dst_section_pk = SecretKey::random().public_key();
-        let dst_location = DstLocation::Node {
-            name: dst_name,
-            section_pk: dst_section_pk,
+        let dst = Dst {
+            name: xor_name::rand::random(),
+            section_key: SecretKey::random().public_key(),
         };
 
         let msg_id = MsgId::new();
@@ -381,15 +354,15 @@ mod tests {
 
         let auth = AuthKind::Service(auth);
 
-        let wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst_location)?;
+        let wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
         let serialized = wire_msg.serialize()?;
 
         // test deserialisation of header
         let deserialized = WireMsg::from(serialized)?;
         assert_eq!(deserialized, wire_msg);
         assert_eq!(deserialized.msg_id(), wire_msg.msg_id());
-        assert_eq!(deserialized.dst_location(), &dst_location);
-        assert_eq!(deserialized.dst_section_pk(), Some(dst_section_pk));
+        assert_eq!(deserialized.dst(), &dst);
+        assert_eq!(deserialized.dst_section_key(), dst.section_key);
         assert_eq!(deserialized.src_section_pk(), None);
 
         // test deserialisation of payload
@@ -398,7 +371,7 @@ mod tests {
             MsgType::Service {
                 msg_id: wire_msg.msg_id(),
                 auth: auth_proof,
-                dst_location,
+                dst,
                 msg: client_msg,
             }
         );
