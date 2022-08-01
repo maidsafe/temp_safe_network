@@ -4,7 +4,8 @@ The Safe Network is a fully autonomous data and communications network. For a ge
 
 The network is implemented in Rust. This repository is a workspace consisting of 4 crates:
 
-* [safe_network](https://crates.io/crates/safe_network): provides the core implementation of network features and the node binary.
+* [sn_node](https://crates.io/crates/sn_node): implements the Safe Network Node binary.
+* [sn_client](https://crates.io/crates/sn_client): provides the low-level interface to connect to a network.
 * [sn_api](https://crates.io/crates/sn_api): an interface to expose network features for client applications.
 * [sn_cli](https://crates.io/crates/sn_cli): a command line interface for using the network.
 * sn_cmd_test_utilities: internal, unpublished crate that provides tools for integration testing.
@@ -13,7 +14,7 @@ Currently, the network can be used via these 3 published crates. To see how, a g
 
 ## Testing
 
-Some of the `safe_network` tests require a live network to test against.
+Some of the tests require a live network to test against.
 
 ### Running a local testnet
 
@@ -21,7 +22,7 @@ You should first ensure that your local machine does not have any artefacts from
 
 You can then run a local testnet using the `testnet` bin:
 
-`NODE_COUNT=15 RUST_LOG=safe_network=trace cargo run --release --bin testnet`
+`NODE_COUNT=15 RUST_LOG=sn_node=trace cargo run --release --bin testnet`
 
 `NODE_COUNT` defaults to 33 nodes and will give you a split section. 15 nodes as above will give only one section. How many nodes you want to run will depend on your hardware. 15 nodes can be considered the minimum for a viable section.
 
@@ -29,9 +30,9 @@ You can then run a local testnet using the `testnet` bin:
 
 Once you have your network running you can simply run `cargo test --release`. This will run _all_ tests in `sn`. 
 
-> Note: if you're running in the root directory, either `cd sn` before running tests or inclide `-p safe_network` in the cargo command to target _only_ that package. Otherwise you'll be running tests from _all_ crates, including sn_api and sn_cli. Eg: `cargo test --release -p safe_network`
+> Note: if you're running in the root directory, either `cd sn_node` before running tests or include `-p sn_node` in the cargo command to target _only_ `sn_node`. Otherwise you'll be running tests from _all_ crates, including sn_api and sn_cli. Eg: `cargo test --release -p sn_node`
 
-In general it can be useful to scope your test running, eg `cargo test --release client_api` will run _only_ the client tests. Or perhaps you want to ignore `proptests` as they can be quite long: `cargo test --release client_api --skip proptest`
+In general it can be useful to scope your test running, eg `cargo test --release client` will run _only_ the client tests. Or perhaps you want to ignore `proptests` as they can be quite long: `cargo test --release client --skip proptest`
 
 
 
