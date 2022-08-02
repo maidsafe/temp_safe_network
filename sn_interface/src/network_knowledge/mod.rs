@@ -494,7 +494,7 @@ impl NetworkKnowledge {
     }
 
     // Returns mutable reference to network prefix map
-    pub fn mut_prefix_map(&mut self) -> &mut NetworkPrefixMap {
+    pub fn prefix_map_mut(&mut self) -> &mut NetworkPrefixMap {
         &mut self.prefix_map
     }
 

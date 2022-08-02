@@ -6,11 +6,13 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::network_knowledge::prefix_map::NetworkPrefixMap;
-use crate::types::{Error, Result};
-use std::path::PathBuf;
-use tokio::fs;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use crate::{
+    network_knowledge::prefix_map::NetworkPrefixMap,
+    types::{Error, Result},
+};
+use std::{io::Write, path::PathBuf};
+use tempfile::NamedTempFile;
+use tokio::{fs, io::AsyncReadExt};
 pub const DEFAULT_PREFIX_HARDLINK_NAME: &str = "default";
 pub const SN_PREFIX_MAP_DIR: &str = "SN_PREFIX_MAP_DIR";
 
@@ -22,25 +24,16 @@ pub async fn write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap) -> Result<(
         .map_err(|_| {
             Error::DirectoryHandling("Could not read '.safe/prefix_maps' directory".to_string())
         })?;
-    let tmp_prefix_map_file = prefix_map_dir.join(format!("temp-{:?}", prefix_map.genesis_key()));
     let prefix_map_file = prefix_map_dir.join(format!("{:?}", prefix_map.genesis_key()));
+    let mut temp_file = NamedTempFile::new_in(prefix_map_dir)
+        .map_err(|e| Error::FileHandling(format!("Error creating tempfile: {:?}", e)))?;
 
     let serialized =
         rmp_serde::to_vec(prefix_map).map_err(|e| Error::Serialisation(e.to_string()))?;
-
-    let mut file = fs::File::create(&tmp_prefix_map_file)
-        .await
+    temp_file
+        .write_all(serialized.as_slice())
         .map_err(|e| Error::FileHandling(e.to_string()))?;
-
-    file.write_all(&serialized)
-        .await
-        .map_err(|e| Error::FileHandling(e.to_string()))?;
-
-    file.sync_all()
-        .await
-        .map_err(|e| Error::FileHandling(e.to_string()))?;
-
-    fs::rename(tmp_prefix_map_file, &prefix_map_file)
+    fs::rename(temp_file.path(), &prefix_map_file)
         .await
         .map_err(|e| Error::FileHandling(e.to_string()))?;
 
