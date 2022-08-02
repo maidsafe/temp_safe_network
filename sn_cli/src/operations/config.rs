@@ -505,7 +505,6 @@ impl Config {
             .wrap_err_with(|| "Error creating temp file".to_string())?;
 
         let serialized = Self::serialise_prefix_map(prefix_map)
-            .await
             .wrap_err("Failed to serialise NetworkPrefixMap")?;
         temp_file
             .write_all(serialized.as_slice())
@@ -619,7 +618,7 @@ impl Config {
         Ok(prefix_map)
     }
 
-    async fn serialise_prefix_map(prefix_map: &NetworkPrefixMap) -> Result<Vec<u8>> {
+    fn serialise_prefix_map(prefix_map: &NetworkPrefixMap) -> Result<Vec<u8>> {
         rmp_serde::to_vec(prefix_map).wrap_err_with(|| "Failed to serialise NetworkPrefixMap")
     }
 }
@@ -627,6 +626,7 @@ impl Config {
 #[cfg(test)]
 pub mod test_utils {
     use super::{Config, NetworkInfo};
+    use crate::operations::config::Settings;
     use assert_fs::{prelude::*, TempDir};
     use color_eyre::{eyre::eyre, Result};
     use sn_api::{NetworkPrefixMap, DEFAULT_PREFIX_HARDLINK_NAME, SN_PREFIX_MAP_DIR};
@@ -655,15 +655,16 @@ pub mod test_utils {
     }
 
     impl Config {
-        pub async fn create_config(
-            tmp_dir: &TempDir,
-            serialized_config: Option<String>,
-        ) -> Result<Config> {
+        // Optionally write a cli/config.json file before creating the Config
+        pub async fn create_config(tmp_dir: &TempDir, config: Option<Settings>) -> Result<Config> {
             let cli_config_dir = tmp_dir.child(".safe/cli");
             let cli_config_file = cli_config_dir.child("config.json");
-            if let Some(serialized) = serialized_config {
-                cli_config_file.write_str(serialized.as_str())?;
+
+            // write settings to config.json which can be read during Config::new
+            if let Some(settings) = config {
+                cli_config_file.write_str(serde_json::to_string(&settings)?.as_str())?;
             }
+
             let prefix_maps_dir = tmp_dir.child(".safe/prefix_maps");
             let prefix_maps_dir_string = prefix_maps_dir.path().display().to_string();
             env::set_var(SN_PREFIX_MAP_DIR, prefix_maps_dir_string);
@@ -826,8 +827,7 @@ mod constructor {
             "network_2".to_string(),
             NetworkInfo::Local(prefix_map_path, Some(*prefix_map.genesis_key())),
         );
-        let settings_serialized = serde_json::to_string(&settings)?;
-        let config = Config::create_config(&tmp_dir, Some(settings_serialized)).await?;
+        let config = Config::create_config(&tmp_dir, Some(settings)).await?;
 
         assert_eq!(config.networks_iter().count(), 2);
         let mut iter = config.networks_iter();
@@ -836,30 +836,17 @@ mod constructor {
             .next()
             .ok_or_else(|| eyre!("failed to obtain item from networks list"))?;
         assert_eq!(network_name, "network_1");
-        match network_info {
-            NetworkInfo::Remote(_, genesis_key) => assert_eq!(*genesis_key, None),
-            _ => {
-                return Err(eyre!(
-                    "The network information should be of type NetworkInfo::Remote"
-                ))
-            }
-        };
+        assert!(matches!(network_info, NetworkInfo::Remote(_, None)));
 
         // second network
         let (network_name, network_info) = iter
             .next()
             .ok_or_else(|| eyre!("failed to obtain item from networks list"))?;
         assert_eq!(network_name, "network_2");
-        match network_info {
-            NetworkInfo::Local(_, genesis_key) => {
-                assert_eq!(*genesis_key, Some(*prefix_map.genesis_key()))
-            }
-            _ => {
-                return Err(eyre!(
-                    "The network information should be of type NetworkInfo::Local"
-                ))
-            }
-        };
+        assert!(matches!(
+                network_info,
+                NetworkInfo::Local(_, Some(genesis_key)) if genesis_key == prefix_map.genesis_key()
+        ));
         Ok(())
     }
 
@@ -977,8 +964,7 @@ mod sync_prefix_maps_and_settings {
                     NetworkInfo::Local(prefix_map_path, Some(*prefix_map.genesis_key())),
                 );
             });
-        let serialized_settings = serde_json::to_string(&settings)?;
-        let mut config = Config::create_config(&tmp_dir, Some(serialized_settings)).await?;
+        let mut config = Config::create_config(&tmp_dir, Some(settings)).await?;
 
         config.sync().await?;
         assert_eq!(config.settings.networks.len(), 4);
@@ -1000,8 +986,7 @@ mod sync_prefix_maps_and_settings {
             "network_2".to_string(),
             NetworkInfo::Local(tmp_dir.path().join("PublicKey(0000.0000)"), None),
         );
-        let serialized_settings = serde_json::to_string(&settings)?;
-        let mut config = Config::create_config(&tmp_dir, Some(serialized_settings)).await?;
+        let mut config = Config::create_config(&tmp_dir, Some(settings)).await?;
 
         config.sync().await?;
         assert_eq!(config.settings.networks.len(), 0);
@@ -1029,31 +1014,25 @@ mod sync_prefix_maps_and_settings {
             "network_2".to_string(),
             NetworkInfo::Local(prefix_map_path, None),
         );
-        let serialized_settings = serde_json::to_string(&settings)?;
-        let mut config = Config::create_config(&tmp_dir, Some(serialized_settings)).await?;
+        let mut config = Config::create_config(&tmp_dir, Some(settings)).await?;
 
         config.sync().await?;
-
+        // network_1
         let mut iter = config.networks_iter();
-        let (_, network_info) = iter
+        let (network_name, network_info) = iter
             .next()
             .ok_or_else(|| eyre!("failed to obtain item from networks list"))?;
-        if let NetworkInfo::Remote(_, genesis_key) = network_info {
-            assert!(genesis_key.is_some());
-        } else {
-            return Err(eyre!("network_1 should be present"));
-        }
-
-        let (_, network_info) = iter
+        assert_eq!(network_name, "network_1");
+        assert!(matches!(network_info, NetworkInfo::Remote(_, Some(_))));
+        // network_2
+        let (network_name, network_info) = iter
             .next()
             .ok_or_else(|| eyre!("failed to obtain item from networks list"))?;
-        if let NetworkInfo::Local(_, genesis_key) = network_info {
-            assert!(genesis_key.is_some());
-        } else {
-            return Err(eyre!("network_2 should be present"));
-        }
+        assert_eq!(network_name, "network_2");
+        assert!(matches!(network_info, NetworkInfo::Local(_, Some(_))));
 
         config.compare_settings_and_prefix_maps_dir().await?;
+
         Ok(())
     }
 
@@ -1070,8 +1049,7 @@ mod sync_prefix_maps_and_settings {
             "network_1".to_string(),
             NetworkInfo::Local(prefix_map_path, None),
         );
-        let serialized_settings = serde_json::to_string(&settings)?;
-        let mut config = Config::create_config(&tmp_dir, Some(serialized_settings)).await?;
+        let mut config = Config::create_config(&tmp_dir, Some(settings)).await?;
 
         let prefix_map_path = tmp_dir
             .path()
@@ -1116,8 +1094,7 @@ mod sync_prefix_maps_and_settings {
             "network_1_copy".to_string(),
             NetworkInfo::Local(prefix_map_path, None),
         );
-        let serialized_settings = serde_json::to_string(&settings)?;
-        let mut config = Config::create_config(&tmp_dir, Some(serialized_settings)).await?;
+        let mut config = Config::create_config(&tmp_dir, Some(settings)).await?;
 
         config.sync().await?;
         assert_eq!(config.settings.networks.len(), 2);
@@ -1144,13 +1121,10 @@ mod sync_prefix_maps_and_settings {
             .next()
             .ok_or_else(|| eyre!("failed to obtain item from networks list"))?;
         assert_eq!(*network_name, format!("{:?}", prefix_map.genesis_key()));
-        if let NetworkInfo::Local(_, Some(genesis_key)) = network_info {
-            assert_eq!(genesis_key, prefix_map.genesis_key());
-        } else {
-            return Err(eyre!(
-                "The network information should be of type NetworkInfo::Remote"
-            ));
-        }
+        assert!(matches!(
+            network_info,
+            NetworkInfo::Local(_, Some(genesis_key)) if genesis_key == prefix_map.genesis_key()
+        ));
 
         fs::remove_file(
             config
@@ -1276,13 +1250,11 @@ mod networks {
             .networks
             .get("network_1")
             .ok_or_else(|| eyre!("network_1 should be present"))?;
-        if let NetworkInfo::Local(_, genesis_key) = net_info {
-            let gk = genesis_key.ok_or_else(|| eyre!("Genesis key should be written"))?;
-            assert_eq!(*default.genesis_key(), gk);
-            assert_eq!(default, prefix_map_1);
-        } else {
-            return Err(eyre!("NetworkInfo should be Local"));
-        }
+        assert_eq!(default, prefix_map_1);
+        assert!(matches!(
+            net_info,
+            NetworkInfo::Local(_, Some(genesis_key)) if genesis_key == default.genesis_key()
+        ));
 
         config.switch_to_network("network_2").await?;
         let default = config.read_default_prefix_map().await?;
@@ -1291,13 +1263,11 @@ mod networks {
             .networks
             .get("network_2")
             .ok_or_else(|| eyre!("network_2 should be present"))?;
-        if let NetworkInfo::Local(_, genesis_key) = net_info {
-            let gk = genesis_key.ok_or_else(|| eyre!("Genesis key should be written"))?;
-            assert_eq!(*default.genesis_key(), gk);
-            assert_eq!(default, prefix_map_2);
-        } else {
-            return Err(eyre!("NetworkInfo should be Local"));
-        }
+        assert_eq!(default, prefix_map_2);
+        assert!(matches!(
+            net_info,
+            NetworkInfo::Local(_, Some(genesis_key)) if genesis_key == default.genesis_key()
+        ));
 
         Ok(())
     }

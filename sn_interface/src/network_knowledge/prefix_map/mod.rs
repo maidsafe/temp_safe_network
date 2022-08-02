@@ -105,13 +105,7 @@ impl NetworkPrefixMap {
     ) -> Option<SectionAuth<SectionAuthorityProvider>> {
         self.sections
             .iter()
-            .filter(|&(prefix, _)| {
-                if let Some(p) = exclude {
-                    prefix != p
-                } else {
-                    true
-                }
-            })
+            .filter(|&(prefix, _)| Some(prefix) != exclude)
             .min_by(|&(prefix_lhs, _), &(prefix_rhs, _)| prefix_lhs.cmp_distance(prefix_rhs, name))
             .map(|(_, sap)| sap.clone())
     }
@@ -145,7 +139,7 @@ impl NetworkPrefixMap {
     /// Get `SectionAuthorityProvider` of a known section with the given prefix.
     #[allow(unused)]
     pub fn get(&self, prefix: &Prefix) -> Option<SectionAuthorityProvider> {
-        self.sections.get(prefix).map(|sap| sap.value.clone())
+        self.get_signed(prefix).map(|sap| sap.value)
     }
 
     /// Get signed `SectionAuthorityProvider` of a known section with the given prefix.
@@ -200,8 +194,8 @@ impl NetworkPrefixMap {
             };
         }
 
-        match self.sections.get(incoming_prefix) {
-            Some(sap) if sap == &signed_sap => {
+        match self.get_signed(incoming_prefix) {
+            Some(sap) if sap == signed_sap => {
                 // It's the same SAP we are already aware of
                 return Ok(false);
             }
@@ -385,7 +379,7 @@ mod tests {
     use crate::network_knowledge::test_utils::{random_sap, section_signed};
     use eyre::{eyre, Context, Result};
     use proptest::{
-        prelude::{any, Strategy},
+        prelude::{any, ProptestConfig, Strategy},
         prop_assert, proptest,
     };
     use rand::{
@@ -642,8 +636,11 @@ mod tests {
     }
 
     proptest! {
+        #![proptest_config(ProptestConfig {
+            cases: 20, .. ProptestConfig::default()
+        })]
         #[test]
-        fn proptest_prefix_map_fields_should_stay_in_sync((main_chain, update_variations_list) in arb_sll_and_proof_chains(100, 3)) {
+        fn proptest_prefix_map_fields_should_stay_in_sync((main_chain, update_variations_list) in arb_sll_and_proof_chains(25, 3)) {
             for variation in update_variations_list {
                 let mut prefix_map = NetworkPrefixMap::new(*main_chain.root_key());
                 for (proof_chain, sap) in &variation {
