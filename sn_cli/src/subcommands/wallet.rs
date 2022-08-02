@@ -238,8 +238,28 @@ pub async fn wallet_commander(
             // back to print it to stdout if that fails.
             let print_out_dbc = match save {
                 None => true,
-                Some(ref path_str) => {
-                    let path = Path::new(path_str);
+                Some(ref target) if target.starts_with("safe://") => match safe
+                    .wallet_deposit(target, None, &dbc, None)
+                    .await
+                    .map_err(map_invalid_sk_error)
+                {
+                    Ok((name, _)) => {
+                        println!(
+                            "Reissued DBC deposited with name '{}' in wallet located at \"{}\".",
+                            name, target
+                        );
+                        false
+                    }
+                    Err(err) => {
+                        eprintln!(
+                            "Error: Unable to desposit DBC into wallet at \"{}\": {}.",
+                            target, err
+                        );
+                        true
+                    }
+                },
+                Some(ref target) => {
+                    let path = Path::new(target);
                     match fs::write(path, dbc_hex.clone()).await {
                         Ok(()) => {
                             println!("DBC content written at '{}'.", path.display());
