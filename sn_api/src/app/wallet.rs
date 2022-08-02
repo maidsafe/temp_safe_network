@@ -176,6 +176,7 @@ impl Safe {
                 shares_for_current_tx,
                 &proof_key_verifier,
             )
+            .is_ok()
         });
 
         Ok(is_spent)
@@ -496,22 +497,27 @@ impl Safe {
                     .filter(|proof_share| proof_share.content.transaction_hash == tx_hash)
                     .collect();
 
-                if verify_spent_proof_shares_for_tx(
+                match verify_spent_proof_shares_for_tx(
                     key_image,
                     tx_hash,
                     shares_for_current_tx.iter(),
                     &proof_key_verifier,
                 ) {
-                    dbc_builder = dbc_builder
-                        .add_spent_proof_shares(shares_for_current_tx.into_iter())
-                        .add_spent_transaction(tx);
+                    Ok(()) => {
+                        dbc_builder = dbc_builder
+                            .add_spent_proof_shares(shares_for_current_tx.into_iter())
+                            .add_spent_transaction(tx);
 
-                    break;
-                } else if attempts == NUM_OF_DBC_REISSUE_ATTEMPTS {
-                    return Err(Error::DbcReissueError(format!(
-                        "Failed to spend input, {} proof shares obtained from spentbook",
-                        shares_for_current_tx.len()
-                    )));
+                        break;
+                    }
+                    Err(err) if attempts == NUM_OF_DBC_REISSUE_ATTEMPTS => {
+                        return Err(Error::DbcReissueError(format!(
+                            "Failed to spend input, {} proof shares obtained from spentbook: {}",
+                            shares_for_current_tx.len(),
+                            err
+                        )));
+                    }
+                    Err(_) => {}
                 }
             }
         }
@@ -530,12 +536,11 @@ fn verify_spent_proof_shares_for_tx<'a>(
     tx_hash: Hash,
     proof_shares: impl Iterator<Item = &'a SpentProofShare>,
     proof_key_verifier: &SpentProofKeyVerifier,
-) -> bool {
-    if let Ok(spent_proof) = SpentProof::try_from_proof_shares(key_image, tx_hash, proof_shares) {
-        spent_proof.verify(tx_hash, proof_key_verifier).is_ok()
-    } else {
-        false
-    }
+) -> Result<()> {
+    SpentProof::try_from_proof_shares(key_image, tx_hash, proof_shares)
+        .and_then(|spent_proof| spent_proof.verify(tx_hash, proof_key_verifier))?;
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1186,10 +1191,8 @@ mod tests {
         // It shall detect no spent proofs for this TX, thus fail to reissue
         match safe.wallet_reissue(&wallet_xorurl, "0.1", None).await {
             Err(Error::DbcReissueError(msg)) => {
-                assert_eq!(
-                    msg,
-                    "Failed to spend input, 0 proof shares obtained from spentbook".to_string()
-                );
+                assert!(msg
+                    .starts_with("Failed to spend input, 0 proof shares obtained from spentbook"));
                 Ok(())
             }
             Err(err) => Err(anyhow!("Error returned is not the expected: {:?}", err)),
