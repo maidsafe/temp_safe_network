@@ -17,6 +17,7 @@ use color_eyre::{eyre::eyre, eyre::Error, Help, Result};
 use sn_api::{Error as ApiError, Safe};
 use sn_dbc::{Dbc, Error as DbcError};
 use std::path::Path;
+use tokio::fs;
 
 #[derive(Subcommand, Debug)]
 pub enum WalletSubCommands {
@@ -54,7 +55,7 @@ pub enum WalletSubCommands {
         force: bool,
     },
     #[clap(name = "reissue")]
-    /// Reissue a DBC from a wallet to a SafeKey.
+    /// Reissue a DBC from a wallet.
     Reissue {
         /// The amount to reissue
         amount: String,
@@ -64,12 +65,15 @@ pub enum WalletSubCommands {
         /// To reissue the DBC to a particular owner, provide their public key. This should be a
         /// hex-encoded BLS key. Otherwise the DBC will be reissued as bearer, meaning anyone can
         /// spend it. This argument and the --owned argument are mutually exclusive.
-        #[clap(long = "public-key")]
-        public_key_hex: Option<String>,
+        #[clap(long = "to")]
+        to: Option<String>,
         /// Set this flag to reissue as an owned DBC, using the public key configured for use with
         /// safe. This argument and the --public-key argument are mutually exclusive.
         #[clap(long = "owned")]
         owned: bool,
+        /// A file path to store the content of the reissued DBC.
+        #[clap(long = "save")]
+        save: Option<String>,
     },
 }
 
@@ -200,18 +204,19 @@ pub async fn wallet_commander(
         WalletSubCommands::Reissue {
             amount,
             from,
-            public_key_hex,
+            save,
+            to,
             owned,
         } => {
-            if owned && public_key_hex.is_some() {
+            if owned && to.is_some() {
                 return Err(eyre!(
-                    "The --owned and --public-key arguments are mutually exclusive."
+                    "The --owned and --to arguments are mutually exclusive."
                 )
                 .suggestion(
                     "Please run the command again and use one or the other, but not both, of these \
                     arguments."));
             }
-            let pk = if let Some(pk_hex) = public_key_hex {
+            let pk = if let Some(pk_hex) = to {
                 Some(PublicKey::from_hex(&pk_hex)?)
             } else if owned {
                 let sk = read_key_from_configured_credentials(
@@ -229,17 +234,43 @@ pub async fn wallet_commander(
             let dbc = safe.wallet_reissue(&from, &amount, pk).await?;
             let dbc_hex = dbc.to_hex()?;
 
+            // Write the DBC to a file if the user requested it, but fall
+            // back to print it to stdout if that fails.
+            let print_out_dbc = match save {
+                None => true,
+                Some(ref path_str) => {
+                    let path = Path::new(path_str);
+                    match fs::write(path, dbc_hex.clone()).await {
+                        Ok(()) => {
+                            println!("DBC content written at '{}'.", path.display());
+                            false
+                        }
+                        Err(err) => {
+                            eprintln!(
+                                "Error: Unable to write DBC at '{}': {}.",
+                                path.display(),
+                                err
+                            );
+                            true
+                        }
+                    }
+                }
+            };
+
             if OutputFmt::Pretty == output_fmt {
                 println!("Reissued DBC with {} safecoins.", amount);
-                println!("-------- DBC DATA --------");
-                println!("{}", dbc_hex);
-                println!("--------------------------");
+                if print_out_dbc {
+                    println!("-------- DBC DATA --------");
+                    println!("{}", dbc_hex);
+                    println!("--------------------------");
+                }
+
                 if let Some(pk) = pk {
                     println!("This DBC is owned by public key {}", pk.to_hex());
                 } else {
                     println!("This is a bearer DBC that can be spent by anyone.");
                 }
-            } else {
+            } else if print_out_dbc {
                 println!("{}", dbc_hex);
             }
 
