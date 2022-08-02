@@ -333,6 +333,7 @@ impl Config {
     pub fn networks_iter(&self) -> impl Iterator<Item = (&String, &NetworkInfo)> {
         self.settings.networks.iter()
     }
+
     pub async fn add_network(
         &mut self,
         name: &str,

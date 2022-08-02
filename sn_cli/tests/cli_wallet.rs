@@ -215,7 +215,7 @@ async fn wallet_deposit_should_deposit_an_owned_dbc_with_configured_secret_key()
             "3.15",
             "--from",
             &wallet_xorurl,
-            "--public-key",
+            "--to",
             &pk_hex,
             "--json",
         ],
@@ -273,7 +273,7 @@ async fn wallet_deposit_should_deposit_an_owned_dbc_with_secret_key_arg() -> Res
             "7.15",
             "--from",
             &wallet_xorurl,
-            "--public-key",
+            "--to",
             &pk.to_hex(),
             "--json",
         ],
@@ -341,7 +341,7 @@ async fn wallet_deposit_owned_dbc_with_no_secret_key_or_credentials_should_fail_
             "0.15",
             "--from",
             &wallet_xorurl,
-            "--public-key",
+            "--to",
             &pk_hex,
             "--json",
         ],
@@ -414,7 +414,7 @@ async fn wallet_deposit_owned_dbc_with_secret_key_that_does_not_match_should_fai
             "0.15",
             "--from",
             &wallet_xorurl,
-            "--public-key",
+            "--to",
             &pk_hex,
             "--json",
         ],
@@ -543,7 +543,7 @@ async fn wallet_reissue_should_reissue_an_owned_dbc_from_a_deposited_dbc() -> Re
             "2.15",
             "--from",
             &wallet_xorurl,
-            "--public-key",
+            "--to",
             &pk_hex,
         ],
         Some(0),
@@ -699,14 +699,14 @@ async fn wallet_reissue_with_owned_and_public_key_args_should_fail_with_suggesti
             "--from",
             &wallet_xorurl,
             "--owned",
-            "--public-key",
+            "--to",
             &sk.public_key().to_hex(),
         ],
         Some(1),
     )?
     .assert()
     .stderr(predicate::str::contains(
-        "The --owned and --public-key arguments are mutually exclusive.",
+        "The --owned and --to arguments are mutually exclusive.",
     ))
     .stderr(predicate::str::contains(
         "Please run the command again and use one or the other, but not both, of these arguments.",
@@ -919,6 +919,152 @@ async fn wallet_deposit_spent_owned_dbc_force() -> Result<()> {
         format!(
             "Spendable DBC deposited ({} safecoins) with name 'spent-owned-dbc' in wallet located at \"{}\"\n",
             balance, wallet_xorurl
+        )
+    ))
+    .success();
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn wallet_reissue_to_file_succeeds() -> Result<()> {
+    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let (from_dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--dbc",
+            &from_dbc_file_path.display().to_string(),
+            &wallet_xorurl,
+        ],
+        Some(0),
+    )?;
+
+    let to_dbc_file_path = tmp_data_dir.child(get_random_string());
+
+    safe_cmd(
+        [
+            "wallet",
+            "reissue",
+            "0.987654321",
+            "--from",
+            &wallet_xorurl,
+            "--save",
+            &to_dbc_file_path.display().to_string(),
+        ],
+        Some(0),
+    )?
+    .assert()
+    .stdout(predicate::str::contains(format!(
+        "DBC content written at '{}'.",
+        to_dbc_file_path.display()
+    )))
+    .stdout(predicate::str::contains("-------- DBC DATA --------").not())
+    .stdout(predicate::str::contains(
+        "Reissued DBC with 0.987654321 safecoins.",
+    ))
+    .success();
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn wallet_reissue_to_file_fails() -> Result<()> {
+    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let (dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--dbc",
+            &dbc_file_path.display().to_string(),
+            &wallet_xorurl,
+        ],
+        Some(0),
+    )?;
+
+    safe_cmd(
+        [
+            "wallet",
+            "reissue",
+            "0.123456789",
+            "--from",
+            &wallet_xorurl,
+            "--save",
+            "/invalid/file/path",
+        ],
+        Some(0),
+    )?
+    .assert()
+    .stderr(predicate::str::contains(
+        "Error: Unable to write DBC at '/invalid/file/path'",
+    ))
+    .stdout(predicate::str::contains("-------- DBC DATA --------"))
+    .stdout(predicate::str::contains(
+        "Reissued DBC with 0.123456789 safecoins.",
+    ))
+    .success();
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn wallet_deposit_dbc_reissued_to_file() -> Result<()> {
+    let json_output = safe_cmd_stdout(["wallet", "create", "--json"], Some(0))?;
+    let wallet_xorurl = parse_wallet_create_output(&json_output)?;
+    let tmp_data_dir = assert_fs::TempDir::new()?;
+    let (from_dbc_file_path, _, _) = get_bearer_dbc_on_file(&tmp_data_dir).await?;
+
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--dbc",
+            &from_dbc_file_path.display().to_string(),
+            &wallet_xorurl,
+        ],
+        Some(0),
+    )?;
+
+    let to_dbc_file_path = tmp_data_dir.child(get_random_string());
+
+    safe_cmd(
+        [
+            "wallet",
+            "reissue",
+            "0.111",
+            "--from",
+            &wallet_xorurl,
+            "--save",
+            &to_dbc_file_path.display().to_string(),
+        ],
+        Some(0),
+    )?;
+
+    safe_cmd(
+        [
+            "wallet",
+            "deposit",
+            "--name",
+            "dbc-reissued-to-file",
+            "--dbc",
+            &to_dbc_file_path.display().to_string(),
+            &wallet_xorurl,
+        ],
+        Some(0),
+    )?
+    .assert()
+    .stdout(predicate::str::contains(
+        format!(
+            "Spendable DBC deposited (0.111000000 safecoins) with name 'dbc-reissued-to-file' in wallet located at \"{}\"\n",
+            wallet_xorurl
         )
     ))
     .success();
