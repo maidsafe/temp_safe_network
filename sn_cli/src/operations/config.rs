@@ -19,10 +19,12 @@ use std::{
     collections::BTreeMap,
     default::Default,
     fmt,
+    io::Write,
     path::{Path, PathBuf},
     thread,
     time::Duration,
 };
+use tempfile::NamedTempFile;
 use tokio::fs;
 use tracing::debug;
 use url::Url;
@@ -494,12 +496,32 @@ impl Config {
         Ok(())
     }
 
-    pub async fn write_prefix_map(path: &Path, prefix_map: &NetworkPrefixMap) -> Result<()> {
-        let serialized = Self::serialise_prefix_map(prefix_map)?;
-        fs::write(path, serialized).await.wrap_err_with(|| {
-            format!("Unable to write NetworkPrefixMap to '{}'", path.display())
+    pub async fn write_prefix_map(path: &PathBuf, prefix_map: &NetworkPrefixMap) -> Result<()> {
+        let prefix_map_dir = path
+            .parent()
+            .ok_or_else(|| eyre!("Path {:?} should be inside a folder", path.display()))?;
+        let mut temp_file = NamedTempFile::new_in(prefix_map_dir)
+            .wrap_err_with(|| "Error creating temp file".to_string())?;
+
+        let serialized = Self::serialise_prefix_map(prefix_map)
+            .wrap_err("Failed to serialise NetworkPrefixMap")?;
+        temp_file
+            .write_all(serialized.as_slice())
+            .wrap_err_with(|| {
+                format!(
+                    "Unable to write temp NetworkPrefixMap to '{}'",
+                    temp_file.path().display()
+                )
+            })?;
+        fs::rename(temp_file.path(), path).await.wrap_err_with(|| {
+            format!(
+                "Error while renaming NetworkPrefixMap file from {:?} to {:?}",
+                temp_file.path().display(),
+                path.display()
+            )
         })?;
-        debug!("NetworkPrefixMap written at {:?}", path.display(),);
+        debug!("NetworkPrefixMap written at {:?}", path.display());
+
         Ok(())
     }
 
@@ -552,14 +574,32 @@ impl Config {
     }
 
     async fn write_settings_to_file(&self) -> Result<()> {
+        let cli_dir = self.cli_config_path.parent().ok_or_else(|| {
+            eyre!(
+                "cli_config_path {} should be inside a folder",
+                self.cli_config_path.display()
+            )
+        })?;
+        let mut temp_file = NamedTempFile::new_in(cli_dir)
+            .wrap_err_with(|| "Error creating temp file".to_string())?;
+
         let serialised_settings = serde_json::to_string(&self.settings)
             .wrap_err("Failed to serialise config settings")?;
-        fs::write(&self.cli_config_path, serialised_settings.as_bytes())
-            .await
+        temp_file
+            .write_all(serialised_settings.as_bytes())
             .wrap_err_with(|| {
                 format!(
                     "Unable to write config settings to '{}'",
-                    self.cli_config_path.display()
+                    temp_file.path().display()
+                )
+            })?;
+        fs::rename(temp_file.path(), &self.cli_config_path)
+            .await
+            .wrap_err_with(|| {
+                format!(
+                    "Error while renaming config.json file from {} to {}",
+                    temp_file.path().display(),
+                    &self.cli_config_path.display()
                 )
             })?;
         debug!(
@@ -567,6 +607,7 @@ impl Config {
             self.cli_config_path.display(),
             self.settings
         );
+
         Ok(())
     }
 

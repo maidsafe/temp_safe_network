@@ -3415,6 +3415,7 @@ dependencies = [
  "sn_cmd_test_utilities",
  "sn_dbc",
  "sn_launch_tool",
+ "tempfile",
  "tokio",
  "tracing",
  "tracing-subscriber 0.2.25",
