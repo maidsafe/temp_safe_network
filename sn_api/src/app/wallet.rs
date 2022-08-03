@@ -292,12 +292,53 @@ impl Safe {
             "Reissuing DBC from wallet at {} for an amount of {} tokens",
             wallet_url, amount
         );
+        let dbcs = self
+            .wallet_reissue_many(
+                wallet_url,
+                [(amount.to_string(), owner_public_key)]
+                    .into_iter()
+                    .collect(),
+            )
+            .await?;
 
-        let output_amount = parse_tokens_amount(amount)?;
-        if output_amount.as_nano() == 0 {
-            return Err(Error::InvalidAmount(
-                "Output amount to reissue needs to be larger than zero (0).".to_string(),
-            ));
+        dbcs.into_iter()
+            .next()
+            .ok_or_else(|| Error::DbcReissueError(
+                "Unexpectedly failed to generate output DBC. No balance were removed from the wallet.".to_string(),
+            ))
+    }
+
+    /// Reissue several DBCs from a wallet.
+    ///
+    /// This works exactly the same as `wallet_reissue` API with the only difference that
+    /// this function allows to reissue from a single wallet several output DBCs instead
+    /// of a single one. If there is change from the transaction, the change DBC will be
+    /// deposited in the source wallet.
+    pub async fn wallet_reissue_many(
+        &self,
+        wallet_url: &str,
+        outputs: Vec<(String, Option<bls::PublicKey>)>,
+    ) -> Result<Vec<Dbc>> {
+        let mut total_output_amount = Token::zero();
+        let mut outputs_owners = Vec::<(Token, OwnerOnce)>::new();
+        for (amount, owner_pk) in outputs.into_iter() {
+            let output_amount = parse_tokens_amount(&amount)?;
+            if output_amount.as_nano() == 0 {
+                return Err(Error::InvalidAmount(
+                    "Output amount to reissue needs to be larger than zero (0).".to_string(),
+                ));
+            }
+            total_output_amount = total_output_amount.checked_add(output_amount).unwrap();
+
+            let output_owner = if let Some(pk) = owner_pk {
+                let owner = Owner::from(pk);
+                OwnerOnce::from_owner_base(owner, &mut rng::thread_rng())
+            } else {
+                let owner = Owner::from_random_secret_key(&mut rng::thread_rng());
+                OwnerOnce::from_owner_base(owner, &mut rng::thread_rng())
+            };
+
+            outputs_owners.push((output_amount, output_owner));
         }
 
         let safeurl = self.parse_and_resolve_url(wallet_url).await?;
@@ -309,7 +350,7 @@ impl Safe {
         let mut input_dbcs_to_spend = Vec::<Dbc>::new();
         let mut input_dbcs_entries_hash = BTreeSet::<EntryHash>::new();
         let mut total_input_amount = 0;
-        let mut change_amount = output_amount;
+        let mut change_amount = total_output_amount;
         for (name, (dbc, entry_hash)) in spendable_dbcs.into_iter() {
             let dbc_balance = match dbc.amount_secrets_bearer() {
                 Ok(amount_secrets) => Token::from_nano(amount_secrets.amount()),
@@ -341,45 +382,22 @@ impl Safe {
         }
 
         // Make sure total input amount gathered with input DBCs are enough for the output amount
-        if total_input_amount < output_amount.as_nano() {
+        if total_input_amount < total_output_amount.as_nano() {
             return Err(Error::NotEnoughBalance(
                 Token::from_nano(total_input_amount).to_string(),
             ));
         }
 
-        let output_owner = if let Some(pk) = owner_public_key {
-            let owner = Owner::from(pk);
-            OwnerOnce::from_owner_base(owner, &mut rng::thread_rng())
-        } else {
-            let owner = Owner::from_random_secret_key(&mut rng::thread_rng());
-            OwnerOnce::from_owner_base(owner, &mut rng::thread_rng())
-        };
-
         // We can now reissue the output DBCs
-        let (output_dbcs, change_owneronce) = self
-            .reissue_dbcs(
-                input_dbcs_to_spend,
-                vec![(output_amount, output_owner)],
-                change_amount,
-            )
+        let (output_dbcs, change_dbc) = self
+            .reissue_dbcs(input_dbcs_to_spend, outputs_owners, change_amount)
             .await?;
 
-        let mut output_dbc = None;
-        let mut change_dbc = None;
-        for (dbc, owneronce, _) in output_dbcs {
-            if change_owneronce == owneronce && change_amount.as_nano() > 0 {
-                change_dbc = Some(dbc);
-            } else {
-                output_dbc = Some(dbc);
-            }
+        if output_dbcs.is_empty() {
+            return Err(Error::DbcReissueError(
+                "Unexpectedly failed to generate output DBC. No balance were removed from the wallet.".to_string(),
+            ));
         }
-
-        let output_dbc = match output_dbc {
-            None => return Err(Error::DbcReissueError(
-                "Unexpectedly failed to generate output DBC. No balance were spent from the wallet.".to_string(),
-            )),
-            Some(dbc) => dbc,
-        };
 
         if let Some(change_dbc) = change_dbc {
             self.insert_dbc_into_wallet(
@@ -394,7 +412,7 @@ impl Safe {
         self.multimap_remove(&safeurl.to_string(), input_dbcs_entries_hash)
             .await?;
 
-        Ok(output_dbc)
+        Ok(output_dbcs.into_iter().map(|(dbc, _, _)| dbc).collect())
     }
 
     ///
@@ -431,12 +449,12 @@ impl Safe {
 
     /// Reissue DBCs and log the spent input DBCs on the network. Return the output DBC and the
     /// change DBC if there is one.
-    pub(crate) async fn reissue_dbcs(
+    pub(super) async fn reissue_dbcs(
         &self,
         input_dbcs: Vec<Dbc>,
         outputs: Vec<(Token, OwnerOnce)>,
         change_amount: Token,
-    ) -> Result<(Vec<(Dbc, OwnerOnce, AmountSecrets)>, OwnerOnce)> {
+    ) -> Result<(Vec<(Dbc, OwnerOnce, AmountSecrets)>, Option<Dbc>)> {
         // TODO: enable the use of decoys
         let mut tx_builder = TransactionBuilder::default()
             .set_decoys_per_input(0)
@@ -456,10 +474,6 @@ impl Safe {
                 tx_builder.add_output_by_amount(change_amount.as_nano(), change_owneronce.clone());
         }
 
-        let mut dbc_builder = tx_builder.build(&mut rng::thread_rng())?;
-
-        // Build the output DBCs
-        // Spend all the input DBCs, collecting the spent proof shares for each of them
         let spent_proofs: BTreeSet<SpentProof> = input_dbcs
             .iter()
             .flat_map(|dbc| dbc.spent_proofs.clone())
@@ -472,6 +486,10 @@ impl Safe {
 
         let proof_key_verifier = SpentProofKeyVerifier { client };
 
+        // Let's build the output DBCs
+        let mut dbc_builder = tx_builder.build(&mut rng::thread_rng())?;
+
+        // Spend all the input DBCs, collecting the spent proof shares for each of them
         for (key_image, tx) in dbc_builder.inputs() {
             let tx_hash = Hash::from(tx.hash());
             // TODO: spend DBCs concurrently spawning tasks
@@ -524,9 +542,19 @@ impl Safe {
 
         // Perform verifications of input TX and spentproofs,
         // as well as building the output DBCs.
-        let dbcs = dbc_builder.build(&proof_key_verifier)?;
+        let mut output_dbcs = dbc_builder.build(&proof_key_verifier)?;
 
-        Ok((dbcs, change_owneronce))
+        let mut change_dbc = None;
+        output_dbcs.retain(|(dbc, owneronce, _)| {
+            if owneronce == &change_owneronce && change_amount.as_nano() > 0 {
+                change_dbc = Some(dbc.clone());
+                false
+            } else {
+                true
+            }
+        });
+
+        Ok((output_dbcs, change_dbc))
     }
 }
 
@@ -566,7 +594,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_wallet_deposit_with_bearer_dbc2() -> Result<()> {
+    async fn test_wallet_deposit_with_bearer_dbc() -> Result<()> {
         let (safe, dbc, dbc_balance) = new_safe_instance_with_dbc().await?;
         let wallet_xorurl = safe.wallet_create().await?;
 
@@ -1218,6 +1246,67 @@ mod tests {
         // confirm the DBC's key_image has not been spent yet
         let is_unspent_dbc_spent = safe.is_dbc_spent(unspent_dbc.key_image_bearer()?).await?;
         assert!(!is_unspent_dbc_spent);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wallet_reissue_multiple_output_dbcs() -> Result<()> {
+        let (safe, dbc1, dbc1_balance) = new_safe_instance_with_dbc().await?;
+        let (dbc2, dbc2_balance) = get_next_bearer_dbc().await?;
+        let wallet_xorurl = safe.wallet_create().await?;
+
+        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-1"), &dbc1, None)
+            .await?;
+        safe.wallet_deposit(&wallet_xorurl, Some("deposited-dbc-2"), &dbc2, None)
+            .await?;
+
+        let change_amount = 1000;
+        let reissued_amount = dbc1_balance.as_nano() + dbc2_balance.as_nano() - change_amount;
+        // let's partition the total amount to reissue in a few amounts
+        let output_amounts = vec![
+            dbc1_balance.as_nano() - 700,
+            dbc2_balance.as_nano() - 700,
+            150,
+            100,
+            60,
+            90,
+        ];
+        assert_eq!(reissued_amount, output_amounts.iter().sum::<u64>());
+
+        let outputs_owners = output_amounts
+            .iter()
+            .map(|amount| (Token::from_nano(*amount).to_string(), None))
+            .collect();
+
+        let output_dbcs = safe
+            .wallet_reissue_many(&wallet_xorurl, outputs_owners)
+            .await?;
+
+        assert_eq!(output_dbcs.len(), output_amounts.len());
+
+        for dbc in output_dbcs {
+            let balance = dbc
+                .amount_secrets_bearer()
+                .map_err(|err| anyhow!("Couldn't read balance from output DBC: {:?}", err))?;
+            assert!(output_amounts.contains(&balance.amount()));
+        }
+
+        let current_balance = safe.wallet_balance(&wallet_xorurl).await?;
+        assert_eq!(current_balance, Token::from_nano(change_amount));
+
+        let wallet_balances = safe.wallet_get(&wallet_xorurl).await?;
+
+        assert_eq!(wallet_balances.len(), 1);
+
+        let (_, (change_dbc_read, _)) = wallet_balances
+            .iter()
+            .next()
+            .ok_or_else(|| anyhow!("Couldn't read change DBC from fetched wallet"))?;
+        let change = change_dbc_read
+            .amount_secrets_bearer()
+            .map_err(|err| anyhow!("Couldn't read balance from change DBC fetched: {:?}", err))?;
+        assert_eq!(change.amount(), change_amount);
 
         Ok(())
     }
