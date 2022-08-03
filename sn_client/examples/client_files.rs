@@ -7,7 +7,7 @@
 // permissions and limitations relating to use of the SAFE Network Software.
 
 use eyre::Result;
-use sn_client::{Client, ClientConfig};
+use sn_client::Client;
 use sn_interface::types::utils::random_bytes;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -16,8 +16,7 @@ use tokio::time::sleep;
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
-    let config = ClientConfig::new(None, None, None, None, None).await;
-    let client = Client::new(config, None, None).await?;
+    let client = Client::builder().build().await?;
 
     let pk = client.public_key();
     println!("Client Public Key: {}", pk);
