@@ -51,7 +51,7 @@ pub enum Error {
     #[error("No matching Section")]
     NoMatchingSection,
     #[error(
-        "A JoinResponse was reeived after we've already joined the network. It has been ignored."
+        "A JoinResponse was received after we've already joined the network. It has been ignored."
     )]
     ExistingMemberConflict,
     #[error("The node in question is not a member of the section")]
@@ -62,4 +62,10 @@ pub enum Error {
     Consensus(#[from] sn_consensus::Error),
     #[error("An archived node attempted to rejoin the section")]
     ArchivedNodeRejoined,
+    #[error("The provided signature cannot be verified")]
+    InvalidSignature,
+    #[error("Key not found in the SectionsDAG: {}", hex::encode(_0.to_bytes()))]
+    KeyNotFound(bls::PublicKey),
+    #[error("The 'to' or 'from' key is not present in the same branch")]
+    InvalidBranch,
 }

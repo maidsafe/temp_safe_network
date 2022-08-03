@@ -13,6 +13,7 @@ pub mod section_authority_provider;
 pub mod section_keys;
 mod section_peers;
 mod section_tree;
+mod sections_dag;
 
 #[cfg(any(test, feature = "test-utils"))]
 pub use self::section_authority_provider::test_utils;
@@ -24,6 +25,7 @@ pub use self::{
     section_authority_provider::{SapCandidate, SectionAuthUtils, SectionAuthorityProvider},
     section_keys::{SectionKeyShare, SectionKeysProvider},
     section_tree::SectionTree,
+    sections_dag::SectionsDAG,
 };
 
 use crate::{
