@@ -35,12 +35,6 @@ pub enum Error {
     /// Genesis Key from the config and the PrefixMap mismatch
     #[error("Genesis Key from the config and the PrefixMap mismatch. You may need to remove your prefixmap or update your config file.")]
     GenesisKeyMismatch,
-    /// Error reading home dir for client
-    #[error("Error reading home dir for client")]
-    CouldNotReadHomeDir,
-    /// Error creating root dir for client
-    #[error("Error creating .safe dir for client")]
-    CouldNotCreateSafeDir,
     /// Received unexpected event.
     #[error("Unexpected event received")]
     ReceivedUnexpectedEvent,
@@ -133,9 +127,6 @@ pub enum Error {
     /// self_enryption errors
     #[error(transparent)]
     SelfEncryption(#[from] self_encryption::Error),
-    /// Other types errors
-    #[error(transparent)]
-    ConfigError(#[from] serde_json::Error),
     /// Io error.
     #[error(transparent)]
     IoError(#[from] io::Error),
