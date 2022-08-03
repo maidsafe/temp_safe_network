@@ -1004,9 +1004,9 @@ dependencies = [
 
 [[package]]
 name = "crdts"
-version = "7.1.0"
+version = "7.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6be45d6797715089e99bdeda0c45c1bc47326ebf009a08605bf0862e249e2b17"
+checksum = "f4c7e621779799b7dfb00cd9bb4542c731de872a7af49c0e550d2a47f46d15c1"
 dependencies = [
  "serde",
  "tiny-keccak",

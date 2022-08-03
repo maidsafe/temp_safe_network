@@ -45,7 +45,7 @@ bls = { package = "blsttc", version = "7.0.0" }
 bls_dkg = "~0.10.5"
 bytes = { version = "1.0.1", features = ["serde"] }
 clap = { version = "3.0.0", features = ["derive"], optional = true }
-crdts = { version = "7.1", default-features = false, features = ["merkle"] }
+crdts = { version = "7.2", default-features = false, features = ["merkle"] }
 custom_debug = "~0.5.0"
 dashmap = { version = "5.1.0", features = [ "serde" ] }
 dirs-next = "2.0.0"
