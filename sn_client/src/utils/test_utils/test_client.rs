@@ -6,7 +6,7 @@
 // KIND, either express or implied. Please review the Licences for the specific language governing
 // permissions and limitations relating to use of the SAFE Network Software.
 
-use crate::{Client, ClientConfig};
+use crate::Client;
 use bls::SecretKey;
 use eyre::{eyre, Result};
 use sn_dbc::{Dbc, Owner};
@@ -31,11 +31,13 @@ pub async fn create_test_client_with(
     timeout: Option<u64>,
 ) -> Result<Client> {
     let timeout = timeout.map(Duration::from_secs);
-    // use standard wait
-    let cmd_ack_wait = None;
-
-    let config = ClientConfig::new(None, None, timeout, timeout, cmd_ack_wait).await;
-    let client = Client::new(config, optional_keypair.clone(), dbc_owner.clone()).await?;
+    let client = Client::builder()
+        .keypair(optional_keypair)
+        .dbc_owner(dbc_owner)
+        .query_timeout(timeout)
+        .cmd_timeout(timeout)
+        .build()
+        .await?;
 
     Ok(client)
 }
