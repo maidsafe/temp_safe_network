@@ -20,7 +20,7 @@ pub use register_apis::RegisterWriteAheadLog;
 
 use crate::{connections::Session, errors::Error, ClientConfig};
 
-use sn_dbc::{rng, Owner};
+use sn_dbc::Owner;
 use sn_interface::{
     messaging::{
         data::{DataQuery, DataQueryVariant, RegisterQuery, ServiceMsg},
@@ -33,7 +33,7 @@ use sn_interface::{
 use bytes::Bytes;
 use std::sync::Arc;
 use tokio::{sync::RwLock, time::Duration};
-use tracing::{debug, info};
+use tracing::debug;
 use uluru::LRUCache;
 use xor_name::XorName;
 
@@ -70,27 +70,10 @@ impl Client {
     #[instrument(skip_all, level = "debug", name = "New client")]
     pub async fn new(
         config: ClientConfig,
-        optional_keypair: Option<Keypair>,
-        dbc_owner: Option<Owner>,
+        keypair: Keypair,
+        dbc_owner: Owner,
     ) -> Result<Self, Error> {
-        let keypair = match optional_keypair {
-            Some(id) => {
-                info!("Client started for specific pk: {:?}", id.public_key());
-                id
-            }
-            None => {
-                let keypair = Keypair::new_ed25519();
-                info!(
-                    "Client started for new randomly created pk: {:?}",
-                    keypair.public_key()
-                );
-                keypair
-            }
-        };
-
         let prefix_map = read_prefix_map_from_disk().await?;
-
-        let client_pk = keypair.public_key();
 
         // Bootstrap to the network, connecting to a section based
         // on a public key of our choice.
@@ -114,8 +97,7 @@ impl Client {
 
         let client = Self {
             keypair,
-            dbc_owner: dbc_owner
-                .unwrap_or_else(|| Owner::from_random_secret_key(&mut rng::thread_rng())),
+            dbc_owner,
             session,
             query_timeout: config.query_timeout,
             cmd_timeout: config.cmd_timeout,
@@ -151,6 +133,7 @@ impl Client {
             Ok((random_dst_addr, auth, serialised_cmd))
         }
 
+        let client_pk = client.public_key();
         let (random_dst_addr, auth, serialised_cmd) = generate_probe_msg(&client, client_pk)?;
 
         // get bootstrap nodes
