@@ -1512,8 +1512,7 @@ fn create_relocation_trigger(
         let decision = section_decision(sk_set, node_state.clone())?;
 
         let sig: Signature = decision.proposals[&node_state].clone();
-
-        let churn_id = ChurnId(sig.to_bytes().to_vec());
+        let churn_id = ChurnId(sig.to_bytes());
 
         if relocation_check(age, &churn_id) && !relocation_check(age + 1, &churn_id) {
             return Ok(decision);

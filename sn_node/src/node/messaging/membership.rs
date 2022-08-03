@@ -195,7 +195,7 @@ impl Node {
         }
 
         if let Some((_, sig)) = decision.proposals.iter().max_by_key(|(_, sig)| *sig) {
-            let churn_id = ChurnId(sig.to_bytes().to_vec());
+            let churn_id = ChurnId(sig.to_bytes());
             let excluded_from_relocation =
                 BTreeSet::from_iter(joining_nodes.iter().map(|(n, _)| n.name));
 

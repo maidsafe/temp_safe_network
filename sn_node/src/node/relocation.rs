@@ -21,7 +21,7 @@ use std::{
 use xor_name::XorName;
 
 // Unique identifier for a churn event, which is used to select nodes to relocate.
-pub(crate) struct ChurnId(pub(crate) Vec<u8>);
+pub(crate) struct ChurnId(pub(crate) [u8; bls::SIG_SIZE]);
 
 impl Display for ChurnId {
     fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
@@ -196,11 +196,8 @@ mod tests {
         }
 
         // Simulate a churn event whose signature has the given number of trailing zeros.
-        let churn_id = ChurnId(
-            signature_with_trailing_zeros(signature_trailing_zeros as u32)
-                .to_bytes()
-                .to_vec(),
-        );
+        let churn_id =
+            ChurnId(signature_with_trailing_zeros(signature_trailing_zeros as u32).to_bytes());
 
         let relocations =
             find_nodes_to_relocate(&network_knowledge, &churn_id, BTreeSet::default());
