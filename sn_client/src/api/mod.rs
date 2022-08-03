@@ -67,12 +67,6 @@ impl Client {
     /// to retrieve the history of the key's balance in order to be ready for any token operations. Or if no SecreteKey
     /// is passed, a random keypair will be used, which provides a client that can only perform Read operations (at
     /// least until the client's SecretKey receives some token).
-    ///
-    /// # Examples
-    ///
-    /// TODO: update once data types are crdt compliant
-    ///
-    ///
     #[instrument(skip_all, level = "debug", name = "New client")]
     pub async fn new(
         config: ClientConfig,
@@ -218,21 +212,11 @@ impl Client {
     /// Return the client's keypair.
     ///
     /// Useful for retrieving the `PublicKey` or `KeyPair` in the event you need to _sign_ something
-    ///
-    /// # Examples
-    ///
-    /// TODO: update once data types are crdt compliant
-    ///
     pub fn keypair(&self) -> Keypair {
         self.keypair.clone()
     }
 
     /// Return the client's `PublicKey`.
-    ///
-    /// # Examples
-    ///
-    /// TODO: update once data types are crdt compliant
-    ///
     pub fn public_key(&self) -> PublicKey {
         self.keypair().public_key()
     }

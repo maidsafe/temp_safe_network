@@ -16,16 +16,6 @@
 //! - Connect to The Safe Network
 //! - Read Public data from the network
 //! - Write data to the network (assuming you have a SafeCoin balance)
-//!
-//! ## Basic Usage
-//!
-//! Setting up a random client for read only access:
-//!
-//! # Examples
-//!
-//! TODO: update once data types are crdt compliant
-//!
-//!
 
 // For quick_error
 #![recursion_limit = "256"]

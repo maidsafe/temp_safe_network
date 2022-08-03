@@ -49,11 +49,6 @@ impl Client {
     /// and the length of bytes to be read.
     /// Passing `0` to position reads the data from the beginning,
     /// and the `length` is just an upper limit.
-    ///
-    /// # Examples
-    ///
-    /// TODO: update once data types are crdt compliant
-    ///
     #[instrument(skip_all, level = "trace")]
     pub async fn read_from(&self, address: XorName, position: usize, length: usize) -> Result<Bytes>
     where
