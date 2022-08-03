@@ -5,11 +5,11 @@ use qp2p::Config as Qp2pConfig;
 use sn_interface::types::Keypair;
 use std::{net::SocketAddr, str::FromStr, time::Duration};
 
-/// Environment variable used to convert into [`ClientConfig.query_timeout`]
+/// Environment variable used to convert into [`ClientConfig::query_timeout`]
 pub const ENV_QUERY_TIMEOUT: &str = "SN_QUERY_TIMEOUT";
-/// Environment variable used to convert into [`ClientConfig.cmd_timeout`]
+/// Environment variable used to convert into [`ClientConfig::cmd_timeout`]
 pub const ENV_CMD_TIMEOUT: &str = "SN_CMD_TIMEOUT";
-/// Environment variable used to convert into [`ClientConfig.cmd_ack_wait`]
+/// Environment variable used to convert into [`ClientConfig::cmd_ack_wait`]
 pub const ENV_AE_WAIT: &str = "SN_AE_WAIT";
 
 /// Build a [`crate::Client`]
