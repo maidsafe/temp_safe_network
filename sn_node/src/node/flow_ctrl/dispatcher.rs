@@ -19,7 +19,7 @@ use sn_interface::{
 };
 
 #[cfg(feature = "traceroute")]
-use sn_interface::{messaging::Entity, types::PublicKey};
+use sn_interface::{messaging::Entity, messaging::Traceroute, types::PublicKey};
 
 use bytes::Bytes;
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
@@ -300,7 +300,7 @@ fn into_wire_msgs(
     msg: OutgoingMsg,
     msg_id: MsgId,
     recipients: Peers,
-    #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+    #[cfg(feature = "traceroute")] traceroute: Traceroute,
 ) -> Result<Vec<(Peer, WireMsg)>> {
     let (auth, payload) = node.sign_msg(msg)?;
     let recipients = match recipients {
@@ -350,7 +350,7 @@ fn entity(node: &Node) -> Entity {
 #[cfg(feature = "traceroute")]
 struct Trace {
     entity: Entity,
-    traceroute: Vec<Entity>,
+    traceroute: Traceroute,
 }
 
 fn wire_msg(
@@ -365,7 +365,7 @@ fn wire_msg(
     #[cfg(feature = "traceroute")]
     {
         let mut traceroute = trace.traceroute;
-        traceroute.push(trace.entity);
+        traceroute.0.push(trace.entity);
         wire_msg.add_trace(&mut traceroute);
     }
     #[cfg(feature = "test-utils")]

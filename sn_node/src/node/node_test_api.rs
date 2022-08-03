@@ -15,6 +15,7 @@ use sn_interface::{
 
 use ed25519_dalek::PublicKey;
 use secured_linked_list::SecuredLinkedList;
+use sn_interface::messaging::Traceroute;
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};
@@ -102,7 +103,7 @@ impl NodeTestApi {
             msg_id: MsgId::new(),
             recipients: Peers::Multiple(recipients),
             #[cfg(feature = "traceroute")]
-            traceroute: vec![],
+            traceroute: Traceroute(vec![]),
         };
         self.send_cmd(cmd).await
     }
