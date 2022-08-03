@@ -638,12 +638,9 @@ pub(super) async fn send_msg(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sn_interface::{
-        messaging::data::CmdError,
-        network_knowledge::{
-            prefix_map::NetworkPrefixMap,
-            test_utils::{random_sap, section_signed},
-        },
+    use sn_interface::network_knowledge::{
+        prefix_map::NetworkPrefixMap,
+        test_utils::{random_sap, section_signed},
     };
 
     use eyre::{eyre, Result};
@@ -671,7 +668,6 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn cmd_sent_to_all_elders() -> Result<()> {
         let elders_len = 5;
-        let (err_sender, _err_receiver) = channel::<CmdError>(10);
 
         let prefix = prefix("0")?;
         let (section_auth, _, secret_key_set) = random_sap(prefix, elders_len);
@@ -682,7 +678,6 @@ mod tests {
         let session = Session::new(
             genesis_key,
             Config::default(),
-            err_sender,
             SocketAddr::from((Ipv4Addr::UNSPECIFIED, 0)),
             Duration::from_secs(10),
             prefix_map,
