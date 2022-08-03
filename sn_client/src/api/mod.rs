@@ -23,7 +23,7 @@ use crate::{connections::Session, errors::Error, ClientConfig};
 use sn_dbc::{rng, Owner};
 use sn_interface::{
     messaging::{
-        data::{CmdError, DataQuery, DataQueryVariant, RegisterQuery, ServiceMsg},
+        data::{DataQuery, DataQueryVariant, RegisterQuery, ServiceMsg},
         ServiceAuth, WireMsg,
     },
     network_knowledge::utils::read_prefix_map_from_disk,
@@ -32,10 +32,7 @@ use sn_interface::{
 
 use bytes::Bytes;
 use std::sync::Arc;
-use tokio::{
-    sync::{mpsc::Receiver, RwLock},
-    time::Duration,
-};
+use tokio::{sync::RwLock, time::Duration};
 use tracing::{debug, info};
 use uluru::LRUCache;
 use xor_name::XorName;
@@ -55,8 +52,6 @@ type ChunksCache = LRUCache<Chunk, CHUNK_CACHE_SIZE>;
 pub struct Client {
     keypair: Keypair,
     dbc_owner: Owner,
-    #[allow(dead_code)]
-    incoming_errors: Arc<RwLock<Receiver<CmdError>>>,
     session: Session,
     pub(crate) query_timeout: Duration,
     pub(crate) cmd_timeout: Duration,
@@ -101,9 +96,6 @@ impl Client {
 
         let prefix_map = read_prefix_map_from_disk().await?;
 
-        // Incoming error notifiers
-        let (err_sender, err_receiver) = tokio::sync::mpsc::channel::<CmdError>(10);
-
         let client_pk = keypair.public_key();
 
         // Bootstrap to the network, connecting to a section based
@@ -121,7 +113,6 @@ impl Client {
         let session = Session::new(
             prefix_map.genesis_key(),
             config.qp2p,
-            err_sender,
             config.local_addr,
             config.cmd_ack_wait,
             prefix_map.clone(),
@@ -132,7 +123,6 @@ impl Client {
             dbc_owner: dbc_owner
                 .unwrap_or_else(|| Owner::from_random_secret_key(&mut rng::thread_rng())),
             session,
-            incoming_errors: Arc::new(RwLock::new(err_receiver)),
             query_timeout: config.query_timeout,
             cmd_timeout: config.cmd_timeout,
             chunks_cache: Arc::new(RwLock::new(ChunksCache::default())),

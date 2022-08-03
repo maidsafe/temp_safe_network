@@ -44,9 +44,6 @@ pub(super) struct Session {
     endpoint: Endpoint,
     // Channels for sending responses to upper layers
     pending_queries: PendingQueryResponses,
-    // Channels for sending errors to upper layer
-    #[allow(dead_code)]
-    incoming_err_sender: Arc<Sender<CmdError>>,
     // Channels for sending CmdAck to upper layers
     pending_cmds: PendingCmdAcks,
     /// All elders we know about from AE messages
@@ -63,11 +60,10 @@ pub(super) struct Session {
 
 impl Session {
     /// Acquire a session by bootstrapping to a section, maintaining connections to several nodes.
-    #[instrument(skip(err_sender), level = "debug")]
+    #[instrument(level = "debug")]
     pub(crate) fn new(
         genesis_key: bls::PublicKey,
         qp2p_config: QuicP2pConfig,
-        err_sender: Sender<CmdError>,
         local_addr: SocketAddr,
         cmd_ack_wait: Duration,
         prefix_map: NetworkPrefixMap,
@@ -77,7 +73,6 @@ impl Session {
 
         let session = Session {
             pending_queries: Arc::new(DashMap::default()),
-            incoming_err_sender: Arc::new(err_sender),
             pending_cmds: Arc::new(DashMap::default()),
             endpoint,
             network: Arc::new(prefix_map),
