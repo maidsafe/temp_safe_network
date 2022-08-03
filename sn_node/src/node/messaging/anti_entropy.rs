@@ -243,7 +243,7 @@ impl Node {
         section_chain: SecuredLinkedList,
         bounced_msg: Bytes,
         sender: Peer,
-        #[cfg(feature = "traceroute")] mut traceroute: Traceroute,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
         let dst_section_key = section_auth.section_key();
 

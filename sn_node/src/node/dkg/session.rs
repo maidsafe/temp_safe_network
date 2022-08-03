@@ -26,6 +26,7 @@ use bls_dkg::key_gen::{
     message::Message as DkgMessage, Error as DkgError, KeyGen, MessageAndTarget, Phase,
 };
 use itertools::Itertools;
+use sn_interface::messaging::Traceroute;
 use std::{
     collections::{BTreeMap, BTreeSet},
     iter, mem,
@@ -101,7 +102,7 @@ impl Session {
                 msg_id: MsgId::new(),
                 recipients: Peers::Single(*peer),
                 #[cfg(feature = "traceroute")]
-                traceroute: vec![],
+                traceroute: Traceroute(vec![]),
             });
         } else {
             warn!(
@@ -208,7 +209,7 @@ impl Session {
                     msg_id: MsgId::new(),
                     recipients: Peers::Single(*peer),
                     #[cfg(feature = "traceroute")]
-                    traceroute: vec![],
+                    traceroute: Traceroute(vec![]),
                 });
             } else {
                 error!("Failed to find target {:?} among peers {:?}", target, peers);
@@ -378,7 +379,7 @@ impl Session {
                     msg_id: MsgId::new(),
                     recipients: Peers::Multiple(self.recipients()),
                     #[cfg(feature = "traceroute")]
-                    traceroute: vec![],
+                    traceroute: Traceroute(vec![]),
                 }
             }))
             .collect();

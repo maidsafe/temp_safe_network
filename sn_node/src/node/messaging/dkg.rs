@@ -23,6 +23,7 @@ use sn_interface::{
 };
 
 use bls_dkg::key_gen::message::Message as DkgMessage;
+use sn_interface::messaging::Traceroute;
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -64,7 +65,7 @@ impl Node {
                 msg_id: MsgId::new(),
                 recipients: Peers::Multiple(others),
                 #[cfg(feature = "traceroute")]
-                traceroute: vec![],
+                traceroute: Traceroute(vec![]),
             });
         }
 
@@ -76,7 +77,7 @@ impl Node {
                 msg_authority: NodeMsgAuthority::BlsShare(AuthorityProof(auth)),
                 wire_msg_payload: payload,
                 #[cfg(feature = "traceroute")]
-                traceroute: vec![],
+                traceroute: Traceroute(vec![]),
             });
         }
 

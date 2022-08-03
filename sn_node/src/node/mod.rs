@@ -115,8 +115,6 @@ mod core {
 
     #[cfg(feature = "traceroute")]
     use sn_interface::messaging::Entity;
-    #[cfg(feature = "traceroute")]
-    use sn_interface::messaging::Traceroute;
 
     /// Amount of tokens to be owned by the Genesis DBC.
     /// At the inception of the Network a total supply of 4,525,524,120 whole tokens will be created.

@@ -28,6 +28,7 @@ use sn_interface::{
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};
 use dashmap::DashMap;
+use sn_interface::messaging::Traceroute;
 use std::{collections::BTreeSet, sync::Arc};
 use xor_name::XorName;
 
@@ -190,7 +191,7 @@ impl DkgVoter {
                 msg_id: MsgId::new(),
                 recipients: Peers::Single(sender),
                 #[cfg(feature = "traceroute")]
-                traceroute: vec![],
+                traceroute: Traceroute(vec![]),
             });
         }
         Ok(cmds)

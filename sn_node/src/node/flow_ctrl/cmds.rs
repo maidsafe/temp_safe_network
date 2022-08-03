@@ -195,14 +195,14 @@ impl Cmd {
             msg,
             recipients,
             #[cfg(feature = "traceroute")]
-            vec![],
+            Traceroute(vec![]),
         )
     }
 
     pub(crate) fn send_traced_msg(
         msg: OutgoingMsg,
         recipients: Peers,
-        #[cfg(feature = "traceroute")] traceroute: Vec<Entity>,
+        #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Self {
         Cmd::SendMsg {
             msg,

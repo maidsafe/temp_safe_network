@@ -80,6 +80,10 @@ impl Node {
         } else {
             let error = convert_to_error_msg(Error::NoAdults(self.network_knowledge().prefix()));
             debug!("No targets found for {msg_id:?}");
+
+            #[cfg(feature = "traceroute")]
+            traceroute.0.push(self.identity());
+
             return Ok(vec![self.send_cmd_error_response(
                 CmdError::Data(error),
                 origin,

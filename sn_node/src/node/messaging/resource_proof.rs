@@ -19,9 +19,6 @@ use sn_interface::{
 use ed25519_dalek::Verifier;
 use xor_name::XorName;
 
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
-
 // Resource signed
 impl Node {
     pub(crate) fn validate_resource_proof(

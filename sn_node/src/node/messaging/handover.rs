@@ -23,9 +23,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use tracing::warn;
 use xor_name::{Prefix, XorName};
 
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
-
 impl Node {
     /// Make a handover consensus proposal vote for a sap candidate
     pub(crate) fn propose_handover_consensus(
