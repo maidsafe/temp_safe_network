@@ -450,7 +450,7 @@ impl Safe {
 
         let client = self.get_safe_client()?;
         let change_owneronce =
-            OwnerOnce::from_owner_base(client.dbc_owner(), &mut rng::thread_rng());
+            OwnerOnce::from_owner_base(client.dbc_owner().clone(), &mut rng::thread_rng());
         if change_amount.as_nano() > 0 {
             tx_builder =
                 tx_builder.add_output_by_amount(change_amount.as_nano(), change_owneronce.clone());
