@@ -9,7 +9,7 @@
 //! `sn_node` provides the interface to Safe routing.  The resulting executable is the node
 //! for the Safe network.
 
-use sn_client::{Client, ClientConfig};
+use sn_client::Client;
 use sn_interface::types::utils::random_bytes;
 use sn_launch_tool::Launch;
 
@@ -170,8 +170,7 @@ pub async fn run_split() -> Result<()> {
     let interval_duration = Duration::from_millis(interval_as_int * ADDITIONAL_NODES_TO_SPLIT / 10);
     sleep(interval_duration).await;
 
-    let config = ClientConfig::new(None, None, None, None, None).await;
-    let client = Client::new(config, None, None).await?;
+    let client = Client::builder().build().await?;
 
     for (address, hash) in all_data_put {
         println!("...reading bytes at address {:?} ...", address);
@@ -202,8 +201,7 @@ pub async fn run_split() -> Result<()> {
 }
 
 async fn upload_data() -> Result<(XorName, [u8; 32])> {
-    let config = ClientConfig::new(None, None, None, None, None).await;
-    let client = Client::new(config, None, None).await?;
+    let client = Client::builder().build().await?;
 
     let bytes = random_bytes(1024 * 1024 * 10);
 

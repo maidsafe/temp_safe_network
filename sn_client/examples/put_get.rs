@@ -9,7 +9,7 @@
 //! `sn_node` provides the interface to Safe routing.  The resulting executable is the node
 //! for the Safe network.
 
-use sn_client::{Client, ClientConfig, Result};
+use sn_client::{Client, Result};
 use sn_interface::{init_logger, types::utils::random_bytes};
 
 use tiny_keccak::{Hasher, Sha3};
@@ -57,8 +57,7 @@ pub async fn run_chunk_soak() -> Result<()> {
 
     let files_to_put = files_count();
 
-    let config = ClientConfig::new(None, None, None, None, None).await;
-    let client = Client::new(config.clone(), None, None).await?;
+    let client = Client::builder().build().await?;
 
     let mut put_tasks = vec![];
     // i is used to determine uppload size, so 0 is 0 bytes, which fails
@@ -85,7 +84,7 @@ pub async fn run_chunk_soak() -> Result<()> {
         "put data len is same as we tried to put"
     );
 
-    let client = Client::new(config, None, None).await?;
+    let client = Client::builder().build().await?;
 
     println!("Now we retrieve the data");
 
@@ -132,8 +131,7 @@ pub async fn run_chunk_soak() -> Result<()> {
 
 #[allow(dead_code)]
 async fn upload_data_using_fresh_client(iteration: usize) -> Result<(XorName, [u8; 32])> {
-    let config = ClientConfig::new(None, None, None, None, None).await;
-    let client = Client::new(config, None, None).await?;
+    let client = Client::builder().build().await?;
 
     upload_data_using_client(client, iteration).await
 }
