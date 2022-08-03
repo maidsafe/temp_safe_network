@@ -212,8 +212,8 @@ impl Client {
     /// Return the client's keypair.
     ///
     /// Useful for retrieving the `PublicKey` or `KeyPair` in the event you need to _sign_ something
-    pub fn keypair(&self) -> Keypair {
-        self.keypair.clone()
+    pub fn keypair(&self) -> &Keypair {
+        &self.keypair
     }
 
     /// Return the client's `PublicKey`.
@@ -224,8 +224,8 @@ impl Client {
     /// Return the client's DBC owner, which will be a secret key.
     ///
     /// This can then be used to sign output DBCs during a DBC reissue.
-    pub fn dbc_owner(&self) -> Owner {
-        self.dbc_owner.clone()
+    pub fn dbc_owner(&self) -> &Owner {
+        &self.dbc_owner
     }
 
     /// Check if the provided public key is a known section key
@@ -325,7 +325,7 @@ mod tests {
         )?;
 
         let client = create_test_client_with(None, Some(dbc_owner.clone()), None).await?;
-        assert_eq!(dbc_owner, client.dbc_owner());
+        assert_eq!(&dbc_owner, client.dbc_owner());
         Ok(())
     }
 }
