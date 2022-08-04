@@ -3204,6 +3204,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_test"
+version = "1.0.142"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbf855c7d1704095906013b4491af507f67cad13d778ff408ca9696e9d195cf5"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde_urlencoded"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4766,12 +4775,13 @@ dependencies = [
 [[package]]
 name = "xor_name"
 version = "4.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6b076044ecafc4d0bad1455f9f0b8ef13e1992b3db789e1440f17bed7633f82"
+source = "git+https://github.com/maidsafe/xor_name?branch=feat-serialize-hex-string#19ba44bfb0dce74df6af88f8cacbe2a8a856b71f"
 dependencies = [
+ "hex",
  "rand 0.8.5",
  "rand_core 0.6.3",
  "serde",
+ "serde_test",
  "tiny-keccak",
 ]
 

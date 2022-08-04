@@ -65,7 +65,7 @@ tracing-core = "~0.1.21"
 tracing-subscriber = { version = "0.3.1", features = ["env-filter", "json"] }
 uluru="3.0.0"
 url = "2.2.0"
-xor_name = "4.0.1"
+xor_name = { version = "4.0.1", features = [ "serialize-hex" ] }
 
 [dependencies.tokio]
 version = "~1.17.0"

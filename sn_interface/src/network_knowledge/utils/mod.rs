@@ -40,7 +40,7 @@ pub async fn compare_and_write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap)
 
     trace!("Writing prefix_map to disk at {:?}", prefix_map_file);
     let serialized =
-        rmp_serde::to_vec(prefix_map).map_err(|e| Error::Serialisation(e.to_string()))?;
+    serde_json::to_vec(prefix_map).map_err(|e| Error::Serialisation(e.to_string()))?;
 
     let mut file = fs::File::create(&prefix_map_file)
         .await
@@ -75,7 +75,7 @@ pub async fn read_prefix_map_from_disk() -> Result<NetworkPrefixMap> {
                     ))
                 })?;
 
-            let prefix_map: NetworkPrefixMap = rmp_serde::from_slice(&prefix_map_contents)
+            let prefix_map: NetworkPrefixMap = serde_json::from_slice(&prefix_map_contents)
                 .map_err(|err| {
                     Error::FileHandling(format!(
                         "Error deserializing PrefixMap from disk: {:?}",

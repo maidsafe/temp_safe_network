@@ -10,3 +10,6 @@ members = [
     "sn_interface",
     "testnet"
 ]
+
+[patch.crates-io]
+xor_name = { git = "https://github.com/maidsafe/xor_name", branch = "feat-serialize-hex-string" }
