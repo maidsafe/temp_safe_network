@@ -25,7 +25,7 @@ static DIFF_THRESHOLD: f32 = 1.0;
 /// Z-score value above which a node is dysfunctional
 static DYSFUNCTIONAL_DEVIATION: f32 = 2.0;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 /// Represents the different type of issues that can be recorded by the Dysfunction Detection
 /// system.
 /// Issues have a xorname so they can be reliable assignd to the same nodes

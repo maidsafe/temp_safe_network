@@ -117,14 +117,18 @@ impl CmdCtrl {
             job: CmdJob::new(
                 self.id_counter.fetch_add(1, ORDER),
                 parent_id,
-                cmd,
+                cmd.clone(),
                 SystemTime::now(),
             ),
             retries: 0,
             reporter,
         };
 
-        let _ = self.cmd_queue.write().await.push(job, priority);
+        let was_already_queued = self.cmd_queue.write().await.push(job, priority);
+
+        if was_already_queued.is_some() {
+            trace!("matched Cmd {cmd} which was already enqeueued.");
+        }
 
         Ok(watcher)
     }
@@ -270,7 +274,7 @@ pub(crate) struct EnqueuedJob {
 
 impl PartialEq for EnqueuedJob {
     fn eq(&self, other: &Self) -> bool {
-        self.job.id() == other.job.id()
+        self.job.cmd() == other.job.cmd()
     }
 }
 

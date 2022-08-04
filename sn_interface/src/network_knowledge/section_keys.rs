@@ -14,7 +14,7 @@ use uluru::LRUCache;
 const KEY_CACHE_SIZE: usize = 50;
 
 /// All the key material needed to sign or combine signature for our section key.
-#[derive(custom_debug::Debug, Clone)]
+#[derive(custom_debug::Debug, Clone, PartialEq)]
 pub struct SectionKeyShare {
     /// Public key set to verify threshold signatures and combine shares.
     pub public_key_set: bls::PublicKeySet,
