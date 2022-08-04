@@ -91,12 +91,6 @@ pub enum Error {
     /// Failed signature validation.
     #[error("Invalid signature")]
     InvalidSignature,
-    /// While parsing, precision would be lost.
-    #[error("Lost precision on the number of coins during parsing")]
-    LossOfPrecision,
-    /// The amount would exceed the maximum value for `Token` (u64::MAX).
-    #[error("The token amount would exceed the maximum value (u64::MAX)")]
-    ExcessiveValue,
     /// Failed to parse a string.
     #[error("Failed to parse: {0}")]
     FailedToParse(String),

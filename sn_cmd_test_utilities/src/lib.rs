@@ -22,9 +22,9 @@ pub mod util {
         test_helpers::get_next_bearer_dbc,
         wallet::{
             dbc::{blsttc::SecretKey, Owner},
-            Dbc,
+            Dbc, Token,
         },
-        SafeUrl, Token,
+        SafeUrl,
     };
     use std::{
         collections::BTreeMap,

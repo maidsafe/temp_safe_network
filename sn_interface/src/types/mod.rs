@@ -24,7 +24,6 @@ mod cache;
 mod chunk;
 mod errors;
 mod peer;
-mod token;
 
 pub use crate::messaging::data::{RegisterCmd, ReplicatedRegisterLog, ReplicatedSpentbookLog};
 
@@ -43,7 +42,6 @@ pub use keys::{
     signature::{Signature, SignatureShare},
 };
 pub use peer::Peer;
-pub use token::Token;
 
 use serde::{Deserialize, Serialize};
 use xor_name::XorName;

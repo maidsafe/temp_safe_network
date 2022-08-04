@@ -24,7 +24,7 @@ use secured_linked_list::SecuredLinkedList;
 use sn_dbc::{
     bls_ringct::{bls_bulletproofs::PedersenGens, group::Curve},
     rng, Dbc, Hash, IndexedSignatureShare, MlsagMaterial, Owner, OwnerOnce, RevealedCommitment,
-    SpentProofContent, SpentProofShare, TransactionBuilder, TrueInput,
+    SpentProofContent, SpentProofShare, Token, TransactionBuilder, TrueInput,
 };
 use std::{collections::BTreeSet, net::SocketAddr, path::PathBuf, sync::Arc};
 use xor_name::XorName;
@@ -168,7 +168,7 @@ fn gen_genesis_dbc(input_sk_set: &bls::SecretKeySet) -> Result<Dbc> {
 
     let mut dbc_builder = TransactionBuilder::default()
         .add_input(mlsag_material)
-        .add_output_by_amount(GENESIS_DBC_AMOUNT, output_owner)
+        .add_output_by_amount(Token::from_nano(GENESIS_DBC_AMOUNT), output_owner)
         .build(&mut rng::thread_rng())
         .map_err(|err| {
             Error::GenesisDbcError(format!(
