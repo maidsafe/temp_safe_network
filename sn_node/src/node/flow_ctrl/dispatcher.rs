@@ -366,7 +366,7 @@ fn wire_msg(
     {
         let mut traceroute = trace.traceroute;
         traceroute.0.push(trace.entity);
-        wire_msg.add_trace(&mut traceroute);
+        wire_msg.append_trace(&mut traceroute);
     }
     #[cfg(feature = "test-utils")]
     let wire_msg = wire_msg.set_payload_debug(msg);
