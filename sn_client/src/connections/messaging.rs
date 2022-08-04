@@ -88,7 +88,7 @@ impl Session {
         let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
 
         #[cfg(feature = "traceroute")]
-        wire_msg.add_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
+        wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
 
         // The insertion of channel will be executed AFTER the completion of the `send_message`.
         let (sender, mut receiver) = channel::<CmdResponse>(elders_len);
@@ -218,7 +218,7 @@ impl Session {
         let mut wire_msg = WireMsg::new_msg(msg_id, payload, auth, dst);
 
         #[cfg(feature = "traceroute")]
-        wire_msg.add_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
+        wire_msg.append_trace(&mut Traceroute(vec![Entity::Client(client_pk)]));
 
         send_msg_in_bg(self.clone(), elders, wire_msg, msg_id)?;
 

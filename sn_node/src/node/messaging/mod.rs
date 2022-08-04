@@ -118,7 +118,7 @@ impl Node {
                 }
 
                 #[cfg(feature = "traceroute")]
-                let traceroute = wire_msg.show_trace();
+                let traceroute = wire_msg.traceroute();
 
                 Ok(vec![Cmd::HandleValidSystemMsg {
                     origin,
@@ -177,7 +177,7 @@ impl Node {
                     origin,
                     auth,
                     #[cfg(feature = "traceroute")]
-                    traceroute: wire_msg.show_trace(),
+                    traceroute: wire_msg.traceroute(),
                 }])
             }
         }

@@ -293,7 +293,7 @@ impl WireMsg {
 
 #[cfg(feature = "traceroute")]
 impl WireMsg {
-    pub fn add_trace(&mut self, traceroute: &mut Traceroute) {
+    pub fn append_trace(&mut self, traceroute: &mut Traceroute) {
         self.header
             .msg_envelope
             .traceroute
@@ -301,7 +301,7 @@ impl WireMsg {
             .append(&mut traceroute.0)
     }
 
-    pub fn show_trace(&self) -> Traceroute {
+    pub fn traceroute(&self) -> Traceroute {
         self.header.msg_envelope.traceroute.clone()
     }
 }

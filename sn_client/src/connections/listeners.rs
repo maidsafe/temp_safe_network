@@ -113,7 +113,7 @@ impl Session {
                 info!(
                     "Message {} with the Traceroute received at client:\n {:?}",
                     msg_type,
-                    wire_msg.show_trace()
+                    wire_msg.traceroute()
                 )
             }
 
