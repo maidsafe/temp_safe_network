@@ -17,7 +17,7 @@ use sn_api::{
     multimap::Multimap,
     nrs::NrsMap,
     wallet::Dbc,
-    Safe, SafeUrl, Token,
+    Safe, SafeUrl,
 };
 use std::io::{stdin, stdout, Read, Write};
 use tracing::{debug, warn};
@@ -173,7 +173,7 @@ pub async fn gen_wallet_table(safe: &Safe, multimap: &Multimap) -> Result<Table>
         };
 
         let balance = match dbc.amount_secrets_bearer() {
-            Ok(amount_secrets) => Token::from_nano(amount_secrets.amount()).to_string(),
+            Ok(amount_secrets) => amount_secrets.amount().to_string(),
             Err(err) => {
                 warn!("Ignoring amount from DBC found in wallet due to error in revealing secret amount: {:?}", err);
                 "unknown".to_string()

@@ -9,8 +9,8 @@
 use crate::{Safe, SafeUrl};
 
 use sn_client::utils::test_utils::read_genesis_dbc_from_first_node;
-use sn_dbc::{rng, Dbc, Owner, OwnerOnce};
-use sn_interface::types::{Keypair, Token};
+use sn_dbc::{rng, Dbc, Owner, OwnerOnce, Token};
+use sn_interface::types::Keypair;
 
 use anyhow::{anyhow, bail, Context, Result};
 use async_once::AsyncOnce;
@@ -85,7 +85,7 @@ pub async fn get_next_bearer_dbc() -> Result<(Dbc, Token)> {
 // Build a set of bearer DBCs with random amounts, by reissuing them from testnet genesis DBC.
 async fn reissue_bearer_dbcs() -> Result<Vec<(Dbc, Token)>> {
     let total_balance = match GENESIS_DBC.amount_secrets_bearer() {
-        Ok(amount_secrets) => amount_secrets.amount(),
+        Ok(amount_secrets) => amount_secrets.amount().as_nano(),
         Err(err) => bail!("Failed to obtain genesis DBC balance: {:?}", err),
     };
 
@@ -95,7 +95,7 @@ async fn reissue_bearer_dbcs() -> Result<Vec<(Dbc, Token)>> {
         .collect();
 
     let total_output_amount: u64 = amounts.iter().sum();
-    let change_amount = Token::from_nano(total_balance - total_output_amount);
+    let change_amount = total_balance - total_output_amount;
 
     let output_amounts: Vec<(Token, OwnerOnce)> = amounts
         .into_iter()
@@ -108,13 +108,17 @@ async fn reissue_bearer_dbcs() -> Result<Vec<(Dbc, Token)>> {
 
     let safe = new_safe_instance().await?;
     let (output_dbcs, _) = safe
-        .reissue_dbcs(vec![GENESIS_DBC.clone()], output_amounts, change_amount)
+        .reissue_dbcs(
+            vec![GENESIS_DBC.clone()],
+            output_amounts,
+            Token::from_nano(change_amount),
+        )
         .await?;
 
     Ok(output_dbcs
         .into_iter()
         .map(|(dbc, _, amount_secrets)| {
-            let amount = Token::from_nano(amount_secrets.amount());
+            let amount = amount_secrets.amount();
             (dbc, amount)
         })
         .collect())

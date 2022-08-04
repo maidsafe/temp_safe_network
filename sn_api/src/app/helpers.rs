@@ -10,9 +10,12 @@
 use crate::{Error, Result};
 use ::time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
-pub use sn_interface::network_knowledge::prefix_map::NetworkPrefixMap;
-pub use sn_interface::network_knowledge::utils::{DEFAULT_PREFIX_HARDLINK_NAME, SN_PREFIX_MAP_DIR};
-use sn_interface::types::{Error as SafeNdError, PublicKey, Token};
+use sn_dbc::{Error as DbcError, Token};
+pub use sn_interface::network_knowledge::{
+    prefix_map::NetworkPrefixMap,
+    utils::{DEFAULT_PREFIX_HARDLINK_NAME, SN_PREFIX_MAP_DIR},
+};
+use sn_interface::types::PublicKey;
 use std::{
     str::{self, FromStr},
     time,
@@ -38,14 +41,14 @@ pub fn pk_from_hex(hex_str: &str) -> Result<PublicKey> {
 pub fn parse_tokens_amount(amount_str: &str) -> Result<Token> {
     Token::from_str(amount_str).map_err(|err| {
         match err {
-            SafeNdError::ExcessiveValue => Error::InvalidAmount(format!(
+            DbcError::ExcessiveTokenValue => Error::InvalidAmount(format!(
                 "Invalid tokens amount '{}', it exceeds the maximum possible value '{}'",
                 amount_str, Token::from_nano(MAX_TOKENS_VALUE)
             )),
-            SafeNdError::LossOfPrecision => {
+            DbcError::LossOfTokenPrecision => {
                 Error::InvalidAmount(format!("Invalid tokens amount '{}', the minimum possible amount is one nano token (0.000000001)", amount_str))
             }
-            SafeNdError::FailedToParse(msg) => {
+            DbcError::FailedToParseToken(msg) => {
                 Error::InvalidAmount(format!("Invalid tokens amount '{}': {}", amount_str, msg))
             },
             other_err => Error::InvalidAmount(format!("Invalid tokens amount '{}': {:?}", amount_str, other_err)),
