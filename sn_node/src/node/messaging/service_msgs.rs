@@ -16,6 +16,8 @@ use sn_dbc::{
     Commitment, Hash, IndexedSignatureShare, KeyImage, RingCtTransaction, SpentProof,
     SpentProofContent, SpentProofShare,
 };
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Traceroute;
 use sn_interface::{
     data_copy_count,
     messaging::{
@@ -36,9 +38,6 @@ use sn_interface::{
 use bytes::Bytes;
 use std::collections::{BTreeMap, BTreeSet};
 use xor_name::XorName;
-
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
 
 impl Node {
     /// Forms a `CmdError` msg to send back to the client

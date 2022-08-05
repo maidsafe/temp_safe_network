@@ -15,8 +15,9 @@ use crate::node::{
     MAX_WAITING_PEERS_PER_QUERY,
 };
 
-use itertools::Itertools;
 use sn_dysfunction::IssueType;
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Traceroute;
 use sn_interface::{
     data_copy_count,
     messaging::{
@@ -26,12 +27,11 @@ use sn_interface::{
     },
     types::{log_markers::LogMarker, Peer, PublicKey, ReplicatedData},
 };
+
+use itertools::Itertools;
 use std::{cmp::Ordering, collections::BTreeSet};
 use tracing::info;
 use xor_name::XorName;
-
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
 
 impl Node {
     // Locate ideal holders for this data, instruct them to store the data

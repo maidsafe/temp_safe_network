@@ -10,6 +10,12 @@ use super::{QueryResult, Session};
 
 use crate::{connections::CmdResponse, Error, Result};
 
+#[cfg(feature = "traceroute")]
+use sn_interface::{
+    messaging::{Entity, Traceroute},
+    types::PublicKey,
+};
+
 use sn_interface::{
     messaging::{
         data::{DataQuery, DataQueryVariant, QueryResponse},
@@ -28,15 +34,6 @@ use std::time::Duration;
 use tokio::{sync::mpsc::channel, task::JoinHandle};
 use tracing::{debug, error, trace, warn};
 use xor_name::XorName;
-
-#[cfg(feature = "traceroute")]
-use sn_interface::types::PublicKey;
-
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Entity;
-
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
 
 // Number of Elders subset to send queries to
 pub(crate) const NUM_OF_ELDERS_SUBSET_FOR_QUERIES: usize = 3;

@@ -14,10 +14,7 @@ use crate::node::{
 };
 
 use sn_interface::{
-    messaging::{
-        system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
-        MsgId,
-    },
+    messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
     network_knowledge::{supermajority, NodeInfo, SectionAuthorityProvider, SectionKeyShare},
     types::{
         keys::ed25519::{self, Digest256},
@@ -28,7 +25,6 @@ use sn_interface::{
 use bls::PublicKey as BlsPublicKey;
 use bls_dkg::key_gen::{message::Message as DkgMessage, KeyGen};
 use dashmap::DashMap;
-use sn_interface::messaging::Traceroute;
 use std::{collections::BTreeSet, sync::Arc};
 use xor_name::XorName;
 
@@ -181,18 +177,14 @@ impl DkgVoter {
                 &session_id,
                 &sender
             );
-
             let msg = SystemMsg::DkgSessionUnknown {
                 session_id: session_id.clone(),
                 message,
             };
-            cmds.push(Cmd::SendMsg {
-                msg: OutgoingMsg::System(msg),
-                msg_id: MsgId::new(),
-                recipients: Peers::Single(sender),
-                #[cfg(feature = "traceroute")]
-                traceroute: Traceroute(vec![]),
-            });
+            cmds.push(Cmd::send_msg(
+                OutgoingMsg::System(msg),
+                Peers::Single(sender),
+            ));
         }
         Ok(cmds)
     }

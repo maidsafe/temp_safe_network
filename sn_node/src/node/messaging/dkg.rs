@@ -13,17 +13,18 @@ use crate::node::{
 };
 
 use bytes::Bytes;
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SigShare, SystemMsg},
-        AuthorityProof, BlsShareAuth, MsgId, NodeMsgAuthority, WireMsg,
+        AuthorityProof, BlsShareAuth, NodeMsgAuthority, WireMsg,
     },
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     types::{log_markers::LogMarker, Peer},
 };
 
 use bls_dkg::key_gen::message::Message as DkgMessage;
-use sn_interface::messaging::Traceroute;
 use std::collections::BTreeSet;
 use xor_name::XorName;
 
@@ -60,13 +61,10 @@ impl Node {
         let (auth, payload) = self.get_auth(msg.clone(), src_name)?;
 
         if !others.is_empty() {
-            cmds.push(Cmd::SendMsg {
-                msg: OutgoingMsg::DstAggregated((auth.clone(), payload.clone())),
-                msg_id: MsgId::new(),
-                recipients: Peers::Multiple(others),
-                #[cfg(feature = "traceroute")]
-                traceroute: Traceroute(vec![]),
-            });
+            cmds.push(Cmd::send_msg(
+                OutgoingMsg::DstAggregated((auth.clone(), payload.clone())),
+                Peers::Multiple(others),
+            ));
         }
 
         if handle {

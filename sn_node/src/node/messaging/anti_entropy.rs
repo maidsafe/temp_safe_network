@@ -11,11 +11,9 @@ use crate::node::{
     messaging::{OutgoingMsg, Peers},
     Error, Event, MembershipEvent, Node, Result, StateSnapshot,
 };
-use backoff::{backoff::Backoff, ExponentialBackoff};
-use bls::PublicKey as BlsPublicKey;
-use bytes::Bytes;
-use itertools::Itertools;
-use secured_linked_list::SecuredLinkedList;
+
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         system::{KeyedSig, NodeCmd, SectionAuth, SectionPeers, SystemMsg},
@@ -24,11 +22,14 @@ use sn_interface::{
     network_knowledge::SectionAuthorityProvider,
     types::{log_markers::LogMarker, Peer, PublicKey},
 };
+
+use backoff::{backoff::Backoff, ExponentialBackoff};
+use bls::PublicKey as BlsPublicKey;
+use bytes::Bytes;
+use itertools::Itertools;
+use secured_linked_list::SecuredLinkedList;
 use std::{collections::BTreeSet, time::Duration};
 use xor_name::{Prefix, XorName};
-
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
 
 impl Node {
     /// Send `AntiEntropyUpdate` message to all nodes in our own section.
