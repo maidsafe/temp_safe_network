@@ -19,6 +19,8 @@ pub(crate) use self::cmd_ctrl::CmdCtrl;
 use crate::comm::MsgEvent;
 use crate::node::{flow_ctrl::cmds::Cmd, messaging::Peers, Error, Node, Result};
 
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::{DataQuery, DataQueryVariant, ServiceMsg},
@@ -35,9 +37,6 @@ use tokio::{
     task::{self, JoinHandle},
     time::MissedTickBehavior,
 };
-
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
 
 const PROBE_INTERVAL: Duration = Duration::from_secs(30);
 const MISSING_VOTE_INTERVAL: Duration = Duration::from_secs(15);

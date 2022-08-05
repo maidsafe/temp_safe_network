@@ -8,14 +8,10 @@
 
 use crate::node::{flow_ctrl::FlowCtrl, Node, Peer, Result};
 
-use sn_interface::{
-    messaging::{system::SystemMsg, MsgId},
-    network_knowledge::SectionAuthorityProvider,
-};
+use sn_interface::{messaging::system::SystemMsg, network_knowledge::SectionAuthorityProvider};
 
 use ed25519_dalek::PublicKey;
 use secured_linked_list::SecuredLinkedList;
-use sn_interface::messaging::Traceroute;
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use xor_name::{Prefix, XorName};
@@ -98,13 +94,7 @@ impl NodeTestApi {
 
     /// Send a system msg.
     pub async fn send(&self, msg: SystemMsg, recipients: BTreeSet<Peer>) -> Result<()> {
-        let cmd = Cmd::SendMsg {
-            msg: OutgoingMsg::System(msg),
-            msg_id: MsgId::new(),
-            recipients: Peers::Multiple(recipients),
-            #[cfg(feature = "traceroute")]
-            traceroute: Traceroute(vec![]),
-        };
+        let cmd = Cmd::send_msg(OutgoingMsg::System(msg), Peers::Multiple(recipients));
         self.send_cmd(cmd).await
     }
 

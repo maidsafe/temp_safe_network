@@ -17,6 +17,8 @@ use crate::{
     },
 };
 
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::StorageLevel,
@@ -39,9 +41,6 @@ use sn_interface::{
 
 use bytes::Bytes;
 use xor_name::XorName;
-
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
 
 impl Node {
     /// Send a (`SystemMsg`) message to all Elders in our section

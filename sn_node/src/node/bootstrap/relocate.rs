@@ -15,11 +15,8 @@ use crate::node::{
 };
 
 use sn_interface::{
-    messaging::{
-        system::{
-            JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeState, SectionAuth, SystemMsg,
-        },
-        MsgId,
+    messaging::system::{
+        JoinAsRelocatedRequest, JoinAsRelocatedResponse, NodeState, SectionAuth, SystemMsg,
     },
     network_knowledge::{NodeInfo, SectionAuthorityProvider},
     types::{keys::ed25519, Peer, PublicKey},
@@ -27,7 +24,6 @@ use sn_interface::{
 
 use bls::PublicKey as BlsPublicKey;
 use ed25519_dalek::{Keypair, Signature};
-use sn_interface::messaging::Traceroute;
 use std::{collections::BTreeSet, net::SocketAddr, sync::Arc};
 use xor_name::{Prefix, XorName};
 
@@ -220,13 +216,8 @@ impl JoiningAsRelocated {
 
         info!("Sending {:?} to {:?}", join_request, recipients);
 
-        let cmd = Cmd::SendMsg {
-            msg: OutgoingMsg::System(SystemMsg::JoinAsRelocatedRequest(Box::new(join_request))),
-            msg_id: MsgId::new(),
-            recipients: Peers::Multiple(recipients),
-            #[cfg(feature = "traceroute")]
-            traceroute: Traceroute(vec![]),
-        };
+        let msg = SystemMsg::JoinAsRelocatedRequest(Box::new(join_request));
+        let cmd = Cmd::send_msg(OutgoingMsg::System(msg), Peers::Multiple(recipients));
 
         Ok(cmd)
     }
