@@ -12,14 +12,12 @@ use crate::node::{
     Cmd, Error, Node, Result,
 };
 
-use sn_interface::messaging::{AuthKind, Dst, MsgId};
-use sn_interface::{
-    messaging::{system::SystemMsg, WireMsg},
-    types::Peer,
-};
-
 #[cfg(feature = "traceroute")]
 use sn_interface::{messaging::Entity, messaging::Traceroute, types::PublicKey};
+use sn_interface::{
+    messaging::{system::SystemMsg, AuthKind, Dst, MsgId, WireMsg},
+    types::Peer,
+};
 
 use bytes::Bytes;
 use std::{collections::BTreeSet, sync::Arc, time::Duration};

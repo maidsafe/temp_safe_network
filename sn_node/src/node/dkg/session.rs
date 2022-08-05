@@ -13,10 +13,7 @@ use crate::node::{
 };
 
 use sn_interface::{
-    messaging::{
-        system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
-        MsgId,
-    },
+    messaging::system::{DkgFailureSig, DkgFailureSigSet, DkgSessionId, SystemMsg},
     network_knowledge::{NodeInfo, SectionAuthorityProvider, SectionKeyShare},
     types::{keys::ed25519, log_markers::LogMarker, Peer},
 };
@@ -26,7 +23,6 @@ use bls_dkg::key_gen::{
     message::Message as DkgMessage, Error as DkgError, KeyGen, MessageAndTarget, Phase,
 };
 use itertools::Itertools;
-use sn_interface::messaging::Traceroute;
 use std::{
     collections::{BTreeMap, BTreeSet},
     iter, mem,
@@ -97,13 +93,10 @@ impl Session {
                 session_id: self.session_id.clone(),
                 message,
             };
-            cmds.push(Cmd::SendMsg {
-                msg: OutgoingMsg::System(msg),
-                msg_id: MsgId::new(),
-                recipients: Peers::Single(*peer),
-                #[cfg(feature = "traceroute")]
-                traceroute: Traceroute(vec![]),
-            });
+            cmds.push(Cmd::send_msg(
+                OutgoingMsg::System(msg),
+                Peers::Single(*peer),
+            ));
         } else {
             warn!(
                 "Failed to fetch peer of {:?} among {:?}",
@@ -203,14 +196,10 @@ impl Session {
                     session_id: self.session_id.clone(),
                     message: message.clone(),
                 };
-
-                cmds.push(Cmd::SendMsg {
-                    msg: OutgoingMsg::System(msg),
-                    msg_id: MsgId::new(),
-                    recipients: Peers::Single(*peer),
-                    #[cfg(feature = "traceroute")]
-                    traceroute: Traceroute(vec![]),
-                });
+                cmds.push(Cmd::send_msg(
+                    OutgoingMsg::System(msg),
+                    Peers::Single(*peer),
+                ));
             } else {
                 error!("Failed to find target {:?} among peers {:?}", target, peers);
             }
@@ -374,13 +363,7 @@ impl Session {
                     failed_participants,
                 };
                 trace!("{}", LogMarker::DkgSendFailureObservation);
-                Cmd::SendMsg {
-                    msg: OutgoingMsg::System(msg),
-                    msg_id: MsgId::new(),
-                    recipients: Peers::Multiple(self.recipients()),
-                    #[cfg(feature = "traceroute")]
-                    traceroute: Traceroute(vec![]),
-                }
+                Cmd::send_msg(OutgoingMsg::System(msg), Peers::Multiple(self.recipients()))
             }))
             .collect();
 

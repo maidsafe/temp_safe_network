@@ -20,6 +20,8 @@ use crate::node::{
 };
 
 use sn_consensus::Decision;
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Traceroute;
 use sn_interface::{
     elder_count, init_logger,
     messaging::{
@@ -48,7 +50,6 @@ use itertools::Itertools;
 use rand::{distributions::Alphanumeric, rngs::OsRng, Rng};
 use resource_proof::ResourceProof as ChallengeSolver;
 use secured_linked_list::SecuredLinkedList;
-use sn_interface::messaging::Traceroute;
 use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     iter,
@@ -1106,12 +1107,7 @@ async fn msg_to_self() -> Result<()> {
         // don't use the cmd collection fn, as it skips Cmd::SendMsg
         let cmds = dispatcher
             .process_cmd(
-                Cmd::SendMsg {
-                    msg: OutgoingMsg::System(node_msg.clone()),
-                    msg_id: MsgId::new(),
-                    recipients: Peers::Single(info.peer()),
-                    #[cfg(feature = "traceroute")] traceroute: Traceroute(vec![]),
-                },
+                Cmd::send_msg(OutgoingMsg::System(node_msg.clone()), Peers::Single(info.peer()))
             )
             .await?;
 

@@ -84,6 +84,8 @@ mod core {
         UsedSpace,
     };
     use sn_dysfunction::{DysfunctionDetection, DysfunctionSeverity, IssueType};
+    #[cfg(feature = "traceroute")]
+    use sn_interface::messaging::Entity;
     use sn_interface::{
         messaging::{
             data::OperationId,
@@ -112,9 +114,6 @@ mod core {
         time::Duration,
     };
     use uluru::LRUCache;
-
-    #[cfg(feature = "traceroute")]
-    use sn_interface::messaging::Entity;
 
     /// Amount of tokens to be owned by the Genesis DBC.
     /// At the inception of the Network a total supply of 4,525,524,120 whole tokens will be created.

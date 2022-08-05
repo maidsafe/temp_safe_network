@@ -11,10 +11,10 @@ use crate::node::{
     Proposal, XorName,
 };
 
-use bytes::Bytes;
-use custom_debug::Debug;
 use sn_consensus::Decision;
 use sn_dysfunction::IssueType;
+#[cfg(feature = "traceroute")]
+use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         data::{OperationId, ServiceMsg},
@@ -24,15 +24,15 @@ use sn_interface::{
     network_knowledge::{SectionAuthorityProvider, SectionKeyShare},
     types::{Peer, ReplicatedDataAddress},
 };
+
+use bytes::Bytes;
+use custom_debug::Debug;
 use std::{
     collections::BTreeSet,
     fmt,
     sync::atomic::{AtomicU64, Ordering},
     time::{Duration, SystemTime},
 };
-
-#[cfg(feature = "traceroute")]
-use sn_interface::messaging::Traceroute;
 
 /// A struct for the job of controlling the flow
 /// of a [`Cmd`] in the system.
