@@ -29,7 +29,7 @@ use tokio::{sync::RwLock, time::Instant};
 
 type Priority = i32;
 
-const SLEEP_TIME: Duration = Duration::from_millis(20);
+const SLEEP_TIME: Duration = Duration::from_millis(10);
 
 const ORDER: Ordering = Ordering::SeqCst;
 
@@ -146,7 +146,7 @@ impl CmdCtrl {
             let actual_rate = self.attempted.value();
             if actual_rate > expected_rate {
                 let diff = actual_rate - expected_rate;
-                let diff_ms = Duration::from_millis((diff * 1000_f64) as u64);
+                let diff_ms = Duration::from_millis((diff * 10_f64) as u64);
                 tokio::time::sleep(diff_ms).await;
                 continue;
             } else if self.cmd_queue.read().await.is_empty() {
