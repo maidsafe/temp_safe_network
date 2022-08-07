@@ -33,6 +33,8 @@ pub enum Error {
     // section keys are not in chain.
     #[error("Dkg prefix is shorter than our prefix, so dropping the message.")]
     InvalidDkgPrefix,
+    #[error("No membership data exists when it is needed.")]
+    NoMembershipFound,
     #[error("Max retries reached for processing cmd, cmd dropped.")]
     MaxCmdRetriesReached(usize),
     #[error("Cmd job watcher dropped for some unknown reason.")]
