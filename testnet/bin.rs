@@ -33,7 +33,10 @@ use eyre::{eyre, Result, WrapErr as _};
 use sn_launch_tool::Launch;
 #[cfg(not(target_os = "windows"))]
 use std::process::{Command, Stdio};
-use std::{io, path::PathBuf};
+use std::{
+    io,
+    path::{Path, PathBuf},
+};
 use tokio::fs::{create_dir_all, remove_dir_all};
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
@@ -77,7 +80,7 @@ async fn main() -> Result<()> {
     color_eyre::install()?;
     init_tracing()?;
 
-    let path = std::path::Path::new("nodes");
+    let path = Path::new("nodes");
     remove_dir_all(&path)
         .await
         .or_else(|error| match error.kind() {

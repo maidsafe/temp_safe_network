@@ -16,7 +16,7 @@ use clap::Subcommand;
 use color_eyre::{eyre::eyre, eyre::Error, Help, Result};
 use sn_api::{Error as ApiError, Safe};
 use sn_dbc::{Dbc, Error as DbcError};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tokio::fs;
 
 #[derive(Subcommand, Debug)]
@@ -73,7 +73,7 @@ pub enum WalletSubCommands {
         owned: bool,
         /// A file path to store the content of the reissued DBC.
         #[clap(long = "save")]
-        save: Option<String>,
+        save: Option<PathBuf>,
     },
 }
 
@@ -238,23 +238,20 @@ pub async fn wallet_commander(
             // back to print it to stdout if that fails.
             let print_out_dbc = match save {
                 None => true,
-                Some(ref path_str) => {
-                    let path = Path::new(path_str);
-                    match fs::write(path, dbc_hex.clone()).await {
-                        Ok(()) => {
-                            println!("DBC content written at '{}'.", path.display());
-                            false
-                        }
-                        Err(err) => {
-                            eprintln!(
-                                "Error: Unable to write DBC at '{}': {}.",
-                                path.display(),
-                                err
-                            );
-                            true
-                        }
+                Some(path) => match fs::write(&path, dbc_hex.clone()).await {
+                    Ok(()) => {
+                        println!("DBC content written at '{}'.", path.display());
+                        false
                     }
-                }
+                    Err(err) => {
+                        eprintln!(
+                            "Error: Unable to write DBC at '{}': {}.",
+                            path.display(),
+                            err
+                        );
+                        true
+                    }
+                },
             };
 
             if OutputFmt::Pretty == output_fmt {

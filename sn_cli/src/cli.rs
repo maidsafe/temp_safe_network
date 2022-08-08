@@ -33,7 +33,6 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tracing::debug;
 
-use sn_api::SN_PREFIX_MAP_DIR;
 const DEFAULT_OPERATION_TIMEOUT_SECS: u64 = 120; // 2mins
 const SN_CLI_QUERY_TIMEOUT: &str = "SN_CLI_QUERY_TIMEOUT";
 
@@ -181,8 +180,6 @@ async fn get_config() -> Result<Config> {
     cli_config_path.push("config.json");
     let mut prefix_maps_path = config_path;
     prefix_maps_path.push("prefix_maps");
-    let prefix_maps_path_string = prefix_maps_path.as_path().display().to_string();
-    env::set_var(SN_PREFIX_MAP_DIR, prefix_maps_path_string);
     let mut config = Config::new(cli_config_path, prefix_maps_path).await?;
     config.sync().await?;
     Ok(config)

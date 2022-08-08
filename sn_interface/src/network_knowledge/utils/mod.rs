@@ -10,42 +10,52 @@ use crate::{
     network_knowledge::prefix_map::NetworkPrefixMap,
     types::{Error, Result},
 };
-use std::{io::Write, path::PathBuf};
+use std::{io::Write, path::Path};
 use tempfile::NamedTempFile;
 use tokio::{fs, io::AsyncReadExt};
-pub const DEFAULT_PREFIX_HARDLINK_NAME: &str = "default";
-pub const SN_PREFIX_MAP_DIR: &str = "SN_PREFIX_MAP_DIR";
 
-pub async fn write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap) -> Result<()> {
-    // Open or create `$User/.safe/prefix_maps` dir
-    let prefix_map_dir = get_prefix_map_dir()?;
-    fs::create_dir_all(prefix_map_dir.clone())
-        .await
-        .map_err(|_| {
-            Error::DirectoryHandling("Could not read '.safe/prefix_maps' directory".to_string())
+pub async fn write_prefix_map_to_disk(prefix_map: &NetworkPrefixMap, path: &Path) -> Result<()> {
+    trace!("Writing prefix_map to disk at {}", path.display());
+    let parent_path = if let Some(parent_path) = path.parent() {
+        fs::create_dir_all(parent_path).await.map_err(|err| {
+            Error::DirectoryHandling(format!(
+                "Could not create '{}' parent directory path: {}",
+                path.display(),
+                err,
+            ))
         })?;
-    let prefix_map_file = prefix_map_dir.join(format!("{:?}", prefix_map.genesis_key()));
-    let mut temp_file = NamedTempFile::new_in(prefix_map_dir)
-        .map_err(|e| Error::FileHandling(format!("Error creating tempfile: {:?}", e)))?;
+        parent_path
+    } else {
+        Path::new(".")
+    };
+
+    let mut temp_file = NamedTempFile::new_in(parent_path).map_err(|e| {
+        Error::FileHandling(format!(
+            "Error creating tempfile at {}: {:?}",
+            parent_path.display(),
+            e
+        ))
+    })?;
 
     let serialized =
         rmp_serde::to_vec(prefix_map).map_err(|e| Error::Serialisation(e.to_string()))?;
+
     temp_file
         .write_all(serialized.as_slice())
         .map_err(|e| Error::FileHandling(e.to_string()))?;
-    fs::rename(temp_file.path(), &prefix_map_file)
+
+    fs::rename(temp_file.path(), &path)
         .await
         .map_err(|e| Error::FileHandling(e.to_string()))?;
 
-    set_default_prefix_map(prefix_map.genesis_key()).await?;
-    trace!("Wrote prefix_map to disk {:?}", prefix_map_file);
+    trace!("Wrote prefix_map to disk: {}", path.display());
+
     Ok(())
 }
 
-pub async fn read_prefix_map_from_disk() -> Result<NetworkPrefixMap> {
-    // Read the default NetworkPrefixMap from disk
-    let path = get_prefix_map_dir()?.join(DEFAULT_PREFIX_HARDLINK_NAME);
-    match fs::File::open(&path).await {
+/// Read the default NetworkPrefixMap from disk
+pub async fn read_prefix_map_from_disk(path: &Path) -> Result<NetworkPrefixMap> {
+    match fs::File::open(path).await {
         Ok(mut prefix_map_file) => {
             let mut prefix_map_contents = vec![];
             let _ = prefix_map_file
@@ -53,8 +63,9 @@ pub async fn read_prefix_map_from_disk() -> Result<NetworkPrefixMap> {
                 .await
                 .map_err(|err| {
                     Error::FileHandling(format!(
-                        "Error reading PrefixMap from {:?}: {:?}",
-                        path, err
+                        "Error reading PrefixMap from {}: {:?}",
+                        path.display(),
+                        err
                     ))
                 })?;
 
@@ -68,51 +79,5 @@ pub async fn read_prefix_map_from_disk() -> Result<NetworkPrefixMap> {
             Ok(prefix_map)
         }
         Err(e) => Err(Error::FailedToParse(e.to_string())),
-    }
-}
-
-pub async fn set_default_prefix_map(genesis_key: &bls::PublicKey) -> Result<()> {
-    // create hardlink '.safe/prefix_maps/default' that points to the PrefixMap corresponding to
-    // the given genesis_key
-    let prefix_map_dir = get_prefix_map_dir()?;
-    let prefix_map_file = prefix_map_dir.join(format!("{:?}", genesis_key));
-    let default_prefix = prefix_map_dir.join(DEFAULT_PREFIX_HARDLINK_NAME);
-
-    if default_prefix.exists() {
-        trace!("Remove default_prefix hardlink as it already exists");
-        fs::remove_file(&default_prefix).await.map_err(|e| {
-            Error::FileHandling(format!(
-                "Error removing previous PrefixMap hardlink: {:?}",
-                e
-            ))
-        })?;
-    }
-
-    trace!(
-        "Creating hardlink for PrefixMap from {:?} to {:?}",
-        prefix_map_file,
-        default_prefix
-    );
-    fs::hard_link(prefix_map_file, default_prefix)
-        .await
-        .map_err(|e| {
-            Error::FileHandling(format!(
-                "Error creating default PrefixMap hardlink: {:?}",
-                e
-            ))
-        })?;
-    Ok(())
-}
-
-fn get_prefix_map_dir() -> Result<PathBuf> {
-    if let Ok(dir) = std::env::var(SN_PREFIX_MAP_DIR) {
-        Ok(PathBuf::from(dir))
-    } else {
-        Ok(dirs_next::home_dir()
-            .ok_or_else(|| {
-                Error::DirectoryHandling("Could not read '.safe' directory".to_string())
-            })?
-            .join(".safe")
-            .join("prefix_maps"))
     }
 }

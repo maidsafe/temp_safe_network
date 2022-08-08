@@ -8,13 +8,9 @@
 
 #[cfg(feature = "app")]
 use crate::{Error, Result};
-use ::time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
+use ::time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use sn_dbc::{Error as DbcError, Token};
-pub use sn_interface::network_knowledge::{
-    prefix_map::NetworkPrefixMap,
-    utils::{DEFAULT_PREFIX_HARDLINK_NAME, SN_PREFIX_MAP_DIR},
-};
 use sn_interface::types::PublicKey;
 use std::{
     str::{self, FromStr},

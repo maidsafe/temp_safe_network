@@ -55,7 +55,7 @@ mod connections;
 mod errors;
 
 // Export public API.
-pub use api::{Client, RegisterWriteAheadLog};
+pub use api::{Client, RegisterWriteAheadLog, DEFAULT_PREFIX_HARDLINK_NAME};
 pub use config_handler::{ClientConfig, DEFAULT_ACK_WAIT, DEFAULT_OPERATION_TIMEOUT};
 pub use errors::{Error, Result};
 pub use qp2p::Config as QuicP2pConfig;
