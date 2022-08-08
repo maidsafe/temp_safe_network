@@ -103,7 +103,6 @@ impl FlowCtrl {
         // the internal process loop
         loop {
             let now = Instant::now();
-            let mut cmds = vec![];
 
             let (info, is_elder) = {
                 let node = self.node.read().await;
@@ -134,7 +133,7 @@ impl FlowCtrl {
             // happens regardless of if elder or adult
             if last_link_cleanup.elapsed() > LINK_CLEANUP_INTERVAL {
                 last_link_cleanup = now;
-                cmds.push(Cmd::CleanupPeerLinks);
+                self.cmd_channel.send(Cmd::CleanupPeerLinks);
             }
 
             #[cfg(feature = "back-pressure")]
@@ -146,7 +145,9 @@ impl FlowCtrl {
                     self.cmd_channel.clone(),
                 )
                 .await
-                {}
+                {
+
+                }
             }
 
             // Things that should only happen to non elder nodes
@@ -158,19 +159,6 @@ impl FlowCtrl {
                         Self::probe_the_section(self.node.clone(), self.cmd_channel.clone()).await
                     {
                     };
-                }
-
-                let no_cmds = cmds.is_empty();
-
-                for cmd in cmds {
-                    if let Err(error) = self.fire_and_forget(cmd).await {
-                        error!("Error pushing node process cmd to controller: {error:?}");
-                    }
-                }
-
-                if no_cmds {
-                    // prevent cpu racing
-                    sleep(LOOP_SLEEP_INTERVAL).await;
                 }
 
                 // remaining cmds are for elders only.
@@ -246,18 +234,7 @@ impl FlowCtrl {
                 }
             }
 
-            let no_cmds = cmds.is_empty();
-
-            for cmd in cmds {
-                if let Err(error) = self.fire_and_forget(cmd).await {
-                    error!("Error pushing node process cmd to controller: {error:?}");
-                }
-            }
-
-            if no_cmds {
-                // prevent cpu racing
-                sleep(LOOP_SLEEP_INTERVAL).await;
-            }
+            sleep(LOOP_SLEEP_INTERVAL).await;
         }
 
         error!("Internal processing ended.")
