@@ -45,10 +45,10 @@ const ORDER: Ordering = Ordering::SeqCst;
 /// We're now saying to a node "do as much as you can without choking,
 /// and start with the most important things first".
 pub(crate) struct CmdCtrl {
-    cmd_queue: PriorityQueue<EnqueuedJob, Priority>,
+    cmd_queue: PriorityQueue<CmdJob, Priority>,
     attempted: CmdThroughput,
     monitoring: RateLimits,
-    stopped: Arc<RwLock<bool>>,
+    stopped: bool,
     pub(crate) dispatcher: Arc<Dispatcher>,
     id_counter: Arc<AtomicUsize>,
     event_sender: EventSender,
@@ -64,7 +64,7 @@ impl CmdCtrl {
             cmd_queue: PriorityQueue::new(),
             attempted: CmdThroughput::default(),
             monitoring,
-            stopped: Arc::new(RwLock::new(false)),
+            stopped: false,
             dispatcher: Arc::new(dispatcher),
             id_counter: Arc::new(AtomicUsize::new(0)),
             event_sender,
@@ -80,19 +80,22 @@ impl CmdCtrl {
         self.dispatcher.node()
     }
 
-    pub(crate) async fn push(&mut self, cmd: Cmd) -> Result<SendWatcher> {
+    pub(crate) async fn push(&mut self, cmd: Cmd) -> Result<()> {
         self.push_internal(cmd, None).await
+    }
+    pub(crate) fn q_len(&self) -> usize {
+        self.cmd_queue.len()
     }
 
     // consume self
     // NB that clones could still exist, however they would be in the disconnected state
     #[allow(unused)]
     pub(crate) async fn stop(mut self) {
-        *self.stopped.write().await = true;
+        self.stopped = true;
         self.cmd_queue.clear();
     }
 
-    async fn extend(&mut self, cmds: Vec<Cmd>, parent_id: usize) -> Vec<Result<SendWatcher>> {
+    async fn extend(&mut self, cmds: Vec<Cmd>, parent_id: usize) -> Vec<Result<()>> {
         let mut results = vec![];
 
         for cmd in cmds {
@@ -102,43 +105,52 @@ impl CmdCtrl {
         results
     }
 
-    async fn push_internal(&mut self, cmd: Cmd, parent_id: Option<usize>) -> Result<SendWatcher> {
+    async fn push_internal(&mut self, cmd: Cmd, parent_id: Option<usize>) -> Result<()> {
         debug!("pushing cmd {cmd:?}");
         if self.stopped().await {
             // should not happen (be reachable)
             return Err(Error::InvalidState);
         }
 
-        let priority = cmd.priority();
+        let job = CmdJob::new(
+            self.id_counter.fetch_add(1, ORDER),
+            parent_id,
+            cmd,
+            SystemTime::now(),
+        );
 
-        let (watcher, reporter) = status_watching();
-
-        let job = EnqueuedJob {
-            job: CmdJob::new(
-                self.id_counter.fetch_add(1, ORDER),
-                parent_id,
-                cmd,
-                SystemTime::now(),
-            ),
-            reporter,
-        };
-
-        let _ = self.cmd_queue.push(job, priority);
+        let prio = job.priority();
+        let _ = self.cmd_queue.push(job, prio);
         debug!("cmd pushed to q");
-        Ok(watcher)
+        Ok(())
     }
 
     // could be accessed via a clone
     async fn stopped(&self) -> bool {
-        *self.stopped.read().await
+        self.stopped
     }
 
     async fn notify(&self, event: Event) {
         self.event_sender.send(event).await
     }
 
+    /// Get the next Cmd going off of priority
+    pub(crate) fn next_cmd(&mut self) -> Option<CmdJob> {
+        self.cmd_queue.pop().map(|(job, _prio)| job)
+    }
+
+    // TODO: process a _specific_ cmd,
+    // pass in notifier.
+    // put this whole thing in another local thread??
+    // It needs to be untied from the normal loop?
+
     /// Processes the next priority cmd
-    pub(crate) async fn process_next_cmd(&mut self) -> Result<()> {
+    pub(crate) async fn process_cmd(
+        &self,
+        cmd_job_id: usize,
+        cmd: Cmd,
+        cmd_process_api: tokio::sync::mpsc::Sender<(Cmd, Option<usize>)>,
+    ) -> Result<()> {
         debug!("processing next cmd");
         // loop {
         if self.stopped().await {
@@ -156,57 +168,57 @@ impl CmdCtrl {
         //     continue;
         // }
 
-        #[cfg(feature = "test-utils")]
-        {
-            let queue = self.cmd_queue;
-            debug!("Cmd queue length: {}", queue.len());
-        }
+        // #[cfg(feature = "test-utils")]
+        // {
+        //     let queue = self.cmd_queue;
+        //     debug!("Cmd queue length: {}", queue.len());
+        // }
 
         debug!("q lennn {}", self.cmd_queue.len());
-        let queue_res = self.cmd_queue.pop();
-        if let Some((enqueued, _prio)) = queue_res {
-            let cmd_ctrl = self;
-            cmd_ctrl
-                .notify(Event::CmdProcessing(CmdProcessEvent::Started {
-                    job: enqueued.job.clone(),
-                    time: SystemTime::now(),
-                }))
-                .await;
+        // let queue_res = self.cmd_queue.pop();
+        // if let Some((job, _prio)) = queue_res {
+        // let cmd_ctrl = self;
+        self
+            .notify(Event::CmdProcessing(CmdProcessEvent::Started {
+                job_id: cmd_job_id,
+                time: SystemTime::now(),
+            }))
+            .await;
 
-            // let _ = tokio::task::spawn_local(async move {
-            match cmd_ctrl
-                .dispatcher
-                .process_cmd(enqueued.job.cmd().clone())
-                .await
-            {
-                Ok(cmds) => {
-                    enqueued.reporter.send(CtrlStatus::Finished);
+        // let node = self.dispatcher.node().clone();
+        // let comm = self.dispatcher.comm();
+        // let dkg_timeout = self.dispatcher.dkg_timeout().clone();
 
-                    cmd_ctrl.monitoring.increment_cmds().await;
+        let dispatcher = self.dispatcher.clone();
+        let _ = tokio::task::spawn_local(async move{
+        match dispatcher.process_cmd(cmd).await {
+            Ok(cmds) => {
+                // self.monitoring.increment_cmds().await;
 
-                    // evaluate: handle these watchers?
-                    let _watchers = cmd_ctrl.extend(cmds, enqueued.job.id()).await;
-                    cmd_ctrl
-                        .notify(Event::CmdProcessing(CmdProcessEvent::Finished {
-                            job: enqueued.job,
-                            time: SystemTime::now(),
-                        }))
-                        .await;
+                // evaluate: handle these watchers?
+                for cmd in cmds {
+                    cmd_process_api.send((cmd, Some(cmd_job_id))).await;
                 }
-                Err(error) => {
-                    cmd_ctrl
-                        .notify(Event::CmdProcessing(CmdProcessEvent::Failed {
-                            job: enqueued.job.clone(),
-                            time: SystemTime::now(),
-                            error: format!("{:?}", error),
-                        }))
-                        .await;
-                    enqueued.reporter.send(CtrlStatus::Error(Arc::new(error)));
-                }
+                // self
+                //     .notify(Event::CmdProcessing(CmdProcessEvent::Finished {
+                //         job: job,
+                //         time: SystemTime::now(),
+                //     }))
+                //     .await;
             }
-            cmd_ctrl.attempted.increment(); // both on fail and success
-                                            // });
+            Err(error) => {
+                // self
+                //     .notify(Event::CmdProcessing(CmdProcessEvent::Failed {
+                //         job: job.clone(),
+                //         time: SystemTime::now(),
+                //         error: format!("{:?}", error),
+                //     }))
+                //     .await;
+            }
         }
+        // self.attempted.increment(); // both on fail and success
+                                    });
+                                    // }
 
         Ok(())
         // }
@@ -241,69 +253,21 @@ impl CmdThroughput {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct EnqueuedJob {
-    job: CmdJob,
-    reporter: StatusReporting,
-}
+// #[derive(Debug)]
+// pub(crate) struct EnqueuedJob {
+//     job: CmdJob,
+// }
 
-impl PartialEq for EnqueuedJob {
-    fn eq(&self, other: &Self) -> bool {
-        self.job.id() == other.job.id()
-    }
-}
+// impl PartialEq for EnqueuedJob {
+//     fn eq(&self, other: &Self) -> bool {
+//         self.job.id() == other.job.id()
+//     }
+// }
 
-impl Eq for EnqueuedJob {}
+// impl Eq for EnqueuedJob {}
 
-impl std::hash::Hash for EnqueuedJob {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.job.id().hash(state);
-    }
-}
-
-#[derive(Clone, Debug)]
-pub(crate) enum CtrlStatus {
-    Enqueued,
-    Finished,
-    Error(Arc<Error>),
-    #[allow(unused)]
-    WatcherDropped,
-}
-
-pub(crate) struct SendWatcher {
-    receiver: tokio::sync::watch::Receiver<CtrlStatus>,
-}
-
-impl SendWatcher {
-    /// Reads current status
-    #[allow(unused)]
-    pub(crate) fn status(&self) -> CtrlStatus {
-        self.receiver.borrow().clone()
-    }
-
-    /// Waits until a new status arrives.
-    pub(crate) async fn await_change(&mut self) -> CtrlStatus {
-        if self.receiver.changed().await.is_ok() {
-            self.receiver.borrow_and_update().clone()
-        } else {
-            CtrlStatus::WatcherDropped
-        }
-    }
-}
-
-#[derive(Debug)]
-struct StatusReporting {
-    sender: tokio::sync::watch::Sender<CtrlStatus>,
-}
-
-impl StatusReporting {
-    fn send(&self, status: CtrlStatus) {
-        // todo: ok to drop error here?
-        let _ = self.sender.send(status);
-    }
-}
-
-fn status_watching() -> (SendWatcher, StatusReporting) {
-    let (sender, receiver) = tokio::sync::watch::channel(CtrlStatus::Enqueued);
-    (SendWatcher { receiver }, StatusReporting { sender })
-}
+// impl std::hash::Hash for EnqueuedJob {
+//     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+//         self.job.id().hash(state);
+//     }
+// }

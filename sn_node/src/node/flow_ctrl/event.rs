@@ -86,21 +86,21 @@ pub enum CmdProcessEvent {
     ///
     Started {
         ///
-        job: CmdJob,
+        job_id: usize,
         ///
         time: SystemTime,
     },
     ///
     Finished {
         ///
-        job: CmdJob,
+        job_id: usize,
         ///
         time: SystemTime,
     },
     ///
     Failed {
         ///
-        job: CmdJob,
+        job_id: usize,
         ///
         time: SystemTime,
         ///
