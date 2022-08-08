@@ -227,7 +227,7 @@ mod core {
             info!("Creating DysfunctionDetection checks");
             let node_dysfunction_detector = DysfunctionDetection::new(
                 network_knowledge
-                    .adults()
+                    .members()
                     .iter()
                     .map(|peer| peer.name())
                     .collect::<Vec<XorName>>(),
