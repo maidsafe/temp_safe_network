@@ -52,7 +52,7 @@ const DATA_BATCH_INTERVAL: Duration = Duration::from_millis(50);
 const DYSFUNCTION_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 // 30 adult nodes checked per minute., so each node should be queried 10x in 10 mins
 // Which should hopefully trigger dysfunction if we're not getting responses back
-const ADULT_HEALTH_CHECK_INTERVAL: Duration = Duration::from_millis(50);
+const ADULT_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(2);
 const ELDER_HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(10);
 // to prevent cpu racing
 const LOOP_SLEEP_INTERVAL: Duration = Duration::from_millis(10);
