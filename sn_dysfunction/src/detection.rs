@@ -13,6 +13,10 @@ use xor_name::XorName;
 
 use std::time::Duration;
 static RECENT_ISSUE_DURATION: Duration = Duration::from_secs(60 * 10); // 10 minutes
+
+#[cfg(test)]
+static OUTDATED_PENDING_REQUEST_DURATION: Duration = Duration::from_secs(0);
+#[cfg(not(test))]
 static OUTDATED_PENDING_REQUEST_DURATION: Duration = Duration::from_secs(10);
 
 static CONN_WEIGHTING: f32 = 2.0;
@@ -79,7 +83,7 @@ impl DysfunctionDetection {
         let mut dkg_scores = BTreeMap::new();
         let mut probe_scores = BTreeMap::new();
 
-        let nodes = self.get_all_tracked_nodes();
+        let nodes = &self.nodes;
         for node in nodes.iter() {
             let _ = dkg_scores.insert(
                 *node,
@@ -106,9 +110,6 @@ impl DysfunctionDetection {
             );
         }
 
-        debug!("communicationscoressssssssssssssssssssssssssssssss");
-        debug!("communicationscoressssssssssssssssssssssssssssssss");
-        debug!("communicationscoressss {:?}", communication_scores);
         ScoreResults {
             communication_scores,
             dkg_scores,
@@ -125,79 +126,82 @@ impl DysfunctionDetection {
     ) -> f32 {
         let node_issue_count = self.get_node_issue_count_for_type(node, issue_type);
 
+        // we can shortcircuit here
+        if node_issue_count == 0 {
+            return 0.0
+        }
+
         debug!("node {node} issue count: {:?}", node_issue_count);
-        let all_tracked_nodes = self.get_all_tracked_nodes();
+        let all_tracked_nodes = &self.nodes;
         let mut other_node_counts = Vec::new();
         for itr in all_tracked_nodes {
-            if itr == *node {
+            if itr == node {
                 continue;
             }
             other_node_counts.push(self.get_node_issue_count_for_type(&itr, issue_type) as f32);
         }
         let average = get_mean_of(&other_node_counts).unwrap_or(1.0);
 
-        // add one as we subtract the average
-        let diff_from_avg = node_issue_count.checked_sub(average as usize) ;
+        // let diff_from_avg = node_issue_count.checked_sub(average as usize) ;
 
-        debug!("!!!!!!!!!!!!!!!!! diff is {diff_from_avg:?}");
+        // debug!("!!!!!!!!!!!!!!!!! diff is {:?}", diff_from_avg);
 
         // if our score is 2... we subract 1, and have the same as everyone else still...
-        //
-        let score = node_issue_count.checked_sub(average as usize).unwrap_or(1) as f32;
-        if score < 1.0 {
-            1.0
-        } else {
-            score
-        }
+
+        let score = node_issue_count.checked_sub(average as usize).unwrap_or(0) as f32;
+
+        score
+        // if score < 1.0 {
+        //     1.0
+        // } else {
+        //     score
+        // }
     }
 
     fn get_node_issue_count_for_type(&self, node: &XorName, issue_type: &IssueType) -> usize {
         match issue_type {
             IssueType::Communication => {
-                let count = if let Some(issues) = self.communication_issues.get(node) {
+                if let Some(issues) = self.communication_issues.get(node) {
                     issues.len()
                 } else {
-                    1
-                };
-                count
+                    0
+                }
             }
             IssueType::Dkg => {
-                let count = if let Some(issues) = self.dkg_issues.get(node) {
-                    issues.len()
+                if let Some(issues) = self.dkg_issues.get(node) {
+                   issues.len()
                 } else {
-                    1
-                };
-                count
+                    0
+                }
             }
             IssueType::AwaitingProbeResponse => {
-                let count = if let Some(issues) = self.probe_issues.get(node) {
-                    issues.len()
+                if let Some(issues) = self.probe_issues.get(node) {
+                   issues.len()
                 } else {
-                    1
-                };
-                count
+                    0
+                }
             }
             IssueType::Knowledge => {
-                let count = if let Some(issues) = self.knowledge_issues.get(node) {
-                    issues.len()
+                if let Some(issues) = self.knowledge_issues.get(node) {
+                   issues.len()
                 } else {
-                    1
-                };
-                count
+                    0
+                }
             }
             IssueType::PendingRequestOperation(_) => {
-                let count = if let Some(issues) = self.unfulfilled_ops.get(node) {
+                if let Some(issues) = self.unfulfilled_ops.get(node) {
                     // To avoid the case that the check get carried out just after
                     // burst of messages get inserted, only those issues has sat a
                     // while will be considered as outdated.
-                    issues
+                    let count = issues
                         .iter()
                         .filter(|(_, time)| time.elapsed() > OUTDATED_PENDING_REQUEST_DURATION)
-                        .count()
+                        .count();
+
+                        count
                 } else {
-                    1
-                };
-                count
+                    0
+                }
             }
         }
     }
@@ -212,6 +216,7 @@ impl DysfunctionDetection {
     //     }
     // }
 
+
     pub(crate) fn get_all_tracked_nodes(&self) -> BTreeSet<XorName> {
         let mut nodes = BTreeSet::new();
 
@@ -223,8 +228,8 @@ impl DysfunctionDetection {
 
             nodes
 
-
     }
+
 
     /// get scores mapped by name, to score and z-score, which is std dev's from the mean
     fn get_weighted_scores(&self) -> BTreeMap<XorName, Option<f32>> {
@@ -556,7 +561,7 @@ mod tests {
         {
             Runtime::new().unwrap().block_on(async {
                 let nodes = (0..node_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
-                let mut dysfunctional_detection = DysfunctionDetection::new();
+                let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
                 for _ in 0..5 {
                     dysfunctional_detection.track_issue(
                         nodes[0], issue_type.clone());
@@ -585,8 +590,8 @@ mod tests {
         }
 
         #[test]
-        fn pt_calculate_scores_one_node_with_issues_should_have_higher_score_and_others_should_have_one(
-            node_count in 4..50usize, issue_count in 2..50, issue_type in generate_no_churn_normal_use_msg_issues())
+        fn pt_calculate_scores_one_node_with_issues_should_have_higher_score_and_others_should_have_zero(
+            node_count in 4..50usize, issue_count in 1..50, issue_type in generate_no_churn_normal_use_msg_issues())
         {
 
             init_test_logger();
@@ -595,21 +600,18 @@ mod tests {
             Runtime::new().unwrap().block_on(async {
 
                 let nodes = (0..node_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
-                let mut dysfunctional_detection = DysfunctionDetection::new();
-                let mut pending_operation_count = 0;
+                let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
 
                 // one node keeps getting the issues applied to it
                 for _ in 0..issue_count {
                     dysfunctional_detection.track_issue(
                         nodes[0], issue_type.clone());
-                    if let IssueType::PendingRequestOperation(_) = issue_type {
-                        pending_operation_count += 1;
-                    }
                 }
 
                 let score_results = dysfunctional_detection
                     .calculate_scores();
-                let scores = match issue_type {
+
+                    let scores = match issue_type {
                     IssueType::Dkg => {
                         score_results.dkg_scores
                     },
@@ -627,18 +629,11 @@ mod tests {
                     },
                 };
 
-                debug!(">>>>>>>>>>>>>>>>>>>>>>>>>>>");
-                debug!(">>scores: {:?}", scores);
-                let expected_score = if (issue_count - pending_operation_count) > 1 {
-                    issue_count - pending_operation_count - 1
-                } else {
-                    1
-                };
 
                 debug!("Actual node score: {:?}", scores.get(&nodes[0]).unwrap());
-                assert!(*scores.get(&nodes[0]).unwrap() > 1 as f32);
+                assert!(*scores.get(&nodes[0]).unwrap() > 0 as f32);
                 for node in nodes.iter().take(node_count).skip(1) {
-                    assert_eq!(*scores.get(node).unwrap(), 1.0);
+                    assert_eq!(*scores.get(node).unwrap(), 0.0);
                 }
             })
         }
@@ -684,7 +679,7 @@ mod tests {
                     // add dysf to our all_nodes
                     let all_node_names = nodes.clone().iter().map(|(name, _)| *name).collect::<Vec<XorName>>();
 
-                    let mut dysfunctional_detection = DysfunctionDetection::new();
+                    let mut dysfunctional_detection = DysfunctionDetection::new(all_node_names);
 
                     // Now we loop through each issue/msg
                     for (issue, issue_location, fail_test ) in issues {
@@ -833,12 +828,12 @@ mod tests {
         }
 
         #[test]
-        fn pt_calculate_scores_when_all_nodes_have_the_same_number_of_issues_scores_should_all_be_one(
+        fn pt_calculate_scores_when_all_nodes_have_the_same_number_of_issues_scores_should_all_be_zero(
             node_count in 4..50, issue_count in 0..50, issue_type in generate_no_churn_normal_use_msg_issues())
         {
             Runtime::new().unwrap().block_on(async {
                 let nodes = (0..node_count).map(|_| random_xorname()).collect::<Vec<XorName>>();
-                let mut dysfunctional_detection = DysfunctionDetection::new();
+                let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
                 for node in nodes.iter() {
                     for _ in 0..issue_count {
                         dysfunctional_detection.track_issue(
@@ -866,7 +861,7 @@ mod tests {
                     },
                 };
                 for node in nodes.iter() {
-                    assert_eq!(*scores.get(node).unwrap(), 1.0);
+                    assert_eq!(*scores.get(node).unwrap(), 0.0);
                 }
             })
         }
@@ -887,7 +882,7 @@ mod ops_tests {
     #[tokio::test]
     async fn op_dysfunction() -> Result<()> {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
-        let mut dysfunctional_detection = DysfunctionDetection::new();
+        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
         let mut pending_operations = Vec::new();
         for node in &nodes {
             for _ in 0..NORMAL_OPERATIONS_ISSUES {
@@ -967,7 +962,7 @@ mod comm_tests {
     async fn conn_dys_is_tolerant_of_norms() -> Result<()> {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
 
-        let mut dysfunctional_detection = DysfunctionDetection::new();
+        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
 
         for node in &nodes {
             for _ in 0..NORMAL_CONNECTION_PROBLEM_COUNT {
@@ -1012,7 +1007,7 @@ mod knowledge_tests {
     async fn knowledge_dys_is_tolerant_of_norms() -> Result<()> {
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
 
-        let mut dysfunctional_detection = DysfunctionDetection::new();
+        let mut dysfunctional_detection = DysfunctionDetection::new(nodes.clone());
 
         // Write data NORMAL_KNOWLEDGE_ISSUES times to the 10 nodes
         for node in &nodes {
@@ -1048,7 +1043,7 @@ mod knowledge_tests {
 
         let nodes = (0..10).map(|_| random_xorname()).collect::<Vec<XorName>>();
 
-        let mut dysfunctional_detection = DysfunctionDetection::new();
+        let mut dysfunctional_detection = DysfunctionDetection::new(nodes);
 
         // Add a new nodes
         let new_node = random_xorname();
