@@ -49,6 +49,20 @@ pub use dbs::UsedSpace;
 
 pub mod node;
 
+#[macro_export]
+/// Help macro to log a sleep with unique id, meanwhile retain the info of LOC.
+/// Pass in a Duration constructor as an argument.
+macro_rules! log_sleep {
+    ($duration_expr:expr) => {
+        let duration = $duration_expr;
+        let mut rng = rand::thread_rng();
+        let sleep_id = xor_name::XorName::random(&mut rng);
+        debug!("Sleep ID {sleep_id} going to sleep for {:?}", duration);
+        tokio::time::sleep(duration).await;
+        debug!("Sleep ID {sleep_id} completed");
+    };
+}
+
 #[cfg(test)]
 #[ctor::ctor]
 fn test_setup() {
