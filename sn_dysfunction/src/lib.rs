@@ -69,6 +69,8 @@ pub struct DysfunctionDetection {
     pub communication_issues: TimedTracker,
     /// The dkg issues logged against a node, along with a timestamp to expire after some time.
     pub dkg_issues: TimedTracker,
+    /// The probe issues logged against a node and as yet unfulfilled, along with a timestamp to expire after some time.
+    pub probe_issues: TimedTracker,
     /// The knowledge issues logged against a node, along with a timestamp.
     pub knowledge_issues: TimedTracker,
     /// The unfulfilled pending request operation issues logged against a node, along with an
@@ -83,6 +85,7 @@ impl DysfunctionDetection {
         Self {
             communication_issues: BTreeMap::new(),
             dkg_issues: BTreeMap::new(),
+            probe_issues: BTreeMap::new(),
             knowledge_issues: BTreeMap::new(),
             unfulfilled_ops: BTreeMap::new(),
             nodes,
@@ -93,10 +96,14 @@ impl DysfunctionDetection {
     ///
     /// The `op_id` only applies when adding an operational issue.
     pub fn track_issue(&mut self, node_id: NodeIdentifier, issue_type: IssueType) {
-        trace!("Adding a new issue to the dysfunction tracker: {issue_type:?}");
+        debug!("Adding a new issue to {node_id:?} the dysfunction tracker: {issue_type:?}");
         match issue_type {
             IssueType::Dkg => {
                 let queue = self.dkg_issues.entry(node_id).or_default();
+                queue.push_back(Instant::now());
+            }
+            IssueType::AwaitingProbeResponse => {
+                let queue = self.probe_issues.entry(node_id).or_default();
                 queue.push_back(Instant::now());
             }
             IssueType::Communication => {
@@ -170,6 +177,24 @@ impl DysfunctionDetection {
             }
         }
     }
+    /// Removes a probe tracker from the node liveness records. Returns true if a record was removed
+    pub fn ae_update_msg_received(&mut self, node_id: &NodeIdentifier) {
+        trace!(
+            "Attempting to remove pending AEProbe response for {:?}",
+            node_id,
+        );
+
+        if let Some(v) = self.probe_issues.get_mut(node_id) {
+            // only remove the first instance from the vec
+            let prev = v.pop_front();
+
+            if prev.is_some() {
+                trace!("Pending probe msg removed for node: {:?}", node_id,);
+            } else {
+                trace!("No Pending probe session found for node: {:?}", node_id);
+            }
+        }
+    }
 
     /// Gets the unfulfilled operation IDs for a given node.
     ///
@@ -185,8 +210,8 @@ impl DysfunctionDetection {
     }
 
     /// List all current tracked nodes
-    pub fn current_nodes(&self) -> Vec<XorName> {
-        self.nodes.to_vec()
+    pub fn current_nodes(&self) -> &Vec<XorName> {
+        &self.nodes
     }
 
     /// Add a new node to the tracker and recompute closest nodes.
@@ -199,16 +224,20 @@ impl DysfunctionDetection {
     ///
     /// Tracked issues related to nodes that were removed will also be removed.
     pub fn retain_members_only(&mut self, current_members: BTreeSet<XorName>) {
-        let nodes = &mut self.nodes;
+        let nodes = self.current_nodes();
         let nodes_being_removed = nodes
             .iter()
             .filter(|x| !current_members.contains(x))
             .copied()
             .collect::<Vec<XorName>>();
-        nodes.retain(|x| current_members.contains(x));
+
+        self.nodes.retain(|x| current_members.contains(x));
+
         for node in nodes_being_removed.iter() {
             let _ = self.communication_issues.remove(node);
             let _ = self.knowledge_issues.remove(node);
+            let _ = self.dkg_issues.remove(node);
+            let _ = self.probe_issues.remove(node);
             let _ = self.unfulfilled_ops.remove(node);
         }
     }
