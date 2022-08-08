@@ -440,7 +440,7 @@ mod core {
                 elder_candidates
             );
 
-            let res = if elder_candidates
+            if elder_candidates
                 .iter()
                 .map(NodeState::peer)
                 .eq(current_elders.iter())
@@ -478,9 +478,7 @@ mod core {
                 }
 
                 vec![session_id]
-            };
-
-            res
+            }
         }
 
         fn initialize_membership(&mut self, sap: SectionAuthorityProvider) -> Result<()> {

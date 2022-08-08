@@ -811,10 +811,7 @@ mod constructor {
     async fn given_config_file_exists_then_the_settings_should_be_read() -> Result<()> {
         // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let prefix_map = store_dummy_prefix_maps(&tmp_dir.to_path_buf(), 1)
-            .await?
-            .pop()
-            .unwrap();
+        let prefix_map = store_dummy_prefix_maps(&tmp_dir, 1).await?.pop().unwrap();
         let prefix_map_path = tmp_dir
             .path()
             .join(format!("{:?}", prefix_map.genesis_key()));
@@ -942,7 +939,7 @@ mod sync_prefix_maps_and_settings {
     async fn prefix_maps_should_be_fetched_from_cli_config_file() -> Result<()> {
         // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let prefix_maps = store_dummy_prefix_maps(&tmp_dir.to_path_buf(), 2).await?;
+        let prefix_maps = store_dummy_prefix_maps(&tmp_dir, 2).await?;
         let mut settings = Settings::default();
         settings.networks.insert(
             "network_1".to_string(),
@@ -998,10 +995,7 @@ mod sync_prefix_maps_and_settings {
     async fn genesis_key_field_should_be_set() -> Result<()> {
         // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let prefix_map = store_dummy_prefix_maps(&tmp_dir.to_path_buf(), 1)
-            .await?
-            .pop()
-            .unwrap();
+        let prefix_map = store_dummy_prefix_maps(&tmp_dir, 1).await?.pop().unwrap();
         let prefix_map_path = tmp_dir
             .path()
             .join(format!("{:?}", prefix_map.genesis_key()));
@@ -1040,7 +1034,7 @@ mod sync_prefix_maps_and_settings {
     async fn network_list_should_be_fetched_from_cli_config_file() -> Result<()> {
         // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let mut prefix_maps = store_dummy_prefix_maps(&tmp_dir.to_path_buf(), 2).await?;
+        let mut prefix_maps = store_dummy_prefix_maps(&tmp_dir, 2).await?;
         let prefix_map_path = tmp_dir
             .path()
             .join(format!("{:?}", prefix_maps.pop().unwrap().genesis_key()));
@@ -1078,10 +1072,7 @@ mod sync_prefix_maps_and_settings {
     async fn multiple_networks_with_the_same_prefix_map() -> Result<()> {
         // write cli/config.json file
         let tmp_dir = assert_fs::TempDir::new()?;
-        let prefix_map = store_dummy_prefix_maps(&tmp_dir.to_path_buf(), 1)
-            .await?
-            .pop()
-            .unwrap();
+        let prefix_map = store_dummy_prefix_maps(&tmp_dir, 1).await?.pop().unwrap();
         let prefix_map_path = tmp_dir
             .path()
             .join(format!("{:?}", prefix_map.genesis_key()));
@@ -1149,10 +1140,7 @@ mod networks {
     #[tokio::test]
     async fn local_and_remote_networks_should_be_added() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
-        let prefix_map = store_dummy_prefix_maps(&tmp_dir.to_path_buf(), 1)
-            .await?
-            .pop()
-            .unwrap();
+        let prefix_map = store_dummy_prefix_maps(&tmp_dir, 1).await?.pop().unwrap();
         let prefix_map_path = tmp_dir
             .path()
             .join(format!("{:?}", prefix_map.genesis_key()));
@@ -1196,10 +1184,7 @@ mod networks {
     #[tokio::test]
     async fn removing_network_should_give_the_desirable_output() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
-        let prefix_map = store_dummy_prefix_maps(&tmp_dir.to_path_buf(), 1)
-            .await?
-            .pop()
-            .unwrap();
+        let prefix_map = store_dummy_prefix_maps(&tmp_dir, 1).await?.pop().unwrap();
         let prefix_map_path = tmp_dir
             .path()
             .join(format!("{:?}", prefix_map.genesis_key()));
@@ -1223,7 +1208,7 @@ mod networks {
     #[tokio::test]
     async fn switching_network_should_change_the_default_prefix_map() -> Result<()> {
         let tmp_dir = assert_fs::TempDir::new()?;
-        let mut prefix_maps = store_dummy_prefix_maps(&tmp_dir.to_path_buf(), 2).await?;
+        let mut prefix_maps = store_dummy_prefix_maps(&tmp_dir, 2).await?;
         let mut config = Config::create_config(&tmp_dir, None).await?;
 
         let prefix_map_1 = prefix_maps.pop().unwrap();
