@@ -133,7 +133,9 @@ impl FlowCtrl {
             // happens regardless of if elder or adult
             if last_link_cleanup.elapsed() > LINK_CLEANUP_INTERVAL {
                 last_link_cleanup = now;
-                self.cmd_channel.send(Cmd::CleanupPeerLinks);
+                if let Err(error) = self.cmd_channel.send(Cmd::CleanupPeerLinks).await {
+
+                };
             }
 
             #[cfg(feature = "back-pressure")]
