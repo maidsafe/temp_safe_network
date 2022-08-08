@@ -286,6 +286,10 @@ mod core {
             NodeInfo { keypair, addr }
         }
 
+        pub(crate) fn name(&self) -> XorName {
+            self.info().name()
+        }
+
         ////////////////////////////////////////////////////////////////////////////
         // Miscellaneous
         ////////////////////////////////////////////////////////////////////////////
@@ -528,7 +532,7 @@ mod core {
         /// Updates various state if elders changed.
         pub(crate) async fn update_on_elder_change(
             &mut self,
-            old: StateSnapshot,
+            old: &StateSnapshot,
         ) -> Result<Vec<Cmd>> {
             let new = self.state_snapshot();
 
@@ -630,7 +634,7 @@ mod core {
                     info!("{}: {:?}", LogMarker::StillElderAfterSplit, new.prefix);
                 }
 
-                cmds.extend(self.send_updates_to_sibling_section(&old)?);
+                cmds.extend(self.send_updates_to_sibling_section(old)?);
                 self.liveness_retain_only(
                     self.network_knowledge
                         .adults()
@@ -738,6 +742,7 @@ mod core {
         }
     }
 
+    #[derive(Clone)]
     pub(crate) struct StateSnapshot {
         pub(crate) is_elder: bool,
         pub(crate) section_key: bls::PublicKey,

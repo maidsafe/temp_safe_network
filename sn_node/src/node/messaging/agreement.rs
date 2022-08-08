@@ -184,6 +184,6 @@ impl Node {
             self.network_knowledge.prefix_map()
         );
 
-        self.update_on_elder_change(snapshot).await
+        self.update_on_elder_change(&snapshot).await
     }
 }
