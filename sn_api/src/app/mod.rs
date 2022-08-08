@@ -34,7 +34,7 @@ pub mod test_helpers;
 
 use super::{common, constants, Error, Result};
 
-use sn_client::{Client, DEFAULT_OPERATION_TIMEOUT};
+use sn_client::Client;
 use sn_dbc::Owner;
 use sn_interface::types::Keypair;
 
@@ -88,23 +88,19 @@ impl Safe {
         debug!("Connecting to SAFE Network...");
         debug!("Client to be instantiated with specific pk?: {:?}", keypair);
 
-        let timeout = timeout.unwrap_or(DEFAULT_OPERATION_TIMEOUT);
+        let mut b = Client::builder()
+            .from_env() // Load parameters from environment variables.
+            .keypair(keypair)
+            .dbc_owner(dbc_owner);
 
-        self.client = Some(
-            Client::builder()
-                .keypair(keypair)
-                .dbc_owner(dbc_owner)
-                .query_timeout(timeout)
-                .cmd_timeout(timeout)
-                .build()
-                .await
-                .map_err(|err| {
-                    Error::ConnectionError(format!(
-                        "Failed to connect to the SAFE Network: {:?}",
-                        err
-                    ))
-                })?,
-        );
+        // Override timeout
+        if let Some(timeout) = timeout {
+            b = b.query_timeout(timeout).cmd_timeout(timeout);
+        }
+
+        self.client = Some(b.build().await.map_err(|err| {
+            Error::ConnectionError(format!("Failed to connect to the SAFE Network: {:?}", err))
+        })?);
 
         debug!("Successfully connected to the Network!!!");
 

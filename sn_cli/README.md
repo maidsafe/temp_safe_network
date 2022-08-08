@@ -169,7 +169,7 @@ export RUST_LOG=safe=debug,sn_api=debug,sn_client=debug
 
 Logging is available from 3 sources: `safe`, `sn_api` and `sn_cli`. Possible values for levels are `info`, `debug` and `trace`, each of those increasing in detail. You can try varying these to get the level you want.
 
-If you experience the CLI taking a long time to respond, you can try decreasing its timeout duration. This is controlled using the `SN_CLI_QUERY_TIMEOUT` environment variable. The units of this variable is in seconds. So for example, you may try `export SN_CLI_QUERY_TIMEOUT=30`.
+If you experience the CLI taking a long time to respond, you can try decreasing its timeout duration. This is controlled using the `SN_QUERY_TIMEOUT` environment variable. The units of this variable is in seconds. So for example, you may try `export SN_QUERY_TIMEOUT=30`.
 
 ## Networks
 

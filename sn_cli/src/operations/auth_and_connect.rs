@@ -14,7 +14,6 @@ use std::{
     fs::{create_dir_all, File},
     io::Write,
     path::{Path, PathBuf},
-    time::Duration,
 };
 use tracing::{debug, info, warn};
 
@@ -56,7 +55,7 @@ pub async fn authorise_cli(
 
 // Attempt to connect with credentials if found and valid,
 // otherwise it creates a read only connection.
-pub async fn connect(safe: &mut Safe, config: &Config, timeout: Duration) -> Result<()> {
+pub async fn connect(safe: &mut Safe, config: &Config) -> Result<()> {
     debug!("Connecting...");
 
     let app_keypair = if let Ok((_, keypair)) = read_credentials(config) {
@@ -71,13 +70,13 @@ pub async fn connect(safe: &mut Safe, config: &Config, timeout: Duration) -> Res
     }
 
     match safe
-        .connect(app_keypair.clone(), Some(timeout), config.dbc_owner.clone())
+        .connect(app_keypair.clone(), None, config.dbc_owner.clone())
         .await
     {
         Ok(()) => Ok(()),
         Err(_) if found_app_keypair => {
             warn!("Credentials found for CLI are invalid, connecting with read-only access...");
-            safe.connect(None, Some(timeout), config.dbc_owner.clone())
+            safe.connect(None, None, config.dbc_owner.clone())
                 .await
                 .wrap_err("Failed to connect with read-only access")
         }
