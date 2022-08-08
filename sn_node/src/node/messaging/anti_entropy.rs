@@ -18,7 +18,7 @@ use sn_interface::messaging::system::AntiEntropyKind;
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
-        system::{KeyedSig, NodeCmd, SectionAuth, SectionPeers, SystemMsg},
+        system::{KeyedSig, NodeCmd, SectionAuth, SystemMsg},
         MsgType, WireMsg,
     },
     network_knowledge::SectionAuthorityProvider,
@@ -156,51 +156,6 @@ impl Node {
         sender: Peer,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
-        match kind {
-            AntiEntropyKind::Update { members } => {
-                self.handle_anti_entropy_update_msg(
-                    section_auth,
-                    section_signed,
-                    proof_chain,
-                    members,
-                )
-                .await
-            }
-            AntiEntropyKind::Retry { bounced_msg } => {
-                self.handle_anti_entropy_retry_msg(
-                    section_auth,
-                    section_signed,
-                    proof_chain,
-                    bounced_msg,
-                    sender,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
-                )
-                .await
-            }
-            AntiEntropyKind::Redirect { bounced_msg } => {
-                self.handle_anti_entropy_redirect_msg(
-                    section_auth,
-                    section_signed,
-                    proof_chain,
-                    bounced_msg,
-                    sender,
-                    #[cfg(feature = "traceroute")]
-                    traceroute,
-                )
-                .await
-            }
-        }
-    }
-
-    #[instrument(skip_all)]
-    pub(crate) async fn handle_anti_entropy_update_msg(
-        &mut self,
-        section_auth: SectionAuthorityProvider,
-        section_signed: KeyedSig,
-        proof_chain: SecuredLinkedList,
-        members: SectionPeers,
-    ) -> Result<Vec<Cmd>> {
         let snapshot = self.state_snapshot();
 
         let our_name = self.info().name();
@@ -209,16 +164,22 @@ impl Node {
             sig: section_signed.clone(),
         };
 
+        let members = if let AntiEntropyKind::Update { members } = kind.clone() {
+            Some(members)
+        } else {
+            None
+        };
+
         let updated = self.network_knowledge.update_knowledge_if_valid(
             signed_sap.clone(),
             &proof_chain,
-            Some(members),
+            members,
             &our_name,
             &self.section_keys_provider,
         )?;
 
         // always run this, only changes will trigger events
-        let mut cmds = self.update_on_elder_change(snapshot).await?;
+        let mut cmds = self.update_on_elder_change(&snapshot).await?;
 
         // Only trigger reorganize data when there is a membership change happens.
         if updated && self.is_not_elder() {
@@ -227,37 +188,50 @@ impl Node {
             cmds.push(self.ask_for_any_new_data());
         }
 
+        match kind {
+            AntiEntropyKind::Update { .. } => (),
+            AntiEntropyKind::Retry { bounced_msg } => {
+                cmds.extend(
+                    self.handle_anti_entropy_retry_msg(
+                        updated,
+                        snapshot,
+                        section_auth,
+                        bounced_msg,
+                        sender,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
+                    .await?,
+                );
+            }
+            AntiEntropyKind::Redirect { bounced_msg } => {
+                cmds.extend(
+                    self.handle_anti_entropy_redirect_msg(
+                        updated,
+                        snapshot,
+                        section_auth,
+                        bounced_msg,
+                        sender,
+                        #[cfg(feature = "traceroute")]
+                        traceroute,
+                    )
+                    .await?,
+                );
+            }
+        }
         Ok(cmds)
     }
 
     pub(crate) async fn handle_anti_entropy_retry_msg(
         &mut self,
+        there_was_an_update: bool,
+        snapshot: StateSnapshot,
         section_auth: SectionAuthorityProvider,
-        section_signed: KeyedSig,
-        proof_chain: SecuredLinkedList,
         bounced_msg: Bytes,
         sender: Peer,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
-        let snapshot = self.state_snapshot();
-
         info!("Anti-Entropy: message received from peer: {sender}");
-
-        let signed_sap = SectionAuth {
-            value: section_auth.clone(),
-            sig: section_signed.clone(),
-        };
-        let our_name = self.info().name();
-
-        // Update our network knowledge
-        let there_was_an_update = self.network_knowledge.update_knowledge_if_valid(
-            signed_sap.clone(),
-            &proof_chain,
-            None,
-            &our_name,
-            &self.section_keys_provider,
-        )?;
-
         if there_was_an_update {
             let prefix = section_auth.prefix();
 
@@ -272,13 +246,13 @@ impl Node {
             let is_in_current_section = section_auth
                 .members()
                 .any(|node_state| node_state.peer() == &self.info().peer());
-            let prefix_matches_our_name = prefix.matches(&our_name);
+            let prefix_matches_our_name = prefix.matches(&self.name());
             let equal_prefix = section_auth.prefix() == snapshot.prefix;
             let is_extension_prefix = section_auth.prefix().is_extension_of(&snapshot.prefix);
             let was_in_ancestor_section = equal_prefix || is_extension_prefix;
 
             if was_in_ancestor_section && prefix_matches_our_name && !is_in_current_section {
-                error!("Detected churn join miss while processing AE, was in section {:?}, updated to {:?}, wasn't in members anymore even if name matches: {:?}", snapshot.prefix, prefix, our_name);
+                error!("Detected churn join miss while processing AE, was in section {:?}, updated to {:?}, wasn't in members anymore even if name matches: {:?}", snapshot.prefix, prefix, self.name());
                 self.send_event(Event::Membership(MembershipEvent::ChurnJoinMissError))
                     .await;
                 return Err(Error::ChurnJoinMiss);
@@ -303,7 +277,7 @@ impl Node {
         }
 
         let mut cmds = Vec::new();
-        if let Ok(elder_cmds) = self.update_on_elder_change(snapshot).await {
+        if let Ok(elder_cmds) = self.update_on_elder_change(&snapshot).await {
             cmds.extend(elder_cmds);
         }
 
@@ -330,30 +304,14 @@ impl Node {
 
     pub(crate) async fn handle_anti_entropy_redirect_msg(
         &mut self,
+        there_was_an_update: bool,
+        snapshot: StateSnapshot,
         section_auth: SectionAuthorityProvider,
-        section_signed: KeyedSig,
-        section_chain: SecuredLinkedList,
         bounced_msg: Bytes,
         sender: Peer,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
-        let snapshot = self.state_snapshot();
         info!("Anti-Entropy: message received from peer: {sender}");
-
-        let signed_sap = SectionAuth {
-            value: section_auth.clone(),
-            sig: section_signed.clone(),
-        };
-        let our_name = self.info().name();
-
-        // Update our network knowledge
-        let there_was_an_update = self.network_knowledge.update_knowledge_if_valid(
-            signed_sap.clone(),
-            &section_chain,
-            None,
-            &our_name,
-            &self.section_keys_provider,
-        )?;
 
         if there_was_an_update {
             self.write_prefix_map().await;
@@ -366,13 +324,13 @@ impl Node {
             let is_in_current_section = section_auth
                 .members()
                 .any(|node_state| node_state.peer() == &self.info().peer());
-            let prefix_matches_our_name = section_auth.prefix().matches(&our_name);
+            let prefix_matches_our_name = section_auth.prefix().matches(&self.name());
             let equal_prefix = section_auth.prefix() == snapshot.prefix;
             let is_extension_prefix = section_auth.prefix().is_extension_of(&snapshot.prefix);
             let was_in_ancestor_section = equal_prefix || is_extension_prefix;
 
             if was_in_ancestor_section && prefix_matches_our_name && !is_in_current_section {
-                error!("Detected churn join miss while processing AE, was in section {:?}, updated to {:?}, wasn't in members anymore even if name matches: {:?}", snapshot.prefix, section_auth.prefix(), our_name);
+                error!("Detected churn join miss while processing AE, was in section {:?}, updated to {:?}, wasn't in members anymore even if name matches: {:?}", snapshot.prefix, section_auth.prefix(), self.name());
                 self.send_event(Event::Membership(MembershipEvent::ChurnJoinMissError))
                     .await;
                 return Err(Error::ChurnJoinMiss);

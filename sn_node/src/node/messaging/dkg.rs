@@ -304,7 +304,7 @@ impl Node {
             .network_knowledge
             .try_update_current_sap(key_share_pk, &sap.prefix())
         {
-            self.update_on_elder_change(snapshot).await
+            self.update_on_elder_change(&snapshot).await
         } else {
             // This proposal is sent to the current set of elders to be aggregated
             // and section signed.
