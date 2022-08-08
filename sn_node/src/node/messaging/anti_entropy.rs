@@ -19,7 +19,7 @@ use sn_interface::messaging::Traceroute;
 use sn_interface::{
     messaging::{
         system::{KeyedSig, NodeCmd, SectionAuth, SectionPeers, SystemMsg},
-        MsgId, MsgType, WireMsg,
+        MsgType, WireMsg,
     },
     network_knowledge::SectionAuthorityProvider,
     types::{log_markers::LogMarker, Peer, PublicKey},
@@ -241,26 +241,30 @@ impl Node {
     ) -> Result<Vec<Cmd>> {
         let snapshot = self.state_snapshot();
 
-        let to_resend = self
-            .update_network_knowledge(
-                section_auth,
-                section_signed,
-                proof_chain,
-                bounced_msg,
-                sender,
-            )
+        self.update_network_knowledge(section_auth.clone(), section_signed, proof_chain, sender)
             .await?;
+
+        let (msg_to_resend, msg_id, dst) = match WireMsg::deserialize(bounced_msg)? {
+            MsgType::System {
+                msg, msg_id, dst, ..
+            } => (msg, msg_id, dst),
+            _ => {
+                warn!("Non System MsgType received in AE response. We do not handle any other type in AE msgs yet.");
+                return Ok(vec![]);
+            }
+        };
+
+        // If the new SAP's section key is the same as the section key set when the
+        // bounced message was originally sent, we just drop it.
+        if dst.section_key == section_auth.section_key() {
+            error!("Dropping bounced msg ({:?}) received in AE-Retry from {msg_id:?} as suggested new dst section key is the same as previously sent: {:?}", sender,section_auth.section_key());
+            return Ok(vec![]);
+        }
 
         let mut cmds = Vec::new();
         if let Ok(elder_cmds) = self.update_on_elder_change(snapshot).await {
             cmds.extend(elder_cmds);
         }
-
-        let (msg_to_resend, msg_id) = if let Some((msg, id)) = to_resend {
-            (msg, id)
-        } else {
-            return Ok(vec![]);
-        };
 
         self.create_or_wait_for_backoff(&sender).await;
 
@@ -292,27 +296,31 @@ impl Node {
         sender: Peer,
         #[cfg(feature = "traceroute")] traceroute: Traceroute,
     ) -> Result<Vec<Cmd>> {
+        self.update_network_knowledge(section_auth.clone(), section_signed, section_chain, sender)
+            .await?;
+
+        let (msg_to_redirect, msg_id, dst) = match WireMsg::deserialize(bounced_msg)? {
+            MsgType::System {
+                msg, msg_id, dst, ..
+            } => (msg, msg_id, dst),
+            _ => {
+                warn!("Non System MsgType received in AE response. We do not handle any other type in AE msgs yet.");
+                return Ok(vec![]);
+            }
+        };
+
+        // If the new SAP's section key is the same as the section key set when the
+        // bounced message was originally sent, we just drop it.
+        if dst.section_key == section_auth.section_key() {
+            error!("Dropping bounced msg ({:?}) received in AE-Retry from {} as suggested new dst section key is the same as previously sent: {:?}", msg_id, sender,section_auth.section_key());
+            return Ok(vec![]);
+        }
+
         let dst_section_key = section_auth.section_key();
 
         // We choose the Elder closest to the dst section key,
         // just to pick one of them in an arbitrary but deterministic fashion.
         let target_name = XorName::from(PublicKey::Bls(dst_section_key));
-
-        let to_resend = self
-            .update_network_knowledge(
-                section_auth.clone(),
-                section_signed,
-                section_chain,
-                bounced_msg,
-                sender,
-            )
-            .await?;
-
-        let (msg_to_redirect, msg_id) = if let Some((msg, id)) = to_resend {
-            (msg, id)
-        } else {
-            return Ok(vec![]);
-        };
 
         let chosen_dst_elder = if let Some(dst) = section_auth
             .elders()
@@ -352,32 +360,17 @@ impl Node {
         section_auth: SectionAuthorityProvider,
         section_signed: KeyedSig,
         proof_chain: SecuredLinkedList,
-        bounced_msg: Bytes,
         sender: Peer,
-    ) -> Result<Option<(SystemMsg, MsgId)>> {
-        let (bounced_msg, msg_id, dst) = match WireMsg::deserialize(bounced_msg)? {
-            MsgType::System {
-                msg, msg_id, dst, ..
-            } => (msg, msg_id, dst),
-            _ => {
-                warn!("Non System MsgType received in AE response. We do not handle any other type in AE msgs yet.");
-                return Ok(None);
-            }
-        };
-
+    ) -> Result<()> {
         info!("Anti-Entropy: message received from peer: {sender}");
 
         let prefix = section_auth.prefix();
-        let dst_section_key = section_auth.section_key();
         let signed_sap = SectionAuth {
             value: section_auth.clone(),
             sig: section_signed.clone(),
         };
         let our_name = self.info().name();
         let our_section_prefix = self.network_knowledge.prefix();
-        let equal_prefix = section_auth.prefix() == our_section_prefix;
-        let is_extension_prefix = section_auth.prefix().is_extension_of(&our_section_prefix);
-        let our_peer_info = self.info().peer();
 
         // Update our network knowledge
         let there_was_an_update = self.network_knowledge.update_knowledge_if_valid(
@@ -398,26 +391,21 @@ impl Node {
             // check for churn join miss
             let is_in_current_section = section_auth
                 .members()
-                .any(|node_state| node_state.peer() == &our_peer_info);
+                .any(|node_state| node_state.peer() == &self.info().peer());
             let prefix_matches_our_name = prefix.matches(&our_name);
+            let equal_prefix = section_auth.prefix() == our_section_prefix;
+            let is_extension_prefix = section_auth.prefix().is_extension_of(&our_section_prefix);
             let was_in_ancestor_section = equal_prefix || is_extension_prefix;
 
             if was_in_ancestor_section && prefix_matches_our_name && !is_in_current_section {
-                error!("Detected churn join miss while processing msg ({:?}), was in section {:?}, updated to {:?}, wasn't in members anymore even if name matches: {:?}", msg_id, our_section_prefix, prefix, our_name);
+                error!("Detected churn join miss while processing AE, was in section {:?}, updated to {:?}, wasn't in members anymore even if name matches: {:?}", our_section_prefix, prefix, our_name);
                 self.send_event(Event::Membership(MembershipEvent::ChurnJoinMissError))
                     .await;
                 return Err(Error::ChurnJoinMiss);
             }
         }
 
-        // If the new SAP's section key is the same as the section key set when the
-        // bounced message was originally sent, we just drop it.
-        if dst.section_key == dst_section_key {
-            error!("Dropping bounced msg ({:?}) received in AE-Retry from {} as suggested new dst section key is the same as previously sent: {:?}", msg_id, sender,dst_section_key);
-            Ok(None)
-        } else {
-            Ok(Some((bounced_msg, msg_id)))
-        }
+        Ok(())
     }
 
     /// Checks AE-BackoffCache for backoff, or creates a new instance
