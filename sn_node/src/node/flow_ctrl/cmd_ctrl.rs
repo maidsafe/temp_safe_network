@@ -26,7 +26,7 @@ use std::{
     },
     time::Duration,
 };
-use tokio::{sync::RwLock, time::Instant};
+use tokio::{sync::{mpsc, RwLock}, time::Instant};
 
 type Priority = i32;
 
@@ -54,6 +54,7 @@ pub(crate) struct CmdCtrl {
     pub(crate) dispatcher: Arc<Dispatcher>,
     id_counter: Arc<AtomicUsize>,
     event_sender: EventSender,
+    cmd_channel: mpsc::Sender<Cmd>,
 }
 
 impl CmdCtrl {
@@ -62,6 +63,10 @@ impl CmdCtrl {
         monitoring: RateLimits,
         event_sender: EventSender,
     ) -> Self {
+
+        let (cmd_channel, incoming_cmds_channel) = mpsc::channel(1);
+
+
         let session = Self {
             cmd_queue: Arc::new(RwLock::new(PriorityQueue::new())),
             attempted: CmdThroughput::default(),
@@ -70,12 +75,20 @@ impl CmdCtrl {
             dispatcher: Arc::new(dispatcher),
             id_counter: Arc::new(AtomicUsize::new(0)),
             event_sender,
+            cmd_channel
         };
 
         let session_clone = session.clone();
+        let session_clone2 = session.clone();
         let _ = tokio::task::spawn_local(async move { session_clone.keep_processing().await });
+        let _ = tokio::task::spawn_local(async move { session_clone2.queue_sent_cmds(incoming_cmds_channel).await });
 
         session
+    }
+
+    /// Get the cmd_channel to send cmds to the queue
+    pub(crate) fn cmd_channel(&self) -> mpsc::Sender<Cmd> {
+        self.cmd_channel.clone()
     }
 
     pub(crate) fn node(&self) -> Arc<RwLock<crate::node::Node>> {
@@ -136,6 +149,18 @@ impl CmdCtrl {
 
     async fn notify(&self, event: Event) {
         self.event_sender.send(event).await
+    }
+
+    async fn queue_sent_cmds(&self, mut incoming: mpsc::Receiver<Cmd>) {
+        while let Some(cmd) =  incoming.recv().await {
+            if self.stopped().await {
+                break;
+            }
+
+            if let Err(error) = self.push(cmd).await {
+                error!("error qneueuing sent cmd {error:?}");
+            }
+        }
     }
 
     async fn keep_processing(&self) {

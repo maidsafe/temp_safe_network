@@ -63,7 +63,6 @@ pub(crate) struct FlowCtrl {
     node: Arc<RwLock<Node>>,
     cmd_ctrl: CmdCtrl,
     incoming_msg_events: mpsc::Receiver<MsgEvent>,
-    incoming_cmds_from_apis: mpsc::Receiver<Cmd>,
     cmd_channel: mpsc::Sender<Cmd>,
 }
 
@@ -73,14 +72,13 @@ impl FlowCtrl {
         incoming_msg_events: mpsc::Receiver<MsgEvent>,
     ) -> (Self, mpsc::Sender<Cmd>) {
         let node = cmd_ctrl.node();
-        let (cmd_channel, incoming_cmds_from_apis) = mpsc::channel(1);
+        let cmd_channel = cmd_ctrl.cmd_channel();
 
         (
             Self {
                 cmd_ctrl,
                 node,
                 incoming_msg_events,
-                incoming_cmds_from_apis,
                 cmd_channel: cmd_channel.clone(),
             },
             cmd_channel,
@@ -112,18 +110,6 @@ impl FlowCtrl {
 
                 (node.info(), node.is_elder())
             };
-
-            // Finally, handle any incoming conn messages
-            // this requires mut self
-            match self.incoming_cmds_from_apis.try_recv() {
-                Ok(cmd) => cmds.push(cmd),
-                Err(TryRecvError::Empty) => {
-                    // do nothing
-                }
-                Err(TryRecvError::Disconnected) => {
-                    trace!("Senders to `incoming_cmds_from_apis` have disconnected.");
-                }
-            }
 
             // Handle any incoming conn messages
             // this requires mut self
