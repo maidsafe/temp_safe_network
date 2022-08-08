@@ -20,6 +20,7 @@ use crate::node::{
 };
 
 use sn_consensus::Decision;
+use sn_interface::messaging::system::AntiEntropyKind;
 #[cfg(feature = "traceroute")]
 use sn_interface::messaging::Traceroute;
 use sn_interface::{
@@ -839,11 +840,13 @@ async fn ae_msg_from_the_future_is_handled() -> Result<()> {
                     name: XorName::from(PublicKey::Bls(pk1)),
                     section_key: pk1,
                 },
-                SystemMsg::AntiEntropyUpdate {
+                SystemMsg::AntiEntropy {
                     section_auth: new_sap.to_msg(),
-                    members: BTreeSet::default(),
                     section_signed: signed_new_sap.sig,
                     proof_chain: chain,
+                    kind: AntiEntropyKind::Update {
+                        members: BTreeSet::default(),
+                    },
                 },
                 src_section_pk,
             )?;
@@ -909,11 +912,13 @@ async fn untrusted_ae_msg_errors() -> Result<()> {
 
             // a valid AE msg but with a non-verifiable SAP...
             let bogus_section_pk = bls::SecretKey::random().public_key();
-            let node_msg = SystemMsg::AntiEntropyUpdate {
+            let node_msg = SystemMsg::AntiEntropy {
                 section_auth: section_signed_our_section_auth.value.clone().to_msg(),
                 section_signed: section_signed_our_section_auth.sig,
                 proof_chain: SecuredLinkedList::new(bogus_section_pk),
-                members: BTreeSet::default(),
+                kind: AntiEntropyKind::Update {
+                    members: BTreeSet::default(),
+                },
             };
 
             let (event_sender, _) = event_channel::new(TEST_EVENT_CHANNEL_SIZE);
@@ -1234,7 +1239,7 @@ async fn handle_elders_update() -> Result<()> {
             };
 
             let proof_chain = match msg {
-                SystemMsg::AntiEntropyUpdate { proof_chain, .. } => proof_chain,
+                SystemMsg::AntiEntropy { proof_chain, kind: AntiEntropyKind::Update { .. }, .. } => proof_chain,
                 _ => continue,
             };
 
@@ -1417,7 +1422,13 @@ async fn handle_demote_during_split() -> Result<()> {
                     _ => continue,
                 };
 
-                if matches!(msg, SystemMsg::AntiEntropyUpdate { .. }) {
+                if matches!(
+                    msg,
+                    SystemMsg::AntiEntropy {
+                        kind: AntiEntropyKind::Update { .. },
+                        ..
+                    }
+                ) {
                     for recipient in recipients {
                         let _old = update_recipients.insert(recipient.name(), recipient.addr());
                     }

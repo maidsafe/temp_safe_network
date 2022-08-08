@@ -20,8 +20,8 @@ use sn_interface::{
     at_least_one_correct_elder,
     messaging::{
         data::{CmdError, ServiceMsg},
-        system::{KeyedSig, SectionAuth, SystemMsg},
-        AuthKind, AuthorityProof, Dst, MsgId, MsgType, ServiceAuth, WireMsg,
+        system::{AntiEntropyKind, KeyedSig, SectionAuth, SystemMsg},
+        AuthKind, AuthorityProof, Dst, MsgId, MsgType, NodeMsgAuthority, ServiceAuth, WireMsg,
     },
     network_knowledge::{
         utils::write_prefix_map_to_disk, NetworkKnowledge, SectionAuthorityProvider,
@@ -134,88 +134,56 @@ impl Session {
                 Self::handle_client_msg(session, msg_id, msg, src_peer)
             }
             MsgType::System {
-                msg:
-                    SystemMsg::AntiEntropyRedirect {
-                        section_auth,
-                        section_signed,
-                        section_chain,
-                        bounced_msg,
-                    },
-                msg_authority,
-                ..
+                msg, msg_authority, ..
             } => {
-                let sys_msg = SystemMsg::AntiEntropyRedirect {
-                    section_auth: section_auth.clone(),
-                    section_signed: section_signed.clone(),
-                    section_chain: section_chain.clone(),
-                    bounced_msg: bounced_msg.clone(),
-                };
-                // check that the message can be trusted based upon our network knowledge
-
-                // Let's now verify the section key in the msg authority is trusted
-                // based on our current knowledge of the network and sections chains.
-                let known_keys: Vec<BlsPublicKey> = session
-                    .network
-                    .read()
+                session
+                    .handle_system_msg(msg, msg_authority, src_peer)
                     .await
-                    .get_sections_dag()
-                    .keys()
-                    .cloned()
-                    .collect();
-
-                if !NetworkKnowledge::verify_node_msg_can_be_trusted(
-                    msg_authority.clone(),
-                    sys_msg,
-                    &known_keys,
-                ) {
-                    warn!(
-                        "Untrusted message has been dropped, from {:?}: {:?} ",
-                        src_peer, msg
-                    );
-                    return Err(Error::UntrustedMessage);
-                }
-
-                // Okay, we can carry on
-                debug!("AE-Redirect msg received");
-                let result = Self::handle_ae_msg(
-                    session,
-                    section_auth.into_state(),
-                    section_signed,
-                    section_chain,
-                    bounced_msg,
-                    src_peer,
-                )
-                .await;
-                if result.is_err() {
-                    error!(
-                        "Failed to handle AE-Redirect msg from {:?}, {result:?}",
-                        src_peer.addr()
-                    );
-                }
-                result
             }
-            MsgType::System {
-                msg:
-                    SystemMsg::AntiEntropyRetry {
-                        section_auth,
-                        section_signed,
-                        bounced_msg,
-                        proof_chain,
-                    },
-                ..
+        }
+    }
+
+    async fn handle_system_msg(
+        self,
+        msg: SystemMsg,
+        msg_authority: NodeMsgAuthority,
+        sender: Peer,
+    ) -> Result<(), Error> {
+        // Check that the message can be trusted w.r.t. our known keys
+        let known_keys: Vec<BlsPublicKey> = self
+            .network
+            .read()
+            .await
+            .get_sections_dag()
+            .keys()
+            .cloned()
+            .collect();
+
+        if !NetworkKnowledge::verify_node_msg_can_be_trusted(msg_authority, &msg, &known_keys) {
+            warn!("Untrusted message has been dropped, from {sender:?}: {msg:?} ");
+            return Err(Error::UntrustedMessage);
+        }
+
+        match msg {
+            SystemMsg::AntiEntropy {
+                section_auth,
+                section_signed,
+                proof_chain,
+                kind:
+                    AntiEntropyKind::Redirect { bounced_msg } | AntiEntropyKind::Retry { bounced_msg },
             } => {
-                debug!("AE-Retry msg received");
+                debug!("AE-Redirect/Retry msg received");
                 let result = Self::handle_ae_msg(
-                    session,
+                    self,
                     section_auth.into_state(),
                     section_signed,
                     proof_chain,
                     bounced_msg,
-                    src_peer,
+                    sender,
                 )
                 .await;
                 if result.is_err() {
-                    error!("Failed to handle AE-Retry msg from {:?}", src_peer.addr());
+                    error!("Failed to handle AE msg from {sender:?}, {result:?}");
                 }
                 result
             }

@@ -40,42 +40,25 @@ use xor_name::XorName;
 /// List of peers of a section
 pub type SectionPeers = BTreeSet<SectionAuth<NodeState>>;
 
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
+pub enum AntiEntropyKind {
+    /// This AE message is sent to a peer when a message with outdated section
+    /// information was received, attaching the bounced message so
+    /// the peer can resend it with up to date destination information.
+    Retry { bounced_msg: Bytes },
+    /// This AE message is sent to a peer when a message needs to be sent to a
+    /// different and/or closest section, attaching the bounced message so the peer
+    /// can resend it to the correct section with up to date destination information.
+    Redirect { bounced_msg: Bytes },
+    /// This AE message is sent to update a peer when we notice they are behind
+    Update { members: SectionPeers },
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize, custom_debug::Debug)]
 #[allow(clippy::large_enum_variant)]
 /// Message sent over the among nodes
 pub enum SystemMsg {
-    /// Message sent to a peer when a message with outdated section
-    /// information was received, attaching the bounced message so
-    /// the peer can resend it with up to date destination information.
-    AntiEntropyRetry {
-        /// Current `SectionAuthorityProvider` of the sender's section.
-        section_auth: SectionAuthorityProvider,
-        /// Sender's section signature over the `SectionAuthorityProvider`.
-        section_signed: KeyedSig,
-        /// Sender's section chain truncated from the dst section key found in the `bounced_msg`.
-        proof_chain: SecuredLinkedList,
-        /// Message bounced due to outdated destination section information.
-        #[debug(skip)]
-        bounced_msg: Bytes,
-    },
-    /// Message sent to a peer when a message needs to be sent to a different
-    /// and/or closest section, attaching the bounced message so the peer can
-    /// resend it to the correct section with up to date destination information.
-    AntiEntropyRedirect {
-        /// Current `SectionAuthorityProvider` of a closest section.
-        section_auth: SectionAuthorityProvider,
-        /// Section signature over the `SectionAuthorityProvider` of the closest
-        /// section the bounced message shall be resent to.
-        section_signed: KeyedSig,
-        /// Section chain (from genesis key) for the closest section.
-        section_chain: SecuredLinkedList,
-        /// Message bounced that shall be resent by the peer.
-        #[debug(skip)]
-        bounced_msg: Bytes,
-    },
-    /// Message to update a section when they bounced a message as untrusted back at us.
-    /// That section must be behind our current knowledge.
-    AntiEntropyUpdate {
+    AntiEntropy {
         /// Current `SectionAuthorityProvider` of our section.
         section_auth: SectionAuthorityProvider,
         /// Section signature over the `SectionAuthorityProvider` of our
@@ -83,8 +66,8 @@ pub enum SystemMsg {
         section_signed: KeyedSig,
         /// Our section chain truncated from the triggering msg's dst section_key (or genesis key for full proof)
         proof_chain: SecuredLinkedList,
-        /// Section members
-        members: SectionPeers,
+        /// The kind of anti-entropy response.
+        kind: AntiEntropyKind,
     },
     /// Probes the network by sending a message to a random or chosen dst triggering an AE flow.
     AntiEntropyProbe,
@@ -227,10 +210,7 @@ impl SystemMsg {
             | SystemMsg::DkgFailureAgreement(_) => DKG_MSG_PRIORITY,
 
             // Inter-node comms for AE updates
-            SystemMsg::AntiEntropyRetry { .. }
-            | SystemMsg::AntiEntropyRedirect { .. }
-            | SystemMsg::AntiEntropyUpdate { .. }
-            | SystemMsg::AntiEntropyProbe => ANTIENTROPY_MSG_PRIORITY,
+            SystemMsg::AntiEntropy { .. } | SystemMsg::AntiEntropyProbe => ANTIENTROPY_MSG_PRIORITY,
 
             // Join responses
             SystemMsg::JoinResponse(_) | SystemMsg::JoinAsRelocatedResponse(_) => {
@@ -267,9 +247,7 @@ impl SystemMsg {
 impl Display for SystemMsg {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            SystemMsg::AntiEntropyRetry { .. } => write!(f, "SystemMsg::AntiEntropyRetry"),
-            SystemMsg::AntiEntropyRedirect { .. } => write!(f, "SystemMsg::AntiEntropyRedirect"),
-            SystemMsg::AntiEntropyUpdate { .. } => write!(f, "SystemMsg::AntiEntropyUpdate"),
+            SystemMsg::AntiEntropy { .. } => write!(f, "SystemMsg::AntiEntropy"),
             SystemMsg::AntiEntropyProbe { .. } => write!(f, "SystemMsg::AntiEntropyProbe"),
             SystemMsg::Relocate { .. } => write!(f, "SystemMsg::Relocate"),
             SystemMsg::MembershipVotes { .. } => write!(f, "SystemMsg::MembershipVotes"),
